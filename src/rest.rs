@@ -74,6 +74,51 @@ pub fn skills(conn: &Connection, profile: &str) -> Result<Vec<SkillRow>> {
     Ok(rows)
 }
 
+/// Owners of Telegram sessions: (session id, telegram user id, display name).
+pub fn telegram_owners(conn: &Connection, profile: &str) -> Result<Vec<(String, String, String)>> {
+    let v = get(
+        conn,
+        "/api/sessions?source=telegram&limit=100&order=recent",
+        profile,
+    )?;
+    Ok(v["sessions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|s| {
+            let user = s["user_id"].as_str().or(s["chat_id"].as_str())?.to_string();
+            let name = s["display_name"]
+                .as_str()
+                .filter(|n| !n.is_empty())
+                .unwrap_or(&user)
+                .to_string();
+            Some((s["id"].as_str()?.to_string(), user, name))
+        })
+        .collect())
+}
+
+/// The profile's defaults from config.yaml: (`agent.reasoning_effort`, model name).
+pub fn profile_defaults(
+    conn: &Connection,
+    profile: &str,
+) -> Result<(Option<String>, Option<String>)> {
+    let raw = get(conn, "/api/config/raw", profile)?;
+    let yaml: Value =
+        serde_yaml::from_str(raw["yaml"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
+    let effort = yaml["agent"]["reasoning_effort"]
+        .as_str()
+        .map(str::to_lowercase);
+    let model = match &yaml["model"] {
+        Value::String(s) => Some(s.clone()),
+        m => m["default"]
+            .as_str()
+            .or(m["name"].as_str())
+            .map(str::to_string),
+    }
+    .filter(|m| !m.is_empty());
+    Ok((effort, model))
+}
+
 pub fn skill_content(conn: &Connection, profile: &str, name: &str) -> Result<String> {
     let v = get(conn, &format!("/api/skills/content?name={name}"), profile)?;
     Ok(v["content"].as_str().unwrap_or_default().to_string())

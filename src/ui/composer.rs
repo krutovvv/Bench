@@ -66,7 +66,7 @@ impl HermesApp {
         v_flex()
             .w_full()
             .flex_none()
-            .bg(theme.title_bar)
+            .bg(theme.background)
             .border_t_1()
             .border_color(if recording {
                 theme.danger

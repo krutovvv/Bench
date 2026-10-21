@@ -7,6 +7,7 @@ mod gateway;
 mod history;
 mod model;
 mod rest;
+mod theme;
 mod ui;
 
 use gpui_kit::component::Theme;
@@ -81,13 +82,7 @@ fn main() {
         .run(|cx| {
             gpui_kit::init(cx);
             Theme::sync_system_appearance(None, cx);
-            // Zed-like: square, flat, dense.
-            let theme = Theme::global_mut(cx);
-            theme.radius = px(0.);
-            theme.radius_lg = px(0.);
-            theme.shadow = false;
-            theme.font_size = px(14.);
-            theme.mono_font_size = px(13.);
+            theme::apply(cx);
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

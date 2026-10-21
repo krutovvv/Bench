@@ -5,7 +5,8 @@ mod composer;
 mod panels;
 mod sidebar;
 
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::{HermesApp, Panel};
@@ -47,21 +48,96 @@ pub fn clip(s: &str, n: usize) -> String {
     }
 }
 
-impl Render for HermesApp {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+impl HermesApp {
+    /// Header strip: the session title, or the settings tabs.
+    fn render_header(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let title: SharedString = match self.panel {
-            Panel::Skills => "Скиллы".into(),
-            Panel::Mcp => "MCP-серверы".into(),
-            Panel::Chat => self
+        let bar = h_flex()
+            .id("header")
+            .h(px(36.))
+            .flex_none()
+            .bg(theme.title_bar)
+            .items_center()
+            .border_b_1()
+            .border_color(theme.border);
+
+        if !self.panel.is_settings() {
+            let title: SharedString = self
                 .session
                 .as_ref()
                 .and_then(|id| self.sessions.iter().find(|s| &s.id == id))
                 .map(|s| s.title.clone())
                 .unwrap_or_else(|| "Новая сессия".into())
-                .into(),
-        };
+                .into();
+            return bar.px_4().child(
+                div()
+                    .text_sm()
+                    .font_weight(FontWeight::MEDIUM)
+                    .truncate()
+                    .child(title),
+            );
+        }
 
+        let tab = |id: &'static str, label: &'static str, panel: Panel, current: Panel| {
+            let active = panel == current;
+            div()
+                .id(id)
+                .h_full()
+                .px_4()
+                .flex()
+                .items_center()
+                .text_sm()
+                .cursor_pointer()
+                .border_r_1()
+                .border_color(theme.border)
+                .when(active, |d| {
+                    d.bg(theme.background).text_color(theme.foreground)
+                })
+                .when(!active, |d| {
+                    d.text_color(theme.muted_foreground)
+                        .hover(|s| s.text_color(theme.foreground))
+                })
+                .child(label)
+        };
+        let current = self.panel;
+        bar.child(
+            tab("tab-skills", "Скиллы", Panel::Skills, current).on_click(
+                cx.listener(|this, _, window, cx| this.open_panel(Panel::Skills, window, cx)),
+            ),
+        )
+        .child(
+            tab("tab-mcp", "MCP", Panel::Mcp, current).on_click(
+                cx.listener(|this, _, window, cx| this.open_panel(Panel::Mcp, window, cx)),
+            ),
+        )
+        .child(
+            tab("tab-tg", "Telegram", Panel::Telegram, current).on_click(
+                cx.listener(|this, _, window, cx| this.open_panel(Panel::Telegram, window, cx)),
+            ),
+        )
+        .child(div().flex_1())
+        .child(
+            div()
+                .id("settings-close")
+                .px_3()
+                .h_full()
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .text_color(theme.muted_foreground)
+                .hover(|s| s.text_color(theme.foreground))
+                .child(Icon::new(IconName::Close).small())
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.panel = Panel::Chat;
+                    cx.notify();
+                })),
+        )
+    }
+}
+
+impl Render for HermesApp {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
         let body = match self.panel {
             Panel::Chat => v_flex()
                 .size_full()
@@ -70,6 +146,7 @@ impl Render for HermesApp {
                 .into_any_element(),
             Panel::Skills => self.render_skills(cx).into_any_element(),
             Panel::Mcp => self.render_mcp(cx).into_any_element(),
+            Panel::Telegram => self.render_telegram(cx).into_any_element(),
         };
 
         h_flex()
@@ -82,23 +159,7 @@ impl Render for HermesApp {
                     .flex_1()
                     .h_full()
                     .min_w_0()
-                    .child(
-                        h_flex()
-                            .h(px(36.))
-                            .flex_none()
-                            .px_4()
-                            .bg(theme.title_bar)
-                            .items_center()
-                            .border_b_1()
-                            .border_color(theme.border)
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::MEDIUM)
-                                    .truncate()
-                                    .child(title),
-                            ),
-                    )
+                    .child(self.render_header(cx))
                     .child(div().flex_1().min_h_0().child(body)),
             )
     }

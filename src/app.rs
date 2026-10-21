@@ -1,5 +1,6 @@
 //! Application state, gateway events and user actions. Rendering lives in `ui/`.
 
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -23,8 +24,16 @@ pub type Choice = SelectState<Vec<SharedString>>;
 #[derive(Clone, Copy, PartialEq)]
 pub enum Panel {
     Chat,
+    /// Settings tabs.
     Skills,
     Mcp,
+    Telegram,
+}
+
+impl Panel {
+    pub fn is_settings(self) -> bool {
+        self != Panel::Chat
+    }
 }
 
 pub struct Live {
@@ -50,6 +59,12 @@ pub struct HermesApp {
     /// The id the gateway uses for prompts and events of the open session.
     runtime: Option<String>,
     pub confirm_delete: Option<String>,
+    /// Stored id -> runtime id for sessions this client has opened (to close before delete).
+    opened: HashMap<String, String>,
+    /// Telegram: session id -> owner user id; known people; whose sessions to show (None = all).
+    tg_owner: HashMap<String, String>,
+    pub tg_people: Vec<(String, String)>,
+    pub tg_visible: Option<HashSet<String>>,
 
     pub turns: Vec<Turn>,
     pub live: Option<Live>,
@@ -116,9 +131,11 @@ impl HermesApp {
                     this.send(window, cx);
                 }
             }),
+            // An error shown after a failed save goes away once the text is edited.
             cx.subscribe_in(&mcp_editor, window, |this, _, ev: &InputEvent, _, cx| {
-                if matches!(ev, InputEvent::Change) {
-                    this.validate_mcp(cx);
+                if matches!(ev, InputEvent::Change) && this.mcp_error.is_some() {
+                    this.mcp_error = None;
+                    cx.notify();
                 }
             }),
             cx.subscribe_in(
@@ -219,6 +236,10 @@ impl HermesApp {
             session: None,
             runtime: None,
             confirm_delete: None,
+            opened: HashMap::new(),
+            tg_owner: HashMap::new(),
+            tg_people: vec![],
+            tg_visible: None,
             turns: vec![],
             live: None,
             queued: None,
@@ -276,6 +297,7 @@ impl HermesApp {
         self.conn = None;
         self.target = target.clone();
         self.connecting = true;
+        self.opened.clear();
         self.profiles.clear();
         self.profile = None;
         self.sessions.clear();
@@ -345,17 +367,33 @@ impl HermesApp {
             }
             Evt::Sessions(p, rows) => {
                 if self.profile.as_deref() == Some(&p) {
+                    let unknown_tg = rows
+                        .iter()
+                        .any(|s| s.source == "telegram" && !self.tg_owner.contains_key(&s.id));
                     self.sessions = rows;
+                    if unknown_tg {
+                        self.load_telegram_owners(window, cx);
+                    }
                 }
             }
             Evt::SessionsChanged => self.refresh_sessions(),
             Evt::Deleted => self.refresh_sessions(),
+            Evt::DeleteFailed(e) => {
+                let msg = if e.contains("active") {
+                    "Сессия сейчас открыта в другом клиенте (Hermes.app, Telegram) — там её и закройте".to_string()
+                } else {
+                    format!("Не удалось удалить: {e}")
+                };
+                self.toast(NotificationType::Error, msg, window, cx);
+                self.refresh_sessions();
+            }
             Evt::History {
                 session,
                 runtime,
                 turns,
                 running,
             } => {
+                self.opened.insert(session.clone(), runtime.clone());
                 if self.session.as_deref() == Some(&session) {
                     self.runtime = Some(runtime);
                     self.turns = turns;
@@ -367,6 +405,7 @@ impl HermesApp {
                 }
             }
             Evt::Created { session, runtime } => {
+                self.opened.insert(session.clone(), runtime.clone());
                 self.session = Some(session);
                 self.runtime = Some(runtime.clone());
                 if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
@@ -498,7 +537,11 @@ impl HermesApp {
             s.set_selected_index(idx.map(IndexPath::new), window, cx)
         });
         self.profile = Some(name.clone());
+        self.load_profile_effort(window, cx);
         self.sessions.clear();
+        self.tg_owner.clear();
+        self.tg_people.clear();
+        self.tg_visible = None;
         self.skills.clear();
         self.skill_open = None;
         self.reset_chat(cx);
@@ -546,9 +589,11 @@ impl HermesApp {
             self.reset_chat(cx);
         }
         self.sessions.retain(|s| s.id != id);
+        let runtime = self.opened.remove(&id);
         self.cmd(Cmd::Delete {
             profile,
             session: id,
+            runtime,
         });
         cx.notify();
     }
@@ -651,12 +696,115 @@ impl HermesApp {
         .detach();
     }
 
+    // ---- profile defaults & telegram filter ---------------------------------
+
+    /// Start each profile on its configured reasoning effort.
+    fn load_profile_effort(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.effort_pending = false;
+        self.rest(window, cx, rest::profile_defaults, |this, r, _, _| {
+            let Ok((effort, model)) = r else { return };
+            if let Some(i) = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v)) {
+                this.effort = i;
+                this.effort_pending = false;
+            }
+            if let (Some(model), Some(p)) = (model, this.profile.clone()) {
+                if let Some(profile) = this.profiles.iter_mut().find(|x| x.name == p) {
+                    profile.model = model;
+                }
+            }
+        });
+    }
+
+    fn telegram_prefs_path(&self) -> std::path::PathBuf {
+        let key: String = format!("{}-{}", self.target.label(), self.current_profile())
+            .chars()
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        connection::state_dir().join(format!("telegram-{key}.json"))
+    }
+
+    fn load_telegram_owners(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.rest(window, cx, rest::telegram_owners, |this, r, _, cx| {
+            let Ok(rows) = r else { return };
+            for (session, user, name) in rows {
+                if !this.tg_people.iter().any(|(u, _)| *u == user) {
+                    this.tg_people.push((user.clone(), name));
+                }
+                this.tg_owner.insert(session, user);
+            }
+            if this.tg_visible.is_none() {
+                this.tg_visible = this.initial_telegram_visible();
+            }
+            cx.notify();
+        });
+    }
+
+    /// Saved choice, else the account whose name matches this Mac's user, else everyone.
+    fn initial_telegram_visible(&self) -> Option<HashSet<String>> {
+        if let Ok(text) = std::fs::read_to_string(self.telegram_prefs_path()) {
+            if let Ok(ids) = serde_json::from_str::<Vec<String>>(&text) {
+                return Some(ids.into_iter().collect());
+            }
+        }
+        let me = std::process::Command::new("id")
+            .arg("-F")
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_lowercase())
+            .unwrap_or_default();
+        let first = me.split_whitespace().next().unwrap_or_default().to_string();
+        let mine: HashSet<String> = self
+            .tg_people
+            .iter()
+            .filter(|(_, name)| {
+                !first.is_empty() && name.to_lowercase().split_whitespace().any(|w| w == first)
+            })
+            .map(|(u, _)| u.clone())
+            .collect();
+        (!mine.is_empty()).then_some(mine)
+    }
+
+    pub fn toggle_telegram_person(&mut self, user: String, cx: &mut Context<Self>) {
+        let all: HashSet<String> = self.tg_people.iter().map(|(u, _)| u.clone()).collect();
+        let mut visible = self.tg_visible.clone().unwrap_or(all);
+        if !visible.remove(&user) {
+            visible.insert(user);
+        }
+        let ids: Vec<&String> = visible.iter().collect();
+        let _ = std::fs::write(
+            self.telegram_prefs_path(),
+            serde_json::to_string(&ids).unwrap_or_default(),
+        );
+        self.tg_visible = Some(visible);
+        cx.notify();
+    }
+
+    /// Indices into `sessions` the list should show (other people's Telegram chats filtered out).
+    pub fn visible_sessions(&self) -> Vec<usize> {
+        (0..self.sessions.len())
+            .filter(|&i| {
+                let s = &self.sessions[i];
+                match (&self.tg_visible, s.source.as_str()) {
+                    (Some(vis), "telegram") => {
+                        self.tg_owner.get(&s.id).is_none_or(|u| vis.contains(u))
+                    }
+                    _ => true,
+                }
+            })
+            .collect()
+    }
+
     // ---- panels ----------------------------------------------------------
 
     pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
         self.panel = panel;
         match panel {
-            Panel::Chat => {}
+            Panel::Chat | Panel::Telegram => {}
             Panel::Skills => self.rest(window, cx, rest::skills, |this, r, window, cx| match r {
                 Ok(list) => this.skills = list,
                 Err(e) => this.toast(
@@ -673,7 +821,7 @@ impl HermesApp {
                         this.mcp_editor
                             .update(cx, |s, cx| s.set_value(text, window, cx));
                         this.mcp_status = "".into();
-                        this.validate_mcp(cx);
+                        this.mcp_error = None;
                     }
                     Err(e) => this.mcp_status = format!("Не удалось загрузить: {e:#}").into(),
                 })
@@ -697,7 +845,7 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// Live JSON check of the MCP editor; saving is blocked while it fails.
+    /// JSON check run on save; an invalid document is not sent.
     fn validate_mcp(&mut self, cx: &mut Context<Self>) {
         let text = self.mcp_editor.read(cx).value().to_string();
         self.mcp_error = match serde_json::from_str::<serde_json::Value>(&text) {

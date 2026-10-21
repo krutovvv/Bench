@@ -32,9 +32,12 @@ pub enum Cmd {
         profile: String,
         session: String,
     },
+    /// `runtime` set when this client has the session open: it is closed first,
+    /// since the gateway refuses to delete an active session.
     Delete {
         profile: String,
         session: String,
+        runtime: Option<String>,
     },
     Shutdown,
 }
@@ -58,6 +61,7 @@ pub enum Evt {
     /// The gateway says the session list changed (new session, generated title, …).
     SessionsChanged,
     Deleted,
+    DeleteFailed(String),
     Started(String),
     Delta(String, String),
     Reasoning(String, String),
@@ -144,11 +148,24 @@ impl Rpc {
                 json!({"session_id": session, "profile": profile}),
                 Pending::Resume(session),
             )?,
-            Cmd::Delete { profile, session } => self.call(
-                "session.delete",
-                json!({"session_id": session, "profile": profile}),
-                Pending::Delete,
-            )?,
+            Cmd::Delete {
+                profile,
+                session,
+                runtime,
+            } => {
+                if let Some(runtime) = runtime {
+                    self.call(
+                        "session.close",
+                        json!({"session_id": runtime}),
+                        Pending::Ignore,
+                    )?;
+                }
+                self.call(
+                    "session.delete",
+                    json!({"session_id": session, "profile": profile}),
+                    Pending::Delete,
+                )?
+            }
             Cmd::Create { profile } => self.call(
                 "session.create",
                 json!({"profile": profile}),
@@ -224,9 +241,13 @@ fn run(
                 continue;
             };
             if let Some(err) = msg.get("error") {
-                emit(Evt::Error(
-                    err["message"].as_str().unwrap_or("error").to_string(),
-                ));
+                let text = err["message"].as_str().unwrap_or("error").to_string();
+                match kind {
+                    Pending::Delete => emit(Evt::DeleteFailed(text)),
+                    // A close of a session the gateway already dropped is not worth a toast.
+                    Pending::Ignore if text.contains("not found") => {}
+                    _ => emit(Evt::Error(text)),
+                }
                 continue;
             }
             on_result(kind, &msg["result"], &emit);

@@ -14,30 +14,10 @@ impl HermesApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
 
-        let nav = |id: &'static str, icon: IconName, label: &'static str, active: bool| {
-            h_flex()
-                .id(id)
-                .gap_2()
-                .px_2()
-                .py_1()
-                .text_sm()
-                .cursor_pointer()
-                .border_l_2()
-                .border_color(if active {
-                    theme.primary
-                } else {
-                    theme.transparent
-                })
-                .when(active, |d| d.bg(theme.sidebar_accent))
-                .hover(|s| s.bg(theme.sidebar_accent))
-                .child(Icon::new(icon).small().text_color(muted))
-                .child(label)
-        };
-
-        // Group sessions by where they live (Hermes UI/CLI, Telegram, cron…), Hermes first.
+        // Group visible sessions by where they live (Hermes UI/CLI, Telegram, cron…), Hermes first.
         let mut groups: Vec<(String, Vec<usize>)> = vec![];
-        for (i, s) in self.sessions.iter().enumerate() {
-            let label = source_label(&s.source);
+        for i in self.visible_sessions() {
+            let label = source_label(&self.sessions[i].source);
             match groups.iter_mut().find(|(l, _)| *l == label) {
                 Some((_, rows)) => rows.push(i),
                 None => groups.push((label, vec![i])),
@@ -51,9 +31,9 @@ impl HermesApp {
             if !single {
                 list.push(
                     div()
-                        .px_2()
-                        .pt_2()
-                        .pb_0p5()
+                        .px_3()
+                        .pt_3()
+                        .pb_1()
                         .text_xs()
                         .text_color(muted)
                         .child(format!("{} · {}", label.to_uppercase(), rows.len()))
@@ -65,6 +45,22 @@ impl HermesApp {
             }
         }
 
+        let new_session = h_flex()
+            .id("new-session")
+            .h(px(35.))
+            .px_3()
+            .gap_2()
+            .items_center()
+            .text_sm()
+            .border_1()
+            .border_color(theme.input)
+            .bg(theme.background)
+            .cursor_pointer()
+            .hover(|s| s.bg(theme.list_hover))
+            .child(Icon::new(IconName::Plus).small().text_color(muted))
+            .child("Новая сессия")
+            .on_click(cx.listener(|this, _, _, cx| this.new_session(cx)));
+
         v_flex()
             .w(px(280.))
             .h_full()
@@ -75,102 +71,84 @@ impl HermesApp {
             .child(
                 v_flex()
                     .pt(px(40.))
-                    .px_2()
-                    .gap_1p5()
+                    .px_3()
+                    .pb_3()
+                    .gap_2()
+                    .border_b_1()
+                    .border_color(theme.sidebar_border)
                     .child(
                         h_flex()
                             .gap_2()
                             .items_center()
                             .pb_1()
-                            .child(
-                                div()
-                                    .size(px(20.))
-                                    .bg(theme.foreground)
-                                    .text_color(theme.background)
-                                    .flex()
-                                    .items_center()
-                                    .justify_center()
-                                    .child(Icon::new(IconName::Bot).xsmall()),
-                            )
+                            .child(crate::theme::logo(px(20.)))
                             .child(
                                 div()
                                     .text_sm()
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .child("HERMES"),
+                                    .child("Hermes"),
                             ),
                     )
-                    .child(Select::new(&self.target_choice).small())
-                    .child(
-                        Select::new(&self.profile_choice)
-                            .small()
-                            .placeholder("Профиль"),
-                    ),
+                    .child(Select::new(&self.target_choice))
+                    .child(Select::new(&self.profile_choice).placeholder("Профиль"))
+                    .child(new_session),
             )
             .child(
                 v_flex()
-                    .px_2()
-                    .pt_3()
-                    .child(
-                        nav("nav-new", IconName::Plus, "Новая сессия", false)
-                            .on_click(cx.listener(|this, _, _, cx| this.new_session(cx))),
-                    )
-                    .child(
-                        nav(
-                            "nav-skills",
-                            IconName::BookOpen,
-                            "Скиллы",
-                            self.panel == Panel::Skills,
-                        )
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.open_panel(Panel::Skills, window, cx)
-                        })),
-                    )
-                    .child(
-                        nav(
-                            "nav-mcp",
-                            IconName::Network,
-                            "MCP",
-                            self.panel == Panel::Mcp,
-                        )
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.open_panel(Panel::Mcp, window, cx)
-                        })),
-                    ),
-            )
-            .child(
-                v_flex()
+                    .id("sessions")
                     .flex_1()
                     .min_h_0()
-                    .px_2()
-                    .pt_3()
+                    .overflow_y_scroll()
+                    .py_1()
+                    .children(list)
+                    .when(self.connecting, |d| {
+                        d.child(
+                            div()
+                                .px_3()
+                                .py_2()
+                                .text_sm()
+                                .text_color(muted)
+                                .child("Подключаюсь…"),
+                        )
+                    }),
+            )
+            .child(
+                h_flex()
+                    .flex_none()
+                    .items_start()
+                    .bg(theme.title_bar)
+                    .border_t_1()
+                    .border_color(theme.sidebar_border)
+                    .child(div().flex_1().min_w_0().child(self.render_status(cx)))
                     .child(
                         div()
-                            .px_2()
-                            .pb_1()
-                            .text_xs()
-                            .text_color(muted)
-                            .child("СЕССИИ"),
-                    )
-                    .child(
-                        v_flex()
-                            .id("sessions")
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
-                            .pb_2()
-                            .children(list)
-                            .when(self.connecting, |d| {
-                                d.child(
-                                    div()
-                                        .px_2()
-                                        .text_sm()
-                                        .text_color(muted)
-                                        .child("Подключаюсь…"),
+                            .id("settings")
+                            .m_2()
+                            .p_1()
+                            .cursor_pointer()
+                            .text_color(if self.panel.is_settings() {
+                                theme.primary
+                            } else {
+                                muted
+                            })
+                            .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                            .child(Icon::new(IconName::Settings).small())
+                            .tooltip(|window, cx| {
+                                gpui_kit::component::tooltip::Tooltip::new(
+                                    "Настройки: скиллы, MCP, Telegram",
                                 )
-                            }),
+                                .build(window, cx)
+                            })
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                if this.panel.is_settings() {
+                                    this.panel = Panel::Chat;
+                                    cx.notify();
+                                } else {
+                                    this.open_panel(Panel::Skills, window, cx);
+                                }
+                            })),
                     ),
             )
-            .child(self.render_status(cx))
     }
 
     fn render_session_row(&self, i: usize, cx: &mut Context<Self>) -> impl IntoElement {
@@ -241,8 +219,8 @@ impl HermesApp {
             .id(("session", i))
             .group(group)
             .gap_1()
-            .px_2()
-            .py_1()
+            .px_3()
+            .py_1p5()
             .cursor_pointer()
             .border_l_2()
             .border_color(if selected {
@@ -289,6 +267,13 @@ impl HermesApp {
                 self.profiles
                     .iter()
                     .find(|x| &x.name == p)
+                    .map(|x| x.model.clone())
+            })
+            .filter(|m| !m.is_empty())
+            .or_else(|| {
+                self.profiles
+                    .iter()
+                    .find(|x| x.name == "default")
                     .map(|x| x.model.clone())
             })
             .filter(|m| !m.is_empty())
@@ -340,13 +325,9 @@ impl HermesApp {
         };
 
         v_flex()
-            .flex_none()
             .gap_1()
             .px_3()
             .py_2()
-            .bg(theme.title_bar)
-            .border_t_1()
-            .border_color(theme.sidebar_border)
             .text_xs()
             .child(row(IconName::Cpu, model))
             .child(row(IconName::MemoryStick, context))
