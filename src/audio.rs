@@ -1,0 +1,135 @@
+//! Microphone capture (-> WAV for STT) and playback of TTS audio.
+
+use std::io::Cursor;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use anyhow::{Result, anyhow, bail};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+pub struct Recorder {
+    stream: cpal::Stream,
+    samples: Arc<Mutex<Vec<f32>>>,
+    rate: u32,
+}
+
+fn push_mono(buf: &Mutex<Vec<f32>>, data: impl Iterator<Item = f32>, channels: usize, len: usize) {
+    let mut out = buf.lock().unwrap();
+    let frame: Vec<f32> = data.collect();
+    out.reserve(len / channels.max(1));
+    for chunk in frame.chunks(channels.max(1)) {
+        out.push(chunk.iter().sum::<f32>() / chunk.len() as f32);
+    }
+}
+
+impl Recorder {
+    pub fn start() -> Result<Self> {
+        let device = cpal::default_host()
+            .default_input_device()
+            .ok_or_else(|| anyhow!("нет микрофона"))?;
+        let config = device.default_input_config()?;
+        let rate = config.sample_rate().0;
+        let channels = config.channels() as usize;
+        let samples = Arc::new(Mutex::new(Vec::new()));
+        let sink = samples.clone();
+        let on_err = |e| eprintln!("[audio] {e}");
+        let stream = match config.sample_format() {
+            cpal::SampleFormat::F32 => device.build_input_stream(
+                &config.into(),
+                move |d: &[f32], _| push_mono(&sink, d.iter().copied(), channels, d.len()),
+                on_err,
+                None,
+            )?,
+            cpal::SampleFormat::I16 => device.build_input_stream(
+                &config.into(),
+                move |d: &[i16], _| {
+                    push_mono(
+                        &sink,
+                        d.iter().map(|s| *s as f32 / i16::MAX as f32),
+                        channels,
+                        d.len(),
+                    )
+                },
+                on_err,
+                None,
+            )?,
+            other => bail!("формат микрофона {other:?} не поддержан"),
+        };
+        stream.play()?;
+        Ok(Self {
+            stream,
+            samples,
+            rate,
+        })
+    }
+
+    /// Stop and return a 16-bit mono WAV.
+    pub fn finish(self) -> Result<Vec<u8>> {
+        drop(self.stream);
+        let samples = std::mem::take(&mut *self.samples.lock().unwrap());
+        if samples.len() < self.rate as usize / 4 {
+            bail!("слишком короткая запись");
+        }
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: self.rate,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut w = hound::WavWriter::new(&mut cursor, spec)?;
+            for s in samples {
+                w.write_sample((s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)?;
+            }
+            w.finalize()?;
+        }
+        Ok(cursor.into_inner())
+    }
+}
+
+/// Plays one clip on a background thread; `stop()` or drop ends it.
+pub struct Playback {
+    stop: Arc<AtomicBool>,
+    done: Arc<AtomicBool>,
+}
+
+impl Playback {
+    pub fn start(bytes: Vec<u8>) -> Self {
+        let stop = Arc::new(AtomicBool::new(false));
+        let done = Arc::new(AtomicBool::new(false));
+        let (s, d) = (stop.clone(), done.clone());
+        std::thread::spawn(move || {
+            let run = || -> Result<()> {
+                let (_stream, handle) = rodio::OutputStream::try_default()?;
+                let sink = rodio::Sink::try_new(&handle)?;
+                sink.append(rodio::Decoder::new(Cursor::new(bytes))?);
+                while !sink.empty() && !s.load(Ordering::Relaxed) {
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+                sink.stop();
+                Ok(())
+            };
+            if let Err(e) = run() {
+                eprintln!("[audio] playback: {e}");
+            }
+            d.store(true, Ordering::Relaxed);
+        });
+        Self { stop, done }
+    }
+
+    pub fn is_done(&self) -> bool {
+        self.done.load(Ordering::Relaxed)
+    }
+
+    pub fn stop(&self) {
+        self.stop.store(true, Ordering::Relaxed);
+    }
+}
+
+impl Drop for Playback {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
