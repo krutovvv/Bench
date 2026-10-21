@@ -1,14 +1,14 @@
-//! The input box: multi-line text, mic, reasoning effort, send / stop. Flat, no shadow.
+//! The input: multi-line text on the left, a quiet icon column on the right (mic, send / stop).
+//! No buttons, no shadow — the icons just light up on hover.
 
-use crate::icons::Ico;
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Textarea;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::HermesApp;
-use crate::model::EFFORTS;
+use crate::icons::Ico;
 
 impl HermesApp {
     pub(super) fn render_composer(
@@ -19,54 +19,63 @@ impl HermesApp {
         let theme = cx.theme().clone();
         let busy = self.live.is_some();
         let recording = self.recorder.is_some();
+        let has_text = !self.composer.read(cx).value().trim().is_empty();
 
-        let efforts = EFFORTS.iter().enumerate().map(|(i, name)| {
-            Button::new(("effort", i))
-                .xsmall()
-                .label(*name)
-                .map(|b| {
-                    if i == self.effort {
-                        b.secondary()
-                    } else {
-                        b.ghost()
-                    }
-                })
-                .on_click(cx.listener(move |this, _, _, cx| this.set_effort(i, cx)))
-        });
+        let area = |id: &'static str, icon: Ico, tip: &'static str, color: Hsla| {
+            div()
+                .id(id)
+                .size(px(34.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .text_color(color)
+                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                .child(icon.icon().small())
+                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
+        };
 
-        let mic = Button::new("mic")
-            .small()
-            .map(|b| if recording { b.danger() } else { b.ghost() })
-            .icon(if self.transcribing {
-                Ico::Loader.icon()
+        let mic = area(
+            "mic",
+            if self.transcribing {
+                Ico::Loader
             } else {
-                Ico::Mic.icon()
-            })
-            .tooltip(if recording {
+                Ico::Mic
+            },
+            if recording {
                 "Остановить и распознать"
             } else {
                 "Надиктовать"
-            })
-            .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)));
+            },
+            if recording {
+                theme.danger
+            } else {
+                theme.muted_foreground
+            },
+        )
+        .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)));
 
         let action = if busy {
-            Button::new("stop")
-                .small()
-                .secondary()
-                .icon(Ico::Square.icon())
-                .tooltip("Остановить")
+            area("stop", Ico::Square, "Остановить", theme.foreground)
                 .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
         } else {
-            Button::new("send")
-                .small()
-                .primary()
-                .icon(Ico::ArrowUp.icon())
-                .on_click(cx.listener(|this, _, window, cx| this.send(window, cx)))
+            area(
+                "send",
+                Ico::ArrowUp,
+                "Отправить (Enter)",
+                if has_text {
+                    theme.primary
+                } else {
+                    theme.muted_foreground
+                },
+            )
+            .on_click(cx.listener(|this, _, window, cx| this.send(window, cx)))
         };
 
-        v_flex()
+        h_flex()
             .w_full()
             .flex_none()
+            .items_end()
             .bg(theme.background)
             .border_t_1()
             .border_color(if recording {
@@ -75,25 +84,31 @@ impl HermesApp {
                 theme.border
             })
             .child(
-                v_flex()
-                    .w_full()
-                    .gap_1()
+                div()
+                    .flex_1()
+                    .min_w_0()
                     .px_4()
-                    .pt_2()
-                    .pb_2()
-                    .child(Textarea::new(&self.composer).appearance(false))
-                    .child(
-                        h_flex()
-                            .gap_1()
-                            .items_center()
-                            .child(mic)
-                            .child(h_flex().gap_0p5().children(efforts))
-                            .child(div().flex_1())
-                            .when(recording, |d| {
-                                d.child(div().text_xs().text_color(theme.danger).child("Запись…"))
-                            })
-                            .child(action),
-                    ),
+                    .py_3()
+                    .child(Textarea::new(&self.composer).appearance(false)),
+            )
+            .child(
+                h_flex()
+                    .flex_none()
+                    .gap_1()
+                    .px_2()
+                    .py_2()
+                    .items_center()
+                    .when(recording, |d| {
+                        d.child(
+                            div()
+                                .text_xs()
+                                .text_color(theme.danger)
+                                .pr_1()
+                                .child("запись…"),
+                        )
+                    })
+                    .child(mic)
+                    .child(action),
             )
     }
 }

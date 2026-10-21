@@ -1,12 +1,10 @@
 //! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
 
-use gpui_kit::component::select::Select;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::{compact, plural};
+use super::plural;
 use crate::app::{HermesApp, Panel};
 use crate::icons::Ico;
 use crate::model::source_label;
@@ -64,44 +62,18 @@ impl HermesApp {
             .child("Новая сессия")
             .on_click(cx.listener(|this, _, _, cx| this.new_session(cx)));
 
-        let footer_button = |id: &'static str, icon: Ico, tip: &'static str, active: bool| {
-            div()
-                .id(id)
-                .p_1()
-                .cursor_pointer()
-                .text_color(if active { theme.primary } else { muted })
-                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(icon.icon().small())
-                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
-        };
-
         v_flex()
-            .w(px(280.))
-            .h_full()
-            .flex_none()
+            .size_full()
             .bg(theme.sidebar)
             .border_r_1()
             .border_color(theme.sidebar_border)
             .child(
                 v_flex()
-                    .pt(px(40.))
+                    .pt(px(38.))
                     .px_3()
                     .pb_3()
-                    .gap_3()
                     .border_b_1()
                     .border_color(theme.sidebar_border)
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .items_center()
-                            .child(crate::theme::logo(px(20.)))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child("Hermes"),
-                            ),
-                    )
                     .child(new_session),
             )
             .child(
@@ -122,77 +94,6 @@ impl HermesApp {
                                 .child("Подключаюсь…"),
                         )
                     }),
-            )
-            // Rarely changed: where and which profile, then the status line.
-            .child(
-                v_flex()
-                    .flex_none()
-                    .gap_1p5()
-                    .px_3()
-                    .py_2()
-                    .bg(theme.title_bar)
-                    .border_t_1()
-                    .border_color(theme.sidebar_border)
-                    .child(
-                        h_flex()
-                            .gap_1p5()
-                            .items_center()
-                            .child(Ico::Server.icon().xsmall().text_color(muted))
-                            .child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .child(Select::new(&self.target_choice).small()),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .gap_1p5()
-                            .items_center()
-                            .child(Ico::UserRound.icon().xsmall().text_color(muted))
-                            .child(
-                                div().flex_1().min_w_0().child(
-                                    Select::new(&self.profile_choice)
-                                        .small()
-                                        .placeholder("Профиль"),
-                                ),
-                            ),
-                    )
-                    .child(
-                        h_flex()
-                            .items_start()
-                            .pt_1()
-                            .child(div().flex_1().min_w_0().child(self.render_status(cx)))
-                            .child(
-                                footer_button(
-                                    "restart",
-                                    Ico::RefreshCw,
-                                    "Перезапустить шлюз Hermes",
-                                    false,
-                                )
-                                .on_click(cx.listener(
-                                    |this, _, window, cx| this.restart_gateway(window, cx),
-                                )),
-                            )
-                            .child(
-                                footer_button(
-                                    "settings",
-                                    Ico::Settings,
-                                    "Настройки: скиллы, MCP, Telegram",
-                                    self.panel.is_settings(),
-                                )
-                                .on_click(cx.listener(
-                                    |this, _, window, cx| {
-                                        if this.panel.is_settings() {
-                                            this.panel = Panel::Chat;
-                                            cx.notify();
-                                        } else {
-                                            this.open_panel(Panel::Skills, window, cx);
-                                        }
-                                    },
-                                )),
-                            ),
-                    ),
             )
     }
 
@@ -223,9 +124,9 @@ impl HermesApp {
                         .text_color(theme.danger_foreground)
                         .cursor_pointer()
                         .child("Удалить")
-                        .on_click(cx.listener(move |this, _, _, cx| {
+                        .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
-                            this.delete_session(del_id.clone(), cx)
+                            this.delete_session(del_id.clone(), window, cx)
                         })),
                 )
                 .child(
@@ -253,9 +154,9 @@ impl HermesApp {
                 .text_color(muted)
                 .hover(|s| s.text_color(theme.danger))
                 .child(Ico::Trash.icon().xsmall())
-                .on_click(cx.listener(move |this, _, _, cx| {
+                .on_click(cx.listener(move |this, _, window, cx| {
                     cx.stop_propagation();
-                    this.delete_session(del_id.clone(), cx)
+                    this.delete_session(del_id.clone(), window, cx)
                 }))
                 .into_any_element()
         };
@@ -287,100 +188,5 @@ impl HermesApp {
             )
             .child(delete)
             .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))
-    }
-
-    fn render_status(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-
-        // Model: live usage, else the open session, else the profile default.
-        let model = self
-            .usage
-            .as_ref()
-            .map(|u| u.model.clone())
-            .filter(|m| !m.is_empty())
-            .or_else(|| {
-                let id = self.session.as_ref()?;
-                self.sessions
-                    .iter()
-                    .find(|s| &s.id == id)
-                    .map(|s| s.model.clone())
-            })
-            .filter(|m| !m.is_empty())
-            .or_else(|| {
-                let p = self.profile.as_ref()?;
-                self.profiles
-                    .iter()
-                    .find(|x| &x.name == p)
-                    .map(|x| x.model.clone())
-            })
-            .filter(|m| !m.is_empty())
-            .or_else(|| {
-                self.profiles
-                    .iter()
-                    .find(|x| x.name == "default")
-                    .map(|x| x.model.clone())
-            })
-            .filter(|m| !m.is_empty())
-            .unwrap_or_else(|| "—".into());
-
-        let usage = self.usage.as_ref().filter(|u| u.context_max > 0);
-        let pct = usage
-            .map(|u| (u.context_percent / 100.0).clamp(0.0, 1.0) as f32)
-            .unwrap_or(0.);
-        let bar = if pct > 0.85 {
-            theme.danger
-        } else if pct > 0.6 {
-            theme.warning
-        } else {
-            theme.foreground
-        };
-        let context = usage
-            .map(|u| {
-                format!(
-                    "{} / {} · {:.0}%",
-                    compact(u.context_used),
-                    compact(u.context_max),
-                    u.context_percent
-                )
-            })
-            .unwrap_or_else(|| "контекст —".into());
-        let extra = usage
-            .map(|u| {
-                [
-                    (u.total_tokens > 0).then(|| format!("всего {}", compact(u.total_tokens))),
-                    (u.compressions > 0)
-                        .then(|| plural(u.compressions as usize, "сжатие", "сжатия", "сжатий")),
-                    u.cache_hit_pct.map(|c| format!("кэш {c}%")),
-                ]
-                .into_iter()
-                .flatten()
-                .collect::<Vec<_>>()
-                .join(" · ")
-            })
-            .unwrap_or_default();
-
-        let row = |icon: Ico, text: String| {
-            h_flex()
-                .gap_1p5()
-                .items_center()
-                .h(px(18.))
-                .child(icon.icon().xsmall().text_color(muted))
-                .child(div().truncate().child(text))
-        };
-
-        v_flex()
-            .gap_1()
-            .text_xs()
-            .child(row(Ico::Cpu, model))
-            .child(row(Ico::MemoryStick, context))
-            .child(
-                div()
-                    .h(px(2.))
-                    .w_full()
-                    .bg(theme.border)
-                    .child(div().h_full().bg(bar).w(relative(pct))),
-            )
-            .child(div().h(px(16.)).text_color(muted).truncate().child(extra))
     }
 }

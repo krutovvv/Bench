@@ -68,14 +68,3 @@ pub fn apply(cx: &mut App) {
     t.success = c(0x4F8A3F);
     t.warning = c(0xB7791F);
 }
-
-const LOGO: &[u8] = include_bytes!("../assets/logo.svg");
-
-/// The app mark (square "H" with wings).
-pub fn logo(size: Pixels) -> impl IntoElement {
-    img(std::sync::Arc::new(Image::from_bytes(
-        ImageFormat::Svg,
-        LOGO.to_vec(),
-    )))
-    .size(size)
-}

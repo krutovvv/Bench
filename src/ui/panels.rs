@@ -1,19 +1,65 @@
-//! Profile panels: skills (read-only browser) and MCP servers (raw JSON editor).
+//! Settings panels: skills and config (editable text), MCP (JSON), cron (read-only), Telegram filter.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::Editor;
-use gpui_kit::component::text::TextView;
+use gpui_kit::component::input::{Editor, EditorState};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::{HermesApp, Panel};
+
+/// A toolbar over a full-height code editor.
+fn editor_page(
+    editor: &Entity<EditorState>,
+    left: AnyElement,
+    error: Option<SharedString>,
+    actions: Vec<AnyElement>,
+    cx: &App,
+) -> impl IntoElement {
+    let theme = cx.theme();
+    v_flex()
+        .size_full()
+        .child(
+            h_flex()
+                .h(px(36.))
+                .flex_none()
+                .px_3()
+                .gap_2()
+                .items_center()
+                .border_b_1()
+                .border_color(theme.border)
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .text_sm()
+                        .text_color(theme.muted_foreground)
+                        .truncate()
+                        .child(left),
+                )
+                .children(error.map(|e| {
+                    div()
+                        .text_sm()
+                        .text_color(theme.danger)
+                        .truncate()
+                        .max_w(px(520.))
+                        .child(e)
+                }))
+                .children(actions),
+        )
+        .child(
+            div()
+                .flex_1()
+                .min_h_0()
+                .child(Editor::new(editor).appearance(false).h_full()),
+        )
+}
 
 impl HermesApp {
     pub(super) fn render_skills(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let open = self.skill_open.as_ref().map(|(n, _)| n.clone());
+        let open = self.skill_open.clone();
 
         let mut rows: Vec<AnyElement> = vec![];
         let mut category = String::new();
@@ -24,7 +70,7 @@ impl HermesApp {
                     div()
                         .pt_3()
                         .pb_1()
-                        .px_2()
+                        .px_3()
                         .text_xs()
                         .text_color(muted)
                         .child(category.to_uppercase())
@@ -36,7 +82,7 @@ impl HermesApp {
             rows.push(
                 v_flex()
                     .id(("skill", i))
-                    .px_2()
+                    .px_3()
                     .py_1()
                     .cursor_pointer()
                     .border_l_2()
@@ -45,8 +91,8 @@ impl HermesApp {
                     } else {
                         theme.transparent
                     })
-                    .when(selected, |d| d.bg(theme.secondary))
-                    .hover(|d| d.bg(theme.secondary))
+                    .when(selected, |d| d.bg(theme.list_active))
+                    .hover(|d| d.bg(theme.list_hover))
                     .child(
                         div()
                             .text_sm()
@@ -67,18 +113,22 @@ impl HermesApp {
             );
         }
 
-        let content = match &self.skill_open {
-            Some((name, body)) => v_flex()
-                .id("skill-body")
-                .size_full()
-                .overflow_y_scroll()
-                .px_8()
-                .py_6()
-                .child(TextView::markdown(
-                    SharedString::from(format!("skill-{name}")),
-                    body.clone(),
-                ))
-                .into_any_element(),
+        let content = match &open {
+            Some(name) => editor_page(
+                &self.skill_editor,
+                format!("{name} · SKILL.md").into_any_element(),
+                None,
+                vec![
+                    Button::new("skill-save")
+                        .small()
+                        .primary()
+                        .label("Сохранить")
+                        .on_click(cx.listener(|this, _, window, cx| this.save_skill(window, cx)))
+                        .into_any_element(),
+                ],
+                cx,
+            )
+            .into_any_element(),
             None => div()
                 .size_full()
                 .flex()
@@ -99,11 +149,10 @@ impl HermesApp {
             .child(
                 v_flex()
                     .id("skills-list")
-                    .w(px(320.))
+                    .w(px(300.))
                     .h_full()
                     .flex_none()
                     .overflow_y_scroll()
-                    .px_3()
                     .pb_4()
                     .border_r_1()
                     .border_color(theme.border)
@@ -113,40 +162,131 @@ impl HermesApp {
     }
 
     pub(super) fn render_mcp(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        v_flex()
-            .size_full()
-            .px_4()
-            .py_3()
-            .gap_2()
-            .child(
-                h_flex()
-                    .gap_3()
-                    .items_center()
-                    .child(
-                        div()
-                            .flex_1()
-                            .text_sm()
-                            .text_color(theme.muted_foreground)
-                            .child("Блок mcp_servers из config.yaml профиля. Секреты показаны как есть — сохраняется целиком."),
+        let status = self.mcp_status.clone();
+        editor_page(
+            &self.mcp_editor,
+            format!("mcp_servers из config.yaml {status}").into_any_element(),
+            self.mcp_error.clone(),
+            vec![
+                Button::new("mcp-reload")
+                    .small()
+                    .ghost()
+                    .label("Обновить")
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.open_panel(Panel::Mcp, window, cx)),
                     )
-                    .child(div().text_sm().text_color(theme.muted_foreground).child(self.mcp_status.clone()))
-                    .children(self.mcp_error.clone().map(|e| div().text_sm().text_color(theme.danger).child(e)))
-                    .child(Button::new("mcp-reload").small().ghost().label("Обновить").on_click(cx.listener(|this, _, window, cx| {
-                        this.open_panel(crate::app::Panel::Mcp, window, cx)
-                    })))
-                    .child(Button::new("mcp-save").small().primary().label("Сохранить").on_click(cx.listener(|this, _, window, cx| {
-                        this.save_mcp(window, cx)
-                    }))),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .border_1()
-                    .border_color(theme.border)
-                    .child(Editor::new(&self.mcp_editor).appearance(false).h_full()),
-            )
+                    .into_any_element(),
+                Button::new("mcp-save")
+                    .small()
+                    .primary()
+                    .label("Сохранить")
+                    .on_click(cx.listener(|this, _, window, cx| this.save_mcp(window, cx)))
+                    .into_any_element(),
+            ],
+            cx,
+        )
+    }
+
+    pub(super) fn render_config(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        editor_page(
+            &self.config_editor,
+            format!("config.yaml · {}", self.current_profile()).into_any_element(),
+            self.config_error.clone(),
+            vec![
+                Button::new("cfg-reload")
+                    .small()
+                    .ghost()
+                    .label("Обновить")
+                    .on_click(
+                        cx.listener(|this, _, window, cx| {
+                            this.open_panel(Panel::Config, window, cx)
+                        }),
+                    )
+                    .into_any_element(),
+                Button::new("cfg-save")
+                    .small()
+                    .primary()
+                    .label("Сохранить")
+                    .on_click(cx.listener(|this, _, window, cx| this.save_config(window, cx)))
+                    .into_any_element(),
+            ],
+            cx,
+        )
+    }
+
+    pub(super) fn render_cron(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let rows = self.cron.iter().map(|j| {
+            v_flex()
+                .px_4()
+                .py_2()
+                .gap_0p5()
+                .border_b_1()
+                .border_color(theme.border)
+                .child(
+                    h_flex()
+                        .gap_3()
+                        .items_center()
+                        .child(
+                            div()
+                                .text_sm()
+                                .font_weight(FontWeight::MEDIUM)
+                                .when(!j.enabled, |d| d.text_color(muted))
+                                .child(j.name.clone()),
+                        )
+                        .child(
+                            div()
+                                .text_xs()
+                                .font_family("Menlo")
+                                .text_color(muted)
+                                .child(j.schedule.clone()),
+                        )
+                        .when(!j.enabled, |d| {
+                            d.child(div().text_xs().text_color(theme.warning).child("на паузе"))
+                        })
+                        .child(div().flex_1())
+                        .when(!j.last_status.is_empty(), |d| {
+                            d.child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .child(format!("последний: {}", j.last_status)),
+                            )
+                        })
+                        .when(!j.next_run.is_empty(), |d| {
+                            d.child(
+                                div()
+                                    .text_xs()
+                                    .text_color(muted)
+                                    .child(format!("след.: {}", j.next_run)),
+                            )
+                        }),
+                )
+                .when(!j.prompt.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .text_xs()
+                            .text_color(muted)
+                            .line_clamp(2)
+                            .child(j.prompt.clone()),
+                    )
+                })
+        });
+        v_flex()
+            .id("cron")
+            .size_full()
+            .overflow_y_scroll()
+            .children(rows)
+            .when(self.cron.is_empty(), |d| {
+                d.child(
+                    div()
+                        .p_4()
+                        .text_sm()
+                        .text_color(muted)
+                        .child("В этом профиле нет задач по расписанию."),
+                )
+            })
     }
 
     pub(super) fn render_telegram(&mut self, cx: &mut Context<Self>) -> impl IntoElement {

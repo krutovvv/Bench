@@ -4,7 +4,9 @@ mod chat;
 mod composer;
 mod panels;
 mod sidebar;
+mod statusbar;
 
+use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -78,7 +80,15 @@ impl HermesApp {
             );
         }
 
-        let tab = |id: &'static str, label: &'static str, panel: Panel, current: Panel| {
+        let current = self.panel;
+        let tabs = [
+            ("tab-skills", "Скиллы", Panel::Skills),
+            ("tab-mcp", "MCP", Panel::Mcp),
+            ("tab-config", "Конфиг", Panel::Config),
+            ("tab-cron", "Cron", Panel::Cron),
+            ("tab-tg", "Telegram", Panel::Telegram),
+        ]
+        .map(|(id, label, panel)| {
             let active = panel == current;
             div()
                 .id(id)
@@ -98,25 +108,11 @@ impl HermesApp {
                         .hover(|s| s.text_color(theme.foreground))
                 })
                 .child(label)
-        };
-        let current = self.panel;
-        bar.child(
-            tab("tab-skills", "Скиллы", Panel::Skills, current).on_click(
-                cx.listener(|this, _, window, cx| this.open_panel(Panel::Skills, window, cx)),
-            ),
-        )
-        .child(
-            tab("tab-mcp", "MCP", Panel::Mcp, current).on_click(
-                cx.listener(|this, _, window, cx| this.open_panel(Panel::Mcp, window, cx)),
-            ),
-        )
-        .child(
-            tab("tab-tg", "Telegram", Panel::Telegram, current).on_click(
-                cx.listener(|this, _, window, cx| this.open_panel(Panel::Telegram, window, cx)),
-            ),
-        )
-        .child(div().flex_1())
-        .child(
+                .on_click(
+                    cx.listener(move |this, _, window, cx| this.open_panel(panel, window, cx)),
+                )
+        });
+        bar.children(tabs).child(div().flex_1()).child(
             div()
                 .id("settings-close")
                 .px_3()
@@ -146,21 +142,33 @@ impl Render for HermesApp {
                 .into_any_element(),
             Panel::Skills => self.render_skills(cx).into_any_element(),
             Panel::Mcp => self.render_mcp(cx).into_any_element(),
+            Panel::Config => self.render_config(cx).into_any_element(),
+            Panel::Cron => self.render_cron(cx).into_any_element(),
             Panel::Telegram => self.render_telegram(cx).into_any_element(),
         };
 
-        h_flex()
+        let main = v_flex()
+            .size_full()
+            .min_w_0()
+            .child(self.render_header(cx))
+            .child(div().flex_1().min_h_0().child(body));
+
+        v_flex()
             .size_full()
             .bg(theme.background)
             .text_color(theme.foreground)
-            .child(self.render_sidebar(cx))
             .child(
-                v_flex()
-                    .flex_1()
-                    .h_full()
-                    .min_w_0()
-                    .child(self.render_header(cx))
-                    .child(div().flex_1().min_h_0().child(body)),
+                div().flex_1().min_h_0().child(
+                    h_resizable("layout")
+                        .child(
+                            resizable_panel()
+                                .size(px(280.))
+                                .size_range(px(200.)..px(480.))
+                                .child(self.render_sidebar(cx)),
+                        )
+                        .child(main.into_any_element()),
+                ),
             )
+            .child(self.render_statusbar(window, cx))
     }
 }

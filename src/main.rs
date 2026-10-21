@@ -43,6 +43,15 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 if let Some(c) = &conn {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
                     println!("mcp[{p}]: {} bytes of JSON", rest::mcp_json(c, &p)?.len());
+                    match rest::cron_jobs(c, &p) {
+                        Ok(jobs) => println!(
+                            "cron[{p}]: {:?}",
+                            jobs.iter()
+                                .map(|j| (&j.name, &j.schedule, &j.next_run))
+                                .collect::<Vec<_>>()
+                        ),
+                        Err(e) => println!("cron[{p}]: {e:#}"),
+                    }
                 }
                 let pick = std::env::var("PROBE_MATCH").unwrap_or_default();
                 let Some(first) = rows.iter().find(|r| r.title.contains(&pick)) else {

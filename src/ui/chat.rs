@@ -17,8 +17,6 @@ use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
-pub const COLUMN: f32 = 900.;
-
 /// What a turn row needs besides the turn itself.
 #[derive(Clone)]
 struct RowState {
@@ -31,6 +29,19 @@ struct RowState {
 impl HermesApp {
     pub(super) fn render_chat(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
+        if self.turns.is_empty() && self.session.is_some() {
+            return div()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .child(
+                    ShimmerText::new("Загружаю историю…")
+                        .text_sm()
+                        .text_color(theme.muted_foreground),
+                )
+                .into_any_element();
+        }
         if self.turns.is_empty() {
             let profile = self.current_profile();
             return v_flex()
@@ -290,7 +301,6 @@ fn render_turn(
         .child(
             v_flex()
                 .w_full()
-                .max_w(px(COLUMN))
                 .gap_3()
                 .child(
                     div()

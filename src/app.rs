@@ -27,6 +27,8 @@ pub enum Panel {
     /// Settings tabs.
     Skills,
     Mcp,
+    Config,
+    Cron,
     Telegram,
 }
 
@@ -75,7 +77,12 @@ pub struct HermesApp {
 
     pub panel: Panel,
     pub skills: Vec<SkillRow>,
-    pub skill_open: Option<(String, String)>,
+    pub skill_open: Option<String>,
+    pub skill_editor: Entity<EditorState>,
+    pub config_editor: Entity<EditorState>,
+    pub config_error: Option<SharedString>,
+    pub cron: Vec<rest::CronJob>,
+    pub effort_choice: Entity<Choice>,
     pub mcp_editor: Entity<EditorState>,
     pub mcp_status: SharedString,
     pub mcp_error: Option<SharedString>,
@@ -122,6 +129,26 @@ impl HermesApp {
                 .language("json")
                 .line_number(true)
         });
+        let skill_editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("markdown")
+                .line_number(true)
+        });
+        let config_editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("yaml")
+                .line_number(true)
+        });
+        let effort_labels: Vec<SharedString> =
+            EFFORTS.iter().map(|e| SharedString::from(*e)).collect();
+        let effort_choice = cx.new(|cx| {
+            SelectState::new(
+                effort_labels,
+                Some(IndexPath::new(EFFORTS.len() - 1)),
+                window,
+                cx,
+            )
+        });
         let scroller = cx.new(|cx| MessageScrollerState::new(0, cx));
         cx.observe(&scroller, |_, _, cx| cx.notify()).detach();
 
@@ -138,6 +165,18 @@ impl HermesApp {
                     cx.notify();
                 }
             }),
+            cx.subscribe_in(
+                &effort_choice,
+                window,
+                |this, _, ev: &SelectEvent<Vec<SharedString>>, _, cx| {
+                    let SelectEvent::Confirm(Some(label)) = ev else {
+                        return;
+                    };
+                    if let Some(i) = EFFORTS.iter().position(|e| *e == label.as_ref()) {
+                        this.set_effort(i, cx);
+                    }
+                },
+            ),
             cx.subscribe_in(
                 &target_choice,
                 window,
@@ -249,6 +288,11 @@ impl HermesApp {
             panel: Panel::Chat,
             skills: vec![],
             skill_open: None,
+            skill_editor,
+            config_editor,
+            config_error: None,
+            cron: vec![],
+            effort_choice,
             mcp_editor,
             mcp_status: "".into(),
             mcp_error: None,
@@ -402,6 +446,7 @@ impl HermesApp {
                         label: "Работает…".into(),
                     });
                     self.reset_scroller(cx);
+                    self.settle_scroller(cx);
                 }
             }
             Evt::Created { session, runtime } => {
@@ -582,7 +627,7 @@ impl HermesApp {
     }
 
     /// First click arms, second click deletes.
-    pub fn delete_session(&mut self, id: String, cx: &mut Context<Self>) {
+    pub fn delete_session(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         if self.confirm_delete.as_deref() != Some(&id) {
             self.confirm_delete = Some(id);
             cx.notify();
@@ -597,17 +642,61 @@ impl HermesApp {
         }
         self.sessions.retain(|s| s.id != id);
         let runtime = self.opened.remove(&id);
-        self.cmd(Cmd::Delete {
-            profile,
-            session: id,
-            runtime,
-        });
+        let rid = id.clone();
+        self.rest(
+            window,
+            cx,
+            move |c, p| rest::delete_session(c, p, &rid),
+            move |this, r, window, cx| match r {
+                Ok(()) => this.refresh_sessions(),
+                // Older gateways without the REST route: the JSON-RPC delete.
+                Err(e) if e.to_string().starts_with("404") || e.to_string().starts_with("405") => {
+                    this.cmd(Cmd::Delete {
+                        profile,
+                        session: id,
+                        runtime,
+                    })
+                }
+                Err(e) => {
+                    this.toast(
+                        NotificationType::Error,
+                        format!("Не удалось удалить: {e:#}"),
+                        window,
+                        cx,
+                    );
+                    this.refresh_sessions();
+                }
+            },
+        );
         cx.notify();
     }
 
     pub fn cancel_delete(&mut self, cx: &mut Context<Self>) {
         self.confirm_delete = None;
         cx.notify();
+    }
+
+    /// Markdown and tables finish laying out after the first measure: measure again shortly
+    /// so scrolling reaches the real bottom.
+    fn settle_scroller(&mut self, cx: &mut Context<Self>) {
+        cx.spawn(async move |this, cx| {
+            for ms in [80u64, 400] {
+                cx.background_executor()
+                    .timer(Duration::from_millis(ms))
+                    .await;
+                let _ = this.update(cx, |this, cx| {
+                    let n = this.turns.len();
+                    let follow = this.scroller.read(cx).is_following_tail();
+                    this.scroller.update(cx, |s, cx| {
+                        let _ = s.remeasure_items(0..n, cx);
+                        if follow {
+                            s.scroll_to_end(cx);
+                        }
+                    });
+                });
+            }
+        })
+        .detach();
     }
 
     pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -771,11 +860,14 @@ impl HermesApp {
     /// Start each profile on its configured reasoning effort.
     fn load_profile_effort(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.effort_pending = false;
-        self.rest(window, cx, rest::profile_defaults, |this, r, _, _| {
+        self.rest(window, cx, rest::profile_defaults, |this, r, window, cx| {
             let Ok((effort, model)) = r else { return };
             if let Some(i) = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v)) {
                 this.effort = i;
                 this.effort_pending = false;
+                this.effort_choice.update(cx, |s, cx| {
+                    s.set_selected_index(Some(IndexPath::new(i)), window, cx)
+                });
             }
             if let (Some(model), Some(p)) = (model, this.profile.clone()) {
                 if let Some(profile) = this.profiles.iter_mut().find(|x| x.name == p) {
@@ -875,6 +967,29 @@ impl HermesApp {
         self.panel = panel;
         match panel {
             Panel::Chat | Panel::Telegram => {}
+            Panel::Config => {
+                self.config_error = None;
+                self.rest(
+                    window,
+                    cx,
+                    rest::config_raw,
+                    |this, r, window, cx| match r {
+                        Ok(text) => this
+                            .config_editor
+                            .update(cx, |s, cx| s.set_value(text, window, cx)),
+                        Err(e) => this.toast(
+                            NotificationType::Error,
+                            format!("Конфиг: {e:#}"),
+                            window,
+                            cx,
+                        ),
+                    },
+                )
+            }
+            Panel::Cron => self.rest(window, cx, rest::cron_jobs, |this, r, window, cx| match r {
+                Ok(jobs) => this.cron = jobs,
+                Err(e) => this.toast(NotificationType::Error, format!("Cron: {e:#}"), window, cx),
+            }),
             Panel::Skills => self.rest(window, cx, rest::skills, |this, r, window, cx| match r {
                 Ok(list) => this.skills = list,
                 Err(e) => this.toast(
@@ -901,18 +1016,81 @@ impl HermesApp {
     }
 
     pub fn open_skill(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.skill_open = Some((name.clone(), "Загружаю…".into()));
+        self.skill_open = Some(name.clone());
+        self.skill_editor
+            .update(cx, |s, cx| s.set_value("", window, cx));
         self.rest(
             window,
             cx,
             move |c, p| rest::skill_content(c, p, &name),
-            |this, r, _, _| {
-                if let Some((_, body)) = this.skill_open.as_mut() {
-                    *body = r.unwrap_or_else(|e| format!("Не удалось открыть: {e:#}"));
-                }
+            |this, r, window, cx| match r {
+                Ok(text) => this
+                    .skill_editor
+                    .update(cx, |s, cx| s.set_value(text, window, cx)),
+                Err(e) => this.toast(NotificationType::Error, format!("Скилл: {e:#}"), window, cx),
             },
         );
         cx.notify();
+    }
+
+    pub fn save_skill(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(name) = self.skill_open.clone() else {
+            return;
+        };
+        let text = self.skill_editor.read(cx).value().to_string();
+        self.rest(
+            window,
+            cx,
+            move |c, p| rest::save_skill(c, p, &name, &text),
+            |this, r, window, cx| match r {
+                Ok(()) => this.toast(NotificationType::Success, "Скилл сохранён", window, cx),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Скилл не сохранён: {e:#}"),
+                    window,
+                    cx,
+                ),
+            },
+        );
+    }
+
+    /// YAML is parsed before saving; a broken document is not sent.
+    pub fn save_config(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let text = self.config_editor.read(cx).value().to_string();
+        self.config_error = match serde_yaml::from_str::<serde_yaml::Value>(&text) {
+            Ok(serde_yaml::Value::Mapping(_)) => None,
+            Ok(_) => Some("Конфиг должен быть YAML-словарём".into()),
+            Err(e) => Some(
+                match e.location() {
+                    Some(l) => format!("Строка {}, столбец {}: {e}", l.line(), l.column()),
+                    None => e.to_string(),
+                }
+                .into(),
+            ),
+        };
+        cx.notify();
+        if self.config_error.is_some() {
+            return;
+        }
+        self.rest(
+            window,
+            cx,
+            move |c, p| rest::save_config_raw(c, p, &text),
+            |this, r, window, cx| match r {
+                Ok(()) => this.toast(
+                    NotificationType::Success,
+                    "config.yaml сохранён",
+                    window,
+                    cx,
+                ),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Конфиг не сохранён: {e:#}"),
+                    window,
+                    cx,
+                ),
+            },
+        );
     }
 
     /// JSON check run on save; an invalid document is not sent.

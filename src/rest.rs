@@ -190,3 +190,115 @@ pub fn transcribe(conn: &Connection, profile: &str, wav: &[u8]) -> Result<String
         .trim()
         .to_string())
 }
+
+/// Delete a stored session the way Hermes Desktop does (also closes a live one).
+pub fn delete_session(conn: &Connection, profile: &str, id: &str) -> Result<()> {
+    let (h, v) = conn.rest_auth(profile)?;
+    let resp = ureq::request(
+        "DELETE",
+        &url(conn, &format!("/api/sessions/{id}"), profile),
+    )
+    .set(h, &v)
+    .timeout(Duration::from_secs(30))
+    .call();
+    match resp {
+        Ok(_) => Ok(()),
+        Err(ureq::Error::Status(code, r)) => {
+            let body: Value = r.into_json().unwrap_or(Value::Null);
+            Err(anyhow!(
+                "{code}: {}",
+                body["detail"]
+                    .as_str()
+                    .or(body["detail"]["reason"].as_str())
+                    .unwrap_or("delete failed")
+            ))
+        }
+        Err(e) => Err(anyhow!("{e}")),
+    }
+}
+
+pub fn save_skill(conn: &Connection, profile: &str, name: &str, content: &str) -> Result<()> {
+    send(
+        conn,
+        "PUT",
+        "/api/skills/content",
+        profile,
+        json!({"name": name, "content": content}),
+        30,
+    )?;
+    Ok(())
+}
+
+/// The profile's config.yaml as text.
+pub fn config_raw(conn: &Connection, profile: &str) -> Result<String> {
+    let raw = get(conn, "/api/config/raw", profile)?;
+    Ok(raw["yaml"].as_str().unwrap_or_default().to_string())
+}
+
+pub fn save_config_raw(conn: &Connection, profile: &str, text: &str) -> Result<()> {
+    send(
+        conn,
+        "PUT",
+        "/api/config/raw",
+        profile,
+        json!({"yaml_text": text}),
+        30,
+    )?;
+    Ok(())
+}
+
+#[derive(Clone, Debug)]
+pub struct CronJob {
+    pub name: String,
+    pub schedule: String,
+    pub enabled: bool,
+    pub next_run: String,
+    pub last_status: String,
+    pub prompt: String,
+}
+
+/// Scheduled jobs of this profile (read-only view).
+pub fn cron_jobs(conn: &Connection, profile: &str) -> Result<Vec<CronJob>> {
+    let key = if profile.is_empty() {
+        "default"
+    } else {
+        profile
+    };
+    let (h, v) = conn.rest_auth(profile)?;
+    let resp = ureq::get(&format!("{}/api/cron/jobs?profile={key}", conn.base))
+        .set(h, &v)
+        .timeout(Duration::from_secs(30))
+        .call()
+        .map_err(|e| anyhow!("cron: {e}"))?;
+    let v: Value = resp.into_json()?;
+    let list = v
+        .as_array()
+        .cloned()
+        .or_else(|| v["jobs"].as_array().cloned())
+        .unwrap_or_default();
+    let s = |j: &Value, keys: &[&str]| {
+        keys.iter()
+            .find_map(|k| match &j[*k] {
+                Value::String(s) if !s.is_empty() => Some(s.clone()),
+                Value::Number(n) => Some(n.to_string()),
+                Value::Object(o) => o
+                    .get("display")
+                    .or(o.get("expr"))
+                    .and_then(Value::as_str)
+                    .map(str::to_string),
+                _ => None,
+            })
+            .unwrap_or_default()
+    };
+    Ok(list
+        .iter()
+        .map(|j| CronJob {
+            name: s(j, &["name", "id", "job_id"]),
+            schedule: s(j, &["schedule_display", "schedule", "cron", "interval"]),
+            enabled: j["enabled"].as_bool().unwrap_or(j["state"] != "paused"),
+            next_run: s(j, &["next_run_at", "next_run"]),
+            last_status: s(j, &["last_status", "last_result"]),
+            prompt: s(j, &["prompt", "task", "message"]),
+        })
+        .collect())
+}
