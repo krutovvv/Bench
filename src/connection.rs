@@ -159,7 +159,7 @@ impl Connection {
 
     pub fn websocket(&self) -> Result<WebSocket<TcpStream>> {
         let host = self.base.trim_start_matches("http://").to_string();
-        let mut req = match &self.auth {
+        let req = match &self.auth {
             Auth::Ticket { endpoint, helper } => {
                 let ticket = helper.lock().unwrap().mint(endpoint, "interactive")?;
                 let mut req =
@@ -174,7 +174,6 @@ impl Connection {
                 format!("ws://{host}/api/ws?token={token}").into_client_request()?
             }
         };
-        req.headers_mut().insert("Origin", self.base.parse()?);
         let stream = TcpStream::connect(&host)?;
         let (ws, _) = tungstenite::client(req, stream).map_err(|e| anyhow!("websocket: {e}"))?;
         ws.get_ref()
@@ -207,6 +206,9 @@ impl Connection {
     // ---- SSH -------------------------------------------------------------
 
     fn open_ssh(host: &str) -> Result<Self> {
+        if !has_hermes(host) {
+            bail!("на {host} не найден Hermes (~/.local/bin/hermes) или хост недоступен");
+        }
         let state_path = state_dir().join(format!("ssh-{host}.json"));
         // Reattach to the backend we started last time, if it still answers.
         if let Ok(saved) = std::fs::read(&state_path)
@@ -214,8 +216,11 @@ impl Connection {
             .and_then(|b| Ok(serde_json::from_slice::<Value>(&b)?))
         {
             if let (Some(port), Some(token)) = (saved["port"].as_u64(), saved["token"].as_str()) {
+                // The saved token must still open the WebSocket (a restarted backend rejects it with 403).
                 if let Ok(conn) = Self::attach_ssh(host, port as u16, token) {
-                    return Ok(conn);
+                    if conn.websocket().is_ok() {
+                        return Ok(conn);
+                    }
                 }
             }
         }
@@ -340,6 +345,24 @@ tail -3 "{dir}/serve.log"; exit 1"#
 
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
+}
+
+/// Whether `host` answers over SSH and has a working Hermes (a stale wrapper is not enough).
+pub fn has_hermes(host: &str) -> bool {
+    Command::new("ssh")
+        .args([
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=5",
+            host,
+            "timeout 30 \"$HOME/.local/bin/hermes\" --version >/dev/null 2>&1",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
 }
 
 /// `Host` entries from ~/.ssh/config, without wildcards.

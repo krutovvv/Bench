@@ -201,6 +201,8 @@ fn render_turn(
                         div()
                             .id(("speak", i))
                             .p_1()
+                            .border_1()
+                            .border_color(theme.border)
                             .cursor_pointer()
                             .text_color(muted)
                             .hover(|s| s.bg(theme.secondary).text_color(theme.foreground))

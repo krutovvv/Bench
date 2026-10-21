@@ -4,8 +4,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui_kit::component::IndexPath;
-use gpui_kit::component::input::{InputEvent, TextareaState};
+use gpui_kit::component::WindowExt as _;
+use gpui_kit::component::input::{EditorState, InputEvent, TextareaState};
 use gpui_kit::component::message_scroller::MessageScrollerState;
+use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
 
@@ -38,13 +40,16 @@ pub struct HermesApp {
     pub conn: Option<Arc<Connection>>,
     evt_tx: async_channel::Sender<Evt>,
     pub connecting: bool,
-    pub notice: Option<SharedString>,
 
     pub profiles: Vec<Profile>,
     pub profile: Option<String>,
     pub profile_choice: Entity<Choice>,
     pub sessions: Vec<SessionRow>,
+    /// Stored id of the open session (what the session list shows).
     pub session: Option<String>,
+    /// The id the gateway uses for prompts and events of the open session.
+    runtime: Option<String>,
+    pub confirm_delete: Option<String>,
 
     pub turns: Vec<Turn>,
     pub live: Option<Live>,
@@ -56,8 +61,9 @@ pub struct HermesApp {
     pub panel: Panel,
     pub skills: Vec<SkillRow>,
     pub skill_open: Option<(String, String)>,
-    pub mcp_editor: Entity<TextareaState>,
+    pub mcp_editor: Entity<EditorState>,
     pub mcp_status: SharedString,
+    pub mcp_error: Option<SharedString>,
 
     pub composer: Entity<TextareaState>,
     pub scroller: Entity<MessageScrollerState>,
@@ -96,7 +102,11 @@ impl HermesApp {
                 .submit_on_enter(true)
                 .placeholder("Напиши Hermes…")
         });
-        let mcp_editor = cx.new(|cx| TextareaState::new(window, cx).rows(24));
+        let mcp_editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("json")
+                .line_number(true)
+        });
         let scroller = cx.new(|cx| MessageScrollerState::new(0, cx));
         cx.observe(&scroller, |_, _, cx| cx.notify()).detach();
 
@@ -104,6 +114,11 @@ impl HermesApp {
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
                 if let InputEvent::PressEnter { shift: false, .. } = ev {
                     this.send(window, cx);
+                }
+            }),
+            cx.subscribe_in(&mcp_editor, window, |this, _, ev: &InputEvent, _, cx| {
+                if matches!(ev, InputEvent::Change) {
+                    this.validate_mcp(cx);
                 }
             }),
             cx.subscribe_in(
@@ -119,7 +134,7 @@ impl HermesApp {
                         .find(|t| t.label() == label.as_ref())
                         .cloned()
                     {
-                        if t != this.target {
+                        if t != this.target || this.conn.is_none() {
                             this.connect(t, window, cx);
                         }
                     }
@@ -170,21 +185,40 @@ impl HermesApp {
                 }
             }
         });
+        let mut tasks = vec![events, ticker];
+
+        // Hide SSH hosts that do not run Hermes.
+        for host in targets.iter().filter_map(|t| match t {
+            Target::Ssh(h) => Some(h.clone()),
+            Target::Local => None,
+        }) {
+            tasks.push(cx.spawn_in(window, async move |this, cx| {
+                let h = host.clone();
+                let ok = cx
+                    .background_spawn(async move { connection::has_hermes(&h) })
+                    .await;
+                if !ok {
+                    let _ =
+                        this.update_in(cx, |this, window, cx| this.drop_target(&host, window, cx));
+                }
+            }));
+        }
 
         let mut app = Self {
             targets,
-            target: Target::Local,
+            target: initial.clone(),
             target_choice,
             gateway: None,
             conn: None,
             evt_tx,
             connecting: false,
-            notice: None,
             profiles: vec![],
             profile: None,
             profile_choice,
             sessions: vec![],
             session: None,
+            runtime: None,
+            confirm_delete: None,
             turns: vec![],
             live: None,
             queued: None,
@@ -196,6 +230,7 @@ impl HermesApp {
             skill_open: None,
             mcp_editor,
             mcp_status: "".into(),
+            mcp_error: None,
             composer,
             scroller,
             recorder: None,
@@ -203,20 +238,44 @@ impl HermesApp {
             playing: None,
             speaking: None,
             _subscriptions: subs,
-            _tasks: vec![events, ticker],
+            _tasks: tasks,
         };
         app.connect(initial, window, cx);
         app
     }
 
+    pub fn toast(
+        &self,
+        kind: NotificationType,
+        msg: impl Into<SharedString>,
+        window: &mut Window,
+        cx: &mut App,
+    ) {
+        window.push_notification((kind, msg.into()), cx);
+    }
+
     // ---- connection ------------------------------------------------------
+
+    fn drop_target(&mut self, host: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let gone = Target::Ssh(host.to_string());
+        if self.target == gone {
+            return; // keep the one the user is on; its error explains itself
+        }
+        self.targets.retain(|t| *t != gone);
+        let labels: Vec<SharedString> = self.targets.iter().map(|t| t.label().into()).collect();
+        let current = self.targets.iter().position(|t| *t == self.target);
+        self.target_choice.update(cx, |s, cx| {
+            s.set_items(labels, window, cx);
+            s.set_selected_index(current.map(IndexPath::new), window, cx);
+        });
+        cx.notify();
+    }
 
     pub fn connect(&mut self, target: Target, _window: &mut Window, cx: &mut Context<Self>) {
         self.gateway = None; // drops the old thread
         self.conn = None;
         self.target = target.clone();
         self.connecting = true;
-        self.notice = None;
         self.profiles.clear();
         self.profile = None;
         self.sessions.clear();
@@ -239,8 +298,15 @@ impl HermesApp {
         self.profile.clone().unwrap_or_default()
     }
 
+    /// Events carry the runtime id.
     fn is_current(&self, sid: &str) -> bool {
-        self.session.as_deref() == Some(sid)
+        self.runtime.as_deref() == Some(sid)
+    }
+
+    fn refresh_sessions(&self) {
+        if let Some(p) = self.profile.clone() {
+            self.cmd(Cmd::Sessions(p));
+        }
     }
 
     // ---- events ----------------------------------------------------------
@@ -253,10 +319,10 @@ impl HermesApp {
             }
             Evt::Error(e) => {
                 self.connecting = false;
-                self.notice = Some(e.into());
                 if self.live.is_some() && self.turns.last().is_some_and(|t| t.answer.is_empty()) {
                     self.live = None;
                 }
+                self.toast(NotificationType::Error, e, window, cx);
             }
             Evt::Profiles(list) => {
                 self.profiles = list;
@@ -282,12 +348,16 @@ impl HermesApp {
                     self.sessions = rows;
                 }
             }
+            Evt::SessionsChanged => self.refresh_sessions(),
+            Evt::Deleted => self.refresh_sessions(),
             Evt::History {
                 session,
+                runtime,
                 turns,
                 running,
             } => {
-                if self.is_current(&session) {
+                if self.session.as_deref() == Some(&session) {
+                    self.runtime = Some(runtime);
                     self.turns = turns;
                     self.live = running.then(|| Live {
                         started: Instant::now(),
@@ -296,19 +366,20 @@ impl HermesApp {
                     self.reset_scroller(cx);
                 }
             }
-            Evt::Created(sid) => {
-                self.session = Some(sid.clone());
+            Evt::Created { session, runtime } => {
+                self.session = Some(session);
+                self.runtime = Some(runtime.clone());
                 if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
                     let effort = self.take_effort();
                     self.cmd(Cmd::Send {
-                        profile: profile.clone(),
-                        session: sid,
+                        profile,
+                        session: runtime,
                         text,
                         effort,
                     });
-                    // Show the new session in the list right away.
-                    self.cmd(Cmd::Sessions(profile));
                 }
+                // Show the new session in the list right away.
+                self.refresh_sessions();
             }
             Evt::Started(sid) if self.is_current(&sid) => {
                 if self.live.is_none() {
@@ -362,9 +433,7 @@ impl HermesApp {
                 }
                 self.remeasure_last(cx);
             }
-            Evt::ToolDone {
-                session, failed, ..
-            } if self.is_current(&session) => {
+            Evt::ToolDone { session, failed } if self.is_current(&session) => {
                 if let Some(Some(Step::Tool { failed: f, .. })) = self.turns.last_mut().map(|t| {
                     t.steps
                         .iter_mut()
@@ -383,9 +452,7 @@ impl HermesApp {
                     }
                 }
                 self.remeasure_last(cx);
-                if let Some(p) = self.profile.clone() {
-                    self.cmd(Cmd::Sessions(p));
-                }
+                self.refresh_sessions();
             }
             _ => {}
         }
@@ -396,6 +463,7 @@ impl HermesApp {
 
     fn reset_chat(&mut self, cx: &mut Context<Self>) {
         self.session = None;
+        self.runtime = None;
         self.turns.clear();
         self.live = None;
         self.queued = None;
@@ -447,6 +515,7 @@ impl HermesApp {
             return;
         };
         self.panel = Panel::Chat;
+        self.confirm_delete = None;
         self.reset_chat(cx);
         self.session = Some(id.clone());
         self.cmd(Cmd::Open {
@@ -459,6 +528,33 @@ impl HermesApp {
     pub fn new_session(&mut self, cx: &mut Context<Self>) {
         self.panel = Panel::Chat;
         self.reset_chat(cx);
+        cx.notify();
+    }
+
+    /// First click arms, second click deletes.
+    pub fn delete_session(&mut self, id: String, cx: &mut Context<Self>) {
+        if self.confirm_delete.as_deref() != Some(&id) {
+            self.confirm_delete = Some(id);
+            cx.notify();
+            return;
+        }
+        self.confirm_delete = None;
+        let Some(profile) = self.profile.clone() else {
+            return;
+        };
+        if self.session.as_deref() == Some(&id) {
+            self.reset_chat(cx);
+        }
+        self.sessions.retain(|s| s.id != id);
+        self.cmd(Cmd::Delete {
+            profile,
+            session: id,
+        });
+        cx.notify();
+    }
+
+    pub fn cancel_delete(&mut self, cx: &mut Context<Self>) {
+        self.confirm_delete = None;
         cx.notify();
     }
 
@@ -494,7 +590,7 @@ impl HermesApp {
             started: Instant::now(),
             label: "Отправляю…".into(),
         });
-        match self.session.clone() {
+        match self.runtime.clone() {
             Some(session) => {
                 let effort = self.take_effort();
                 self.cmd(Cmd::Send {
@@ -515,7 +611,7 @@ impl HermesApp {
     }
 
     pub fn stop(&mut self, cx: &mut Context<Self>) {
-        if let (Some(profile), Some(session)) = (self.profile.clone(), self.session.clone()) {
+        if let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) {
             self.cmd(Cmd::Interrupt { profile, session });
         }
         cx.notify();
@@ -561,9 +657,14 @@ impl HermesApp {
         self.panel = panel;
         match panel {
             Panel::Chat => {}
-            Panel::Skills => self.rest(window, cx, rest::skills, |this, r, _, _| match r {
+            Panel::Skills => self.rest(window, cx, rest::skills, |this, r, window, cx| match r {
                 Ok(list) => this.skills = list,
-                Err(e) => this.notice = Some(format!("Скиллы: {e:#}").into()),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Скиллы: {e:#}"),
+                    window,
+                    cx,
+                ),
             }),
             Panel::Mcp => {
                 self.mcp_status = "Загружаю…".into();
@@ -572,6 +673,7 @@ impl HermesApp {
                         this.mcp_editor
                             .update(cx, |s, cx| s.set_value(text, window, cx));
                         this.mcp_status = "".into();
+                        this.validate_mcp(cx);
                     }
                     Err(e) => this.mcp_status = format!("Не удалось загрузить: {e:#}").into(),
                 })
@@ -595,18 +697,44 @@ impl HermesApp {
         cx.notify();
     }
 
+    /// Live JSON check of the MCP editor; saving is blocked while it fails.
+    fn validate_mcp(&mut self, cx: &mut Context<Self>) {
+        let text = self.mcp_editor.read(cx).value().to_string();
+        self.mcp_error = match serde_json::from_str::<serde_json::Value>(&text) {
+            Ok(v) if v.is_object() => None,
+            Ok(_) => Some("Нужен объект: { \"имя-сервера\": { … } }".into()),
+            Err(e) => Some(format!("Строка {}, столбец {}: {e}", e.line(), e.column()).into()),
+        };
+        cx.notify();
+    }
+
     pub fn save_mcp(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.validate_mcp(cx);
+        if self.mcp_error.is_some() {
+            return;
+        }
         let text = self.mcp_editor.read(cx).value().to_string();
         self.mcp_status = "Сохраняю…".into();
         self.rest(
             window,
             cx,
             move |c, p| rest::save_mcp_json(c, p, &text),
-            |this, r, _, _| {
-                this.mcp_status = match r {
-                    Ok(()) => "Сохранено. Новые MCP подхватятся в новой сессии.".into(),
-                    Err(e) => format!("Ошибка: {e:#}").into(),
-                };
+            |this, r, window, cx| {
+                this.mcp_status = "".into();
+                match r {
+                    Ok(()) => this.toast(
+                        NotificationType::Success,
+                        "MCP сохранены. Подхватятся в новой сессии.",
+                        window,
+                        cx,
+                    ),
+                    Err(e) => this.toast(
+                        NotificationType::Error,
+                        format!("MCP не сохранены: {e:#}"),
+                        window,
+                        cx,
+                    ),
+                }
             },
         );
     }
@@ -635,20 +763,38 @@ impl HermesApp {
                                     this.composer
                                         .update(cx, |s, cx| s.set_value(joined, window, cx));
                                 }
-                                Ok(_) => this.notice = Some("Ничего не распознано".into()),
-                                Err(e) => {
-                                    this.notice = Some(format!("Распознавание: {e:#}").into())
-                                }
+                                Ok(_) => this.toast(
+                                    NotificationType::Warning,
+                                    "Ничего не распознано",
+                                    window,
+                                    cx,
+                                ),
+                                Err(e) => this.toast(
+                                    NotificationType::Error,
+                                    format!("Распознавание: {e:#}"),
+                                    window,
+                                    cx,
+                                ),
                             }
                         },
                     );
                 }
-                Err(e) => self.notice = Some(format!("Запись: {e:#}").into()),
+                Err(e) => self.toast(
+                    NotificationType::Warning,
+                    format!("Запись: {e:#}"),
+                    window,
+                    cx,
+                ),
             }
         } else {
             match Recorder::start() {
                 Ok(r) => self.recorder = Some(r),
-                Err(e) => self.notice = Some(format!("Микрофон: {e:#}").into()),
+                Err(e) => self.toast(
+                    NotificationType::Error,
+                    format!("Микрофон: {e:#}"),
+                    window,
+                    cx,
+                ),
             }
         }
         cx.notify();
@@ -669,11 +815,16 @@ impl HermesApp {
             window,
             cx,
             move |c, p| rest::speak(c, p, &text),
-            move |this, r, _, _| {
+            move |this, r, window, cx| {
                 this.speaking = None;
                 match r {
                     Ok(bytes) => this.playing = Some((i, Playback::start(bytes))),
-                    Err(e) => this.notice = Some(format!("Озвучка: {e:#}").into()),
+                    Err(e) => this.toast(
+                        NotificationType::Error,
+                        format!("Озвучка: {e:#}"),
+                        window,
+                        cx,
+                    ),
                 }
             },
         );

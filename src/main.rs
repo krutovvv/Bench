@@ -41,6 +41,24 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
                     println!("mcp[{p}]: {} bytes of JSON", rest::mcp_json(c, &p)?.len());
                 }
+                let Some(first) = rows.first() else {
+                    return Ok(());
+                };
+                gw.send(gateway::Cmd::Open {
+                    profile: p,
+                    session: first.id.clone(),
+                });
+            }
+            gateway::Evt::History {
+                session,
+                runtime,
+                turns,
+                ..
+            } => {
+                println!(
+                    "open: stored={session} runtime={runtime} turns={}",
+                    turns.len()
+                );
                 return Ok(());
             }
             _ => {}
@@ -69,6 +87,7 @@ fn main() {
             theme.radius_lg = px(0.);
             theme.shadow = false;
             theme.font_size = px(14.);
+            theme.mono_font_size = px(13.);
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

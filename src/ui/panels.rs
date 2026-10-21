@@ -1,7 +1,8 @@
 //! Profile panels: skills (read-only browser) and MCP servers (raw JSON editor).
 
+use gpui_kit::component::Disableable as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::Textarea;
+use gpui_kit::component::input::Editor;
 use gpui_kit::component::text::TextView;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -131,10 +132,14 @@ impl HermesApp {
                             .child("Блок mcp_servers из config.yaml профиля. Секреты показаны как есть — сохраняется целиком."),
                     )
                     .child(div().text_sm().text_color(theme.muted_foreground).child(self.mcp_status.clone()))
+                    .child(match &self.mcp_error {
+                        Some(e) => div().text_sm().text_color(theme.danger).child(e.clone()),
+                        None => div().text_sm().text_color(theme.success).child("JSON корректен"),
+                    })
                     .child(Button::new("mcp-reload").small().ghost().label("Обновить").on_click(cx.listener(|this, _, window, cx| {
                         this.open_panel(crate::app::Panel::Mcp, window, cx)
                     })))
-                    .child(Button::new("mcp-save").small().primary().label("Сохранить").on_click(cx.listener(|this, _, window, cx| {
+                    .child(Button::new("mcp-save").small().primary().label("Сохранить").disabled(self.mcp_error.is_some()).on_click(cx.listener(|this, _, window, cx| {
                         this.save_mcp(window, cx)
                     }))),
             )
@@ -144,10 +149,7 @@ impl HermesApp {
                     .min_h_0()
                     .border_1()
                     .border_color(theme.border)
-                    .p_2()
-                    .font_family("Menlo")
-                    .text_sm()
-                    .child(Textarea::new(&self.mcp_editor).appearance(false).h_full()),
+                    .child(Editor::new(&self.mcp_editor).appearance(false).h_full()),
             )
     }
 }

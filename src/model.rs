@@ -21,6 +21,7 @@ impl Target {
 pub struct Profile {
     pub name: String,
     pub label: String,
+    pub model: String,
 }
 
 #[derive(Clone, Debug)]
@@ -30,6 +31,24 @@ pub struct SessionRow {
     pub messages: u64,
     pub model: String,
     pub running: bool,
+    /// Where the session lives: "local" (desktop/CLI), "telegram", "cron", …
+    pub source: String,
+}
+
+/// Human name of a session source, for grouping the session list.
+pub fn source_label(source: &str) -> String {
+    match source {
+        "" | "local" | "desktop" | "tui" | "cli" | "dashboard" => "Hermes".into(),
+        "telegram" => "Telegram".into(),
+        "cron" => "Cron".into(),
+        "api_server" | "api" => "API".into(),
+        other => {
+            let mut c = other.chars();
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
+        }
+    }
 }
 
 /// One unit of agent work inside a turn.

@@ -137,8 +137,15 @@ pub fn turns(messages: &[Value]) -> Vec<Turn> {
                 let Some(turn) = out.last_mut() else { continue };
                 demote_answer(turn);
                 turn.steps.push(Step::Tool {
-                    name: m["tool_name"].as_str().or(m["name"].as_str()).unwrap_or("tool").to_string(),
-                    detail: m["context"].as_str().map(str::to_string).unwrap_or_else(|| preview(&m["content"])),
+                    name: m["tool_name"]
+                        .as_str()
+                        .or(m["name"].as_str())
+                        .unwrap_or("tool")
+                        .to_string(),
+                    detail: m["context"]
+                        .as_str()
+                        .map(str::to_string)
+                        .unwrap_or_else(|| preview(&m["content"])),
                     failed: failed(&m["content"]),
                 });
             }

@@ -6,7 +6,6 @@ use gpui_kit::component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_fl
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::chat::COLUMN;
 use crate::app::HermesApp;
 use crate::model::EFFORTS;
 
@@ -77,7 +76,6 @@ impl HermesApp {
             .child(
                 v_flex()
                     .w_full()
-                    .max_w(px(COLUMN))
                     .gap_1()
                     .px_4()
                     .pt_2()

@@ -32,6 +32,10 @@ pub enum Cmd {
         profile: String,
         session: String,
     },
+    Delete {
+        profile: String,
+        session: String,
+    },
     Shutdown,
 }
 
@@ -40,12 +44,20 @@ pub enum Evt {
     Error(String),
     Profiles(Vec<Profile>),
     Sessions(String, Vec<SessionRow>),
+    /// `session` is the stored id (session list); `runtime` the id prompts and events use.
     History {
         session: String,
+        runtime: String,
         turns: Vec<Turn>,
         running: bool,
     },
-    Created(String),
+    Created {
+        session: String,
+        runtime: String,
+    },
+    /// The gateway says the session list changed (new session, generated title, …).
+    SessionsChanged,
+    Deleted,
     Started(String),
     Delta(String, String),
     Reasoning(String, String),
@@ -70,6 +82,7 @@ enum Pending {
     Sessions(String),
     Resume(String),
     Create,
+    Delete,
     Ignore,
 }
 
@@ -130,6 +143,11 @@ impl Rpc {
                 "session.resume",
                 json!({"session_id": session, "profile": profile}),
                 Pending::Resume(session),
+            )?,
+            Cmd::Delete { profile, session } => self.call(
+                "session.delete",
+                json!({"session_id": session, "profile": profile}),
+                Pending::Delete,
             )?,
             Cmd::Create { profile } => self.call(
                 "session.create",
@@ -231,7 +249,15 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                         .filter(|s| !s.trim().is_empty())
                         .unwrap_or(&name)
                         .to_string();
-                    Profile { name, label }
+                    let model = match &p["model"] {
+                        Value::String(s) => s.clone(),
+                        m => m["default"]
+                            .as_str()
+                            .or(m["name"].as_str())
+                            .unwrap_or_default()
+                            .to_string(),
+                    };
+                    Profile { name, label, model }
                 })
                 .collect(),
         )),
@@ -249,17 +275,25 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                     messages: s["message_count"].as_u64().unwrap_or(0),
                     model: s["model"].as_str().unwrap_or_default().into(),
                     running: s["running"].as_bool().unwrap_or(false),
+                    source: s["source"].as_str().unwrap_or_default().into(),
                 })
                 .collect(),
         )),
         Pending::Resume(session) => emit(Evt::History {
             turns: history::turns(&list(&r["messages"])),
             running: r["running"].as_bool().unwrap_or(false),
+            runtime: r["session_id"].as_str().unwrap_or(&session).to_string(),
             session,
         }),
-        Pending::Create => emit(Evt::Created(
-            r["session_id"].as_str().unwrap_or_default().into(),
-        )),
+        Pending::Create => {
+            let runtime = r["session_id"].as_str().unwrap_or_default().to_string();
+            let session = r["stored_session_id"]
+                .as_str()
+                .unwrap_or(&runtime)
+                .to_string();
+            emit(Evt::Created { session, runtime })
+        }
+        Pending::Delete => emit(Evt::Deleted),
         Pending::Ignore => {}
     }
 }
@@ -284,6 +318,7 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             failed: history::failed(&payload["result"]),
             session: sid,
         }),
+        "sessions.changed" => emit(Evt::SessionsChanged),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
         "message.complete" => {
             if payload["usage"].is_object() {

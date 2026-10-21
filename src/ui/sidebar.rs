@@ -1,4 +1,4 @@
-//! Left column: where, which profile, navigation, sessions, status bar.
+//! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
 
 use gpui_kit::component::select::Select;
 use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
@@ -7,6 +7,7 @@ use gpui_kit::*;
 
 use super::{compact, plural};
 use crate::app::{HermesApp, Panel};
+use crate::model::source_label;
 
 impl HermesApp {
     pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -33,34 +34,36 @@ impl HermesApp {
                 .child(label)
         };
 
-        let sessions = self.sessions.iter().enumerate().map(|(i, s)| {
-            let id = s.id.clone();
-            let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(&s.id);
-            let meta = if s.running {
-                "работает…".to_string()
-            } else {
-                plural(s.messages as usize, "сообщение", "сообщения", "сообщений")
-            };
-            div()
-                .id(("session", i))
-                .px_2()
-                .py_1()
-                .cursor_pointer()
-                .border_l_2()
-                .border_color(if selected {
-                    theme.primary
-                } else {
-                    theme.transparent
-                })
-                .when(selected, |d| {
-                    d.bg(theme.sidebar_accent)
-                        .text_color(theme.sidebar_accent_foreground)
-                })
-                .hover(|s| s.bg(theme.sidebar_accent))
-                .child(div().text_sm().truncate().child(s.title.clone()))
-                .child(div().text_xs().text_color(muted).child(meta))
-                .on_click(cx.listener(move |this, _, _, cx| this.open_session(id.clone(), cx)))
-        });
+        // Group sessions by where they live (Hermes UI/CLI, Telegram, cron…), Hermes first.
+        let mut groups: Vec<(String, Vec<usize>)> = vec![];
+        for (i, s) in self.sessions.iter().enumerate() {
+            let label = source_label(&s.source);
+            match groups.iter_mut().find(|(l, _)| *l == label) {
+                Some((_, rows)) => rows.push(i),
+                None => groups.push((label, vec![i])),
+            }
+        }
+        groups.sort_by_key(|(l, _)| l != "Hermes");
+        let single = groups.len() <= 1;
+
+        let mut list: Vec<AnyElement> = vec![];
+        for (label, rows) in groups {
+            if !single {
+                list.push(
+                    div()
+                        .px_2()
+                        .pt_2()
+                        .pb_0p5()
+                        .text_xs()
+                        .text_color(muted)
+                        .child(format!("{} · {}", label.to_uppercase(), rows.len()))
+                        .into_any_element(),
+                );
+            }
+            for i in rows {
+                list.push(self.render_session_row(i, cx).into_any_element());
+            }
+        }
 
         v_flex()
             .w(px(280.))
@@ -87,7 +90,7 @@ impl HermesApp {
                                     .flex()
                                     .items_center()
                                     .justify_center()
-                                    .child(Icon::new(IconName::Bot).small()),
+                                    .child(Icon::new(IconName::Bot).xsmall()),
                             )
                             .child(
                                 div()
@@ -107,7 +110,6 @@ impl HermesApp {
                 v_flex()
                     .px_2()
                     .pt_3()
-                    .gap_0()
                     .child(
                         nav("nav-new", IconName::Plus, "Новая сессия", false)
                             .on_click(cx.listener(|this, _, _, cx| this.new_session(cx))),
@@ -141,17 +143,22 @@ impl HermesApp {
                     .min_h_0()
                     .px_2()
                     .pt_3()
-                    .gap_1()
-                    .child(div().px_2().text_xs().text_color(muted).child("СЕССИИ"))
+                    .child(
+                        div()
+                            .px_2()
+                            .pb_1()
+                            .text_xs()
+                            .text_color(muted)
+                            .child("СЕССИИ"),
+                    )
                     .child(
                         v_flex()
                             .id("sessions")
                             .flex_1()
                             .min_h_0()
                             .overflow_y_scroll()
-                            .gap_0()
                             .pb_2()
-                            .children(sessions)
+                            .children(list)
                             .when(self.connecting, |d| {
                                 d.child(
                                     div()
@@ -166,9 +173,104 @@ impl HermesApp {
             .child(self.render_status(cx))
     }
 
+    fn render_session_row(&self, i: usize, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let s = &self.sessions[i];
+        let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(&s.id);
+        let armed = self.confirm_delete.as_deref() == Some(&s.id);
+        let group: SharedString = format!("srow{i}").into();
+        let meta = if s.running {
+            "работает…".to_string()
+        } else {
+            plural(s.messages as usize, "сообщение", "сообщения", "сообщений")
+        };
+        let (open_id, del_id) = (s.id.clone(), s.id.clone());
+
+        let delete = if armed {
+            h_flex()
+                .gap_1()
+                .text_xs()
+                .child(
+                    div()
+                        .id(("del-yes", i))
+                        .px_1p5()
+                        .py_0p5()
+                        .bg(theme.danger)
+                        .text_color(theme.danger_foreground)
+                        .cursor_pointer()
+                        .child("Удалить")
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            cx.stop_propagation();
+                            this.delete_session(del_id.clone(), cx)
+                        })),
+                )
+                .child(
+                    div()
+                        .id(("del-no", i))
+                        .px_1()
+                        .py_0p5()
+                        .cursor_pointer()
+                        .text_color(muted)
+                        .hover(|s| s.text_color(theme.foreground))
+                        .child("Нет")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            cx.stop_propagation();
+                            this.cancel_delete(cx)
+                        })),
+                )
+                .into_any_element()
+        } else {
+            div()
+                .id(("del", i))
+                .p_1()
+                .cursor_pointer()
+                .opacity(0.)
+                .group_hover(group.clone(), |s| s.opacity(1.))
+                .text_color(muted)
+                .hover(|s| s.text_color(theme.danger))
+                .child(Icon::new(IconName::Delete).xsmall())
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.delete_session(del_id.clone(), cx)
+                }))
+                .into_any_element()
+        };
+
+        h_flex()
+            .id(("session", i))
+            .group(group)
+            .gap_1()
+            .px_2()
+            .py_1()
+            .cursor_pointer()
+            .border_l_2()
+            .border_color(if selected {
+                theme.primary
+            } else {
+                theme.transparent
+            })
+            .when(selected, |d| {
+                d.bg(theme.sidebar_accent)
+                    .text_color(theme.sidebar_accent_foreground)
+            })
+            .hover(|s| s.bg(theme.sidebar_accent))
+            .child(
+                v_flex()
+                    .flex_1()
+                    .min_w_0()
+                    .child(div().text_sm().truncate().child(s.title.clone()))
+                    .child(div().text_xs().text_color(muted).child(meta)),
+            )
+            .child(delete)
+            .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))
+    }
+
     fn render_status(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+
+        // Model: live usage, else the open session, else the profile default.
         let model = self
             .usage
             .as_ref()
@@ -181,57 +283,61 @@ impl HermesApp {
                     .find(|s| &s.id == id)
                     .map(|s| s.model.clone())
             })
-            .or_else(|| self.sessions.first().map(|s| s.model.clone()))
+            .filter(|m| !m.is_empty())
+            .or_else(|| {
+                let p = self.profile.as_ref()?;
+                self.profiles
+                    .iter()
+                    .find(|x| &x.name == p)
+                    .map(|x| x.model.clone())
+            })
             .filter(|m| !m.is_empty())
             .unwrap_or_else(|| "—".into());
 
-        let context = self.usage.as_ref().filter(|u| u.context_max > 0).map(|u| {
-            let pct = (u.context_percent / 100.0).clamp(0.0, 1.0) as f32;
-            let color = if pct > 0.85 {
-                theme.danger
-            } else if pct > 0.6 {
-                theme.warning
-            } else {
-                theme.foreground
-            };
-            v_flex()
-                .gap_1()
-                .child(
-                    h_flex()
-                        .gap_1p5()
-                        .items_center()
-                        .child(Icon::new(IconName::MemoryStick).xsmall().text_color(muted))
-                        .child(format!(
-                            "{} / {} · {:.0}%",
-                            compact(u.context_used),
-                            compact(u.context_max),
-                            u.context_percent
-                        )),
+        let usage = self.usage.as_ref().filter(|u| u.context_max > 0);
+        let pct = usage
+            .map(|u| (u.context_percent / 100.0).clamp(0.0, 1.0) as f32)
+            .unwrap_or(0.);
+        let bar = if pct > 0.85 {
+            theme.danger
+        } else if pct > 0.6 {
+            theme.warning
+        } else {
+            theme.foreground
+        };
+        let context = usage
+            .map(|u| {
+                format!(
+                    "{} / {} · {:.0}%",
+                    compact(u.context_used),
+                    compact(u.context_max),
+                    u.context_percent
                 )
-                .child(
-                    div()
-                        .h(px(2.))
-                        .w_full()
-                        .bg(theme.border)
-                        .child(div().h_full().bg(color).w(relative(pct))),
-                )
-                .child(
-                    div().text_color(muted).child(
-                        [
-                            (u.total_tokens > 0)
-                                .then(|| format!("всего {}", compact(u.total_tokens))),
-                            (u.compressions > 0).then(|| {
-                                plural(u.compressions as usize, "сжатие", "сжатия", "сжатий")
-                            }),
-                            u.cache_hit_pct.map(|c| format!("кэш {c}%")),
-                        ]
-                        .into_iter()
-                        .flatten()
-                        .collect::<Vec<_>>()
-                        .join(" · "),
-                    ),
-                )
-        });
+            })
+            .unwrap_or_else(|| "контекст —".into());
+        let extra = usage
+            .map(|u| {
+                [
+                    (u.total_tokens > 0).then(|| format!("всего {}", compact(u.total_tokens))),
+                    (u.compressions > 0)
+                        .then(|| plural(u.compressions as usize, "сжатие", "сжатия", "сжатий")),
+                    u.cache_hit_pct.map(|c| format!("кэш {c}%")),
+                ]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<_>>()
+                .join(" · ")
+            })
+            .unwrap_or_default();
+
+        let row = |icon: IconName, text: String| {
+            h_flex()
+                .gap_1p5()
+                .items_center()
+                .h(px(18.))
+                .child(Icon::new(icon).xsmall().text_color(muted))
+                .child(div().truncate().child(text))
+        };
 
         v_flex()
             .flex_none()
@@ -242,16 +348,15 @@ impl HermesApp {
             .border_t_1()
             .border_color(theme.sidebar_border)
             .text_xs()
+            .child(row(IconName::Cpu, model))
+            .child(row(IconName::MemoryStick, context))
             .child(
-                h_flex()
-                    .gap_1p5()
-                    .items_center()
-                    .child(Icon::new(IconName::Cpu).xsmall().text_color(muted))
-                    .child(div().truncate().child(model)),
+                div()
+                    .h(px(2.))
+                    .w_full()
+                    .bg(theme.border)
+                    .child(div().h_full().bg(bar).w(relative(pct))),
             )
-            .children(context)
-            .when_some(self.notice.clone(), |d, n| {
-                d.child(div().text_color(theme.danger).child(n))
-            })
+            .child(div().h(px(16.)).text_color(muted).truncate().child(extra))
     }
 }
