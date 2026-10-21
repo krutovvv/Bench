@@ -5,7 +5,7 @@ mod composer;
 mod panels;
 mod sidebar;
 
-use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -126,7 +126,7 @@ impl HermesApp {
                 .cursor_pointer()
                 .text_color(theme.muted_foreground)
                 .hover(|s| s.text_color(theme.foreground))
-                .child(Icon::new(IconName::Close).small())
+                .child(crate::icons::Ico::X.icon().small())
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.panel = Panel::Chat;
                     cx.notify();

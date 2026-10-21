@@ -1,8 +1,9 @@
 //! The input box: multi-line text, mic, reasoning effort, send / stop. Flat, no shadow.
 
+use crate::icons::Ico;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Textarea;
-use gpui_kit::component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -37,9 +38,9 @@ impl HermesApp {
             .small()
             .map(|b| if recording { b.danger() } else { b.ghost() })
             .icon(if self.transcribing {
-                IconName::LoaderCircle
+                Ico::Loader.icon()
             } else {
-                IconName::Mic
+                Ico::Mic.icon()
             })
             .tooltip(if recording {
                 "Остановить и распознать"
@@ -52,14 +53,14 @@ impl HermesApp {
             Button::new("stop")
                 .small()
                 .secondary()
-                .icon(IconName::Square)
+                .icon(Ico::Square.icon())
                 .tooltip("Остановить")
                 .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
         } else {
             Button::new("send")
                 .small()
                 .primary()
-                .icon(IconName::ArrowUp)
+                .icon(Ico::ArrowUp.icon())
                 .on_click(cx.listener(|this, _, window, cx| this.send(window, cx)))
         };
 

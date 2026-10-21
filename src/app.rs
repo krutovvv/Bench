@@ -453,8 +453,14 @@ impl HermesApp {
                 session,
                 name,
                 detail,
+                urls,
             } if self.is_current(&session) => {
                 if let Some(turn) = self.turns.last_mut() {
+                    for url in urls {
+                        if !turn.sources.contains(&url) {
+                            turn.sources.push(url);
+                        }
+                    }
                     let narration = last_line(&turn.answer);
                     history::demote_answer(turn);
                     if let Some(live) = self.live.as_mut() {
@@ -486,6 +492,7 @@ impl HermesApp {
             Evt::Complete { session, text } if self.is_current(&session) => {
                 self.live = None;
                 if let Some(turn) = self.turns.last_mut() {
+                    turn.finished = Some(now_secs());
                     if !text.trim().is_empty() {
                         turn.answer = text;
                     }
@@ -625,6 +632,7 @@ impl HermesApp {
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.turns.push(Turn {
             user: text.clone(),
+            started: Some(now_secs()),
             ..Default::default()
         });
         self.scroller.update(cx, |s, cx| {
@@ -653,6 +661,68 @@ impl HermesApp {
             }
         }
         cx.notify();
+    }
+
+    /// Ask the last question again: the gateway drops the last exchange, then the same text is sent.
+    pub fn regenerate(&mut self, cx: &mut Context<Self>) {
+        let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) else {
+            return;
+        };
+        if self.live.is_some() {
+            return;
+        }
+        let Some(turn) = self.turns.last_mut() else {
+            return;
+        };
+        let text = turn.user.clone();
+        *turn = Turn {
+            user: text.clone(),
+            started: Some(now_secs()),
+            ..Default::default()
+        };
+        self.live = Some(Live {
+            started: Instant::now(),
+            label: "Повторяю…".into(),
+        });
+        self.remeasure_last(cx);
+        self.cmd(Cmd::Regenerate {
+            profile,
+            session,
+            text,
+        });
+        cx.notify();
+    }
+
+    pub fn copy_answer(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(t) = self.turns.get(i) {
+            cx.write_to_clipboard(ClipboardItem::new_string(t.answer.clone()));
+            self.toast(NotificationType::Success, "Скопировано", window, cx);
+        }
+    }
+
+    /// `hermes gateway restart` on the machine we are connected to, then reconnect.
+    pub fn restart_gateway(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let target = self.target.clone();
+        self.toast(NotificationType::Info, "Перезапускаю шлюз…", window, cx);
+        cx.spawn_in(window, async move |this, cx| {
+            let t = target.clone();
+            let result = cx
+                .background_spawn(async move { connection::restart_gateway(&t) })
+                .await;
+            let _ = this.update_in(cx, |this, window, cx| match result {
+                Ok(()) => {
+                    this.toast(NotificationType::Success, "Шлюз перезапущен", window, cx);
+                    this.connect(target, window, cx);
+                }
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Перезапуск: {e:#}"),
+                    window,
+                    cx,
+                ),
+            });
+        })
+        .detach();
     }
 
     pub fn stop(&mut self, cx: &mut Context<Self>) {
@@ -978,6 +1048,13 @@ impl HermesApp {
         );
         cx.notify();
     }
+}
+
+pub fn now_secs() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or_default()
 }
 
 pub fn last_line(text: &str) -> String {

@@ -347,6 +347,33 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
 
+/// `hermes gateway restart` locally or on the SSH host (the messaging gateway service).
+pub fn restart_gateway(target: &Target) -> Result<()> {
+    let out = match target {
+        Target::Local => Command::new(home().join(".local/bin/hermes"))
+            .args(["gateway", "restart"])
+            .output()?,
+        Target::Ssh(host) => Command::new("ssh")
+            .args([
+                "-o",
+                "BatchMode=yes",
+                host,
+                "bash -lc '\"$HOME/.local/bin/hermes\" gateway restart'",
+            ])
+            .output()?,
+    };
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        bail!(
+            "{}",
+            err.lines()
+                .last()
+                .unwrap_or("hermes gateway restart failed")
+        );
+    }
+    Ok(())
+}
+
 /// Whether `host` answers over SSH and has a working Hermes (a stale wrapper is not enough).
 pub fn has_hermes(host: &str) -> bool {
     Command::new("ssh")

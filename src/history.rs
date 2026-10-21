@@ -154,3 +154,146 @@ pub fn turns(messages: &[Value]) -> Vec<Turn> {
     }
     out
 }
+
+// ---- sources & timing ------------------------------------------------------
+
+/// Sites a tool call visited: URLs in its arguments, except file contents, patches and code
+/// (an HTML file being written is full of schema URLs that were never opened).
+pub fn tool_urls(name: &str, args: &Value, out: &mut Vec<String>) {
+    let name = name.to_lowercase();
+    if ["write", "patch", "edit", "create", "memory", "skill"]
+        .iter()
+        .any(|w| name.contains(w))
+    {
+        return;
+    }
+    let args = match args {
+        Value::String(s) => serde_json::from_str(s).unwrap_or_else(|_| args.clone()),
+        other => other.clone(),
+    };
+    match &args {
+        Value::Object(m) => {
+            for (k, v) in m {
+                if ![
+                    "content",
+                    "code",
+                    "text",
+                    "patch",
+                    "new_string",
+                    "old_string",
+                    "script",
+                    "html",
+                    "body",
+                    "expression",
+                    "function",
+                    "js",
+                    "javascript",
+                    "source",
+                ]
+                .contains(&k.as_str())
+                {
+                    urls_in(v, out);
+                }
+            }
+        }
+        other => urls_in(other, out),
+    }
+}
+
+/// External http(s) URLs anywhere in a JSON value; local-network ones are skipped.
+pub fn urls_in(v: &Value, out: &mut Vec<String>) {
+    match v {
+        Value::String(s) => {
+            for word in s.split(|c: char| c.is_whitespace() || "\"'<>`()[]".contains(c)) {
+                if let Some(start) = word.find("http") {
+                    let url = word[start..].trim_end_matches(['.', ',', ';', ':', '!', '?']);
+                    if (url.starts_with("http://") || url.starts_with("https://"))
+                        && !is_local(&host_of(url))
+                        && !url.contains("w3.org/")
+                        && !url.contains("${")
+                        && !url.contains('{')
+                        && !out.iter().any(|u| u == url)
+                    {
+                        out.push(url.to_string());
+                    }
+                }
+            }
+        }
+        Value::Array(a) => a.iter().for_each(|x| urls_in(x, out)),
+        Value::Object(m) => m.values().for_each(|x| urls_in(x, out)),
+        _ => {}
+    }
+}
+
+pub fn host_of(url: &str) -> String {
+    let rest = url.split("://").nth(1).unwrap_or(url);
+    let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let host = host.rsplit('@').next().unwrap_or(host);
+    let host = host.split(':').next().unwrap_or(host);
+    host.trim_start_matches("www.").to_lowercase()
+}
+
+fn is_local(host: &str) -> bool {
+    host.is_empty()
+        || host == "localhost"
+        || host.ends_with(".local")
+        || host.starts_with("127.")
+        || host.starts_with("10.")
+        || host.starts_with("192.168.")
+        || host.starts_with("0.0.0.0")
+        || (host.starts_with("172.")
+            && host
+                .split('.')
+                .nth(1)
+                .and_then(|n| n.parse::<u8>().ok())
+                .is_some_and(|n| (16..=31).contains(&n)))
+}
+
+/// Per-turn extras from the `session.history` projection (tool args, timestamps).
+pub struct Meta {
+    pub sources: Vec<String>,
+    pub started: Option<f64>,
+    pub finished: Option<f64>,
+}
+
+pub fn metas(messages: &[Value]) -> Vec<Meta> {
+    let mut out: Vec<Meta> = vec![];
+    for m in messages {
+        let ts = m["timestamp"].as_f64();
+        let text = m["text"]
+            .as_str()
+            .map(str::to_string)
+            .unwrap_or_else(|| text_of(&m["content"]));
+        if m["role"] == "user" {
+            if !is_system_row(&text) {
+                out.push(Meta {
+                    sources: vec![],
+                    started: ts,
+                    finished: ts,
+                });
+            }
+            continue;
+        }
+        let Some(meta) = out.last_mut() else { continue };
+        if ts.is_some_and(|t| meta.finished.is_none_or(|f| t > f)) {
+            meta.finished = ts;
+        }
+        if m["role"] == "tool" {
+            let name = m["name"]
+                .as_str()
+                .or(m["tool_name"].as_str())
+                .unwrap_or_default();
+            tool_urls(name, &m["args"], &mut meta.sources);
+        }
+    }
+    out
+}
+
+/// Pair metas with turns from the end (both skip the same system rows).
+pub fn attach(turns: &mut [Turn], metas: Vec<Meta>) {
+    for (turn, meta) in turns.iter_mut().rev().zip(metas.into_iter().rev()) {
+        turn.sources = meta.sources;
+        turn.started = meta.started;
+        turn.finished = meta.finished;
+    }
+}

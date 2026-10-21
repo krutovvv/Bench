@@ -1,19 +1,32 @@
-//! The conversation: one row per turn — user bubble, folded steps, answer.
+//! The conversation: one row per turn — user message, folded steps, answer,
+//! sources (always) and actions (on hover).
 
 use std::rc::Rc;
 
 use gpui_kit::component::message_scroller::MessageScroller;
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::text::TextView;
-use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::{clip, clock, plural};
 use crate::app::{HermesApp, tool_label};
+use crate::history::host_of;
+use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
 pub const COLUMN: f32 = 900.;
+
+/// What a turn row needs besides the turn itself.
+#[derive(Clone)]
+struct RowState {
+    live: Option<(SharedString, u64)>,
+    playing: bool,
+    speaking: bool,
+    last: bool,
+}
 
 impl HermesApp {
     pub(super) fn render_chat(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -53,28 +66,36 @@ impl HermesApp {
             let Some(turn) = turns.get(i) else {
                 return div().into_any_element();
             };
-            let is_last = i + 1 == turns.len();
-            render_turn(
-                i,
-                turn,
-                live.clone().filter(|_| is_last),
-                playing == Some(i),
-                speaking == Some(i),
-                &view,
-                cx,
-            )
+            let last = i + 1 == turns.len();
+            let state = RowState {
+                live: live.clone().filter(|_| last),
+                playing: playing == Some(i),
+                speaking: speaking == Some(i),
+                last,
+            };
+            render_turn(i, turn, state, &view, cx)
         })
         .size_full()
         .into_any_element()
     }
 }
 
+fn icon_button(id: impl Into<ElementId>, icon: Ico, tip: &'static str, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme();
+    div()
+        .id(id)
+        .p_1()
+        .cursor_pointer()
+        .text_color(theme.muted_foreground)
+        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+        .child(icon.icon().xsmall())
+        .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
+}
+
 fn render_turn(
     i: usize,
     turn: &Turn,
-    live: Option<(SharedString, u64)>,
-    playing: bool,
-    speaking: bool,
+    st: RowState,
     view: &Entity<HermesApp>,
     cx: &mut App,
 ) -> AnyElement {
@@ -87,19 +108,18 @@ fn render_turn(
         .filter(|s| matches!(s, Step::Tool { failed: true, .. }))
         .count();
     let has_steps = !turn.steps.is_empty();
+    let group: SharedString = format!("turn{i}").into();
 
-    // The one-line summary, clickable when there is something to unfold.
-    let summary = (has_steps || live.is_some()).then(|| {
-        let tail = [
-            (tools > 0).then(|| plural(tools, "действие", "действия", "действий")),
-            (errors > 0).then(|| plural(errors, "ошибка", "ошибки", "ошибок")),
-            live.as_ref().map(|(_, s)| clock(*s)),
-        ]
-        .into_iter()
-        .flatten()
-        .collect::<Vec<_>>()
-        .join(" · ");
+    // One-line summary of the steps; only the error count is red.
+    let summary = (has_steps || st.live.is_some()).then(|| {
         let toggle = view.clone();
+        let mut tail: Vec<String> = vec![];
+        if tools > 0 {
+            tail.push(plural(tools, "действие", "действия", "действий"));
+        }
+        if let Some((_, s)) = &st.live {
+            tail.push(clock(*s));
+        }
         h_flex()
             .id(("steps", i))
             .gap_1p5()
@@ -111,15 +131,16 @@ fn render_turn(
                 d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
             })
             .child(
-                Icon::new(if turn.expanded {
-                    IconName::ChevronDown
+                (if turn.expanded {
+                    Ico::ChevronDown
                 } else {
-                    IconName::ChevronRight
+                    Ico::ChevronRight
                 })
+                .icon()
                 .xsmall()
                 .when(!has_steps, |i| i.text_color(theme.transparent)),
             )
-            .map(|d| match &live {
+            .map(|d| match &st.live {
                 Some((label, _)) => d.child(
                     ShimmerText::new(label.clone())
                         .text_color(muted)
@@ -128,104 +149,141 @@ fn render_turn(
                 None => d.child(div().flex_none().child("Готово")),
             })
             .when(!tail.is_empty(), |d| {
-                d.child(
-                    div()
-                        .flex_none()
-                        .text_color(if errors > 0 { theme.danger } else { muted })
-                        .child(tail),
-                )
+                d.child(div().flex_none().child(format!("· {}", tail.join(" · "))))
             })
-            .on_click(move |_, _, cx| view_toggle(&toggle, i, cx))
+            .when(errors > 0, |d| {
+                d.child(div().flex_none().text_color(theme.danger).child(format!(
+                    "· {}",
+                    plural(errors, "ошибка", "ошибки", "ошибок")
+                )))
+            })
+            .on_click(move |_, _, cx| toggle.update(cx, |this, cx| this.toggle_turn(i, cx)))
     });
 
-    let steps =
-        turn.expanded.then(|| {
-            v_flex()
-                .ml(px(6.))
-                .pl_4()
-                .gap_1p5()
-                .border_l_1()
-                .border_color(theme.border)
-                .text_sm()
-                .children(turn.steps.iter().map(|step| {
-                    match step {
-                        Step::Tool {
-                            name,
-                            detail,
-                            failed,
-                        } => {
-                            h_flex()
-                                .gap_2()
-                                .items_start()
-                                .child(
-                                    Icon::new(if *failed {
-                                        IconName::CircleAlert
-                                    } else {
-                                        IconName::SquareTerminal
-                                    })
-                                    .xsmall()
-                                    .mt(px(3.))
-                                    .text_color(if *failed { theme.danger } else { muted }),
-                                )
-                                .child(
-                                    div()
-                                        .text_color(if *failed { theme.danger } else { muted })
-                                        .child(clip(&tool_label(name, detail), 220)),
-                                )
-                                .into_any_element()
-                        }
-                        Step::Note(text) => div()
-                            .text_color(theme.foreground.opacity(0.75))
-                            .child(clip(text, 400))
-                            .into_any_element(),
-                        Step::Thought(text) => v_flex()
-                            .gap_0p5()
-                            .child(div().text_xs().text_color(muted).child("Размышление"))
-                            .child(div().text_xs().text_color(muted).child(clip(text, 600)))
-                            .into_any_element(),
+    let steps = turn.expanded.then(|| {
+        v_flex()
+            .ml(px(6.))
+            .pl_4()
+            .gap_1p5()
+            .border_l_1()
+            .border_color(theme.border)
+            .text_sm()
+            .children(turn.steps.iter().map(|step| {
+                match step {
+                    Step::Tool {
+                        name,
+                        detail,
+                        failed,
+                    } => {
+                        let color = if *failed { theme.danger } else { muted };
+                        h_flex()
+                            .gap_2()
+                            .items_start()
+                            .child(
+                                (if *failed {
+                                    Ico::CircleAlert
+                                } else {
+                                    Ico::Terminal
+                                })
+                                .icon()
+                                .xsmall()
+                                .mt(px(3.))
+                                .text_color(color),
+                            )
+                            .child(
+                                div()
+                                    .text_color(color)
+                                    .child(clip(&tool_label(name, detail), 220)),
+                            )
+                            .into_any_element()
                     }
-                }))
-        });
+                    Step::Note(text) => div()
+                        .text_color(theme.foreground.opacity(0.75))
+                        .child(clip(text, 400))
+                        .into_any_element(),
+                    Step::Thought(text) => h_flex()
+                        .gap_2()
+                        .items_start()
+                        .child(Ico::Brain.icon().xsmall().mt(px(3.)).text_color(muted))
+                        .child(div().text_xs().text_color(muted).child(clip(text, 600)))
+                        .into_any_element(),
+                }
+            }))
+    });
 
     let answer = (!turn.answer.trim().is_empty()).then(|| {
-        let speak = view.clone();
-        v_flex()
-            .gap_1()
-            .child(TextView::markdown(
-                SharedString::from(format!("answer-{i}")),
-                turn.answer.clone(),
-            ))
-            .when(live.is_none(), |d| {
+        TextView::markdown(
+            SharedString::from(format!("answer-{i}")),
+            turn.answer.clone(),
+        )
+    });
+
+    // Sources (left, always) and actions (right, on hover).
+    let sources = render_sources(i, &turn.sources, cx);
+    let actions = (st.live.is_none() && !turn.answer.trim().is_empty()).then(|| {
+        let (copy, speak, regen) = (view.clone(), view.clone(), view.clone());
+        let time = match (turn.started, turn.finished) {
+            (Some(a), Some(b)) if b > a => clock((b - a) as u64),
+            _ => String::new(),
+        };
+        let when = turn.finished.or(turn.started).unwrap_or_default();
+        h_flex()
+            .gap_0p5()
+            .items_center()
+            .opacity(0.)
+            .group_hover(group.clone(), |s| s.opacity(1.))
+            .when(!time.is_empty(), |d| {
                 d.child(
-                    h_flex().child(
-                        div()
-                            .id(("speak", i))
-                            .p_1()
-                            .border_1()
-                            .border_color(theme.border)
-                            .cursor_pointer()
-                            .text_color(muted)
-                            .hover(|s| s.bg(theme.secondary).text_color(theme.foreground))
-                            .child(
-                                Icon::new(if playing {
-                                    IconName::Pause
-                                } else if speaking {
-                                    IconName::LoaderCircle
-                                } else {
-                                    IconName::Play
-                                })
-                                .xsmall(),
-                            )
-                            .on_click(move |_, window, cx| {
-                                speak.update(cx, |this, cx| this.toggle_speak(i, window, cx));
-                            }),
-                    ),
+                    div()
+                        .id(("time", i))
+                        .px_1()
+                        .text_xs()
+                        .text_color(muted)
+                        .child(time)
+                        .tooltip(move |window, cx| {
+                            Tooltip::new(format_when(when)).build(window, cx)
+                        }),
+                )
+            })
+            .child(
+                icon_button(("copy", i), Ico::Copy, "Копировать", cx).on_click(
+                    move |_, window, cx| {
+                        copy.update(cx, |this, cx| this.copy_answer(i, window, cx))
+                    },
+                ),
+            )
+            .child(
+                icon_button(
+                    ("speak", i),
+                    if st.playing {
+                        Ico::Square
+                    } else if st.speaking {
+                        Ico::Loader
+                    } else {
+                        Ico::Volume
+                    },
+                    if st.playing {
+                        "Остановить"
+                    } else {
+                        "Озвучить"
+                    },
+                    cx,
+                )
+                .on_click(move |_, window, cx| {
+                    speak.update(cx, |this, cx| this.toggle_speak(i, window, cx))
+                }),
+            )
+            .when(st.last, |d| {
+                d.child(
+                    icon_button(("regen", i), Ico::RotateCcw, "Ответить заново", cx)
+                        .on_click(move |_, _, cx| regen.update(cx, |this, cx| this.regenerate(cx))),
                 )
             })
     });
 
     h_flex()
         .id(("turn", i))
+        .group(group)
         .w_full()
         .px_4()
         .py_3()
@@ -247,11 +305,74 @@ fn render_turn(
                 )
                 .children(summary)
                 .children(steps)
-                .children(answer),
+                .children(answer)
+                .child(
+                    h_flex()
+                        .min_h(px(22.))
+                        .gap_2()
+                        .items_start()
+                        .child(div().flex_1().min_w_0().children(sources))
+                        .children(actions),
+                ),
         )
         .into_any_element()
 }
 
-fn view_toggle(view: &Entity<HermesApp>, i: usize, cx: &mut App) {
-    view.update(cx, |this, cx| this.toggle_turn(i, cx));
+/// One chip per site; click opens its first page, the tooltip lists them all.
+fn render_sources(i: usize, urls: &[String], cx: &App) -> Option<AnyElement> {
+    if urls.is_empty() {
+        return None;
+    }
+    let theme = cx.theme().clone();
+    let mut hosts: Vec<(String, Vec<String>)> = vec![];
+    for u in urls {
+        let h = host_of(u);
+        match hosts.iter_mut().find(|(x, _)| *x == h) {
+            Some((_, pages)) => pages.push(u.clone()),
+            None => hosts.push((h, vec![u.clone()])),
+        }
+    }
+    hosts.sort_by_key(|(_, p)| std::cmp::Reverse(p.len()));
+    let chips = hosts
+        .into_iter()
+        .take(10)
+        .enumerate()
+        .map(|(k, (host, pages))| {
+            let first = pages[0].clone();
+            let list: SharedString = pages.join("\n").into();
+            h_flex()
+                .id(SharedString::from(format!("src-{i}-{k}")))
+                .gap_1()
+                .px_1p5()
+                .py_0p5()
+                .border_1()
+                .border_color(theme.border)
+                .text_xs()
+                .text_color(theme.muted_foreground)
+                .cursor_pointer()
+                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                .child(Ico::Globe.icon().xsmall())
+                .child(host)
+                .when(pages.len() > 1, |d| {
+                    d.child(div().opacity(0.6).child(pages.len().to_string()))
+                })
+                .tooltip(move |window, cx| Tooltip::new(list.clone()).build(window, cx))
+                .on_click(move |_, _, cx| cx.open_url(&first))
+        });
+    Some(
+        h_flex()
+            .flex_wrap()
+            .gap_1()
+            .children(chips)
+            .into_any_element(),
+    )
+}
+
+/// "21 окт 22:15" for a Unix timestamp, in local time.
+fn format_when(ts: f64) -> String {
+    let out = std::process::Command::new("date")
+        .args(["-r", &(ts as i64).to_string(), "+%d.%m.%Y %H:%M"])
+        .output();
+    out.map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+        .unwrap_or_default()
 }

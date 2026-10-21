@@ -5,6 +5,7 @@ mod audio;
 mod connection;
 mod gateway;
 mod history;
+mod icons;
 mod model;
 mod rest;
 mod theme;
@@ -32,9 +33,10 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     "profiles: {:?}",
                     p.iter().map(|p| &p.name).collect::<Vec<_>>()
                 );
-                gw.send(gateway::Cmd::Sessions(
-                    p.first().map(|p| p.name.clone()).unwrap_or_default(),
-                ));
+                let want = std::env::var("PROBE_PROFILE").ok();
+                let name =
+                    want.unwrap_or_else(|| p.first().map(|p| p.name.clone()).unwrap_or_default());
+                gw.send(gateway::Cmd::Sessions(name));
             }
             gateway::Evt::Sessions(p, rows) => {
                 println!("sessions[{p}]: {}", rows.len());
@@ -42,7 +44,8 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
                     println!("mcp[{p}]: {} bytes of JSON", rest::mcp_json(c, &p)?.len());
                 }
-                let Some(first) = rows.first() else {
+                let pick = std::env::var("PROBE_MATCH").unwrap_or_default();
+                let Some(first) = rows.iter().find(|r| r.title.contains(&pick)) else {
                     return Ok(());
                 };
                 gw.send(gateway::Cmd::Open {
@@ -60,6 +63,17 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     "open: stored={session} runtime={runtime} turns={}",
                     turns.len()
                 );
+                for t in turns.iter().rev().take(3) {
+                    let took = match (t.started, t.finished) {
+                        (Some(a), Some(b)) => format!("{:.0}s", b - a),
+                        _ => "?".into(),
+                    };
+                    let src: Vec<_> = t.sources.iter().take(3).collect();
+                    println!(
+                        "  turn: steps={} sources={src:?} took={took}",
+                        t.steps.len()
+                    );
+                }
                 return Ok(());
             }
             _ => {}

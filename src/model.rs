@@ -73,6 +73,11 @@ pub struct Turn {
     pub steps: Vec<Step>,
     pub answer: String,
     pub expanded: bool,
+    /// External pages the agent's tool calls touched, in order, deduplicated.
+    pub sources: Vec<String>,
+    /// Unix seconds: when the user sent it, when the last message of the turn landed.
+    pub started: Option<f64>,
+    pub finished: Option<f64>,
 }
 
 impl Turn {

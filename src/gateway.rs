@@ -39,6 +39,12 @@ pub enum Cmd {
         session: String,
         runtime: Option<String>,
     },
+    /// Drop the last exchange and ask the same question again.
+    Regenerate {
+        profile: String,
+        session: String,
+        text: String,
+    },
     Shutdown,
 }
 
@@ -69,6 +75,7 @@ pub enum Evt {
         session: String,
         name: String,
         detail: String,
+        urls: Vec<String>,
     },
     ToolDone {
         session: String,
@@ -84,7 +91,15 @@ pub enum Evt {
 enum Pending {
     Profiles,
     Sessions(String),
-    Resume(String),
+    /// (stored session id, profile)
+    Resume(String, String),
+    /// Resume done; `session.history` fills in sources and timing before the UI gets it.
+    Meta {
+        session: String,
+        runtime: String,
+        turns: Vec<Turn>,
+        running: bool,
+    },
     Create,
     Delete,
     Ignore,
@@ -146,7 +161,7 @@ impl Rpc {
             Cmd::Open { profile, session } => self.call(
                 "session.resume",
                 json!({"session_id": session, "profile": profile}),
-                Pending::Resume(session),
+                Pending::Resume(session, profile),
             )?,
             Cmd::Delete {
                 profile,
@@ -192,6 +207,22 @@ impl Rpc {
                 json!({"session_id": session, "profile": profile}),
                 Pending::Ignore,
             )?,
+            Cmd::Regenerate {
+                profile,
+                session,
+                text,
+            } => {
+                self.call(
+                    "session.undo",
+                    json!({"session_id": session, "profile": profile, "intent": "retry"}),
+                    Pending::Ignore,
+                )?;
+                let mut params = json!({"session_id": session, "text": text, "profile": profile});
+                if self.canonical {
+                    params["submission_id"] = json!(uuid::Uuid::new_v4().to_string());
+                }
+                self.call("prompt.submit", params, Pending::Ignore)?
+            }
         }
         Ok(true)
     }
@@ -244,10 +275,42 @@ fn run(
                 let text = err["message"].as_str().unwrap_or("error").to_string();
                 match kind {
                     Pending::Delete => emit(Evt::DeleteFailed(text)),
+                    // Older gateways may lack the projection: show the turns without extras.
+                    Pending::Meta {
+                        session,
+                        runtime,
+                        turns,
+                        running,
+                    } => emit(Evt::History {
+                        session,
+                        runtime,
+                        turns,
+                        running,
+                    }),
                     // A close of a session the gateway already dropped is not worth a toast.
                     Pending::Ignore if text.contains("not found") => {}
                     _ => emit(Evt::Error(text)),
                 }
+                continue;
+            }
+            // Resume -> fetch the history projection for sources and timing.
+            if let Pending::Resume(session, profile) = kind {
+                let r = &msg["result"];
+                let runtime = r["session_id"].as_str().unwrap_or(&session).to_string();
+                let turns =
+                    history::turns(r["messages"].as_array().map(Vec::as_slice).unwrap_or(&[]));
+                let running = r["running"].as_bool().unwrap_or(false);
+                let params = json!({"session_id": runtime, "profile": profile});
+                rpc.call(
+                    "session.history",
+                    params,
+                    Pending::Meta {
+                        session,
+                        runtime,
+                        turns,
+                        running,
+                    },
+                )?;
                 continue;
             }
             on_result(kind, &msg["result"], &emit);
@@ -300,12 +363,21 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                 })
                 .collect(),
         )),
-        Pending::Resume(session) => emit(Evt::History {
-            turns: history::turns(&list(&r["messages"])),
-            running: r["running"].as_bool().unwrap_or(false),
-            runtime: r["session_id"].as_str().unwrap_or(&session).to_string(),
+        Pending::Resume(..) => {}
+        Pending::Meta {
             session,
-        }),
+            runtime,
+            mut turns,
+            running,
+        } => {
+            history::attach(&mut turns, history::metas(&list(&r["messages"])));
+            emit(Evt::History {
+                session,
+                runtime,
+                turns,
+                running,
+            })
+        }
         Pending::Create => {
             let runtime = r["session_id"].as_str().unwrap_or_default().to_string();
             let session = r["stored_session_id"]
@@ -333,6 +405,15 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
                 .as_str()
                 .map(str::to_string)
                 .unwrap_or_else(|| history::preview(&payload["args"])),
+            urls: {
+                let mut urls = vec![];
+                history::tool_urls(
+                    payload["name"].as_str().unwrap_or_default(),
+                    &payload["args"],
+                    &mut urls,
+                );
+                urls
+            },
             session: sid,
         }),
         "tool.complete" => emit(Evt::ToolDone {

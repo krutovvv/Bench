@@ -1,12 +1,14 @@
 //! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
 
 use gpui_kit::component::select::Select;
-use gpui_kit::component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::{compact, plural};
 use crate::app::{HermesApp, Panel};
+use crate::icons::Ico;
 use crate::model::source_label;
 
 impl HermesApp {
@@ -47,19 +49,31 @@ impl HermesApp {
 
         let new_session = h_flex()
             .id("new-session")
-            .h(px(35.))
+            .h(px(32.))
             .px_3()
             .gap_2()
             .items_center()
+            .justify_center()
             .text_sm()
-            .border_1()
-            .border_color(theme.input)
-            .bg(theme.background)
+            .font_weight(FontWeight::MEDIUM)
+            .bg(theme.primary)
+            .text_color(theme.primary_foreground)
             .cursor_pointer()
-            .hover(|s| s.bg(theme.list_hover))
-            .child(Icon::new(IconName::Plus).small().text_color(muted))
+            .hover(|s| s.bg(theme.primary_hover))
+            .child(Ico::Plus.icon().small())
             .child("Новая сессия")
             .on_click(cx.listener(|this, _, _, cx| this.new_session(cx)));
+
+        let footer_button = |id: &'static str, icon: Ico, tip: &'static str, active: bool| {
+            div()
+                .id(id)
+                .p_1()
+                .cursor_pointer()
+                .text_color(if active { theme.primary } else { muted })
+                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                .child(icon.icon().small())
+                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
+        };
 
         v_flex()
             .w(px(280.))
@@ -73,14 +87,13 @@ impl HermesApp {
                     .pt(px(40.))
                     .px_3()
                     .pb_3()
-                    .gap_2()
+                    .gap_3()
                     .border_b_1()
                     .border_color(theme.sidebar_border)
                     .child(
                         h_flex()
                             .gap_2()
                             .items_center()
-                            .pb_1()
                             .child(crate::theme::logo(px(20.)))
                             .child(
                                 div()
@@ -89,8 +102,6 @@ impl HermesApp {
                                     .child("Hermes"),
                             ),
                     )
-                    .child(Select::new(&self.target_choice))
-                    .child(Select::new(&self.profile_choice).placeholder("Профиль"))
                     .child(new_session),
             )
             .child(
@@ -112,41 +123,75 @@ impl HermesApp {
                         )
                     }),
             )
+            // Rarely changed: where and which profile, then the status line.
             .child(
-                h_flex()
+                v_flex()
                     .flex_none()
-                    .items_start()
+                    .gap_1p5()
+                    .px_3()
+                    .py_2()
                     .bg(theme.title_bar)
                     .border_t_1()
                     .border_color(theme.sidebar_border)
-                    .child(div().flex_1().min_w_0().child(self.render_status(cx)))
                     .child(
-                        div()
-                            .id("settings")
-                            .m_2()
-                            .p_1()
-                            .cursor_pointer()
-                            .text_color(if self.panel.is_settings() {
-                                theme.primary
-                            } else {
-                                muted
-                            })
-                            .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                            .child(Icon::new(IconName::Settings).small())
-                            .tooltip(|window, cx| {
-                                gpui_kit::component::tooltip::Tooltip::new(
-                                    "Настройки: скиллы, MCP, Telegram",
+                        h_flex()
+                            .gap_1p5()
+                            .items_center()
+                            .child(Ico::Server.icon().xsmall().text_color(muted))
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .child(Select::new(&self.target_choice).small()),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .gap_1p5()
+                            .items_center()
+                            .child(Ico::UserRound.icon().xsmall().text_color(muted))
+                            .child(
+                                div().flex_1().min_w_0().child(
+                                    Select::new(&self.profile_choice)
+                                        .small()
+                                        .placeholder("Профиль"),
+                                ),
+                            ),
+                    )
+                    .child(
+                        h_flex()
+                            .items_start()
+                            .pt_1()
+                            .child(div().flex_1().min_w_0().child(self.render_status(cx)))
+                            .child(
+                                footer_button(
+                                    "restart",
+                                    Ico::RefreshCw,
+                                    "Перезапустить шлюз Hermes",
+                                    false,
                                 )
-                                .build(window, cx)
-                            })
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                if this.panel.is_settings() {
-                                    this.panel = Panel::Chat;
-                                    cx.notify();
-                                } else {
-                                    this.open_panel(Panel::Skills, window, cx);
-                                }
-                            })),
+                                .on_click(cx.listener(
+                                    |this, _, window, cx| this.restart_gateway(window, cx),
+                                )),
+                            )
+                            .child(
+                                footer_button(
+                                    "settings",
+                                    Ico::Settings,
+                                    "Настройки: скиллы, MCP, Telegram",
+                                    self.panel.is_settings(),
+                                )
+                                .on_click(cx.listener(
+                                    |this, _, window, cx| {
+                                        if this.panel.is_settings() {
+                                            this.panel = Panel::Chat;
+                                            cx.notify();
+                                        } else {
+                                            this.open_panel(Panel::Skills, window, cx);
+                                        }
+                                    },
+                                )),
+                            ),
                     ),
             )
     }
@@ -207,7 +252,7 @@ impl HermesApp {
                 .group_hover(group.clone(), |s| s.opacity(1.))
                 .text_color(muted)
                 .hover(|s| s.text_color(theme.danger))
-                .child(Icon::new(IconName::Delete).xsmall())
+                .child(Ico::Trash.icon().xsmall())
                 .on_click(cx.listener(move |this, _, _, cx| {
                     cx.stop_propagation();
                     this.delete_session(del_id.clone(), cx)
@@ -315,22 +360,20 @@ impl HermesApp {
             })
             .unwrap_or_default();
 
-        let row = |icon: IconName, text: String| {
+        let row = |icon: Ico, text: String| {
             h_flex()
                 .gap_1p5()
                 .items_center()
                 .h(px(18.))
-                .child(Icon::new(icon).xsmall().text_color(muted))
+                .child(icon.icon().xsmall().text_color(muted))
                 .child(div().truncate().child(text))
         };
 
         v_flex()
             .gap_1()
-            .px_3()
-            .py_2()
             .text_xs()
-            .child(row(IconName::Cpu, model))
-            .child(row(IconName::MemoryStick, context))
+            .child(row(Ico::Cpu, model))
+            .child(row(Ico::MemoryStick, context))
             .child(
                 div()
                     .h(px(2.))
