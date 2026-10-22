@@ -444,7 +444,12 @@ impl HermesApp {
                 .child(self.render_header_tail(cx))
                 .into_any_element();
         };
-        let alias = tab.alias.clone();
+        let local = tab.alias == crate::term::LOCAL;
+        let alias = if local {
+            "This Mac".to_string()
+        } else {
+            tab.alias.clone()
+        };
         let title = tab.session.title();
         let exited = tab.session.exited.load(Ordering::SeqCst).then(|| {
             tab.session
@@ -477,8 +482,12 @@ impl HermesApp {
                 )
         })
         .child(
-            toggle("disconnect", Ico::X, "Disconnect")
-                .on_click(cx.listener(|this, _, window, cx| this.close_server_tab(window, cx))),
+            toggle(
+                "disconnect",
+                Ico::X,
+                if local { "Close" } else { "Disconnect" },
+            )
+            .on_click(cx.listener(|this, _, window, cx| this.close_server_tab(window, cx))),
         )
         .child(self.render_header_tail(cx))
         .into_any_element()

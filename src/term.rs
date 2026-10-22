@@ -132,9 +132,13 @@ pub struct Session {
     pub exit_note: Mutex<Option<String>>,
 }
 
+/// The host name of the terminal on this machine: the user's own login shell, no ssh.
+pub const LOCAL: &str = "";
+
 impl Session {
-    /// Start `/usr/bin/ssh <host>` in a new PTY. `wake` gets a message whenever new output was
-    /// parsed (at most one queued: the view repaints once per batch).
+    /// Start `/usr/bin/ssh <host>` (or, for [`LOCAL`], the login shell) in a new PTY. `wake`
+    /// gets a message whenever new output was parsed (at most one queued: the view repaints once
+    /// per batch).
     pub fn spawn(
         host: &str,
         palette: Palette,
@@ -147,10 +151,21 @@ impl Session {
         let pair = native_pty_system()
             .openpty(pty_size(size))
             .context("open a pseudo-terminal")?;
-        let mut cmd = CommandBuilder::new("/usr/bin/ssh");
-        // The shared connection: this terminal reuses it, or opens it for the IDE and the agent.
-        cmd.args(crate::ssh::share_args());
-        cmd.arg(host);
+        let local = host == LOCAL;
+        let program = if local {
+            std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".into())
+        } else {
+            "/usr/bin/ssh".into()
+        };
+        let mut cmd = CommandBuilder::new(&program);
+        if local {
+            // A login shell, as Terminal.app starts it (the profile sets PATH and the prompt).
+            cmd.arg("-l");
+        } else {
+            // The shared connection: this terminal reuses it, or opens it for the IDE and the agent.
+            cmd.args(crate::ssh::share_args());
+            cmd.arg(host);
+        }
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
         // A Finder-launched app has no locale; ssh forwards LANG/LC_* (SendEnv) to the server.
@@ -163,7 +178,7 @@ impl Session {
         let mut child = pair
             .slave
             .spawn_command(cmd)
-            .context("start /usr/bin/ssh")?;
+            .with_context(|| format!("start {program}"))?;
         drop(pair.slave);
         let killer = child.clone_killer();
         let mut reader = pair.master.try_clone_reader()?;
@@ -202,10 +217,12 @@ impl Session {
                     }
                 }
             }
+            let name = if local { "The shell" } else { "ssh" };
             let note = match child.wait() {
+                Ok(status) if status.success() && local => "The shell has exited".to_string(),
                 Ok(status) if status.success() => "Connection closed".to_string(),
-                Ok(status) => format!("ssh exited with code {}", status.exit_code()),
-                Err(e) => format!("ssh: {e}"),
+                Ok(status) => format!("{name} exited with code {}", status.exit_code()),
+                Err(e) => format!("{name}: {e}"),
             };
             *this.exit_note.lock().unwrap() = Some(note);
             this.exited.store(true, Ordering::SeqCst);

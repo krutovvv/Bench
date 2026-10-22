@@ -94,8 +94,13 @@ impl HermesApp {
         if self.ide_open() {
             self.close_ide(cx);
         } else if self.ssh.on {
-            if let Some(alias) = self.ssh.active_tab().map(|t| t.alias.clone()) {
-                self.open_ide_server(alias, window, cx);
+            match self.ssh.active_tab().map(|t| t.alias.clone()) {
+                // This machine's terminal: its files, from the home folder.
+                Some(alias) if alias == crate::term::LOCAL => {
+                    self.open_ide(std::env::var("HOME").ok(), window, cx)
+                }
+                Some(alias) => self.open_ide_server(alias, window, cx),
+                None => {}
             }
         } else {
             match self.session.clone() {

@@ -186,6 +186,10 @@ impl HermesApp {
         self.panel = super::Panel::Chat;
         if on {
             self.reload_servers(cx);
+            // With nothing open, the terminal of this machine.
+            if self.ssh.tabs.is_empty() {
+                self.open_server(crate::term::LOCAL.to_string(), window, cx);
+            }
             if let Some(t) = self.ssh.active_tab() {
                 t.focus.focus(window, cx);
             }
@@ -337,6 +341,10 @@ impl HermesApp {
         self.ssh.active = None;
         if !self.ssh.tabs.is_empty() {
             self.activate_tab(t.min(self.ssh.tabs.len() - 1), window, cx);
+        } else if tab.alias != crate::term::LOCAL {
+            // The last server closed: back to this machine's terminal (closing that one leaves
+            // the window empty).
+            self.open_server(crate::term::LOCAL.to_string(), window, cx);
         }
         cx.notify();
     }
@@ -357,6 +365,10 @@ impl HermesApp {
             return;
         }
         if !(link.starts_with('/') || link.starts_with("~/")) {
+            return;
+        }
+        if alias == crate::term::LOCAL {
+            self.open_local_link(&link, window, cx);
             return;
         }
         let a = alias.clone();
@@ -396,6 +408,32 @@ impl HermesApp {
                 ),
             },
         );
+    }
+
+    /// ⌘-click on a path in this machine's terminal: a folder opens as the IDE's tree, a file in
+    /// its editor (with its folder as the tree).
+    fn open_local_link(&mut self, link: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let path = match link.strip_prefix("~/") {
+            Some(rest) => format!("{}/{rest}", std::env::var("HOME").unwrap_or_default()),
+            None => link.to_string(),
+        };
+        let p = std::path::Path::new(&path);
+        if p.is_dir() {
+            self.open_ide(Some(path), window, cx);
+        } else if p.is_file() {
+            let dir = p
+                .parent()
+                .map_or("/".into(), |d| d.to_string_lossy().to_string());
+            self.open_ide(Some(dir), window, cx);
+            self.open_file(path, window, cx);
+        } else {
+            self.toast(
+                NotificationType::Info,
+                format!("No file or folder at {link}"),
+                window,
+                cx,
+            );
+        }
     }
 
     /// A new window in the same mode: SSH mode opens there too (no server picked yet).

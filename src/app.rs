@@ -690,10 +690,11 @@ impl HermesApp {
         if let Some(alias) = servers::NEXT_SSH.lock().unwrap().take() {
             cx.spawn_in(window, async move |this, cx| {
                 let _ = this.update_in(cx, |this, window, cx| {
-                    this.set_ssh_mode(true, window, cx);
+                    // The server first: SSH mode with nothing open starts this machine's terminal.
                     if !alias.is_empty() {
                         this.open_server(alias, window, cx);
                     }
+                    this.set_ssh_mode(true, window, cx);
                 });
             })
             .detach();
