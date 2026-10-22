@@ -333,6 +333,9 @@ pub fn save_config_raw(conn: &Connection, profile: &str, text: &str) -> Result<(
 
 #[derive(Clone, Debug)]
 pub struct CronJob {
+    pub id: String,
+    /// The schedule as typed ("30 10 * * 1-5", "every 2h"), for editing.
+    pub expr: String,
     pub name: String,
     pub schedule: String,
     pub enabled: bool,
@@ -377,6 +380,12 @@ pub fn cron_jobs(conn: &Connection, profile: &str) -> Result<Vec<CronJob>> {
     Ok(list
         .iter()
         .map(|j| CronJob {
+            id: s(j, &["id", "job_id"]),
+            expr: j["schedule"]["expr"]
+                .as_str()
+                .or(j["schedule"].as_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| s(j, &["schedule_display"])),
             name: s(j, &["name", "id", "job_id"]),
             schedule: s(j, &["schedule_display", "schedule", "cron", "interval"]),
             enabled: j["enabled"].as_bool().unwrap_or(j["state"] != "paused"),
@@ -518,6 +527,54 @@ pub fn worktree_remove(conn: &Connection, profile: &str, repo: &str, folder: &st
         profile,
         json!({"path": repo, "worktreePath": folder, "force": true}),
         60,
+    )?;
+    Ok(())
+}
+
+fn cron_profile(profile: &str) -> &str {
+    if profile.is_empty() {
+        "default"
+    } else {
+        profile
+    }
+}
+
+/// Save a job's text and schedule (the gateway re-derives its next run).
+pub fn update_cron(
+    conn: &Connection,
+    profile: &str,
+    id: &str,
+    prompt: &str,
+    schedule: &str,
+) -> Result<()> {
+    send(
+        conn,
+        "PUT",
+        &format!(
+            "/api/cron/jobs/{}?profile={}",
+            enc(id),
+            enc(cron_profile(profile))
+        ),
+        profile,
+        json!({"updates": {"prompt": prompt, "schedule": schedule}}),
+        30,
+    )?;
+    Ok(())
+}
+
+/// "trigger" (run now), "pause" or "resume".
+pub fn cron_action(conn: &Connection, profile: &str, id: &str, action: &str) -> Result<()> {
+    send(
+        conn,
+        "POST",
+        &format!(
+            "/api/cron/jobs/{}/{action}?profile={}",
+            enc(id),
+            enc(cron_profile(profile))
+        ),
+        profile,
+        json!({}),
+        30,
     )?;
     Ok(())
 }

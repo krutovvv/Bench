@@ -7,6 +7,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::{HermesApp, Panel};
+use crate::icons::Ico;
 
 /// A toolbar over a full-height code editor.
 fn editor_page(
@@ -235,76 +236,150 @@ impl HermesApp {
     pub(super) fn render_cron(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let rows = self.cron.iter().map(|j| {
-            v_flex()
-                .px_4()
-                .py_2()
-                .gap_0p5()
-                .border_b_1()
-                .border_color(theme.border)
-                .child(
+        let open = self.cron_open.clone();
+
+        let rows: Vec<AnyElement> = self
+            .cron
+            .iter()
+            .enumerate()
+            .map(|(i, j)| {
+                let selected = open.as_deref() == Some(&j.id);
+                let id = j.id.clone();
+                let when = if !j.enabled {
+                    "paused".to_string()
+                } else if j.next_run.is_empty() {
+                    j.schedule.clone()
+                } else {
+                    format!("{} · next {}", j.schedule, short_time(&j.next_run))
+                };
+                v_flex()
+                    .id(("cron", i))
+                    .pl(px(14.))
+                    .pr_3()
+                    .py_1p5()
+                    .cursor_pointer()
+                    .border_l_2()
+                    .border_color(if selected {
+                        theme.primary
+                    } else {
+                        theme.transparent
+                    })
+                    .when(selected, |d| d.bg(theme.list_active))
+                    .hover(|d| d.bg(theme.list_hover))
+                    .child(
+                        div()
+                            .text_sm()
+                            .when(!j.enabled, |d| d.text_color(muted))
+                            .child(j.name.clone()),
+                    )
+                    .child(div().text_xs().text_color(muted).truncate().child(when))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_cron(id.clone(), window, cx)
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+
+        let job = open
+            .as_ref()
+            .and_then(|id| self.cron.iter().find(|j| &j.id == id))
+            .cloned();
+        let content = match job {
+            Some(job) => {
+                let icon_button = |id: &'static str, icon: Ico, tip: &'static str| {
+                    div()
+                        .id(id)
+                        .p_1()
+                        .cursor_pointer()
+                        .text_color(muted)
+                        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                        .child(icon.icon().small())
+                        .tooltip(move |window, cx| {
+                            gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx)
+                        })
+                };
+                let status = if job.last_status.is_empty() {
+                    String::new()
+                } else {
+                    format!("last run: {}", job.last_status)
+                };
+                editor_page(
+                    &self.cron_editor,
                     h_flex()
                         .gap_3()
                         .items_center()
+                        .child(div().text_color(theme.foreground).child(job.name.clone()))
                         .child(
-                            div()
-                                .text_sm()
-                                .font_weight(FontWeight::MEDIUM)
-                                .when(!j.enabled, |d| d.text_color(muted))
-                                .child(j.name.clone()),
+                            div().w(px(240.)).child(
+                                gpui_kit::component::input::Input::new(&self.cron_schedule)
+                                    .small()
+                                    .font_family("Menlo"),
+                            ),
                         )
-                        .child(
-                            div()
-                                .text_xs()
-                                .font_family("Menlo")
-                                .text_color(muted)
-                                .child(j.schedule.clone()),
-                        )
-                        .when(!j.enabled, |d| {
-                            d.child(div().text_xs().text_color(theme.warning).child("paused"))
-                        })
-                        .child(div().flex_1())
-                        .when(!j.last_status.is_empty(), |d| {
-                            d.child(
-                                div()
-                                    .text_xs()
-                                    .text_color(muted)
-                                    .child(format!("last: {}", j.last_status)),
+                        .child(div().text_xs().child(status))
+                        .into_any_element(),
+                    None,
+                    vec![
+                        icon_button("cron-run", Ico::Play, "Run now")
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.cron_act("trigger", window, cx)
+                            }))
+                            .into_any_element(),
+                        (if job.enabled {
+                            icon_button("cron-pause", Ico::Pause, "Pause").on_click(
+                                cx.listener(|this, _, window, cx| {
+                                    this.cron_act("pause", window, cx)
+                                }),
+                            )
+                        } else {
+                            icon_button("cron-resume", Ico::RotateCcw, "Resume").on_click(
+                                cx.listener(|this, _, window, cx| {
+                                    this.cron_act("resume", window, cx)
+                                }),
                             )
                         })
-                        .when(!j.next_run.is_empty(), |d| {
-                            d.child(
-                                div()
-                                    .text_xs()
-                                    .text_color(muted)
-                                    .child(format!("next: {}", j.next_run)),
-                            )
-                        }),
+                        .into_any_element(),
+                        Button::new("cron-save")
+                            .small()
+                            .primary()
+                            .label("Save")
+                            .on_click(cx.listener(|this, _, window, cx| this.save_cron(window, cx)))
+                            .into_any_element(),
+                    ],
+                    cx,
                 )
-                .when(!j.prompt.is_empty(), |d| {
-                    d.child(
-                        div()
-                            .text_xs()
-                            .text_color(muted)
-                            .line_clamp(2)
-                            .child(j.prompt.clone()),
-                    )
+                .into_any_element()
+            }
+            None => div()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_sm()
+                .text_color(muted)
+                .child(if self.cron.is_empty() {
+                    "No scheduled jobs in this profile."
+                } else {
+                    "Pick a job on the left"
                 })
-        });
-        v_flex()
-            .id("cron")
+                .into_any_element(),
+        };
+
+        h_flex()
             .size_full()
-            .overflow_y_scroll()
-            .children(rows)
-            .when(self.cron.is_empty(), |d| {
-                d.child(
-                    div()
-                        .p_4()
-                        .text_sm()
-                        .text_color(muted)
-                        .child("No scheduled jobs in this profile."),
-                )
-            })
+            .child(
+                v_flex()
+                    .id("cron-list")
+                    .w(px(300.))
+                    .h_full()
+                    .flex_none()
+                    .overflow_y_scroll()
+                    .py_2()
+                    .border_r_1()
+                    .border_color(theme.border)
+                    .children(rows),
+            )
+            .child(div().flex_1().min_w_0().h_full().child(content))
     }
 
     pub(super) fn render_telegram(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -594,5 +669,26 @@ impl HermesApp {
                     )
                     .children(rows),
             )
+    }
+}
+
+/// "2026-10-23T10:30:00+05:00" → "Oct 23 10:30".
+fn short_time(iso: &str) -> String {
+    let (date, time) = iso.split_once('T').unwrap_or((iso, ""));
+    let mut d = date.split('-');
+    let (_, m, day) = (d.next(), d.next(), d.next());
+    const MONTHS: [&str; 12] = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    ];
+    let month = m
+        .and_then(|m| m.parse::<usize>().ok())
+        .and_then(|m| MONTHS.get(m.wrapping_sub(1)));
+    match (month, day) {
+        (Some(mo), Some(day)) => format!(
+            "{mo} {} {}",
+            day.trim_start_matches('0'),
+            time.get(..5).unwrap_or("")
+        ),
+        _ => iso.to_string(),
     }
 }

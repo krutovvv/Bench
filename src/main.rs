@@ -83,7 +83,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                         Ok(jobs) => println!(
                             "cron[{p}]: {:?}",
                             jobs.iter()
-                                .map(|j| (&j.name, &j.schedule, &j.next_run))
+                                .map(|j| (&j.id, &j.name, &j.expr, &j.schedule, &j.next_run))
                                 .collect::<Vec<_>>()
                         ),
                         Err(e) => println!("cron[{p}]: {e:#}"),

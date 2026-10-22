@@ -69,6 +69,8 @@ icons! {
     MemoryStick => "memory-stick",
     Mic => "mic",
     PanelRight => "panel-right",
+    Pause => "pause",
+    Play => "play",
     Plus => "plus",
     RefreshCw => "refresh-cw",
     RotateCcw => "rotate-ccw",

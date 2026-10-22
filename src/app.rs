@@ -12,6 +12,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
 
+mod cron;
 mod gateways;
 pub(crate) mod projects;
 mod slash;
@@ -159,6 +160,9 @@ pub struct HermesApp {
     pub config_editor: Entity<EditorState>,
     pub config_error: Option<SharedString>,
     pub cron: Vec<rest::CronJob>,
+    pub cron_open: Option<String>,
+    pub cron_editor: Entity<EditorState>,
+    pub cron_schedule: Entity<InputState>,
     pub effort_choice: Entity<Choice>,
     pub mcp_editor: Entity<EditorState>,
     pub mcp_status: SharedString,
@@ -231,6 +235,14 @@ impl HermesApp {
             EditorState::new(window, cx)
                 .language("markdown")
                 .line_number(true)
+        });
+        let cron_editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("markdown")
+                .line_number(true)
+        });
+        let cron_schedule = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("30 10 * * 1-5  ·  every 2h  ·  daily at 9:00")
         });
         let config_editor = cx.new(|cx| {
             EditorState::new(window, cx)
@@ -452,6 +464,9 @@ impl HermesApp {
             panel: Panel::Chat,
             skills: vec![],
             skill_open: None,
+            cron_open: None,
+            cron_editor,
+            cron_schedule,
             skill_editor,
             skill_delete_armed: false,
             config_editor,
@@ -545,7 +560,7 @@ impl HermesApp {
         self.runtime.as_deref() == Some(sid)
     }
 
-    fn refresh_sessions(&self) {
+    pub(crate) fn refresh_sessions(&self) {
         if let Some(p) = self.profile.clone() {
             self.cmd(Cmd::Sessions(p));
         }
@@ -1798,10 +1813,7 @@ impl HermesApp {
                     },
                 )
             }
-            Panel::Cron => self.rest(window, cx, rest::cron_jobs, |this, r, window, cx| match r {
-                Ok(jobs) => this.cron = jobs,
-                Err(e) => this.toast(NotificationType::Error, format!("Cron: {e:#}"), window, cx),
-            }),
+            Panel::Cron => self.load_cron(window, cx),
             Panel::Skills => self.rest(window, cx, rest::skills, |this, r, window, cx| match r {
                 Ok(list) => this.skills = list,
                 Err(e) => this.toast(
