@@ -118,7 +118,13 @@ pub fn search_sessions(conn: &Connection, profile: &str, q: &str) -> Result<Vec<
 
 /// The profile's defaults from config.yaml: (`agent.reasoning_effort`, model name).
 /// (effort, primary model, [(model, provider)] primary first then `fallback_providers`).
-pub type ProfileDefaults = (Option<String>, Option<String>, Vec<(String, String)>);
+/// (effort, primary model, models, approvals.mode).
+pub type ProfileDefaults = (
+    Option<String>,
+    Option<String>,
+    Vec<(String, String)>,
+    String,
+);
 
 pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefaults> {
     let raw = get(conn, "/api/config/raw", profile)?;
@@ -156,7 +162,13 @@ pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefau
             }
         }
     }
-    Ok((effort, model, models))
+    // Hermes' default is manual; a YAML 1.1 writer may have stored `off` as false.
+    let approval = match &yaml["approvals"]["mode"] {
+        Value::String(s) => s.to_lowercase(),
+        Value::Bool(false) => "off".into(),
+        _ => "manual".into(),
+    };
+    Ok((effort, model, models, approval))
 }
 
 pub fn skill_content(conn: &Connection, profile: &str, name: &str) -> Result<String> {
@@ -452,12 +464,12 @@ pub fn get_raw(conn: &Connection, profile: &str, path: &str) -> Result<Value> {
     get(conn, path, profile)
 }
 
-/// Each session's folder and git info, by session id (the most recent 200).
+/// Each session's folder and git info, by session id (the most recent 100, the API maximum).
 pub fn session_places(
     conn: &Connection,
     profile: &str,
 ) -> Result<std::collections::HashMap<String, crate::model::Place>> {
-    let v = get(conn, "/api/sessions?limit=200&order=recent", profile)?;
+    let v = get(conn, "/api/sessions?limit=100&order=recent", profile)?;
     let s = |r: &Value, k: &str| r[k].as_str().unwrap_or_default().to_string();
     Ok(v["sessions"]
         .as_array()

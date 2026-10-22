@@ -15,8 +15,14 @@ use gpui_kit::*;
 use crate::app::{HermesApp, Panel};
 
 /// Height of the bars that face each other across the window: the sidebar's search and
-/// "New session" rows and the composer (one line).
-pub const BAR_H: f32 = 48.;
+/// "New session" rows and the composer (one line). A 2-rem control (the input's own height)
+/// with 8px above and below, so it follows the Appearance size.
+pub fn bar_h(cx: &App) -> Pixels {
+    cx.theme().font_size * 2. + px(16.)
+}
+
+/// The control inside those bars: the search field and the "New session" button.
+pub const BAR_CONTROL_REMS: f32 = 2.;
 
 /// "1 action", "3 actions" (the `few` form is kept for call-site symmetry).
 pub fn plural(n: usize, one: &str, _few: &str, many: &str) -> String {

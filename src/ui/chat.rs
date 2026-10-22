@@ -176,6 +176,7 @@ impl HermesApp {
             .map(|i| self.render_turn(i, cx))
             .collect();
         let files = self.render_session_files(cx);
+        let approval = self.render_approval(cx);
 
         div()
             .relative()
@@ -186,8 +187,11 @@ impl HermesApp {
                     .size_full()
                     .overflow_y_scroll()
                     .track_scroll(&self.chat_scroll)
-                    .pb_4()
+                    // Turns pad 12 top and bottom; 4 more makes the outer edges 16, like the sides.
+                    .pt_1()
+                    .pb_1()
                     .children(rows)
+                    .children(approval)
                     .children(files),
             )
             .when(!self.follow, |d| {
@@ -397,6 +401,65 @@ impl HermesApp {
             .into_any_element()
     }
 
+    /// The agent waits: what it wants to run, and the answers it accepts.
+    fn render_approval(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let req = self.approval.clone()?;
+        let theme = cx.theme().clone();
+        let label = |c: &str| match c {
+            "once" => "Allow once",
+            "session" => "Allow for this chat",
+            "always" => "Always allow",
+            "deny" => "Deny",
+            _ => "OK",
+        };
+        let buttons = req.choices.iter().enumerate().map(|(k, c)| {
+            let choice = c.clone();
+            let b = Button::new(("approve", k)).small().label(label(c));
+            let b = if k == 0 {
+                b.primary()
+            } else if c == "deny" {
+                b.ghost()
+            } else {
+                b.outline()
+            };
+            b.on_click(cx.listener(move |this, _, _, cx| this.answer_approval(choice.clone(), cx)))
+        });
+        Some(
+            v_flex()
+                .mx_4()
+                .mt_2()
+                .p_3()
+                .gap_2()
+                .border_1()
+                .border_color(theme.warning)
+                .child(
+                    h_flex()
+                        .gap_2()
+                        .items_center()
+                        .text_sm()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(Ico::CircleAlert.icon().small().text_color(theme.warning))
+                        .child(if req.description.is_empty() {
+                            "Hermes asks to run this".to_string()
+                        } else {
+                            req.description.clone()
+                        }),
+                )
+                .when(!req.command.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .p_2()
+                            .bg(theme.secondary)
+                            .font_family("Menlo")
+                            .text_xs()
+                            .child(req.command.clone()),
+                    )
+                })
+                .child(h_flex().gap_2().children(buttons))
+                .into_any_element(),
+        )
+    }
+
     /// One step line; click unfolds its details (reasoning text, tool args and output).
     fn render_step(&self, i: usize, k: usize, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
@@ -435,6 +498,31 @@ impl HermesApp {
                     muted,
                     clip(text, 160),
                     vec![("Reasoning", text.clone())],
+                ),
+                Step::Subagent {
+                    goal,
+                    status,
+                    lines,
+                    summary,
+                    ..
+                } => (
+                    Ico::Bot,
+                    if status == "failed" || status == "error" {
+                        theme.danger
+                    } else {
+                        muted
+                    },
+                    clip(
+                        &match status.as_str() {
+                            "" | "running" => format!("Subagent: {goal} — working…"),
+                            s => format!("Subagent: {goal} — {s}"),
+                        },
+                        220,
+                    ),
+                    [("Activity", lines.join("\n")), ("Result", summary.clone())]
+                        .into_iter()
+                        .filter(|(_, v)| !v.trim().is_empty())
+                        .collect(),
                 ),
             };
         let expandable = !details.is_empty();

@@ -141,6 +141,23 @@ impl HermesApp {
                 (e.to_string(), i == self.effort, f)
             })
             .collect();
+        let approvals: Vec<_> = crate::model::APPROVAL_MODES
+            .iter()
+            .map(|m| {
+                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                    Box::new(move |this, _, cx| this.set_approval_mode(m, cx));
+                let label = match *m {
+                    "off" => "off — never ask",
+                    "smart" => "smart — ask for risky commands",
+                    _ => "manual — ask every time",
+                };
+                (
+                    label.to_string(),
+                    self.approval_mode.as_deref() == Some(*m),
+                    f,
+                )
+            })
+            .collect();
         let current_model = self.model_name();
         let models: Vec<_> = self
             .profile_models
@@ -268,6 +285,9 @@ impl HermesApp {
             .child(div().flex_1())
             .children(speed)
             .children(context)
+            .when_some(self.approval_mode.clone(), |d, mode| {
+                d.child(picker("approvals", Ico::Shield, mode, approvals))
+            })
             .child(picker(
                 "effort",
                 Ico::Brain,

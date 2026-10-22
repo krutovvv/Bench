@@ -39,8 +39,31 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     want.unwrap_or_else(|| p.first().map(|p| p.name.clone()).unwrap_or_default());
                 gw.send(gateway::Cmd::Sessions(name));
             }
+            gateway::Evt::Catalog(list) => {
+                println!("catalog: {} commands", list.len());
+                for c in list
+                    .iter()
+                    .filter(|c| ["/goal", "/help", "/new", "/approvals"].contains(&c.name.as_str()))
+                {
+                    println!("  {} [{}] {}", c.name, c.category, c.desc);
+                }
+                if std::env::var("PROBE_DISPATCH").is_err() {
+                    return Ok(());
+                }
+            }
+            gateway::Evt::Dispatched { output, send, .. } => {
+                println!(
+                    "dispatched: output={:?} send={:?}",
+                    output.map(|o| o.chars().take(300).collect::<String>()),
+                    send
+                );
+                return Ok(());
+            }
             gateway::Evt::Sessions(p, rows) => {
                 println!("sessions[{p}]: {}", rows.len());
+                if std::env::var("PROBE_CATALOG").is_ok() {
+                    gw.send(gateway::Cmd::Catalog { profile: p.clone() });
+                }
                 if let Some(c) = &conn {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
                     if let Ok(paths) = std::env::var("PROBE_GET") {
@@ -68,6 +91,9 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 }
                 let pick = std::env::var("PROBE_MATCH").unwrap_or_default();
                 let Some(first) = rows.iter().find(|r| r.title.contains(&pick)) else {
+                    if std::env::var("PROBE_CATALOG").is_ok() {
+                        continue;
+                    }
                     return Ok(());
                 };
                 gw.send(gateway::Cmd::Open {
@@ -85,6 +111,16 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     "open: stored={session} runtime={runtime} turns={}",
                     turns.len()
                 );
+                if let Ok(cmd) = std::env::var("PROBE_DISPATCH") {
+                    let (name, arg) = cmd.split_once(' ').unwrap_or((&cmd, ""));
+                    gw.send(gateway::Cmd::Dispatch {
+                        profile: std::env::var("PROBE_PROFILE").unwrap_or_default(),
+                        session: runtime.clone(),
+                        name: name.into(),
+                        arg: arg.into(),
+                    });
+                    continue;
+                }
                 for t in turns.iter().rev().take(3) {
                     let took = match (t.started, t.finished) {
                         (Some(a), Some(b)) => format!("{:.0}s", b - a),

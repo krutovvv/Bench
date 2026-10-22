@@ -48,6 +48,7 @@ macro_rules! icons {
 icons! {
     ArrowUp => "arrow-up",
     AudioLines => "audio-lines",
+    Bot => "bot",
     Brain => "brain",
     ChevronDown => "chevron-down",
     ChevronRight => "chevron-right",
@@ -73,6 +74,7 @@ icons! {
     RotateCcw => "rotate-ccw",
     Server => "server",
     Settings => "settings",
+    Shield => "shield",
     Square => "square",
     Terminal => "square-terminal",
     Trash => "trash",

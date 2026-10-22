@@ -68,7 +68,40 @@ pub enum Step {
     Note(String),
     /// Model reasoning.
     Thought(String),
+    /// A subagent the model delegated to: its goal, what it did, how it ended.
+    Subagent {
+        id: String,
+        goal: String,
+        /// "running", "completed", "failed", …
+        status: String,
+        /// Its tool calls and notes, one line each.
+        lines: Vec<String>,
+        summary: String,
+    },
 }
+
+/// A slash command from the gateway's catalog.
+#[derive(Clone, Debug)]
+pub struct SlashCommand {
+    /// "/goal".
+    pub name: String,
+    pub desc: String,
+    pub category: String,
+}
+
+/// The agent asks before running something (approval mode manual/smart).
+#[derive(Clone, Debug)]
+pub struct ApprovalReq {
+    pub session: String,
+    pub prompt_id: String,
+    pub generation: Option<i64>,
+    pub command: String,
+    pub description: String,
+    /// Offered answers: "once", "session", "always", "deny".
+    pub choices: Vec<String>,
+}
+
+pub const APPROVAL_MODES: &[&str] = &["off", "smart", "manual"];
 
 /// One exchange: the user's words, the steps the agent took, the answer.
 #[derive(Clone, Debug, Default)]

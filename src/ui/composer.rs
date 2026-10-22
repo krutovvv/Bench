@@ -3,17 +3,87 @@
 
 use gpui_kit::component::input::Textarea;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::HermesApp;
 use crate::icons::Ico;
 
+/// Rows the command list shows before it scrolls.
+const SLASH_ROWS: f32 = 8.;
+
 /// Bars in the waveform; it scrolls right to left, newest on the right (25 ms each = 3 s).
 const WAVE_BARS: usize = 120;
 
 impl HermesApp {
+    /// Commands matching a bare `/word`, in a small list right above the input.
+    fn render_slash(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let matches = self.slash_matches(cx);
+        if matches.is_empty() {
+            return None;
+        }
+        let theme = cx.theme().clone();
+        let sel = self.slash_sel.min(matches.len() - 1);
+        let rows = matches.into_iter().enumerate().map(|(i, c)| {
+            let on = i == sel;
+            h_flex()
+                .id(("slash", i))
+                .h(px(28.))
+                .px_3()
+                .gap_3()
+                .items_center()
+                .text_sm()
+                .cursor_pointer()
+                .when(on, |d| d.bg(theme.list_active))
+                .hover(|s| s.bg(theme.list_hover))
+                .child(
+                    div()
+                        .flex_none()
+                        .font_family("Menlo")
+                        .text_xs()
+                        .child(c.name),
+                )
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_xs()
+                        .text_color(theme.muted_foreground)
+                        .child(c.desc),
+                )
+                .child(
+                    div()
+                        .flex_none()
+                        .text_xs()
+                        .text_color(theme.muted_foreground.opacity(0.7))
+                        .child(c.category),
+                )
+                .on_click(cx.listener(move |this, _, window, cx| this.pick_slash(i, window, cx)))
+        });
+        Some(
+            div()
+                .absolute()
+                .bottom_full()
+                .left(px(8.))
+                .w(px(560.))
+                .max_w(relative(0.9))
+                .bg(theme.popover)
+                .border_1()
+                .border_color(theme.border)
+                .child(
+                    v_flex()
+                        .id("slash-list")
+                        .max_h(px(28. * SLASH_ROWS))
+                        .overflow_y_scroll()
+                        .track_scroll(&self.slash_scroll)
+                        .children(rows),
+                )
+                .into_any_element(),
+        )
+    }
+
     /// While recording the text field is not needed (speech is recognized at the end), so its
     /// place shows the voice level live.
     fn render_wave(&self, theme: &gpui_kit::component::Theme) -> impl IntoElement {
@@ -101,12 +171,24 @@ impl HermesApp {
             .on_click(cx.listener(|this, _, window, cx| this.send(window, cx)))
         };
 
+        let slash = self.render_slash(cx);
+
         h_flex()
+            .id("composer")
+            .relative()
             .w_full()
             .flex_none()
-            .min_h(px(super::BAR_H))
+            .min_h(super::bar_h(cx))
             .items_center()
             .bg(theme.background)
+            // The command list takes ↑ ↓ Tab Esc before the text field does.
+            .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                let k = &ev.keystroke;
+                if !k.modifiers.modified() && this.slash_key(k.key.as_str(), window, cx) {
+                    cx.stop_propagation();
+                }
+            }))
+            .children(slash)
             .border_t_1()
             .border_color(theme.border)
             .when(recording, |d| d.child(self.render_wave(&theme)))

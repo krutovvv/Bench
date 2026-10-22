@@ -14,6 +14,7 @@ use gpui_kit::*;
 
 mod gateways;
 pub(crate) mod projects;
+mod slash;
 pub use projects::GitArm;
 
 use crate::audio::{Playback, Recorder};
@@ -109,11 +110,24 @@ pub struct HermesApp {
     pub effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
     pub profile_models: Vec<(String, String)>,
+    /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
+    pub catalog: Vec<crate::model::SlashCommand>,
+    pub slash_sel: usize,
+    pub slash_closed: bool,
+    pub slash_scroll: ScrollHandle,
+    /// The agent waits for an answer (approval mode manual/smart).
+    pub approval: Option<crate::model::ApprovalReq>,
+    /// The profile's `approvals.mode`, once read.
+    pub approval_mode: Option<String>,
     /// Session folders/repos as Hermes recorded them, and repos inferred from edited files.
     pub places: HashMap<String, crate::model::Place>,
     pub inferred: HashMap<String, String>,
     /// The open session's project (None for chats that touch no repo).
     pub project: Option<crate::model::Project>,
+    /// Hermes' default working folder (sessions started there have no folder of their own).
+    pub default_cwd: Option<String>,
+    /// Reopen this session once the list arrives (where the app was last closed).
+    resume_session: Option<String>,
     /// For the next new chat: work in this repo, and in a branch of its own.
     pub new_project: Option<String>,
     pub new_branch: bool,
@@ -243,8 +257,17 @@ impl HermesApp {
                 }
             }),
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
-                if let InputEvent::PressEnter { shift: false, .. } = ev {
-                    this.send(window, cx);
+                match ev {
+                    InputEvent::PressEnter { shift: false, .. } => this.send(window, cx),
+                    // New text: the command list starts over at its first row.
+                    InputEvent::Change => {
+                        this.slash_sel = 0;
+                        if !this.composer.read(cx).value().starts_with('/') {
+                            this.slash_closed = false;
+                        }
+                        cx.notify();
+                    }
+                    _ => {}
                 }
             }),
             cx.subscribe_in(
@@ -398,9 +421,17 @@ impl HermesApp {
             usage: None,
             effort: EFFORTS.len() - 1,
             profile_models: vec![],
+            catalog: vec![],
+            slash_sel: 0,
+            slash_closed: false,
+            slash_scroll: ScrollHandle::new(),
+            approval: None,
+            approval_mode: None,
             places: HashMap::new(),
             inferred: HashMap::new(),
             project: None,
+            default_cwd: None,
+            resume_session: None,
             new_project: None,
             new_branch: false,
             new_project_repo: true,
@@ -544,12 +575,16 @@ impl HermesApp {
                     .collect();
                 self.profile_choice
                     .update(cx, |s, cx| s.set_items(labels, window, cx));
+                // Back where the app was closed: that profile, then that session.
+                let (last_profile, last_session) = self.last_place();
                 let pick = self
                     .profiles
                     .iter()
-                    .find(|p| p.name == "deep-research")
+                    .find(|p| Some(&p.name) == last_profile.as_ref())
+                    .or_else(|| self.profiles.iter().find(|p| p.name == "deep-research"))
                     .or(self.profiles.first())
                     .map(|p| p.name.clone());
+                self.resume_session = last_session.filter(|_| pick == last_profile);
                 if let Some(p) = pick {
                     self.select_profile(p, window, cx);
                 }
@@ -560,6 +595,11 @@ impl HermesApp {
                         .iter()
                         .any(|s| s.source == "telegram" && !self.tg_owner.contains_key(&s.id));
                     self.sessions = rows;
+                    if let Some(id) = self.resume_session.take() {
+                        if self.session.is_none() && self.sessions.iter().any(|s| s.id == id) {
+                            self.open_session(id, cx);
+                        }
+                    }
                     if unknown_tg {
                         self.load_telegram_owners(window, cx);
                     }
@@ -599,16 +639,25 @@ impl HermesApp {
             Evt::Created { session, runtime } => {
                 self.opened.insert(session.clone(), runtime.clone());
                 self.session = Some(session);
+                self.save_place();
                 self.runtime = Some(runtime.clone());
                 if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
                     self.apply_model_pick(&profile, &runtime);
                     let effort = self.take_effort();
-                    self.cmd(Cmd::Send {
-                        profile,
-                        session: runtime,
-                        text,
-                        effort,
-                    });
+                    match self.parse_command(&text) {
+                        Some((name, arg)) => self.cmd(Cmd::Dispatch {
+                            profile,
+                            session: runtime,
+                            name,
+                            arg,
+                        }),
+                        None => self.cmd(Cmd::Send {
+                            profile,
+                            session: runtime,
+                            text,
+                            effort,
+                        }),
+                    }
                 }
                 // Show the new session in the list right away.
                 self.refresh_sessions();
@@ -710,6 +759,99 @@ impl HermesApp {
                 }
                 cx.notify();
             }
+            Evt::Catalog(list) => self.catalog = list,
+            Evt::Dispatched {
+                session,
+                output,
+                send,
+            } if self.is_current(&session) => match send {
+                // The command expanded into a prompt (skills, /goal, …): run it as a turn.
+                Some(message) => {
+                    if let Some(profile) = self.profile.clone() {
+                        self.speed.request();
+                        self.cmd(Cmd::Send {
+                            profile,
+                            session,
+                            text: message,
+                            effort: None,
+                        });
+                    }
+                }
+                None => {
+                    self.live = None;
+                    if let Some(turn) = self.turns.last_mut() {
+                        turn.answer = output.unwrap_or_else(|| "Done.".into());
+                        turn.finished = Some(now_secs());
+                    }
+                    self.remeasure_last(cx);
+                }
+            },
+            Evt::Approval(req) if self.is_current(&req.session) => {
+                if let Some(live) = self.live.as_mut() {
+                    live.label = "Waiting for your approval…".into();
+                }
+                self.approval = Some(req);
+                self.remeasure_last(cx);
+            }
+            Evt::ApprovalDone(sid) => {
+                if self.approval.as_ref().is_some_and(|a| a.session == sid) {
+                    self.approval = None;
+                }
+            }
+            Evt::Subagent {
+                session,
+                id,
+                kind,
+                text,
+                status,
+            } if self.is_current(&session) => {
+                if let Some(turn) = self.turns.last_mut() {
+                    let pos = turn
+                        .steps
+                        .iter()
+                        .position(|s| matches!(s, Step::Subagent { id: x, .. } if *x == id));
+                    let k = pos.unwrap_or_else(|| {
+                        turn.steps.push(Step::Subagent {
+                            id: id.clone(),
+                            goal: String::new(),
+                            status: "running".into(),
+                            lines: vec![],
+                            summary: String::new(),
+                        });
+                        turn.steps.len() - 1
+                    });
+                    if let Step::Subagent {
+                        goal,
+                        status: st,
+                        lines,
+                        summary,
+                        ..
+                    } = &mut turn.steps[k]
+                    {
+                        match kind {
+                            "start" => *goal = clip_line(&text),
+                            "tool" => lines.push(text),
+                            "text" if !text.trim().is_empty() => lines.push(clip_line(&text)),
+                            "complete" => {
+                                *st = if status.is_empty() {
+                                    "completed".into()
+                                } else {
+                                    status
+                                };
+                                *summary = text;
+                            }
+                            _ => {}
+                        }
+                        if goal.is_empty() {
+                            *goal = "task".into();
+                        }
+                    }
+                    if let Some(live) = self.live.as_mut() {
+                        live.label = "Subagent working…".into();
+                    }
+                }
+                self.remeasure_last(cx);
+            }
             Evt::Usage(sid, usage) if self.is_current(&sid) => {
                 self.speed.usage(&usage);
                 self.usage = Some(usage);
@@ -776,6 +918,10 @@ impl HermesApp {
         });
         self.profile = Some(name.clone());
         self.load_profile_effort(window, cx);
+        if let Some(profile) = self.profile.clone() {
+            self.catalog.clear();
+            self.cmd(Cmd::Catalog { profile });
+        }
         self.sessions.clear();
         self.tg_owner.clear();
         self.tg_people.clear();
@@ -783,6 +929,10 @@ impl HermesApp {
         self.skills.clear();
         self.skill_open = None;
         self.reset_chat(cx);
+        // Keep the session to resume across this reset (startup picks the profile first).
+        if self.resume_session.is_none() {
+            self.save_place();
+        }
         self.cmd(Cmd::Sessions(name));
         if self.panel != Panel::Chat {
             let panel = self.panel;
@@ -799,6 +949,7 @@ impl HermesApp {
         self.confirm_delete = None;
         self.reset_chat(cx);
         self.session = Some(id.clone());
+        self.save_place();
         self.cmd(Cmd::Open {
             profile,
             session: id,
@@ -809,6 +960,7 @@ impl HermesApp {
     pub fn new_session(&mut self, cx: &mut Context<Self>) {
         self.panel = Panel::Chat;
         self.reset_chat(cx);
+        self.save_place();
         cx.notify();
     }
 
@@ -986,6 +1138,10 @@ impl HermesApp {
         if text.is_empty() || self.live.is_some() {
             return;
         }
+        // Enter in the command list picks the command instead of sending.
+        if self.complete_slash(window, cx) {
+            return;
+        }
         self.composer
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.turns.push(Turn {
@@ -1000,15 +1156,23 @@ impl HermesApp {
             label: "Sending…".into(),
         });
         match self.runtime.clone() {
-            Some(session) => {
-                let effort = self.take_effort();
-                self.cmd(Cmd::Send {
+            Some(session) => match self.parse_command(&text) {
+                Some((name, arg)) => self.cmd(Cmd::Dispatch {
                     profile,
                     session,
-                    text,
-                    effort,
-                });
-            }
+                    name,
+                    arg,
+                }),
+                None => {
+                    let effort = self.take_effort();
+                    self.cmd(Cmd::Send {
+                        profile,
+                        session,
+                        text,
+                        effort,
+                    });
+                }
+            },
             None => {
                 // A new session is created on the first message; the effort goes with it.
                 self.effort_pending = true;
@@ -1019,11 +1183,7 @@ impl HermesApp {
                         let Some(conn) = self.conn.clone() else {
                             return;
                         };
-                        let name: String = text
-                            .split_whitespace()
-                            .take(5)
-                            .collect::<Vec<_>>()
-                            .join(" ");
+                        let name = branch_name(&text);
                         self.rest_branch(conn, profile, root, name, window, cx);
                     }
                     (root, _) => self.cmd(Cmd::Create { profile, cwd: root }),
@@ -1147,9 +1307,10 @@ impl HermesApp {
     fn load_profile_effort(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.effort_pending = false;
         self.rest(window, cx, rest::profile_defaults, |this, r, window, cx| {
-            let Ok((effort, model, models)) = r else {
+            let Ok((effort, model, models, approval)) = r else {
                 return;
             };
+            this.approval_mode = Some(approval);
             this.profile_models = models;
             this.model_pick = None;
             if let Some(i) = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v)) {
@@ -1295,7 +1456,12 @@ impl HermesApp {
     /// Tree root: the chat's project, else the common folder of the changed files, else the
     /// profile's working dir.
     pub(super) fn load_tree_root(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(dir) = self.project.as_ref().map(|p| p.dir.clone()) {
+        let own = self
+            .project
+            .as_ref()
+            .map(|p| p.dir.clone())
+            .or_else(|| self.session.as_ref().and_then(|s| self.folder_of(s)));
+        if let Some(dir) = own {
             self.set_tree_root(dir, window, cx);
             return;
         }
@@ -1440,6 +1606,58 @@ impl HermesApp {
         a.save();
         crate::theme::apply(a, Some(window), cx);
         cx.notify();
+    }
+
+    pub fn answer_approval(&mut self, choice: String, cx: &mut Context<Self>) {
+        let (Some(req), Some(profile)) = (self.approval.take(), self.profile.clone()) else {
+            return;
+        };
+        if let Some(live) = self.live.as_mut() {
+            live.label = "Working…".into();
+        }
+        self.cmd(Cmd::Approve {
+            profile,
+            req,
+            choice,
+        });
+        cx.notify();
+    }
+
+    pub fn set_approval_mode(&mut self, mode: &str, cx: &mut Context<Self>) {
+        let Some(profile) = self.profile.clone() else {
+            return;
+        };
+        self.approval_mode = Some(mode.to_string());
+        self.cmd(Cmd::SetApproval {
+            profile,
+            mode: mode.to_string(),
+        });
+        cx.notify();
+    }
+
+    /// Where this target was last: (profile, open session).
+    fn last_place(&self) -> (Option<String>, Option<String>) {
+        let all: HashMap<String, (Option<String>, Option<String>)> =
+            std::fs::read(connection::state_dir().join("last-place.json"))
+                .ok()
+                .and_then(|b| serde_json::from_slice(&b).ok())
+                .unwrap_or_default();
+        all.get(&self.target.label()).cloned().unwrap_or_default()
+    }
+
+    /// Remember the profile and session for this target (called whenever either changes).
+    fn save_place(&self) {
+        let path = connection::state_dir().join("last-place.json");
+        let mut all: HashMap<String, (Option<String>, Option<String>)> = std::fs::read(&path)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        all.insert(
+            self.target.label(),
+            (self.profile.clone(), self.session.clone()),
+        );
+        let _ = std::fs::create_dir_all(connection::state_dir());
+        let _ = std::fs::write(path, serde_json::to_vec(&all).unwrap_or_default());
     }
 
     pub fn toggle_file_list(&mut self, cx: &mut Context<Self>) {
@@ -1950,4 +2168,38 @@ fn diff_state(files: Vec<DiffFile>, cx: &mut App) -> Entity<DiffState> {
 
 fn file_list_pref() -> std::path::PathBuf {
     connection::state_dir().join("file-list")
+}
+
+/// One line of at most 160 characters.
+fn clip_line(s: &str) -> String {
+    let line = s
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or_default()
+        .trim();
+    if line.chars().count() > 160 {
+        format!("{}…", line.chars().take(159).collect::<String>())
+    } else {
+        line.to_string()
+    }
+}
+
+/// A branch/folder name from the request: its first Latin words ("fix login bug"), else a short
+/// unique "chat-1a2b" (Hermes keeps only ASCII in the slug).
+fn branch_name(text: &str) -> String {
+    let words: Vec<String> = text
+        .split_whitespace()
+        .map(|w| {
+            w.chars()
+                .filter(|c| c.is_ascii_alphanumeric())
+                .collect::<String>()
+        })
+        .filter(|w| w.len() > 1)
+        .take(5)
+        .collect();
+    if words.is_empty() {
+        format!("chat-{}", &uuid::Uuid::new_v4().simple().to_string()[..4])
+    } else {
+        words.join(" ").to_lowercase()
+    }
 }

@@ -41,6 +41,14 @@ impl HermesApp {
             .ok()
             .and_then(|b| serde_json::from_slice::<HashMap<String, String>>(&b).ok())
             .unwrap_or_default();
+        if self.default_cwd.is_none() {
+            self.rest(window, cx, rest::default_cwd, |this, r, _, cx| {
+                if let Ok(d) = r {
+                    this.default_cwd = Some(d);
+                    cx.notify();
+                }
+            });
+        }
         self.rest(window, cx, rest::session_places, |this, r, window, cx| {
             if let Ok(places) = r {
                 this.places = places;
@@ -56,9 +64,26 @@ impl HermesApp {
         if let Some(p) = place.filter(|p| !p.repo.is_empty()) {
             return Some(Project::from_top(&p.repo, &p.branch));
         }
+        // A branch folder is recognizable before Hermes records its repo.
+        if let Some(p) = place.filter(|p| p.cwd.contains("/.worktrees/")) {
+            let branch = if p.branch.is_empty() {
+                format!("hermes/{}", p.cwd.rsplit('/').next().unwrap_or_default())
+            } else {
+                p.branch.clone()
+            };
+            return Some(Project::from_top(&p.cwd, &branch));
+        }
         self.inferred
             .get(session)
             .map(|top| Project::from_top(top, place.map(|p| p.branch.as_str()).unwrap_or("")))
+    }
+
+    /// The folder a session was started in, when it is not Hermes' default (the user chose it).
+    pub fn folder_of(&self, session: &str) -> Option<String> {
+        // Until Hermes' default folder is known, nothing counts as chosen (and nothing is probed).
+        let default = self.default_cwd.as_ref()?;
+        let cwd = &self.places.get(session)?.cwd;
+        (!cwd.is_empty() && cwd != default).then(|| cwd.clone())
     }
 
     /// Every project seen in this profile (for the new-chat picker), by name.
@@ -87,9 +112,11 @@ impl HermesApp {
             return;
         };
         let known = self.project_of(&session);
-        let probe = match &known {
-            Some(p) => p.dir.clone(),
-            None => {
+        let folder = self.folder_of(&session);
+        let probe = match (&known, folder) {
+            (Some(p), _) => p.dir.clone(),
+            (None, Some(f)) => f,
+            (None, None) => {
                 // The first edited file's folder: is it inside a repo?
                 let Some(dir) = self
                     .session_files()

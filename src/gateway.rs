@@ -54,10 +54,50 @@ pub enum Cmd {
         session: String,
         text: String,
     },
+    /// The profile's slash commands (and skills).
+    Catalog {
+        profile: String,
+    },
+    /// Run a slash command in a session.
+    Dispatch {
+        profile: String,
+        session: String,
+        name: String,
+        arg: String,
+    },
+    /// `approvals.mode` for the profile: off / smart / manual.
+    SetApproval {
+        profile: String,
+        mode: String,
+    },
+    /// Answer an approval request.
+    Approve {
+        profile: String,
+        req: crate::model::ApprovalReq,
+        choice: String,
+    },
     Shutdown,
 }
 
 pub enum Evt {
+    Catalog(Vec<crate::model::SlashCommand>),
+    /// A slash command ran: either it printed something, or it wants a prompt sent.
+    Dispatched {
+        session: String,
+        output: Option<String>,
+        send: Option<String>,
+    },
+    Approval(crate::model::ApprovalReq),
+    /// The pending approval was answered or withdrawn.
+    ApprovalDone(String),
+    Subagent {
+        session: String,
+        id: String,
+        /// "start" | "tool" | "text" | "complete"
+        kind: &'static str,
+        text: String,
+        status: String,
+    },
     Connected(Arc<Connection>),
     Error(String),
     Profiles(Vec<Profile>),
@@ -116,6 +156,13 @@ enum Pending {
     },
     Create,
     Delete,
+    Catalog,
+    Dispatch(String),
+    /// Regenerate, step 1 done: the transcript (for the last user row id) has arrived.
+    Regen {
+        profile: String,
+        text: String,
+    },
     Ignore,
 }
 
@@ -150,6 +197,8 @@ struct Rpc {
     ws: WebSocket<TcpStream>,
     next_id: u64,
     pending: HashMap<u64, Pending>,
+    /// Method of each pending call, for error reports.
+    methods: HashMap<u64, String>,
     canonical: bool,
     /// runtime session id -> (revision, execution generation), for fenced mutations.
     fences: HashMap<String, (i64, i64)>,
@@ -159,6 +208,7 @@ impl Rpc {
     fn call(&mut self, method: &str, params: Value, kind: Pending) -> Result<()> {
         self.next_id += 1;
         self.pending.insert(self.next_id, kind);
+        self.methods.insert(self.next_id, method.to_string());
         let frame =
             json!({"jsonrpc": "2.0", "id": self.next_id, "method": method, "params": params});
         self.ws.send(Message::text(frame.to_string()))?;
@@ -258,6 +308,57 @@ impl Rpc {
                     )?
                 }
             }
+            Cmd::Catalog { profile } => self.call(
+                "commands.catalog",
+                json!({"profile": profile}),
+                Pending::Catalog,
+            )?,
+            Cmd::Dispatch {
+                profile,
+                session,
+                name,
+                arg,
+            } => {
+                let params = if self.canonical {
+                    json!({"session_id": session, "profile": profile, "name": name, "arg": arg})
+                } else {
+                    let command = if arg.is_empty() {
+                        name
+                    } else {
+                        format!("{name} {arg}")
+                    };
+                    json!({"session_id": session, "profile": profile, "command": command})
+                };
+                let method = if self.canonical {
+                    "command.dispatch"
+                } else {
+                    "slash.exec"
+                };
+                self.call(method, params, Pending::Dispatch(session))?
+            }
+            Cmd::SetApproval { profile, mode } => self.call(
+                "config.set",
+                json!({"profile": profile, "key": "approvals.mode", "value": mode}),
+                Pending::Ignore,
+            )?,
+            Cmd::Approve {
+                profile,
+                req,
+                choice,
+            } => {
+                let params = if self.canonical {
+                    let generation = req
+                        .generation
+                        .or_else(|| self.fences.get(&req.session).map(|f| f.1))
+                        .unwrap_or(0);
+                    json!({"session_id": req.session, "execution_generation": generation,
+                           "prompt_id": req.prompt_id, "choice": choice})
+                } else {
+                    json!({"session_id": req.session, "request_id": req.prompt_id,
+                           "choice": choice, "profile": profile})
+                };
+                self.call("approval.respond", params, Pending::Ignore)?
+            }
             Cmd::Send {
                 profile,
                 session,
@@ -282,6 +383,17 @@ impl Rpc {
                 "session.interrupt",
                 json!({"session_id": session, "profile": profile}),
                 Pending::Ignore,
+            )?,
+            // The owner protocol has no undo: re-read the transcript for the last user row, cut
+            // there (a fenced `rewind`), then submit the same text again.
+            Cmd::Regenerate {
+                profile,
+                session,
+                text,
+            } if self.canonical => self.call(
+                "session.resume",
+                json!({"session_id": session, "profile": profile}),
+                Pending::Regen { profile, text },
             )?,
             Cmd::Regenerate {
                 profile,
@@ -318,6 +430,7 @@ fn run(
         ws,
         next_id: 0,
         pending: HashMap::new(),
+        methods: HashMap::new(),
         canonical: conn.canonical(),
         fences: HashMap::new(),
     };
@@ -345,11 +458,13 @@ fn run(
         };
 
         if let Some(id) = msg["id"].as_u64() {
+            let method = rpc.methods.remove(&id).unwrap_or_default();
             let Some(kind) = rpc.pending.remove(&id) else {
                 continue;
             };
             if let Some(err) = msg.get("error") {
                 let text = err["message"].as_str().unwrap_or("error").to_string();
+                eprintln!("[gateway] {method}: {err}");
                 match kind {
                     Pending::Delete => emit(Evt::DeleteFailed(text)),
                     // Older gateways may lack the projection: show the turns without extras.
@@ -368,6 +483,27 @@ fn run(
                     Pending::Ignore if text.contains("not found") => {}
                     _ => emit(Evt::Error(text)),
                 }
+                continue;
+            }
+            if let Pending::Regen { profile, text } = kind {
+                let r = &msg["result"];
+                let Some(sid) = r["session_id"].as_str().map(str::to_string) else {
+                    continue;
+                };
+                rpc.note_fence(&sid, r);
+                let row = r["messages"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .rev()
+                    .find(|m| m["role"] == "user" && m["row_id"].is_i64())
+                    .and_then(|m| m["row_id"].as_i64());
+                if let Some(row) = row {
+                    rpc.mutate(&sid, "rewind", json!({"target_message_id": row}))?;
+                }
+                let params = json!({"session_id": sid, "text": text, "profile": profile,
+                                    "submission_id": uuid::Uuid::new_v4().to_string()});
+                rpc.call("prompt.submit", params, Pending::Ignore)?;
                 continue;
             }
             // Resume -> fetch the history projection for sources and timing.
@@ -477,7 +613,27 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
             emit(Evt::Created { session, runtime })
         }
         Pending::Delete => emit(Evt::Deleted),
-        Pending::Ignore => {}
+        Pending::Catalog => emit(Evt::Catalog(catalog(r))),
+        Pending::Dispatch(session) => {
+            let s = |k: &str| {
+                r[k].as_str()
+                    .map(str::to_string)
+                    .filter(|v| !v.trim().is_empty())
+            };
+            match r["type"].as_str().unwrap_or_default() {
+                "send" | "skill" | "prompt" => emit(Evt::Dispatched {
+                    session,
+                    output: None,
+                    send: s("message"),
+                }),
+                _ => emit(Evt::Dispatched {
+                    session,
+                    output: s("output").or_else(|| s("message")).or_else(|| s("text")),
+                    send: None,
+                }),
+            }
+        }
+        Pending::Ignore | Pending::Regen { .. } => {}
     }
 }
 
@@ -518,6 +674,80 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             ),
             session: sid,
         }),
+        "approval.request" => emit(Evt::Approval(crate::model::ApprovalReq {
+            prompt_id: payload["prompt_id"]
+                .as_str()
+                .or(payload["request_id"].as_str())
+                .unwrap_or_default()
+                .to_string(),
+            generation: payload["execution_generation"].as_i64(),
+            command: payload["command"].as_str().unwrap_or_default().to_string(),
+            description: payload["description"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+            choices: payload["choices"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|c| c.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_else(|| {
+                    let mut c = vec!["once".to_string()];
+                    if payload["allow_session"].as_bool() != Some(false) {
+                        c.push("session".into());
+                    }
+                    if payload["allow_permanent"].as_bool() != Some(false) {
+                        c.push("always".into());
+                    }
+                    c.push("deny".into());
+                    c
+                }),
+            session: sid,
+        })),
+        "approval.settled" | "approval.cancelled" | "approval.received" => {
+            emit(Evt::ApprovalDone(sid))
+        }
+        kind @ ("subagent.start" | "subagent.tool" | "subagent.text" | "subagent.complete") => {
+            let s = |k: &str| payload[k].as_str().unwrap_or_default().to_string();
+            let id = payload["subagent_id"]
+                .as_str()
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("sa:{}:{}", payload["task_index"], s("goal")));
+            let (kind, text) = match kind {
+                "subagent.start" => ("start", {
+                    let g = s("goal");
+                    if g.is_empty() { s("preview") } else { g }
+                }),
+                "subagent.tool" => ("tool", {
+                    let name = s("tool_name");
+                    let preview = s("tool_preview");
+                    let preview = if preview.is_empty() {
+                        s("text")
+                    } else {
+                        preview
+                    };
+                    crate::app::tool_label(&name, &preview)
+                }),
+                "subagent.text" => ("text", s("text")),
+                _ => ("complete", {
+                    let summary = s("summary");
+                    if summary.is_empty() {
+                        s("text")
+                    } else {
+                        summary
+                    }
+                }),
+            };
+            emit(Evt::Subagent {
+                session: sid,
+                id,
+                kind,
+                text,
+                status: s("status"),
+            })
+        }
         "sessions.changed" => emit(Evt::SessionsChanged),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
         "message.complete" => {
@@ -531,4 +761,40 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         }
         _ => {}
     }
+}
+
+/// `commands.catalog` → one list: each category's commands, then skills (pairs not in a category).
+fn catalog(r: &Value) -> Vec<crate::model::SlashCommand> {
+    let pair = |p: &Value, category: &str| {
+        let name = p[0].as_str()?.trim().to_string();
+        let name = if name.starts_with('/') {
+            name
+        } else {
+            format!("/{name}")
+        };
+        Some(crate::model::SlashCommand {
+            name,
+            desc: p[1].as_str().unwrap_or_default().trim().to_string(),
+            category: category.to_string(),
+        })
+    };
+    let mut out: Vec<crate::model::SlashCommand> = vec![];
+    for c in r["categories"].as_array().into_iter().flatten() {
+        let cat = c["name"].as_str().unwrap_or("Commands");
+        out.extend(
+            c["pairs"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|p| pair(p, cat)),
+        );
+    }
+    for p in r["pairs"].as_array().into_iter().flatten() {
+        if let Some(cmd) = pair(p, "Skills") {
+            if !out.iter().any(|c| c.name == cmd.name) {
+                out.push(cmd);
+            }
+        }
+    }
+    out
 }

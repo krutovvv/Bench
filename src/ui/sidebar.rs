@@ -20,9 +20,14 @@ impl HermesApp {
         let mut groups: Vec<(String, Vec<usize>)> = vec![];
         let mut rank: Vec<(String, u8)> = vec![];
         for i in self.visible_sessions() {
-            let (label, r) = match self.project_of(&self.sessions[i].id) {
-                Some(p) => (p.name(), 1),
-                None => {
+            let id = &self.sessions[i].id;
+            let folder = self
+                .folder_of(id)
+                .map(|f| f.rsplit('/').next().unwrap_or(&f).to_string());
+            let (label, r) = match (self.project_of(id), folder) {
+                (Some(p), _) => (p.name(), 1),
+                (None, Some(f)) => (f, 1),
+                (None, None) => {
                     let l = source_label(&self.sessions[i].source);
                     let r = if l == "Hermes" { 0 } else { 2 };
                     (l, r)
@@ -45,7 +50,8 @@ impl HermesApp {
         groups.sort_by(|(a, _), (b, _)| {
             (rank_of(a), a.to_lowercase()).cmp(&(rank_of(b), b.to_lowercase()))
         });
-        let single = groups.len() <= 1;
+        // One plain group needs no header; a project always names itself.
+        let single = groups.len() <= 1 && groups.first().is_none_or(|(l, _)| rank_of(l) != 1);
 
         let mut list: Vec<AnyElement> = vec![];
         let searching = !self.search_query.is_empty();
@@ -84,7 +90,7 @@ impl HermesApp {
 
         let new_session = h_flex()
             .id("new-session")
-            .h(px(32.))
+            .h(rems(super::BAR_CONTROL_REMS))
             .px_3()
             .gap_2()
             .items_center()
@@ -106,14 +112,14 @@ impl HermesApp {
                 // Mirrors the footer: same 8px inset, same 32px control, a rule on the inner side.
                 div().pt(px(38.)).flex_none().child(
                     h_flex()
-                        .h(px(super::BAR_H))
+                        .h(super::bar_h(cx))
                         .px_4()
                         .items_center()
                         .border_b_1()
                         .border_color(theme.sidebar_border)
                         .child(
+                            // Medium input = 2 rem, the same as the button below.
                             Input::new(&self.search)
-                                .h(px(32.))
                                 .cleanable(true)
                                 .prefix(Ico::Search.icon().small().text_color(muted)),
                         ),
@@ -142,7 +148,7 @@ impl HermesApp {
                 // Same height as the composer, so the two top rules line up across the window.
                 h_flex()
                     .flex_none()
-                    .h(px(super::BAR_H))
+                    .h(super::bar_h(cx))
                     .px_4()
                     .items_center()
                     .border_t_1()
