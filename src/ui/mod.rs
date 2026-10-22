@@ -292,7 +292,7 @@ impl Render for HermesApp {
 
         // The IDE maximized (⌘⇧B) has the whole window; the rest keeps running, hidden.
         let expanded = self.ide.expanded && self.right.is_some() && self.panel == Panel::Chat;
-        let content = self.render_layout(main, expanded, cx);
+        let content = self.render_layout(main, expanded, window, cx);
         v_flex()
             .size_full()
             .bg(theme.background)
@@ -311,30 +311,67 @@ impl Render for HermesApp {
 impl HermesApp {
     /// Sidebar | main | IDE (when open), resizable. Maximized, the IDE takes both places: its
     /// tree where the sidebar is (same width), its editor where the chat/terminal is.
-    fn render_layout(&mut self, main: Div, expanded: bool, cx: &mut Context<Self>) -> AnyElement {
+    fn render_layout(
+        &mut self,
+        main: Div,
+        expanded: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        // One left column, one IDE width: when the set of panels changes (maximized or not,
+        // IDE on the right or not) the group starts from a fresh state laid out at the widths
+        // remembered here — gpui-kit would otherwise squeeze the old sizes to fit a new panel.
+        let shape = (expanded, self.right.is_some() && self.panel == Panel::Chat);
+        if self.layout_synced != Some(shape) {
+            self.layout_synced = Some(shape);
+            if expanded {
+                self.layout_ide_state = cx.new(|_| Default::default());
+            } else {
+                self.layout_state = cx.new(|_| Default::default());
+            }
+        }
+        let state = if expanded {
+            self.layout_ide_state.clone()
+        } else {
+            self.layout_state.clone()
+        };
+        let _ = window;
+        // Every drag of a divider is that column's width from now on.
+        let view = cx.entity();
+        let remember = move |state: &Entity<gpui_kit::component::resizable::ResizableState>,
+                             _: &mut Window,
+                             cx: &mut App| {
+            let sizes = state.read(cx).sizes().clone();
+            view.update(cx, |this, _| {
+                if let Some(w) = sizes.first() {
+                    this.sidebar_w = *w;
+                }
+                // Normal layout with the IDE on the right: sidebar | main | IDE.
+                if let (Some(w), false) = (sizes.get(2), this.ide.expanded) {
+                    this.ide_w = *w;
+                }
+            });
+        };
+        let left = resizable_panel()
+            .size(self.sidebar_w)
+            .size_range(px(200.)..px(480.));
         if expanded {
-            return h_resizable("layout")
-                .child(
-                    resizable_panel()
-                        .size(px(280.))
-                        .size_range(px(200.)..px(480.))
-                        .child(self.render_ide_sidebar(cx)),
-                )
+            return h_resizable("layout-ide")
+                .with_state(&state)
+                .on_resize(remember)
+                .child(left.child(self.render_ide_sidebar(cx)))
                 .child(resizable_panel().child(self.render_ide_main(cx)))
                 .into_any_element();
         }
         h_resizable("layout")
-            .child(
-                resizable_panel()
-                    .size(px(280.))
-                    .size_range(px(200.)..px(480.))
-                    .child(self.render_sidebar(cx)),
-            )
+            .with_state(&state)
+            .on_resize(remember)
+            .child(left.child(self.render_sidebar(cx)))
             .child(resizable_panel().child(main))
             .when(self.right.is_some() && self.panel == Panel::Chat, |d| {
                 d.child(
                     resizable_panel()
-                        .size(px(640.))
+                        .size(self.ide_w)
                         .size_range(px(360.)..px(1400.))
                         .child(self.render_right(cx)),
                 )

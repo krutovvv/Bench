@@ -268,6 +268,16 @@ pub struct HermesApp {
     pub ssh: servers::Ssh,
     /// The mini IDE's source and the server file it keeps in sync.
     pub ide: ide::Ide,
+    /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
+    /// width, kept by the app across the two layouts that show it (`ui/mod.rs`).
+    pub sidebar_w: Pixels,
+    /// The IDE's width when it sits on the right.
+    pub ide_w: Pixels,
+    pub layout_state: Entity<gpui_kit::component::resizable::ResizableState>,
+    pub layout_ide_state: Entity<gpui_kit::component::resizable::ResizableState>,
+    /// The layout shape (maximized IDE, IDE on the right) the left width was last applied to;
+    /// a new shape gets it again.
+    pub layout_synced: Option<(bool, bool)>,
 
     _subscriptions: Vec<Subscription>,
     _tasks: Vec<Task<()>>,
@@ -545,6 +555,11 @@ impl HermesApp {
         let mut app = Self {
             ssh,
             ide: Default::default(),
+            sidebar_w: px(280.),
+            ide_w: px(640.),
+            layout_state: cx.new(|_| Default::default()),
+            layout_ide_state: cx.new(|_| Default::default()),
+            layout_synced: None,
             targets,
             target: initial.clone(),
             _target_choice: target_choice,
