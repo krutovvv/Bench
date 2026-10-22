@@ -344,7 +344,8 @@ impl HermesApp {
                         h_flex()
                             .id("prompt-add")
                             .flex_none()
-                            .h(px(36.))
+                            // The same bar as the sidebar's "New session", so their rules line up.
+                            .h(super::bar_h(cx))
                             .px_4()
                             .gap_2()
                             .items_center()
