@@ -21,6 +21,8 @@ pub enum Cmd {
     },
     Create {
         profile: String,
+        /// The working folder (a project, or a branch folder of one); None = Hermes' default.
+        cwd: Option<String>,
     },
     Send {
         profile: String,
@@ -224,11 +226,13 @@ impl Rpc {
                     Pending::Delete,
                 )?
             }
-            Cmd::Create { profile } => self.call(
-                "session.create",
-                json!({"profile": profile}),
-                Pending::Create,
-            )?,
+            Cmd::Create { profile, cwd } => {
+                let mut params = json!({"profile": profile});
+                if let Some(cwd) = cwd {
+                    params["cwd"] = json!(cwd);
+                }
+                self.call("session.create", params, Pending::Create)?
+            }
             Cmd::SetModel {
                 profile,
                 session,

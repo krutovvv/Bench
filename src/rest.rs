@@ -446,3 +446,66 @@ fn enc(s: &str) -> String {
         })
         .collect()
 }
+
+/// Raw GET, for diagnostics (`--probe`).
+pub fn get_raw(conn: &Connection, profile: &str, path: &str) -> Result<Value> {
+    get(conn, path, profile)
+}
+
+/// Each session's folder and git info, by session id (the most recent 200).
+pub fn session_places(
+    conn: &Connection,
+    profile: &str,
+) -> Result<std::collections::HashMap<String, crate::model::Place>> {
+    let v = get(conn, "/api/sessions?limit=200&order=recent", profile)?;
+    let s = |r: &Value, k: &str| r[k].as_str().unwrap_or_default().to_string();
+    Ok(v["sessions"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| {
+            let place = crate::model::Place {
+                cwd: s(r, "cwd"),
+                repo: s(r, "git_repo_root"),
+                branch: s(r, "git_branch"),
+            };
+            Some((r["id"].as_str()?.to_string(), place))
+        })
+        .collect())
+}
+
+/// A new branch in its own folder (`<repo>/.worktrees/<name>`): (folder, branch).
+pub fn worktree_add(
+    conn: &Connection,
+    profile: &str,
+    repo: &str,
+    name: &str,
+) -> Result<(String, String)> {
+    let v = send(
+        conn,
+        "POST",
+        "/api/git/worktree/add",
+        profile,
+        json!({"path": repo, "name": name}),
+        60,
+    )?;
+    Ok((
+        v["path"]
+            .as_str()
+            .ok_or_else(|| anyhow!("no worktree path"))?
+            .to_string(),
+        v["branch"].as_str().unwrap_or_default().to_string(),
+    ))
+}
+
+pub fn worktree_remove(conn: &Connection, profile: &str, repo: &str, folder: &str) -> Result<()> {
+    send(
+        conn,
+        "POST",
+        "/api/git/worktree/remove",
+        profile,
+        json!({"path": repo, "worktreePath": folder, "force": true}),
+        60,
+    )?;
+    Ok(())
+}

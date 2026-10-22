@@ -43,6 +43,13 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 println!("sessions[{p}]: {}", rows.len());
                 if let Some(c) = &conn {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
+                    if let Ok(paths) = std::env::var("PROBE_GET") {
+                        for path in paths.split(',') {
+                            let v = rest::get_raw(c, &p, path)?;
+                            let s = serde_json::to_string_pretty(&v)?;
+                            println!("GET {path}:\n{}", s.chars().take(2500).collect::<String>());
+                        }
+                    }
                     if let Ok(q) = std::env::var("PROBE_SEARCH") {
                         for (id, s) in rest::search_sessions(c, &p, &q)? {
                             println!("  hit {id}: {}", s.chars().take(100).collect::<String>());
@@ -132,6 +139,13 @@ fn probe(target: &str) -> anyhow::Result<()> {
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
+    if args.get(1).map(String::as_str) == Some("--probe-git") {
+        if let Err(e) = probe_git(&args[2]) {
+            eprintln!("probe-git failed: {e:#}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if args.get(1).map(String::as_str) == Some("--probe") {
         if let Err(e) = probe(args.get(2).map(String::as_str).unwrap_or("local")) {
             eprintln!("probe failed: {e:#}");
@@ -164,4 +178,42 @@ fn main() {
             .expect("open window");
             cx.activate(true);
         });
+}
+
+/// End-to-end check of the branch flow on a scratch repo, through the local gateway.
+fn probe_git(repo: &str) -> anyhow::Result<()> {
+    use model::{Project, Target};
+    let conn = connection::Connection::open(&Target::Local)?;
+    let profile = std::env::var("PROBE_PROFILE").unwrap_or_else(|_| "default".into());
+    connection::exclude_worktrees(&Target::Local, repo)?;
+    let (dir, branch) = rest::worktree_add(&conn, &profile, repo, "probe idea")?;
+    println!(
+        "main status with a branch folder: {:?}",
+        connection::git(&Target::Local, repo, &["status", "--short"])?
+    );
+    println!("worktree: {dir} on {branch}");
+    std::fs::write(format!("{dir}/idea.txt"), "from the branch\n")?;
+    let top = connection::git(&Target::Local, &dir, &["rev-parse", "--show-toplevel"])?;
+    let p = Project::from_top(&top, &branch);
+    println!(
+        "project root={} dir={} in_branch={}",
+        p.root,
+        p.dir,
+        p.in_branch_folder()
+    );
+    println!(
+        "{}",
+        app::projects::merge(&Target::Local, &p, "Probe idea")?
+    );
+    println!(
+        "main log: {}",
+        connection::git(&Target::Local, repo, &["log", "--oneline", "-3"])?
+    );
+    rest::worktree_remove(&conn, &profile, &p.root, &p.dir)?;
+    connection::git(&Target::Local, &p.root, &["branch", "-D", &p.branch])?;
+    println!(
+        "branches after delete: {}",
+        connection::git(&Target::Local, repo, &["branch"])?
+    );
+    Ok(())
 }

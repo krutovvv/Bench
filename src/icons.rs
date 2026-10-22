@@ -55,6 +55,7 @@ icons! {
     Copy => "copy",
     Cpu => "cpu",
     Gauge => "gauge",
+    GitBranch => "git-branch",
     Globe => "globe",
     ExternalLink => "external-link",
     File => "file",

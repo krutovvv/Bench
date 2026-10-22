@@ -2,6 +2,8 @@
 //! (each unfoldable), the answer, sources and hover actions; after the last turn, the
 //! files this session changed.
 
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::text::TextView;
 use gpui_kit::component::tooltip::Tooltip;
@@ -16,6 +18,105 @@ use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
 impl HermesApp {
+    /// New chat: optionally work in a git project, optionally in a branch of its own.
+    fn render_project_choice(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let projects = self.known_projects();
+        let chosen = self.new_project.clone();
+        let label = chosen
+            .as_deref()
+            .map(|r| r.rsplit('/').next().unwrap_or(r).to_string())
+            .unwrap_or_else(|| "No project".into());
+        let view = cx.entity();
+        let picker = Button::new("new-project")
+            .ghost()
+            .small()
+            .icon(Ico::Folder.icon())
+            .label(label)
+            .dropdown_menu(move |menu, _, _| {
+                let mut menu = menu;
+                let none = view.clone();
+                menu = menu.item(
+                    PopupMenuItem::new("No project")
+                        .checked(chosen.is_none())
+                        .on_click(move |_, _, cx| {
+                            none.update(cx, |this, cx| {
+                                this.new_project = None;
+                                this.new_branch = false;
+                                cx.notify();
+                            })
+                        }),
+                );
+                let browse = view.clone();
+                menu = menu.item(PopupMenuItem::new("Choose folder…").on_click(
+                    move |_, window, cx| {
+                        browse.update(cx, |this, cx| this.choose_project_folder(window, cx))
+                    },
+                ));
+                if !projects.is_empty() {
+                    menu = menu.separator();
+                }
+                for root in &projects {
+                    let (view, r) = (view.clone(), root.clone());
+                    menu = menu.item(
+                        PopupMenuItem::new(root.clone())
+                            .checked(chosen.as_deref() == Some(root))
+                            .on_click(move |_, _, cx| {
+                                view.update(cx, |this, cx| {
+                                    this.new_project = Some(r.clone());
+                                    this.new_project_repo = true;
+                                    cx.notify();
+                                })
+                            }),
+                    );
+                }
+                menu
+            });
+        let on = self.new_branch;
+        h_flex()
+            .mt_4()
+            .gap_3()
+            .items_center()
+            .text_sm()
+            .child(picker)
+            .when(self.path_entry, |d| {
+                d.child(
+                    div().w(px(320.)).child(
+                        gpui_kit::component::input::Input::new(&self.project_path).small(),
+                    ),
+                )
+            })
+            .when(self.new_project.is_some() && self.new_project_repo, |d| {
+                d.child(
+                    h_flex()
+                        .id("new-branch")
+                        .gap_1p5()
+                        .items_center()
+                        .cursor_pointer()
+                        .text_color(if on { theme.foreground } else { muted })
+                        .hover(|s| s.text_color(theme.foreground))
+                        .child(
+                            div()
+                                .size(px(14.))
+                                .border_1()
+                                .border_color(if on { theme.primary } else { theme.input })
+                                .when(on, |d| d.bg(theme.primary)),
+                        )
+                        .child(Ico::GitBranch.icon().xsmall())
+                        .child("In a new branch")
+                        .tooltip(|window, cx| {
+                            Tooltip::new("A branch of its own in a separate folder (git worktree): main stays untouched until you merge")
+                                .build(window, cx)
+                        })
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.new_branch = !this.new_branch;
+                            cx.notify();
+                        })),
+                )
+            })
+    }
+
     pub(super) fn render_chat(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         if self.turns.is_empty() && self.session.is_some() {
@@ -53,6 +154,7 @@ impl HermesApp {
                             self.current_profile()
                         )),
                 )
+                .child(self.render_project_choice(cx))
                 .into_any_element();
         }
 

@@ -15,16 +15,36 @@ impl HermesApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
 
-        // Group visible sessions by where they live (Hermes UI/CLI, Telegram, cron…), Hermes first.
+        // Group visible sessions: by git project when they work in one, else by where they live
+        // (Hermes UI/CLI, Telegram, cron…). Plain Hermes chats first, then projects, then the rest.
         let mut groups: Vec<(String, Vec<usize>)> = vec![];
+        let mut rank: Vec<(String, u8)> = vec![];
         for i in self.visible_sessions() {
-            let label = source_label(&self.sessions[i].source);
+            let (label, r) = match self.project_of(&self.sessions[i].id) {
+                Some(p) => (p.name(), 1),
+                None => {
+                    let l = source_label(&self.sessions[i].source);
+                    let r = if l == "Hermes" { 0 } else { 2 };
+                    (l, r)
+                }
+            };
             match groups.iter_mut().find(|(l, _)| *l == label) {
                 Some((_, rows)) => rows.push(i),
-                None => groups.push((label, vec![i])),
+                None => {
+                    rank.push((label.clone(), r));
+                    groups.push((label, vec![i]));
+                }
             }
         }
-        groups.sort_by_key(|(l, _)| l != "Hermes");
+        let rank_of = |l: &str| {
+            rank.iter()
+                .find(|(x, _)| x == l)
+                .map(|(_, r)| *r)
+                .unwrap_or(2)
+        };
+        groups.sort_by(|(a, _), (b, _)| {
+            (rank_of(a), a.to_lowercase()).cmp(&(rank_of(b), b.to_lowercase()))
+        });
         let single = groups.len() <= 1;
 
         let mut list: Vec<AnyElement> = vec![];
@@ -190,10 +210,15 @@ impl HermesApp {
         let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(&s.id);
         let armed = self.confirm_delete.as_deref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
-        let meta = if s.running {
+        let count = if s.running {
             "working…".to_string()
         } else {
             plural(s.messages as usize, "message", "messages", "messages")
+        };
+        // A chat in a branch of its own says which.
+        let meta = match self.project_of(&s.id).filter(|p| p.in_branch_folder()) {
+            Some(p) if !p.branch.is_empty() => format!("{} · {count}", p.branch),
+            _ => count,
         };
         let (open_id, del_id) = (s.id.clone(), s.id.clone());
 

@@ -152,3 +152,50 @@ pub struct SkillRow {
 }
 
 pub const EFFORTS: &[&str] = &["low", "medium", "xhigh"];
+
+/// Where a session works: its folder and, when that folder is in a git repo, the project.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Place {
+    pub cwd: String,
+    /// The repo's top folder as Hermes recorded it (for a branch folder, that folder itself).
+    pub repo: String,
+    pub branch: String,
+}
+
+/// A git project a session belongs to.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Project {
+    /// The main checkout: `~/code/app`, also for chats in `~/code/app/.worktrees/x`.
+    pub root: String,
+    /// Where this chat's files are: the main checkout or its branch folder.
+    pub dir: String,
+    pub branch: String,
+}
+
+impl Project {
+    /// From any folder inside a repo (`top` = `git rev-parse --show-toplevel` of it).
+    pub fn from_top(top: &str, branch: &str) -> Self {
+        let root = match top.find("/.worktrees/") {
+            Some(i) => top[..i].to_string(),
+            None => top.to_string(),
+        };
+        Self {
+            root,
+            dir: top.to_string(),
+            branch: branch.to_string(),
+        }
+    }
+
+    pub fn name(&self) -> String {
+        self.root
+            .rsplit('/')
+            .next()
+            .unwrap_or(&self.root)
+            .to_string()
+    }
+
+    /// The chat works in its own branch folder (not the main checkout).
+    pub fn in_branch_folder(&self) -> bool {
+        self.dir != self.root
+    }
+}

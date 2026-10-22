@@ -12,6 +12,9 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
 
+pub(crate) mod projects;
+pub use projects::GitArm;
+
 use crate::audio::{Playback, Recorder};
 use crate::connection::{self, Connection};
 use crate::gateway::{Cmd, Evt, Gateway};
@@ -104,6 +107,20 @@ pub struct HermesApp {
     pub effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
     pub profile_models: Vec<(String, String)>,
+    /// Session folders/repos as Hermes recorded them, and repos inferred from edited files.
+    pub places: HashMap<String, crate::model::Place>,
+    pub inferred: HashMap<String, String>,
+    /// The open session's project (None for chats that touch no repo).
+    pub project: Option<crate::model::Project>,
+    /// For the next new chat: work in this repo, and in a branch of its own.
+    pub new_project: Option<String>,
+    pub new_branch: bool,
+    /// The chosen folder is a git repo (so "in a new branch" applies).
+    pub new_project_repo: bool,
+    /// Typing a folder path (SSH hosts have no native folder dialog here).
+    pub path_entry: bool,
+    pub project_path: Entity<InputState>,
+    pub git_armed: Option<GitArm>,
     pub appearance: crate::theme::Appearance,
     pub speed: crate::speed::Meter,
     /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
@@ -185,6 +202,8 @@ impl HermesApp {
                 .placeholder("Message Hermes…")
         });
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sessions"));
+        let project_path =
+            cx.new(|cx| InputState::new(window, cx).placeholder("/home/you/project — Enter"));
         let mcp_editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("json")
@@ -231,6 +250,19 @@ impl HermesApp {
                     if matches!(ev, InputEvent::Change) {
                         let q = state.read(cx).value().trim().to_string();
                         this.search_sessions(q, window, cx);
+                    }
+                },
+            ),
+            cx.subscribe_in(
+                &project_path,
+                window,
+                |this, state, ev: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = ev {
+                        let path = state.read(cx).value().trim().to_string();
+                        if !path.is_empty() {
+                            this.path_entry = false;
+                            this.set_new_project(path, window, cx);
+                        }
                     }
                 },
             ),
@@ -362,6 +394,15 @@ impl HermesApp {
             usage: None,
             effort: EFFORTS.len() - 1,
             profile_models: vec![],
+            places: HashMap::new(),
+            inferred: HashMap::new(),
+            project: None,
+            new_project: None,
+            new_branch: false,
+            new_project_repo: true,
+            path_entry: false,
+            project_path,
+            git_armed: None,
             appearance: crate::theme::Appearance::load(),
             speed: crate::speed::Meter::fresh(),
             show_list: std::fs::read_to_string(file_list_pref()).is_ok_and(|s| s.trim() == "1"),
@@ -517,6 +558,7 @@ impl HermesApp {
                     if unknown_tg {
                         self.load_telegram_owners(window, cx);
                     }
+                    self.load_places(window, cx);
                 }
             }
             Evt::SessionsChanged => self.refresh_sessions(),
@@ -546,6 +588,7 @@ impl HermesApp {
                         label: "Working…".into(),
                     });
                     self.reset_scroller(cx);
+                    self.resolve_project(window, cx);
                 }
             }
             Evt::Created { session, runtime } => {
@@ -655,6 +698,9 @@ impl HermesApp {
                     }
                     if let Some(edit) = edit {
                         turn.files.push(edit);
+                        if self.project.is_none() {
+                            self.resolve_project(window, cx);
+                        }
                     }
                 }
                 cx.notify();
@@ -682,6 +728,8 @@ impl HermesApp {
     // ---- chat ------------------------------------------------------------
 
     fn reset_chat(&mut self, cx: &mut Context<Self>) {
+        self.tree_root = None;
+        self.tree.clear();
         self.session = None;
         self.runtime = None;
         self.turns.clear();
@@ -692,6 +740,10 @@ impl HermesApp {
         self.model_pick = None;
         self.model_pending = false;
         self.speed = crate::speed::Meter::fresh();
+        self.project = None;
+        self.new_project = None;
+        self.new_branch = false;
+        self.git_armed = None;
         self.reset_scroller(cx);
     }
 
@@ -803,6 +855,43 @@ impl HermesApp {
     pub fn cancel_delete(&mut self, cx: &mut Context<Self>) {
         self.confirm_delete = None;
         cx.notify();
+    }
+
+    fn rest_branch(
+        &mut self,
+        conn: Arc<Connection>,
+        profile: String,
+        root: String,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let p = profile.clone();
+        let target = self.target.clone();
+        self.background(
+            window,
+            cx,
+            move || {
+                let _ = connection::exclude_worktrees(&target, &root);
+                rest::worktree_add(&conn, &p, &root, &name)
+            },
+            move |this, r, window, cx| match r {
+                Ok((folder, _branch)) => this.cmd(Cmd::Create {
+                    profile,
+                    cwd: Some(folder),
+                }),
+                Err(e) => {
+                    this.live = None;
+                    this.queued = None;
+                    this.toast(
+                        NotificationType::Error,
+                        format!("New branch: {e:#}"),
+                        window,
+                        cx,
+                    );
+                }
+            },
+        );
     }
 
     /// Pick the model for a new session (primary or a fallback); applied once it is created.
@@ -918,8 +1007,22 @@ impl HermesApp {
             None => {
                 // A new session is created on the first message; the effort goes with it.
                 self.effort_pending = true;
-                self.queued = Some(text);
-                self.cmd(Cmd::Create { profile });
+                self.queued = Some(text.clone());
+                match (self.new_project.clone(), self.new_branch) {
+                    (Some(root), true) => {
+                        // Its own branch: a fresh folder named after the request.
+                        let Some(conn) = self.conn.clone() else {
+                            return;
+                        };
+                        let name: String = text
+                            .split_whitespace()
+                            .take(5)
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        self.rest_branch(conn, profile, root, name, window, cx);
+                    }
+                    (root, _) => self.cmd(Cmd::Create { profile, cwd: root }),
+                }
             }
         }
         cx.notify();
@@ -1184,8 +1287,13 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// Tree root: the common folder of the changed files, else the profile's working dir.
-    fn load_tree_root(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// Tree root: the chat's project, else the common folder of the changed files, else the
+    /// profile's working dir.
+    pub(super) fn load_tree_root(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(dir) = self.project.as_ref().map(|p| p.dir.clone()) {
+            self.set_tree_root(dir, window, cx);
+            return;
+        }
         let files: Vec<String> = self.session_files().into_iter().map(|(p, _)| p).collect();
         if let Some(root) = common_dir(&files) {
             self.set_tree_root(root, window, cx);
@@ -1375,24 +1483,46 @@ impl HermesApp {
     }
 
     /// Open the file in Zed: locally by path, over SSH as ssh://host/path.
+    /// The open file in Zed, inside its project when there is one (so Zed opens the whole repo).
     pub fn open_in_zed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(path) = self.file.as_ref().map(|f| f.path.clone()) else {
             return;
         };
-        let target = match &self.target {
-            Target::Local => path,
-            Target::Ssh(host) => format!("ssh://{host}{path}"),
-        };
+        let mut paths: Vec<String> = self
+            .project
+            .as_ref()
+            .filter(|p| path.starts_with(&format!("{}/", p.dir)))
+            .map(|p| vec![p.dir.clone()])
+            .unwrap_or_default();
+        paths.push(path);
+        self.zed(paths, window, cx);
+    }
+
+    pub fn open_project_in_zed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(dir) = self.project.as_ref().map(|p| p.dir.clone()) {
+            self.zed(vec![dir], window, cx);
+        }
+    }
+
+    fn zed(&mut self, paths: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+        let targets: Vec<String> = paths
+            .into_iter()
+            .map(|p| match &self.target {
+                Target::Local => p,
+                Target::Ssh(host) => format!("ssh://{host}{p}"),
+            })
+            .collect();
         let zed = ["/usr/local/bin/zed", "/opt/homebrew/bin/zed"]
             .into_iter()
             .find(|p| std::path::Path::new(p).exists());
         let result = match (zed, &self.target) {
             (Some(cli), _) => std::process::Command::new(cli)
-                .arg(&target)
+                .args(&targets)
                 .spawn()
                 .map(|_| ()),
             (None, Target::Local) => std::process::Command::new("open")
-                .args(["-a", "Zed", &target])
+                .args(["-a", "Zed"])
+                .args(&targets)
                 .spawn()
                 .map(|_| ()),
             (None, Target::Ssh(_)) => Err(std::io::Error::other(

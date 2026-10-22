@@ -347,6 +347,47 @@ tail -3 "{dir}/serve.log"; exit 1"#
     Ok((port, token))
 }
 
+/// Keep branch folders (`.worktrees/`) out of the main checkout's status: a local-only exclude
+/// in `.git/info/exclude`, never committed.
+pub fn exclude_worktrees(target: &Target, repo: &str) -> Result<()> {
+    let path = git(
+        target,
+        repo,
+        &[
+            "rev-parse",
+            "--path-format=absolute",
+            "--git-path",
+            "info/exclude",
+        ],
+    )?;
+    let line = ".worktrees/";
+    match target {
+        Target::Local => {
+            let text = std::fs::read_to_string(&path).unwrap_or_default();
+            if !text.lines().any(|l| l.trim() == line) {
+                if let Some(dir) = std::path::Path::new(&path).parent() {
+                    std::fs::create_dir_all(dir)?;
+                }
+                let sep = if text.is_empty() || text.ends_with('\n') {
+                    ""
+                } else {
+                    "\n"
+                };
+                std::fs::write(&path, format!("{text}{sep}{line}\n"))?;
+            }
+        }
+        Target::Ssh(host) => {
+            let p = shell_quote(&path);
+            let script = format!("grep -qxF '{line}' {p} 2>/dev/null || echo '{line}' >> {p}");
+            Command::new("ssh")
+                .args(["-o", "BatchMode=yes", host, &script])
+                .stdin(Stdio::null())
+                .output()?;
+        }
+    }
+    Ok(())
+}
+
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
@@ -376,6 +417,37 @@ pub fn restart_gateway(target: &Target) -> Result<()> {
         );
     }
     Ok(())
+}
+
+/// Run `git -C dir args…` where the gateway lives (this Mac, or the SSH host); stdout trimmed.
+pub fn git(target: &Target, dir: &str, args: &[&str]) -> Result<String> {
+    let out = match target {
+        Target::Local => Command::new("git").arg("-C").arg(dir).args(args).output()?,
+        Target::Ssh(host) => {
+            let quoted: Vec<String> = std::iter::once("git".to_string())
+                .chain(["-C", dir].iter().chain(args).map(|a| shell_quote(a)))
+                .collect();
+            Command::new("ssh")
+                .args(["-o", "BatchMode=yes", host, &quoted.join(" ")])
+                .stdin(Stdio::null())
+                .output()?
+        }
+    };
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        let msg = err
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with("hint:"))
+            .collect::<Vec<_>>()
+            .join(" ");
+        bail!(
+            "git {}: {}",
+            args.first().unwrap_or(&""),
+            if msg.is_empty() { "failed".into() } else { msg }
+        );
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
 /// Whether `host` answers over SSH and has a working Hermes (a stale wrapper is not enough).
