@@ -1,6 +1,8 @@
 //! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
 
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -27,11 +29,13 @@ impl HermesApp {
                 .folder_of(id)
                 .map(|f| f.rsplit('/').next().unwrap_or(&f).to_string());
             let (label, r) = match (self.project_of(id), folder) {
+                // Pinned chats sit together at the very top, whatever they belong to.
+                _ if self.mark_of(id).pinned => ("Pinned".to_string(), 0),
                 (Some(p), _) => {
                     if !homes.iter().any(|(l, _, _)| *l == p.name()) {
                         homes.push((p.name(), p.root.clone(), true));
                     }
-                    (p.name(), 1)
+                    (p.name(), 2)
                 }
                 (None, Some(f)) => {
                     if let Some(path) = self.folder_of(id) {
@@ -39,11 +43,11 @@ impl HermesApp {
                             homes.push((f.clone(), path, false));
                         }
                     }
-                    (f, 1)
+                    (f, 2)
                 }
                 (None, None) => {
                     let l = source_label(&self.sessions[i].source);
-                    let r = if l == "Hermes" { 0 } else { 2 };
+                    let r = if l == "Hermes" { 1 } else { 3 };
                     (l, r)
                 }
             };
@@ -59,13 +63,13 @@ impl HermesApp {
             rank.iter()
                 .find(|(x, _)| x == l)
                 .map(|(_, r)| *r)
-                .unwrap_or(2)
+                .unwrap_or(3)
         };
         groups.sort_by(|(a, _), (b, _)| {
             (rank_of(a), a.to_lowercase()).cmp(&(rank_of(b), b.to_lowercase()))
         });
         // One plain group needs no header; a project always names itself.
-        let single = groups.len() <= 1 && groups.first().is_none_or(|(l, _)| rank_of(l) != 1);
+        let single = groups.len() <= 1 && groups.first().is_none_or(|(l, _)| rank_of(l) == 1);
 
         let mut list: Vec<AnyElement> = vec![];
         let searching = !self.search_query.is_empty();
@@ -308,21 +312,67 @@ impl HermesApp {
                 )
                 .into_any_element()
         } else {
+            // "⋯" on hover: pin, color, a window of its own, delete.
+            let view = cx.entity();
+            let id = s.id.clone();
+            let mark = self.mark_of(&s.id);
             div()
-                .id(("del", i))
-                .p_1()
-                .cursor_pointer()
                 .opacity(0.)
                 .group_hover(group.clone(), |s| s.opacity(1.))
-                .text_color(muted)
-                .hover(|s| s.text_color(theme.danger))
-                .child(Ico::Trash.icon().xsmall())
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    cx.stop_propagation();
-                    this.delete_session(del_id.clone(), window, cx)
-                }))
+                // Opening the menu must not also open the chat.
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                .child(
+                    Button::new(("more", i))
+                        .ghost()
+                        .xsmall()
+                        .icon(Ico::Ellipsis.icon())
+                        .dropdown_menu(move |menu, _, _| {
+                            let act = |f: Box<
+                                dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>),
+                            >| {
+                                let view = view.clone();
+                                move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
+                                    view.update(cx, |this, cx| f(this, window, cx))
+                                }
+                            };
+                            let (pin_id, win_id, del) = (id.clone(), id.clone(), del_id.clone());
+                            let (swatch_view, swatch_id) = (view.clone(), id.clone());
+                            menu.item(
+                                PopupMenuItem::new(if mark.pinned { "Unpin" } else { "Pin" })
+                                    .icon(Ico::Pin.icon())
+                                    .on_click(act(Box::new(move |this, _, cx| {
+                                        this.toggle_pin(pin_id.clone(), cx)
+                                    }))),
+                            )
+                            .item(PopupMenuItem::element(move |_, cx| {
+                                color_row(&swatch_view, &swatch_id, mark.color, cx)
+                            }))
+                            .separator()
+                            .item(
+                                PopupMenuItem::new("Open in new window")
+                                    .icon(Ico::AppWindow.icon())
+                                    .on_click(act(Box::new(move |this, _, cx| {
+                                        this.open_window(Some(win_id.clone()), cx)
+                                    }))),
+                            )
+                            .separator()
+                            .item(
+                                PopupMenuItem::new("Delete")
+                                    .icon(Ico::Trash.icon())
+                                    .on_click(act(Box::new(move |this, window, cx| {
+                                        this.delete_session(del.clone(), window, cx)
+                                    }))),
+                            )
+                        }),
+                )
                 .into_any_element()
         };
+        // A chosen color marks the row with a quiet stripe (the open chat keeps the accent).
+        let stripe = self
+            .mark_of(&s.id)
+            .color
+            .and_then(|c| crate::app::marks::SESSION_COLORS.get(c))
+            .map(|c| -> Hsla { rgb(*c).into() });
 
         h_flex()
             .id(("session", i))
@@ -336,7 +386,7 @@ impl HermesApp {
             .border_color(if selected {
                 theme.primary
             } else {
-                theme.transparent
+                stripe.unwrap_or(theme.transparent)
             })
             .when(selected, |d| {
                 d.bg(theme.sidebar_accent)
@@ -353,4 +403,46 @@ impl HermesApp {
             .child(delete)
             .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))
     }
+}
+
+/// The swatches row of a session's menu: six colors and "none".
+fn color_row(view: &Entity<HermesApp>, id: &str, current: Option<usize>, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let swatch = |k: Option<usize>| {
+        let (view, id) = (view.clone(), id.to_string());
+        let on = current == k;
+        div()
+            .id(SharedString::from(format!("swatch-{k:?}")))
+            .size(px(16.))
+            .flex()
+            .items_center()
+            .justify_center()
+            .cursor_pointer()
+            .border_1()
+            .border_color(if on {
+                theme.foreground
+            } else {
+                theme.transparent
+            })
+            .map(|d| match k {
+                Some(c) => d.child(
+                    div()
+                        .size(px(12.))
+                        .bg(Hsla::from(rgb(crate::app::marks::SESSION_COLORS[c]))),
+                ),
+                None => d
+                    .text_color(theme.muted_foreground)
+                    .child(Ico::X.icon().xsmall()),
+            })
+            .on_click(move |_, _, cx| {
+                cx.stop_propagation();
+                view.update(cx, |this, cx| this.set_color(id.clone(), k, cx));
+            })
+    };
+    h_flex()
+        .gap_1p5()
+        .py_1()
+        .children((0..crate::app::marks::SESSION_COLORS.len()).map(|c| swatch(Some(c))))
+        .child(swatch(None))
+        .into_any_element()
 }

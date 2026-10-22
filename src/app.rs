@@ -14,6 +14,7 @@ use gpui_kit::*;
 
 mod cron;
 mod gateways;
+pub mod marks;
 pub(crate) mod projects;
 mod prompts;
 mod slash;
@@ -124,6 +125,10 @@ pub struct HermesApp {
     pub approval_mode: Option<String>,
     /// `model.context_length` of the profile (0 when not set).
     pub profile_context: u64,
+    /// Colors and pins of sessions (this Mac).
+    pub marks: HashMap<String, marks::Mark>,
+    /// This window was opened for a given profile/session (else: where the app was last).
+    start_place: Option<(Option<String>, Option<String>)>,
     /// Session folders/repos as Hermes recorded them, and repos inferred from edited files.
     pub places: HashMap<String, crate::model::Place>,
     pub inferred: HashMap<String, String>,
@@ -214,9 +219,13 @@ impl HermesApp {
         let mut targets = vec![Target::Local];
         targets.extend(connection::ssh_hosts().into_iter().map(Target::Ssh));
         let labels: Vec<SharedString> = targets.iter().map(|t| t.label().into()).collect();
-        // Reopen where we were last time.
-        let last = std::fs::read_to_string(connection::state_dir().join("last-target"))
-            .unwrap_or_default();
+        // A window opened from another one starts where it was asked to; else where we were last.
+        let next = marks::NEXT_WINDOW.lock().unwrap().take();
+        let last = match &next {
+            Some((target, _, _)) => target.clone(),
+            None => std::fs::read_to_string(connection::state_dir().join("last-target"))
+                .unwrap_or_default(),
+        };
         let start = targets
             .iter()
             .position(|t| t.label() == last.trim())
@@ -464,6 +473,8 @@ impl HermesApp {
             approval: None,
             approval_mode: None,
             profile_context: 0,
+            marks: marks::load(),
+            start_place: next.as_ref().map(|(_, p, s)| (p.clone(), s.clone())),
             places: HashMap::new(),
             inferred: HashMap::new(),
             project: None,
@@ -621,7 +632,8 @@ impl HermesApp {
                 self.profile_choice
                     .update(cx, |s, cx| s.set_items(labels, window, cx));
                 // Back where the app was closed: that profile, then that session.
-                let (last_profile, last_session) = self.last_place();
+                let (last_profile, last_session) =
+                    self.start_place.take().unwrap_or_else(|| self.last_place());
                 let pick = self
                     .profiles
                     .iter()

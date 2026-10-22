@@ -167,6 +167,15 @@ impl HermesApp {
                 .children(self.render_project_chip(cx))
                 .child(
                     toggle(
+                        "hdr-window",
+                        crate::icons::Ico::AppWindow,
+                        "New window",
+                        false,
+                    )
+                    .on_click(cx.listener(|this, _, _, cx| this.open_window(None, cx))),
+                )
+                .child(
+                    toggle(
                         "hdr-changes",
                         crate::icons::Ico::FileDiff,
                         "Changed files",

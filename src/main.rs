@@ -222,25 +222,31 @@ fn main() {
             gpui_kit::init(cx);
             theme::apply(theme::Appearance::load(), None, cx);
 
-            let options = WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
-                    None,
-                    size(px(1240.), px(800.)),
-                    cx,
-                ))),
-                titlebar: Some(TitlebarOptions {
-                    title: Some("Hermes".into()),
-                    appears_transparent: true,
-                    traffic_light_position: Some(point(px(14.), px(14.))),
-                }),
-                ..Default::default()
-            };
-            gpui_kit::open_window(options, cx, |window, cx| {
-                cx.new(|cx| app::HermesApp::new(window, cx))
-            })
-            .expect("open window");
+            open_main_window(cx);
             cx.activate(true);
         });
+}
+
+/// A Hermes window: its own gateway connection, profile and chat.
+pub fn open_main_window(cx: &mut App) {
+    let options = WindowOptions {
+        window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
+            None,
+            size(px(1240.), px(800.)),
+            cx,
+        ))),
+        titlebar: Some(TitlebarOptions {
+            title: Some("Hermes".into()),
+            appears_transparent: true,
+            traffic_light_position: Some(point(px(14.), px(14.))),
+        }),
+        ..Default::default()
+    };
+    if let Err(e) = gpui_kit::open_window(options, cx, |window, cx| {
+        cx.new(|cx| app::HermesApp::new(window, cx))
+    }) {
+        eprintln!("open window: {e:#}");
+    }
 }
 
 /// End-to-end check of the branch flow on a scratch repo, through the local gateway.

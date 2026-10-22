@@ -46,6 +46,7 @@ macro_rules! icons {
 }
 
 icons! {
+    AppWindow => "app-window",
     ArrowUp => "arrow-up",
     AudioLines => "audio-lines",
     Bot => "bot",
@@ -54,6 +55,7 @@ icons! {
     ChevronRight => "chevron-right",
     CircleAlert => "circle-alert",
     Copy => "copy",
+    Ellipsis => "ellipsis",
     Cpu => "cpu",
     Gauge => "gauge",
     GitBranch => "git-branch",
@@ -70,6 +72,7 @@ icons! {
     Mic => "mic",
     PanelRight => "panel-right",
     Pause => "pause",
+    Pin => "pin",
     Play => "play",
     Plus => "plus",
     RefreshCw => "refresh-cw",
