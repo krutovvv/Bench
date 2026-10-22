@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" fill="#1F2329"/>
-  <!-- A bench: the top and two legs; on it a block cursor in the accent and a small part. -->
-  <path d="M12 36h40v5H12z" fill="#FAFAFA"/>
-  <path d="M16 41h5v13h-5zM43 41h5v13h-5z" fill="#FAFAFA"/>
-  <path d="M20 21h9v15h-9z" fill="#5C78E2"/>
-  <path d="M34 29h7v7h-7z" fill="#FAFAFA"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B313A"/><stop offset="1" stop-color="#16191E"/></linearGradient></defs>
+  <!-- Two slabs: a bench seen from the side, or two lines of a chat. The macOS icon grid:
+       an 824px rounded square on 1024, corners left transparent. -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)"/>
+  <rect x="290" y="300" width="330" height="190" rx="95" fill="#FAFAFA"/>
+  <rect x="290" y="534" width="444" height="190" rx="95" fill="#5C78E2"/>
 </svg>
