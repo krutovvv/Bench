@@ -352,9 +352,11 @@ impl HermesApp {
                 }
             });
         };
+        // Fixed: a window resize goes to the middle; the columns keep their widths.
         let left = resizable_panel()
             .size(self.sidebar_w)
-            .size_range(px(200.)..px(480.));
+            .size_range(px(200.)..px(480.))
+            .fixed();
         if expanded {
             return h_resizable("layout-ide")
                 .with_state(&state)
@@ -372,7 +374,8 @@ impl HermesApp {
                 d.child(
                     resizable_panel()
                         .size(self.ide_w)
-                        .size_range(px(360.)..px(1400.))
+                        .size_range(px(360.)..px(1000.))
+                        .fixed()
                         .child(self.render_right(cx)),
                 )
             })

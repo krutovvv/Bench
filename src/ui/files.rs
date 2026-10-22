@@ -104,30 +104,36 @@ impl HermesApp {
                     .child(div().flex_1())
                     .child(self.ide_window_buttons(cx)),
             )
-            .child(
-                div().flex_1().min_h_0().child(
+            .child(div().flex_1().min_h_0().child(
+                // No file open: the list is the whole panel (a 240px cell with blank space
+                // beside it was the "white strip"); with a file, editor | list, the list
+                // fixed so only the editor grows with the panel.
+                if self.file.is_some() {
                     h_resizable("right-split")
-                        .when(self.file.is_some(), |d| {
-                            d.child(resizable_panel().child(self.render_viewer(cx)))
-                        })
-                        .map(|d| {
-                            d.child(
-                                resizable_panel()
-                                    .size(px(240.))
-                                    .size_range(px(160.)..px(600.))
-                                    .child(
-                                        div()
-                                            .size_full()
-                                            .when(self.file.is_some(), |d| {
-                                                d.border_l_1().border_color(theme.border)
-                                            })
-                                            .bg(theme.sidebar)
-                                            .child(list),
-                                    ),
-                            )
-                        }),
-                ),
-            );
+                        .child(resizable_panel().child(self.render_viewer(cx)))
+                        .child(
+                            resizable_panel()
+                                .size(px(240.))
+                                .size_range(px(160.)..px(600.))
+                                .fixed()
+                                .child(
+                                    div()
+                                        .size_full()
+                                        .border_l_1()
+                                        .border_color(theme.border)
+                                        .bg(theme.sidebar)
+                                        .child(list),
+                                ),
+                        )
+                        .into_any_element()
+                } else {
+                    div()
+                        .size_full()
+                        .bg(theme.sidebar)
+                        .child(list)
+                        .into_any_element()
+                },
+            ));
         div().size_full().relative().child(panel).children(quick)
     }
 
