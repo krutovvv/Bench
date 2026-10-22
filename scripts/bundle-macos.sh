@@ -37,9 +37,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleShortVersionString</key><string>0.1.0</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSMicrophoneUsageDescription</key><string>Диктовка сообщений для Hermes</string>
+  <key>NSMicrophoneUsageDescription</key><string>Dictating messages to Hermes</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Connecting to Hermes gateways on your local network over SSH</string>
 </dict>
 </plist>
 PLIST
+
+# A stable identity, so macOS privacy grants (microphone, local network) belong to the app
+# rather than to one particular build.
+codesign --force --sign - --identifier local.hermes-gpui "$APP"
 
 echo "Built: $APP"

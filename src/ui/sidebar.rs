@@ -83,11 +83,20 @@ impl HermesApp {
             .size_full()
             .bg(theme.sidebar)
             .child(
-                div().pt(px(38.)).px_2().pb_2().flex_none().child(
-                    Input::new(&self.search)
-                        .small()
-                        .cleanable(true)
-                        .prefix(Ico::Search.icon().xsmall().text_color(muted)),
+                // Mirrors the footer: same 8px inset, same 32px control, a rule on the inner side.
+                div().pt(px(38.)).flex_none().child(
+                    h_flex()
+                        .h(px(super::BAR_H))
+                        .px_4()
+                        .items_center()
+                        .border_b_1()
+                        .border_color(theme.sidebar_border)
+                        .child(
+                            Input::new(&self.search)
+                                .h(px(32.))
+                                .cleanable(true)
+                                .prefix(Ico::Search.icon().small().text_color(muted)),
+                        ),
                 ),
             )
             .child(
@@ -110,12 +119,15 @@ impl HermesApp {
                     }),
             )
             .child(
-                div()
+                // Same height as the composer, so the two top rules line up across the window.
+                h_flex()
                     .flex_none()
-                    .p_2()
+                    .h(px(super::BAR_H))
+                    .px_4()
+                    .items_center()
                     .border_t_1()
                     .border_color(theme.sidebar_border)
-                    .child(new_session),
+                    .child(new_session.flex_1()),
             )
     }
 

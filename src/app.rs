@@ -30,6 +30,7 @@ pub enum Panel {
     Config,
     Cron,
     Telegram,
+    Appearance,
 }
 
 impl Panel {
@@ -103,6 +104,8 @@ pub struct HermesApp {
     pub effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
     pub profile_models: Vec<(String, String)>,
+    pub appearance: crate::theme::Appearance,
+    pub speed: crate::speed::Meter,
     /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
     pub search: Entity<InputState>,
     pub search_query: String,
@@ -145,6 +148,8 @@ pub struct HermesApp {
     pub tree: HashMap<String, Vec<(String, String, bool)>>,
     pub tree_open: HashSet<String>,
     pub recorder: Option<Recorder>,
+    /// Repaints the waveform while recording.
+    wave_ticker: Option<Task<()>>,
     pub transcribing: bool,
     pub playing: Option<(usize, Playback)>,
     pub speaking: Option<usize>,
@@ -208,6 +213,12 @@ impl HermesApp {
         let file_editor = cx.new(|cx| EditorState::new(window, cx).line_number(true));
 
         let subs = vec![
+            // "System" follows macOS light/dark as it changes.
+            cx.observe_window_appearance(window, |this, window, cx| {
+                if this.appearance.mode == crate::theme::Mode::System {
+                    crate::theme::apply(this.appearance, Some(window), cx);
+                }
+            }),
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
                 if let InputEvent::PressEnter { shift: false, .. } = ev {
                     this.send(window, cx);
@@ -316,9 +327,10 @@ impl HermesApp {
             tasks.push(cx.spawn_in(window, async move |this, cx| {
                 let h = host.clone();
                 let ok = cx
-                    .background_spawn(async move { connection::has_hermes(&h) })
+                    .background_spawn(async move { connection::host_check(&h) })
                     .await;
-                if !ok {
+                // Only hide hosts that answered without Hermes; unreachable ones stay listed.
+                if ok == connection::HostCheck::NoHermes {
                     let _ =
                         this.update_in(cx, |this, window, cx| this.drop_target(&host, window, cx));
                 }
@@ -350,6 +362,8 @@ impl HermesApp {
             usage: None,
             effort: EFFORTS.len() - 1,
             profile_models: vec![],
+            appearance: crate::theme::Appearance::load(),
+            speed: crate::speed::Meter::fresh(),
             show_list: std::fs::read_to_string(file_list_pref()).is_ok_and(|s| s.trim() == "1"),
             search,
             search_query: String::new(),
@@ -382,6 +396,7 @@ impl HermesApp {
             tree_root: None,
             tree: HashMap::new(),
             tree_open: HashSet::new(),
+            wave_ticker: None,
             recorder: None,
             transcribing: false,
             playing: None,
@@ -559,6 +574,7 @@ impl HermesApp {
                 }
             }
             Evt::Delta(sid, text) if self.is_current(&sid) => {
+                self.speed.token();
                 if let Some(turn) = self.turns.last_mut() {
                     turn.answer.push_str(&text);
                 }
@@ -568,6 +584,7 @@ impl HermesApp {
                 self.remeasure_last(cx);
             }
             Evt::Reasoning(sid, text) if self.is_current(&sid) => {
+                self.speed.token();
                 if let Some(turn) = self.turns.last_mut() {
                     match turn.steps.last_mut() {
                         Some(Step::Thought(t)) => t.push_str(&text),
@@ -587,6 +604,7 @@ impl HermesApp {
                 call_id,
                 args,
             } if self.is_current(&session) => {
+                self.speed.tool_call();
                 if let Some(turn) = self.turns.last_mut() {
                     for url in urls {
                         if !turn.sources.contains(&url) {
@@ -620,6 +638,7 @@ impl HermesApp {
                 output,
                 edit,
             } if self.is_current(&session) => {
+                self.speed.request();
                 if let Some(turn) = self.turns.last_mut() {
                     let step = turn.steps.iter_mut().rev().find(|s| match s {
                         Step::Tool { call_id: id, .. } => call_id.is_empty() || *id == call_id,
@@ -640,7 +659,10 @@ impl HermesApp {
                 }
                 cx.notify();
             }
-            Evt::Usage(sid, usage) if self.is_current(&sid) => self.usage = Some(usage),
+            Evt::Usage(sid, usage) if self.is_current(&sid) => {
+                self.speed.usage(&usage);
+                self.usage = Some(usage);
+            }
             Evt::Complete { session, text } if self.is_current(&session) => {
                 self.live = None;
                 if let Some(turn) = self.turns.last_mut() {
@@ -669,6 +691,7 @@ impl HermesApp {
         self.playing = None;
         self.model_pick = None;
         self.model_pending = false;
+        self.speed = crate::speed::Meter::fresh();
         self.reset_scroller(cx);
     }
 
@@ -877,6 +900,7 @@ impl HermesApp {
             ..Default::default()
         });
         self.follow = true;
+        self.speed.request();
         self.live = Some(Live {
             started: Instant::now(),
             label: "Sending…".into(),
@@ -1293,6 +1317,18 @@ impl HermesApp {
         cx.notify();
     }
 
+    pub fn set_appearance(
+        &mut self,
+        a: crate::theme::Appearance,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.appearance = a;
+        a.save();
+        crate::theme::apply(a, Some(window), cx);
+        cx.notify();
+    }
+
     pub fn toggle_file_list(&mut self, cx: &mut Context<Self>) {
         self.show_list = !self.show_list;
         let _ = std::fs::create_dir_all(connection::state_dir());
@@ -1388,7 +1424,7 @@ impl HermesApp {
     pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
         self.panel = panel;
         match panel {
-            Panel::Chat | Panel::Telegram => {}
+            Panel::Chat | Panel::Telegram | Panel::Appearance => {}
             Panel::Config => {
                 self.config_error = None;
                 self.rest(
@@ -1639,7 +1675,23 @@ impl HermesApp {
             }
         } else {
             match Recorder::start() {
-                Ok(r) => self.recorder = Some(r),
+                Ok(r) => {
+                    self.recorder = Some(r);
+                    self.wave_ticker = Some(cx.spawn(async move |this, cx| {
+                        loop {
+                            cx.background_executor()
+                                .timer(Duration::from_millis(33))
+                                .await;
+                            let alive = this.update(cx, |this, cx| {
+                                cx.notify();
+                                this.recorder.is_some()
+                            });
+                            if !matches!(alive, Ok(true)) {
+                                break;
+                            }
+                        }
+                    }));
+                }
                 Err(e) => self.toast(
                     NotificationType::Error,
                     format!("Microphone: {e:#}"),

@@ -10,7 +10,34 @@ use gpui_kit::*;
 use crate::app::HermesApp;
 use crate::icons::Ico;
 
+/// Bars in the waveform; it scrolls right to left, newest on the right (25 ms each = 3 s).
+const WAVE_BARS: usize = 120;
+
 impl HermesApp {
+    /// While recording the text field is not needed (speech is recognized at the end), so its
+    /// place shows the voice level live.
+    fn render_wave(&self, theme: &gpui_kit::component::Theme) -> impl IntoElement {
+        let levels = self
+            .recorder
+            .as_ref()
+            .map(|r| r.levels(WAVE_BARS))
+            .unwrap_or_default();
+        let bars = levels.into_iter().map(|v| {
+            div()
+                .flex_1()
+                .h(px(2. + v * 26.))
+                .bg(theme.primary.opacity(0.35 + v * 0.65))
+        });
+        h_flex()
+            .flex_1()
+            .min_w_0()
+            .h(px(32.))
+            .px_4()
+            .gap(px(2.))
+            .items_center()
+            .children(bars)
+    }
+
     pub(super) fn render_composer(
         &mut self,
         _window: &mut Window,
@@ -77,33 +104,29 @@ impl HermesApp {
         h_flex()
             .w_full()
             .flex_none()
+            .min_h(px(super::BAR_H))
             .items_center()
             .bg(theme.background)
             .border_t_1()
             .border_color(theme.border)
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .px_4()
-                    .py_2()
-                    .child(Textarea::new(&self.composer).appearance(false)),
-            )
+            .when(recording, |d| d.child(self.render_wave(&theme)))
+            .when(!recording, |d| {
+                d.child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        // The textarea pads its text by 8px itself: 8 + 8 = the 16px content inset.
+                        .pl_2()
+                        .py_1()
+                        .child(Textarea::new(&self.composer).appearance(false)),
+                )
+            })
             .child(
                 h_flex()
                     .flex_none()
                     .gap_1()
                     .px_2()
                     .items_center()
-                    .when(recording, |d| {
-                        d.child(
-                            div()
-                                .text_xs()
-                                .text_color(theme.muted_foreground)
-                                .pr_1()
-                                .child("Listening…"),
-                        )
-                    })
                     .child(mic)
                     .child(action),
             )

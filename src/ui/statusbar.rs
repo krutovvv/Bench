@@ -205,6 +205,54 @@ impl HermesApp {
                 .tooltip(move |window, cx| Tooltip::new(details.clone()).build(window, cx))
         });
 
+        // Speed: our own split (prefill / generation) when measured, else Hermes' blended average.
+        let rate = |v: f64| {
+            if v >= 1000. {
+                format!("{:.1}k", v / 1000.)
+            } else {
+                format!("{v:.0}")
+            }
+        };
+        let speed = match (self.speed.prefill, self.speed.generation) {
+            (_, Some(g)) => Some((
+                match self.speed.prefill {
+                    Some(p) => format!("{} · {} t/s", rate(p), rate(g)),
+                    None => format!("{} t/s", rate(g)),
+                },
+                SharedString::from(
+                    [
+                        self.speed
+                            .prefill
+                            .map(|p| format!("prefill {} tok/s", rate(p))),
+                        Some(format!("generation {} tok/s", rate(g))),
+                        Some("last model call, measured here".to_string()),
+                    ]
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>()
+                    .join("\n"),
+                ),
+            )),
+            (Some(p), None) => Some((
+                format!("{} t/s prefill", rate(p)),
+                SharedString::from(format!("prefill {} tok/s", rate(p))),
+            )),
+            (None, None) => self.usage.as_ref().and_then(|u| u.avg_tps).map(|t| {
+                (
+                    format!("{} t/s", rate(t)),
+                    SharedString::from(
+                        "average over recent calls, prompt processing included (Hermes)",
+                    ),
+                )
+            }),
+        }
+        .map(|(label, tip)| {
+            item("speed")
+                .child(Ico::Gauge.icon().xsmall())
+                .child(label)
+                .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+        });
+
         h_flex()
             .h(px(28.))
             .flex_none()
@@ -218,6 +266,7 @@ impl HermesApp {
                 d.child(picker("profile", Ico::UserRound, profile_label, profiles))
             })
             .child(div().flex_1())
+            .children(speed)
             .children(context)
             .child(picker(
                 "effort",

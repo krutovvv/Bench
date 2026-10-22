@@ -54,6 +54,7 @@ icons! {
     CircleAlert => "circle-alert",
     Copy => "copy",
     Cpu => "cpu",
+    Gauge => "gauge",
     Globe => "globe",
     ExternalLink => "external-link",
     File => "file",

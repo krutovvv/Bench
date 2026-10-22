@@ -14,6 +14,10 @@ use gpui_kit::*;
 
 use crate::app::{HermesApp, Panel};
 
+/// Height of the bars that face each other across the window: the sidebar's search and
+/// "New session" rows and the composer (one line).
+pub const BAR_H: f32 = 48.;
+
 /// "1 action", "3 actions" (the `few` form is kept for call-site symmetry).
 pub fn plural(n: usize, one: &str, _few: &str, many: &str) -> String {
     format!("{n} {}", if n == 1 { one } else { many })
@@ -128,6 +132,7 @@ impl HermesApp {
             ("tab-config", "Config", Panel::Config),
             ("tab-cron", "Cron", Panel::Cron),
             ("tab-tg", "Telegram", Panel::Telegram),
+            ("tab-look", "Appearance", Panel::Appearance),
         ]
         .map(|(id, label, panel)| {
             let active = panel == current;
@@ -186,6 +191,7 @@ impl Render for HermesApp {
             Panel::Config => self.render_config(cx).into_any_element(),
             Panel::Cron => self.render_cron(cx).into_any_element(),
             Panel::Telegram => self.render_telegram(cx).into_any_element(),
+            Panel::Appearance => self.render_appearance(cx).into_any_element(),
         };
 
         let main = v_flex()

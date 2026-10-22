@@ -206,8 +206,12 @@ impl Connection {
     // ---- SSH -------------------------------------------------------------
 
     fn open_ssh(host: &str) -> Result<Self> {
-        if !has_hermes(host) {
-            bail!("{host}: no working Hermes at ~/.local/bin/hermes, or the host is unreachable");
+        match host_check(host) {
+            HostCheck::Ready => {}
+            HostCheck::Unreachable => bail!(
+                "{host}: SSH could not connect (offline, or macOS has not allowed local network access)"
+            ),
+            HostCheck::NoHermes => bail!("{host}: no working Hermes at ~/.local/bin/hermes"),
         }
         let state_path = state_dir().join(format!("ssh-{host}.json"));
         // Reattach to the backend we started last time, if it still answers.
@@ -375,8 +379,18 @@ pub fn restart_gateway(target: &Target) -> Result<()> {
 }
 
 /// Whether `host` answers over SSH and has a working Hermes (a stale wrapper is not enough).
-pub fn has_hermes(host: &str) -> bool {
-    Command::new("ssh")
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostCheck {
+    Ready,
+    /// SSH itself failed (exit 255): offline, no route, no network permission yet.
+    Unreachable,
+    /// Reached the host, but Hermes is missing or broken there.
+    NoHermes,
+}
+
+/// Checks a host over SSH; the result is also appended to `hosts.log` for diagnosis.
+pub fn host_check(host: &str) -> HostCheck {
+    let status = Command::new("/usr/bin/ssh")
         .args([
             "-o",
             "BatchMode=yes",
@@ -388,8 +402,23 @@ pub fn has_hermes(host: &str) -> bool {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success())
+        .status();
+    let result = match &status {
+        Ok(s) if s.success() => HostCheck::Ready,
+        Ok(s) if s.code() == Some(255) => HostCheck::Unreachable,
+        Ok(_) => HostCheck::NoHermes,
+        Err(_) => HostCheck::Unreachable,
+    };
+    let _ = std::fs::create_dir_all(state_dir());
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(state_dir().join("hosts.log"))
+    {
+        use std::io::Write as _;
+        let _ = writeln!(f, "{host}: {result:?} ({status:?})");
+    }
+    result
 }
 
 /// `Host` entries from ~/.ssh/config, without wildcards.

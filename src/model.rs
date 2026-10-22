@@ -113,6 +113,11 @@ pub struct Usage {
     pub total_tokens: u64,
     pub compressions: u64,
     pub cache_hit_pct: Option<u64>,
+    pub input: u64,
+    pub output: u64,
+    pub calls: u64,
+    /// Hermes' own average: output tokens over whole-call time (prefill included).
+    pub avg_tps: Option<f64>,
 }
 
 impl Usage {
@@ -130,6 +135,10 @@ impl Usage {
             total_tokens: n("total"),
             compressions: n("compressions"),
             cache_hit_pct: v["cache_hit_pct"].as_u64(),
+            input: n("input"),
+            output: n("output"),
+            calls: n("calls"),
+            avg_tps: v["avg_tps"].as_f64().filter(|t| *t > 0.),
         }
     }
 }

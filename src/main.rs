@@ -9,10 +9,10 @@ mod history;
 mod icons;
 mod model;
 mod rest;
+mod speed;
 mod theme;
 mod ui;
 
-use gpui_kit::component::Theme;
 use gpui_kit::*;
 
 /// `hermes-gpui --probe [local|<ssh-host>]`: connect without a window and print what the gateway has.
@@ -143,8 +143,7 @@ fn main() {
         .with_assets(gpui_kit::assets::Assets)
         .run(|cx| {
             gpui_kit::init(cx);
-            Theme::sync_system_appearance(None, cx);
-            theme::apply(cx);
+            theme::apply(theme::Appearance::load(), None, cx);
 
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

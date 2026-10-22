@@ -64,6 +64,25 @@ impl Recorder {
         })
     }
 
+    /// The loudness of the last `n` 25 ms slices, oldest first, each 0..1 (perceptual curve).
+    pub fn levels(&self, n: usize) -> Vec<f32> {
+        let win = (self.rate as usize / 40).max(1);
+        let samples = self.samples.lock().unwrap();
+        let usable = samples.len() / win * win;
+        let start = usable.saturating_sub(n * win);
+        let mut out: Vec<f32> = samples[start..usable]
+            .chunks(win)
+            .map(|c| {
+                let rms = (c.iter().map(|s| s * s).sum::<f32>() / c.len() as f32).sqrt();
+                (rms * 6.).sqrt().min(1.)
+            })
+            .collect();
+        while out.len() < n {
+            out.insert(0, 0.);
+        }
+        out
+    }
+
     /// Stop and return a 16-bit mono WAV.
     pub fn finish(self) -> Result<Vec<u8>> {
         drop(self.stream);
