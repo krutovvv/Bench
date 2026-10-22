@@ -257,44 +257,34 @@ impl HermesApp {
                 format!("{v:.0}")
             }
         };
-        let speed = match (self.speed.prefill, self.speed.generation) {
-            (_, Some(g)) => Some((
-                match self.speed.prefill {
-                    Some(p) => format!("{} · {} t/s", rate(p), rate(g)),
-                    None => format!("{} t/s", rate(g)),
-                },
-                SharedString::from(
-                    [
-                        self.speed
-                            .prefill
-                            .map(|p| format!("prefill {} tok/s", rate(p))),
-                        Some(format!("generation {} tok/s", rate(g))),
-                        Some("last model call, measured here".to_string()),
-                    ]
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>()
-                    .join("\n"),
-                ),
-            )),
-            (Some(p), None) => Some((
-                format!("{} t/s prefill", rate(p)),
-                SharedString::from(format!("prefill {} tok/s", rate(p))),
-            )),
-            (None, None) => self.usage.as_ref().and_then(|u| u.avg_tps).map(|t| {
-                (
-                    format!("{} t/s", rate(t)),
-                    SharedString::from(
-                        "average over recent calls, prompt processing included (Hermes)",
-                    ),
+        // Speed: live (last second) while text streams; else the last call's measured prefill /
+        // generation; else Hermes' blended average. Click: the chart of this answer.
+        let label = match (self.speed.live, self.speed.prefill, self.speed.generation) {
+            (Some(l), _, _) => Some(format!("{} t/s", rate(l))),
+            (None, Some(p), Some(g)) => Some(format!("{} · {} t/s", rate(p), rate(g))),
+            (None, None, Some(g)) => Some(format!("{} t/s", rate(g))),
+            (None, Some(p), None) => Some(format!("{} t/s prefill", rate(p))),
+            _ => self
+                .usage
+                .as_ref()
+                .and_then(|u| u.avg_tps)
+                .map(|t| format!("{} t/s", rate(t))),
+        };
+        let samples = self.speed.samples.clone();
+        let (prefill, generation) = (self.speed.prefill, self.speed.generation);
+        let live = self.speed.live.is_some();
+        let speed = label.map(|label| {
+            gpui_kit::component::popover::Popover::new("speed-pop")
+                .anchor(gpui_kit::Anchor::BottomRight)
+                .trigger(
+                    Button::new("speed")
+                        .ghost()
+                        .xsmall()
+                        .icon(Ico::Gauge.icon())
+                        .label(label)
+                        .when(live, |b| b.text_color(theme.primary)),
                 )
-            }),
-        }
-        .map(|(label, tip)| {
-            item("speed")
-                .child(Ico::Gauge.icon().xsmall())
-                .child(label)
-                .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                .content(move |_, _, cx| speed_panel(&samples, prefill, generation, cx))
         });
 
         h_flex()
@@ -310,7 +300,7 @@ impl HermesApp {
                 d.child(picker("profile", Ico::UserRound, profile_label, profiles))
             })
             .child(div().flex_1())
-            .children(speed)
+            .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .when_some(self.approval_mode.clone(), |d, mode| {
                 d.child(picker("approvals", Ico::Shield, mode, approvals))
@@ -449,4 +439,76 @@ impl HermesApp {
         }
         rows
     }
+}
+
+/// The speed panel: per-second generation speed of the current/last answer as bars, its range,
+/// and the last call's measured prefill and generation.
+fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, cx: &App) -> Div {
+    let theme = cx.theme();
+    let row = |k: &str, v: String| {
+        h_flex()
+            .px_3()
+            .py_0p5()
+            .gap_4()
+            .text_xs()
+            .child(
+                div()
+                    .flex_1()
+                    .text_color(theme.muted_foreground)
+                    .child(k.to_string()),
+            )
+            .child(div().child(v))
+    };
+    let mut panel = v_flex().w(px(300.)).py_2();
+    if samples.is_empty() {
+        panel = panel.child(
+            div()
+                .px_3()
+                .pb_1()
+                .text_xs()
+                .text_color(theme.muted_foreground)
+                .child("The chart fills in while the next answer is written."),
+        );
+    } else {
+        let max = samples.iter().cloned().fold(0., f64::max).max(1.);
+        let min = samples.iter().cloned().fold(f64::MAX, f64::min);
+        let avg = samples.iter().sum::<f64>() / samples.len() as f64;
+        // The last 120 seconds at most; each bar is one second.
+        let shown = &samples[samples.len().saturating_sub(120)..];
+        let bars = shown.iter().map(|v| {
+            div()
+                .flex_1()
+                .h(px((v / max * 56.).max(1.) as f32))
+                .bg(theme.primary.opacity(0.75))
+        });
+        panel = panel
+            .child(
+                h_flex()
+                    .mx_3()
+                    .mb_2()
+                    .h(px(56.))
+                    .gap(px(1.))
+                    .items_end()
+                    .border_b_1()
+                    .border_color(theme.border)
+                    .children(bars),
+            )
+            .child(row(
+                "Now / average",
+                format!(
+                    "{:.0} / {:.0} tok/s",
+                    shown.last().copied().unwrap_or(0.),
+                    avg
+                ),
+            ))
+            .child(row("Min – max", format!("{min:.0} – {max:.0} tok/s")))
+            .child(row("Seconds", samples.len().to_string()));
+    }
+    if let Some(p) = prefill {
+        panel = panel.child(row("Prefill (last call)", format!("{p:.0} tok/s")));
+    }
+    if let Some(g) = generation {
+        panel = panel.child(row("Generation (last call)", format!("{g:.0} tok/s")));
+    }
+    panel
 }

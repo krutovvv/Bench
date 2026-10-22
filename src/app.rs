@@ -400,6 +400,9 @@ impl HermesApp {
                         this.playing = None;
                         cx.notify();
                     }
+                    if this.live.is_some() {
+                        this.speed.tick();
+                    }
                     if this.live.is_some() || this.recorder.is_some() {
                         cx.notify();
                     }
@@ -714,7 +717,7 @@ impl HermesApp {
                 }
             }
             Evt::Delta(sid, text) if self.is_current(&sid) => {
-                self.speed.token();
+                self.speed.token(text.chars().count());
                 if let Some(turn) = self.turns.last_mut() {
                     turn.answer.push_str(&text);
                 }
@@ -724,7 +727,7 @@ impl HermesApp {
                 self.remeasure_last(cx);
             }
             Evt::Reasoning(sid, text) if self.is_current(&sid) => {
-                self.speed.token();
+                self.speed.token(text.chars().count());
                 if let Some(turn) = self.turns.last_mut() {
                     match turn.steps.last_mut() {
                         Some(Step::Thought(t)) => t.push_str(&text),
@@ -908,6 +911,7 @@ impl HermesApp {
             }
             Evt::Complete { session, text } if self.is_current(&session) => {
                 self.live = None;
+                self.speed.finish();
                 if let Some(turn) = self.turns.last_mut() {
                     turn.finished = Some(now_secs());
                     if !text.trim().is_empty() {
@@ -1204,6 +1208,7 @@ impl HermesApp {
             ..Default::default()
         });
         self.follow = true;
+        self.speed.begin_answer();
         self.speed.request();
         self.live = Some(Live {
             started: Instant::now(),
