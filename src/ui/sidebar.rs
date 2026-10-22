@@ -344,6 +344,7 @@ impl HermesApp {
                                         this.toggle_pin(pin_id.clone(), cx)
                                     }))),
                             )
+                            .separator()
                             // Reads the color live, so a click shows at once in the open menu.
                             .item(PopupMenuItem::element(move |_, cx| {
                                 let current = swatch_view.read(cx).mark_of(&swatch_id).color;
@@ -414,7 +415,7 @@ impl HermesApp {
     }
 }
 
-/// The swatches row of a session's menu: six colors and "none".
+/// The swatches row of a session's menu: the colors and "none".
 fn color_row(view: &Entity<HermesApp>, id: &str, current: Option<usize>, cx: &App) -> AnyElement {
     let theme = cx.theme();
     let swatch = |k: Option<usize>| {

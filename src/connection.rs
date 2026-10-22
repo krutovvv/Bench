@@ -181,8 +181,9 @@ impl Connection {
         Ok(ws)
     }
 
-    /// Auth header for one REST call scoped to `profile`.
-    pub fn rest_auth(&self, profile: &str) -> Result<(&'static str, String)> {
+    /// Auth header for one REST call scoped to `profile`, with the ticket `purpose` the route
+    /// needs ("native-http", or "native-profile-create" / "native-profile-registry").
+    pub fn rest_auth(&self, profile: &str, purpose: &str) -> Result<(&'static str, String)> {
         match &self.auth {
             Auth::Token(token) => Ok(("X-Hermes-Session-Token", token.clone())),
             Auth::Ticket { endpoint, helper } => {
@@ -197,7 +198,7 @@ impl Connection {
                 }
                 Ok((
                     "X-Hermes-Gateway-Ticket",
-                    helper.lock().unwrap().mint(&ep, "native-http")?,
+                    helper.lock().unwrap().mint(&ep, purpose)?,
                 ))
             }
         }
@@ -433,30 +434,87 @@ fn shell_quote(s: &str) -> String {
 }
 
 /// `hermes gateway restart` locally or on the SSH host (the messaging gateway service).
-pub fn restart_gateway(target: &Target) -> Result<()> {
+/// What `hermes gateway restart` did.
+pub enum Restart {
+    Done,
+    /// It refused: work is running (turns, cron jobs, delegations), as Hermes describes it.
+    /// Restarting anyway (`interrupt`) stops that work.
+    Busy(String),
+}
+
+/// `hermes gateway restart`; with `interrupt`, also while work is running (`--yes`).
+pub fn restart_gateway(target: &Target, interrupt: bool) -> Result<Restart> {
+    let flags = if interrupt { " --yes" } else { "" };
     let out = match target {
-        Target::Local => Command::new(home().join(".local/bin/hermes"))
-            .args(["gateway", "restart"])
-            .output()?,
+        Target::Local => {
+            let mut cmd = Command::new(home().join(".local/bin/hermes"));
+            cmd.args(["gateway", "restart", "--detach"]);
+            if interrupt {
+                cmd.arg("--yes");
+            }
+            cmd.stdin(Stdio::null()).output()?
+        }
         Target::Ssh(host) => Command::new("ssh")
             .args([
                 "-o",
                 "BatchMode=yes",
                 host,
-                "bash -lc '\"$HOME/.local/bin/hermes\" gateway restart'",
+                &format!("bash -lc '\"$HOME/.local/bin/hermes\" gateway restart --detach{flags}'"),
             ])
+            .stdin(Stdio::null())
             .output()?,
     };
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        bail!(
-            "{}",
-            err.lines()
-                .last()
-                .unwrap_or("hermes gateway restart failed")
-        );
+    if out.status.success() {
+        return Ok(Restart::Done);
     }
-    Ok(())
+    // Hermes prints its refusal on stdout, colored.
+    let text = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let lines: Vec<String> = text
+        .lines()
+        .map(strip_ansi)
+        .map(|l| l.trim().trim_start_matches(['✗', '⚠', '•', '-']).trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+    if let Some(at) = lines.iter().position(|l| l.starts_with("Refusing to restart")) {
+        let summary = lines[at]
+            .trim_start_matches("Refusing to restart the gateway")
+            .trim_start_matches([':', ' ', '—', '-'])
+            .trim_end_matches('.')
+            .to_string();
+        return Ok(Restart::Busy(if summary.is_empty() {
+            "work is running".into()
+        } else {
+            summary
+        }));
+    }
+    bail!(
+        "{}",
+        lines
+            .last()
+            .map(String::as_str)
+            .unwrap_or("hermes gateway restart failed")
+    )
+}
+
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::new();
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            for c in chars.by_ref() {
+                if c.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
 }
 
 /// Run `git -C dir args…` where the gateway lives (this Mac, or the SSH host); stdout trimmed.

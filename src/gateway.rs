@@ -389,11 +389,16 @@ impl Rpc {
                 }
                 self.call("prompt.submit", params, Pending::Ignore)?
             }
-            Cmd::Interrupt { profile, session } => self.call(
-                "session.interrupt",
-                json!({"session_id": session, "profile": profile}),
-                Pending::Ignore,
-            )?,
+            // Stop names the turn it stops: the gateway refuses any other generation.
+            Cmd::Interrupt { profile, session } => {
+                let generation = self.fences.get(&session).map_or(0, |f| f.1);
+                self.call(
+                    "session.interrupt",
+                    json!({"session_id": session, "profile": profile,
+                           "execution_generation": generation}),
+                    Pending::Ignore,
+                )?
+            }
             // The owner protocol has no undo: re-read the transcript for the last user row, cut
             // there (a fenced `rewind`), then submit the same text again.
             Cmd::Regenerate {
@@ -548,9 +553,13 @@ fn run(
             on_result(kind, &msg["result"], &emit);
             continue;
         }
-        // session.info carries the authority's current revision/generation.
-        if msg["params"]["type"] == "session.info" {
-            if let Some(sid) = msg["params"]["session_id"].as_str() {
+        // session.info carries the authority's current revision/generation; every event frame
+        // is stamped with the generation of the turn it belongs to.
+        if let Some(sid) = msg["params"]["session_id"].as_str() {
+            if let Some(g) = msg["params"]["execution_generation"].as_i64() {
+                rpc.fences.entry(sid.to_string()).or_insert((0, 0)).1 = g;
+            }
+            if msg["params"]["type"] == "session.info" {
                 let payload = msg["params"]["payload"].clone();
                 rpc.note_fence(sid, &payload);
             }

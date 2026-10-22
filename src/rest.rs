@@ -18,8 +18,22 @@ fn url(conn: &Connection, path: &str, profile: &str) -> String {
     }
 }
 
+/// The ticket a route needs (Hermes Desktop's `nativeGrantPurpose`): creating a profile and
+/// renaming/deleting the one a path names are registry operations with grants of their own.
+fn purpose(method: &str, path: &str) -> &'static str {
+    let path = path.split('?').next().unwrap_or_default().trim_end_matches('/');
+    let named = path
+        .strip_prefix("/api/profiles/")
+        .is_some_and(|s| !s.is_empty() && !s.contains('/') && !matches!(s, "active" | "import"));
+    match method {
+        "POST" if path == "/api/profiles" => "native-profile-create",
+        "PATCH" | "DELETE" if named => "native-profile-registry",
+        _ => "native-http",
+    }
+}
+
 fn get(conn: &Connection, path: &str, profile: &str) -> Result<Value> {
-    let (h, v) = conn.rest_auth(profile)?;
+    let (h, v) = conn.rest_auth(profile, "native-http")?;
     let resp = ureq::get(&url(conn, path, profile))
         .set(h, &v)
         .timeout(Duration::from_secs(30))
@@ -35,7 +49,7 @@ fn send(
     body: Value,
     timeout: u64,
 ) -> Result<Value> {
-    let (h, v) = conn.rest_auth(profile)?;
+    let (h, v) = conn.rest_auth(profile, purpose(method, path))?;
     let resp = ureq::request(method, &url(conn, path, profile))
         .set(h, &v)
         .timeout(Duration::from_secs(timeout))
@@ -265,7 +279,7 @@ pub fn delete_session(conn: &Connection, profile: &str, id: &str) -> Result<()> 
         target.push(if target.contains('?') { '&' } else { '?' });
         target.push_str(&fence);
     }
-    let (h, v) = conn.rest_auth(profile)?;
+    let (h, v) = conn.rest_auth(profile, "native-http")?;
     match ureq::request("DELETE", &target)
         .set(h, &v)
         .timeout(Duration::from_secs(30))
@@ -353,7 +367,7 @@ pub fn cron_jobs(conn: &Connection, profile: &str) -> Result<Vec<CronJob>> {
     } else {
         profile
     };
-    let (h, v) = conn.rest_auth(profile)?;
+    let (h, v) = conn.rest_auth(profile, "native-http")?;
     let resp = ureq::get(&format!("{}/api/cron/jobs?profile={key}", conn.base))
         .set(h, &v)
         .timeout(Duration::from_secs(30))
@@ -452,6 +466,34 @@ pub fn list_dir(
             )
         })
         .collect())
+}
+
+/// A file's bytes as the gateway's machine has them (at most `cap`).
+pub fn download(conn: &Connection, profile: &str, path: &str, cap: u64) -> Result<Vec<u8>> {
+    use std::io::Read as _;
+    let route = format!("/api/fs/download?path={}", enc(path));
+    let (h, v) = conn.rest_auth(profile, "native-http")?;
+    let resp = match ureq::get(&url(conn, &route, profile))
+        .set(h, &v)
+        .timeout(Duration::from_secs(300))
+        .call()
+    {
+        Ok(r) => r,
+        Err(ureq::Error::Status(code, r)) => {
+            let body: Value = r.into_json().unwrap_or(Value::Null);
+            return Err(anyhow!(
+                "{code}: {}",
+                body["detail"].as_str().unwrap_or("download failed")
+            ));
+        }
+        Err(e) => return Err(anyhow!("{e}")),
+    };
+    let mut bytes = vec![];
+    resp.into_reader().take(cap + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > cap {
+        return Err(anyhow!("file is over {} MB", cap >> 20));
+    }
+    Ok(bytes)
 }
 
 pub fn default_cwd(conn: &Connection, profile: &str) -> Result<String> {
@@ -723,6 +765,7 @@ pub fn save_profile_soul(
 }
 
 /// A new profile cloned from `from` (its config, skills and SOUL; not its chats or bots).
+/// Returns once the gateway serves it: until then no ticket can be minted for it (~250 ms).
 pub fn create_profile(conn: &Connection, profile: &str, name: &str, from: &str) -> Result<()> {
     send(
         conn,
@@ -732,6 +775,12 @@ pub fn create_profile(conn: &Connection, profile: &str, name: &str, from: &str) 
         json!({"name": name, "clone_from": from}),
         120,
     )?;
+    for _ in 0..40 {
+        if profile_soul(conn, name, name).is_ok() {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(250));
+    }
     Ok(())
 }
 

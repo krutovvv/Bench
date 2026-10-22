@@ -19,7 +19,7 @@ macro_rules! icons {
                 Icon::default().data(self.bytes())
             }
 
-            /// The icon at a size; the loader spins, the recording waveform breathes.
+            /// The icon at a size; the loader spins.
             pub fn live(self, small: bool) -> AnyElement {
                 let icon = if small { self.icon().small() } else { self.icon().xsmall() };
                 match self {
@@ -28,14 +28,6 @@ macro_rules! icons {
                             "spin",
                             Animation::new(Duration::from_millis(900)).repeat(),
                             |i, t| i.transform(Transformation::rotate(percentage(t))),
-                        )
-                        .into_any_element(),
-                    Ico::AudioLines => div()
-                        .child(icon)
-                        .with_animation(
-                            "breathe",
-                            Animation::new(Duration::from_millis(1400)).repeat().with_easing(pulsating_between(0.45, 1.)),
-                            |d, t| d.opacity(t),
                         )
                         .into_any_element(),
                     _ => icon.into_any_element(),
@@ -48,7 +40,6 @@ macro_rules! icons {
 icons! {
     AppWindow => "app-window",
     ArrowUp => "arrow-up",
-    AudioLines => "audio-lines",
     Bot => "bot",
     Brain => "brain",
     ChevronDown => "chevron-down",
@@ -62,6 +53,10 @@ icons! {
     Globe => "globe",
     ExternalLink => "external-link",
     File => "file",
+    FileText => "file-text",
+    Film => "film",
+    Image => "image",
+    Music => "music",
     FileDiff => "file-diff",
     Folder => "folder",
     FolderOpen => "folder-open",

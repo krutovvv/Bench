@@ -92,6 +92,8 @@ impl HermesApp {
                     .xsmall()
                     .icon(icon.icon())
                     .label(label)
+                    // One tone across the bar, like the model and the icon buttons.
+                    .text_color(muted)
                     .dropdown_menu(move |menu, _, _| {
                         let mut menu = menu;
                         for (k, (text, checked, _)) in items.iter().enumerate() {
@@ -159,6 +161,8 @@ impl HermesApp {
                 )
             })
             .collect();
+        // Nothing about the profile until its own settings are in.
+        let ready = self.conn.is_some() && self.profile_ready;
         let current_model = self.model_name();
         let models: Vec<_> = self
             .profile_models
@@ -282,7 +286,7 @@ impl HermesApp {
                         .xsmall()
                         .icon(Ico::Gauge.icon())
                         .label(label)
-                        .when(live, |b| b.text_color(theme.primary)),
+                        .text_color(if live { theme.primary } else { muted }),
                 )
                 .content(move |_, _, cx| speed_panel(&samples, prefill, generation, cx))
         });
@@ -302,17 +306,21 @@ impl HermesApp {
             .child(div().flex_1())
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
-            .when_some(self.approval_mode.clone(), |d, mode| {
+            .when_some(self.approval_mode.clone().filter(|_| ready), |d, mode| {
                 d.child(picker("approvals", Ico::Shield, mode, approvals))
             })
-            .child(picker(
-                "effort",
-                Ico::Brain,
-                EFFORTS[self.effort].to_string(),
-                efforts,
-            ))
+            .when(ready, |d| {
+                d.child(picker(
+                    "effort",
+                    Ico::Brain,
+                    EFFORTS[self.effort].to_string(),
+                    efforts,
+                ))
+            })
             .map(|d| {
-                if models.is_empty() || self.session.is_some() {
+                if !ready {
+                    d
+                } else if models.is_empty() || self.session.is_some() {
                     d.child(
                         item("model")
                             .child(Ico::Cpu.icon().xsmall())

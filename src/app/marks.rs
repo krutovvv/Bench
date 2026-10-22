@@ -9,8 +9,11 @@ use gpui_kit::*;
 use super::HermesApp;
 use crate::connection;
 
-/// Session colors: red, orange, yellow, green, blue, violet.
-pub const SESSION_COLORS: [u32; 6] = [0xD0605A, 0xD99A4E, 0xD6C24A, 0x6DB86A, 0x5C8FD8, 0x9A6AD6];
+/// Session colors: red, orange, yellow, green, blue, violet, pink (saved by index: new ones go
+/// at the end).
+pub const SESSION_COLORS: [u32; 7] = [
+    0xD0605A, 0xD99A4E, 0xD6C24A, 0x6DB86A, 0x5C8FD8, 0x9A6AD6, 0xD46A9F,
+];
 
 #[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Mark {

@@ -3,6 +3,7 @@
 mod chat;
 mod composer;
 mod files;
+mod media;
 mod panels;
 mod sidebar;
 mod statusbar;

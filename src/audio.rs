@@ -108,6 +108,11 @@ impl Recorder {
     }
 }
 
+/// Whether playback can decode these bytes (Opus, for one, it cannot).
+pub fn decodable(bytes: &[u8]) -> bool {
+    rodio::Decoder::new(Cursor::new(bytes.to_vec())).is_ok()
+}
+
 /// Plays one clip on a background thread; `stop()` or drop ends it.
 pub struct Playback {
     stop: Arc<AtomicBool>,

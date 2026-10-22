@@ -5,7 +5,6 @@
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::shimmer::ShimmerText;
-use gpui_kit::component::text::TextView;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -313,13 +312,8 @@ impl HermesApp {
                 .children(items)
         });
 
+        let answer = self.render_answer(i, cx);
         let turn: &Turn = &self.turns[i];
-        let answer = (!turn.answer.trim().is_empty()).then(|| {
-            TextView::markdown(
-                SharedString::from(format!("answer-{i}")),
-                turn.answer.clone(),
-            )
-        });
         let has_answer = !turn.answer.trim().is_empty();
         let time = match (turn.started, turn.finished) {
             (Some(a), Some(b)) if b > a => clock((b - a) as u64),
@@ -394,6 +388,8 @@ impl HermesApp {
                 })
         });
 
+        // The question 16px in from the column's edge, the agent's side twice that, so each
+        // answer reads as hanging off its question.
         v_flex()
             .id(("turn", i))
             .group(group)
@@ -401,6 +397,8 @@ impl HermesApp {
             .px_4()
             .py_3()
             .gap_3()
+            // Chat text matches the session titles: answers are skimmed, not read aloud.
+            .text_sm()
             .child(
                 div()
                     .w_full()
@@ -410,21 +408,30 @@ impl HermesApp {
                     .border_1()
                     .border_color(theme.border)
                     .whitespace_normal()
-                    .child(user),
+                    // Selectable and copyable, like the answers.
+                    .child(gpui_kit::base::SelectableText::new(
+                        SharedString::from(format!("user-{i}")),
+                        user,
+                    )),
             )
-            .children(summary)
-            .children(steps)
-            .children(answer)
-            .when(!reviews.is_empty(), |d| {
-                d.child(v_flex().gap_1().children(reviews))
-            })
             .child(
-                h_flex()
-                    .min_h(px(22.))
-                    .gap_2()
-                    .items_start()
-                    .child(div().flex_1().min_w_0().children(sources))
-                    .children(actions),
+                v_flex()
+                    .pl_4()
+                    .gap_3()
+                    .children(summary)
+                    .children(steps)
+                    .children(answer)
+                    .when(!reviews.is_empty(), |d| {
+                        d.child(v_flex().gap_1().children(reviews))
+                    })
+                    .child(
+                        h_flex()
+                            .min_h(px(22.))
+                            .gap_2()
+                            .items_start()
+                            .child(div().flex_1().min_w_0().children(sources))
+                            .children(actions),
+                    ),
             )
             .into_any_element()
     }

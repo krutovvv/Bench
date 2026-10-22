@@ -109,9 +109,9 @@ impl HermesApp {
             .flex_1()
             .min_w_0()
             .h(px(32.))
-            // The right gap runs to the mic glyph: 16 + the icon column's 8 + 9 inside its
-            // 34px box around a 16px icon. The left gets the same 33.
-            .pl(px(33.))
+            // The same gap on both sides: 24 from the divider, and 16 + the button column's 8
+            // to the round stop button.
+            .pl(px(24.))
             .pr_4()
             .gap(px(2.))
             .items_center()
@@ -128,55 +128,51 @@ impl HermesApp {
         let recording = self.recorder.is_some();
         let has_text = !self.composer.read(cx).value().trim().is_empty();
 
-        let area = |id: &'static str, icon: Ico, tip: &'static str, color: Hsla| {
+        // The two round buttons in a square UI: a quiet one (outline) and a filled one.
+        let round = |id: &'static str, icon: Ico, tip: &'static str, filled: Option<Hsla>| {
+            let fg = if filled.is_some() {
+                theme.primary_foreground
+            } else {
+                theme.muted_foreground
+            };
             div()
                 .id(id)
-                .size(px(34.))
+                .size(px(30.))
                 .flex()
                 .items_center()
                 .justify_center()
+                .rounded_full()
                 .cursor_pointer()
-                .text_color(color)
-                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(icon.live(true))
+                .text_color(fg)
+                .map(|d| match filled {
+                    Some(bg) => d.bg(bg).hover(|s| s.opacity(0.88)),
+                    None => d
+                        .border_1()
+                        .border_color(theme.border)
+                        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground)),
+                })
+                .child(icon.live(false))
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
         };
 
-        let mic = area(
-            "mic",
-            if self.transcribing {
-                Ico::Loader
-            } else if recording {
-                Ico::AudioLines
-            } else {
-                Ico::Mic
-            },
-            if recording {
-                "Stop and transcribe"
-            } else {
-                "Dictate"
-            },
-            if recording {
-                theme.primary
-            } else {
-                theme.muted_foreground
-            },
-        )
+        let mic = if self.transcribing {
+            round("mic", Ico::Loader, "Transcribing…", None)
+        } else if recording {
+            round("mic", Ico::Square, "Stop and transcribe", Some(theme.danger))
+        } else {
+            round("mic", Ico::Mic, "Dictate", None)
+        }
         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)));
 
         let action = if busy {
-            area("stop", Ico::Square, "Stop", theme.foreground)
+            round("stop", Ico::Square, "Stop", Some(theme.foreground))
                 .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
         } else {
-            area(
+            round(
                 "send",
                 Ico::ArrowUp,
                 "Send (Enter)",
-                if has_text {
-                    theme.primary
-                } else {
-                    theme.muted_foreground
-                },
+                has_text.then_some(theme.primary),
             )
             .on_click(cx.listener(|this, _, window, cx| this.send(window, cx)))
         };
@@ -217,7 +213,7 @@ impl HermesApp {
             .child(
                 h_flex()
                     .flex_none()
-                    .gap_1()
+                    .gap_2()
                     .pl_2()
                     // A little more room right of the send button than the 8 it had.
                     .pr_3()

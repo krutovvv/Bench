@@ -25,6 +25,7 @@ use crate::audio::{Playback, Recorder};
 use crate::connection::{self, Connection};
 use crate::gateway::{Cmd, Evt, Gateway};
 use crate::history;
+use crate::media::{self, Loaded};
 use crate::model::{EFFORTS, Profile, SessionRow, SkillRow, Step, Target, Turn, Usage};
 use crate::rest;
 
@@ -125,6 +126,12 @@ pub struct HermesApp {
     pub approval: Option<crate::model::ApprovalReq>,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
+    /// The profile's own approvals, effort and model have arrived: until then the status bar
+    /// shows none of them (defaults there would only mislead).
+    pub profile_ready: bool,
+    /// The gateway refused a restart over running work: the next press (within a minute)
+    /// restarts anyway.
+    pub restart_armed: Option<Instant>,
     /// `model.context_length` of the profile (0 when not set).
     pub profile_context: u64,
     /// Colors and pins of sessions (this Mac).
@@ -215,6 +222,18 @@ pub struct HermesApp {
     pub transcribing: bool,
     pub playing: Option<(usize, Playback)>,
     pub speaking: Option<usize>,
+    /// Files answers delivered, by target and path; diagrams, by source and dark theme.
+    pub media: HashMap<String, Loaded<media::Fetched>>,
+    pub diagrams: HashMap<(String, bool), Loaded<media::Diagram>>,
+    /// The delivered audio file playing, by its media key, and since when.
+    pub media_playing: Option<(String, Playback)>,
+    pub media_since: Instant,
+    /// The video playing in the chat, the one starting, and the loop that shows its frames.
+    pub video: Option<crate::video::Player>,
+    pub video_loading: Option<String>,
+    pub video_task: Option<Task<()>>,
+    /// Markdown files shown in full rather than their first lines.
+    pub media_open: HashSet<String>,
 
     _subscriptions: Vec<Subscription>,
     _tasks: Vec<Task<()>>,
@@ -423,6 +442,12 @@ impl HermesApp {
                         this.playing = None;
                         cx.notify();
                     }
+                    if this.media_playing.as_ref().is_some_and(|(_, p)| p.is_done()) {
+                        this.media_playing = None;
+                    }
+                    if this.media_playing.is_some() {
+                        cx.notify(); // the elapsed time
+                    }
                     if this.live.is_some() {
                         this.speed.tick();
                     }
@@ -553,6 +578,16 @@ impl HermesApp {
             transcribing: false,
             playing: None,
             speaking: None,
+            profile_ready: false,
+            restart_armed: None,
+            media: HashMap::new(),
+            diagrams: HashMap::new(),
+            media_playing: None,
+            media_since: Instant::now(),
+            video: None,
+            video_loading: None,
+            video_task: None,
+            media_open: HashSet::new(),
             _subscriptions: subs,
             _tasks: tasks,
         };
@@ -592,6 +627,8 @@ impl HermesApp {
         self.conn = None;
         self.target = target.clone();
         self.connecting = true;
+        self.profile_ready = false;
+        self.approval_mode = None;
         self.opened.clear();
         self.profiles.clear();
         self.profile = None;
@@ -969,6 +1006,8 @@ impl HermesApp {
         self.queued = None;
         self.usage = None;
         self.playing = None;
+        self.media_playing = None;
+        self.stop_video(None, cx);
         self.model_pick = None;
         self.model_pending = false;
         // Speeds describe the model and server, not the chat: keep them, restart the counters.
@@ -1321,23 +1360,42 @@ impl HermesApp {
     }
 
     /// `hermes gateway restart` on the machine we are connected to, then reconnect.
+    /// Restart the gateway. While Hermes is running work it refuses and says what runs; the
+    /// next press within a minute restarts anyway, interrupting that work.
     pub fn restart_gateway(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let target = self.target.clone();
+        let interrupt = self
+            .restart_armed
+            .take()
+            .is_some_and(|t| t.elapsed() < Duration::from_secs(60));
         self.toast(
             NotificationType::Info,
-            "Restarting the gateway…",
+            if interrupt {
+                "Interrupting running work and restarting the gateway…"
+            } else {
+                "Restarting the gateway…"
+            },
             window,
             cx,
         );
         cx.spawn_in(window, async move |this, cx| {
             let t = target.clone();
             let result = cx
-                .background_spawn(async move { connection::restart_gateway(&t) })
+                .background_spawn(async move { connection::restart_gateway(&t, interrupt) })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match result {
-                Ok(()) => {
+                Ok(connection::Restart::Done) => {
                     this.toast(NotificationType::Success, "Gateway restarted", window, cx);
                     this.connect(target, window, cx);
+                }
+                Ok(connection::Restart::Busy(what)) => {
+                    this.restart_armed = Some(Instant::now());
+                    this.toast(
+                        NotificationType::Warning,
+                        format!("Not restarted: {what}. Press restart again to interrupt it and restart."),
+                        window,
+                        cx,
+                    );
                 }
                 Err(e) => this.toast(
                     NotificationType::Error,
@@ -1396,7 +1454,9 @@ impl HermesApp {
     /// Start each profile on its configured reasoning effort.
     fn load_profile_effort(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.effort_pending = false;
+        self.profile_ready = false;
         self.rest(window, cx, rest::profile_defaults, |this, r, window, cx| {
+            this.profile_ready = true;
             let Ok((effort, model, models, approval, context)) = r else {
                 return;
             };
@@ -1906,10 +1966,11 @@ impl HermesApp {
     pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
         self.panel = panel;
         match panel {
-            Panel::Chat | Panel::Settings => {}
+            // Gateways check versions only on their button: a check runs `hermes` on every
+            // machine, too slow and busy to start on a tab click.
+            Panel::Chat | Panel::Settings | Panel::Gateways => {}
             Panel::Profiles => self.load_profiles_admin(window, cx),
             Panel::Prompts => self.load_prompts(window, cx),
-            Panel::Gateways => self.check_installs(window, cx),
             Panel::Config => {
                 self.config_error = None;
                 self.rest(
@@ -2192,6 +2253,7 @@ impl HermesApp {
             return;
         }
         self.playing = None;
+        self.media_playing = None;
         let Some(text) = self.turns.get(i).map(|t| t.answer.clone()) else {
             return;
         };

@@ -6,12 +6,14 @@ mod connection;
 mod diff;
 mod gateway;
 mod history;
+mod media;
 mod icons;
 mod model;
 mod rest;
 mod speed;
 mod theme;
 mod ui;
+mod video;
 
 use gpui_kit::*;
 

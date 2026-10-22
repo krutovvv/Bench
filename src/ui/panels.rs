@@ -1,6 +1,7 @@
 //! Settings panels: skills and config (editable text), MCP (JSON), cron (read-only), Telegram filter.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::Disableable as _;
 use gpui_kit::component::input::{Editor, EditorState};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -861,6 +862,7 @@ impl HermesApp {
     pub(super) fn render_gateways(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        let checking = self.installs.values().any(|i| i.busy.is_some());
         let rows: Vec<AnyElement> = self
             .targets
             .clone()
@@ -957,18 +959,19 @@ impl HermesApp {
                 v_flex()
                     .max_w(px(720.))
                     .child(
-                        h_flex()
+                        v_flex()
                             .py_2()
-                            .gap_3()
-                            .items_center()
-                            .child(div().flex_1().text_xs().text_color(muted).child(
+                            .gap_2()
+                            .items_start()
+                            .child(div().text_xs().text_color(muted).child(
                                 "Hermes on each machine. Updating takes a full backup first, then restarts that gateway; going back to an older release means restoring that backup.",
                             ))
                             .child(
                                 Button::new("gw-check")
                                     .small()
-                                    .ghost()
-                                    .label("Check again")
+                                    .outline()
+                                    .label("Check versions")
+                                    .disabled(checking)
                                     .on_click(cx.listener(|this, _, window, cx| {
                                         this.check_installs(window, cx)
                                     })),

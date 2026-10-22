@@ -17,7 +17,13 @@ uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 cpal = "0.15"
 hound = "3.5"
-rodio = { version = "0.20", default-features = false, features = ["symphonia-mp3", "symphonia-wav"] }
+rodio = { version = "0.20", default-features = false, features = ["symphonia-mp3", "symphonia-wav", "symphonia-flac", "symphonia-vorbis", "symphonia-isomp4", "symphonia-aac"] }
+imagesize = "0.13"
+# LaTeX as Unicode text and Mermaid as SVG: pure Rust, no browser.
+unicodeit = "0.2"
+mermaid-rs-renderer = { version = "0.3", default-features = false }
+# The same image crate gpui decodes with: video frames are handed to it as RenderImages.
+image = { version = "0.25", default-features = false }
 
 [profile.dev]
 opt-level = 1

@@ -58,7 +58,9 @@ impl HermesApp {
         self.rest(
             window,
             cx,
-            move |c, p| rest::profile_soul(c, p, &name),
+            // The gateway admits /api/profiles/<name>/… only on a ticket minted for <name>,
+            // so every call below rides the open profile's grant, not the status bar's.
+            move |c, _| rest::profile_soul(c, &name, &name),
             |this, r, window, cx| match r {
                 Ok(text) => this
                     .soul_editor
@@ -98,6 +100,7 @@ impl HermesApp {
         self.rest(
             window,
             cx,
+            // Any served profile may mint the create grant; the clone source is `from`.
             move |c, p| rest::create_profile(c, p, &n, &f),
             move |this, r, window, cx| match r {
                 Ok(()) => {
@@ -137,10 +140,10 @@ impl HermesApp {
         self.rest(
             window,
             cx,
-            move |c, p| {
-                rest::save_profile_soul(c, p, &n, &soul)?;
+            move |c, _| {
+                rest::save_profile_soul(c, &n, &n, &soul)?;
                 match rename {
-                    Some(new) => rest::rename_profile(c, p, &n, &new).map(Some),
+                    Some(new) => rest::rename_profile(c, &n, &n, &new).map(Some),
                     None => Ok(None),
                 }
             },
@@ -197,7 +200,7 @@ impl HermesApp {
         self.rest(
             window,
             cx,
-            move |c, p| rest::delete_profile(c, p, &n),
+            move |c, _| rest::delete_profile(c, &n, &n),
             move |this, r, window, cx| match r {
                 Ok(()) => {
                     this.profiles.retain(|p| p.name != name);
