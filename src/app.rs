@@ -139,6 +139,11 @@ pub struct HermesApp {
     pub attachments: Vec<std::path::PathBuf>,
     pub usage: Option<Usage>,
     pub effort: usize,
+    /// The open session's effort when it is none of EFFORTS (set elsewhere, e.g. `high`; "" is the
+    /// provider's default): shown as it is, nothing checked.
+    pub effort_other: Option<String>,
+    /// The profile's `agent.reasoning_effort`: where a new chat starts.
+    profile_effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
     pub profile_models: Vec<(String, String)>,
     /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
@@ -587,6 +592,8 @@ impl HermesApp {
             send_after_transcribe: false,
             usage: None,
             effort: EFFORTS.len() - 1,
+            effort_other: None,
+            profile_effort: EFFORTS.len() - 1,
             profile_models: vec![],
             catalog: vec![],
             slash_sel: 0,
@@ -834,6 +841,22 @@ impl HermesApp {
                     });
                     self.reset_scroller(cx);
                     self.resolve_project(window, cx);
+                }
+            }
+            Evt::Effort(sid, value) if self.is_current(&sid) => {
+                // The session's own level replaces whatever the bar showed (the profile's default
+                // or the previous chat's).
+                self.effort_pending = false;
+                match EFFORTS.iter().position(|e| *e == value) {
+                    Some(i) => {
+                        self.effort = i;
+                        self.effort_other = None;
+                        self.effort_choice.update(cx, |s, cx| {
+                            s.set_selected_index(Some(IndexPath::new(i)), window, cx)
+                        });
+                    }
+                    None if value.is_empty() => self.effort_other = Some("default".into()),
+                    None => self.effort_other = Some(value),
                 }
             }
             Evt::Created { session, runtime } => {
@@ -1111,6 +1134,9 @@ impl HermesApp {
         }
         self.session = None;
         self.runtime = None;
+        // A new chat starts on the profile's level.
+        self.effort_other = None;
+        self.effort = self.profile_effort;
         self.turns.clear();
         self.live = None;
         self.queued = None;
@@ -1361,9 +1387,21 @@ impl HermesApp {
         });
     }
 
+    /// An open session takes the level at once (its next turn runs on it, the gateway confirms
+    /// with session.info); a chat not created yet takes it with its first message.
     pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
         self.effort = i;
-        self.effort_pending = true;
+        self.effort_other = None;
+        match self.runtime.clone() {
+            Some(session) => {
+                self.effort_pending = false;
+                self.cmd(Cmd::SetEffort {
+                    session,
+                    effort: EFFORTS[i].to_string(),
+                });
+            }
+            None => self.effort_pending = true,
+        }
         cx.notify();
     }
 
@@ -1653,8 +1691,14 @@ impl HermesApp {
             this.profile_context = context;
             this.profile_models = models;
             this.model_pick = None;
-            if let Some(i) = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v)) {
+            let level = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v));
+            if let Some(i) = level {
+                this.profile_effort = i;
+            }
+            // The profile's level is for new chats: an open session already has its own.
+            if let Some(i) = level.filter(|_| this.runtime.is_none()) {
                 this.effort = i;
+                this.effort_other = None;
                 this.effort_pending = false;
                 this.effort_choice.update(cx, |s, cx| {
                     s.set_selected_index(Some(IndexPath::new(i)), window, cx)

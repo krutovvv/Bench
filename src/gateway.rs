@@ -120,6 +120,8 @@ pub enum Evt {
     },
     Connected(Arc<Connection>),
     Error(String),
+    /// A session's reasoning effort as the gateway has it ("" = the provider's default).
+    Effort(String, String),
     Profiles(Vec<Profile>),
     Sessions(String, Vec<SessionRow>),
     /// `session` is the stored id (session list); `runtime` the id prompts and events use.
@@ -591,6 +593,11 @@ fn run(
                         json!({"type": kind, "session_id": runtime, "payload": p})
                     })
                     .collect();
+                // The session's own settings (its reasoning effort), as the event that updates them.
+                if r["info"].is_object() {
+                    replay.push(json!({"type": "session.info", "session_id": runtime,
+                                       "payload": r["info"]}));
+                }
                 if r["todo_state"]["todos"].is_array() {
                     replay.push(json!({"type": "todo.updated", "session_id": runtime,
                                        "payload": r["todo_state"]}));
@@ -733,6 +740,12 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
     let text = || payload["text"].as_str().unwrap_or_default().to_string();
     match p["type"].as_str().unwrap_or_default() {
         "message.start" => emit(Evt::Started(sid)),
+        // The session's current settings: on resume, after a change, at turn boundaries.
+        "session.info" => {
+            if let Some(effort) = payload["reasoning_effort"].as_str() {
+                emit(Evt::Effort(sid, effort.to_string()));
+            }
+        }
         "message.delta" => emit(Evt::Delta(sid, text())),
         "reasoning.delta" => emit(Evt::Reasoning(sid, text())),
         "tool.start" => emit(Evt::ToolStart {

@@ -75,9 +75,11 @@ impl HermesApp {
         };
 
         // A label as wide as its text that opens a menu of choices.
+        // `note`: a line above the choices saying what they apply to.
         let picker = |id: &'static str,
                       icon: Ico,
                       label: String,
+                      note: Option<&'static str>,
                       items: Vec<(
             String,
             bool,
@@ -96,6 +98,9 @@ impl HermesApp {
                     .text_color(muted)
                     .dropdown_menu(move |menu, _, _| {
                         let mut menu = menu;
+                        if let Some(note) = note {
+                            menu = menu.label(note).separator();
+                        }
                         for (k, (text, checked, _)) in items.iter().enumerate() {
                             let (items, view) = (items.clone(), view.clone());
                             menu = menu.item(
@@ -127,7 +132,11 @@ impl HermesApp {
             .map(|(i, e)| {
                 let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
                     Box::new(move |this, _, cx| this.set_effort(i, cx));
-                (e.to_string(), i == self.effort, f)
+                (
+                    e.to_string(),
+                    self.effort_other.is_none() && i == self.effort,
+                    f,
+                )
             })
             .collect();
         let approvals: Vec<_> = crate::model::APPROVAL_MODES
@@ -287,19 +296,39 @@ impl HermesApp {
             .text_xs()
             .child(self.render_target_picker(cx))
             .when(!self.profiles.is_empty(), |d| {
-                d.child(picker("profile", Ico::UserRound, profile_label, profiles))
+                d.child(picker(
+                    "profile",
+                    Ico::UserRound,
+                    profile_label,
+                    None,
+                    profiles,
+                ))
             })
             .child(div().flex_1())
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .when_some(self.approval_mode.clone().filter(|_| ready), |d, mode| {
-                d.child(picker("approvals", Ico::Shield, mode, approvals))
+                d.child(picker(
+                    "approvals",
+                    Ico::Shield,
+                    mode,
+                    // Hermes keeps approvals in the profile's config, not per chat.
+                    Some("All chats of this profile"),
+                    approvals,
+                ))
             })
             .when(ready, |d| {
                 d.child(picker(
                     "effort",
                     Ico::Brain,
-                    EFFORTS[self.effort].to_string(),
+                    self.effort_other
+                        .clone()
+                        .unwrap_or_else(|| EFFORTS[self.effort].to_string()),
+                    Some(if self.session.is_some() {
+                        "This chat"
+                    } else {
+                        "The new chat"
+                    }),
                     efforts,
                 ))
             })
@@ -313,7 +342,7 @@ impl HermesApp {
                             .child(current_model),
                     )
                 } else {
-                    d.child(picker("model", Ico::Cpu, current_model, models))
+                    d.child(picker("model", Ico::Cpu, current_model, None, models))
                 }
             })
             .child(
