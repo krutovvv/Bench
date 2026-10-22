@@ -129,54 +129,55 @@ impl HermesApp {
         let has_text =
             !self.composer.read(cx).value().trim().is_empty() || !self.attachments.is_empty();
 
-        // The two round buttons in a square UI: a quiet one (outline) and a filled one.
-        let round = |id: &'static str, icon: Ico, tip: &'static str, filled: Option<Hsla>| {
-            let fg = if filled.is_some() {
-                theme.primary_foreground
-            } else {
-                theme.muted_foreground
+        // The round buttons in a square UI: a quiet one (outline) and a filled one. Glyphs are
+        // Lucide at the UI's icon size (16px); Stop is a filled square, not an outline (an
+        // outlined square reads as a missing glyph).
+        let round =
+            |id: &'static str, icon: Option<Ico>, tip: &'static str, filled: Option<Hsla>| {
+                let fg = if filled.is_some() {
+                    theme.primary_foreground
+                } else {
+                    theme.muted_foreground
+                };
+                div()
+                    .id(id)
+                    .size(px(30.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded_full()
+                    .cursor_pointer()
+                    .text_color(fg)
+                    .map(|d| match filled {
+                        Some(bg) => d.bg(bg).hover(|s| s.opacity(0.88)),
+                        None => d
+                            .border_1()
+                            .border_color(theme.border)
+                            .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground)),
+                    })
+                    .map(|d| match icon {
+                        Some(icon) => d.child(icon.live(true)),
+                        None => d.child(div().size(px(10.)).rounded(px(1.5)).bg(fg)),
+                    })
+                    .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
             };
-            div()
-                .id(id)
-                .size(px(30.))
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded_full()
-                .cursor_pointer()
-                .text_color(fg)
-                .map(|d| match filled {
-                    Some(bg) => d.bg(bg).hover(|s| s.opacity(0.88)),
-                    None => d
-                        .border_1()
-                        .border_color(theme.border)
-                        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground)),
-                })
-                .child(icon.live(false))
-                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
-        };
 
         let mic = if self.transcribing {
-            round("mic", Ico::Loader, "Transcribing…", None)
+            round("mic", Some(Ico::Loader), "Transcribing…", None)
         } else if recording {
-            round(
-                "mic",
-                Ico::Square,
-                "Stop and transcribe",
-                Some(theme.danger),
-            )
+            round("mic", None, "Stop and transcribe", Some(theme.danger))
         } else {
-            round("mic", Ico::Mic, "Dictate", None)
+            round("mic", Some(Ico::Mic), "Dictate", None)
         }
         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)));
 
         let action = if busy {
-            round("stop", Ico::Square, "Stop", Some(theme.foreground))
+            round("stop", None, "Stop  ⌘.", Some(theme.foreground))
                 .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
         } else {
             round(
                 "send",
-                Ico::ArrowUp,
+                Some(Ico::ArrowUp),
                 "Send (Enter)",
                 // While dictating it sends what is being said.
                 (has_text || recording || self.transcribing).then_some(theme.primary),
@@ -187,7 +188,7 @@ impl HermesApp {
         let slash = self.render_slash(cx);
         let clip = round(
             "attach",
-            Ico::Paperclip,
+            Some(Ico::Paperclip),
             "Attach files (or drop them, or ⌘V)",
             None,
         )
