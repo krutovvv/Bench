@@ -670,6 +670,7 @@ impl HermesApp {
                 if self.session.as_deref() == Some(&session) {
                     self.runtime = Some(runtime);
                     self.turns = turns;
+                    self.restore_reviews();
                     self.live = running.then(|| Live {
                         started: Instant::now(),
                         label: "Working…".into(),
@@ -802,6 +803,13 @@ impl HermesApp {
                 cx.notify();
             }
             Evt::Catalog(list) => self.catalog = list,
+            Evt::Review(sid, text) if self.is_current(&sid) => {
+                if let Some(i) = self.turns.len().checked_sub(1) {
+                    self.turns[i].reviews.push(text.clone());
+                    self.remember_review(i, text);
+                }
+                self.remeasure_last(cx);
+            }
             Evt::Dispatched {
                 session,
                 output,
@@ -1680,6 +1688,44 @@ impl HermesApp {
             mode: mode.to_string(),
         });
         cx.notify();
+    }
+
+    /// Hermes sends review notes only live; keep them per chat (turn index → notes) to show again.
+    fn reviews_path(&self) -> std::path::PathBuf {
+        connection::state_dir().join("reviews.json")
+    }
+
+    fn remember_review(&self, turn: usize, text: String) {
+        let Some(session) = self.session.clone() else {
+            return;
+        };
+        let path = self.reviews_path();
+        let mut all: HashMap<String, HashMap<usize, Vec<String>>> = std::fs::read(&path)
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        all.entry(session)
+            .or_default()
+            .entry(turn)
+            .or_default()
+            .push(text);
+        let _ = std::fs::create_dir_all(connection::state_dir());
+        let _ = std::fs::write(path, serde_json::to_vec(&all).unwrap_or_default());
+    }
+
+    fn restore_reviews(&mut self) {
+        let Some(session) = self.session.clone() else {
+            return;
+        };
+        let all: HashMap<String, HashMap<usize, Vec<String>>> = std::fs::read(self.reviews_path())
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default();
+        for (i, notes) in all.get(&session).cloned().unwrap_or_default() {
+            if let Some(t) = self.turns.get_mut(i) {
+                t.reviews = notes;
+            }
+        }
     }
 
     /// Where this target was last: (profile, open session).

@@ -275,10 +275,13 @@ impl HermesApp {
                     .when(!has_steps, |i| i.text_color(theme.transparent)),
                 )
                 .map(|d| match &live {
+                    // One line: what the agent says it is doing, cut with "…" before the counters.
                     Some((label, _)) => d.child(
-                        ShimmerText::new(label.clone())
-                            .text_color(muted)
-                            .max_w(px(560.)),
+                        div()
+                            .flex_shrink(1.)
+                            .min_w_0()
+                            .truncate()
+                            .child(ShimmerText::new(label.clone()).text_color(muted)),
                     ),
                     None => d.child(div().flex_none().child("Done")),
                 })
@@ -326,6 +329,22 @@ impl HermesApp {
         let user = turn.user.clone();
 
         let sources = self.render_sources(i, cx);
+        // What the background review did with skills and memory, quietly under the answer.
+        let reviews: Vec<AnyElement> = turn
+            .reviews
+            .iter()
+            .map(|r| {
+                let text = r.trim_start_matches('💾').trim().to_string();
+                h_flex()
+                    .gap_2()
+                    .items_start()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(Ico::Save.icon().xsmall().mt(px(2.)))
+                    .child(div().flex_1().min_w_0().child(text))
+                    .into_any_element()
+            })
+            .collect();
         let actions = (live.is_none() && has_answer).then(|| {
             let playing = self.playing.as_ref().is_some_and(|(j, _)| *j == i);
             let speaking = self.speaking == Some(i);
@@ -396,6 +415,9 @@ impl HermesApp {
             .children(summary)
             .children(steps)
             .children(answer)
+            .when(!reviews.is_empty(), |d| {
+                d.child(v_flex().gap_1().children(reviews))
+            })
             .child(
                 h_flex()
                     .min_h(px(22.))

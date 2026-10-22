@@ -107,6 +107,8 @@ pub const APPROVAL_MODES: &[&str] = &["off", "smart", "manual"];
 #[derive(Clone, Debug, Default)]
 pub struct Turn {
     pub user: String,
+    /// Hermes' background review after the turn ("saved skill X, patched Y"), as it reported.
+    pub reviews: Vec<String>,
     pub steps: Vec<Step>,
     pub answer: String,
     pub expanded: bool,

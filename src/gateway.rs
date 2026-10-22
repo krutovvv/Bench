@@ -88,6 +88,8 @@ pub enum Evt {
         send: Option<String>,
     },
     Approval(crate::model::ApprovalReq),
+    /// The background self-improvement review of the last turn: what it saved or patched.
+    Review(String, String),
     /// The pending approval was answered or withdrawn.
     ApprovalDone(String),
     Subagent {
@@ -747,6 +749,12 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
                 text,
                 status: s("status"),
             })
+        }
+        "review.summary" => {
+            let t = text();
+            if !t.trim().is_empty() {
+                emit(Evt::Review(sid, t.trim().to_string()))
+            }
         }
         "sessions.changed" => emit(Evt::SessionsChanged),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
