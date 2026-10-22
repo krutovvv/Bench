@@ -318,9 +318,12 @@ mod install_tests {
     }
 }
 
-/// A saved text snippet (Settings → Prompts), inserted from the composer with `@`.
-#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+/// A saved text snippet (Settings → Prompts), inserted from the composer with `@`: a Markdown
+/// file `<profile home>/prompts/<title>.md` on the gateway's machine.
+#[derive(Clone, Debug, Default)]
 pub struct Prompt {
     pub title: String,
     pub body: String,
+    /// Where it lives; empty until first saved.
+    pub path: String,
 }

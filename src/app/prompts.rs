@@ -1,31 +1,32 @@
-//! Settings → Prompts: the user's own text snippets, kept on this Mac (the same for every
-//! gateway) and inserted from the composer with `@`.
+//! Settings → Prompts: the user's text snippets, kept per Hermes profile as Markdown files
+//! (`<profile home>/prompts/<title>.md`, like skills) and inserted from the composer with `@`.
 
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use super::HermesApp;
-use crate::connection;
 use crate::model::Prompt;
-
-fn path() -> std::path::PathBuf {
-    connection::state_dir().join("prompts.json")
-}
-
-pub(super) fn load() -> Vec<Prompt> {
-    std::fs::read(path())
-        .ok()
-        .and_then(|b| serde_json::from_slice(&b).ok())
-        .unwrap_or_default()
-}
+use crate::rest;
 
 impl HermesApp {
-    fn store_prompts(&self, window: &mut Window, cx: &mut Context<Self>) {
-        let _ = std::fs::create_dir_all(connection::state_dir());
-        let json = serde_json::to_vec_pretty(&self.prompts).unwrap_or_default();
-        if let Err(e) = std::fs::write(path(), json) {
-            self.toast(NotificationType::Error, format!("Prompts: {e}"), window, cx);
-        }
+    /// Read the profile's prompts (on profile switch and when the tab opens).
+    pub(super) fn load_prompts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.rest(window, cx, rest::prompts, |this, r, window, cx| {
+            if let Ok(list) = r {
+                this.prompts = list;
+                if this.panel == super::Panel::Prompts {
+                    let i = this
+                        .prompt_open
+                        .filter(|i| *i < this.prompts.len())
+                        .or((!this.prompts.is_empty()).then_some(0));
+                    this.prompt_open = None;
+                    if let Some(i) = i {
+                        this.open_prompt(i, window, cx);
+                    }
+                }
+                cx.notify();
+            }
+        });
     }
 
     pub fn open_prompt(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -41,13 +42,13 @@ impl HermesApp {
         cx.notify();
     }
 
+    /// A new, unsaved prompt (it becomes a file on Save).
     pub fn new_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.prompts.push(Prompt {
             title: "New prompt".into(),
-            body: String::new(),
+            ..Default::default()
         });
         let i = self.prompts.len() - 1;
-        self.store_prompts(window, cx);
         self.open_prompt(i, window, cx);
         self.prompt_title.update(cx, |s, cx| s.focus(window, cx));
     }
@@ -65,15 +66,35 @@ impl HermesApp {
             return;
         }
         let body = self.prompt_editor.read(cx).value().to_string();
-        if let Some(p) = self.prompts.get_mut(i) {
-            *p = Prompt { title, body };
-        }
-        self.store_prompts(window, cx);
-        self.toast(NotificationType::Success, "Saved", window, cx);
-        cx.notify();
+        let old = self
+            .prompts
+            .get(i)
+            .map(|p| p.path.clone())
+            .unwrap_or_default();
+        let (t, b) = (title.clone(), body.clone());
+        self.rest(
+            window,
+            cx,
+            move |c, p| rest::save_prompt(c, p, &old, &t, &b),
+            move |this, r, window, cx| match r {
+                Ok(path) => {
+                    if let Some(p) = this.prompts.get_mut(i) {
+                        *p = Prompt { title, body, path };
+                    }
+                    this.toast(NotificationType::Success, "Saved", window, cx);
+                    cx.notify();
+                }
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Prompt: {e:#}"),
+                    window,
+                    cx,
+                ),
+            },
+        );
     }
 
-    /// First press arms, second deletes.
+    /// First press arms, second deletes the file.
     pub fn delete_prompt(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(i) = self.prompt_open else { return };
         if !self.prompt_delete_armed {
@@ -82,13 +103,34 @@ impl HermesApp {
             return;
         }
         self.prompt_delete_armed = false;
+        let path = self
+            .prompts
+            .get(i)
+            .map(|p| p.path.clone())
+            .unwrap_or_default();
         if i < self.prompts.len() {
             self.prompts.remove(i);
         }
-        self.store_prompts(window, cx);
         self.prompt_open = None;
         if !self.prompts.is_empty() {
             self.open_prompt(i.min(self.prompts.len() - 1), window, cx);
+        }
+        if !path.is_empty() {
+            self.rest(
+                window,
+                cx,
+                move |c, p| rest::delete_prompt(c, p, &path),
+                |this, r, window, cx| {
+                    if let Err(e) = r {
+                        this.toast(
+                            NotificationType::Error,
+                            format!("Prompt: {e:#}"),
+                            window,
+                            cx,
+                        );
+                    }
+                },
+            );
         }
         cx.notify();
     }

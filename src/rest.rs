@@ -578,3 +578,88 @@ pub fn cron_action(conn: &Connection, profile: &str, id: &str, action: &str) -> 
     )?;
     Ok(())
 }
+
+/// The profile's Hermes home on the gateway's machine: `~/.hermes`, or
+/// `~/.hermes/profiles/<name>` for a named profile.
+pub fn profile_home(conn: &Connection, profile: &str) -> Result<String> {
+    let v = get(conn, "/api/chat/workspaces", profile)?;
+    let home = v["home"]
+        .as_str()
+        .ok_or_else(|| anyhow!("home folder unknown"))?;
+    Ok(if profile.is_empty() || profile == "default" {
+        format!("{home}/.hermes")
+    } else {
+        format!("{home}/.hermes/profiles/{profile}")
+    })
+}
+
+/// The profile's prompts (`prompts/*.md`), by name.
+pub fn prompts(conn: &Connection, profile: &str) -> Result<Vec<crate::model::Prompt>> {
+    let dir = format!("{}/prompts", profile_home(conn, profile)?);
+    let Ok(entries) = list_dir(conn, profile, &dir) else {
+        return Ok(vec![]); // no folder yet
+    };
+    let mut out = vec![];
+    for (name, path, is_dir) in entries {
+        if is_dir || !name.to_lowercase().ends_with(".md") {
+            continue;
+        }
+        let body = read_text(conn, profile, &path)
+            .map(|f| f.text)
+            .unwrap_or_default();
+        out.push(crate::model::Prompt {
+            title: name[..name.len() - 3].to_string(),
+            body,
+            path,
+        });
+    }
+    out.sort_by_key(|p| p.title.to_lowercase());
+    Ok(out)
+}
+
+/// Write a prompt as `prompts/<title>.md` (renaming its file when the title changed); its path.
+pub fn save_prompt(
+    conn: &Connection,
+    profile: &str,
+    old_path: &str,
+    title: &str,
+    body: &str,
+) -> Result<String> {
+    let dir = format!("{}/prompts", profile_home(conn, profile)?);
+    let _ = send(
+        conn,
+        "POST",
+        "/api/files/mkdir",
+        profile,
+        json!({"path": dir}),
+        30,
+    );
+    let file: String = title
+        .chars()
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '\0') {
+                '-'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let path = format!("{dir}/{}.md", file.trim());
+    write_text(conn, profile, &path, body)?;
+    if !old_path.is_empty() && old_path != path {
+        delete_prompt(conn, profile, old_path)?;
+    }
+    Ok(path)
+}
+
+pub fn delete_prompt(conn: &Connection, profile: &str, path: &str) -> Result<()> {
+    send(
+        conn,
+        "DELETE",
+        "/api/files",
+        profile,
+        json!({"path": path, "recursive": false}),
+        30,
+    )?;
+    Ok(())
+}

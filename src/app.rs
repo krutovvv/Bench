@@ -231,6 +231,9 @@ impl HermesApp {
                 .submit_on_enter(true)
                 .placeholder("Message Hermes…")
         });
+        if let Ok(v) = std::env::var("HERMES_GPUI_PREFILL") {
+            composer.update(cx, |s, cx| s.set_value(v, window, cx));
+        }
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sessions"));
         let project_path =
             cx.new(|cx| InputState::new(window, cx).placeholder("/home/you/project — Enter"));
@@ -481,7 +484,7 @@ impl HermesApp {
             skills: vec![],
             skill_open: None,
             cron_open: None,
-            prompts: prompts::load(),
+            prompts: vec![],
             prompt_open: None,
             prompt_title,
             prompt_editor,
@@ -958,6 +961,9 @@ impl HermesApp {
             self.catalog.clear();
             self.cmd(Cmd::Catalog { profile });
         }
+        self.prompts.clear();
+        self.prompt_open = None;
+        self.load_prompts(window, cx);
         self.sessions.clear();
         self.tg_owner.clear();
         self.tg_people.clear();
@@ -1814,11 +1820,7 @@ impl HermesApp {
         self.panel = panel;
         match panel {
             Panel::Chat | Panel::Telegram | Panel::Appearance => {}
-            Panel::Prompts => {
-                if self.prompt_open.is_none() && !self.prompts.is_empty() {
-                    self.open_prompt(0, window, cx);
-                }
-            }
+            Panel::Prompts => self.load_prompts(window, cx),
             Panel::Gateways => self.check_installs(window, cx),
             Panel::Config => {
                 self.config_error = None;

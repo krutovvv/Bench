@@ -63,18 +63,20 @@ impl HermesApp {
                 .on_click(cx.listener(move |this, _, window, cx| this.pick_slash(i, window, cx)))
         });
         Some(
-            // Floats over the chat: its width with the chat's 16px sides, 8px above the input.
+            // Rests on the input: the chat's width with its 16px sides; the input's top rule is
+            // its bottom edge.
             div()
                 .absolute()
                 .bottom_full()
                 .left_0()
                 .right_0()
                 .px_4()
-                .pb_2()
                 .child(
                     div()
                         .bg(theme.popover)
-                        .border_1()
+                        .border_t_1()
+                        .border_l_1()
+                        .border_r_1()
                         .border_color(theme.border)
                         .child(
                             v_flex()

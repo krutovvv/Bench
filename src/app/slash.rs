@@ -9,10 +9,42 @@ use super::HermesApp;
 use crate::model::SlashCommand;
 
 impl HermesApp {
-    /// Commands matching the composer text, when the list should show.
+    /// `@word` at the end of the composer text: (byte offset of the `@`, the word).
+    fn prompt_token(text: &str) -> Option<(usize, String)> {
+        let start = text.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
+        let token = &text[start..];
+        token
+            .starts_with('@')
+            .then(|| (start, token[1..].to_lowercase()))
+    }
+
+    /// Rows for the pop-up list: commands for a bare `/word`, prompts for a trailing `@word`.
     pub fn slash_matches(&self, cx: &App) -> Vec<SlashCommand> {
         let text = self.composer.read(cx).value();
-        if self.slash_closed || !text.starts_with('/') || text.contains(char::is_whitespace) {
+        if self.slash_closed {
+            return vec![];
+        }
+        if let Some((_, q)) = Self::prompt_token(&text) {
+            return self
+                .prompts
+                .iter()
+                .filter(|p| !p.path.is_empty())
+                .filter(|p| {
+                    p.title.to_lowercase().contains(&q) || p.body.to_lowercase().contains(&q)
+                })
+                .map(|p| SlashCommand {
+                    name: format!("@{}", p.title),
+                    desc: p
+                        .body
+                        .lines()
+                        .find(|l| !l.trim().is_empty())
+                        .unwrap_or_default()
+                        .to_string(),
+                    category: "Prompt".into(),
+                })
+                .collect();
+        }
+        if !text.starts_with('/') || text.contains(char::is_whitespace) {
             return vec![];
         }
         let q = text.to_lowercase();
@@ -49,7 +81,21 @@ impl HermesApp {
         let Some(c) = matches.get(self.slash_sel.min(matches.len().saturating_sub(1))) else {
             return false;
         };
-        let value = format!("{} ", c.name);
+        let text = self.composer.read(cx).value().to_string();
+        let value = match (c.category.as_str(), Self::prompt_token(&text)) {
+            // A prompt replaces the `@word` it was found by.
+            ("Prompt", Some((start, _))) => {
+                let title = &c.name[1..];
+                let body = self
+                    .prompts
+                    .iter()
+                    .find(|p| p.title == title)
+                    .map(|p| p.body.clone())
+                    .unwrap_or_default();
+                format!("{}{body}", &text[..start])
+            }
+            _ => format!("{} ", c.name),
+        };
         self.composer
             .update(cx, |s, cx| s.set_value(value, window, cx));
         cx.notify();
