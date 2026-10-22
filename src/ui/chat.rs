@@ -437,14 +437,14 @@ impl HermesApp {
                 .child(
                     div()
                         .h(px(2.))
-                        .w(px(if on { 10. } else { 6. }))
+                        .w(px(8.))
                         .bg(if on {
                             theme.primary
                         } else {
                             theme.muted_foreground.opacity(0.35)
                         })
                         .group_hover(SharedString::from(format!("rail-tick-{i}")), |s| {
-                            s.w(px(12.)).bg(theme.foreground)
+                            s.bg(theme.foreground)
                         }),
                 )
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))

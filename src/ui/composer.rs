@@ -63,22 +63,27 @@ impl HermesApp {
                 .on_click(cx.listener(move |this, _, window, cx| this.pick_slash(i, window, cx)))
         });
         Some(
+            // Floats over the chat: its width with the chat's 16px sides, 8px above the input.
             div()
                 .absolute()
                 .bottom_full()
-                .left(px(8.))
-                .w(px(560.))
-                .max_w(relative(0.9))
-                .bg(theme.popover)
-                .border_1()
-                .border_color(theme.border)
+                .left_0()
+                .right_0()
+                .px_4()
+                .pb_2()
                 .child(
-                    v_flex()
-                        .id("slash-list")
-                        .max_h(px(28. * SLASH_ROWS))
-                        .overflow_y_scroll()
-                        .track_scroll(&self.slash_scroll)
-                        .children(rows),
+                    div()
+                        .bg(theme.popover)
+                        .border_1()
+                        .border_color(theme.border)
+                        .child(
+                            v_flex()
+                                .id("slash-list")
+                                .max_h(px(28. * SLASH_ROWS))
+                                .overflow_y_scroll()
+                                .track_scroll(&self.slash_scroll)
+                                .children(rows),
+                        ),
                 )
                 .into_any_element(),
         )

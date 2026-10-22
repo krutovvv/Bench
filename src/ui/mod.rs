@@ -196,6 +196,7 @@ impl HermesApp {
             ("tab-config", "Config", Panel::Config),
             ("tab-cron", "Cron", Panel::Cron),
             ("tab-tg", "Telegram", Panel::Telegram),
+            ("tab-prompts", "Prompts", Panel::Prompts),
             ("tab-gw", "Gateways", Panel::Gateways),
             ("tab-look", "Appearance", Panel::Appearance),
         ]
@@ -258,6 +259,7 @@ impl Render for HermesApp {
             Panel::Telegram => self.render_telegram(cx).into_any_element(),
             Panel::Appearance => self.render_appearance(cx).into_any_element(),
             Panel::Gateways => self.render_gateways(cx).into_any_element(),
+            Panel::Prompts => self.render_prompts(cx).into_any_element(),
         };
 
         let main = v_flex()

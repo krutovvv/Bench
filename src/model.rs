@@ -317,3 +317,10 @@ mod install_tests {
         );
     }
 }
+
+/// A saved text snippet (Settings → Prompts), inserted from the composer with `@`.
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
+pub struct Prompt {
+    pub title: String,
+    pub body: String,
+}

@@ -1,6 +1,7 @@
-//! Slash commands in the composer: a quiet list that appears only while the input is a bare
-//! `/word` (no space yet), filtered as you type; ↑↓ move, Tab/Enter pick, Esc hides it.
-//! A `/` elsewhere, or a word that is not a command (a path like /Users/…), is just text.
+//! The composer's pop-up list: slash commands while the input is a bare `/word` (no space yet),
+//! saved prompts while the last word starts with `@`. Filtered as you type; ↑↓ move, Tab/Enter
+//! pick, Esc hides it. A `/` elsewhere, or a word that is not a command (a path like /Users/…),
+//! is just text.
 
 use gpui_kit::*;
 

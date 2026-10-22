@@ -233,6 +233,137 @@ impl HermesApp {
         )
     }
 
+    pub(super) fn render_prompts(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let open = self.prompt_open;
+        let rows: Vec<AnyElement> = self
+            .prompts
+            .iter()
+            .enumerate()
+            .map(|(i, p)| {
+                let selected = open == Some(i);
+                let first = p
+                    .body
+                    .lines()
+                    .find(|l| !l.trim().is_empty())
+                    .unwrap_or_default()
+                    .to_string();
+                v_flex()
+                    .id(("prompt", i))
+                    .pl(px(14.))
+                    .pr_3()
+                    .py_1p5()
+                    .cursor_pointer()
+                    .border_l_2()
+                    .border_color(if selected {
+                        theme.primary
+                    } else {
+                        theme.transparent
+                    })
+                    .when(selected, |d| d.bg(theme.list_active))
+                    .hover(|d| d.bg(theme.list_hover))
+                    .child(div().text_sm().child(p.title.clone()))
+                    .child(div().text_xs().text_color(muted).truncate().child(first))
+                    .on_click(
+                        cx.listener(move |this, _, window, cx| this.open_prompt(i, window, cx)),
+                    )
+                    .into_any_element()
+            })
+            .collect();
+
+        let content = match open {
+            Some(_) => editor_page(
+                &self.prompt_editor,
+                div()
+                    .w(px(320.))
+                    .child(gpui_kit::component::input::Input::new(&self.prompt_title).small())
+                    .into_any_element(),
+                None,
+                vec![
+                    Button::new("prompt-delete")
+                        .small()
+                        .map(|b| {
+                            if self.prompt_delete_armed {
+                                b.danger()
+                            } else {
+                                b.ghost()
+                            }
+                        })
+                        .label(if self.prompt_delete_armed {
+                            "Confirm delete"
+                        } else {
+                            "Delete"
+                        })
+                        .on_click(cx.listener(|this, _, window, cx| this.delete_prompt(window, cx)))
+                        .into_any_element(),
+                    Button::new("prompt-save")
+                        .small()
+                        .primary()
+                        .label("Save")
+                        .on_click(cx.listener(|this, _, window, cx| this.save_prompt(window, cx)))
+                        .into_any_element(),
+                ],
+                cx,
+            )
+            .into_any_element(),
+            None => div()
+                .size_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .text_sm()
+                .text_color(muted)
+                .child(if self.prompts.is_empty() {
+                    "No prompts yet. Add one, then type @ in the chat to insert it."
+                } else {
+                    "Pick a prompt on the left"
+                })
+                .into_any_element(),
+        };
+
+        h_flex()
+            .size_full()
+            .child(
+                v_flex()
+                    .w(px(300.))
+                    .h_full()
+                    .flex_none()
+                    .border_r_1()
+                    .border_color(theme.border)
+                    .child(
+                        v_flex()
+                            .id("prompt-list")
+                            .flex_1()
+                            .min_h_0()
+                            .overflow_y_scroll()
+                            .py_2()
+                            .children(rows),
+                    )
+                    .child(
+                        h_flex()
+                            .id("prompt-add")
+                            .flex_none()
+                            .h(px(36.))
+                            .px_4()
+                            .gap_2()
+                            .items_center()
+                            .text_sm()
+                            .text_color(muted)
+                            .cursor_pointer()
+                            .border_t_1()
+                            .border_color(theme.border)
+                            .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                            .child(Ico::Plus.icon().small())
+                            .child("New prompt")
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.new_prompt(window, cx)),
+                            ),
+                    ),
+            )
+            .child(div().flex_1().min_w_0().h_full().child(content))
+    }
+
     pub(super) fn render_cron(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;

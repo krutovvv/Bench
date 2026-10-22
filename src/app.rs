@@ -15,6 +15,7 @@ use gpui_kit::*;
 mod cron;
 mod gateways;
 pub(crate) mod projects;
+mod prompts;
 mod slash;
 pub use projects::GitArm;
 
@@ -36,6 +37,7 @@ pub enum Panel {
     Config,
     Cron,
     Telegram,
+    Prompts,
     Gateways,
     Appearance,
 }
@@ -161,6 +163,12 @@ pub struct HermesApp {
     pub config_error: Option<SharedString>,
     pub cron: Vec<rest::CronJob>,
     pub cron_open: Option<String>,
+    /// Settings → Prompts.
+    pub prompts: Vec<crate::model::Prompt>,
+    pub prompt_open: Option<usize>,
+    pub prompt_title: Entity<InputState>,
+    pub prompt_editor: Entity<EditorState>,
+    pub prompt_delete_armed: bool,
     pub cron_editor: Entity<EditorState>,
     pub cron_schedule: Entity<InputState>,
     pub effort_choice: Entity<Choice>,
@@ -236,6 +244,12 @@ impl HermesApp {
                 .language("markdown")
                 .line_number(true)
         });
+        let prompt_title = cx.new(|cx| InputState::new(window, cx).placeholder("Name"));
+        let prompt_editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("markdown")
+                .line_number(true)
+        });
         let cron_editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("markdown")
@@ -274,7 +288,9 @@ impl HermesApp {
                     // New text: the command list starts over at its first row.
                     InputEvent::Change => {
                         this.slash_sel = 0;
-                        if !this.composer.read(cx).value().starts_with('/') {
+                        // Esc hides the list for the current word; a new word may open it again.
+                        let text = this.composer.read(cx).value();
+                        if text.is_empty() || text.ends_with(char::is_whitespace) {
                             this.slash_closed = false;
                         }
                         cx.notify();
@@ -465,6 +481,11 @@ impl HermesApp {
             skills: vec![],
             skill_open: None,
             cron_open: None,
+            prompts: prompts::load(),
+            prompt_open: None,
+            prompt_title,
+            prompt_editor,
+            prompt_delete_armed: false,
             cron_editor,
             cron_schedule,
             skill_editor,
@@ -1793,6 +1814,11 @@ impl HermesApp {
         self.panel = panel;
         match panel {
             Panel::Chat | Panel::Telegram | Panel::Appearance => {}
+            Panel::Prompts => {
+                if self.prompt_open.is_none() && !self.prompts.is_empty() {
+                    self.open_prompt(0, window, cx);
+                }
+            }
             Panel::Gateways => self.check_installs(window, cx),
             Panel::Config => {
                 self.config_error = None;

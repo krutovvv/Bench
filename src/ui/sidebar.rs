@@ -19,14 +19,28 @@ impl HermesApp {
         // (Hermes UI/CLI, Telegram, cron…). Plain Hermes chats first, then projects, then the rest.
         let mut groups: Vec<(String, Vec<usize>)> = vec![];
         let mut rank: Vec<(String, u8)> = vec![];
+        // A project/folder group's place on disk and whether it is a git repo (for its "+").
+        let mut homes: Vec<(String, String, bool)> = vec![];
         for i in self.visible_sessions() {
             let id = &self.sessions[i].id;
             let folder = self
                 .folder_of(id)
                 .map(|f| f.rsplit('/').next().unwrap_or(&f).to_string());
             let (label, r) = match (self.project_of(id), folder) {
-                (Some(p), _) => (p.name(), 1),
-                (None, Some(f)) => (f, 1),
+                (Some(p), _) => {
+                    if !homes.iter().any(|(l, _, _)| *l == p.name()) {
+                        homes.push((p.name(), p.root.clone(), true));
+                    }
+                    (p.name(), 1)
+                }
+                (None, Some(f)) => {
+                    if let Some(path) = self.folder_of(id) {
+                        if !homes.iter().any(|(l, _, _)| *l == f) {
+                            homes.push((f.clone(), path, false));
+                        }
+                    }
+                    (f, 1)
+                }
                 (None, None) => {
                     let l = source_label(&self.sessions[i].source);
                     let r = if l == "Hermes" { 0 } else { 2 };
@@ -70,16 +84,47 @@ impl HermesApp {
             }
             groups.clear();
         }
-        for (label, rows) in groups {
+        for (g, (label, rows)) in groups.into_iter().enumerate() {
             if !single {
+                let home = homes.iter().find(|(l, _, _)| *l == label).cloned();
+                let group: SharedString = format!("ghead{g}").into();
                 list.push(
-                    div()
+                    h_flex()
+                        .group(group.clone())
                         .px_4()
                         .pt_4()
                         .pb_1()
+                        .items_center()
                         .text_xs()
                         .text_color(muted)
-                        .child(format!("{} · {}", label.to_uppercase(), rows.len()))
+                        .child(div().flex_1().child(format!(
+                            "{} · {}",
+                            label.to_uppercase(),
+                            rows.len()
+                        )))
+                        // A project's "+": a new chat already in it (in a branch of its own).
+                        .children(home.map(|(_, path, repo)| {
+                            div()
+                                .id(("group-new", g))
+                                .p_0p5()
+                                .cursor_pointer()
+                                .opacity(0.)
+                                .group_hover(group.clone(), |s| s.opacity(1.))
+                                .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
+                                .child(Ico::Plus.icon().xsmall())
+                                .tooltip(move |window, cx| {
+                                    gpui_kit::component::tooltip::Tooltip::new(if repo {
+                                        "New chat in this project"
+                                    } else {
+                                        "New chat in this folder"
+                                    })
+                                    .build(window, cx)
+                                })
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.new_chat_in(Some(path.clone()), repo, cx);
+                                    this.new_project_repo = repo;
+                                }))
+                        }))
                         .into_any_element(),
                 );
             }
