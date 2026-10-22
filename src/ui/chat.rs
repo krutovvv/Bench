@@ -137,6 +137,27 @@ impl HermesApp {
                 .items_center()
                 .justify_center()
                 .gap_2()
+                // The app's mark (assets/logo.svg's two slabs, same proportions), in a quiet grey.
+                .child(
+                    v_flex()
+                        .mb_4()
+                        .gap(px(4.5))
+                        .opacity(0.28)
+                        .child(
+                            div()
+                                .w(px(33.))
+                                .h(px(19.))
+                                .rounded_full()
+                                .bg(theme.muted_foreground),
+                        )
+                        .child(
+                            div()
+                                .w(px(44.))
+                                .h(px(19.))
+                                .rounded_full()
+                                .bg(theme.muted_foreground),
+                        ),
+                )
                 .child(
                     div()
                         .text_2xl()
