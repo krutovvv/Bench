@@ -177,6 +177,8 @@ impl HermesApp {
             .collect();
         let files = self.render_session_files(cx);
         let approval = self.render_approval(cx);
+        let rail = self.render_turn_rail(at_bottom, cx);
+        let trailing = files.is_some() || approval.is_some();
 
         div()
             .relative()
@@ -192,8 +194,12 @@ impl HermesApp {
                     .pb_1()
                     .children(rows)
                     .children(approval)
-                    .children(files),
+                    .children(files)
+                    // A scroll area ignores a last child's margin: a real 12px block (+ the
+                    // column's 4) keeps the bottom edge at 16 when cards end the chat.
+                    .when(trailing, |d| d.child(div().h_3().flex_none())),
             )
+            .children(rail)
             .when(!self.follow, |d| {
                 d.child(
                     h_flex()
@@ -399,6 +405,66 @@ impl HermesApp {
                     .children(actions),
             )
             .into_any_element()
+    }
+
+    /// The turns as ticks in the right gutter (no scrollbar): which one is on screen, a peek at
+    /// each question on hover, a click to jump. Only with two turns or more.
+    fn render_turn_rail(&mut self, at_bottom: bool, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let n = self.turns.len();
+        if n < 2 {
+            return None;
+        }
+        let theme = cx.theme().clone();
+        let current = if at_bottom {
+            n - 1
+        } else {
+            self.chat_scroll.top_item().min(n - 1)
+        };
+        // Ticks pack tighter as turns add up, so the rail stays a modest column.
+        let pitch = (240. / n as f32).clamp(3., 8.);
+        let ticks = (0..n).map(|i| {
+            let on = i == current;
+            let tip: SharedString = clip(self.turns[i].user.trim(), 120).into();
+            div()
+                .id(("rail", i))
+                .h(px(pitch))
+                .w_full()
+                .flex()
+                .items_center()
+                .justify_end()
+                .cursor_pointer()
+                .group(SharedString::from(format!("rail-tick-{i}")))
+                .child(
+                    div()
+                        .h(px(2.))
+                        .w(px(if on { 10. } else { 6. }))
+                        .bg(if on {
+                            theme.primary
+                        } else {
+                            theme.muted_foreground.opacity(0.35)
+                        })
+                        .group_hover(SharedString::from(format!("rail-tick-{i}")), |s| {
+                            s.w(px(12.)).bg(theme.foreground)
+                        }),
+                )
+                .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.follow = false;
+                    this.chat_scroll.scroll_to_top_of_item(i);
+                    cx.notify();
+                }))
+        });
+        Some(
+            v_flex()
+                .absolute()
+                .top_0()
+                .bottom_0()
+                .right(px(2.))
+                .w(px(12.))
+                .justify_center()
+                .child(v_flex().children(ticks))
+                .into_any_element(),
+        )
     }
 
     /// The agent waits: what it wants to run, and the answers it accepts.
