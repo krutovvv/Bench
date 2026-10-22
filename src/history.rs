@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 
-use crate::model::{Step, Turn};
+use crate::model::{FileEdit, Step, Turn};
 
 /// Model-facing "user" rows that are not the user's words.
 const SYSTEM_PREFIXES: &[&str] = &[
@@ -136,23 +136,80 @@ pub fn turns(messages: &[Value]) -> Vec<Turn> {
             Some("tool") => {
                 let Some(turn) = out.last_mut() else { continue };
                 demote_answer(turn);
+                let name = m["tool_name"]
+                    .as_str()
+                    .or(m["name"].as_str())
+                    .unwrap_or("tool")
+                    .to_string();
+                if let Some(edit) = file_edit(&name, &m["content"]) {
+                    turn.files.push(edit);
+                }
                 turn.steps.push(Step::Tool {
-                    name: m["tool_name"]
-                        .as_str()
-                        .or(m["name"].as_str())
-                        .unwrap_or("tool")
-                        .to_string(),
                     detail: m["context"]
                         .as_str()
                         .map(str::to_string)
                         .unwrap_or_else(|| preview(&m["content"])),
                     failed: failed(&m["content"]),
+                    call_id: m["tool_call_id"].as_str().unwrap_or_default().to_string(),
+                    args: pretty(&m["args"]),
+                    output: pretty(&m["content"]),
+                    name,
                 });
             }
             _ => {}
         }
     }
     out
+}
+
+/// JSON (or a JSON string) as readable text, capped so a huge output cannot stall the UI.
+pub fn pretty(v: &Value) -> String {
+    let text = match v {
+        Value::Null => String::new(),
+        Value::String(s) => match serde_json::from_str::<Value>(s) {
+            Ok(inner @ (Value::Object(_) | Value::Array(_))) => {
+                serde_json::to_string_pretty(&inner).unwrap_or_default()
+            }
+            _ => s.clone(),
+        },
+        other => serde_json::to_string_pretty(other).unwrap_or_default(),
+    };
+    if text.chars().count() > 12_000 {
+        format!(
+            "{}\n… (truncated)",
+            text.chars().take(12_000).collect::<String>()
+        )
+    } else {
+        text
+    }
+}
+
+/// A file edit from a file tool's result: its path and, for `patch`, the unified diff.
+pub fn file_edit(name: &str, result: &Value) -> Option<FileEdit> {
+    if !matches!(
+        name,
+        "patch" | "write_file" | "edit_file" | "apply_patch" | "str_replace" | "create_file"
+    ) {
+        return None;
+    }
+    let r = match result {
+        Value::String(s) => serde_json::from_str::<Value>(s).ok()?,
+        other => other.clone(),
+    };
+    if r.get("error").is_some_and(|e| !e.is_null()) || r.get("success") == Some(&Value::Bool(false))
+    {
+        return None;
+    }
+    let path = r["resolved_path"]
+        .as_str()
+        .or_else(|| r["files_modified"].get(0).and_then(Value::as_str))
+        .or(r["path"].as_str())?
+        .to_string();
+    let diff = r["diff"]
+        .as_str()
+        .filter(|d| !d.is_empty())
+        .map(str::to_string);
+    Some(FileEdit { path, diff })
 }
 
 // ---- sources & timing ------------------------------------------------------
@@ -251,6 +308,8 @@ fn is_local(host: &str) -> bool {
 
 /// Per-turn extras from the `session.history` projection (tool args, timestamps).
 pub struct Meta {
+    /// tool_call_id -> arguments (the stored rows do not keep them; the projection does).
+    pub args: std::collections::HashMap<String, String>,
     pub sources: Vec<String>,
     pub started: Option<f64>,
     pub finished: Option<f64>,
@@ -267,6 +326,7 @@ pub fn metas(messages: &[Value]) -> Vec<Meta> {
         if m["role"] == "user" {
             if !is_system_row(&text) {
                 out.push(Meta {
+                    args: Default::default(),
                     sources: vec![],
                     started: ts,
                     finished: ts,
@@ -279,6 +339,9 @@ pub fn metas(messages: &[Value]) -> Vec<Meta> {
             meta.finished = ts;
         }
         if m["role"] == "tool" {
+            if let Some(id) = m["tool_call_id"].as_str() {
+                meta.args.insert(id.to_string(), pretty(&m["args"]));
+            }
             let name = m["name"]
                 .as_str()
                 .or(m["tool_name"].as_str())
@@ -292,6 +355,15 @@ pub fn metas(messages: &[Value]) -> Vec<Meta> {
 /// Pair metas with turns from the end (both skip the same system rows).
 pub fn attach(turns: &mut [Turn], metas: Vec<Meta>) {
     for (turn, meta) in turns.iter_mut().rev().zip(metas.into_iter().rev()) {
+        for step in turn.steps.iter_mut() {
+            if let Step::Tool { call_id, args, .. } = step {
+                if args.is_empty() {
+                    if let Some(a) = meta.args.get(call_id.as_str()) {
+                        *args = a.clone();
+                    }
+                }
+            }
+        }
         turn.sources = meta.sources;
         turn.started = meta.started;
         turn.finished = meta.finished;

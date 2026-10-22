@@ -43,9 +43,9 @@ impl HermesApp {
                 Ico::Mic
             },
             if recording {
-                "Остановить и распознать"
+                "Stop and transcribe"
             } else {
-                "Надиктовать"
+                "Dictate"
             },
             if recording {
                 theme.danger
@@ -56,13 +56,13 @@ impl HermesApp {
         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)));
 
         let action = if busy {
-            area("stop", Ico::Square, "Остановить", theme.foreground)
+            area("stop", Ico::Square, "Stop", theme.foreground)
                 .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
         } else {
             area(
                 "send",
                 Ico::ArrowUp,
-                "Отправить (Enter)",
+                "Send (Enter)",
                 if has_text {
                     theme.primary
                 } else {
@@ -88,7 +88,7 @@ impl HermesApp {
                     .flex_1()
                     .min_w_0()
                     .px_4()
-                    .py_3()
+                    .py_2()
                     .child(Textarea::new(&self.composer).appearance(false)),
             )
             .child(
@@ -96,7 +96,7 @@ impl HermesApp {
                     .flex_none()
                     .gap_1()
                     .px_2()
-                    .py_2()
+                    .py_1()
                     .items_center()
                     .when(recording, |d| {
                         d.child(
@@ -104,7 +104,7 @@ impl HermesApp {
                                 .text_xs()
                                 .text_color(theme.danger)
                                 .pr_1()
-                                .child("запись…"),
+                                .child("recording…"),
                         )
                     })
                     .child(mic)

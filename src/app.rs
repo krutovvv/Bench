@@ -7,7 +7,6 @@ use std::time::{Duration, Instant};
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::input::{EditorState, InputEvent, TextareaState};
-use gpui_kit::component::message_scroller::MessageScrollerState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
@@ -36,6 +35,30 @@ impl Panel {
     pub fn is_settings(self) -> bool {
         self != Panel::Chat
     }
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum RightTab {
+    Changes,
+    Files,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum FileMode {
+    Diff,
+    Before,
+    After,
+}
+
+/// The file open in the right panel. `diffs` are this session's tool diffs for it, in order.
+pub struct FileView {
+    pub path: String,
+    pub mode: FileMode,
+    pub diffs: Vec<String>,
+    pub loaded: bool,
+    /// Original text reconstructed from `diffs`, or why it could not be.
+    pub before: Result<String, String>,
+    pub truncated: bool,
 }
 
 pub struct Live {
@@ -79,6 +102,7 @@ pub struct HermesApp {
     pub skills: Vec<SkillRow>,
     pub skill_open: Option<String>,
     pub skill_editor: Entity<EditorState>,
+    pub skill_delete_armed: bool,
     pub config_editor: Entity<EditorState>,
     pub config_error: Option<SharedString>,
     pub cron: Vec<rest::CronJob>,
@@ -88,7 +112,21 @@ pub struct HermesApp {
     pub mcp_error: Option<SharedString>,
 
     pub composer: Entity<TextareaState>,
-    pub scroller: Entity<MessageScrollerState>,
+    /// The chat column scrolls as one tall list (no virtualization: real heights, real bottom).
+    pub chat_scroll: ScrollHandle,
+    /// Keep the view pinned to the newest content until the user scrolls up.
+    pub follow: bool,
+    pub last_max: Pixels,
+    /// Unfolded steps (turn, step) and the source host whose pages are listed (turn, host).
+    pub open_steps: HashSet<(usize, usize)>,
+    pub open_source: Option<(usize, String)>,
+    /// Right panel: changed files / file tree, and the file being viewed.
+    pub right: Option<RightTab>,
+    pub file: Option<FileView>,
+    pub file_editor: Entity<EditorState>,
+    pub tree_root: Option<String>,
+    pub tree: HashMap<String, Vec<(String, String, bool)>>,
+    pub tree_open: HashSet<String>,
     pub recorder: Option<Recorder>,
     pub transcribing: bool,
     pub playing: Option<(usize, Playback)>,
@@ -122,7 +160,7 @@ impl HermesApp {
             TextareaState::new(window, cx)
                 .auto_grow(1, 10)
                 .submit_on_enter(true)
-                .placeholder("Напиши Hermes…")
+                .placeholder("Message Hermes…")
         });
         let mcp_editor = cx.new(|cx| {
             EditorState::new(window, cx)
@@ -149,8 +187,7 @@ impl HermesApp {
                 cx,
             )
         });
-        let scroller = cx.new(|cx| MessageScrollerState::new(0, cx));
-        cx.observe(&scroller, |_, _, cx| cx.notify()).detach();
+        let file_editor = cx.new(|cx| EditorState::new(window, cx).line_number(true));
 
         let subs = vec![
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
@@ -289,6 +326,7 @@ impl HermesApp {
             skills: vec![],
             skill_open: None,
             skill_editor,
+            skill_delete_armed: false,
             config_editor,
             config_error: None,
             cron: vec![],
@@ -297,7 +335,17 @@ impl HermesApp {
             mcp_status: "".into(),
             mcp_error: None,
             composer,
-            scroller,
+            chat_scroll: ScrollHandle::new(),
+            follow: true,
+            last_max: px(0.),
+            open_steps: HashSet::new(),
+            open_source: None,
+            right: None,
+            file: None,
+            file_editor,
+            tree_root: None,
+            tree: HashMap::new(),
+            tree_open: HashSet::new(),
             recorder: None,
             transcribing: false,
             playing: None,
@@ -424,9 +472,10 @@ impl HermesApp {
             Evt::Deleted => self.refresh_sessions(),
             Evt::DeleteFailed(e) => {
                 let msg = if e.contains("active") {
-                    "Сессия сейчас открыта в другом клиенте (Hermes.app, Telegram) — там её и закройте".to_string()
+                    "The session is open in another client (Hermes.app, Telegram) — close it there"
+                        .to_string()
                 } else {
-                    format!("Не удалось удалить: {e}")
+                    format!("Could not delete: {e}")
                 };
                 self.toast(NotificationType::Error, msg, window, cx);
                 self.refresh_sessions();
@@ -443,10 +492,9 @@ impl HermesApp {
                     self.turns = turns;
                     self.live = running.then(|| Live {
                         started: Instant::now(),
-                        label: "Работает…".into(),
+                        label: "Working…".into(),
                     });
                     self.reset_scroller(cx);
-                    self.settle_scroller(cx);
                 }
             }
             Evt::Created { session, runtime } => {
@@ -469,7 +517,7 @@ impl HermesApp {
                 if self.live.is_none() {
                     self.live = Some(Live {
                         started: Instant::now(),
-                        label: "Думает…".into(),
+                        label: "Thinking…".into(),
                     });
                 }
             }
@@ -478,7 +526,7 @@ impl HermesApp {
                     turn.answer.push_str(&text);
                 }
                 if let Some(live) = self.live.as_mut() {
-                    live.label = "Пишет ответ…".into();
+                    live.label = "Writing…".into();
                 }
                 self.remeasure_last(cx);
             }
@@ -490,7 +538,7 @@ impl HermesApp {
                     }
                 }
                 if let Some(live) = self.live.as_mut() {
-                    live.label = "Думает…".into();
+                    live.label = "Thinking…".into();
                 }
                 self.remeasure_last(cx);
             }
@@ -499,6 +547,8 @@ impl HermesApp {
                 name,
                 detail,
                 urls,
+                call_id,
+                args,
             } if self.is_current(&session) => {
                 if let Some(turn) = self.turns.last_mut() {
                     for url in urls {
@@ -519,19 +569,39 @@ impl HermesApp {
                         name,
                         detail,
                         failed: false,
+                        call_id,
+                        args,
+                        output: String::new(),
                     });
                 }
                 self.remeasure_last(cx);
             }
-            Evt::ToolDone { session, failed } if self.is_current(&session) => {
-                if let Some(Some(Step::Tool { failed: f, .. })) = self.turns.last_mut().map(|t| {
-                    t.steps
-                        .iter_mut()
-                        .rev()
-                        .find(|s| matches!(s, Step::Tool { .. }))
-                }) {
-                    *f = failed;
+            Evt::ToolDone {
+                session,
+                failed,
+                call_id,
+                output,
+                edit,
+            } if self.is_current(&session) => {
+                if let Some(turn) = self.turns.last_mut() {
+                    let step = turn.steps.iter_mut().rev().find(|s| match s {
+                        Step::Tool { call_id: id, .. } => call_id.is_empty() || *id == call_id,
+                        _ => false,
+                    });
+                    if let Some(Step::Tool {
+                        failed: f,
+                        output: o,
+                        ..
+                    }) = step
+                    {
+                        *f = failed;
+                        *o = output;
+                    }
+                    if let Some(edit) = edit {
+                        turn.files.push(edit);
+                    }
                 }
+                cx.notify();
             }
             Evt::Usage(sid, usage) if self.is_current(&sid) => self.usage = Some(usage),
             Evt::Complete { session, text } if self.is_current(&session) => {
@@ -564,23 +634,20 @@ impl HermesApp {
     }
 
     fn reset_scroller(&mut self, cx: &mut Context<Self>) {
-        let n = self.turns.len();
-        self.scroller.update(cx, |s, cx| {
-            s.reset(n, cx);
-            s.scroll_to_end(cx);
-        });
-    }
-
-    pub fn remeasure(&mut self, i: usize, cx: &mut Context<Self>) {
-        self.scroller.update(cx, |s, cx| {
-            let _ = s.remeasure_items(i..i + 1, cx);
-        });
+        self.follow = true;
+        self.open_steps.clear();
+        self.open_source = None;
+        cx.notify();
     }
 
     fn remeasure_last(&mut self, cx: &mut Context<Self>) {
-        if let Some(i) = self.turns.len().checked_sub(1) {
-            self.remeasure(i, cx);
-        }
+        cx.notify();
+    }
+
+    pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
+        self.follow = true;
+        self.chat_scroll.scroll_to_bottom();
+        cx.notify();
     }
 
     pub fn select_profile(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
@@ -660,7 +727,7 @@ impl HermesApp {
                 Err(e) => {
                     this.toast(
                         NotificationType::Error,
-                        format!("Не удалось удалить: {e:#}"),
+                        format!("Could not delete: {e:#}"),
                         window,
                         cx,
                     );
@@ -674,29 +741,6 @@ impl HermesApp {
     pub fn cancel_delete(&mut self, cx: &mut Context<Self>) {
         self.confirm_delete = None;
         cx.notify();
-    }
-
-    /// Markdown and tables finish laying out after the first measure: measure again shortly
-    /// so scrolling reaches the real bottom.
-    fn settle_scroller(&mut self, cx: &mut Context<Self>) {
-        cx.spawn(async move |this, cx| {
-            for ms in [80u64, 400] {
-                cx.background_executor()
-                    .timer(Duration::from_millis(ms))
-                    .await;
-                let _ = this.update(cx, |this, cx| {
-                    let n = this.turns.len();
-                    let follow = this.scroller.read(cx).is_following_tail();
-                    this.scroller.update(cx, |s, cx| {
-                        let _ = s.remeasure_items(0..n, cx);
-                        if follow {
-                            s.scroll_to_end(cx);
-                        }
-                    });
-                });
-            }
-        })
-        .detach();
     }
 
     pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -724,13 +768,10 @@ impl HermesApp {
             started: Some(now_secs()),
             ..Default::default()
         });
-        self.scroller.update(cx, |s, cx| {
-            let _ = s.append(1, cx);
-            s.scroll_to_end(cx);
-        });
+        self.follow = true;
         self.live = Some(Live {
             started: Instant::now(),
-            label: "Отправляю…".into(),
+            label: "Sending…".into(),
         });
         match self.runtime.clone() {
             Some(session) => {
@@ -771,7 +812,7 @@ impl HermesApp {
         };
         self.live = Some(Live {
             started: Instant::now(),
-            label: "Повторяю…".into(),
+            label: "Regenerating…".into(),
         });
         self.remeasure_last(cx);
         self.cmd(Cmd::Regenerate {
@@ -785,14 +826,19 @@ impl HermesApp {
     pub fn copy_answer(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(t) = self.turns.get(i) {
             cx.write_to_clipboard(ClipboardItem::new_string(t.answer.clone()));
-            self.toast(NotificationType::Success, "Скопировано", window, cx);
+            self.toast(NotificationType::Success, "Copied", window, cx);
         }
     }
 
     /// `hermes gateway restart` on the machine we are connected to, then reconnect.
     pub fn restart_gateway(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let target = self.target.clone();
-        self.toast(NotificationType::Info, "Перезапускаю шлюз…", window, cx);
+        self.toast(
+            NotificationType::Info,
+            "Restarting the gateway…",
+            window,
+            cx,
+        );
         cx.spawn_in(window, async move |this, cx| {
             let t = target.clone();
             let result = cx
@@ -800,12 +846,12 @@ impl HermesApp {
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match result {
                 Ok(()) => {
-                    this.toast(NotificationType::Success, "Шлюз перезапущен", window, cx);
+                    this.toast(NotificationType::Success, "Gateway restarted", window, cx);
                     this.connect(target, window, cx);
                 }
                 Err(e) => this.toast(
                     NotificationType::Error,
-                    format!("Перезапуск: {e:#}"),
+                    format!("Restart: {e:#}"),
                     window,
                     cx,
                 ),
@@ -824,7 +870,7 @@ impl HermesApp {
     pub fn toggle_turn(&mut self, i: usize, cx: &mut Context<Self>) {
         if let Some(t) = self.turns.get_mut(i) {
             t.expanded = !t.expanded;
-            self.remeasure(i, cx);
+            cx.notify();
             cx.notify();
         }
     }
@@ -961,6 +1007,237 @@ impl HermesApp {
             .collect()
     }
 
+    // ---- right panel: changed files, tree, viewer --------------------------
+
+    /// Files this session edited, in first-touch order, with their diffs in order.
+    pub fn session_files(&self) -> Vec<(String, Vec<String>)> {
+        let mut out: Vec<(String, Vec<String>)> = vec![];
+        for edit in self.turns.iter().flat_map(|t| &t.files) {
+            let slot = match out.iter_mut().position(|(p, _)| *p == edit.path) {
+                Some(i) => &mut out[i].1,
+                None => {
+                    out.push((edit.path.clone(), vec![]));
+                    &mut out.last_mut().unwrap().1
+                }
+            };
+            if let Some(d) = &edit.diff {
+                slot.push(d.clone());
+            }
+        }
+        out
+    }
+
+    /// Switch the right panel's tab (opening it if closed).
+    pub fn toggle_right_tab(&mut self, tab: RightTab, window: &mut Window, cx: &mut Context<Self>) {
+        self.right = Some(tab);
+        if tab == RightTab::Files && self.tree_root.is_none() {
+            self.load_tree_root(window, cx);
+        }
+        cx.notify();
+    }
+
+    pub fn toggle_right(&mut self, tab: RightTab, window: &mut Window, cx: &mut Context<Self>) {
+        self.right = if self.right == Some(tab) {
+            None
+        } else {
+            Some(tab)
+        };
+        if self.right == Some(RightTab::Files) && self.tree_root.is_none() {
+            self.load_tree_root(window, cx);
+        }
+        cx.notify();
+    }
+
+    /// Tree root: the common folder of the changed files, else the profile's working dir.
+    fn load_tree_root(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let files: Vec<String> = self.session_files().into_iter().map(|(p, _)| p).collect();
+        if let Some(root) = common_dir(&files) {
+            self.set_tree_root(root, window, cx);
+            return;
+        }
+        self.rest(window, cx, rest::default_cwd, |this, r, window, cx| {
+            if let Ok(cwd) = r {
+                if !cwd.is_empty() {
+                    this.set_tree_root(cwd, window, cx);
+                }
+            }
+        });
+    }
+
+    pub fn set_tree_root(&mut self, root: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.tree_root = Some(root.clone());
+        self.tree.clear();
+        self.tree_open.clear();
+        self.open_dir(root, window, cx);
+    }
+
+    pub fn open_dir(&mut self, dir: String, window: &mut Window, cx: &mut Context<Self>) {
+        if self.tree_open.remove(&dir) && self.tree_root.as_deref() != Some(&dir) {
+            cx.notify();
+            return;
+        }
+        self.tree_open.insert(dir.clone());
+        if self.tree.contains_key(&dir) {
+            cx.notify();
+            return;
+        }
+        let d = dir.clone();
+        self.rest(
+            window,
+            cx,
+            move |c, p| rest::list_dir(c, p, &d),
+            move |this, r, window, cx| match r {
+                Ok(entries) => {
+                    this.tree.insert(dir, entries);
+                }
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Folder: {e:#}"),
+                    window,
+                    cx,
+                ),
+            },
+        );
+    }
+
+    /// Open a file in the viewer; `diffs` empty means a plain file from the tree.
+    pub fn open_file(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
+        let diffs = self
+            .session_files()
+            .into_iter()
+            .find(|(p, _)| *p == path)
+            .map(|(_, d)| d)
+            .unwrap_or_default();
+        let mode = if diffs.is_empty() {
+            FileMode::After
+        } else {
+            FileMode::Diff
+        };
+        self.file = Some(FileView {
+            path: path.clone(),
+            mode,
+            diffs,
+            loaded: false,
+            before: Err("loading…".into()),
+            truncated: false,
+        });
+        if self.right.is_none() {
+            self.right = Some(RightTab::Changes);
+        }
+        let language = language_for(&path);
+        self.file_editor.update(cx, |s, cx| {
+            s.set_highlighter(language, cx);
+            s.set_value("", window, cx);
+        });
+        let p = path.clone();
+        self.rest(window, cx, move |c, prof| rest::read_text(c, prof, &p), move |this, r, window, cx| {
+            let Some(view) = this.file.as_mut().filter(|f| f.path == path) else { return };
+            match r {
+                Ok(file) if file.binary => {
+                    view.before = Err("binary file".into());
+                    view.loaded = false;
+                }
+                Ok(file) => {
+                    view.before = if view.diffs.is_empty() {
+                        Err("no recorded edits in this session".into())
+                    } else {
+                        crate::diff::before(&file.text, &view.diffs).ok_or_else(|| {
+                            "the file changed after these edits (or was rewritten whole) — original not recoverable".to_string()
+                        })
+                    };
+                    view.truncated = file.truncated;
+                    view.loaded = true;
+                    this.file_editor.update(cx, |s, cx| s.set_value(file.text, window, cx));
+                }
+                Err(e) => this.toast(NotificationType::Error, format!("Open file: {e:#}"), window, cx),
+            }
+        });
+        cx.notify();
+    }
+
+    pub fn set_file_mode(&mut self, mode: FileMode, cx: &mut Context<Self>) {
+        if let Some(f) = self.file.as_mut() {
+            f.mode = mode;
+        }
+        cx.notify();
+    }
+
+    pub fn save_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(view) = self.file.as_ref() else {
+            return;
+        };
+        if !view.loaded || view.truncated {
+            self.toast(
+                NotificationType::Warning,
+                "This file was loaded partially — saving is disabled",
+                window,
+                cx,
+            );
+            return;
+        }
+        let path = view.path.clone();
+        let text = self.file_editor.read(cx).value().to_string();
+        self.rest(
+            window,
+            cx,
+            move |c, p| rest::write_text(c, p, &path, &text),
+            |this, r, window, cx| match r {
+                Ok(()) => this.toast(NotificationType::Success, "Saved", window, cx),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Not saved: {e:#}"),
+                    window,
+                    cx,
+                ),
+            },
+        );
+    }
+
+    /// Open the file in Zed: locally by path, over SSH as ssh://host/path.
+    pub fn open_in_zed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(path) = self.file.as_ref().map(|f| f.path.clone()) else {
+            return;
+        };
+        let target = match &self.target {
+            Target::Local => path,
+            Target::Ssh(host) => format!("ssh://{host}{path}"),
+        };
+        let zed = ["/usr/local/bin/zed", "/opt/homebrew/bin/zed"]
+            .into_iter()
+            .find(|p| std::path::Path::new(p).exists());
+        let result = match (zed, &self.target) {
+            (Some(cli), _) => std::process::Command::new(cli)
+                .arg(&target)
+                .spawn()
+                .map(|_| ()),
+            (None, Target::Local) => std::process::Command::new("open")
+                .args(["-a", "Zed", &target])
+                .spawn()
+                .map(|_| ()),
+            (None, Target::Ssh(_)) => Err(std::io::Error::other(
+                "the `zed` CLI is not installed (Zed → Install CLI)",
+            )),
+        };
+        if let Err(e) = result {
+            self.toast(NotificationType::Error, format!("Zed: {e}"), window, cx);
+        }
+    }
+
+    pub fn toggle_step(&mut self, turn: usize, step: usize, cx: &mut Context<Self>) {
+        if !self.open_steps.remove(&(turn, step)) {
+            self.open_steps.insert((turn, step));
+        }
+        cx.notify();
+    }
+
+    pub fn toggle_source(&mut self, turn: usize, host: String, cx: &mut Context<Self>) {
+        self.open_source = match &self.open_source {
+            Some((t, h)) if *t == turn && *h == host => None,
+            _ => Some((turn, host)),
+        };
+        cx.notify();
+    }
+
     // ---- panels ----------------------------------------------------------
 
     pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
@@ -979,7 +1256,7 @@ impl HermesApp {
                             .update(cx, |s, cx| s.set_value(text, window, cx)),
                         Err(e) => this.toast(
                             NotificationType::Error,
-                            format!("Конфиг: {e:#}"),
+                            format!("Config: {e:#}"),
                             window,
                             cx,
                         ),
@@ -994,13 +1271,13 @@ impl HermesApp {
                 Ok(list) => this.skills = list,
                 Err(e) => this.toast(
                     NotificationType::Error,
-                    format!("Скиллы: {e:#}"),
+                    format!("Skills: {e:#}"),
                     window,
                     cx,
                 ),
             }),
             Panel::Mcp => {
-                self.mcp_status = "Загружаю…".into();
+                self.mcp_status = "Loading…".into();
                 self.rest(window, cx, rest::mcp_json, |this, r, window, cx| match r {
                     Ok(text) => {
                         this.mcp_editor
@@ -1008,7 +1285,7 @@ impl HermesApp {
                         this.mcp_status = "".into();
                         this.mcp_error = None;
                     }
-                    Err(e) => this.mcp_status = format!("Не удалось загрузить: {e:#}").into(),
+                    Err(e) => this.mcp_status = format!("Could not load: {e:#}").into(),
                 })
             }
         }
@@ -1017,6 +1294,7 @@ impl HermesApp {
 
     pub fn open_skill(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
         self.skill_open = Some(name.clone());
+        self.skill_delete_armed = false;
         self.skill_editor
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.rest(
@@ -1027,10 +1305,47 @@ impl HermesApp {
                 Ok(text) => this
                     .skill_editor
                     .update(cx, |s, cx| s.set_value(text, window, cx)),
-                Err(e) => this.toast(NotificationType::Error, format!("Скилл: {e:#}"), window, cx),
+                Err(e) => this.toast(NotificationType::Error, format!("Skill: {e:#}"), window, cx),
             },
         );
         cx.notify();
+    }
+
+    /// First press arms, second deletes the skill's folder.
+    pub fn delete_skill(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(name) = self.skill_open.clone() else {
+            return;
+        };
+        if !self.skill_delete_armed {
+            self.skill_delete_armed = true;
+            cx.notify();
+            return;
+        }
+        self.skill_delete_armed = false;
+        let n = name.clone();
+        self.rest(
+            window,
+            cx,
+            move |c, p| rest::delete_skill(c, p, &n),
+            move |this, r, window, cx| match r {
+                Ok(()) => {
+                    this.skills.retain(|s| s.name != name);
+                    this.skill_open = None;
+                    this.toast(
+                        NotificationType::Success,
+                        format!("Skill {name} deleted"),
+                        window,
+                        cx,
+                    );
+                }
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Skill not deleted: {e:#}"),
+                    window,
+                    cx,
+                ),
+            },
+        );
     }
 
     pub fn save_skill(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1043,10 +1358,10 @@ impl HermesApp {
             cx,
             move |c, p| rest::save_skill(c, p, &name, &text),
             |this, r, window, cx| match r {
-                Ok(()) => this.toast(NotificationType::Success, "Скилл сохранён", window, cx),
+                Ok(()) => this.toast(NotificationType::Success, "Skill saved", window, cx),
                 Err(e) => this.toast(
                     NotificationType::Error,
-                    format!("Скилл не сохранён: {e:#}"),
+                    format!("Skill not saved: {e:#}"),
                     window,
                     cx,
                 ),
@@ -1059,10 +1374,10 @@ impl HermesApp {
         let text = self.config_editor.read(cx).value().to_string();
         self.config_error = match serde_yaml::from_str::<serde_yaml::Value>(&text) {
             Ok(serde_yaml::Value::Mapping(_)) => None,
-            Ok(_) => Some("Конфиг должен быть YAML-словарём".into()),
+            Ok(_) => Some("config.yaml must be a YAML mapping".into()),
             Err(e) => Some(
                 match e.location() {
-                    Some(l) => format!("Строка {}, столбец {}: {e}", l.line(), l.column()),
+                    Some(l) => format!("Line {}, column {}: {e}", l.line(), l.column()),
                     None => e.to_string(),
                 }
                 .into(),
@@ -1077,15 +1392,10 @@ impl HermesApp {
             cx,
             move |c, p| rest::save_config_raw(c, p, &text),
             |this, r, window, cx| match r {
-                Ok(()) => this.toast(
-                    NotificationType::Success,
-                    "config.yaml сохранён",
-                    window,
-                    cx,
-                ),
+                Ok(()) => this.toast(NotificationType::Success, "config.yaml saved", window, cx),
                 Err(e) => this.toast(
                     NotificationType::Error,
-                    format!("Конфиг не сохранён: {e:#}"),
+                    format!("Config not saved: {e:#}"),
                     window,
                     cx,
                 ),
@@ -1098,8 +1408,8 @@ impl HermesApp {
         let text = self.mcp_editor.read(cx).value().to_string();
         self.mcp_error = match serde_json::from_str::<serde_json::Value>(&text) {
             Ok(v) if v.is_object() => None,
-            Ok(_) => Some("Нужен объект: { \"имя-сервера\": { … } }".into()),
-            Err(e) => Some(format!("Строка {}, столбец {}: {e}", e.line(), e.column()).into()),
+            Ok(_) => Some("Expected an object: { \"server-name\": { … } }".into()),
+            Err(e) => Some(format!("Line {}, column {}: {e}", e.line(), e.column()).into()),
         };
         cx.notify();
     }
@@ -1110,7 +1420,7 @@ impl HermesApp {
             return;
         }
         let text = self.mcp_editor.read(cx).value().to_string();
-        self.mcp_status = "Сохраняю…".into();
+        self.mcp_status = "Saving…".into();
         self.rest(
             window,
             cx,
@@ -1120,13 +1430,13 @@ impl HermesApp {
                 match r {
                     Ok(()) => this.toast(
                         NotificationType::Success,
-                        "MCP сохранены. Подхватятся в новой сессии.",
+                        "MCP servers saved. New sessions pick them up.",
                         window,
                         cx,
                     ),
                     Err(e) => this.toast(
                         NotificationType::Error,
-                        format!("MCP не сохранены: {e:#}"),
+                        format!("MCP not saved: {e:#}"),
                         window,
                         cx,
                     ),
@@ -1161,13 +1471,13 @@ impl HermesApp {
                                 }
                                 Ok(_) => this.toast(
                                     NotificationType::Warning,
-                                    "Ничего не распознано",
+                                    "Nothing recognized",
                                     window,
                                     cx,
                                 ),
                                 Err(e) => this.toast(
                                     NotificationType::Error,
-                                    format!("Распознавание: {e:#}"),
+                                    format!("Transcription: {e:#}"),
                                     window,
                                     cx,
                                 ),
@@ -1177,7 +1487,7 @@ impl HermesApp {
                 }
                 Err(e) => self.toast(
                     NotificationType::Warning,
-                    format!("Запись: {e:#}"),
+                    format!("Recording: {e:#}"),
                     window,
                     cx,
                 ),
@@ -1187,7 +1497,7 @@ impl HermesApp {
                 Ok(r) => self.recorder = Some(r),
                 Err(e) => self.toast(
                     NotificationType::Error,
-                    format!("Микрофон: {e:#}"),
+                    format!("Microphone: {e:#}"),
                     window,
                     cx,
                 ),
@@ -1217,7 +1527,7 @@ impl HermesApp {
                     Ok(bytes) => this.playing = Some((i, Playback::start(bytes))),
                     Err(e) => this.toast(
                         NotificationType::Error,
-                        format!("Озвучка: {e:#}"),
+                        format!("Text-to-speech: {e:#}"),
                         window,
                         cx,
                     ),
@@ -1225,6 +1535,51 @@ impl HermesApp {
             },
         );
         cx.notify();
+    }
+}
+
+/// The deepest folder containing every path.
+fn common_dir(paths: &[String]) -> Option<String> {
+    let first = std::path::Path::new(paths.first()?).parent()?.to_path_buf();
+    let mut root = first;
+    for p in &paths[1..] {
+        while !std::path::Path::new(p).starts_with(&root) {
+            root = root.parent()?.to_path_buf();
+        }
+    }
+    Some(root.to_string_lossy().to_string())
+}
+
+/// Tree-sitter language for a file name (falls back to plain text).
+pub fn language_for(path: &str) -> &'static str {
+    let ext = std::path::Path::new(path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    match ext.as_str() {
+        "rs" => "rust",
+        "py" => "python",
+        "js" | "mjs" | "cjs" => "javascript",
+        "ts" => "typescript",
+        "tsx" => "tsx",
+        "json" => "json",
+        "yaml" | "yml" => "yaml",
+        "toml" => "toml",
+        "md" | "markdown" => "markdown",
+        "html" | "htm" => "html",
+        "css" => "css",
+        "sh" | "bash" | "zsh" => "bash",
+        "go" => "go",
+        "php" => "php",
+        "rb" => "ruby",
+        "swift" => "swift",
+        "java" => "java",
+        "kt" => "kotlin",
+        "c" | "h" => "c",
+        "cpp" | "cc" | "hpp" => "cpp",
+        "lua" => "lua",
+        _ => "text",
     }
 }
 

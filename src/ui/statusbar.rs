@@ -1,7 +1,8 @@
 //! Bottom bar across the window: where / which profile on the left; context, reasoning effort,
 //! model, gateway restart and settings on the right.
 
-use gpui_kit::component::select::Select;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -10,6 +11,7 @@ use gpui_kit::*;
 use super::{compact, plural};
 use crate::app::{HermesApp, Panel};
 use crate::icons::Ico;
+use crate::model::EFFORTS;
 
 impl HermesApp {
     /// Model: live usage, else the open session, else the profile, else the default profile.
@@ -52,6 +54,7 @@ impl HermesApp {
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        let view = cx.entity();
 
         let item = |id: &'static str| {
             h_flex()
@@ -71,6 +74,80 @@ impl HermesApp {
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
         };
 
+        // A label as wide as its text that opens a menu of choices.
+        let picker = |id: &'static str,
+                      icon: Ico,
+                      label: String,
+                      items: Vec<(
+            String,
+            bool,
+            Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)>,
+        )>| {
+            let items = std::rc::Rc::new(items);
+            let view = view.clone();
+            h_flex()
+                .h_full()
+                .items_center()
+                .pl_2()
+                .child(icon.icon().xsmall().text_color(muted))
+                .child(Button::new(id).ghost().xsmall().label(label).dropdown_menu(
+                    move |menu, _, _| {
+                        let mut menu = menu;
+                        for (k, (text, checked, _)) in items.iter().enumerate() {
+                            let (items, view) = (items.clone(), view.clone());
+                            menu = menu.item(
+                                PopupMenuItem::new(text.clone()).checked(*checked).on_click(
+                                    move |_, window, cx| {
+                                        view.update(cx, |this, cx| (items[k].2)(this, window, cx))
+                                    },
+                                ),
+                            );
+                        }
+                        menu
+                    },
+                ))
+        };
+
+        let targets = self
+            .targets
+            .iter()
+            .map(|t| {
+                let t2 = t.clone();
+                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                    Box::new(move |this, window, cx| {
+                        if this.target != t2 || this.conn.is_none() {
+                            this.connect(t2.clone(), window, cx)
+                        }
+                    });
+                (t.label(), *t == self.target, f)
+            })
+            .collect();
+        let profiles = self
+            .profiles
+            .iter()
+            .map(|p| {
+                let name = p.name.clone();
+                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                    Box::new(move |this, window, cx| this.select_profile(name.clone(), window, cx));
+                (p.label.clone(), self.profile.as_deref() == Some(&p.name), f)
+            })
+            .collect();
+        let efforts = EFFORTS
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                    Box::new(move |this, _, cx| this.set_effort(i, cx));
+                (e.to_string(), i == self.effort, f)
+            })
+            .collect();
+        let profile_label = self
+            .profiles
+            .iter()
+            .find(|p| Some(&p.name) == self.profile.as_ref())
+            .map(|p| p.label.clone())
+            .unwrap_or_else(|| "Profile".into());
+
         let usage = self.usage.clone().filter(|u| u.context_max > 0);
         let context = usage.as_ref().map(|u| {
             let color = if u.context_percent > 85. {
@@ -81,11 +158,17 @@ impl HermesApp {
                 muted
             };
             let details: SharedString = [
-                Some(format!("контекст {} из {}", u.context_used, u.context_max)),
-                (u.total_tokens > 0).then(|| format!("всего токенов {}", u.total_tokens)),
-                (u.compressions > 0)
-                    .then(|| plural(u.compressions as usize, "сжатие", "сжатия", "сжатий")),
-                u.cache_hit_pct.map(|c| format!("кэш {c}%")),
+                Some(format!("context {} of {}", u.context_used, u.context_max)),
+                (u.total_tokens > 0).then(|| format!("total tokens {}", u.total_tokens)),
+                (u.compressions > 0).then(|| {
+                    plural(
+                        u.compressions as usize,
+                        "compression",
+                        "compressions",
+                        "compressions",
+                    )
+                }),
+                u.cache_hit_pct.map(|c| format!("cache {c}%")),
             ]
             .into_iter()
             .flatten()
@@ -112,38 +195,16 @@ impl HermesApp {
             .border_t_1()
             .border_color(theme.border)
             .text_xs()
-            .child(
-                item("target").child(Ico::Server.icon().xsmall()).child(
-                    div()
-                        .w(px(150.))
-                        .child(Select::new(&self.target_choice).appearance(false).xsmall()),
-                ),
-            )
-            .child(
-                item("profile").child(Ico::UserRound.icon().xsmall()).child(
-                    div().w(px(150.)).child(
-                        Select::new(&self.profile_choice)
-                            .appearance(false)
-                            .xsmall()
-                            .placeholder("Профиль"),
-                    ),
-                ),
-            )
-            .when(self.connecting, |d| {
-                d.child(item("connecting").child("подключаюсь…"))
-            })
+            .child(picker("target", Ico::Server, self.target.label(), targets))
+            .child(picker("profile", Ico::UserRound, profile_label, profiles))
             .child(div().flex_1())
             .children(context)
-            .child(
-                item("effort")
-                    .child(Ico::Brain.icon().xsmall())
-                    .child(
-                        div()
-                            .w(px(84.))
-                            .child(Select::new(&self.effort_choice).appearance(false).xsmall()),
-                    )
-                    .tooltip(|window, cx| Tooltip::new("Глубина рассуждений").build(window, cx)),
-            )
+            .child(picker(
+                "effort",
+                Ico::Brain,
+                EFFORTS[self.effort].to_string(),
+                efforts,
+            ))
             .child(
                 item("model")
                     .child(Ico::Cpu.icon().xsmall())
@@ -153,7 +214,7 @@ impl HermesApp {
                 button(
                     "restart",
                     Ico::RefreshCw,
-                    "Перезапустить шлюз Hermes",
+                    "Restart the Hermes gateway",
                     false,
                 )
                 .on_click(cx.listener(|this, _, window, cx| this.restart_gateway(window, cx))),
@@ -162,7 +223,7 @@ impl HermesApp {
                 button(
                     "settings",
                     Ico::Settings,
-                    "Настройки",
+                    "Settings",
                     self.panel.is_settings(),
                 )
                 .on_click(cx.listener(|this, _, window, cx| {

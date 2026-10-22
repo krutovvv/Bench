@@ -76,10 +76,15 @@ pub enum Evt {
         name: String,
         detail: String,
         urls: Vec<String>,
+        call_id: String,
+        args: String,
     },
     ToolDone {
         session: String,
         failed: bool,
+        call_id: String,
+        output: String,
+        edit: Option<crate::model::FileEdit>,
     },
     Usage(String, Usage),
     Complete {
@@ -261,7 +266,7 @@ fn run(
             {
                 continue;
             }
-            Err(e) => return Err(anyhow!("соединение потеряно: {e}")),
+            Err(e) => return Err(anyhow!("connection lost: {e}")),
         };
         let Ok(msg) = serde_json::from_str::<Value>(&frame) else {
             continue;
@@ -354,7 +359,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                     title: s["title"]
                         .as_str()
                         .filter(|t| !t.trim().is_empty())
-                        .unwrap_or("Без названия")
+                        .unwrap_or("Untitled")
                         .into(),
                     messages: s["message_count"].as_u64().unwrap_or(0),
                     model: s["model"].as_str().unwrap_or_default().into(),
@@ -400,6 +405,8 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         "message.delta" => emit(Evt::Delta(sid, text())),
         "reasoning.delta" => emit(Evt::Reasoning(sid, text())),
         "tool.start" => emit(Evt::ToolStart {
+            call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
+            args: history::pretty(&payload["args"]),
             name: payload["name"].as_str().unwrap_or("tool").to_string(),
             detail: payload["context"]
                 .as_str()
@@ -418,6 +425,12 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         }),
         "tool.complete" => emit(Evt::ToolDone {
             failed: history::failed(&payload["result"]),
+            call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
+            output: history::pretty(&payload["result"]),
+            edit: history::file_edit(
+                payload["name"].as_str().unwrap_or_default(),
+                &payload["result"],
+            ),
             session: sid,
         }),
         "sessions.changed" => emit(Evt::SessionsChanged),

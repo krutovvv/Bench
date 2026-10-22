@@ -138,7 +138,7 @@ impl Connection {
                 Some("draining" | "starting") if Instant::now() < deadline => {
                     std::thread::sleep(Duration::from_secs(3))
                 }
-                other => bail!("локальный шлюз не готов: {}", other.unwrap_or("?")),
+                other => bail!("local gateway is not ready: {}", other.unwrap_or("?")),
             }
         };
         let endpoint = v["endpoint"].clone();
@@ -207,7 +207,7 @@ impl Connection {
 
     fn open_ssh(host: &str) -> Result<Self> {
         if !has_hermes(host) {
-            bail!("на {host} не найден Hermes (~/.local/bin/hermes) или хост недоступен");
+            bail!("{host}: no working Hermes at ~/.local/bin/hermes, or the host is unreachable");
         }
         let state_path = state_dir().join(format!("ssh-{host}.json"));
         // Reattach to the backend we started last time, if it still answers.

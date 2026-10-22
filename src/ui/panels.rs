@@ -119,10 +119,26 @@ impl HermesApp {
                 format!("{name} · SKILL.md").into_any_element(),
                 None,
                 vec![
+                    Button::new("skill-delete")
+                        .small()
+                        .map(|b| {
+                            if self.skill_delete_armed {
+                                b.danger()
+                            } else {
+                                b.ghost()
+                            }
+                        })
+                        .label(if self.skill_delete_armed {
+                            "Confirm delete"
+                        } else {
+                            "Delete"
+                        })
+                        .on_click(cx.listener(|this, _, window, cx| this.delete_skill(window, cx)))
+                        .into_any_element(),
                     Button::new("skill-save")
                         .small()
                         .primary()
-                        .label("Сохранить")
+                        .label("Save")
                         .on_click(cx.listener(|this, _, window, cx| this.save_skill(window, cx)))
                         .into_any_element(),
                 ],
@@ -137,9 +153,9 @@ impl HermesApp {
                 .text_sm()
                 .text_color(muted)
                 .child(if self.skills.is_empty() {
-                    "Загружаю скиллы…".to_string()
+                    "Loading skills…".to_string()
                 } else {
-                    format!("{} скиллов — выбери слева", self.skills.len())
+                    format!("{} skills — pick one on the left", self.skills.len())
                 })
                 .into_any_element(),
         };
@@ -165,13 +181,13 @@ impl HermesApp {
         let status = self.mcp_status.clone();
         editor_page(
             &self.mcp_editor,
-            format!("mcp_servers из config.yaml {status}").into_any_element(),
+            format!("mcp_servers from config.yaml {status}").into_any_element(),
             self.mcp_error.clone(),
             vec![
                 Button::new("mcp-reload")
                     .small()
                     .ghost()
-                    .label("Обновить")
+                    .label("Reload")
                     .on_click(
                         cx.listener(|this, _, window, cx| this.open_panel(Panel::Mcp, window, cx)),
                     )
@@ -179,7 +195,7 @@ impl HermesApp {
                 Button::new("mcp-save")
                     .small()
                     .primary()
-                    .label("Сохранить")
+                    .label("Save")
                     .on_click(cx.listener(|this, _, window, cx| this.save_mcp(window, cx)))
                     .into_any_element(),
             ],
@@ -196,7 +212,7 @@ impl HermesApp {
                 Button::new("cfg-reload")
                     .small()
                     .ghost()
-                    .label("Обновить")
+                    .label("Reload")
                     .on_click(
                         cx.listener(|this, _, window, cx| {
                             this.open_panel(Panel::Config, window, cx)
@@ -206,7 +222,7 @@ impl HermesApp {
                 Button::new("cfg-save")
                     .small()
                     .primary()
-                    .label("Сохранить")
+                    .label("Save")
                     .on_click(cx.listener(|this, _, window, cx| this.save_config(window, cx)))
                     .into_any_element(),
             ],
@@ -243,7 +259,7 @@ impl HermesApp {
                                 .child(j.schedule.clone()),
                         )
                         .when(!j.enabled, |d| {
-                            d.child(div().text_xs().text_color(theme.warning).child("на паузе"))
+                            d.child(div().text_xs().text_color(theme.warning).child("paused"))
                         })
                         .child(div().flex_1())
                         .when(!j.last_status.is_empty(), |d| {
@@ -251,7 +267,7 @@ impl HermesApp {
                                 div()
                                     .text_xs()
                                     .text_color(muted)
-                                    .child(format!("последний: {}", j.last_status)),
+                                    .child(format!("last: {}", j.last_status)),
                             )
                         })
                         .when(!j.next_run.is_empty(), |d| {
@@ -259,7 +275,7 @@ impl HermesApp {
                                 div()
                                     .text_xs()
                                     .text_color(muted)
-                                    .child(format!("след.: {}", j.next_run)),
+                                    .child(format!("next: {}", j.next_run)),
                             )
                         }),
                 )
@@ -284,7 +300,7 @@ impl HermesApp {
                         .p_4()
                         .text_sm()
                         .text_color(muted)
-                        .child("В этом профиле нет задач по расписанию."),
+                        .child("No scheduled jobs in this profile."),
                 )
             })
     }
@@ -324,7 +340,7 @@ impl HermesApp {
             .py_3()
             .gap_3()
             .child(div().text_sm().text_color(muted).child(
-                "Чьи Telegram-сессии показывать в списке. Отмеченные — видны, остальные скрыты (сами сессии не трогаются).",
+                "Whose Telegram sessions the list shows. Checked people are shown, the rest are hidden (the sessions themselves are not touched).",
             ))
             .child(
                 v_flex()
@@ -333,7 +349,7 @@ impl HermesApp {
                     .border_color(theme.border)
                     .children(rows)
                     .when(self.tg_people.is_empty(), |d| {
-                        d.child(div().py_3().text_sm().text_color(muted).child("В этом профиле нет Telegram-сессий."))
+                        d.child(div().py_3().text_sm().text_color(muted).child("No Telegram sessions in this profile."))
                     }),
             )
     }

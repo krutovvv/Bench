@@ -137,7 +137,7 @@ pub fn mcp_json(conn: &Connection, profile: &str) -> Result<String> {
 pub fn save_mcp_json(conn: &Connection, profile: &str, text: &str) -> Result<()> {
     let servers: Value = serde_json::from_str(text).context("JSON")?;
     if !servers.is_object() {
-        return Err(anyhow!("ожидается объект {{ \"имя\": {{…}} }}"));
+        return Err(anyhow!("expected an object {{ \"name\": {{…}} }}"));
     }
     send(
         conn,
@@ -191,30 +191,62 @@ pub fn transcribe(conn: &Connection, profile: &str, wav: &[u8]) -> Result<String
         .to_string())
 }
 
-/// Delete a stored session the way Hermes Desktop does (also closes a live one).
+/// Delete a stored session the way Hermes Desktop does: read its mutation snapshot, then
+/// DELETE fenced on that revision (the gateway refuses an unfenced edit). Older gateways
+/// without the snapshot route take a plain DELETE.
 pub fn delete_session(conn: &Connection, profile: &str, id: &str) -> Result<()> {
+    let path = format!("/api/sessions/{id}");
+    let fence = match get(conn, &format!("{path}/mutation-snapshot"), profile) {
+        Ok(snap) => format!(
+            "request_id={}&expected_revision={}&expected_generation={}",
+            uuid::Uuid::new_v4(),
+            snap["runtime_revision"].as_i64().unwrap_or(0),
+            snap["runtime_generation"].as_i64().unwrap_or(0)
+        ),
+        Err(e) if e.to_string().contains("404") || e.to_string().contains("405") => String::new(),
+        Err(e) => return Err(e),
+    };
+    let mut target = url(conn, &path, profile);
+    if !fence.is_empty() {
+        target.push(if target.contains('?') { '&' } else { '?' });
+        target.push_str(&fence);
+    }
     let (h, v) = conn.rest_auth(profile)?;
-    let resp = ureq::request(
-        "DELETE",
-        &url(conn, &format!("/api/sessions/{id}"), profile),
-    )
-    .set(h, &v)
-    .timeout(Duration::from_secs(30))
-    .call();
-    match resp {
+    match ureq::request("DELETE", &target)
+        .set(h, &v)
+        .timeout(Duration::from_secs(30))
+        .call()
+    {
         Ok(_) => Ok(()),
         Err(ureq::Error::Status(code, r)) => {
             let body: Value = r.into_json().unwrap_or(Value::Null);
             Err(anyhow!(
                 "{code}: {}",
-                body["detail"]
-                    .as_str()
-                    .or(body["detail"]["reason"].as_str())
-                    .unwrap_or("delete failed")
+                body["detail"].as_str().unwrap_or("delete failed")
             ))
         }
         Err(e) => Err(anyhow!("{e}")),
     }
+}
+
+/// Delete a skill folder (there is no skill-delete API; the managed files route removes it).
+pub fn delete_skill(conn: &Connection, profile: &str, name: &str) -> Result<()> {
+    let found = get(conn, &format!("/api/skills/content?name={name}"), profile)?;
+    let skill_md = found["path"]
+        .as_str()
+        .ok_or_else(|| anyhow!("skill path unknown"))?;
+    let dir = std::path::Path::new(skill_md)
+        .parent()
+        .ok_or_else(|| anyhow!("bad skill path"))?;
+    send(
+        conn,
+        "DELETE",
+        "/api/files",
+        profile,
+        json!({"path": dir.to_string_lossy(), "recursive": true}),
+        30,
+    )?;
+    Ok(())
 }
 
 pub fn save_skill(conn: &Connection, profile: &str, name: &str, content: &str) -> Result<()> {
@@ -301,4 +333,76 @@ pub fn cron_jobs(conn: &Connection, profile: &str) -> Result<Vec<CronJob>> {
             prompt: s(j, &["prompt", "task", "message"]),
         })
         .collect())
+}
+
+/// A text file as the gateway sees it. `truncated` files must not be saved back.
+pub struct TextFile {
+    pub text: String,
+    pub truncated: bool,
+    pub binary: bool,
+}
+
+pub fn read_text(conn: &Connection, profile: &str, path: &str) -> Result<TextFile> {
+    let v = get(
+        conn,
+        &format!("/api/fs/read-text?path={}", enc(path)),
+        profile,
+    )?;
+    Ok(TextFile {
+        text: v["text"].as_str().unwrap_or_default().to_string(),
+        truncated: v["truncated"].as_bool().unwrap_or(false),
+        binary: v["binary"].as_bool().unwrap_or(false),
+    })
+}
+
+pub fn write_text(conn: &Connection, profile: &str, path: &str, content: &str) -> Result<()> {
+    send(
+        conn,
+        "POST",
+        "/api/fs/write-text",
+        profile,
+        json!({"path": path, "content": content}),
+        30,
+    )?;
+    Ok(())
+}
+
+/// Directory entries: (name, full path, is_dir), directories first.
+pub fn list_dir(
+    conn: &Connection,
+    profile: &str,
+    path: &str,
+) -> Result<Vec<(String, String, bool)>> {
+    let v = get(conn, &format!("/api/fs/list?path={}", enc(path)), profile)?;
+    if let Some(err) = v["error"].as_str() {
+        return Err(anyhow!("{err}"));
+    }
+    Ok(v["entries"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|e| {
+            (
+                e["name"].as_str().unwrap_or_default().to_string(),
+                e["path"].as_str().unwrap_or_default().to_string(),
+                e["isDirectory"].as_bool().unwrap_or(false),
+            )
+        })
+        .collect())
+}
+
+pub fn default_cwd(conn: &Connection, profile: &str) -> Result<String> {
+    let v = get(conn, "/api/fs/default-cwd", profile)?;
+    Ok(v["cwd"].as_str().unwrap_or_default().to_string())
+}
+
+fn enc(s: &str) -> String {
+    s.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }

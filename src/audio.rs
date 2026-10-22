@@ -27,7 +27,7 @@ impl Recorder {
     pub fn start() -> Result<Self> {
         let device = cpal::default_host()
             .default_input_device()
-            .ok_or_else(|| anyhow!("нет микрофона"))?;
+            .ok_or_else(|| anyhow!("no microphone"))?;
         let config = device.default_input_config()?;
         let rate = config.sample_rate().0;
         let channels = config.channels() as usize;
@@ -54,7 +54,7 @@ impl Recorder {
                 on_err,
                 None,
             )?,
-            other => bail!("формат микрофона {other:?} не поддержан"),
+            other => bail!("microphone format {other:?} is not supported"),
         };
         stream.play()?;
         Ok(Self {
@@ -69,7 +69,7 @@ impl Recorder {
         drop(self.stream);
         let samples = std::mem::take(&mut *self.samples.lock().unwrap());
         if samples.len() < self.rate as usize / 4 {
-            bail!("слишком короткая запись");
+            bail!("recording too short");
         }
         let spec = hound::WavSpec {
             channels: 1,

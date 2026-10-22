@@ -11,7 +11,7 @@ pub enum Target {
 impl Target {
     pub fn label(&self) -> String {
         match self {
-            Target::Local => "Этот Mac".into(),
+            Target::Local => "This Mac".into(),
             Target::Ssh(host) => format!("{host} (SSH)"),
         }
     }
@@ -59,6 +59,10 @@ pub enum Step {
         name: String,
         detail: String,
         failed: bool,
+        call_id: String,
+        /// Full arguments and output, shown when the step is unfolded.
+        args: String,
+        output: String,
     },
     /// Interim prose the model wrote between tool calls.
     Note(String),
@@ -73,6 +77,8 @@ pub struct Turn {
     pub steps: Vec<Step>,
     pub answer: String,
     pub expanded: bool,
+    /// Files the agent edited in this turn.
+    pub files: Vec<FileEdit>,
     /// External pages the agent's tool calls touched, in order, deduplicated.
     pub sources: Vec<String>,
     /// Unix seconds: when the user sent it, when the last message of the turn landed.
@@ -87,6 +93,14 @@ impl Turn {
             .filter(|s| matches!(s, Step::Tool { .. }))
             .count()
     }
+}
+
+/// One file edit by a tool: the file, and the unified diff when the tool reported one
+/// (`patch` does; `write_file` rewrites the whole file and reports none).
+#[derive(Clone, Debug)]
+pub struct FileEdit {
+    pub path: String,
+    pub diff: Option<String>,
 }
 
 /// Context/usage readout for the status bar.

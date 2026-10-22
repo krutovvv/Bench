@@ -59,14 +59,12 @@ impl HermesApp {
             .cursor_pointer()
             .hover(|s| s.bg(theme.primary_hover))
             .child(Ico::Plus.icon().small())
-            .child("Новая сессия")
+            .child("New session")
             .on_click(cx.listener(|this, _, _, cx| this.new_session(cx)));
 
         v_flex()
             .size_full()
             .bg(theme.sidebar)
-            .border_r_1()
-            .border_color(theme.sidebar_border)
             .child(
                 v_flex()
                     .pt(px(38.))
@@ -91,7 +89,7 @@ impl HermesApp {
                                 .py_2()
                                 .text_sm()
                                 .text_color(muted)
-                                .child("Подключаюсь…"),
+                                .child("Connecting…"),
                         )
                     }),
             )
@@ -105,9 +103,9 @@ impl HermesApp {
         let armed = self.confirm_delete.as_deref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
         let meta = if s.running {
-            "работает…".to_string()
+            "working…".to_string()
         } else {
-            plural(s.messages as usize, "сообщение", "сообщения", "сообщений")
+            plural(s.messages as usize, "message", "messages", "messages")
         };
         let (open_id, del_id) = (s.id.clone(), s.id.clone());
 
@@ -123,7 +121,7 @@ impl HermesApp {
                         .bg(theme.danger)
                         .text_color(theme.danger_foreground)
                         .cursor_pointer()
-                        .child("Удалить")
+                        .child("Delete")
                         .on_click(cx.listener(move |this, _, window, cx| {
                             cx.stop_propagation();
                             this.delete_session(del_id.clone(), window, cx)
@@ -137,7 +135,7 @@ impl HermesApp {
                         .cursor_pointer()
                         .text_color(muted)
                         .hover(|s| s.text_color(theme.foreground))
-                        .child("Нет")
+                        .child("Cancel")
                         .on_click(cx.listener(|this, _, _, cx| {
                             cx.stop_propagation();
                             this.cancel_delete(cx)

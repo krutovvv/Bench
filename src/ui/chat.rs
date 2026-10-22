@@ -1,9 +1,7 @@
-//! The conversation: one row per turn — user message, folded steps, answer,
-//! sources (always) and actions (on hover).
+//! The conversation as one scrolling column: per turn the user message, folded steps
+//! (each unfoldable), the answer, sources and hover actions; after the last turn, the
+//! files this session changed.
 
-use std::rc::Rc;
-
-use gpui_kit::component::message_scroller::MessageScroller;
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::text::TextView;
 use gpui_kit::component::tooltip::Tooltip;
@@ -17,15 +15,6 @@ use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
-/// What a turn row needs besides the turn itself.
-#[derive(Clone)]
-struct RowState {
-    live: Option<(SharedString, u64)>,
-    playing: bool,
-    speaking: bool,
-    last: bool,
-}
-
 impl HermesApp {
     pub(super) fn render_chat(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
@@ -36,14 +25,13 @@ impl HermesApp {
                 .items_center()
                 .justify_center()
                 .child(
-                    ShimmerText::new("Загружаю историю…")
+                    ShimmerText::new("Loading history…")
                         .text_sm()
                         .text_color(theme.muted_foreground),
                 )
                 .into_any_element();
         }
         if self.turns.is_empty() {
-            let profile = self.current_profile();
             return v_flex()
                 .size_full()
                 .items_center()
@@ -53,41 +41,536 @@ impl HermesApp {
                     div()
                         .text_2xl()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .child("Чем займёмся?"),
+                        .child("What are we working on?"),
                 )
                 .child(
                     div()
                         .text_sm()
                         .text_color(theme.muted_foreground)
-                        .child(format!("{} · {profile}", self.target.label())),
+                        .child(format!(
+                            "{} · {}",
+                            self.target.label(),
+                            self.current_profile()
+                        )),
                 )
                 .into_any_element();
         }
 
-        let view = cx.entity();
-        let turns: Rc<Vec<Turn>> = Rc::new(self.turns.clone());
+        // Follow the tail: stay pinned to the bottom until the user scrolls up.
+        let max = self.chat_scroll.max_offset().y;
+        let at_bottom = -self.chat_scroll.offset().y >= max - px(4.);
+        if self.follow && !at_bottom && max == self.last_max {
+            self.follow = false; // the user scrolled away
+        }
+        if at_bottom {
+            self.follow = true;
+        }
+        if self.follow && !at_bottom {
+            self.chat_scroll.scroll_to_bottom();
+        }
+        self.last_max = max;
+
+        let rows: Vec<AnyElement> = (0..self.turns.len())
+            .map(|i| self.render_turn(i, cx))
+            .collect();
+        let files = self.render_session_files(cx);
+
+        div()
+            .relative()
+            .size_full()
+            .child(
+                v_flex()
+                    .id("chat")
+                    .size_full()
+                    .overflow_y_scroll()
+                    .track_scroll(&self.chat_scroll)
+                    .pb_4()
+                    .children(rows)
+                    .children(files),
+            )
+            .when(!self.follow, |d| {
+                d.child(
+                    h_flex()
+                        .id("jump")
+                        .absolute()
+                        .bottom_3()
+                        .right_4()
+                        .gap_1()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .bg(theme.background)
+                        .border_1()
+                        .border_color(theme.border)
+                        .text_color(theme.muted_foreground)
+                        .cursor_pointer()
+                        .hover(|s| s.text_color(theme.foreground))
+                        .child(Ico::ChevronDown.icon().xsmall())
+                        .child("Jump to latest")
+                        .on_click(cx.listener(|this, _, _, cx| this.jump_to_latest(cx))),
+                )
+            })
+            .into_any_element()
+    }
+
+    fn render_turn(&mut self, i: usize, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let turn: &Turn = &self.turns[i];
+        let last = i + 1 == self.turns.len();
         let live = self
             .live
             .as_ref()
+            .filter(|_| last)
             .map(|l| (l.label.clone(), l.started.elapsed().as_secs()));
-        let playing = self.playing.as_ref().map(|(i, _)| *i);
-        let speaking = self.speaking;
+        let tools = turn.tool_count();
+        let errors = turn
+            .steps
+            .iter()
+            .filter(|s| matches!(s, Step::Tool { failed: true, .. }))
+            .count();
+        let has_steps = !turn.steps.is_empty();
+        let expanded = turn.expanded;
+        let group: SharedString = format!("turn{i}").into();
 
-        MessageScroller::new("chat", self.scroller.clone(), move |i, _, cx| {
-            let Some(turn) = turns.get(i) else {
-                return div().into_any_element();
+        // One-line summary; only the error count is red.
+        let summary = (has_steps || live.is_some()).then(|| {
+            let mut tail: Vec<String> = vec![];
+            if tools > 0 {
+                tail.push(plural(tools, "action", "actions", "actions"));
+            }
+            if let Some((_, s)) = &live {
+                tail.push(clock(*s));
+            }
+            h_flex()
+                .id(("steps", i))
+                .gap_1p5()
+                .items_center()
+                .text_sm()
+                .text_color(muted)
+                .min_w_0()
+                .when(has_steps, |d| {
+                    d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
+                })
+                .child(
+                    (if expanded {
+                        Ico::ChevronDown
+                    } else {
+                        Ico::ChevronRight
+                    })
+                    .icon()
+                    .xsmall()
+                    .when(!has_steps, |i| i.text_color(theme.transparent)),
+                )
+                .map(|d| match &live {
+                    Some((label, _)) => d.child(
+                        ShimmerText::new(label.clone())
+                            .text_color(muted)
+                            .max_w(px(560.)),
+                    ),
+                    None => d.child(div().flex_none().child("Done")),
+                })
+                .when(!tail.is_empty(), |d| {
+                    d.child(div().flex_none().child(format!("· {}", tail.join(" · "))))
+                })
+                .when(errors > 0, |d| {
+                    d.child(
+                        div()
+                            .flex_none()
+                            .text_color(theme.danger)
+                            .child(format!("· {}", plural(errors, "error", "errors", "errors"))),
+                    )
+                })
+                .on_click(cx.listener(move |this, _, _, cx| this.toggle_turn(i, cx)))
+        });
+
+        let steps: Option<Div> = expanded.then(|| {
+            let items: Vec<AnyElement> = (0..self.turns[i].steps.len())
+                .map(|k| self.render_step(i, k, cx))
+                .collect();
+            v_flex()
+                .ml(px(6.))
+                .pl_4()
+                .gap_1()
+                .border_l_1()
+                .border_color(theme.border)
+                .text_sm()
+                .children(items)
+        });
+
+        let turn: &Turn = &self.turns[i];
+        let answer = (!turn.answer.trim().is_empty()).then(|| {
+            TextView::markdown(
+                SharedString::from(format!("answer-{i}")),
+                turn.answer.clone(),
+            )
+        });
+        let has_answer = !turn.answer.trim().is_empty();
+        let time = match (turn.started, turn.finished) {
+            (Some(a), Some(b)) if b > a => clock((b - a) as u64),
+            _ => String::new(),
+        };
+        let when = turn.finished.or(turn.started).unwrap_or_default();
+        let user = turn.user.clone();
+
+        let sources = self.render_sources(i, cx);
+        let actions = (live.is_none() && has_answer).then(|| {
+            let playing = self.playing.as_ref().is_some_and(|(j, _)| *j == i);
+            let speaking = self.speaking == Some(i);
+            h_flex()
+                .gap_0p5()
+                .items_center()
+                .opacity(0.)
+                .group_hover(group.clone(), |s| s.opacity(1.))
+                .when(!time.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .id(("time", i))
+                            .px_1()
+                            .text_xs()
+                            .text_color(muted)
+                            .child(time)
+                            .tooltip(move |window, cx| {
+                                Tooltip::new(format_when(when)).build(window, cx)
+                            }),
+                    )
+                })
+                .child(icon_button(("copy", i), Ico::Copy, "Copy", cx).on_click(
+                    cx.listener(move |this, _, window, cx| this.copy_answer(i, window, cx)),
+                ))
+                .child(
+                    icon_button(
+                        ("speak", i),
+                        if playing {
+                            Ico::Square
+                        } else if speaking {
+                            Ico::Loader
+                        } else {
+                            Ico::Volume
+                        },
+                        if playing { "Stop" } else { "Read aloud" },
+                        cx,
+                    )
+                    .on_click(
+                        cx.listener(move |this, _, window, cx| this.toggle_speak(i, window, cx)),
+                    ),
+                )
+                .when(last, |d| {
+                    d.child(
+                        icon_button(("regen", i), Ico::RotateCcw, "Regenerate", cx)
+                            .on_click(cx.listener(|this, _, _, cx| this.regenerate(cx))),
+                    )
+                })
+        });
+
+        v_flex()
+            .id(("turn", i))
+            .group(group)
+            .w_full()
+            .px_4()
+            .py_3()
+            .gap_3()
+            .child(
+                div()
+                    .w_full()
+                    .px_3()
+                    .py_2()
+                    .bg(theme.secondary)
+                    .border_1()
+                    .border_color(theme.border)
+                    .whitespace_normal()
+                    .child(user),
+            )
+            .children(summary)
+            .children(steps)
+            .children(answer)
+            .child(
+                h_flex()
+                    .min_h(px(22.))
+                    .gap_2()
+                    .items_start()
+                    .child(div().flex_1().min_w_0().children(sources))
+                    .children(actions),
+            )
+            .into_any_element()
+    }
+
+    /// One step line; click unfolds its details (reasoning text, tool args and output).
+    fn render_step(&self, i: usize, k: usize, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let open = self.open_steps.contains(&(i, k));
+        let (icon, color, label, details): (Ico, Hsla, String, Vec<(&str, String)>) =
+            match &self.turns[i].steps[k] {
+                Step::Tool {
+                    name,
+                    detail,
+                    failed,
+                    args,
+                    output,
+                    ..
+                } => (
+                    if *failed {
+                        Ico::CircleAlert
+                    } else {
+                        Ico::Terminal
+                    },
+                    if *failed { theme.danger } else { muted },
+                    clip(&tool_label(name, detail), 220),
+                    [("Arguments", args.clone()), ("Output", output.clone())]
+                        .into_iter()
+                        .filter(|(_, v)| !v.trim().is_empty())
+                        .collect(),
+                ),
+                Step::Note(text) => (
+                    Ico::ChevronRight,
+                    theme.foreground.opacity(0.75),
+                    clip(text, 400),
+                    vec![],
+                ),
+                Step::Thought(text) => (
+                    Ico::Brain,
+                    muted,
+                    clip(text, 160),
+                    vec![("Reasoning", text.clone())],
+                ),
             };
-            let last = i + 1 == turns.len();
-            let state = RowState {
-                live: live.clone().filter(|_| last),
-                playing: playing == Some(i),
-                speaking: speaking == Some(i),
-                last,
-            };
-            render_turn(i, turn, state, &view, cx)
-        })
-        .size_full()
-        .into_any_element()
+        let expandable = !details.is_empty();
+        v_flex()
+            .child(
+                h_flex()
+                    .id(SharedString::from(format!("step-{i}-{k}")))
+                    .gap_2()
+                    .items_start()
+                    .text_color(color)
+                    .when(expandable, |d| {
+                        d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
+                    })
+                    .child(icon.icon().xsmall().mt(px(3.)))
+                    .child(div().flex_1().min_w_0().child(label))
+                    .on_click(cx.listener(move |this, _, _, cx| this.toggle_step(i, k, cx))),
+            )
+            .when(open && expandable, |d| {
+                d.children(details.into_iter().map(|(title, body)| {
+                    v_flex()
+                        .ml_5()
+                        .mt_1()
+                        .mb_1()
+                        .child(div().text_xs().text_color(muted).child(title))
+                        .child(
+                            div()
+                                .mt_0p5()
+                                .p_2()
+                                .bg(theme.secondary)
+                                .border_1()
+                                .border_color(theme.border)
+                                .font_family("Menlo")
+                                .text_xs()
+                                .text_color(theme.foreground)
+                                .whitespace_normal()
+                                .child(body),
+                        )
+                }))
+            })
+            .into_any_element()
+    }
+
+    /// One chip per site; click lists its pages, each opens on its own.
+    fn render_sources(&self, i: usize, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let urls = &self.turns[i].sources;
+        if urls.is_empty() {
+            return None;
+        }
+        let theme = cx.theme().clone();
+        let mut hosts: Vec<(String, Vec<String>)> = vec![];
+        for u in urls {
+            let h = host_of(u);
+            match hosts.iter_mut().find(|(x, _)| *x == h) {
+                Some((_, pages)) => pages.push(u.clone()),
+                None => hosts.push((h, vec![u.clone()])),
+            }
+        }
+        hosts.sort_by_key(|(_, p)| std::cmp::Reverse(p.len()));
+        let open_host = self
+            .open_source
+            .as_ref()
+            .filter(|(t, _)| *t == i)
+            .map(|(_, h)| h.clone());
+        let pages = open_host
+            .as_ref()
+            .and_then(|h| hosts.iter().find(|(x, _)| x == h))
+            .map(|(_, p)| p.clone())
+            .unwrap_or_default();
+
+        let chips: Vec<AnyElement> = hosts
+            .into_iter()
+            .take(12)
+            .enumerate()
+            .map(|(k, (host, pages))| {
+                let active = open_host.as_deref() == Some(&host);
+                let single = (pages.len() == 1).then(|| pages[0].clone());
+                let h = host.clone();
+                h_flex()
+                    .id(SharedString::from(format!("src-{i}-{k}")))
+                    .gap_1()
+                    .px_1p5()
+                    .py_0p5()
+                    .border_1()
+                    .border_color(if active { theme.primary } else { theme.border })
+                    .text_xs()
+                    .text_color(if active {
+                        theme.foreground
+                    } else {
+                        theme.muted_foreground
+                    })
+                    .cursor_pointer()
+                    .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                    .child(Ico::Globe.icon().xsmall())
+                    .child(host)
+                    .when(pages.len() > 1, |d| {
+                        d.child(div().opacity(0.6).child(pages.len().to_string()))
+                    })
+                    .on_click(cx.listener(move |this, _, _, cx| match &single {
+                        Some(url) => cx.open_url(url),
+                        None => this.toggle_source(i, h.clone(), cx),
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+
+        let list = (!pages.is_empty()).then(|| {
+            v_flex()
+                .mt_1()
+                .pl_2()
+                .border_l_1()
+                .border_color(theme.border)
+                .children(pages.into_iter().enumerate().map(|(k, url)| {
+                    let open = url.clone();
+                    div()
+                        .id(SharedString::from(format!("page-{i}-{k}")))
+                        .text_xs()
+                        .text_color(theme.link)
+                        .truncate()
+                        .cursor_pointer()
+                        .hover(|s| s.underline())
+                        .child(
+                            url.trim_start_matches("https://")
+                                .trim_start_matches("http://")
+                                .to_string(),
+                        )
+                        .on_click(move |_, _, cx| cx.open_url(&open))
+                }))
+        });
+
+        Some(
+            v_flex()
+                .child(h_flex().flex_wrap().gap_1().children(chips))
+                .children(list)
+                .into_any_element(),
+        )
+    }
+
+    /// After the last turn: every file this session edited, with +/- counts.
+    fn render_session_files(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let files = self.session_files();
+        if files.is_empty() || self.live.is_some() {
+            return None;
+        }
+        let theme = cx.theme().clone();
+        let rows: Vec<AnyElement> = files
+            .into_iter()
+            .enumerate()
+            .map(|(k, (path, diffs))| {
+                let (add, del) = diffs
+                    .iter()
+                    .map(|d| crate::diff::stats(d))
+                    .fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
+                let p = std::path::Path::new(&path);
+                let name = p
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let dir = p
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let selected = self.file.as_ref().is_some_and(|f| f.path == path);
+                let open = path.clone();
+                h_flex()
+                    .id(("file", k))
+                    .gap_2()
+                    .px_2()
+                    .py_1()
+                    .items_center()
+                    .text_sm()
+                    .cursor_pointer()
+                    .border_l_2()
+                    .border_color(if selected {
+                        theme.primary
+                    } else {
+                        theme.transparent
+                    })
+                    .when(selected, |d| d.bg(theme.list_active))
+                    .hover(|s| s.bg(theme.list_hover))
+                    .child(name)
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_xs()
+                            .text_color(theme.muted_foreground)
+                            .truncate()
+                            .child(dir),
+                    )
+                    .when(add > 0, |d| {
+                        d.child(
+                            div()
+                                .text_xs()
+                                .text_color(theme.success)
+                                .child(format!("+{add}")),
+                        )
+                    })
+                    .when(del > 0, |d| {
+                        d.child(
+                            div()
+                                .text_xs()
+                                .text_color(theme.danger)
+                                .child(format!("−{del}")),
+                        )
+                    })
+                    .when(diffs.is_empty(), |d| {
+                        d.child(
+                            div()
+                                .text_xs()
+                                .text_color(theme.muted_foreground)
+                                .child("written"),
+                        )
+                    })
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_file(open.clone(), window, cx)
+                    }))
+                    .into_any_element()
+            })
+            .collect();
+        Some(
+            v_flex()
+                .mx_4()
+                .mt_2()
+                .border_1()
+                .border_color(theme.border)
+                .child(
+                    div()
+                        .px_2()
+                        .py_1()
+                        .text_xs()
+                        .text_color(theme.muted_foreground)
+                        .border_b_1()
+                        .border_color(theme.border)
+                        .child("CHANGED FILES"),
+                )
+                .children(rows)
+                .into_any_element(),
+        )
     }
 }
 
@@ -103,282 +586,7 @@ fn icon_button(id: impl Into<ElementId>, icon: Ico, tip: &'static str, cx: &App)
         .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }
 
-fn render_turn(
-    i: usize,
-    turn: &Turn,
-    st: RowState,
-    view: &Entity<HermesApp>,
-    cx: &mut App,
-) -> AnyElement {
-    let theme = cx.theme().clone();
-    let muted = theme.muted_foreground;
-    let tools = turn.tool_count();
-    let errors = turn
-        .steps
-        .iter()
-        .filter(|s| matches!(s, Step::Tool { failed: true, .. }))
-        .count();
-    let has_steps = !turn.steps.is_empty();
-    let group: SharedString = format!("turn{i}").into();
-
-    // One-line summary of the steps; only the error count is red.
-    let summary = (has_steps || st.live.is_some()).then(|| {
-        let toggle = view.clone();
-        let mut tail: Vec<String> = vec![];
-        if tools > 0 {
-            tail.push(plural(tools, "действие", "действия", "действий"));
-        }
-        if let Some((_, s)) = &st.live {
-            tail.push(clock(*s));
-        }
-        h_flex()
-            .id(("steps", i))
-            .gap_1p5()
-            .items_center()
-            .text_sm()
-            .text_color(muted)
-            .min_w_0()
-            .when(has_steps, |d| {
-                d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
-            })
-            .child(
-                (if turn.expanded {
-                    Ico::ChevronDown
-                } else {
-                    Ico::ChevronRight
-                })
-                .icon()
-                .xsmall()
-                .when(!has_steps, |i| i.text_color(theme.transparent)),
-            )
-            .map(|d| match &st.live {
-                Some((label, _)) => d.child(
-                    ShimmerText::new(label.clone())
-                        .text_color(muted)
-                        .max_w(px(480.)),
-                ),
-                None => d.child(div().flex_none().child("Готово")),
-            })
-            .when(!tail.is_empty(), |d| {
-                d.child(div().flex_none().child(format!("· {}", tail.join(" · "))))
-            })
-            .when(errors > 0, |d| {
-                d.child(div().flex_none().text_color(theme.danger).child(format!(
-                    "· {}",
-                    plural(errors, "ошибка", "ошибки", "ошибок")
-                )))
-            })
-            .on_click(move |_, _, cx| toggle.update(cx, |this, cx| this.toggle_turn(i, cx)))
-    });
-
-    let steps = turn.expanded.then(|| {
-        v_flex()
-            .ml(px(6.))
-            .pl_4()
-            .gap_1p5()
-            .border_l_1()
-            .border_color(theme.border)
-            .text_sm()
-            .children(turn.steps.iter().map(|step| {
-                match step {
-                    Step::Tool {
-                        name,
-                        detail,
-                        failed,
-                    } => {
-                        let color = if *failed { theme.danger } else { muted };
-                        h_flex()
-                            .gap_2()
-                            .items_start()
-                            .child(
-                                (if *failed {
-                                    Ico::CircleAlert
-                                } else {
-                                    Ico::Terminal
-                                })
-                                .icon()
-                                .xsmall()
-                                .mt(px(3.))
-                                .text_color(color),
-                            )
-                            .child(
-                                div()
-                                    .text_color(color)
-                                    .child(clip(&tool_label(name, detail), 220)),
-                            )
-                            .into_any_element()
-                    }
-                    Step::Note(text) => div()
-                        .text_color(theme.foreground.opacity(0.75))
-                        .child(clip(text, 400))
-                        .into_any_element(),
-                    Step::Thought(text) => h_flex()
-                        .gap_2()
-                        .items_start()
-                        .child(Ico::Brain.icon().xsmall().mt(px(3.)).text_color(muted))
-                        .child(div().text_xs().text_color(muted).child(clip(text, 600)))
-                        .into_any_element(),
-                }
-            }))
-    });
-
-    let answer = (!turn.answer.trim().is_empty()).then(|| {
-        TextView::markdown(
-            SharedString::from(format!("answer-{i}")),
-            turn.answer.clone(),
-        )
-    });
-
-    // Sources (left, always) and actions (right, on hover).
-    let sources = render_sources(i, &turn.sources, cx);
-    let actions = (st.live.is_none() && !turn.answer.trim().is_empty()).then(|| {
-        let (copy, speak, regen) = (view.clone(), view.clone(), view.clone());
-        let time = match (turn.started, turn.finished) {
-            (Some(a), Some(b)) if b > a => clock((b - a) as u64),
-            _ => String::new(),
-        };
-        let when = turn.finished.or(turn.started).unwrap_or_default();
-        h_flex()
-            .gap_0p5()
-            .items_center()
-            .opacity(0.)
-            .group_hover(group.clone(), |s| s.opacity(1.))
-            .when(!time.is_empty(), |d| {
-                d.child(
-                    div()
-                        .id(("time", i))
-                        .px_1()
-                        .text_xs()
-                        .text_color(muted)
-                        .child(time)
-                        .tooltip(move |window, cx| {
-                            Tooltip::new(format_when(when)).build(window, cx)
-                        }),
-                )
-            })
-            .child(
-                icon_button(("copy", i), Ico::Copy, "Копировать", cx).on_click(
-                    move |_, window, cx| {
-                        copy.update(cx, |this, cx| this.copy_answer(i, window, cx))
-                    },
-                ),
-            )
-            .child(
-                icon_button(
-                    ("speak", i),
-                    if st.playing {
-                        Ico::Square
-                    } else if st.speaking {
-                        Ico::Loader
-                    } else {
-                        Ico::Volume
-                    },
-                    if st.playing {
-                        "Остановить"
-                    } else {
-                        "Озвучить"
-                    },
-                    cx,
-                )
-                .on_click(move |_, window, cx| {
-                    speak.update(cx, |this, cx| this.toggle_speak(i, window, cx))
-                }),
-            )
-            .when(st.last, |d| {
-                d.child(
-                    icon_button(("regen", i), Ico::RotateCcw, "Ответить заново", cx)
-                        .on_click(move |_, _, cx| regen.update(cx, |this, cx| this.regenerate(cx))),
-                )
-            })
-    });
-
-    h_flex()
-        .id(("turn", i))
-        .group(group)
-        .w_full()
-        .px_4()
-        .py_3()
-        .child(
-            v_flex()
-                .w_full()
-                .gap_3()
-                .child(
-                    div()
-                        .w_full()
-                        .px_3()
-                        .py_2()
-                        .bg(theme.secondary)
-                        .border_1()
-                        .border_color(theme.border)
-                        .whitespace_normal()
-                        .child(turn.user.clone()),
-                )
-                .children(summary)
-                .children(steps)
-                .children(answer)
-                .child(
-                    h_flex()
-                        .min_h(px(22.))
-                        .gap_2()
-                        .items_start()
-                        .child(div().flex_1().min_w_0().children(sources))
-                        .children(actions),
-                ),
-        )
-        .into_any_element()
-}
-
-/// One chip per site; click opens its first page, the tooltip lists them all.
-fn render_sources(i: usize, urls: &[String], cx: &App) -> Option<AnyElement> {
-    if urls.is_empty() {
-        return None;
-    }
-    let theme = cx.theme().clone();
-    let mut hosts: Vec<(String, Vec<String>)> = vec![];
-    for u in urls {
-        let h = host_of(u);
-        match hosts.iter_mut().find(|(x, _)| *x == h) {
-            Some((_, pages)) => pages.push(u.clone()),
-            None => hosts.push((h, vec![u.clone()])),
-        }
-    }
-    hosts.sort_by_key(|(_, p)| std::cmp::Reverse(p.len()));
-    let chips = hosts
-        .into_iter()
-        .take(10)
-        .enumerate()
-        .map(|(k, (host, pages))| {
-            let first = pages[0].clone();
-            let list: SharedString = pages.join("\n").into();
-            h_flex()
-                .id(SharedString::from(format!("src-{i}-{k}")))
-                .gap_1()
-                .px_1p5()
-                .py_0p5()
-                .border_1()
-                .border_color(theme.border)
-                .text_xs()
-                .text_color(theme.muted_foreground)
-                .cursor_pointer()
-                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(Ico::Globe.icon().xsmall())
-                .child(host)
-                .when(pages.len() > 1, |d| {
-                    d.child(div().opacity(0.6).child(pages.len().to_string()))
-                })
-                .tooltip(move |window, cx| Tooltip::new(list.clone()).build(window, cx))
-                .on_click(move |_, _, cx| cx.open_url(&first))
-        });
-    Some(
-        h_flex()
-            .flex_wrap()
-            .gap_1()
-            .children(chips)
-            .into_any_element(),
-    )
-}
-
-/// "21 окт 22:15" for a Unix timestamp, in local time.
+/// "21.10.2026 22:15" for a Unix timestamp, in local time.
 fn format_when(ts: f64) -> String {
     let out = std::process::Command::new("date")
         .args(["-r", &(ts as i64).to_string(), "+%d.%m.%Y %H:%M"])

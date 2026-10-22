@@ -3,6 +3,7 @@
 mod app;
 mod audio;
 mod connection;
+mod diff;
 mod gateway;
 mod history;
 mod icons;
@@ -82,6 +83,39 @@ fn probe(target: &str) -> anyhow::Result<()> {
                         "  turn: steps={} sources={src:?} took={took}",
                         t.steps.len()
                     );
+                    for f in &t.files {
+                        let (add, del) = f.diff.as_deref().map(diff::stats).unwrap_or((0, 0));
+                        println!("    file: {} +{add} -{del}", f.path);
+                    }
+                    let detailed = t
+                        .steps
+                        .iter()
+                        .filter(|s| matches!(s, model::Step::Tool { args, output, .. } if !args.is_empty() && !output.is_empty()))
+                        .count();
+                    println!("    tool steps with args+output: {detailed}");
+                    if let (Some(c), Some(f)) = (&conn, t.files.first()) {
+                        let diffs: Vec<String> = t
+                            .files
+                            .iter()
+                            .filter(|x| x.path == f.path)
+                            .filter_map(|x| x.diff.clone())
+                            .collect();
+                        match rest::read_text(
+                            c,
+                            &std::env::var("PROBE_PROFILE").unwrap_or_default(),
+                            &f.path,
+                        ) {
+                            Ok(file) => println!(
+                                "    before: {} (file {} bytes, truncated={})",
+                                diff::before(&file.text, &diffs)
+                                    .map(|b| format!("reconstructed, {} bytes", b.len()))
+                                    .unwrap_or_else(|| "not recoverable".into()),
+                                file.text.len(),
+                                file.truncated
+                            ),
+                            Err(e) => println!("    read: {e:#}"),
+                        }
+                    }
                 }
                 return Ok(());
             }
