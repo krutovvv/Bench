@@ -1,3 +1,24 @@
 target/
 dist/
+
+# macOS junk: Finder metadata, resource forks, volume indexes, custom folder icons.
 .DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+.TemporaryItems
+.DocumentRevisions-V100
+Icon?
+
+# Editors and temp files.
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+.env
