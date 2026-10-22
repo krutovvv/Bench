@@ -190,6 +190,7 @@ impl HermesApp {
             ("tab-config", "Config", Panel::Config),
             ("tab-cron", "Cron", Panel::Cron),
             ("tab-tg", "Telegram", Panel::Telegram),
+            ("tab-gw", "Gateways", Panel::Gateways),
             ("tab-look", "Appearance", Panel::Appearance),
         ]
         .map(|(id, label, panel)| {
@@ -250,6 +251,7 @@ impl Render for HermesApp {
             Panel::Cron => self.render_cron(cx).into_any_element(),
             Panel::Telegram => self.render_telegram(cx).into_any_element(),
             Panel::Appearance => self.render_appearance(cx).into_any_element(),
+            Panel::Gateways => self.render_gateways(cx).into_any_element(),
         };
 
         let main = v_flex()

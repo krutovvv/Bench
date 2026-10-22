@@ -12,6 +12,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
 
+mod gateways;
 pub(crate) mod projects;
 pub use projects::GitArm;
 
@@ -33,6 +34,7 @@ pub enum Panel {
     Config,
     Cron,
     Telegram,
+    Gateways,
     Appearance,
 }
 
@@ -121,6 +123,8 @@ pub struct HermesApp {
     pub path_entry: bool,
     pub project_path: Entity<InputState>,
     pub git_armed: Option<GitArm>,
+    /// Settings → Gateways: each machine's install, by target label.
+    pub installs: HashMap<String, crate::model::Install>,
     pub appearance: crate::theme::Appearance,
     pub speed: crate::speed::Meter,
     /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
@@ -403,6 +407,7 @@ impl HermesApp {
             path_entry: false,
             project_path,
             git_armed: None,
+            installs: HashMap::new(),
             appearance: crate::theme::Appearance::load(),
             speed: crate::speed::Meter::fresh(),
             show_list: std::fs::read_to_string(file_list_pref()).is_ok_and(|s| s.trim() == "1"),
@@ -1555,6 +1560,7 @@ impl HermesApp {
         self.panel = panel;
         match panel {
             Panel::Chat | Panel::Telegram | Panel::Appearance => {}
+            Panel::Gateways => self.check_installs(window, cx),
             Panel::Config => {
                 self.config_error = None;
                 self.rest(

@@ -347,6 +347,46 @@ tail -3 "{dir}/serve.log"; exit 1"#
     Ok((port, token))
 }
 
+/// Run the `hermes` CLI on a machine; stdout and stderr together (the CLI reports on both).
+pub fn hermes_cli(target: &Target, args: &[&str]) -> Result<String> {
+    let out = match target {
+        Target::Local => Command::new(home().join(".local/bin/hermes"))
+            .args(args)
+            .stdin(Stdio::null())
+            .output()?,
+        Target::Ssh(host) => {
+            let quoted: Vec<String> = args.iter().map(|a| shell_quote(a)).collect();
+            let script = format!("\"$HOME/.local/bin/hermes\" {}", quoted.join(" "));
+            Command::new("ssh")
+                .args([
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "ConnectTimeout=8",
+                    host,
+                    &format!("bash -lc {}", shell_quote(&script)),
+                ])
+                .stdin(Stdio::null())
+                .output()?
+        }
+    };
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    if !out.status.success() {
+        let last = text
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .last()
+            .unwrap_or("failed");
+        bail!("hermes {}: {last}", args.first().unwrap_or(&""));
+    }
+    Ok(text)
+}
+
 /// Keep branch folders (`.worktrees/`) out of the main checkout's status: a local-only exclude
 /// in `.git/info/exclude`, never committed.
 pub fn exclude_worktrees(target: &Target, repo: &str) -> Result<()> {

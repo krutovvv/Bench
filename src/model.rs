@@ -199,3 +199,88 @@ impl Project {
         self.dir != self.root
     }
 }
+
+/// One machine's Hermes install, for the Gateways settings tab.
+#[derive(Clone, Debug, Default)]
+pub struct Install {
+    /// "v0.22.3 (2026.9.24)".
+    pub version: String,
+    /// "stable" / "canary".
+    pub channel: String,
+    /// A newer release, when `hermes update --check` found one: "v0.22.4".
+    pub available: Option<String>,
+    pub checked: bool,
+    /// Working on it: "Checking…", "Updating…".
+    pub busy: Option<String>,
+    pub error: Option<String>,
+}
+
+impl Install {
+    /// From `hermes --version`: "Hermes Agent v0.22.3 (2026.9.24) · stable · local 5b147ab036d6"
+    /// (a source checkout says "· upstream 10c6188d" instead of a channel).
+    pub fn parse_version(&mut self, text: &str) {
+        let line = text
+            .lines()
+            .find(|l| l.contains("Hermes Agent"))
+            .unwrap_or_default();
+        let parts: Vec<&str> = line.split('·').map(str::trim).collect();
+        self.version = parts
+            .first()
+            .map(|p| p.trim_start_matches("Hermes Agent").trim().to_string())
+            .unwrap_or_default();
+        if let Some(ch) = parts.get(1).filter(|p| !p.contains(' ')) {
+            self.channel = ch.to_string();
+        }
+    }
+
+    /// From `hermes update --check`: "Update channel: stable", then either
+    /// "Selected release available: stable v0.22.4 (…)" or
+    /// "Update available: 7587 commits behind origin/main." or nothing new.
+    pub fn parse_check(&mut self, text: &str) {
+        self.checked = true;
+        if let Some(ch) = text.lines().find_map(|l| l.split_once("Update channel:")) {
+            self.channel = ch.1.trim().to_string();
+        }
+        self.available = text.lines().find_map(|l| {
+            let (_, rest) = l.split_once("available:")?;
+            let rest = rest.trim().trim_end_matches('.');
+            Some(
+                rest.split_whitespace()
+                    .find(|w| {
+                        w.starts_with('v') && w[1..].starts_with(|c: char| c.is_ascii_digit())
+                    })
+                    .map(str::to_string)
+                    .unwrap_or_else(|| rest.to_string()),
+            )
+        });
+    }
+}
+
+#[cfg(test)]
+mod install_tests {
+    use super::Install;
+
+    #[test]
+    fn parses_version_and_check() {
+        let mut i = Install::default();
+        i.parse_version(
+            "Hermes Agent v0.22.3 (2026.9.24) · stable · local 5b147ab036d6\nInstall method: git",
+        );
+        assert_eq!(
+            (i.version.as_str(), i.channel.as_str()),
+            ("v0.22.3 (2026.9.24)", "stable")
+        );
+        i.parse_check("→ Update channel: stable\n→ Selected release available: stable v0.22.4 (4d04303818b6)\n");
+        assert_eq!(i.available.as_deref(), Some("v0.22.4"));
+        i.parse_check("→ Already up to date");
+        assert_eq!(i.available, None);
+        let mut s = Install::default();
+        s.parse_version("Hermes Agent v0.21.5+8459.g2c542f7 (2026.9.24) · upstream 2c542f79");
+        s.parse_check("Update available — run 'hermes update'\n→ Update channel: main\n⚕ Update available: 7587 commits behind origin/main.");
+        assert_eq!(s.channel, "main");
+        assert_eq!(
+            s.available.as_deref(),
+            Some("7587 commits behind origin/main")
+        );
+    }
+}

@@ -475,4 +475,124 @@ impl HermesApp {
                     )),
             )
     }
+
+    pub(super) fn render_gateways(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let rows: Vec<AnyElement> = self
+            .targets
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(k, target)| {
+                let i = self
+                    .installs
+                    .get(&target.label())
+                    .cloned()
+                    .unwrap_or_default();
+                let status: SharedString = match (&i.busy, &i.error, &i.available) {
+                    (Some(b), _, _) => b.clone().into(),
+                    (_, Some(e), _) => e.clone().into(),
+                    (_, _, Some(v)) if v.starts_with('v') => format!("{v} is available").into(),
+                    (_, _, Some(v)) => format!("Update available: {v}").into(),
+                    _ if i.checked => "Up to date".into(),
+                    _ => "".into(),
+                };
+                let status_color = if i.error.is_some() {
+                    theme.danger
+                } else if i.available.is_some() {
+                    theme.primary
+                } else {
+                    muted
+                };
+                let t2 = target.clone();
+                h_flex()
+                    .gap_4()
+                    .py_3()
+                    .items_center()
+                    .border_b_1()
+                    .border_color(theme.border)
+                    .child(
+                        v_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap_0p5()
+                            .child(
+                                h_flex()
+                                    .gap_2()
+                                    .items_baseline()
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .font_weight(FontWeight::MEDIUM)
+                                            .child(target.label()),
+                                    )
+                                    .child(div().text_sm().font_family("Menlo").child(
+                                        if i.version.is_empty() {
+                                            "—".to_string()
+                                        } else {
+                                            i.version.clone()
+                                        },
+                                    ))
+                                    .when(!i.channel.is_empty(), |d| {
+                                        d.child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(muted)
+                                                .child(i.channel.clone()),
+                                        )
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(status_color)
+                                    .truncate()
+                                    .child(status),
+                            ),
+                    )
+                    .when(i.available.is_some() && i.busy.is_none(), |d| {
+                        d.child(
+                            Button::new(("gw-update", k))
+                                .small()
+                                .primary()
+                                .label("Update")
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.update_install(t2.clone(), window, cx)
+                                })),
+                        )
+                    })
+            })
+            .map(|r| r.into_any_element())
+            .collect();
+        v_flex()
+            .id("gateways")
+            .size_full()
+            .overflow_y_scroll()
+            .px_4()
+            .py_2()
+            .child(
+                v_flex()
+                    .max_w(px(720.))
+                    .child(
+                        h_flex()
+                            .py_2()
+                            .gap_3()
+                            .items_center()
+                            .child(div().flex_1().text_xs().text_color(muted).child(
+                                "Hermes on each machine. Updating takes a full backup first, then restarts that gateway; going back to an older release means restoring that backup.",
+                            ))
+                            .child(
+                                Button::new("gw-check")
+                                    .small()
+                                    .ghost()
+                                    .label("Check again")
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.check_installs(window, cx)
+                                    })),
+                            ),
+                    )
+                    .children(rows),
+            )
+    }
 }
