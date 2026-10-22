@@ -39,6 +39,21 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     want.unwrap_or_else(|| p.first().map(|p| p.name.clone()).unwrap_or_default());
                 gw.send(gateway::Cmd::Sessions(name));
             }
+            gateway::Evt::Created { session, runtime } => {
+                println!("created {session} (runtime {runtime}); setting effort");
+                gw.send(gateway::Cmd::SetEffort {
+                    session: runtime.clone(),
+                    effort: "low".into(),
+                });
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                gw.send(gateway::Cmd::Delete {
+                    profile: std::env::var("PROBE_PROFILE").unwrap_or_default(),
+                    session: session.clone(),
+                    runtime: Some(runtime),
+                });
+                std::thread::sleep(std::time::Duration::from_secs(3));
+                return Ok(());
+            }
             gateway::Evt::Catalog(list) => {
                 println!("catalog: {} commands", list.len());
                 for c in list
@@ -61,11 +76,23 @@ fn probe(target: &str) -> anyhow::Result<()> {
             }
             gateway::Evt::Sessions(p, rows) => {
                 println!("sessions[{p}]: {}", rows.len());
+                if std::env::var("PROBE_NEWSESSION").is_ok() {
+                    gw.send(gateway::Cmd::Create {
+                        profile: p.clone(),
+                        cwd: None,
+                    });
+                    continue;
+                }
                 if std::env::var("PROBE_CATALOG").is_ok() {
                     gw.send(gateway::Cmd::Catalog { profile: p.clone() });
                 }
                 if let Some(c) = &conn {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
+                    if let Ok(id) = std::env::var("PROBE_DELETE") {
+                        rest::delete_session(c, &p, &id)?;
+                        println!("deleted {id}");
+                        return Ok(());
+                    }
                     if let Ok(paths) = std::env::var("PROBE_GET") {
                         for path in paths.split(',') {
                             let v = rest::get_raw(c, &p, path)?;

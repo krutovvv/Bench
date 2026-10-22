@@ -54,6 +54,11 @@ pub enum Cmd {
         session: String,
         text: String,
     },
+    /// Only the reasoning effort, no prompt (diagnostics).
+    SetEffort {
+        session: String,
+        effort: String,
+    },
     /// The profile's slash commands (and skills).
     Catalog {
         profile: String,
@@ -310,6 +315,9 @@ impl Rpc {
                     )?
                 }
             }
+            Cmd::SetEffort { session, effort } => {
+                self.mutate(&session, "reasoning", json!({"effort": effort}))?
+            }
             Cmd::Catalog { profile } => self.call(
                 "commands.catalog",
                 json!({"profile": profile}),
@@ -466,7 +474,7 @@ fn run(
             };
             if let Some(err) = msg.get("error") {
                 let text = err["message"].as_str().unwrap_or("error").to_string();
-                eprintln!("[gateway] {method}: {err}");
+                log_error(&method, &err.to_string());
                 match kind {
                     Pending::Delete => emit(Evt::DeleteFailed(text)),
                     // Older gateways may lack the projection: show the turns without extras.
@@ -482,7 +490,10 @@ fn run(
                         running,
                     }),
                     // A close of a session the gateway already dropped is not worth a toast.
-                    Pending::Ignore if text.contains("not found") => {}
+                    // Fire-and-forget calls on a session the gateway no longer (or not yet) knows:
+                    // logged above, not worth a toast.
+                    Pending::Ignore if text.contains("not found") || text.contains("not_found") => {
+                    }
                     _ => emit(Evt::Error(text)),
                 }
                 continue;
@@ -805,4 +816,18 @@ fn catalog(r: &Value) -> Vec<crate::model::SlashCommand> {
         }
     }
     out
+}
+
+/// RPC errors go to `gateway-errors.log` too (a Finder-launched app has no visible stderr).
+fn log_error(method: &str, err: &str) {
+    eprintln!("[gateway] {method}: {err}");
+    let path = crate::connection::state_dir().join("gateway-errors.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+    {
+        use std::io::Write as _;
+        let _ = writeln!(f, "{} {method}: {err}", crate::app::now_secs() as u64);
+    }
 }

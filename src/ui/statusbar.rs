@@ -473,11 +473,13 @@ fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, c
         let max = samples.iter().cloned().fold(0., f64::max).max(1.);
         let min = samples.iter().cloned().fold(f64::MAX, f64::min);
         let avg = samples.iter().sum::<f64>() / samples.len() as f64;
-        // The last 120 seconds at most; each bar is one second.
-        let shown = &samples[samples.len().saturating_sub(120)..];
+        // The last 68 seconds at most (as many 3px bars as fit); each bar is one second.
+        let shown = &samples[samples.len().saturating_sub(68)..];
+        // One 3px bar per second from the left: a short answer is a few bars, not one slab.
         let bars = shown.iter().map(|v| {
             div()
-                .flex_1()
+                .w(px(3.))
+                .flex_none()
                 .h(px((v / max * 56.).max(1.) as f32))
                 .bg(theme.primary.opacity(0.75))
         });
