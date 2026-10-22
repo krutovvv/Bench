@@ -9,6 +9,10 @@ use gpui_kit::*;
 use crate::app::{HermesApp, Panel};
 use crate::icons::Ico;
 
+/// Line height of list titles: a wrapped title stays one block, its lines no further apart
+/// than the title is from the description under it.
+const TITLE_LINE: f32 = 1.25;
+
 /// A toolbar over a full-height code editor.
 fn editor_page(
     editor: &Entity<EditorState>,
@@ -99,6 +103,7 @@ impl HermesApp {
                     .child(
                         div()
                             .text_sm()
+                            .line_height(relative(TITLE_LINE))
                             .when(!s.enabled, |d| d.text_color(muted))
                             .child(s.name.clone()),
                     )
@@ -263,7 +268,12 @@ impl HermesApp {
                     })
                     .when(selected, |d| d.bg(theme.list_active))
                     .hover(|d| d.bg(theme.list_hover))
-                    .child(div().text_sm().child(p.title.clone()))
+                    .child(
+                        div()
+                            .text_sm()
+                            .line_height(relative(TITLE_LINE))
+                            .child(p.title.clone()),
+                    )
                     .child(div().text_xs().text_color(muted).truncate().child(first))
                     .on_click(
                         cx.listener(move |this, _, window, cx| this.open_prompt(i, window, cx)),
@@ -401,6 +411,7 @@ impl HermesApp {
                     .child(
                         div()
                             .text_sm()
+                            .line_height(relative(TITLE_LINE))
                             .when(!j.enabled, |d| d.text_color(muted))
                             .child(j.name.clone()),
                     )
