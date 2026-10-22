@@ -1,4 +1,4 @@
-//! Herm — one window for a local Hermes agent, its sessions, the user's servers (terminal over
+//! Bench — one window for a local Hermes agent, its sessions, the user's servers (terminal over
 //! SSH) and their files (a mini IDE). Formerly "Hermes GPUI": the crate, the binary, the bundle
 //! id (local.hermes-gpui) and the state folder keep that name.
 
@@ -246,7 +246,7 @@ pub fn open_main_window(cx: &mut App) {
             cx,
         ))),
         titlebar: Some(TitlebarOptions {
-            title: Some("Herm".into()),
+            title: Some("Bench".into()),
             appears_transparent: true,
             traffic_light_position: Some(point(px(14.), px(14.))),
         }),

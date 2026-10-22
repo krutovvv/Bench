@@ -1,9 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" fill="#1F2329"/>
-  <!-- A herm: Hermes' head on a square pillar, as at crossroads; his wings in the accent. -->
-  <circle cx="27.5" cy="17" r="7" fill="#FAFAFA"/>
-  <path d="M20.5 27h14v20h-14z" fill="#FAFAFA"/>
-  <path d="M16.5 49h22v5h-22z" fill="#FAFAFA"/>
-  <path d="M36.5 11h11l-4 5h-7z" fill="#5C78E2"/>
-  <path d="M36.5 18h8l-4 5h-4z" fill="#5C78E2"/>
+  <!-- A bench: the top and two legs; on it a block cursor in the accent and a small part. -->
+  <path d="M12 36h40v5H12z" fill="#FAFAFA"/>
+  <path d="M16 41h5v13h-5zM43 41h5v13h-5z" fill="#FAFAFA"/>
+  <path d="M20 21h9v15h-9z" fill="#5C78E2"/>
+  <path d="M34 29h7v7h-7z" fill="#FAFAFA"/>
 </svg>

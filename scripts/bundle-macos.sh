@@ -1,13 +1,13 @@
 #!/bin/bash
-# Build "Herm.app" (release binary + icon + Info.plist) into dist/.
-# The name shown is Herm; the bundle id stays local.hermes-gpui (macOS grants — local network,
+# Build "Bench.app" (release binary + icon + Info.plist) into dist/.
+# The name shown is Bench; the bundle id stays local.hermes-gpui (macOS grants — local network,
 # microphone — and the state folder belong to it), and so does the binary's name.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 cargo build --release
 
-APP="dist/Herm.app"
+APP="dist/Bench.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp target/release/hermes-gpui "$APP/Contents/MacOS/hermes-gpui"
@@ -30,8 +30,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Herm</string>
-  <key>CFBundleDisplayName</key><string>Herm</string>
+  <key>CFBundleName</key><string>Bench</string>
+  <key>CFBundleDisplayName</key><string>Bench</string>
   <key>CFBundleIdentifier</key><string>local.hermes-gpui</string>
   <key>CFBundleExecutable</key><string>hermes-gpui</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
