@@ -344,8 +344,10 @@ impl HermesApp {
                                         this.toggle_pin(pin_id.clone(), cx)
                                     }))),
                             )
+                            // Reads the color live, so a click shows at once in the open menu.
                             .item(PopupMenuItem::element(move |_, cx| {
-                                color_row(&swatch_view, &swatch_id, mark.color, cx)
+                                let current = swatch_view.read(cx).mark_of(&swatch_id).color;
+                                color_row(&swatch_view, &swatch_id, current, cx)
                             }))
                             .separator()
                             .item(
@@ -383,12 +385,19 @@ impl HermesApp {
             .py_2()
             .cursor_pointer()
             .border_l_2()
-            .border_color(if selected {
+            // A chosen color wins over the accent; it also tints the row lightly.
+            .border_color(stripe.unwrap_or(if selected {
                 theme.primary
             } else {
-                stripe.unwrap_or(theme.transparent)
+                theme.transparent
+            }))
+            .when_some(stripe, |d, c| {
+                d.bg(Hsla {
+                    a: if selected { 0.22 } else { 0.12 },
+                    ..c
+                })
             })
-            .when(selected, |d| {
+            .when(selected && stripe.is_none(), |d| {
                 d.bg(theme.sidebar_accent)
                     .text_color(theme.sidebar_accent_foreground)
             })

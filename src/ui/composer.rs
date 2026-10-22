@@ -207,8 +207,9 @@ impl HermesApp {
                     div()
                         .flex_1()
                         .min_w_0()
-                        // The textarea pads its text by 8px itself: 8 + 8 = the 16px content inset.
-                        .pl_2()
+                        // Measured: the "New session" button sits 14pt from the divider; the
+                        // textarea pads its text by ~10.5 itself, so 3.5 more lands the text at 14.
+                        .pl(px(3.5))
                         .py_1()
                         .child(Textarea::new(&self.composer).appearance(false)),
                 )
@@ -217,7 +218,9 @@ impl HermesApp {
                 h_flex()
                     .flex_none()
                     .gap_1()
-                    .px_2()
+                    .pl_2()
+                    // A little more room right of the send button than the 8 it had.
+                    .pr_3()
                     .items_center()
                     .child(mic)
                     .child(action),
