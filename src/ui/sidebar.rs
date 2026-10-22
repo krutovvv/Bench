@@ -154,11 +154,12 @@ impl HermesApp {
             .size_full()
             .bg(theme.sidebar)
             .child(
-                // Mirrors the footer: same 8px inset, same 32px control, a rule on the inner side.
+                // Right under the window buttons (no padding of its own above), 8px below like the
+                // footer's, then the rule.
                 div().pt(px(38.)).flex_none().child(
                     h_flex()
-                        .h(super::bar_h(cx))
                         .px_4()
+                        .pb_2()
                         .items_center()
                         .border_b_1()
                         .border_color(theme.sidebar_border)
