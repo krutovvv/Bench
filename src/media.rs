@@ -62,7 +62,10 @@ pub fn kind(path: &str) -> Kind {
 }
 
 pub fn file_name(path: &str) -> String {
-    path.rsplit(['/', '\\']).find(|s| !s.is_empty()).unwrap_or(path).to_string()
+    path.rsplit(['/', '\\'])
+        .find(|s| !s.is_empty())
+        .unwrap_or(path)
+        .to_string()
 }
 
 /// A piece of an answer, in order.
@@ -160,7 +163,8 @@ pub fn segments(answer: &str) -> Vec<Segment> {
 fn clean_path(raw: &str) -> String {
     let p = raw.trim().trim_matches(['`', '"', '\'']).trim();
     let p = p.strip_prefix("file://").unwrap_or(p);
-    p.trim_end_matches(['.', ',', ';', ':', '!', '?']).to_string()
+    p.trim_end_matches(['.', ',', ';', ':', '!', '?'])
+        .to_string()
 }
 
 /// `![alt](/some/file.png)` alone on its line, for a local file (web images stay markdown).
@@ -170,7 +174,11 @@ fn standalone_image(t: &str) -> Option<String> {
     let url = url.split(" \"").next().unwrap_or(url).trim();
     let url = url.trim_start_matches('<').trim_end_matches('>');
     let lower = url.to_lowercase();
-    if url.is_empty() || ["http:", "https:", "data:"].iter().any(|s| lower.starts_with(s)) {
+    if url.is_empty()
+        || ["http:", "https:", "data:"]
+            .iter()
+            .any(|s| lower.starts_with(s))
+    {
         return None;
     }
     Some(clean_path(url))
@@ -313,7 +321,10 @@ fn thumb_file(file: &Path) -> PathBuf {
         .join("media")
         .join("thumbs")
         .join(hash_of(&[&file.to_string_lossy(), &stamp]));
-    dir.join(format!("{}.png", file.file_name().unwrap_or_default().to_string_lossy()))
+    dir.join(format!(
+        "{}.png",
+        file.file_name().unwrap_or_default().to_string_lossy()
+    ))
 }
 
 /// The first frame or page as Quick Look draws it (`qlmanage -t`), with its pixel size.
@@ -343,7 +354,10 @@ pub type Diagram = (PathBuf, (f32, f32));
 pub fn mermaid_svg(code: &str, dark: bool) -> Result<Diagram> {
     let dir = state_dir().join("diagrams");
     std::fs::create_dir_all(&dir)?;
-    let file = dir.join(format!("{}.svg", hash_of(&[code, if dark { "dark" } else { "light" }])));
+    let file = dir.join(format!(
+        "{}.svg",
+        hash_of(&[code, if dark { "dark" } else { "light" }])
+    ));
     let svg = match std::fs::read_to_string(&file) {
         Ok(svg) => svg,
         Err(_) => {
@@ -400,12 +414,20 @@ pub fn latex_text(tex: &str) -> String {
     while let Some(at) = rest.find('\\') {
         out.push_str(&rest[..at]);
         let after = &rest[at + 1..];
-        let name: String = after.chars().take_while(|c| c.is_ascii_alphabetic()).collect();
+        let name: String = after
+            .chars()
+            .take_while(|c| c.is_ascii_alphabetic())
+            .collect();
         let tail = &after[name.len()..];
         match name.as_str() {
-            "frac" | "dfrac" | "tfrac" => match group(tail).and_then(|(a, t)| Some((a, group(t)?))) {
+            "frac" | "dfrac" | "tfrac" => match group(tail).and_then(|(a, t)| Some((a, group(t)?)))
+            {
                 Some((a, (b, t))) => {
-                    out.push_str(&format!("{}/{}", wrap(latex_text(&a)), wrap(latex_text(&b))));
+                    out.push_str(&format!(
+                        "{}/{}",
+                        wrap(latex_text(&a)),
+                        wrap(latex_text(&b))
+                    ));
                     rest = t;
                     continue;
                 }

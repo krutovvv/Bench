@@ -12,15 +12,23 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
 
+mod asks;
+mod attachments;
 mod cron;
 mod gateways;
+pub(crate) mod ide;
+pub(crate) mod ide_ops;
+mod ide_tabs;
+mod keys;
 pub mod marks;
 mod profiles;
 pub(crate) mod projects;
 mod prompts;
+pub(crate) mod servers;
 mod slash;
 pub use projects::GitArm;
 
+use crate::attach;
 use crate::audio::{Playback, Recorder};
 use crate::connection::{self, Connection};
 use crate::gateway::{Cmd, Evt, Gateway};
@@ -80,6 +88,14 @@ pub struct FileView {
     pub before_view: Option<Entity<DiffState>>,
 }
 
+/// The instant a turn began, from its Unix start time (now when unknown or in the future).
+fn live_since(started: Option<f64>) -> Instant {
+    started
+        .map(|t| (now_secs() - t).max(0.))
+        .and_then(|ago| Instant::now().checked_sub(Duration::from_secs_f64(ago)))
+        .unwrap_or_else(Instant::now)
+}
+
 pub struct Live {
     pub started: Instant,
     pub label: SharedString,
@@ -88,7 +104,8 @@ pub struct Live {
 pub struct HermesApp {
     pub targets: Vec<Target>,
     pub target: Target,
-    pub target_choice: Entity<Choice>,
+    /// The gateway list as a Select (kept for its subscription; the status bar has its own menu).
+    _target_choice: Entity<Choice>,
     gateway: Option<Gateway>,
     pub conn: Option<Arc<Connection>>,
     evt_tx: async_channel::Sender<Evt>,
@@ -113,6 +130,13 @@ pub struct HermesApp {
     pub turns: Vec<Turn>,
     pub live: Option<Live>,
     queued: Option<String>,
+    queued_images: Vec<(String, String)>,
+    /// Send was pressed while dictating: send once the speech is recognized.
+    pub send_after_transcribe: bool,
+    /// The "Changed files" list under the last turn is unfolded (folded by default).
+    pub files_open: bool,
+    /// Files waiting in the composer to go with the next message.
+    pub attachments: Vec<std::path::PathBuf>,
     pub usage: Option<Usage>,
     pub effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
@@ -124,6 +148,13 @@ pub struct HermesApp {
     pub slash_scroll: ScrollHandle,
     /// The agent waits for an answer (approval mode manual/smart).
     pub approval: Option<crate::model::ApprovalReq>,
+    /// A question the agent asks, the choices ticked so far (multi-select), the free answer.
+    pub clarify: Option<crate::model::ClarifyReq>,
+    pub clarify_picked: Vec<usize>,
+    pub clarify_input: Entity<InputState>,
+    /// The agent's plan for this chat, and whether its list is unfolded.
+    pub todos: Vec<crate::model::Todo>,
+    pub plan_open: bool,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
     /// The profile's own approvals, effort and model have arrived: until then the status bar
@@ -211,8 +242,6 @@ pub struct HermesApp {
     pub right: Option<RightTab>,
     pub file: Option<FileView>,
     pub file_editor: Entity<EditorState>,
-    /// The file list beside the viewer (remembered; hidden by default).
-    pub show_list: bool,
     pub tree_root: Option<String>,
     pub tree: HashMap<String, Vec<(String, String, bool)>>,
     pub tree_open: HashSet<String>,
@@ -234,6 +263,11 @@ pub struct HermesApp {
     pub video_task: Option<Task<()>>,
     /// Markdown files shown in full rather than their first lines.
     pub media_open: HashSet<String>,
+
+    /// SSH mode: servers of ~/.ssh/config and their terminals.
+    pub ssh: servers::Ssh,
+    /// The mini IDE's source and the server file it keeps in sync.
+    pub ide: ide::Ide,
 
     _subscriptions: Vec<Subscription>,
     _tasks: Vec<Task<()>>,
@@ -273,6 +307,8 @@ impl HermesApp {
             composer.update(cx, |s, cx| s.set_value(v, window, cx));
         }
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sessions"));
+        let clarify_input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Your own answer — Enter to send"));
         let project_path =
             cx.new(|cx| InputState::new(window, cx).placeholder("/home/you/project — Enter"));
         let mcp_editor = cx.new(|cx| {
@@ -320,15 +356,40 @@ impl HermesApp {
                 cx,
             )
         });
-        let file_editor = cx.new(|cx| EditorState::new(window, cx).line_number(true));
+        // The IDE panel is narrow: long lines scroll sideways instead of wrapping into a mess.
+        let file_editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .line_number(true)
+                .soft_wrap(false)
+        });
 
         let subs = vec![
+            // The IDE's editor: unsaved edits show as a dot on the tab.
+            cx.subscribe_in(&file_editor, window, |this, _, ev: &InputEvent, _, cx| {
+                if let InputEvent::Change = ev {
+                    this.on_editor_change(cx);
+                }
+            }),
             // "System" follows macOS light/dark as it changes.
             cx.observe_window_appearance(window, |this, window, cx| {
                 if this.appearance.mode == crate::theme::Mode::System {
                     crate::theme::apply(this.appearance, Some(window), cx);
+                    this.repaint_terminals(cx);
                 }
             }),
+            // Enter in the question card's field sends that text as the answer.
+            cx.subscribe_in(
+                &clarify_input,
+                window,
+                |this, state, ev: &InputEvent, window, cx| {
+                    if let InputEvent::PressEnter { .. } = ev {
+                        let text = state.read(cx).value().trim().to_string();
+                        if !text.is_empty() {
+                            this.answer_clarify(text, window, cx);
+                        }
+                    }
+                },
+            ),
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
                 match ev {
                     InputEvent::PressEnter { shift: false, .. } => this.send(window, cx),
@@ -442,7 +503,11 @@ impl HermesApp {
                         this.playing = None;
                         cx.notify();
                     }
-                    if this.media_playing.as_ref().is_some_and(|(_, p)| p.is_done()) {
+                    if this
+                        .media_playing
+                        .as_ref()
+                        .is_some_and(|(_, p)| p.is_done())
+                    {
                         this.media_playing = None;
                     }
                     if this.media_playing.is_some() {
@@ -462,7 +527,8 @@ impl HermesApp {
         });
         let mut tasks = vec![events, ticker];
 
-        // Hide SSH hosts that do not run Hermes.
+        // The gateway list keeps the SSH hosts that run Hermes (asked again when the menu opens).
+        let ssh = servers::Ssh::new(window, cx);
         for host in targets.iter().filter_map(|t| match t {
             Target::Ssh(h) => Some(h.clone()),
             Target::Local => None,
@@ -472,18 +538,16 @@ impl HermesApp {
                 let ok = cx
                     .background_spawn(async move { connection::host_check(&h) })
                     .await;
-                // Only hide hosts that answered without Hermes; unreachable ones stay listed.
-                if ok == connection::HostCheck::NoHermes {
-                    let _ =
-                        this.update_in(cx, |this, window, cx| this.drop_target(&host, window, cx));
-                }
+                let _ = this.update(cx, |this, cx| this.host_checked(host, ok, cx));
             }));
         }
 
         let mut app = Self {
+            ssh,
+            ide: Default::default(),
             targets,
             target: initial.clone(),
-            target_choice,
+            _target_choice: target_choice,
             gateway: None,
             conn: None,
             evt_tx,
@@ -502,6 +566,10 @@ impl HermesApp {
             turns: vec![],
             live: None,
             queued: None,
+            queued_images: vec![],
+            attachments: vec![],
+            files_open: false,
+            send_after_transcribe: false,
             usage: None,
             effort: EFFORTS.len() - 1,
             profile_models: vec![],
@@ -510,6 +578,11 @@ impl HermesApp {
             slash_closed: false,
             slash_scroll: ScrollHandle::new(),
             approval: None,
+            clarify: None,
+            clarify_picked: vec![],
+            clarify_input,
+            todos: vec![],
+            plan_open: false,
             approval_mode: None,
             profile_context: 0,
             marks: marks::load(),
@@ -528,7 +601,6 @@ impl HermesApp {
             installs: HashMap::new(),
             appearance: crate::theme::Appearance::load(),
             speed: crate::speed::Meter::fresh(),
-            show_list: std::fs::read_to_string(file_list_pref()).is_ok_and(|s| s.trim() == "1"),
             search,
             search_query: String::new(),
             search_hits: None,
@@ -592,6 +664,18 @@ impl HermesApp {
             _tasks: tasks,
         };
         app.connect(initial, window, cx);
+        // A new window opened from SSH mode starts in SSH mode.
+        if let Some(alias) = servers::NEXT_SSH.lock().unwrap().take() {
+            cx.spawn_in(window, async move |this, cx| {
+                let _ = this.update_in(cx, |this, window, cx| {
+                    this.set_ssh_mode(true, window, cx);
+                    if !alias.is_empty() {
+                        this.open_server(alias, window, cx);
+                    }
+                });
+            })
+            .detach();
+        }
         app
     }
 
@@ -606,21 +690,6 @@ impl HermesApp {
     }
 
     // ---- connection ------------------------------------------------------
-
-    fn drop_target(&mut self, host: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let gone = Target::Ssh(host.to_string());
-        if self.target == gone {
-            return; // keep the one the user is on; its error explains itself
-        }
-        self.targets.retain(|t| *t != gone);
-        let labels: Vec<SharedString> = self.targets.iter().map(|t| t.label().into()).collect();
-        let current = self.targets.iter().position(|t| *t == self.target);
-        self.target_choice.update(cx, |s, cx| {
-            s.set_items(labels, window, cx);
-            s.set_selected_index(current.map(IndexPath::new), window, cx);
-        });
-        cx.notify();
-    }
 
     pub fn connect(&mut self, target: Target, _window: &mut Window, cx: &mut Context<Self>) {
         self.gateway = None; // drops the old thread
@@ -742,8 +811,10 @@ impl HermesApp {
                     self.runtime = Some(runtime);
                     self.turns = turns;
                     self.restore_reviews();
+                    // The clock runs from the user's message, not from when this chat was opened.
+                    let since = live_since(self.turns.last().and_then(|t| t.started));
                     self.live = running.then(|| Live {
-                        started: Instant::now(),
+                        started: since,
                         label: "Working…".into(),
                     });
                     self.reset_scroller(cx);
@@ -758,7 +829,8 @@ impl HermesApp {
                 if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
                     self.apply_model_pick(&profile, &runtime);
                     let effort = self.take_effort();
-                    match self.parse_command(&text) {
+                    let images = std::mem::take(&mut self.queued_images);
+                    match self.parse_command(&text).filter(|_| images.is_empty()) {
                         Some((name, arg)) => self.cmd(Cmd::Dispatch {
                             profile,
                             session: runtime,
@@ -770,6 +842,7 @@ impl HermesApp {
                             session: runtime,
                             text,
                             effort,
+                            images,
                         }),
                     }
                 }
@@ -779,7 +852,7 @@ impl HermesApp {
             Evt::Started(sid) if self.is_current(&sid) => {
                 if self.live.is_none() {
                     self.live = Some(Live {
-                        started: Instant::now(),
+                        started: live_since(self.turns.last().and_then(|t| t.started)),
                         label: "Thinking…".into(),
                     });
                 }
@@ -895,6 +968,7 @@ impl HermesApp {
                             session,
                             text: message,
                             effort: None,
+                            images: vec![],
                         });
                     }
                 }
@@ -918,6 +992,24 @@ impl HermesApp {
                 if self.approval.as_ref().is_some_and(|a| a.session == sid) {
                     self.approval = None;
                 }
+            }
+            Evt::Clarify(req) if self.is_current(&req.session) => {
+                if let Some(live) = self.live.as_mut() {
+                    live.label = "Waiting for your answer…".into();
+                }
+                self.clarify = Some(req);
+                self.clarify_picked.clear();
+                self.clarify_input
+                    .update(cx, |s, cx| s.set_value("", window, cx));
+                self.remeasure_last(cx);
+            }
+            Evt::ClarifyDone(sid) => {
+                if self.clarify.as_ref().is_some_and(|c| c.session == sid) {
+                    self.clarify = None;
+                }
+            }
+            Evt::Todos(sid, todos) if self.is_current(&sid) => {
+                self.todos = todos;
             }
             Evt::Subagent {
                 session,
@@ -997,8 +1089,11 @@ impl HermesApp {
     // ---- chat ------------------------------------------------------------
 
     fn reset_chat(&mut self, cx: &mut Context<Self>) {
-        self.tree_root = None;
-        self.tree.clear();
+        // An open IDE stays as it is (it was opened on purpose); a closed one re-roots next time.
+        if !self.ide_open() {
+            self.tree_root = None;
+            self.tree.clear();
+        }
         self.session = None;
         self.runtime = None;
         self.turns.clear();
@@ -1008,6 +1103,9 @@ impl HermesApp {
         self.playing = None;
         self.media_playing = None;
         self.stop_video(None, cx);
+        self.approval = None;
+        self.clarify = None;
+        self.todos.clear();
         self.model_pick = None;
         self.model_pending = false;
         // Speeds describe the model and server, not the chat: keep them, restart the counters.
@@ -1259,21 +1357,43 @@ impl HermesApp {
     }
 
     pub fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // While dictating, Send stops the recording and sends what it recognizes.
+        if self.recorder.is_some() || self.transcribing {
+            self.send_after_transcribe = true;
+            if self.recorder.is_some() {
+                self.toggle_mic(window, cx);
+            }
+            cx.notify();
+            return;
+        }
         let text = self.composer.read(cx).value().trim().to_string();
         let Some(profile) = self.profile.clone() else {
             return;
         };
-        if text.is_empty() || self.live.is_some() {
+        let files = self.attachments.clone();
+        if (text.is_empty() && files.is_empty()) || self.live.is_some() {
             return;
         }
         // Enter in the command list picks the command instead of sending.
-        if self.complete_slash(window, cx) {
+        if files.is_empty() && self.complete_slash(window, cx) {
             return;
         }
         self.composer
             .update(cx, |s, cx| s.set_value("", window, cx));
+        self.attachments.clear();
+        let with_files = |text: &str, lines: Vec<String>| {
+            std::iter::once(text.to_string())
+                .filter(|t| !t.is_empty())
+                .chain(lines)
+                .collect::<Vec<_>>()
+                .join("\n\n")
+        };
+        let shown: Vec<String> = files
+            .iter()
+            .map(|f| format!("{}{}]", attach::PREFIX, f.display()))
+            .collect();
         self.turns.push(Turn {
-            user: text.clone(),
+            user: with_files(&text, shown),
             started: Some(now_secs()),
             ..Default::default()
         });
@@ -1282,10 +1402,62 @@ impl HermesApp {
         self.speed.request();
         self.live = Some(Live {
             started: Instant::now(),
-            label: "Sending…".into(),
+            label: if files.is_empty() {
+                "Sending…"
+            } else {
+                "Uploading…"
+            }
+            .into(),
         });
+        if files.is_empty() {
+            self.submit(profile, text, vec![], window, cx);
+            return;
+        }
+        let Some(conn) = self.conn.clone() else {
+            return;
+        };
+        let (target, canonical) = (self.target.clone(), conn.canonical());
+        cx.spawn_in(window, async move |this, cx| {
+            let p = profile.clone();
+            let prepared = cx
+                .background_spawn(
+                    async move { attach::prepare(&conn, &target, &p, canonical, &files) },
+                )
+                .await;
+            let _ = this.update_in(cx, |this, window, cx| match prepared {
+                Ok(prep) => {
+                    if let Some(live) = this.live.as_mut() {
+                        live.label = "Sending…".into();
+                    }
+                    let full = with_files(&text, prep.lines);
+                    this.submit(profile, full, prep.images, window, cx);
+                }
+                Err(e) => {
+                    this.live = None;
+                    this.toast(
+                        NotificationType::Error,
+                        format!("Attach: {e:#}"),
+                        window,
+                        cx,
+                    );
+                }
+            });
+        })
+        .detach();
+    }
+
+    /// The message (with its files named in the text, images staged) to the session, or to a
+    /// new one.
+    fn submit(
+        &mut self,
+        profile: String,
+        text: String,
+        images: Vec<(String, String)>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         match self.runtime.clone() {
-            Some(session) => match self.parse_command(&text) {
+            Some(session) => match self.parse_command(&text).filter(|_| images.is_empty()) {
                 Some((name, arg)) => self.cmd(Cmd::Dispatch {
                     profile,
                     session,
@@ -1299,6 +1471,7 @@ impl HermesApp {
                         session,
                         text,
                         effort,
+                        images,
                     });
                 }
             },
@@ -1306,6 +1479,7 @@ impl HermesApp {
                 // A new session is created on the first message; the effort goes with it.
                 self.effort_pending = true;
                 self.queued = Some(text.clone());
+                self.queued_images = images;
                 match (self.new_project.clone(), self.new_branch) {
                     (Some(root), true) => {
                         // Its own branch: a fresh folder named after the request.
@@ -1583,170 +1757,6 @@ impl HermesApp {
         out
     }
 
-    /// Switch the right panel's tab (opening it if closed).
-    pub fn toggle_right_tab(&mut self, tab: RightTab, window: &mut Window, cx: &mut Context<Self>) {
-        self.right = Some(tab);
-        if tab == RightTab::Files && self.tree_root.is_none() {
-            self.load_tree_root(window, cx);
-        }
-        cx.notify();
-    }
-
-    pub fn toggle_right(&mut self, tab: RightTab, window: &mut Window, cx: &mut Context<Self>) {
-        self.right = if self.right == Some(tab) {
-            None
-        } else {
-            Some(tab)
-        };
-        if self.right == Some(RightTab::Files) && self.tree_root.is_none() {
-            self.load_tree_root(window, cx);
-        }
-        cx.notify();
-    }
-
-    /// Tree root: the chat's project, else the common folder of the changed files, else the
-    /// profile's working dir.
-    pub(super) fn load_tree_root(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let own = self
-            .project
-            .as_ref()
-            .map(|p| p.dir.clone())
-            .or_else(|| self.session.as_ref().and_then(|s| self.folder_of(s)));
-        if let Some(dir) = own {
-            self.set_tree_root(dir, window, cx);
-            return;
-        }
-        let files: Vec<String> = self.session_files().into_iter().map(|(p, _)| p).collect();
-        if let Some(root) = common_dir(&files) {
-            self.set_tree_root(root, window, cx);
-            return;
-        }
-        self.rest(window, cx, rest::default_cwd, |this, r, window, cx| {
-            if let Ok(cwd) = r {
-                if !cwd.is_empty() {
-                    this.set_tree_root(cwd, window, cx);
-                }
-            }
-        });
-    }
-
-    pub fn set_tree_root(&mut self, root: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.tree_root = Some(root.clone());
-        self.tree.clear();
-        self.tree_open.clear();
-        self.open_dir(root, window, cx);
-    }
-
-    pub fn open_dir(&mut self, dir: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.tree_open.remove(&dir) && self.tree_root.as_deref() != Some(&dir) {
-            cx.notify();
-            return;
-        }
-        self.tree_open.insert(dir.clone());
-        if self.tree.contains_key(&dir) {
-            cx.notify();
-            return;
-        }
-        let d = dir.clone();
-        self.rest(
-            window,
-            cx,
-            move |c, p| rest::list_dir(c, p, &d),
-            move |this, r, window, cx| match r {
-                Ok(entries) => {
-                    this.tree.insert(dir, entries);
-                }
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Folder: {e:#}"),
-                    window,
-                    cx,
-                ),
-            },
-        );
-    }
-
-    /// Open a file in the viewer; `diffs` empty means a plain file from the tree.
-    pub fn open_file(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
-        let diffs = self
-            .session_files()
-            .into_iter()
-            .find(|(p, _)| *p == path)
-            .map(|(_, d)| d)
-            .unwrap_or_default();
-        let mode = if diffs.is_empty() {
-            FileMode::After
-        } else {
-            FileMode::Diff
-        };
-        self.file = Some(FileView {
-            path: path.clone(),
-            mode,
-            diffs,
-            loaded: false,
-            truncated: false,
-            missing: false,
-            diff_view: None,
-            before_view: None,
-        });
-        if let Some(view) = self.file.as_mut() {
-            if !view.diffs.is_empty() {
-                let files = DiffFile::parse(&crate::diff::joined(&view.diffs)).unwrap_or_default();
-                view.diff_view = Some(diff_state(files, cx));
-            }
-        }
-        if self.right.is_none() {
-            self.right = Some(RightTab::Changes);
-        }
-        let language = language_for(&path);
-        self.file_editor.update(cx, |s, cx| {
-            s.set_highlighter(language, cx);
-            s.set_value("", window, cx);
-        });
-        let p = path.clone();
-        self.rest(
-            window,
-            cx,
-            move |c, prof| rest::read_text(c, prof, &p),
-            move |this, r, window, cx| {
-                let Some(view) = this.file.as_mut().filter(|f| f.path == path) else {
-                    return;
-                };
-                match r {
-                    Ok(file) if file.binary => view.missing = true,
-                    Ok(file) => {
-                        let before = (!view.diffs.is_empty() && !file.truncated)
-                            .then(|| crate::diff::before(&file.text, &view.diffs))
-                            .flatten();
-                        if let Some(before) = before {
-                            let full = crate::diff::full(&view.path, &before, &file.text);
-                            if let Ok(files) = DiffFile::parse(&full) {
-                                if !files.is_empty() {
-                                    view.diff_view = Some(diff_state(files, cx));
-                                }
-                            }
-                            let original = DiffFile::unchanged(view.path.clone(), &before);
-                            view.before_view = Some(diff_state(vec![original], cx));
-                        }
-                        view.truncated = file.truncated;
-                        view.loaded = true;
-                        this.file_editor
-                            .update(cx, |s, cx| s.set_value(file.text, window, cx));
-                    }
-                    // Deleted or moved since (old sessions): no error, just the recorded edits.
-                    Err(_) => {
-                        view.missing = true;
-                        if view.diff_view.is_none() {
-                            view.mode = FileMode::After;
-                        }
-                    }
-                }
-                cx.notify();
-            },
-        );
-        cx.notify();
-    }
-
     pub fn set_appearance(
         &mut self,
         a: crate::theme::Appearance,
@@ -1756,6 +1766,7 @@ impl HermesApp {
         self.appearance = a;
         a.save();
         crate::theme::apply(a, Some(window), cx);
+        self.repaint_terminals(cx);
         cx.notify();
     }
 
@@ -1847,103 +1858,6 @@ impl HermesApp {
         );
         let _ = std::fs::create_dir_all(connection::state_dir());
         let _ = std::fs::write(path, serde_json::to_vec(&all).unwrap_or_default());
-    }
-
-    pub fn toggle_file_list(&mut self, cx: &mut Context<Self>) {
-        self.show_list = !self.show_list;
-        let _ = std::fs::create_dir_all(connection::state_dir());
-        let _ = std::fs::write(file_list_pref(), if self.show_list { "1" } else { "0" });
-        cx.notify();
-    }
-
-    pub fn set_file_mode(&mut self, mode: FileMode, cx: &mut Context<Self>) {
-        if let Some(f) = self.file.as_mut() {
-            f.mode = mode;
-        }
-        cx.notify();
-    }
-
-    pub fn save_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(view) = self.file.as_ref() else {
-            return;
-        };
-        if !view.loaded || view.truncated {
-            self.toast(
-                NotificationType::Warning,
-                "This file was loaded partially — saving is disabled",
-                window,
-                cx,
-            );
-            return;
-        }
-        let path = view.path.clone();
-        let text = self.file_editor.read(cx).value().to_string();
-        self.rest(
-            window,
-            cx,
-            move |c, p| rest::write_text(c, p, &path, &text),
-            |this, r, window, cx| match r {
-                Ok(()) => this.toast(NotificationType::Success, "Saved", window, cx),
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Not saved: {e:#}"),
-                    window,
-                    cx,
-                ),
-            },
-        );
-    }
-
-    /// Open the file in Zed: locally by path, over SSH as ssh://host/path.
-    /// The open file in Zed, inside its project when there is one (so Zed opens the whole repo).
-    pub fn open_in_zed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(path) = self.file.as_ref().map(|f| f.path.clone()) else {
-            return;
-        };
-        let mut paths: Vec<String> = self
-            .project
-            .as_ref()
-            .filter(|p| path.starts_with(&format!("{}/", p.dir)))
-            .map(|p| vec![p.dir.clone()])
-            .unwrap_or_default();
-        paths.push(path);
-        self.zed(paths, window, cx);
-    }
-
-    pub fn open_project_in_zed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(dir) = self.project.as_ref().map(|p| p.dir.clone()) {
-            self.zed(vec![dir], window, cx);
-        }
-    }
-
-    fn zed(&mut self, paths: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
-        let targets: Vec<String> = paths
-            .into_iter()
-            .map(|p| match &self.target {
-                Target::Local => p,
-                Target::Ssh(host) => format!("ssh://{host}{p}"),
-            })
-            .collect();
-        let zed = ["/usr/local/bin/zed", "/opt/homebrew/bin/zed"]
-            .into_iter()
-            .find(|p| std::path::Path::new(p).exists());
-        let result = match (zed, &self.target) {
-            (Some(cli), _) => std::process::Command::new(cli)
-                .args(&targets)
-                .spawn()
-                .map(|_| ()),
-            (None, Target::Local) => std::process::Command::new("open")
-                .args(["-a", "Zed"])
-                .args(&targets)
-                .spawn()
-                .map(|_| ()),
-            (None, Target::Ssh(_)) => Err(std::io::Error::other(
-                "the `zed` CLI is not installed (Zed → Install CLI)",
-            )),
-        };
-        if let Err(e) = result {
-            self.toast(NotificationType::Error, format!("Zed: {e}"), window, cx);
-        }
     }
 
     pub fn toggle_step(&mut self, turn: usize, step: usize, cx: &mut Context<Self>) {
@@ -2182,6 +2096,7 @@ impl HermesApp {
                         move |c, p| rest::transcribe(c, p, &wav),
                         |this, r, window, cx| {
                             this.transcribing = false;
+                            let send = std::mem::take(&mut this.send_after_transcribe);
                             match r {
                                 Ok(text) if !text.is_empty() => {
                                     let current = this.composer.read(cx).value().to_string();
@@ -2192,6 +2107,9 @@ impl HermesApp {
                                     };
                                     this.composer
                                         .update(cx, |s, cx| s.set_value(joined, window, cx));
+                                    if send {
+                                        this.send(window, cx);
+                                    }
                                 }
                                 Ok(_) => this.toast(
                                     NotificationType::Warning,
@@ -2209,12 +2127,15 @@ impl HermesApp {
                         },
                     );
                 }
-                Err(e) => self.toast(
-                    NotificationType::Warning,
-                    format!("Recording: {e:#}"),
-                    window,
-                    cx,
-                ),
+                Err(e) => {
+                    self.send_after_transcribe = false;
+                    self.toast(
+                        NotificationType::Warning,
+                        format!("Recording: {e:#}"),
+                        window,
+                        cx,
+                    );
+                }
             }
         } else {
             match Recorder::start() {
@@ -2280,7 +2201,7 @@ impl HermesApp {
 }
 
 /// The deepest folder containing every path.
-fn common_dir(paths: &[String]) -> Option<String> {
+pub(super) fn common_dir(paths: &[String]) -> Option<String> {
     let first = std::path::Path::new(paths.first()?).parent()?.to_path_buf();
     let mut root = first;
     for p in &paths[1..] {
@@ -2289,39 +2210,6 @@ fn common_dir(paths: &[String]) -> Option<String> {
         }
     }
     Some(root.to_string_lossy().to_string())
-}
-
-/// Tree-sitter language for a file name (falls back to plain text).
-pub fn language_for(path: &str) -> &'static str {
-    let ext = std::path::Path::new(path)
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or("")
-        .to_lowercase();
-    match ext.as_str() {
-        "rs" => "rust",
-        "py" => "python",
-        "js" | "mjs" | "cjs" => "javascript",
-        "ts" => "typescript",
-        "tsx" => "tsx",
-        "json" => "json",
-        "yaml" | "yml" => "yaml",
-        "toml" => "toml",
-        "md" | "markdown" => "markdown",
-        "html" | "htm" => "html",
-        "css" => "css",
-        "sh" | "bash" | "zsh" => "bash",
-        "go" => "go",
-        "php" => "php",
-        "rb" => "ruby",
-        "swift" => "swift",
-        "java" => "java",
-        "kt" => "kotlin",
-        "c" | "h" => "c",
-        "cpp" | "cc" | "hpp" => "cpp",
-        "lua" => "lua",
-        _ => "text",
-    }
 }
 
 pub fn now_secs() -> f64 {
@@ -2352,12 +2240,8 @@ pub fn tool_label(name: &str, detail: &str) -> String {
 }
 
 /// A diff view state: three lines of context around each change, the rest folded (expandable).
-fn diff_state(files: Vec<DiffFile>, cx: &mut App) -> Entity<DiffState> {
+pub(super) fn diff_state(files: Vec<DiffFile>, cx: &mut App) -> Entity<DiffState> {
     cx.new(|cx| DiffState::new(files, cx).with_context_lines(Some(3)))
-}
-
-fn file_list_pref() -> std::path::PathBuf {
-    connection::state_dir().join("file-list")
 }
 
 /// One line of at most 160 characters.

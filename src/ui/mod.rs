@@ -1,12 +1,19 @@
 //! Rendering. Each file adds `render_*` methods to `HermesApp`.
 
+mod asks;
 mod chat;
 mod composer;
 mod files;
 mod media;
 mod panels;
+mod servers;
 mod sidebar;
 mod statusbar;
+mod terminal;
+
+pub fn terminal_palette(theme: &gpui_kit::component::Theme) -> crate::term::Palette {
+    terminal::palette(theme)
+}
 
 use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -20,6 +27,47 @@ use crate::app::{HermesApp, Panel};
 /// with 8px above and below, so it follows the Appearance size.
 pub fn bar_h(cx: &App) -> Pixels {
     cx.theme().font_size * 2. + px(16.)
+}
+
+/// Rows under a group header (sessions of a project, servers of a folder) start where the
+/// header's name does: 1rem inset + 1rem icon + 0.375rem gap, less the row's 2px stripe and
+/// 2px the icon box is narrower than 1rem (measured).
+pub fn nest_pl(cx: &App) -> Pixels {
+    cx.theme().font_size * 2.375 - px(4.)
+}
+
+/// The group's indent guide: a 1px line under the center of the header's icon (1.5rem), less
+/// the row's stripe. In a group's `last` row it stops where the text does, not in the row's
+/// bottom padding (`py_2` = 0.5rem).
+pub fn nest_guide(cx: &App, last: bool) -> impl IntoElement {
+    div()
+        .absolute()
+        .top_0()
+        .when(last, |d| d.bottom(cx.theme().font_size * 0.5))
+        .when(!last, |d| d.bottom_0())
+        .left(cx.theme().font_size * 1.5 - px(2.5))
+        .w(px(1.))
+        .bg(cx.theme().border)
+}
+
+/// A group header's fold chevron, at the right before its "+": shown on a folded group, and
+/// on hover of an open one.
+pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl IntoElement {
+    div()
+        .flex_none()
+        .p_0p5()
+        .text_color(cx.theme().muted_foreground)
+        .opacity(if collapsed { 1. } else { 0. })
+        .group_hover(group, |s| s.opacity(1.))
+        .child(
+            if collapsed {
+                crate::icons::Ico::ChevronRight
+            } else {
+                crate::icons::Ico::ChevronDown
+            }
+            .icon()
+            .xsmall(),
+        )
 }
 
 /// The control inside those bars: the search field and the "New session" button.
@@ -104,17 +152,17 @@ impl HermesApp {
                                 .on_click(act(|this, window, cx| this.delete_branch(window, cx))),
                             );
                     }
-                    menu.item(
-                        PopupMenuItem::new("Open project in Zed")
-                            .on_click(act(|this, window, cx| this.open_project_in_zed(window, cx))),
-                    )
+                    menu
                 })
                 .into_any_element(),
         )
     }
 
     /// Header strip: the session title, or the settings tabs.
-    fn render_header(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.ssh.on && self.panel == Panel::Chat {
+            return self.render_ssh_header(cx);
+        }
         let theme = cx.theme().clone();
         let bar = h_flex()
             .id("header")
@@ -133,25 +181,6 @@ impl HermesApp {
                 .map(|s| s.title.clone())
                 .unwrap_or_else(|| "New session".into())
                 .into();
-            let right = self.right;
-            let toggle =
-                |id: &'static str, icon: crate::icons::Ico, tip: &'static str, active: bool| {
-                    div()
-                        .id(id)
-                        .p_1()
-                        .cursor_pointer()
-                        .text_color(if active {
-                            theme.primary
-                        } else {
-                            theme.muted_foreground
-                        })
-                        .when(active, |d| d.bg(theme.list_active))
-                        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                        .child(icon.icon().small())
-                        .tooltip(move |window, cx| {
-                            gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx)
-                        })
-                };
             return bar
                 .pl_4()
                 .pr_2()
@@ -166,37 +195,8 @@ impl HermesApp {
                         .child(title),
                 )
                 .children(self.render_project_chip(cx))
-                .child(
-                    toggle(
-                        "hdr-window",
-                        crate::icons::Ico::AppWindow,
-                        "New window",
-                        false,
-                    )
-                    .on_click(cx.listener(|this, _, _, cx| this.open_window(None, cx))),
-                )
-                .child(
-                    toggle(
-                        "hdr-changes",
-                        crate::icons::Ico::FileDiff,
-                        "Changed files",
-                        right == Some(crate::app::RightTab::Changes),
-                    )
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.toggle_right(crate::app::RightTab::Changes, window, cx)
-                    })),
-                )
-                .child(
-                    toggle(
-                        "hdr-files",
-                        crate::icons::Ico::FolderTree,
-                        "Project files",
-                        right == Some(crate::app::RightTab::Files),
-                    )
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.toggle_right(crate::app::RightTab::Files, window, cx)
-                    })),
-                );
+                .child(self.render_header_tail(cx))
+                .into_any_element();
         }
 
         let current = self.panel;
@@ -234,32 +234,44 @@ impl HermesApp {
                     cx.listener(move |this, _, window, cx| this.open_panel(panel, window, cx)),
                 )
         });
-        bar.children(tabs).child(div().flex_1()).child(
-            div()
-                .id("settings-close")
-                .px_3()
-                .h_full()
-                .flex()
-                .items_center()
-                .cursor_pointer()
-                .text_color(theme.muted_foreground)
-                .hover(|s| s.text_color(theme.foreground))
-                .child(crate::icons::Ico::X.icon().small())
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.panel = Panel::Chat;
-                    cx.notify();
-                })),
-        )
+        bar.children(tabs)
+            .child(div().flex_1())
+            .child(
+                div()
+                    .id("settings-close")
+                    .px_3()
+                    .h_full()
+                    .flex()
+                    .items_center()
+                    .cursor_pointer()
+                    .text_color(theme.muted_foreground)
+                    .hover(|s| s.text_color(theme.foreground))
+                    .child(crate::icons::Ico::X.icon().small())
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.panel = Panel::Chat;
+                        cx.notify();
+                    })),
+            )
+            .into_any_element()
     }
 }
 
 impl Render for HermesApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
+        let ssh = self.ssh.on && self.panel == Panel::Chat;
         let body = match self.panel {
+            Panel::Chat if ssh => self.render_ssh_body(window, cx),
+            // Files dropped anywhere on the chat or the input are attached.
             Panel::Chat => v_flex()
+                .id("chat-drop")
                 .size_full()
+                .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
+                .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
+                    this.add_attachments(paths.paths().to_vec(), cx)
+                }))
                 .child(div().flex_1().min_h_0().child(self.render_chat(cx)))
+                .children(self.render_plan(cx))
                 .child(self.render_composer(window, cx))
                 .into_any_element(),
             Panel::Skills => self.render_skills(cx).into_any_element(),
@@ -278,30 +290,55 @@ impl Render for HermesApp {
             .child(self.render_header(cx))
             .child(div().flex_1().min_h_0().child(body));
 
+        // The IDE maximized (⌘⇧B) has the whole window; the rest keeps running, hidden.
+        let expanded = self.ide.expanded && self.right.is_some() && self.panel == Panel::Chat;
+        let content = self.render_layout(main, expanded, cx);
         v_flex()
             .size_full()
             .bg(theme.background)
             .text_color(theme.foreground)
-            .child(
-                div().flex_1().min_h_0().child(
-                    h_resizable("layout")
-                        .child(
-                            resizable_panel()
-                                .size(px(280.))
-                                .size_range(px(200.)..px(480.))
-                                .child(self.render_sidebar(cx)),
-                        )
-                        .child(resizable_panel().child(main))
-                        .when(self.right.is_some() && self.panel == Panel::Chat, |d| {
-                            d.child(
-                                resizable_panel()
-                                    .size(px(640.))
-                                    .size_range(px(360.)..px(1400.))
-                                    .child(self.render_right(cx)),
-                            )
-                        }),
-                ),
-            )
+            // Shortcuts for the whole window (app/keys.rs) see every key first.
+            .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                if this.global_key(&ev.keystroke, window, cx) {
+                    cx.stop_propagation();
+                }
+            }))
+            .child(div().flex_1().min_h_0().child(content))
             .child(self.render_statusbar(window, cx))
+    }
+}
+
+impl HermesApp {
+    /// Sidebar | main | IDE (when open), resizable. Maximized, the IDE takes both places: its
+    /// tree where the sidebar is (same width), its editor where the chat/terminal is.
+    fn render_layout(&mut self, main: Div, expanded: bool, cx: &mut Context<Self>) -> AnyElement {
+        if expanded {
+            return h_resizable("layout")
+                .child(
+                    resizable_panel()
+                        .size(px(280.))
+                        .size_range(px(200.)..px(480.))
+                        .child(self.render_ide_sidebar(cx)),
+                )
+                .child(resizable_panel().child(self.render_ide_main(cx)))
+                .into_any_element();
+        }
+        h_resizable("layout")
+            .child(
+                resizable_panel()
+                    .size(px(280.))
+                    .size_range(px(200.)..px(480.))
+                    .child(self.render_sidebar(cx)),
+            )
+            .child(resizable_panel().child(main))
+            .when(self.right.is_some() && self.panel == Panel::Chat, |d| {
+                d.child(
+                    resizable_panel()
+                        .size(px(640.))
+                        .size_range(px(360.)..px(1400.))
+                        .child(self.render_right(cx)),
+                )
+            })
+            .into_any_element()
     }
 }

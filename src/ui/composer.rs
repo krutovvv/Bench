@@ -126,7 +126,8 @@ impl HermesApp {
         let theme = cx.theme().clone();
         let busy = self.live.is_some();
         let recording = self.recorder.is_some();
-        let has_text = !self.composer.read(cx).value().trim().is_empty();
+        let has_text =
+            !self.composer.read(cx).value().trim().is_empty() || !self.attachments.is_empty();
 
         // The two round buttons in a square UI: a quiet one (outline) and a filled one.
         let round = |id: &'static str, icon: Ico, tip: &'static str, filled: Option<Hsla>| {
@@ -158,7 +159,12 @@ impl HermesApp {
         let mic = if self.transcribing {
             round("mic", Ico::Loader, "Transcribing…", None)
         } else if recording {
-            round("mic", Ico::Square, "Stop and transcribe", Some(theme.danger))
+            round(
+                "mic",
+                Ico::Square,
+                "Stop and transcribe",
+                Some(theme.danger),
+            )
         } else {
             round("mic", Ico::Mic, "Dictate", None)
         }
@@ -172,54 +178,104 @@ impl HermesApp {
                 "send",
                 Ico::ArrowUp,
                 "Send (Enter)",
-                has_text.then_some(theme.primary),
+                // While dictating it sends what is being said.
+                (has_text || recording || self.transcribing).then_some(theme.primary),
             )
             .on_click(cx.listener(|this, _, window, cx| this.send(window, cx)))
         };
 
         let slash = self.render_slash(cx);
+        let clip = round(
+            "attach",
+            Ico::Paperclip,
+            "Attach files (or drop them, or ⌘V)",
+            None,
+        )
+        .on_click(cx.listener(|this, _, _, cx| this.pick_attachments(cx)));
+        let chips: Vec<AnyElement> = self
+            .attachments
+            .clone()
+            .iter()
+            .enumerate()
+            .map(|(k, p)| {
+                self.attachment_chip(
+                    format!("attach-{k}").into(),
+                    &p.to_string_lossy(),
+                    Some(k),
+                    cx,
+                )
+            })
+            .collect();
 
-        h_flex()
+        v_flex()
             .id("composer")
             .relative()
             .w_full()
             .flex_none()
-            .min_h(super::bar_h(cx))
-            .items_center()
             .bg(theme.background)
-            // The command list takes ↑ ↓ Tab Esc before the text field does.
+            // The command list takes ↑ ↓ Tab Esc before the text field does; ⌘V of a
+            // screenshot or of Finder files attaches them.
             .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                 let k = &ev.keystroke;
                 if !k.modifiers.modified() && this.slash_key(k.key.as_str(), window, cx) {
+                    cx.stop_propagation();
+                }
+                let m = &k.modifiers;
+                if k.key == "v"
+                    && m.platform
+                    && !m.shift
+                    && !m.alt
+                    && !m.control
+                    && this.paste_attachments(cx)
+                {
                     cx.stop_propagation();
                 }
             }))
             .children(slash)
             .border_t_1()
             .border_color(theme.border)
-            .when(recording, |d| d.child(self.render_wave(&theme)))
-            .when(!recording, |d| {
+            // Files waiting to go: one row of chips over the text, at the text's inset.
+            .when(!chips.is_empty(), |d| {
                 d.child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        // Measured: the "New session" button sits 14pt from the divider; the
-                        // textarea pads its text by ~10.5 itself, so 3.5 more lands the text at 14.
-                        .pl(px(3.5))
-                        .py_1()
-                        .child(Textarea::new(&self.composer).appearance(false)),
+                    h_flex()
+                        .flex_wrap()
+                        .gap_1p5()
+                        .px(px(14.))
+                        .pt_2()
+                        .children(chips),
                 )
             })
             .child(
                 h_flex()
-                    .flex_none()
-                    .gap_2()
-                    .pl_2()
-                    // A little more room right of the send button than the 8 it had.
-                    .pr_3()
+                    .w_full()
+                    .min_h(super::bar_h(cx))
                     .items_center()
-                    .child(mic)
-                    .child(action),
+                    .when(recording, |d| d.child(self.render_wave(&theme)))
+                    .when(!recording, |d| {
+                        d.child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                // Measured: the "New session" button sits 14pt from the divider;
+                                // the textarea pads its text by ~10.5 itself, so 3.5 more lands
+                                // the text at 14.
+                                .pl(px(3.5))
+                                .py_1()
+                                .child(Textarea::new(&self.composer).appearance(false)),
+                        )
+                    })
+                    .child(
+                        h_flex()
+                            .flex_none()
+                            .gap_2()
+                            .pl_2()
+                            // A little more room right of the send button than the 8 it had.
+                            .pr_3()
+                            .items_center()
+                            .when(!recording, |d| d.child(clip))
+                            .child(mic)
+                            .child(action),
+                    ),
             )
     }
 }

@@ -21,7 +21,11 @@ fn url(conn: &Connection, path: &str, profile: &str) -> String {
 /// The ticket a route needs (Hermes Desktop's `nativeGrantPurpose`): creating a profile and
 /// renaming/deleting the one a path names are registry operations with grants of their own.
 fn purpose(method: &str, path: &str) -> &'static str {
-    let path = path.split('?').next().unwrap_or_default().trim_end_matches('/');
+    let path = path
+        .split('?')
+        .next()
+        .unwrap_or_default()
+        .trim_end_matches('/');
     let named = path
         .strip_prefix("/api/profiles/")
         .is_some_and(|s| !s.is_empty() && !s.contains('/') && !matches!(s, "active" | "import"));
@@ -810,6 +814,58 @@ pub fn delete_profile(conn: &Connection, profile: &str, name: &str) -> Result<()
         profile,
         json!({}),
         120,
+    )?;
+    Ok(())
+}
+
+fn data_url(mime: &str, bytes: &[u8]) -> String {
+    format!(
+        "data:{mime};base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    )
+}
+
+/// Stage an image where `prompt.submit` attachments must live (the profile's image cache);
+/// the path on the gateway's machine.
+pub fn upload_image(
+    conn: &Connection,
+    profile: &str,
+    name: &str,
+    mime: &str,
+    bytes: &[u8],
+) -> Result<String> {
+    let v = send(
+        conn,
+        "POST",
+        "/api/chat/image-upload",
+        profile,
+        json!({"data_url": data_url(mime, bytes), "filename": name}),
+        120,
+    )?;
+    v["path"]
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| anyhow!("upload: no path"))
+}
+
+/// Write a file on the gateway's machine (inside the profile's managed files).
+pub fn upload_file(conn: &Connection, profile: &str, path: &str, bytes: &[u8]) -> Result<()> {
+    let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or(path);
+    let _ = send(
+        conn,
+        "POST",
+        "/api/files/mkdir",
+        profile,
+        json!({"path": dir}),
+        30,
+    );
+    send(
+        conn,
+        "POST",
+        "/api/files/upload",
+        profile,
+        json!({"path": path, "data_url": data_url("application/octet-stream", bytes), "overwrite": true}),
+        600,
     )?;
     Ok(())
 }

@@ -176,8 +176,9 @@ impl HermesApp {
             .collect();
         let files = self.render_session_files(cx);
         let approval = self.render_approval(cx);
+        let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
-        let trailing = files.is_some() || approval.is_some();
+        let trailing = files.is_some() || approval.is_some() || clarify.is_some();
 
         div()
             .relative()
@@ -193,6 +194,7 @@ impl HermesApp {
                     .pb_1()
                     .children(rows)
                     .children(approval)
+                    .children(clarify)
                     .children(files)
                     // A scroll area ignores a last child's margin: a real 12px block (+ the
                     // column's 4) keeps the bottom edge at 16 when cards end the chat.
@@ -233,7 +235,19 @@ impl HermesApp {
             .live
             .as_ref()
             .filter(|_| last)
-            .map(|l| (l.label.clone(), l.started.elapsed().as_secs()));
+            // Counted from the turn's own start (the user's message), so leaving the chat and
+            // coming back, or reopening the app, keeps the real running time.
+            .map(|l| {
+                let since_send = l.started.elapsed().as_secs_f64();
+                let since_turn = turn
+                    .started
+                    .map(|t| crate::app::now_secs() - t)
+                    .filter(|d| *d >= 0.);
+                (
+                    l.label.clone(),
+                    since_turn.unwrap_or(since_send).max(since_send) as u64,
+                )
+            });
         let tools = turn.tool_count();
         let errors = turn
             .steps
@@ -320,7 +334,13 @@ impl HermesApp {
             _ => String::new(),
         };
         let when = turn.finished.or(turn.started).unwrap_or_default();
-        let user = turn.user.clone();
+        let (user, attached_paths) = crate::attach::split(&turn.user);
+        let has_text = !user.is_empty();
+        let attached: Vec<AnyElement> = attached_paths
+            .iter()
+            .enumerate()
+            .map(|(k, p)| self.attachment_chip(format!("sent-{i}-{k}").into(), p, None, cx))
+            .collect();
 
         let sources = self.render_sources(i, cx);
         // What the background review did with skills and memory, quietly under the answer.
@@ -409,10 +429,22 @@ impl HermesApp {
                     .border_color(theme.border)
                     .whitespace_normal()
                     // Selectable and copyable, like the answers.
-                    .child(gpui_kit::base::SelectableText::new(
-                        SharedString::from(format!("user-{i}")),
-                        user,
-                    )),
+                    .when(!user.is_empty(), |d| {
+                        d.child(gpui_kit::base::SelectableText::new(
+                            SharedString::from(format!("user-{i}")),
+                            user,
+                        ))
+                    })
+                    // The files that went with it.
+                    .when(!attached.is_empty(), |d| {
+                        d.child(
+                            h_flex()
+                                .flex_wrap()
+                                .gap_1p5()
+                                .when(has_text, |d| d.mt_2())
+                                .children(attached),
+                        )
+                    }),
             )
             .child(
                 v_flex()
@@ -762,8 +794,15 @@ impl HermesApp {
             return None;
         }
         let theme = cx.theme().clone();
+        let open = self.files_open;
+        let count = files.len();
+        let (all_add, all_del) = files
+            .iter()
+            .flat_map(|(_, diffs)| diffs.iter().map(|d| crate::diff::stats(d)))
+            .fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
         let rows: Vec<AnyElement> = files
             .into_iter()
+            .filter(|_| open)
             .enumerate()
             .map(|(k, (path, diffs))| {
                 let (add, del) = diffs
@@ -843,15 +882,42 @@ impl HermesApp {
                 .mt_2()
                 .border_1()
                 .border_color(theme.border)
+                // Folded by default: one line with the totals; a click lists the files.
                 .child(
-                    div()
+                    h_flex()
+                        .id("files-head")
                         .px_2()
                         .py_1()
+                        .gap_1p5()
+                        .items_center()
                         .text_xs()
                         .text_color(theme.muted_foreground)
-                        .border_b_1()
-                        .border_color(theme.border)
-                        .child("CHANGED FILES"),
+                        .cursor_pointer()
+                        .hover(|s| s.text_color(theme.foreground))
+                        .when(open, |d| d.border_b_1().border_color(theme.border))
+                        .child(
+                            if open {
+                                Ico::ChevronDown
+                            } else {
+                                Ico::ChevronRight
+                            }
+                            .icon()
+                            .xsmall(),
+                        )
+                        .child(format!(
+                            "CHANGED FILES · {}",
+                            plural(count, "file", "files", "files")
+                        ))
+                        .when(all_add > 0, |d| {
+                            d.child(div().text_color(theme.success).child(format!("+{all_add}")))
+                        })
+                        .when(all_del > 0, |d| {
+                            d.child(div().text_color(theme.danger).child(format!("−{all_del}")))
+                        })
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.files_open = !this.files_open;
+                            cx.notify();
+                        })),
                 )
                 .children(rows)
                 .into_any_element(),

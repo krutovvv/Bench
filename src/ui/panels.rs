@@ -1,7 +1,7 @@
 //! Settings panels: skills and config (editable text), MCP (JSON), cron (read-only), Telegram filter.
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::Disableable as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Editor, EditorState};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;

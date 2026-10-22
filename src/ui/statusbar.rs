@@ -111,20 +111,6 @@ impl HermesApp {
             )
         };
 
-        let targets = self
-            .targets
-            .iter()
-            .map(|t| {
-                let t2 = t.clone();
-                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
-                    Box::new(move |this, window, cx| {
-                        if this.target != t2 || this.conn.is_none() {
-                            this.connect(t2.clone(), window, cx)
-                        }
-                    });
-                (t.label(), *t == self.target, f)
-            })
-            .collect();
         let profiles = self
             .profiles
             .iter()
@@ -299,7 +285,7 @@ impl HermesApp {
             .border_t_1()
             .border_color(theme.border)
             .text_xs()
-            .child(picker("target", Ico::Server, self.target.label(), targets))
+            .child(self.render_target_picker(cx))
             .when(!self.profiles.is_empty(), |d| {
                 d.child(picker("profile", Ico::UserRound, profile_label, profiles))
             })

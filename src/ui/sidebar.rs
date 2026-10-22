@@ -3,6 +3,7 @@
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -13,7 +14,10 @@ use crate::icons::Ico;
 use crate::model::source_label;
 
 impl HermesApp {
-    pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.ssh.on {
+            return self.render_ssh_sidebar(cx);
+        }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
 
@@ -92,48 +96,91 @@ impl HermesApp {
             if !single {
                 let home = homes.iter().find(|(l, _, _)| *l == label).cloned();
                 let group: SharedString = format!("ghead{g}").into();
+                // Like a folder in a file tree: what kind of group it is, its name, a count;
+                // its chats hang below on an indent guide.
+                let icon = match (label.as_str(), &home) {
+                    ("Pinned", _) => Ico::Pin,
+                    (_, Some((_, _, true))) => Ico::FolderGit,
+                    (_, Some(_)) => Ico::Folder,
+                    ("Telegram", _) => Ico::Send,
+                    ("Cron", _) => Ico::Clock,
+                    ("API", _) => Ico::Globe,
+                    _ => Ico::Chat,
+                };
+                let key = format!("s:{label}");
+                let collapsed = self.ssh.collapsed.contains(&key);
+                let top = rems(if g > 0 { 0.75 } else { 0.5 });
                 list.push(
                     h_flex()
+                        .id(("ghead", g))
                         .group(group.clone())
+                        .cursor_pointer()
                         .px_4()
-                        .pt_4()
+                        .pt(top)
+                        .on_click(
+                            cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)),
+                        )
                         .pb_1()
+                        .gap_1p5()
                         .items_center()
-                        .text_xs()
-                        .text_color(muted)
-                        .child(div().flex_1().child(format!(
-                            "{} · {}",
-                            label.to_uppercase(),
-                            rows.len()
-                        )))
-                        // A project's "+": a new chat already in it (in a branch of its own).
-                        .children(home.map(|(_, path, repo)| {
+                        .text_sm()
+                        .child(icon.icon().small().text_color(muted))
+                        .child(
                             div()
-                                .id(("group-new", g))
-                                .p_0p5()
-                                .cursor_pointer()
-                                .opacity(0.)
-                                .group_hover(group.clone(), |s| s.opacity(1.))
-                                .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
-                                .child(Ico::Plus.icon().xsmall())
-                                .tooltip(move |window, cx| {
-                                    gpui_kit::component::tooltip::Tooltip::new(if repo {
-                                        "New chat in this project"
-                                    } else {
-                                        "New chat in this folder"
+                                .min_w_0()
+                                .truncate()
+                                .font_weight(FontWeight::MEDIUM)
+                                .child(label.clone()),
+                        )
+                        .child(div().flex_1())
+                        .child(super::group_chevron(collapsed, group.clone(), cx))
+                        // "+", always shown (icon, name, "+": a balanced row): a new chat in
+                        // the project/folder (a project's in a branch of its own), or a plain
+                        // Hermes chat. Telegram, cron and pinned groups can't start one here.
+                        .when(home.is_some() || label == "Hermes", |d| {
+                            let tip = match &home {
+                                Some((_, _, true)) => "New chat in this project",
+                                Some(_) => "New chat in this folder",
+                                None => "New chat",
+                            };
+                            let home = home.clone();
+                            d.child(
+                                div()
+                                    .id(("group-new", g))
+                                    .p_0p5()
+                                    .cursor_pointer()
+                                    .text_color(muted)
+                                    .hover(|s| {
+                                        s.bg(theme.sidebar_accent).text_color(theme.foreground)
                                     })
-                                    .build(window, cx)
-                                })
-                                .on_click(cx.listener(move |this, _, _, cx| {
-                                    this.new_chat_in(Some(path.clone()), repo, cx);
-                                    this.new_project_repo = repo;
-                                }))
-                        }))
+                                    .child(Ico::Plus.icon().xsmall())
+                                    .tooltip(move |window, cx| {
+                                        gpui_kit::component::tooltip::Tooltip::new(tip)
+                                            .build(window, cx)
+                                    })
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        match &home {
+                                            Some((_, path, repo)) => {
+                                                this.new_chat_in(Some(path.clone()), *repo, cx);
+                                                this.new_project_repo = *repo;
+                                            }
+                                            None => this.new_session(cx),
+                                        }
+                                    })),
+                            )
+                        })
                         .into_any_element(),
                 );
             }
-            for i in rows {
-                list.push(self.render_session_row(i, cx).into_any_element());
+            // A folded group shows its header only.
+            if !single && self.ssh.collapsed.contains(&format!("s:{label}")) {
+                continue;
+            }
+            let n = rows.len();
+            for (k, i) in rows.into_iter().enumerate() {
+                let guide = (!single).then_some(k + 1 == n);
+                list.push(self.render_session_row(i, guide, cx).into_any_element());
             }
         }
 
@@ -160,7 +207,7 @@ impl HermesApp {
             .child(
                 // Right under the window buttons (no padding of its own above), 8px below like the
                 // footer's, then the rule.
-                div().pt(px(38.)).flex_none().child(
+                v_flex().flex_none().pt(px(38.)).child(
                     h_flex()
                         .px_4()
                         .pb_2()
@@ -205,6 +252,7 @@ impl HermesApp {
                     .border_color(theme.sidebar_border)
                     .child(new_session.flex_1()),
             )
+            .into_any_element()
     }
 
     fn sidebar_note(&self, text: &'static str, cx: &mut Context<Self>) -> AnyElement {
@@ -259,7 +307,13 @@ impl HermesApp {
             .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))
     }
 
-    fn render_session_row(&self, i: usize, cx: &mut Context<Self>) -> impl IntoElement {
+    /// `guide`: under a group header, indented on the group's guide line (`Some(last row)`).
+    fn render_session_row(
+        &self,
+        i: usize,
+        guide: Option<bool>,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let s = &self.sessions[i];
@@ -312,7 +366,8 @@ impl HermesApp {
                 )
                 .into_any_element()
         } else {
-            // "⋯" on hover: pin, color, a window of its own, delete.
+            // "⋯" on hover: pin, color, its files (the mini IDE; Zed is one click from there),
+            // delete.
             let view = cx.entity();
             let id = s.id.clone();
             let mark = self.mark_of(&s.id);
@@ -335,7 +390,8 @@ impl HermesApp {
                                     view.update(cx, |this, cx| f(this, window, cx))
                                 }
                             };
-                            let (pin_id, win_id, del) = (id.clone(), id.clone(), del_id.clone());
+                            let (pin_id, del) = (id.clone(), del_id.clone());
+                            let files_id = id.clone();
                             let (swatch_view, swatch_id) = (view.clone(), id.clone());
                             menu.item(
                                 PopupMenuItem::new(if mark.pinned { "Unpin" } else { "Pin" })
@@ -352,10 +408,10 @@ impl HermesApp {
                             }))
                             .separator()
                             .item(
-                                PopupMenuItem::new("Open in new window")
-                                    .icon(Ico::AppWindow.icon())
-                                    .on_click(act(Box::new(move |this, _, cx| {
-                                        this.open_window(Some(win_id.clone()), cx)
+                                PopupMenuItem::new("Open files")
+                                    .icon(Ico::FolderTree.icon())
+                                    .on_click(act(Box::new(move |this, window, cx| {
+                                        this.open_ide_for_session(files_id.clone(), window, cx)
                                     }))),
                             )
                             .separator()
@@ -371,6 +427,8 @@ impl HermesApp {
                 .into_any_element()
         };
         // A chosen color marks the row with a quiet stripe (the open chat keeps the accent).
+        let working =
+            s.running || (self.live.is_some() && self.session.as_deref() == Some(s.id.as_str()));
         let stripe = self
             .mark_of(&s.id)
             .color
@@ -380,8 +438,14 @@ impl HermesApp {
         h_flex()
             .id(("session", i))
             .group(group)
+            .relative()
             .gap_1()
-            .pl(px(14.))
+            .pl(if guide.is_some() {
+                super::nest_pl(cx)
+            } else {
+                px(14.)
+            })
+            .when_some(guide, |d, last| d.child(super::nest_guide(cx, last)))
             .pr_3()
             .py_2()
             .cursor_pointer()
@@ -402,12 +466,26 @@ impl HermesApp {
                 d.bg(theme.sidebar_accent)
                     .text_color(theme.sidebar_accent_foreground)
             })
-            .hover(|s| s.bg(theme.sidebar_accent))
+            // Hover keeps a chosen color, half a step denser; plain rows get the usual grey.
+            .hover(move |h| match stripe {
+                Some(c) => h.bg(Hsla {
+                    a: if selected { 0.30 } else { 0.20 },
+                    ..c
+                }),
+                None => h.bg(theme.sidebar_accent),
+            })
             .child(
                 v_flex()
                     .flex_1()
                     .min_w_0()
-                    .child(div().text_sm().truncate().child(s.title.clone()))
+                    // A working session's title carries a moving highlight, to find it at a glance.
+                    .child(div().text_sm().truncate().map(|d| {
+                        if working {
+                            d.child(ShimmerText::new(s.title.clone()))
+                        } else {
+                            d.child(s.title.clone())
+                        }
+                    }))
                     .child(div().text_xs().text_color(muted).child(meta)),
             )
             .child(delete)

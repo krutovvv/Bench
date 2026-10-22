@@ -28,6 +28,8 @@ pub enum Cmd {
         profile: String,
         session: String,
         text: String,
+        /// Staged images: (path on the gateway's machine, mime).
+        images: Vec<(String, String)>,
         effort: Option<String>,
     },
     Interrupt {
@@ -75,6 +77,12 @@ pub enum Cmd {
         profile: String,
         mode: String,
     },
+    /// Answer a question (`answer` empty = declined).
+    Clarify {
+        profile: String,
+        req: crate::model::ClarifyReq,
+        answer: String,
+    },
     /// Answer an approval request.
     Approve {
         profile: String,
@@ -93,6 +101,11 @@ pub enum Evt {
         send: Option<String>,
     },
     Approval(crate::model::ApprovalReq),
+    Clarify(crate::model::ClarifyReq),
+    /// The pending question was answered, timed out or withdrawn.
+    ClarifyDone(String),
+    /// The session's plan, whole: (runtime session, steps).
+    Todos(String, Vec<crate::model::Todo>),
     /// The background self-improvement review of the last turn: what it saved or patched.
     Review(String, String),
     /// The pending approval was answered or withdrawn.
@@ -160,6 +173,9 @@ enum Pending {
         runtime: String,
         turns: Vec<Turn>,
         running: bool,
+        /// What was open when the chat was reopened (questions, approvals, the plan), as
+        /// event frames to replay once the UI has the session.
+        replay: Vec<Value>,
     },
     Create,
     Delete,
@@ -351,6 +367,23 @@ impl Rpc {
                 json!({"profile": profile, "key": "approvals.mode", "value": mode}),
                 Pending::Ignore,
             )?,
+            Cmd::Clarify {
+                profile,
+                req,
+                answer,
+            } => {
+                let generation = req
+                    .generation
+                    .or_else(|| self.fences.get(&req.session).map(|f| f.1))
+                    .unwrap_or(0);
+                let mut params = json!({"session_id": req.session, "execution_generation": generation,
+                                        "prompt_id": req.prompt_id, "answer": answer});
+                if !self.canonical {
+                    params["request_id"] = json!(req.prompt_id);
+                    params["profile"] = json!(profile);
+                }
+                self.call("clarify.respond", params, Pending::Ignore)?
+            }
             Cmd::Approve {
                 profile,
                 req,
@@ -374,6 +407,7 @@ impl Rpc {
                 session,
                 text,
                 effort,
+                images,
             } => {
                 if let Some(value) = effort {
                     if self.canonical {
@@ -386,6 +420,12 @@ impl Rpc {
                 let mut params = json!({"session_id": session, "text": text, "profile": profile});
                 if self.canonical {
                     params["submission_id"] = json!(uuid::Uuid::new_v4().to_string());
+                    if !images.is_empty() {
+                        params["attachments"] = images
+                            .iter()
+                            .map(|(path, mime)| json!({"path": path, "mime": mime}))
+                            .collect();
+                    }
                 }
                 self.call("prompt.submit", params, Pending::Ignore)?
             }
@@ -488,12 +528,18 @@ fn run(
                         runtime,
                         turns,
                         running,
-                    } => emit(Evt::History {
-                        session,
-                        runtime,
-                        turns,
-                        running,
-                    }),
+                        replay,
+                    } => {
+                        emit(Evt::History {
+                            session,
+                            runtime,
+                            turns,
+                            running,
+                        });
+                        for frame in &replay {
+                            on_event(frame, &emit);
+                        }
+                    }
                     // A close of a session the gateway already dropped is not worth a toast.
                     // Fire-and-forget calls on a session the gateway no longer (or not yet) knows:
                     // logged above, not worth a toast.
@@ -532,6 +578,23 @@ fn run(
                 let turns =
                     history::turns(r["messages"].as_array().map(Vec::as_slice).unwrap_or(&[]));
                 let running = r["running"].as_bool().unwrap_or(false);
+                let mut replay: Vec<Value> = r["prompts"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|p| {
+                        let kind = if p["kind"] == "clarify" {
+                            "clarify.request"
+                        } else {
+                            "approval.request"
+                        };
+                        json!({"type": kind, "session_id": runtime, "payload": p})
+                    })
+                    .collect();
+                if r["todo_state"]["todos"].is_array() {
+                    replay.push(json!({"type": "todo.updated", "session_id": runtime,
+                                       "payload": r["todo_state"]}));
+                }
                 let params = json!({"session_id": runtime, "profile": profile});
                 rpc.call(
                     "session.history",
@@ -541,6 +604,7 @@ fn run(
                         runtime,
                         turns,
                         running,
+                        replay,
                     },
                 )?;
                 continue;
@@ -617,6 +681,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
             runtime,
             mut turns,
             running,
+            replay,
         } => {
             history::attach(&mut turns, history::metas(&list(&r["messages"])));
             emit(Evt::History {
@@ -624,7 +689,10 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                 runtime,
                 turns,
                 running,
-            })
+            });
+            for frame in &replay {
+                on_event(frame, emit);
+            }
         }
         Pending::Create => {
             let runtime = r["session_id"].as_str().unwrap_or_default().to_string();
@@ -686,6 +754,16 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             },
             session: sid,
         }),
+        "tool.complete" if payload["todos"].is_array() => {
+            emit(Evt::Todos(sid.clone(), todos(payload)));
+            emit(Evt::ToolDone {
+                failed: history::failed(&payload["result"]),
+                call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
+                output: history::pretty(&payload["result"]),
+                edit: None,
+                session: sid,
+            })
+        }
         "tool.complete" => emit(Evt::ToolDone {
             failed: history::failed(&payload["result"]),
             call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
@@ -731,6 +809,29 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         "approval.settled" | "approval.cancelled" | "approval.received" => {
             emit(Evt::ApprovalDone(sid))
         }
+        "clarify.request" => {
+            let strings = |v: &Value| -> Vec<String> {
+                v.as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|c| c.as_str().map(str::to_string))
+                    .collect()
+            };
+            emit(Evt::Clarify(crate::model::ClarifyReq {
+                prompt_id: payload["prompt_id"]
+                    .as_str()
+                    .or(payload["request_id"].as_str())
+                    .unwrap_or_default()
+                    .to_string(),
+                generation: payload["execution_generation"].as_i64(),
+                question: payload["question"].as_str().unwrap_or_default().to_string(),
+                choices: strings(&payload["choices"]),
+                multi_select: payload["multi_select"].as_bool().unwrap_or(false),
+                session: sid,
+            }))
+        }
+        "clarify.settled" | "clarify.cancelled" => emit(Evt::ClarifyDone(sid)),
+        "todo.updated" => emit(Evt::Todos(sid, todos(payload))),
         kind @ ("subagent.start" | "subagent.tool" | "subagent.text" | "subagent.complete") => {
             let s = |k: &str| payload[k].as_str().unwrap_or_default().to_string();
             let id = payload["subagent_id"]
@@ -839,4 +940,31 @@ fn log_error(method: &str, err: &str) {
         use std::io::Write as _;
         let _ = writeln!(f, "{} {method}: {err}", crate::app::now_secs() as u64);
     }
+}
+
+/// The plan steps of a `todo.updated` / todo `tool.complete` payload, sub-steps indented.
+fn todos(payload: &Value) -> Vec<crate::model::Todo> {
+    let items = payload["todos"].as_array().cloned().unwrap_or_default();
+    let parent_of = |id: &str| {
+        items
+            .iter()
+            .find(|t| t["id"].as_str() == Some(id))
+            .and_then(|t| t["parent"].as_str().map(str::to_string))
+    };
+    items
+        .iter()
+        .map(|t| {
+            let mut depth = 0;
+            let mut up = t["parent"].as_str().map(str::to_string);
+            while let Some(p) = up.filter(|_| depth < 4) {
+                depth += 1;
+                up = parent_of(&p);
+            }
+            crate::model::Todo {
+                content: t["content"].as_str().unwrap_or_default().to_string(),
+                status: t["status"].as_str().unwrap_or("pending").to_string(),
+                depth,
+            }
+        })
+        .collect()
 }

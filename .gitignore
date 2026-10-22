@@ -11,7 +11,8 @@ dist/
 .fseventsd
 .TemporaryItems
 .DocumentRevisions-V100
-Icon?
+# A folder's custom icon is a file named "Icon\r" ("Icon?" would also hide assets/icons/).
+Icon
 
 # Editors and temp files.
 .idea/

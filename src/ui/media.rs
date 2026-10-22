@@ -42,7 +42,11 @@ impl MarkdownPlugin for InlineMath {
         "math"
     }
 
-    fn parse(&self, node: &markdown_ast::Node, _: &MarkdownParseContext<'_>) -> Option<MarkdownNode> {
+    fn parse(
+        &self,
+        node: &markdown_ast::Node,
+        _: &MarkdownParseContext<'_>,
+    ) -> Option<MarkdownNode> {
         let markdown_ast::Node::InlineMath(m) = node else {
             return None;
         };
@@ -75,7 +79,11 @@ impl MarkdownPlugin for BlockMath {
         "math-block"
     }
 
-    fn parse(&self, node: &markdown_ast::Node, _: &MarkdownParseContext<'_>) -> Option<MarkdownNode> {
+    fn parse(
+        &self,
+        node: &markdown_ast::Node,
+        _: &MarkdownParseContext<'_>,
+    ) -> Option<MarkdownNode> {
         let markdown_ast::Node::Math(m) = node else {
             return None;
         };
@@ -236,7 +244,13 @@ impl HermesApp {
         cx.notify();
     }
 
-    fn render_media(&mut self, i: usize, k: usize, path: String, cx: &mut Context<Self>) -> AnyElement {
+    fn render_media(
+        &mut self,
+        i: usize,
+        k: usize,
+        path: String,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let key = format!("{}\0{path}", self.target.label());
         if !self.media.contains_key(&key) {
             match media::fetch_now(&self.target, &path) {
@@ -332,12 +346,19 @@ impl HermesApp {
         let local = fetched.local.clone();
         let where_ = local
             .parent()
-            .map(|p| p.to_string_lossy().replace(&std::env::var("HOME").unwrap_or_default(), "~"))
+            .map(|p| {
+                p.to_string_lossy()
+                    .replace(&std::env::var("HOME").unwrap_or_default(), "~")
+            })
             .filter(|_| matches!(self.target, crate::model::Target::Local))
             .unwrap_or_default();
 
         // A picture that opens the file: an image itself, or a video's frame or a document's page.
-        let picture = |src: ImageSource, size: (f32, f32), max_w: f32, badge: Option<AnyElement>, tip: SharedString| {
+        let picture = |src: ImageSource,
+                       size: (f32, f32),
+                       max_w: f32,
+                       badge: Option<AnyElement>,
+                       tip: SharedString| {
             let (w, h) = fit(size, max_w, MAX_H);
             div()
                 .id(id("picture"))
@@ -362,7 +383,9 @@ impl HermesApp {
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
         };
         let open_tip: SharedString = format!("{name} — click to open").into();
-        let opener = |local: PathBuf| move |_: &ClickEvent, _: &mut Window, cx: &mut App| cx.open_with_system(&local);
+        let opener = |local: PathBuf| {
+            move |_: &ClickEvent, _: &mut Window, cx: &mut App| cx.open_with_system(&local)
+        };
 
         match kind {
             Kind::Image => match fetched.size {
@@ -462,9 +485,17 @@ impl HermesApp {
                     .id(id("play"))
                     .p_1()
                     .cursor_pointer()
-                    .text_color(if playing { theme.primary } else { theme.foreground })
+                    .text_color(if playing {
+                        theme.primary
+                    } else {
+                        theme.foreground
+                    })
                     .hover(|s| s.bg(theme.list_hover))
-                    .child(if playing { Ico::Square } else { Ico::Play }.icon().xsmall())
+                    .child(
+                        if playing { Ico::Square } else { Ico::Play }
+                            .icon()
+                            .xsmall(),
+                    )
                     .tooltip(move |window, cx| {
                         Tooltip::new(if playing { "Stop" } else { "Play" }).build(window, cx)
                     })
@@ -510,7 +541,12 @@ impl HermesApp {
                             .bg(theme.secondary)
                             .border_b_1()
                             .border_color(theme.border)
-                            .child(Ico::FileText.icon().xsmall().text_color(theme.muted_foreground))
+                            .child(
+                                Ico::FileText
+                                    .icon()
+                                    .xsmall()
+                                    .text_color(theme.muted_foreground),
+                            )
                             .child(div().flex_none().child(name.clone()))
                             .child(
                                 div()
@@ -567,7 +603,13 @@ impl HermesApp {
         }
     }
 
-    fn render_diagram(&mut self, i: usize, k: usize, code: String, cx: &mut Context<Self>) -> AnyElement {
+    fn render_diagram(
+        &mut self,
+        i: usize,
+        k: usize,
+        code: String,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let key = (code.clone(), theme.is_dark());
         if !self.diagrams.contains_key(&key) {
@@ -592,8 +634,91 @@ impl HermesApp {
                     .into_any_element()
             }
             // Not drawable here (a diagram type it lacks, or a syntax slip): its source, as code.
-            Some(Loaded::Failed(_)) => markdown(id, format!("```mermaid\n{code}```")).into_any_element(),
+            Some(Loaded::Failed(_)) => {
+                markdown(id, format!("```mermaid\n{code}```")).into_any_element()
+            }
             _ => div().into_any_element(),
         }
+    }
+
+    /// A file going with a message: a small picture for an image, else its icon, and the name.
+    /// `remove`: its index in the composer (shows ×); otherwise a click opens it.
+    pub(super) fn attachment_chip(
+        &self,
+        id: SharedString,
+        path: &str,
+        remove: Option<usize>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let local = std::path::PathBuf::from(path);
+        let here = local.is_file();
+        let icon = match media::kind(path) {
+            Kind::Image => Ico::Image,
+            Kind::Audio => Ico::Music,
+            Kind::Video => Ico::Film,
+            Kind::Markdown => Ico::FileText,
+            Kind::Doc | Kind::File => Ico::File,
+        };
+        let open = local.clone();
+        h_flex()
+            .id(id.clone())
+            .max_w(px(260.))
+            .h(px(32.))
+            .pl_1()
+            .pr_2()
+            .gap_1p5()
+            .items_center()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.background)
+            .text_xs()
+            .map(|d| {
+                if here && media::kind(path) == Kind::Image {
+                    d.child(
+                        img(local.clone())
+                            .size(px(24.))
+                            .flex_none()
+                            .object_fit(ObjectFit::Cover),
+                    )
+                } else {
+                    d.child(
+                        div()
+                            .size(px(24.))
+                            .flex_none()
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .text_color(theme.muted_foreground)
+                            .child(icon.icon().xsmall()),
+                    )
+                }
+            })
+            .child(div().min_w_0().truncate().child(
+                // A server file's local copy names the server file it stands for.
+                match crate::remote::origin(path) {
+                    Some((alias, remote)) => format!("{alias}: {remote}"),
+                    None => file_name(path),
+                },
+            ))
+            .map(|d| match remove {
+                Some(k) => d.child(
+                    div()
+                        .id(SharedString::from(format!("{id}-x")))
+                        .flex_none()
+                        .p_0p5()
+                        .cursor_pointer()
+                        .text_color(theme.muted_foreground)
+                        .hover(|s| s.text_color(theme.foreground))
+                        .child(Ico::X.icon().xsmall())
+                        .on_click(cx.listener(move |this, _, _, cx| this.remove_attachment(k, cx))),
+                ),
+                None if here => d
+                    .cursor_pointer()
+                    .hover(|s| s.bg(theme.list_hover))
+                    .on_click(move |_, _, cx| cx.open_with_system(&open)),
+                None => d,
+            })
+            .into_any_element()
     }
 }

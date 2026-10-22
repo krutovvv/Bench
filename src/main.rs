@@ -1,16 +1,24 @@
-//! Hermes GPUI — a native client for Hermes Agent gateways (local or over SSH).
+//! Herm — one window for a local Hermes agent, its sessions, the user's servers (terminal over
+//! SSH) and their files (a mini IDE). Formerly "Hermes GPUI": the crate, the binary, the bundle
+//! id (local.hermes-gpui) and the state folder keep that name.
 
 mod app;
+mod attach;
 mod audio;
 mod connection;
 mod diff;
 mod gateway;
 mod history;
-mod media;
 mod icons;
+mod lang;
+mod media;
 mod model;
+mod remote;
 mod rest;
 mod speed;
+mod ssh;
+mod sshconfig;
+mod term;
 mod theme;
 mod ui;
 mod video;
@@ -238,7 +246,7 @@ pub fn open_main_window(cx: &mut App) {
             cx,
         ))),
         titlebar: Some(TitlebarOptions {
-            title: Some("Hermes".into()),
+            title: Some("Herm".into()),
             appears_transparent: true,
             traffic_light_position: Some(point(px(14.), px(14.))),
         }),

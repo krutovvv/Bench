@@ -86,7 +86,8 @@ impl Player {
                 }
             }
         });
-        let sound = (sound.len() > 4096 && audio::decodable(&sound)).then(|| Playback::start(sound));
+        let sound =
+            (sound.len() > 4096 && audio::decodable(&sound)).then(|| Playback::start(sound));
         Ok(Self {
             key,
             frame: None,

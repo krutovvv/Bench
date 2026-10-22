@@ -476,10 +476,18 @@ pub fn restart_gateway(target: &Target, interrupt: bool) -> Result<Restart> {
     let lines: Vec<String> = text
         .lines()
         .map(strip_ansi)
-        .map(|l| l.trim().trim_start_matches(['✗', '⚠', '•', '-']).trim().to_string())
+        .map(|l| {
+            l.trim()
+                .trim_start_matches(['✗', '⚠', '•', '-'])
+                .trim()
+                .to_string()
+        })
         .filter(|l| !l.is_empty())
         .collect();
-    if let Some(at) = lines.iter().position(|l| l.starts_with("Refusing to restart")) {
+    if let Some(at) = lines
+        .iter()
+        .position(|l| l.starts_with("Refusing to restart"))
+    {
         let summary = lines[at]
             .trim_start_matches("Refusing to restart the gateway")
             .trim_start_matches([':', ' ', '—', '-'])
