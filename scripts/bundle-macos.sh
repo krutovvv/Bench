@@ -14,12 +14,12 @@ cp target/release/hermes-gpui "$APP/Contents/MacOS/hermes-gpui"
 
 # Icon: render the SVG mark, then build an .icns with every size macOS asks for.
 WORK=$(mktemp -d)
-qlmanage -t -s 1024 -o "$WORK" assets/logo.svg >/dev/null 2>&1
-# Quick Look paints the background white: cut the corners outside the rounded square back to
-# transparent (ImageMagick's own SVG renderer would lose the gradient).
+# Transparent corners, and the soft shadow under the tile that macOS icons carry (the merge
+# grows the canvas by the shadow's reach; the crop puts the tile back on the 1024 grid).
 SRC="$WORK/logo.png"
-magick "$WORK/logo.svg.png" \( -size 1024x1024 xc:none -fill white \
-  -draw "roundrectangle 100,100,923,923,185,185" \) -compose CopyOpacity -composite "$SRC"
+magick -background none -density 96 assets/logo.svg -resize 1024x1024 \
+  \( +clone -background black -shadow 22x14+0+12 \) +swap -background none -layers merge \
+  +repage -crop 1024x1024+28+16 +repage "$SRC"
 ICONSET="$WORK/AppIcon.iconset"
 mkdir -p "$ICONSET"
 for s in 16 32 128 256 512; do
