@@ -33,6 +33,15 @@ impl Meter {
         }
     }
 
+    /// A new chat: counters from zero, the last measured speeds kept.
+    pub fn restart(&mut self) {
+        *self = Self {
+            prefill: self.prefill,
+            generation: self.generation,
+            ..Self::fresh()
+        };
+    }
+
     pub fn request(&mut self) {
         self.request = Some(Instant::now());
         self.first = None;

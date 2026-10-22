@@ -122,6 +122,8 @@ pub struct HermesApp {
     pub approval: Option<crate::model::ApprovalReq>,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
+    /// `model.context_length` of the profile (0 when not set).
+    pub profile_context: u64,
     /// Session folders/repos as Hermes recorded them, and repos inferred from edited files.
     pub places: HashMap<String, crate::model::Place>,
     pub inferred: HashMap<String, String>,
@@ -458,6 +460,7 @@ impl HermesApp {
             slash_scroll: ScrollHandle::new(),
             approval: None,
             approval_mode: None,
+            profile_context: 0,
             places: HashMap::new(),
             inferred: HashMap::new(),
             project: None,
@@ -925,7 +928,8 @@ impl HermesApp {
         self.playing = None;
         self.model_pick = None;
         self.model_pending = false;
-        self.speed = crate::speed::Meter::fresh();
+        // Speeds describe the model and server, not the chat: keep them, restart the counters.
+        self.speed.restart();
         self.project = None;
         self.new_project = None;
         self.new_branch = false;
@@ -1349,10 +1353,11 @@ impl HermesApp {
     fn load_profile_effort(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.effort_pending = false;
         self.rest(window, cx, rest::profile_defaults, |this, r, window, cx| {
-            let Ok((effort, model, models, approval)) = r else {
+            let Ok((effort, model, models, approval, context)) = r else {
                 return;
             };
             this.approval_mode = Some(approval);
+            this.profile_context = context;
             this.profile_models = models;
             this.model_pick = None;
             if let Some(i) = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v)) {

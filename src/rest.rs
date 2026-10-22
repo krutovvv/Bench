@@ -116,14 +116,15 @@ pub fn search_sessions(conn: &Connection, profile: &str, q: &str) -> Result<Vec<
         .collect())
 }
 
-/// The profile's defaults from config.yaml: (`agent.reasoning_effort`, model name).
-/// (effort, primary model, [(model, provider)] primary first then `fallback_providers`).
-/// (effort, primary model, models, approvals.mode).
+/// The profile's defaults from config.yaml: (`agent.reasoning_effort`, primary model,
+/// [(model, provider)] primary first then `fallback_providers`, `approvals.mode`,
+/// `model.context_length` or 0).
 pub type ProfileDefaults = (
     Option<String>,
     Option<String>,
     Vec<(String, String)>,
     String,
+    u64,
 );
 
 pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefaults> {
@@ -168,7 +169,8 @@ pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefau
         Value::Bool(false) => "off".into(),
         _ => "manual".into(),
     };
-    Ok((effort, model, models, approval))
+    let context = yaml["model"]["context_length"].as_u64().unwrap_or(0);
+    Ok((effort, model, models, approval, context))
 }
 
 pub fn skill_content(conn: &Connection, profile: &str, name: &str) -> Result<String> {

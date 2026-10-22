@@ -4,14 +4,14 @@
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::{compact, plural};
+use super::compact;
 use crate::app::{HermesApp, Panel};
 use crate::icons::Ico;
-use crate::model::EFFORTS;
+use crate::model::{EFFORTS, Step};
 
 impl HermesApp {
     /// Model: live usage, else the open session, else the profile, else the default profile.
@@ -85,13 +85,14 @@ impl HermesApp {
         )>| {
             let items = std::rc::Rc::new(items);
             let view = view.clone();
-            h_flex()
-                .h_full()
-                .items_center()
-                .pl_2()
-                .child(icon.icon().xsmall().text_color(muted))
-                .child(Button::new(id).ghost().xsmall().label(label).dropdown_menu(
-                    move |menu, _, _| {
+            // The icon sits inside the button, so hover lights up both.
+            h_flex().h_full().items_center().pl_1().child(
+                Button::new(id)
+                    .ghost()
+                    .xsmall()
+                    .icon(icon.icon())
+                    .label(label)
+                    .dropdown_menu(move |menu, _, _| {
                         let mut menu = menu;
                         for (k, (text, checked, _)) in items.iter().enumerate() {
                             let (items, view) = (items.clone(), view.clone());
@@ -104,8 +105,8 @@ impl HermesApp {
                             );
                         }
                         menu
-                    },
-                ))
+                    }),
+            )
         };
 
         let targets = self
@@ -183,43 +184,69 @@ impl HermesApp {
             .map(|p| p.label.clone())
             .unwrap_or_else(|| "Profile".into());
 
-        let usage = self.usage.clone().filter(|u| u.context_max > 0);
-        let context = usage.as_ref().map(|u| {
-            let color = if u.context_percent > 85. {
+        // Context: Hermes' numbers once a turn has run; before that (a reopened chat) a rough
+        // estimate from the transcript, marked "~". The limit falls back to model.context_length.
+        let usage = self.usage.clone();
+        let real = usage.as_ref().filter(|u| u.context_used > 0);
+        let max = real
+            .map(|u| u.context_max)
+            .filter(|m| *m > 0)
+            .unwrap_or(self.profile_context);
+        let (used, estimated) = match real {
+            Some(u) => (u.context_used, false),
+            None => (self.estimate_tokens(), true),
+        };
+        let percent = if max > 0 {
+            used as f64 * 100. / max as f64
+        } else {
+            0.
+        };
+        let stats = self.session_stats(used, max, estimated);
+        let context = (max > 0 && (self.session.is_some() || !self.turns.is_empty())).then(|| {
+            let color = if percent > 85. {
                 theme.danger
-            } else if u.context_percent > 60. {
+            } else if percent > 60. {
                 theme.warning
             } else {
                 muted
             };
-            let details: SharedString = [
-                Some(format!("context {} of {}", u.context_used, u.context_max)),
-                (u.total_tokens > 0).then(|| format!("total tokens {}", u.total_tokens)),
-                (u.compressions > 0).then(|| {
-                    plural(
-                        u.compressions as usize,
-                        "compression",
-                        "compressions",
-                        "compressions",
-                    )
-                }),
-                u.cache_hit_pct.map(|c| format!("cache {c}%")),
-            ]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join("\n")
-            .into();
-            item("context")
-                .text_color(color)
-                .child(Ico::MemoryStick.icon().xsmall())
-                .child(format!(
-                    "{} / {} · {:.0}%",
-                    compact(u.context_used),
-                    compact(u.context_max),
-                    u.context_percent
-                ))
-                .tooltip(move |window, cx| Tooltip::new(details.clone()).build(window, cx))
+            let label = format!(
+                "{}{} / {} · {:.0}%",
+                if estimated { "~" } else { "" },
+                compact(used),
+                compact(max),
+                percent
+            );
+            gpui_kit::component::popover::Popover::new("context-pop")
+                .anchor(gpui_kit::Anchor::BottomRight)
+                .trigger(
+                    Button::new("context")
+                        .ghost()
+                        .xsmall()
+                        .icon(Ico::MemoryStick.icon())
+                        .label(label)
+                        .text_color(color),
+                )
+                .content(move |_, _, cx| {
+                    let theme = cx.theme();
+                    v_flex()
+                        .w(px(260.))
+                        .py_1()
+                        .children(stats.iter().map(|(k, v)| {
+                            h_flex()
+                                .px_3()
+                                .py_0p5()
+                                .gap_4()
+                                .text_xs()
+                                .child(
+                                    div()
+                                        .flex_1()
+                                        .text_color(theme.muted_foreground)
+                                        .child(k.clone()),
+                                )
+                                .child(div().child(v.clone()))
+                        }))
+                })
         });
 
         // Speed: our own split (prefill / generation) when measured, else Hermes' blended average.
@@ -284,7 +311,7 @@ impl HermesApp {
             })
             .child(div().flex_1())
             .children(speed)
-            .children(context)
+            .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .when_some(self.approval_mode.clone(), |d, mode| {
                 d.child(picker("approvals", Ico::Shield, mode, approvals))
             })
@@ -330,5 +357,96 @@ impl HermesApp {
                     }
                 })),
             )
+    }
+}
+
+impl HermesApp {
+    /// Rough tokens of the open chat: its text at ~3.5 characters a token.
+    fn estimate_tokens(&self) -> u64 {
+        let chars: usize = self
+            .turns
+            .iter()
+            .map(|t| {
+                t.user.len()
+                    + t.answer.len()
+                    + t.steps
+                        .iter()
+                        .map(|s| match s {
+                            Step::Tool { args, output, .. } => args.len() + output.len(),
+                            Step::Note(x) | Step::Thought(x) => x.len(),
+                            Step::Subagent { summary, .. } => summary.len(),
+                        })
+                        .sum::<usize>()
+            })
+            .sum();
+        (chars as f64 / 3.5) as u64
+    }
+
+    /// The rows of the context panel: what this chat has used and done.
+    fn session_stats(&self, used: u64, max: u64, estimated: bool) -> Vec<(String, String)> {
+        let mut rows: Vec<(String, String)> = vec![];
+        let tilde = if estimated { "~" } else { "" };
+        rows.push((
+            "Context".into(),
+            if max > 0 {
+                format!("{tilde}{} of {}", compact(used), compact(max))
+            } else {
+                format!("{tilde}{}", compact(used))
+            },
+        ));
+        if max > 0 {
+            rows.push(("Left".into(), compact(max.saturating_sub(used))));
+        }
+        rows.push(("Turns".into(), self.turns.len().to_string()));
+        let tools = self
+            .turns
+            .iter()
+            .flat_map(|t| &t.steps)
+            .filter(|s| matches!(s, Step::Tool { .. }))
+            .count();
+        rows.push(("Tool calls".into(), tools.to_string()));
+        let subagents = self
+            .turns
+            .iter()
+            .flat_map(|t| &t.steps)
+            .filter(|s| matches!(s, Step::Subagent { .. }))
+            .count();
+        if subagents > 0 {
+            rows.push(("Subagents".into(), subagents.to_string()));
+        }
+        let files: std::collections::HashSet<&str> = self
+            .turns
+            .iter()
+            .flat_map(|t| &t.files)
+            .map(|f| f.path.as_str())
+            .collect();
+        if !files.is_empty() {
+            rows.push(("Files changed".into(), files.len().to_string()));
+        }
+        if let Some(u) = self.usage.as_ref() {
+            if u.calls > 0 {
+                rows.push(("Model calls".into(), u.calls.to_string()));
+            }
+            if u.input + u.output > 0 {
+                rows.push((
+                    "Tokens in / out".into(),
+                    format!("{} / {}", compact(u.input), compact(u.output)),
+                ));
+            }
+            if let Some(c) = u.cache_hit_pct {
+                rows.push(("Cache hit".into(), format!("{c}%")));
+            }
+            rows.push(("Compactions".into(), u.compressions.to_string()));
+        }
+        if let Some(p) = self.speed.prefill {
+            rows.push(("Prefill".into(), format!("{p:.0} tok/s")));
+        }
+        if let Some(g) = self.speed.generation {
+            rows.push(("Generation".into(), format!("{g:.0} tok/s")));
+        }
+        if estimated {
+            rows.push(("".into(), "~ estimated until the next reply".into()));
+        }
+        rows
     }
 }
