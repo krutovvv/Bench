@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
   <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B313A"/><stop offset="1" stop-color="#16191E"/></linearGradient></defs>
-  <!-- Two slabs: a bench seen from the side, or two lines of a chat. The macOS icon grid:
-       an 824px rounded square on 1024, corners left transparent. -->
+  <!-- Two square-cornered slabs, like the app's own panels: a bench seen from the side, or two
+       lines of a chat. The macOS icon grid: an 824px rounded square on 1024, corners transparent. -->
   <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#g)"/>
-  <rect x="290" y="300" width="330" height="190" rx="95" fill="#FAFAFA"/>
-  <rect x="290" y="534" width="444" height="190" rx="95" fill="#5C78E2"/>
+  <rect x="290" y="300" width="330" height="190" fill="#FAFAFA"/>
+  <rect x="290" y="534" width="444" height="190" fill="#5C78E2"/>
 </svg>

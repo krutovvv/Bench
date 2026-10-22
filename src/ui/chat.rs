@@ -137,31 +137,18 @@ impl HermesApp {
                 .items_center()
                 .justify_center()
                 .gap_2()
-                // The app's icon as the Dock shows it (assets/logo.svg at 64px: the rounded tile
-                // and its two slabs), in a quiet grey.
+                // The app's mark (assets/logo.svg's two slabs at 64px), square like the rest of the
+                // window, in a quiet grey.
                 .child(
                     v_flex()
                         .mb_4()
                         .size(px(64.))
-                        .rounded(px(14.4))
                         .bg(theme.muted_foreground.opacity(0.22))
                         .justify_center()
                         .pl(px(14.8))
                         .gap(px(3.4))
-                        .child(
-                            div()
-                                .w(px(25.6))
-                                .h(px(14.8))
-                                .rounded_full()
-                                .bg(theme.background),
-                        )
-                        .child(
-                            div()
-                                .w(px(34.5))
-                                .h(px(14.8))
-                                .rounded_full()
-                                .bg(theme.background),
-                        ),
+                        .child(div().w(px(25.6)).h(px(14.8)).bg(theme.background))
+                        .child(div().w(px(34.5)).h(px(14.8)).bg(theme.background)),
                 )
                 .child(
                     div()
