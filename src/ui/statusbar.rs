@@ -343,7 +343,7 @@ impl HermesApp {
                         this.panel = Panel::Chat;
                         cx.notify();
                     } else {
-                        this.open_panel(Panel::Skills, window, cx);
+                        this.open_panel(Panel::Mcp, window, cx);
                     }
                 })),
             )

@@ -15,6 +15,7 @@ use gpui_kit::*;
 mod cron;
 mod gateways;
 pub mod marks;
+mod profiles;
 pub(crate) mod projects;
 mod prompts;
 mod slash;
@@ -33,14 +34,15 @@ pub type Choice = SelectState<Vec<SharedString>>;
 pub enum Panel {
     Chat,
     /// Settings tabs.
-    Skills,
     Mcp,
+    Skills,
+    Prompts,
     Config,
     Cron,
-    Telegram,
-    Prompts,
     Gateways,
-    Appearance,
+    Profiles,
+    /// Appearance and the Telegram filter.
+    Settings,
 }
 
 impl Panel {
@@ -176,6 +178,12 @@ pub struct HermesApp {
     pub prompt_title: Entity<InputState>,
     pub prompt_editor: Entity<EditorState>,
     pub prompt_delete_armed: bool,
+    /// Settings → Profiles.
+    pub prof_rows: Vec<rest::ProfileRow>,
+    pub prof_open: Option<String>,
+    pub prof_name: Entity<InputState>,
+    pub soul_editor: Entity<EditorState>,
+    pub prof_delete_armed: bool,
     pub cron_editor: Entity<EditorState>,
     pub cron_schedule: Entity<InputState>,
     pub effort_choice: Entity<Choice>,
@@ -259,6 +267,12 @@ impl HermesApp {
                 .line_number(true)
         });
         let prompt_title = cx.new(|cx| InputState::new(window, cx).placeholder("Name"));
+        let prof_name = cx.new(|cx| InputState::new(window, cx).placeholder("Profile name"));
+        let soul_editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .language("markdown")
+                .line_number(true)
+        });
         let prompt_editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("markdown")
@@ -506,6 +520,11 @@ impl HermesApp {
             prompt_title,
             prompt_editor,
             prompt_delete_armed: false,
+            prof_rows: vec![],
+            prof_open: None,
+            prof_name,
+            soul_editor,
+            prof_delete_armed: false,
             cron_editor,
             cron_schedule,
             skill_editor,
@@ -1887,7 +1906,8 @@ impl HermesApp {
     pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
         self.panel = panel;
         match panel {
-            Panel::Chat | Panel::Telegram | Panel::Appearance => {}
+            Panel::Chat | Panel::Settings => {}
+            Panel::Profiles => self.load_profiles_admin(window, cx),
             Panel::Prompts => self.load_prompts(window, cx),
             Panel::Gateways => self.check_installs(window, cx),
             Panel::Config => {

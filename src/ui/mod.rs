@@ -200,14 +200,14 @@ impl HermesApp {
 
         let current = self.panel;
         let tabs = [
-            ("tab-skills", "Skills", Panel::Skills),
             ("tab-mcp", "MCP", Panel::Mcp),
+            ("tab-skills", "Skills", Panel::Skills),
+            ("tab-prompts", "Prompts", Panel::Prompts),
             ("tab-config", "Config", Panel::Config),
             ("tab-cron", "Cron", Panel::Cron),
-            ("tab-tg", "Telegram", Panel::Telegram),
-            ("tab-prompts", "Prompts", Panel::Prompts),
             ("tab-gw", "Gateways", Panel::Gateways),
-            ("tab-look", "Appearance", Panel::Appearance),
+            ("tab-profiles", "Profiles", Panel::Profiles),
+            ("tab-settings", "Settings", Panel::Settings),
         ]
         .map(|(id, label, panel)| {
             let active = panel == current;
@@ -265,8 +265,8 @@ impl Render for HermesApp {
             Panel::Mcp => self.render_mcp(cx).into_any_element(),
             Panel::Config => self.render_config(cx).into_any_element(),
             Panel::Cron => self.render_cron(cx).into_any_element(),
-            Panel::Telegram => self.render_telegram(cx).into_any_element(),
-            Panel::Appearance => self.render_appearance(cx).into_any_element(),
+            Panel::Settings => self.render_settings(cx).into_any_element(),
+            Panel::Profiles => self.render_profiles(cx).into_any_element(),
             Panel::Gateways => self.render_gateways(cx).into_any_element(),
             Panel::Prompts => self.render_prompts(cx).into_any_element(),
         };
