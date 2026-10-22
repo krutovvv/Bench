@@ -1,5 +1,6 @@
 //! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
 
+use gpui_kit::component::input::Input;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -27,12 +28,28 @@ impl HermesApp {
         let single = groups.len() <= 1;
 
         let mut list: Vec<AnyElement> = vec![];
+        let searching = !self.search_query.is_empty();
+        if searching {
+            match &self.search_hits {
+                None => list.push(self.sidebar_note("Searching…", cx)),
+                Some(hits) if hits.is_empty() => list.push(self.sidebar_note("Nothing found", cx)),
+                Some(hits) => {
+                    for (k, (id, snippet)) in hits.iter().enumerate() {
+                        list.push(
+                            self.render_search_hit(k, id, snippet, cx)
+                                .into_any_element(),
+                        );
+                    }
+                }
+            }
+            groups.clear();
+        }
         for (label, rows) in groups {
             if !single {
                 list.push(
                     div()
-                        .px_3()
-                        .pt_3()
+                        .px_4()
+                        .pt_4()
                         .pb_1()
                         .text_xs()
                         .text_color(muted)
@@ -66,13 +83,12 @@ impl HermesApp {
             .size_full()
             .bg(theme.sidebar)
             .child(
-                v_flex()
-                    .pt(px(38.))
-                    .px_3()
-                    .pb_3()
-                    .border_b_1()
-                    .border_color(theme.sidebar_border)
-                    .child(new_session),
+                div().pt(px(38.)).px_2().pb_2().flex_none().child(
+                    Input::new(&self.search)
+                        .small()
+                        .cleanable(true)
+                        .prefix(Ico::Search.icon().xsmall().text_color(muted)),
+                ),
             )
             .child(
                 v_flex()
@@ -85,7 +101,7 @@ impl HermesApp {
                     .when(self.connecting, |d| {
                         d.child(
                             div()
-                                .px_3()
+                                .px_4()
                                 .py_2()
                                 .text_sm()
                                 .text_color(muted)
@@ -93,6 +109,66 @@ impl HermesApp {
                         )
                     }),
             )
+            .child(
+                div()
+                    .flex_none()
+                    .p_2()
+                    .border_t_1()
+                    .border_color(theme.sidebar_border)
+                    .child(new_session),
+            )
+    }
+
+    fn sidebar_note(&self, text: &'static str, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .px_4()
+            .py_2()
+            .text_sm()
+            .text_color(cx.theme().muted_foreground)
+            .child(text)
+            .into_any_element()
+    }
+
+    /// A search result: the session's title (if it is in the list) and the matching snippet.
+    fn render_search_hit(
+        &self,
+        k: usize,
+        id: &str,
+        snippet: &str,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        let theme = cx.theme().clone();
+        let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(id);
+        let title = self
+            .sessions
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.title.clone())
+            .unwrap_or_else(|| "Untitled session".into());
+        let open_id = id.to_string();
+        v_flex()
+            .id(("hit", k))
+            .pl(px(14.))
+            .pr_3()
+            .py_2()
+            .cursor_pointer()
+            .border_l_2()
+            .border_color(if selected {
+                theme.primary
+            } else {
+                theme.transparent
+            })
+            .when(selected, |d| d.bg(theme.sidebar_accent))
+            .hover(|s| s.bg(theme.sidebar_accent))
+            .child(div().text_sm().truncate().child(title))
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(theme.muted_foreground)
+                    .line_clamp(2)
+                    .child(snippet.replace(">>>", "").replace("<<<", "")),
+            )
+            .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))
     }
 
     fn render_session_row(&self, i: usize, cx: &mut Context<Self>) -> impl IntoElement {
@@ -163,8 +239,9 @@ impl HermesApp {
             .id(("session", i))
             .group(group)
             .gap_1()
-            .px_3()
-            .py_1p5()
+            .pl(px(14.))
+            .pr_3()
+            .py_2()
             .cursor_pointer()
             .border_l_2()
             .border_color(if selected {

@@ -3,7 +3,7 @@
 
 use gpui_kit::component::input::Textarea;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -31,7 +31,7 @@ impl HermesApp {
                 .cursor_pointer()
                 .text_color(color)
                 .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(icon.icon().small())
+                .child(icon.live(true))
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
         };
 
@@ -39,6 +39,8 @@ impl HermesApp {
             "mic",
             if self.transcribing {
                 Ico::Loader
+            } else if recording {
+                Ico::AudioLines
             } else {
                 Ico::Mic
             },
@@ -48,7 +50,7 @@ impl HermesApp {
                 "Dictate"
             },
             if recording {
-                theme.danger
+                theme.primary
             } else {
                 theme.muted_foreground
             },
@@ -75,14 +77,10 @@ impl HermesApp {
         h_flex()
             .w_full()
             .flex_none()
-            .items_end()
+            .items_center()
             .bg(theme.background)
             .border_t_1()
-            .border_color(if recording {
-                theme.danger
-            } else {
-                theme.border
-            })
+            .border_color(theme.border)
             .child(
                 div()
                     .flex_1()
@@ -96,15 +94,14 @@ impl HermesApp {
                     .flex_none()
                     .gap_1()
                     .px_2()
-                    .py_1()
                     .items_center()
                     .when(recording, |d| {
                         d.child(
                             div()
                                 .text_xs()
-                                .text_color(theme.danger)
+                                .text_color(theme.muted_foreground)
                                 .pr_1()
-                                .child("recording…"),
+                                .child("Listening…"),
                         )
                     })
                     .child(mic)

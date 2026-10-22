@@ -1,7 +1,9 @@
 //! Right panel: what this session changed (or the project tree) and a small viewer/editor —
 //! Diff / Before / After, save back to the gateway's disk, or open in Zed.
 
+use gpui_kit::component::diff::{Diff, DiffChangeIndicator, DiffHunkSeparator, DiffState};
 use gpui_kit::component::input::Editor;
+use gpui_kit::component::resizable::{h_resizable, resizable_panel};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -21,6 +23,8 @@ impl HermesApp {
     pub(super) fn render_right(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let tab = self.right.unwrap_or(RightTab::Changes);
+        // With nothing open the list is the only content, so it shows regardless.
+        let show_list = self.show_list || self.file.is_none();
 
         let tab_button = |id: &'static str, label: &'static str, active: bool| {
             div()
@@ -48,6 +52,23 @@ impl HermesApp {
             RightTab::Files => self.render_tree(cx).into_any_element(),
         };
 
+        let list_toggle = div()
+            .id("list-toggle")
+            .h_full()
+            .px_3()
+            .flex()
+            .items_center()
+            .cursor_pointer()
+            .text_color(if self.show_list {
+                theme.foreground
+            } else {
+                theme.muted_foreground
+            })
+            .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+            .child(Ico::PanelRight.icon().xsmall())
+            .tooltip(|window, cx| Tooltip::new("File list").build(window, cx))
+            .on_click(cx.listener(|this, _, _, cx| this.toggle_file_list(cx)));
+
         v_flex()
             .size_full()
             .bg(theme.background)
@@ -72,29 +93,32 @@ impl HermesApp {
                             }),
                         ),
                     )
-                    .child(div().flex_1()),
+                    .child(div().flex_1())
+                    .when(self.file.is_some(), |d| d.child(list_toggle)),
             )
             .child(
-                h_flex()
-                    .flex_1()
-                    .min_h_0()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .h_full()
-                            .child(self.render_viewer(cx)),
-                    )
-                    .child(
-                        div()
-                            .w(px(230.))
-                            .flex_none()
-                            .h_full()
-                            .border_l_1()
-                            .border_color(theme.border)
-                            .bg(theme.sidebar)
-                            .child(list),
-                    ),
+                div().flex_1().min_h_0().child(
+                    h_resizable("right-split")
+                        .when(self.file.is_some(), |d| {
+                            d.child(resizable_panel().child(self.render_viewer(cx)))
+                        })
+                        .when(show_list, |d| {
+                            d.child(
+                                resizable_panel()
+                                    .size(px(240.))
+                                    .size_range(px(160.)..px(600.))
+                                    .child(
+                                        div()
+                                            .size_full()
+                                            .when(self.file.is_some(), |d| {
+                                                d.border_l_1().border_color(theme.border)
+                                            })
+                                            .bg(theme.sidebar)
+                                            .child(list),
+                                    ),
+                            )
+                        }),
+                ),
             )
     }
 
@@ -102,19 +126,13 @@ impl HermesApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(view) = self.file.as_ref() else {
-            return div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_sm()
-                .text_color(muted)
-                .child("Select a file")
-                .into_any_element();
+            return div().into_any_element();
         };
-        let has_diff = !view.diffs.is_empty();
         let mode = view.mode;
-        let can_save = view.loaded && !view.truncated;
+        let missing = view.missing;
+        let has_diff = view.diff_view.is_some();
+        let has_before = view.before_view.is_some();
+        let can_save = view.loaded && !view.truncated && !missing;
 
         let mode_button = |id: &'static str, label: &'static str, m: FileMode| {
             let active = mode == m;
@@ -162,58 +180,77 @@ impl HermesApp {
                         move |window, cx| Tooltip::new(p.clone()).build(window, cx)
                     }),
             )
+            .when(missing, |d| {
+                d.child(
+                    div()
+                        .text_xs()
+                        .text_color(muted)
+                        .px_1()
+                        .child("no longer on disk"),
+                )
+            })
             .when(has_diff, |d| {
                 d.child(
                     mode_button("m-diff", "Diff", FileMode::Diff).on_click(
                         cx.listener(|this, _, _, cx| this.set_file_mode(FileMode::Diff, cx)),
                     ),
                 )
-                .child(
+            })
+            .when(has_before, |d| {
+                d.child(
                     mode_button("m-before", "Before", FileMode::Before).on_click(
                         cx.listener(|this, _, _, cx| this.set_file_mode(FileMode::Before, cx)),
                     ),
                 )
             })
-            .child(
-                mode_button(
-                    "m-after",
-                    if has_diff { "After" } else { "Edit" },
-                    FileMode::After,
+            .when(!missing, |d| {
+                d.child(
+                    mode_button(
+                        "m-after",
+                        if has_diff { "After" } else { "Edit" },
+                        FileMode::After,
+                    )
+                    .on_click(
+                        cx.listener(|this, _, _, cx| this.set_file_mode(FileMode::After, cx)),
+                    ),
                 )
-                .on_click(cx.listener(|this, _, _, cx| this.set_file_mode(FileMode::After, cx))),
-            )
+            })
             .when(mode == FileMode::After && can_save, |d| {
                 d.child(
                     icon_action("save", Ico::Save, "Save to disk")
                         .on_click(cx.listener(|this, _, window, cx| this.save_file(window, cx))),
                 )
             })
-            .child(
-                icon_action("zed", Ico::ExternalLink, "Open in Zed")
-                    .on_click(cx.listener(|this, _, window, cx| this.open_in_zed(window, cx))),
-            );
+            .when(!missing, |d| {
+                d.child(
+                    icon_action("zed", Ico::ExternalLink, "Open in Zed")
+                        .on_click(cx.listener(|this, _, window, cx| this.open_in_zed(window, cx))),
+                )
+            });
 
-        let body = match mode {
-            FileMode::Diff => render_diff(&crate::diff::joined(&view.diffs), cx).into_any_element(),
-            FileMode::Before => match &view.before {
-                Ok(text) => v_flex()
-                    .id("before")
-                    .size_full()
-                    .overflow_scroll()
-                    .p_2()
-                    .font_family("Menlo")
-                    .text_xs()
-                    .child(text.clone())
-                    .into_any_element(),
-                Err(why) => div()
-                    .p_3()
-                    .text_sm()
-                    .text_color(muted)
-                    .child(why.clone())
-                    .into_any_element(),
-            },
-            FileMode::After => {
-                let note = view.truncated.then(|| {
+        let diff_of = |state: &Entity<DiffState>| {
+            Diff::new(state)
+                .line_number(true)
+                .syntax_highlight(true)
+                .header_visible(false)
+                .change_indicator(DiffChangeIndicator::None)
+                .hunk_separator(DiffHunkSeparator::Simple)
+                .into_any_element()
+        };
+        let note = |text: &'static str| {
+            div()
+                .p_3()
+                .text_sm()
+                .text_color(muted)
+                .child(text)
+                .into_any_element()
+        };
+        let body = match (mode, &view.diff_view, &view.before_view) {
+            (FileMode::Diff, Some(state), _) => diff_of(state),
+            (FileMode::Before, _, Some(state)) => diff_of(state),
+            _ if missing => note("This file is no longer on disk."),
+            (FileMode::After, _, _) => {
+                let warn = view.truncated.then(|| {
                     div()
                         .px_2()
                         .py_1()
@@ -223,7 +260,7 @@ impl HermesApp {
                 });
                 v_flex()
                     .size_full()
-                    .children(note)
+                    .children(warn)
                     .child(
                         div()
                             .flex_1()
@@ -232,6 +269,7 @@ impl HermesApp {
                     )
                     .into_any_element()
             }
+            _ => note("Loading…"),
         };
 
         v_flex()
@@ -382,44 +420,4 @@ impl HermesApp {
             }
         }
     }
-}
-
-/// A unified diff, colored line by line.
-fn render_diff(diff: &str, cx: &App) -> impl IntoElement {
-    let theme = cx.theme();
-    let lines: Vec<AnyElement> = diff
-        .lines()
-        .map(|l| {
-            let (bg, fg) = if l.starts_with("+++") || l.starts_with("---") {
-                (theme.secondary, theme.muted_foreground)
-            } else if l.starts_with("@@") {
-                (theme.secondary, theme.muted_foreground)
-            } else if l.starts_with('+') {
-                (theme.success.opacity(0.14), theme.foreground)
-            } else if l.starts_with('-') {
-                (theme.danger.opacity(0.14), theme.foreground)
-            } else {
-                (theme.transparent, theme.foreground)
-            };
-            div()
-                .px_2()
-                .bg(bg)
-                .text_color(fg)
-                .whitespace_nowrap()
-                .child(if l.is_empty() {
-                    " ".to_string()
-                } else {
-                    l.to_string()
-                })
-                .into_any_element()
-        })
-        .collect();
-    v_flex()
-        .id("diff")
-        .size_full()
-        .overflow_scroll()
-        .py_1()
-        .font_family("Menlo")
-        .text_xs()
-        .children(lines)
 }

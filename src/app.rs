@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::input::{EditorState, InputEvent, TextareaState};
+use gpui_kit::component::diff::{DiffFile, DiffState};
+use gpui_kit::component::input::{EditorState, InputEvent, InputState, TextareaState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
@@ -56,9 +57,13 @@ pub struct FileView {
     pub mode: FileMode,
     pub diffs: Vec<String>,
     pub loaded: bool,
-    /// Original text reconstructed from `diffs`, or why it could not be.
-    pub before: Result<String, String>,
     pub truncated: bool,
+    /// The file is gone from disk (an old session): only the recorded edits can be shown.
+    pub missing: bool,
+    /// Diff view: the whole file with the changes in place, else just the tool diffs.
+    pub diff_view: Option<Entity<DiffState>>,
+    /// The original text, when it could be reconstructed from the edits.
+    pub before_view: Option<Entity<DiffState>>,
 }
 
 pub struct Live {
@@ -96,6 +101,16 @@ pub struct HermesApp {
     queued: Option<String>,
     pub usage: Option<Usage>,
     pub effort: usize,
+    /// The profile's primary model and its fallbacks, as (model, provider).
+    pub profile_models: Vec<(String, String)>,
+    /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
+    pub search: Entity<InputState>,
+    pub search_query: String,
+    pub search_hits: Option<Vec<(String, String)>>,
+    search_seq: u64,
+    /// The model picked in the status bar for this session (None = profile default).
+    pub model_pick: Option<usize>,
+    model_pending: bool,
     effort_pending: bool,
 
     pub panel: Panel,
@@ -124,6 +139,8 @@ pub struct HermesApp {
     pub right: Option<RightTab>,
     pub file: Option<FileView>,
     pub file_editor: Entity<EditorState>,
+    /// The file list beside the viewer (remembered; hidden by default).
+    pub show_list: bool,
     pub tree_root: Option<String>,
     pub tree: HashMap<String, Vec<(String, String, bool)>>,
     pub tree_open: HashSet<String>,
@@ -162,6 +179,7 @@ impl HermesApp {
                 .submit_on_enter(true)
                 .placeholder("Message Hermes…")
         });
+        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sessions"));
         let mcp_editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("json")
@@ -195,6 +213,16 @@ impl HermesApp {
                     this.send(window, cx);
                 }
             }),
+            cx.subscribe_in(
+                &search,
+                window,
+                |this, state, ev: &InputEvent, window, cx| {
+                    if matches!(ev, InputEvent::Change) {
+                        let q = state.read(cx).value().trim().to_string();
+                        this.search_sessions(q, window, cx);
+                    }
+                },
+            ),
             // An error shown after a failed save goes away once the text is edited.
             cx.subscribe_in(&mcp_editor, window, |this, _, ev: &InputEvent, _, cx| {
                 if matches!(ev, InputEvent::Change) && this.mcp_error.is_some() {
@@ -321,6 +349,14 @@ impl HermesApp {
             queued: None,
             usage: None,
             effort: EFFORTS.len() - 1,
+            profile_models: vec![],
+            show_list: std::fs::read_to_string(file_list_pref()).is_ok_and(|s| s.trim() == "1"),
+            search,
+            search_query: String::new(),
+            search_hits: None,
+            search_seq: 0,
+            model_pick: None,
+            model_pending: false,
             effort_pending: false,
             panel: Panel::Chat,
             skills: vec![],
@@ -502,6 +538,7 @@ impl HermesApp {
                 self.session = Some(session);
                 self.runtime = Some(runtime.clone());
                 if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
+                    self.apply_model_pick(&profile, &runtime);
                     let effort = self.take_effort();
                     self.cmd(Cmd::Send {
                         profile,
@@ -630,6 +667,8 @@ impl HermesApp {
         self.queued = None;
         self.usage = None;
         self.playing = None;
+        self.model_pick = None;
+        self.model_pending = false;
         self.reset_scroller(cx);
     }
 
@@ -741,6 +780,75 @@ impl HermesApp {
     pub fn cancel_delete(&mut self, cx: &mut Context<Self>) {
         self.confirm_delete = None;
         cx.notify();
+    }
+
+    /// Pick the model for a new session (primary or a fallback); applied once it is created.
+    pub fn set_model(&mut self, i: usize, cx: &mut Context<Self>) {
+        if self.session.is_some() {
+            return;
+        }
+        self.model_pick = Some(i);
+        self.model_pending = true;
+        cx.notify();
+    }
+
+    /// Debounced: only the last query typed within 300 ms goes to the gateway.
+    fn search_sessions(&mut self, q: String, window: &mut Window, cx: &mut Context<Self>) {
+        if q == self.search_query {
+            return;
+        }
+        self.search_seq += 1;
+        let seq = self.search_seq;
+        self.search_query = q.clone();
+        self.search_hits = None;
+        cx.notify();
+        if q.is_empty() {
+            return;
+        }
+        cx.spawn_in(window, async move |this, cx| {
+            cx.background_executor()
+                .timer(Duration::from_millis(300))
+                .await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                if this.search_seq != seq {
+                    return;
+                }
+                this.rest(
+                    window,
+                    cx,
+                    move |conn, profile| rest::search_sessions(conn, profile, &q),
+                    move |this, r, _, cx| {
+                        if this.search_seq == seq {
+                            this.search_hits = Some(r.unwrap_or_default());
+                            cx.notify();
+                        }
+                    },
+                );
+            });
+        })
+        .detach();
+    }
+
+    fn apply_model_pick(&mut self, profile: &str, session: &str) {
+        if !std::mem::take(&mut self.model_pending) {
+            return;
+        }
+        let Some((model, provider)) = self
+            .model_pick
+            .and_then(|i| self.profile_models.get(i))
+            .cloned()
+        else {
+            return;
+        };
+        if let Some(u) = self.usage.as_mut() {
+            u.model = model.clone();
+        }
+        self.cmd(Cmd::SetModel {
+            profile: profile.to_string(),
+            session: session.to_string(),
+            model,
+            provider,
+        });
     }
 
     pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -907,7 +1015,11 @@ impl HermesApp {
     fn load_profile_effort(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.effort_pending = false;
         self.rest(window, cx, rest::profile_defaults, |this, r, window, cx| {
-            let Ok((effort, model)) = r else { return };
+            let Ok((effort, model, models)) = r else {
+                return;
+            };
+            this.profile_models = models;
+            this.model_pick = None;
             if let Some(i) = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v)) {
                 this.effort = i;
                 this.effort_pending = false;
@@ -1118,9 +1230,17 @@ impl HermesApp {
             mode,
             diffs,
             loaded: false,
-            before: Err("loading…".into()),
             truncated: false,
+            missing: false,
+            diff_view: None,
+            before_view: None,
         });
+        if let Some(view) = self.file.as_mut() {
+            if !view.diffs.is_empty() {
+                let files = DiffFile::parse(&crate::diff::joined(&view.diffs)).unwrap_or_default();
+                view.diff_view = Some(diff_state(files, cx));
+            }
+        }
         if self.right.is_none() {
             self.right = Some(RightTab::Changes);
         }
@@ -1130,28 +1250,53 @@ impl HermesApp {
             s.set_value("", window, cx);
         });
         let p = path.clone();
-        self.rest(window, cx, move |c, prof| rest::read_text(c, prof, &p), move |this, r, window, cx| {
-            let Some(view) = this.file.as_mut().filter(|f| f.path == path) else { return };
-            match r {
-                Ok(file) if file.binary => {
-                    view.before = Err("binary file".into());
-                    view.loaded = false;
+        self.rest(
+            window,
+            cx,
+            move |c, prof| rest::read_text(c, prof, &p),
+            move |this, r, window, cx| {
+                let Some(view) = this.file.as_mut().filter(|f| f.path == path) else {
+                    return;
+                };
+                match r {
+                    Ok(file) if file.binary => view.missing = true,
+                    Ok(file) => {
+                        let before = (!view.diffs.is_empty() && !file.truncated)
+                            .then(|| crate::diff::before(&file.text, &view.diffs))
+                            .flatten();
+                        if let Some(before) = before {
+                            let full = crate::diff::full(&view.path, &before, &file.text);
+                            if let Ok(files) = DiffFile::parse(&full) {
+                                if !files.is_empty() {
+                                    view.diff_view = Some(diff_state(files, cx));
+                                }
+                            }
+                            let original = DiffFile::unchanged(view.path.clone(), &before);
+                            view.before_view = Some(diff_state(vec![original], cx));
+                        }
+                        view.truncated = file.truncated;
+                        view.loaded = true;
+                        this.file_editor
+                            .update(cx, |s, cx| s.set_value(file.text, window, cx));
+                    }
+                    // Deleted or moved since (old sessions): no error, just the recorded edits.
+                    Err(_) => {
+                        view.missing = true;
+                        if view.diff_view.is_none() {
+                            view.mode = FileMode::After;
+                        }
+                    }
                 }
-                Ok(file) => {
-                    view.before = if view.diffs.is_empty() {
-                        Err("no recorded edits in this session".into())
-                    } else {
-                        crate::diff::before(&file.text, &view.diffs).ok_or_else(|| {
-                            "the file changed after these edits (or was rewritten whole) — original not recoverable".to_string()
-                        })
-                    };
-                    view.truncated = file.truncated;
-                    view.loaded = true;
-                    this.file_editor.update(cx, |s, cx| s.set_value(file.text, window, cx));
-                }
-                Err(e) => this.toast(NotificationType::Error, format!("Open file: {e:#}"), window, cx),
-            }
-        });
+                cx.notify();
+            },
+        );
+        cx.notify();
+    }
+
+    pub fn toggle_file_list(&mut self, cx: &mut Context<Self>) {
+        self.show_list = !self.show_list;
+        let _ = std::fs::create_dir_all(connection::state_dir());
+        let _ = std::fs::write(file_list_pref(), if self.show_list { "1" } else { "0" });
         cx.notify();
     }
 
@@ -1608,4 +1753,13 @@ pub fn tool_label(name: &str, detail: &str) -> String {
     } else {
         format!("{name}: {detail}")
     }
+}
+
+/// A diff view state: three lines of context around each change, the rest folded (expandable).
+fn diff_state(files: Vec<DiffFile>, cx: &mut App) -> Entity<DiffState> {
+    cx.new(|cx| DiffState::new(files, cx).with_context_lines(Some(3)))
+}
+
+fn file_list_pref() -> std::path::PathBuf {
+    connection::state_dir().join("file-list")
 }

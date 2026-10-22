@@ -23,7 +23,8 @@ fn editor_page(
             h_flex()
                 .h(px(36.))
                 .flex_none()
-                .px_3()
+                .pl_4()
+                .pr_2()
                 .gap_2()
                 .items_center()
                 .border_b_1()
@@ -68,9 +69,9 @@ impl HermesApp {
                 category = s.category.clone();
                 rows.push(
                     div()
-                        .pt_3()
+                        .pt_4()
                         .pb_1()
-                        .px_3()
+                        .px_4()
                         .text_xs()
                         .text_color(muted)
                         .child(category.to_uppercase())
@@ -82,8 +83,9 @@ impl HermesApp {
             rows.push(
                 v_flex()
                     .id(("skill", i))
-                    .px_3()
-                    .py_1()
+                    .pl(px(14.))
+                    .pr_3()
+                    .py_1p5()
                     .cursor_pointer()
                     .border_l_2()
                     .border_color(if selected {

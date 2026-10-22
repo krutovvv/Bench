@@ -97,11 +97,30 @@ pub fn telegram_owners(conn: &Connection, profile: &str) -> Result<Vec<(String, 
         .collect())
 }
 
+/// Full-text search over session titles and message content: (session id, snippet).
+pub fn search_sessions(conn: &Connection, profile: &str, q: &str) -> Result<Vec<(String, String)>> {
+    let v = get(
+        conn,
+        &format!("/api/sessions/search?q={}&limit=30", enc(q)),
+        profile,
+    )?;
+    Ok(v["results"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|r| {
+            let snippet = r["snippet"].as_str().unwrap_or_default();
+            let snippet = snippet.split_whitespace().collect::<Vec<_>>().join(" ");
+            Some((r["session_id"].as_str()?.to_string(), snippet))
+        })
+        .collect())
+}
+
 /// The profile's defaults from config.yaml: (`agent.reasoning_effort`, model name).
-pub fn profile_defaults(
-    conn: &Connection,
-    profile: &str,
-) -> Result<(Option<String>, Option<String>)> {
+/// (effort, primary model, [(model, provider)] primary first then `fallback_providers`).
+pub type ProfileDefaults = (Option<String>, Option<String>, Vec<(String, String)>);
+
+pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefaults> {
     let raw = get(conn, "/api/config/raw", profile)?;
     let yaml: Value =
         serde_yaml::from_str(raw["yaml"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
@@ -116,7 +135,28 @@ pub fn profile_defaults(
             .map(str::to_string),
     }
     .filter(|m| !m.is_empty());
-    Ok((effort, model))
+    let mut models: Vec<(String, String)> = vec![];
+    if let Some(m) = &model {
+        models.push((
+            m.clone(),
+            yaml["model"]["provider"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+        ));
+    }
+    for f in yaml["fallback_providers"].as_array().into_iter().flatten() {
+        if let Some(m) = f["model"].as_str() {
+            let pair = (
+                m.to_string(),
+                f["provider"].as_str().unwrap_or_default().to_string(),
+            );
+            if !models.contains(&pair) {
+                models.push(pair);
+            }
+        }
+    }
+    Ok((effort, model, models))
 }
 
 pub fn skill_content(conn: &Connection, profile: &str, name: &str) -> Result<String> {

@@ -39,6 +39,13 @@ pub enum Cmd {
         session: String,
         runtime: Option<String>,
     },
+    /// Switch the session's model (primary or one of the profile's fallbacks).
+    SetModel {
+        profile: String,
+        session: String,
+        model: String,
+        provider: String,
+    },
     /// Drop the last exchange and ask the same question again.
     Regenerate {
         profile: String,
@@ -142,6 +149,8 @@ struct Rpc {
     next_id: u64,
     pending: HashMap<u64, Pending>,
     canonical: bool,
+    /// runtime session id -> (revision, execution generation), for fenced mutations.
+    fences: HashMap<String, (i64, i64)>,
 }
 
 impl Rpc {
@@ -152,6 +161,35 @@ impl Rpc {
             json!({"jsonrpc": "2.0", "id": self.next_id, "method": method, "params": params});
         self.ws.send(Message::text(frame.to_string()))?;
         Ok(())
+    }
+
+    /// A fenced session mutation (canonical protocol): model, reasoning, …
+    fn mutate(&mut self, session: &str, operation: &str, payload: Value) -> Result<()> {
+        let (revision, generation) = self.fences.get(session).copied().unwrap_or((0, 0));
+        let params = json!({
+            "session_id": session,
+            "request_id": uuid::Uuid::new_v4().to_string(),
+            "expected_revision": revision,
+            "expected_generation": generation,
+            "operation": operation,
+            "payload": payload,
+        });
+        self.call("session.mutate", params, Pending::Ignore)
+    }
+
+    /// Remember a session's revision/generation from a snapshot-shaped value.
+    fn note_fence(&mut self, session: &str, v: &Value) {
+        let rev = v["revision"].as_i64();
+        let generation = v["execution_generation"].as_i64();
+        if rev.is_some() || generation.is_some() {
+            let entry = self.fences.entry(session.to_string()).or_insert((0, 0));
+            if let Some(r) = rev {
+                entry.0 = r;
+            }
+            if let Some(g) = generation {
+                entry.1 = g;
+            }
+        }
     }
 
     /// Returns false on shutdown.
@@ -191,6 +229,31 @@ impl Rpc {
                 json!({"profile": profile}),
                 Pending::Create,
             )?,
+            Cmd::SetModel {
+                profile,
+                session,
+                model,
+                provider,
+            } => {
+                if self.canonical {
+                    self.mutate(
+                        &session,
+                        "model",
+                        json!({"model": model, "provider": provider}),
+                    )?
+                } else {
+                    let command = if provider.is_empty() {
+                        format!("/model {model}")
+                    } else {
+                        format!("/model {model} --provider {provider}")
+                    };
+                    self.call(
+                        "slash.exec",
+                        json!({"session_id": session, "profile": profile, "command": command}),
+                        Pending::Ignore,
+                    )?
+                }
+            }
             Cmd::Send {
                 profile,
                 session,
@@ -198,8 +261,12 @@ impl Rpc {
                 effort,
             } => {
                 if let Some(value) = effort {
-                    let params = json!({"key": "reasoning", "value": value, "session_id": session, "profile": profile});
-                    self.call("config.set", params, Pending::Ignore)?;
+                    if self.canonical {
+                        self.mutate(&session, "reasoning", json!({"effort": value}))?;
+                    } else {
+                        let params = json!({"key": "reasoning", "value": value, "session_id": session, "profile": profile});
+                        self.call("config.set", params, Pending::Ignore)?;
+                    }
                 }
                 let mut params = json!({"session_id": session, "text": text, "profile": profile});
                 if self.canonical {
@@ -248,6 +315,7 @@ fn run(
         next_id: 0,
         pending: HashMap::new(),
         canonical: conn.canonical(),
+        fences: HashMap::new(),
     };
     emit(Evt::Connected(conn.clone()));
     rpc.call("profiles.list", json!({}), Pending::Profiles)?;
@@ -302,6 +370,7 @@ fn run(
             if let Pending::Resume(session, profile) = kind {
                 let r = &msg["result"];
                 let runtime = r["session_id"].as_str().unwrap_or(&session).to_string();
+                rpc.note_fence(&runtime, r);
                 let turns =
                     history::turns(r["messages"].as_array().map(Vec::as_slice).unwrap_or(&[]));
                 let running = r["running"].as_bool().unwrap_or(false);
@@ -318,8 +387,20 @@ fn run(
                 )?;
                 continue;
             }
+            if matches!(kind, Pending::Create) {
+                if let Some(sid) = msg["result"]["session_id"].as_str() {
+                    rpc.note_fence(sid, &msg["result"]);
+                }
+            }
             on_result(kind, &msg["result"], &emit);
             continue;
+        }
+        // session.info carries the authority's current revision/generation.
+        if msg["params"]["type"] == "session.info" {
+            if let Some(sid) = msg["params"]["session_id"].as_str() {
+                let payload = msg["params"]["payload"].clone();
+                rpc.note_fence(sid, &payload);
+            }
         }
         on_event(&msg["params"], &emit);
     }

@@ -141,6 +141,24 @@ impl HermesApp {
                 (e.to_string(), i == self.effort, f)
             })
             .collect();
+        let current_model = self.model_name();
+        let models: Vec<_> = self
+            .profile_models
+            .iter()
+            .enumerate()
+            .map(|(i, (m, p))| {
+                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                    Box::new(move |this, _, cx| this.set_model(i, cx));
+                let checked = self.model_pick.map_or(*m == current_model, |k| k == i);
+                let tag = if i == 0 { "primary" } else { "fallback" };
+                let label = if p.is_empty() {
+                    format!("{m}  ·  {tag}")
+                } else {
+                    format!("{m}  ·  {p}, {tag}")
+                };
+                (label, checked, f)
+            })
+            .collect();
         let profile_label = self
             .profiles
             .iter()
@@ -196,7 +214,9 @@ impl HermesApp {
             .border_color(theme.border)
             .text_xs()
             .child(picker("target", Ico::Server, self.target.label(), targets))
-            .child(picker("profile", Ico::UserRound, profile_label, profiles))
+            .when(!self.profiles.is_empty(), |d| {
+                d.child(picker("profile", Ico::UserRound, profile_label, profiles))
+            })
             .child(div().flex_1())
             .children(context)
             .child(picker(
@@ -205,11 +225,17 @@ impl HermesApp {
                 EFFORTS[self.effort].to_string(),
                 efforts,
             ))
-            .child(
-                item("model")
-                    .child(Ico::Cpu.icon().xsmall())
-                    .child(self.model_name()),
-            )
+            .map(|d| {
+                if models.is_empty() || self.session.is_some() {
+                    d.child(
+                        item("model")
+                            .child(Ico::Cpu.icon().xsmall())
+                            .child(current_model),
+                    )
+                } else {
+                    d.child(picker("model", Ico::Cpu, current_model, models))
+                }
+            })
             .child(
                 button(
                     "restart",

@@ -2940,6 +2940,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "similar",
  "tungstenite",
  "ureq",
  "uuid",

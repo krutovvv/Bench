@@ -582,7 +582,7 @@ fn icon_button(id: impl Into<ElementId>, icon: Ico, tip: &'static str, cx: &App)
         .cursor_pointer()
         .text_color(theme.muted_foreground)
         .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-        .child(icon.icon().xsmall())
+        .child(icon.live(false))
         .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }
 

@@ -97,6 +97,16 @@ pub fn before(current: &str, diffs: &[String]) -> Option<String> {
     Some(text)
 }
 
+/// The whole file as one unified diff (every unchanged line kept as context), so a viewer
+/// can show the full text with the changes highlighted in place.
+pub fn full(path: &str, before: &str, after: &str) -> String {
+    similar::TextDiff::from_lines(before, after)
+        .unified_diff()
+        .context_radius(usize::MAX / 4)
+        .header(&format!("a/{path}"), &format!("b/{path}"))
+        .to_string()
+}
+
 /// A combined unified diff between two texts' hunks is not needed: the session diff is
 /// simply the tool diffs in order.
 pub fn joined(diffs: &[String]) -> String {
@@ -123,5 +133,15 @@ mod tests {
     fn refuses_when_file_moved_on() {
         let diff = "@@ -1,1 +1,1 @@\n-x\n+y\n";
         assert!(before("z\n", &[diff.to_string()]).is_none());
+    }
+
+    #[test]
+    fn full_diff_parses_with_every_line() {
+        let full = full("src/x.rs", "a\nb\nc\n", "a\nB\nc\nd\n");
+        let files = gpui_kit::component::diff::DiffFile::parse(&full).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!((files[0].additions(), files[0].deletions()), (2, 1));
+        assert_eq!(full.lines().filter(|l| l.starts_with(' ')).count(), 2);
+        assert!(files[0].path().ends_with("src/x.rs"));
     }
 }

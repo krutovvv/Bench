@@ -1,6 +1,7 @@
 //! Look and feel: flat, square, dense — after Zed's One Light.
 
 use gpui_kit::component::Theme;
+use gpui_kit::component::highlighter::HighlightTheme;
 use gpui_kit::*;
 
 fn c(hex: u32) -> Hsla {
@@ -19,7 +20,13 @@ pub fn apply(cx: &mut App) {
     t.radius_lg = px(0.);
     t.shadow = false;
     t.font_size = px(14.);
-    t.mono_font_size = px(13.);
+    t.mono_font_size = px(12.);
+    // One Light syntax colors for every editor and diff (config, MCP, skills, files).
+    if let Ok(h) =
+        serde_json::from_str::<HighlightTheme>(include_str!("../assets/themes/one-light.json"))
+    {
+        t.highlight_theme = std::sync::Arc::new(h);
+    }
 
     // Surfaces: editor-white content, one step darker chrome, thin neutral borders.
     t.background = c(0xFAFAFA);

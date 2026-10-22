@@ -43,6 +43,11 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 println!("sessions[{p}]: {}", rows.len());
                 if let Some(c) = &conn {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
+                    if let Ok(q) = std::env::var("PROBE_SEARCH") {
+                        for (id, s) in rest::search_sessions(c, &p, &q)? {
+                            println!("  hit {id}: {}", s.chars().take(100).collect::<String>());
+                        }
+                    }
                     println!("mcp[{p}]: {} bytes of JSON", rest::mcp_json(c, &p)?.len());
                     match rest::cron_jobs(c, &p) {
                         Ok(jobs) => println!(
