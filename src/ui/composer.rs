@@ -109,7 +109,10 @@ impl HermesApp {
             .flex_1()
             .min_w_0()
             .h(px(32.))
-            .px_4()
+            // The right gap runs to the mic glyph: 16 + the icon column's 8 + 9 inside its
+            // 34px box around a 16px icon. The left gets the same 33.
+            .pl(px(33.))
+            .pr_4()
             .gap(px(2.))
             .items_center()
             .children(bars)
