@@ -15,6 +15,9 @@ use crate::model::source_label;
 
 impl HermesApp {
     pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.tools.on {
+            return self.render_tools_sidebar(cx);
+        }
         if self.ssh.on {
             return self.render_ssh_sidebar(cx);
         }

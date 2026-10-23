@@ -107,6 +107,7 @@ icons! {
     Trash => "trash",
     UserRound => "user-round",
     Volume => "volume-2",
+    Wrench => "wrench",
     Search => "search",
     X => "x",
     // Not Lucide: a Z in Lucide's style, for "open in Zed".

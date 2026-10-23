@@ -37,6 +37,7 @@ impl HermesApp {
             ("n", true) => self.open_new_window(cx),
             ("1", false) => self.set_ssh_mode(false, window, cx),
             ("2", false) => self.set_ssh_mode(true, window, cx),
+            ("3", false) => self.toggle_tools(window, cx),
             ("b", false) => self.toggle_ide(window, cx),
             ("b", true) if self.ide_open() => {
                 self.ide.expanded = !self.ide.expanded;

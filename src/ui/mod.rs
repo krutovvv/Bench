@@ -10,6 +10,7 @@ mod servers;
 mod sidebar;
 mod statusbar;
 mod terminal;
+mod tools;
 
 pub fn terminal_palette(theme: &gpui_kit::component::Theme) -> crate::term::Palette {
     terminal::palette(theme)
@@ -160,6 +161,9 @@ impl HermesApp {
 
     /// Header strip: the session title, or the settings tabs.
     fn render_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.tools.on && self.panel == Panel::Chat {
+            return self.render_tools_header(cx);
+        }
         if self.ssh.on && self.panel == Panel::Chat {
             return self.render_ssh_header(cx);
         }
@@ -263,6 +267,7 @@ impl Render for HermesApp {
         let theme = cx.theme().clone();
         let ssh = self.ssh.on && self.panel == Panel::Chat;
         let body = match self.panel {
+            Panel::Chat if self.tools.on => self.render_tools_body(cx),
             Panel::Chat if ssh => self.render_ssh_body(window, cx),
             // Files dropped anywhere on the chat or the input are attached.
             Panel::Chat => v_flex()
@@ -372,15 +377,18 @@ impl HermesApp {
             .on_resize(remember)
             .child(left.child(self.render_sidebar(cx)))
             .child(resizable_panel().child(main))
-            .when(self.right.is_some() && self.panel == Panel::Chat, |d| {
-                d.child(
-                    resizable_panel()
-                        .size(self.ide_w)
-                        .size_range(px(360.)..px(1000.))
-                        .fixed()
-                        .child(self.render_right(cx)),
-                )
-            })
+            .when(
+                self.right.is_some() && self.panel == Panel::Chat && !self.tools.on,
+                |d| {
+                    d.child(
+                        resizable_panel()
+                            .size(self.ide_w)
+                            .size_range(px(360.)..px(1000.))
+                            .fixed()
+                            .child(self.render_right(cx)),
+                    )
+                },
+            )
             .into_any_element()
     }
 }

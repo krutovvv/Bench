@@ -77,6 +77,7 @@ impl HermesApp {
         // away, as ⌘B and "Open files" in the "⋯" menu; gone while the IDE is open (its own
         // close button stands there).
         let files = !self.ide_open()
+            && !self.tools.on
             && if ssh {
                 self.ssh.active_tab().is_some()
             } else {

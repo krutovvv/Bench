@@ -183,6 +183,8 @@ impl HermesApp {
 
     pub fn set_ssh_mode(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.ssh.on = on;
+        // Sessions or servers: either leaves Tools.
+        self.tools.on = false;
         self.panel = super::Panel::Chat;
         if on {
             self.reload_servers(cx);

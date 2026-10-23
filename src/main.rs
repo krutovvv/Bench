@@ -6,6 +6,7 @@ mod app;
 mod attach;
 mod audio;
 mod connection;
+mod devtools;
 mod diff;
 mod gateway;
 mod history;

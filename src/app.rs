@@ -27,6 +27,7 @@ pub(crate) mod projects;
 mod prompts;
 pub(crate) mod servers;
 mod slash;
+pub(crate) mod tools;
 pub use projects::GitArm;
 
 use crate::attach;
@@ -281,6 +282,8 @@ pub struct HermesApp {
 
     /// SSH mode: servers of ~/.ssh/config and their terminals.
     pub ssh: servers::Ssh,
+    /// Tools mode (⌘3): the utilities of `crate::devtools`.
+    pub tools: tools::Tools,
     /// The mini IDE's source and the server file it keeps in sync.
     pub ide: ide::Ide,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
@@ -564,6 +567,7 @@ impl HermesApp {
 
         // The gateway list keeps the SSH hosts that run Hermes (asked again when the menu opens).
         let ssh = servers::Ssh::new(window, cx);
+        let tools = tools::Tools::new(window, cx);
         for host in targets.iter().filter_map(|t| match t {
             Target::Ssh(h) => Some(h.clone()),
             Target::Local => None,
@@ -579,6 +583,7 @@ impl HermesApp {
 
         let mut app = Self {
             ssh,
+            tools,
             ide: Default::default(),
             sidebar_w: px(280.),
             ide_w: px(640.),
