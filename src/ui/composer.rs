@@ -130,15 +130,17 @@ impl HermesApp {
             !self.composer.read(cx).value().trim().is_empty() || !self.attachments.is_empty();
 
         // The round buttons in a square UI: a quiet one (outline) and a filled one. Glyphs are
-        // Lucide at 15px in a "bold" cut (assets/icons/*-bold,
-        // mic-fill: the mic's capsule filled, a plain two-loop clip and the arrow a little
-        // heavier); Stop is a filled square, not an outline (an outlined square reads as missing).
+        // Lucide at 15px in a "bold" cut (assets/icons/*-bold, mic-fill: the mic's capsule
+        // filled, a plain two-loop clip; the clip and the arrow at 2.25 instead of 2); Stop is a
+        // filled square, not an outline (an outlined square reads as missing).
         let round =
             |id: &'static str, icon: Option<Ico>, tip: &'static str, filled: Option<Hsla>| {
+                // Outlined: a lighter grey than the muted text, so the bold cut stays quiet;
+                // hover brings the text color.
                 let fg = if filled.is_some() {
                     theme.primary_foreground
                 } else {
-                    theme.muted_foreground
+                    theme.muted_foreground.opacity(0.75)
                 };
                 div()
                     .id(id)
