@@ -381,11 +381,20 @@ impl HermesApp {
         let actions = (live.is_none() && has_answer).then(|| {
             let playing = self.playing.as_ref().is_some_and(|(j, _)| *j == i);
             let speaking = self.speaking == Some(i);
+            // Over the top-right corner, on the line of the steps' summary: on hover only (and
+            // while its audio plays), on the chat's own background so text under it is covered
+            // cleanly when there is no summary line to sit beside.
             h_flex()
+                .absolute()
+                .top(px(15.))
+                .right_4()
+                .pl_1()
                 .gap_0p5()
                 .items_center()
-                .opacity(0.)
-                .group_hover(group.clone(), |s| s.opacity(1.))
+                .bg(theme.background)
+                .when(!(playing || speaking), |d| {
+                    d.opacity(0.).group_hover(group.clone(), |s| s.opacity(1.))
+                })
                 .when(!time.is_empty(), |d| {
                     d.child(
                         div()
@@ -463,25 +472,29 @@ impl HermesApp {
                     }),
             )
             .child(
-                v_flex()
-                    .px_4()
-                    // As much air under the question as under the answer: there the gap, the
-                    // 22px row of hover actions and the padding (12 + 22 + 12).
-                    .pt(theme.font_size * 1.5 + px(22.))
-                    .pb_3()
-                    .gap_3()
-                    .children(summary)
-                    .children(steps)
-                    .children(answer)
-                    // What came with the answer, right under its text (the agent's side); the
-                    // hover actions below all of it.
-                    .children(sources)
-                    .children(processes)
-                    .children(files)
-                    .when(!reviews.is_empty(), |d| {
-                        d.child(v_flex().gap_1().children(reviews))
-                    })
-                    .child(h_flex().min_h(px(22.)).justify_end().children(actions)),
+                div()
+                    .relative()
+                    .w_full()
+                    .child(
+                        v_flex()
+                            .px_4()
+                            // The window's 16px all round: the hover actions float over the corner,
+                            // they don't take a row of their own.
+                            .py_4()
+                            .gap_3()
+                            .children(summary)
+                            .children(steps)
+                            .children(answer)
+                            // What came with the answer, right under its text (the agent's side).
+                            .children(sources)
+                            .children(processes)
+                            .children(files)
+                            .when(!reviews.is_empty(), |d| {
+                                d.child(v_flex().gap_1().children(reviews))
+                            }),
+                    )
+                    // After the column, so the actions paint over it.
+                    .children(actions),
             )
             .into_any_element()
     }
