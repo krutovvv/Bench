@@ -111,8 +111,9 @@ impl HermesApp {
             .h(px(32.))
             // The same gap on both sides: 24 from the divider, and 16 + the button column's 8
             // to the round stop button.
-            .pl(px(24.))
-            .pr_4()
+            // 20 from the window's divider, 20 to the buttons (12 + the buttons' own 8).
+            .pl_5()
+            .pr_3()
             .gap(px(2.))
             .items_center()
             .children(bars)
@@ -257,14 +258,7 @@ impl HermesApp {
             .border_color(theme.border)
             // Files waiting to go: one row of chips over the text, at the text's inset.
             .when(!chips.is_empty(), |d| {
-                d.child(
-                    h_flex()
-                        .flex_wrap()
-                        .gap_1p5()
-                        .px(px(14.))
-                        .pt_2()
-                        .children(chips),
-                )
+                d.child(h_flex().flex_wrap().gap_1p5().px_5().pt_2().children(chips))
             })
             .child(
                 h_flex()
@@ -277,10 +271,9 @@ impl HermesApp {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                // Measured: the "New session" button sits 14pt from the divider;
-                                // the textarea pads its text by ~10.5 itself, so 3.5 more lands
-                                // the text at 14.
-                                .pl(px(3.5))
+                                // The chat's text starts 20 in; with the textarea's own padding,
+                                // 7 more lands it there (measured).
+                                .pl(px(7.))
                                 .py_1()
                                 .child(Textarea::new(&self.composer).appearance(false)),
                         )

@@ -1,7 +1,6 @@
 //! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -226,24 +225,9 @@ impl HermesApp {
         v_flex()
             .size_full()
             .bg(theme.sidebar)
-            .child(
-                // Right under the window buttons (no padding of its own above), 8px below like the
-                // footer's, then the rule.
-                v_flex().flex_none().pt(px(38.)).child(
-                    h_flex()
-                        .px_4()
-                        .pb_2()
-                        .items_center()
-                        .border_b_1()
-                        .border_color(theme.sidebar_border)
-                        .child(
-                            // Medium input = 2 rem, the same as the button below.
-                            Input::new(&self.search)
-                                .cleanable(true)
-                                .prefix(Ico::Search.icon().small().text_color(muted)),
-                        ),
-                ),
-            )
+            // Under the window buttons: the search as a band, the button at the bottom as one.
+            .child(div().h(px(38.)).flex_none())
+            .child(super::search_band(&self.search, cx))
             .child(
                 v_flex()
                     .id("sessions")
@@ -268,11 +252,7 @@ impl HermesApp {
                 h_flex()
                     .flex_none()
                     .h(super::bar_h(cx))
-                    .px_4()
-                    .items_center()
-                    .border_t_1()
-                    .border_color(theme.sidebar_border)
-                    .child(new_session.flex_1()),
+                    .child(new_session.flex_1().h_full()),
             )
             .into_any_element()
     }

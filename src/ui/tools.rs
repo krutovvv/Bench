@@ -84,21 +84,8 @@ impl HermesApp {
         v_flex()
             .size_full()
             .bg(theme.sidebar)
-            .child(
-                v_flex().flex_none().pt(px(38.)).child(
-                    h_flex()
-                        .px_4()
-                        .pb_2()
-                        .items_center()
-                        .border_b_1()
-                        .border_color(theme.sidebar_border)
-                        .child(
-                            Input::new(&self.tools.search)
-                                .cleanable(true)
-                                .prefix(Ico::Search.icon().small().text_color(muted)),
-                        ),
-                ),
-            )
+            .child(div().h(px(38.)).flex_none())
+            .child(super::search_band(&self.tools.search, cx))
             .child(
                 v_flex()
                     .id("tools-list")

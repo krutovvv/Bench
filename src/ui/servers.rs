@@ -407,20 +407,7 @@ impl HermesApp {
             .size_full()
             .bg(theme.sidebar)
             .child(div().h(px(38.)).flex_none())
-            .child(
-                h_flex()
-                    .flex_none()
-                    .px_4()
-                    .pb_2()
-                    .items_center()
-                    .border_b_1()
-                    .border_color(theme.sidebar_border)
-                    .child(
-                        Input::new(&self.ssh.search)
-                            .cleanable(true)
-                            .prefix(Ico::Search.icon().small().text_color(muted)),
-                    ),
-            )
+            .child(super::search_band(&self.ssh.search, cx))
             .child(
                 v_flex()
                     .id("servers")
@@ -436,11 +423,7 @@ impl HermesApp {
                 h_flex()
                     .flex_none()
                     .h(super::bar_h(cx))
-                    .px_4()
-                    .items_center()
-                    .border_t_1()
-                    .border_color(theme.sidebar_border)
-                    .child(new_server.flex_1()),
+                    .child(new_server.flex_1().h_full()),
             )
             .into_any_element()
     }

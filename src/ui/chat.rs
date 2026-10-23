@@ -386,8 +386,8 @@ impl HermesApp {
             // cleanly when there is no summary line to sit beside.
             h_flex()
                 .absolute()
-                .top(px(15.))
-                .right_4()
+                .top(px(19.))
+                .right_5()
                 .pl_1()
                 .gap_0p5()
                 .items_center()
@@ -438,7 +438,7 @@ impl HermesApp {
 
         // The session reads as strips: each question is a band from edge to edge (rules above
         // and below, like the composer's). Its text and the agent's side under it keep one
-        // inset, 16px on both sides, like the composer and the header.
+        // inset, 20px on both sides; the composer's text starts there too.
         v_flex()
             .id(("turn", i))
             .group(group)
@@ -448,8 +448,8 @@ impl HermesApp {
             .child(
                 div()
                     .w_full()
-                    .px_4()
-                    .py_2p5()
+                    .px_5()
+                    .py_3()
                     .bg(theme.secondary)
                     // The first band sits under the header's own rule.
                     .when(i > 0, |d| d.border_t_1())
@@ -477,10 +477,10 @@ impl HermesApp {
                     .w_full()
                     .child(
                         v_flex()
-                            .px_4()
-                            // The window's 16px all round: the hover actions float over the corner,
+                            .px_5()
+                            // 20px all round: the hover actions float over the corner,
                             // they don't take a row of their own.
-                            .py_4()
+                            .py_5()
                             .gap_3()
                             .children(summary)
                             .children(steps)

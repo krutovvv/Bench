@@ -28,6 +28,36 @@ use crate::app::{HermesApp, Panel};
 /// Height of the bars that face each other across the window: the sidebar's search and
 /// "New session" rows and the composer (one line). A 2-rem control (the input's own height)
 /// with 8px above and below, so it follows the Appearance size.
+/// A sidebar's search: a band from edge to edge (rules above and below, the content's
+/// background between), no frame of its own; the magnifier right over the group icons.
+pub fn search_band(input: &Entity<gpui_kit::component::input::InputState>, cx: &App) -> Div {
+    let theme = cx.theme();
+    h_flex()
+        .flex_none()
+        .w_full()
+        .h(bar_h(cx))
+        // Measured: the input's own padding plus the icon's side bearing put it 2.5 right of
+        // the group icons at 6.
+        .pl(px(3.5))
+        .pr_2()
+        .items_center()
+        .bg(theme.background)
+        .border_t_1()
+        .border_b_1()
+        .border_color(theme.sidebar_border)
+        .child(
+            gpui_kit::component::input::Input::new(input)
+                .appearance(false)
+                .cleanable(true)
+                .prefix(
+                    crate::icons::Ico::Search
+                        .icon()
+                        .small()
+                        .text_color(theme.muted_foreground),
+                ),
+        )
+}
+
 pub fn bar_h(cx: &App) -> Pixels {
     cx.theme().font_size * 2. + px(16.)
 }
