@@ -19,12 +19,14 @@ mod gateways;
 pub(crate) mod ide;
 pub(crate) mod ide_ops;
 mod ide_tabs;
+pub(crate) mod install;
 mod keys;
 pub mod marks;
 mod processes;
 mod profiles;
 pub(crate) mod projects;
 mod prompts;
+pub(crate) mod providers;
 pub(crate) mod servers;
 mod slash;
 pub(crate) mod tools;
@@ -49,6 +51,10 @@ pub enum Panel {
     Skills,
     Prompts,
     Config,
+    /// Model providers, fallback, voice, service keys.
+    Providers,
+    /// Telegram: the bot, who may write to it, the proxy; whose chats the list shows.
+    Messages,
     Cron,
     Gateways,
     Profiles,
@@ -152,7 +158,13 @@ pub struct HermesApp {
     /// The profile's `agent.reasoning_effort`: where a new chat starts.
     profile_effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
-    pub profile_models: Vec<(String, String)>,
+    pub profile_models: Vec<rest::ModelChoice>,
+    /// Settings → Providers and Messages.
+    pub pv: providers::Providers,
+    /// Hermes isn't installed on this Mac (and this Mac is the target): offer to install it.
+    pub hermes_missing: bool,
+    /// A setup running in a terminal in the chat area (installing Hermes, Claude login).
+    pub setup: Option<install::Setup>,
     /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
     pub catalog: Vec<crate::model::SlashCommand>,
     pub slash_sel: usize,
@@ -623,6 +635,9 @@ impl HermesApp {
             effort_other: None,
             profile_effort: EFFORTS.len() - 1,
             profile_models: vec![],
+            pv: Default::default(),
+            hermes_missing: false,
+            setup: None,
             catalog: vec![],
             slash_sel: 0,
             slash_closed: false,
@@ -757,6 +772,14 @@ impl HermesApp {
         self.sessions.clear();
         self.skills.clear();
         self.reset_chat(cx);
+        self.pv = Default::default();
+        // Nothing to connect to: the chat offers to install Hermes instead.
+        self.hermes_missing = target == Target::Local && !connection::hermes_installed();
+        if self.hermes_missing {
+            self.connecting = false;
+            cx.notify();
+            return;
+        }
         let dir = connection::state_dir();
         let _ = std::fs::create_dir_all(&dir)
             .and_then(|_| std::fs::write(dir.join("last-target"), target.label()));
@@ -1406,7 +1429,7 @@ impl HermesApp {
         let Some((model, provider)) = self
             .model_pick
             .and_then(|i| self.profile_models.get(i))
-            .cloned()
+            .map(|c| (c.model.clone(), c.provider.clone()))
         else {
             return;
         };
@@ -1725,6 +1748,7 @@ impl HermesApp {
             this.approval_mode = Some(approval);
             this.profile_context = context;
             this.profile_models = models;
+            this.add_picker_models();
             this.model_pick = None;
             let level = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v));
             if let Some(i) = level {
@@ -1997,6 +2021,12 @@ impl HermesApp {
                         ),
                     },
                 )
+            }
+            Panel::Providers | Panel::Messages => {
+                self.load_providers(window, cx);
+                if panel == Panel::Messages {
+                    self.load_telegram_owners(window, cx);
+                }
             }
             Panel::Cron => self.load_cron(window, cx),
             Panel::Skills => self.rest(window, cx, rest::skills, |this, r, window, cx| match r {

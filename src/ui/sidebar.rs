@@ -190,6 +190,8 @@ impl HermesApp {
             }
         }
 
+        // No Hermes on this Mac: the main button installs it.
+        let missing = self.hermes_missing;
         let new_session = h_flex()
             .id("new-session")
             .h(rems(super::BAR_CONTROL_REMS))
@@ -203,9 +205,23 @@ impl HermesApp {
             .text_color(theme.primary_foreground)
             .cursor_pointer()
             .hover(|s| s.bg(theme.primary_hover))
-            .child(Ico::Plus.icon().small())
-            .child("New session")
-            .on_click(cx.listener(|this, _, _, cx| this.new_session(cx)));
+            .child(
+                if missing { Ico::Download } else { Ico::Plus }
+                    .icon()
+                    .small(),
+            )
+            .child(if missing {
+                "Install Hermes Agent"
+            } else {
+                "New session"
+            })
+            .on_click(cx.listener(move |this, _, window, cx| {
+                if missing {
+                    this.start_setup(crate::app::install::SetupKind::Hermes, window, cx)
+                } else {
+                    this.new_session(cx)
+                }
+            }));
 
         v_flex()
             .size_full()

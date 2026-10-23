@@ -122,8 +122,23 @@ impl HermesApp {
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,
-    ) -> impl IntoElement {
+    ) -> AnyElement {
         let theme = cx.theme().clone();
+        // Nowhere to send to: the field is shown, but closed.
+        if self.hermes_missing {
+            return h_flex()
+                .w_full()
+                .min_h(super::bar_h(cx))
+                .px_4()
+                .items_center()
+                .bg(theme.background)
+                .border_t_1()
+                .border_color(theme.border)
+                .text_sm()
+                .text_color(theme.muted_foreground.opacity(0.7))
+                .child("Install Hermes Agent to start a chat")
+                .into_any_element();
+        }
         let busy = self.live.is_some();
         let recording = self.recorder.is_some();
         let has_text =
@@ -283,5 +298,6 @@ impl HermesApp {
                             .child(action),
                     ),
             )
+            .into_any_element()
     }
 }

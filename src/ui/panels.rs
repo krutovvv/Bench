@@ -863,7 +863,6 @@ impl HermesApp {
         let muted = cx.theme().muted_foreground;
         let heading = |t: &'static str| div().pt_4().pb_1().text_xs().text_color(muted).child(t);
         let appearance = self.render_appearance(cx).into_any_element();
-        let telegram = self.render_telegram(cx).into_any_element();
         v_flex()
             .id("settings")
             .size_full()
@@ -872,8 +871,6 @@ impl HermesApp {
             .pb_6()
             .child(heading("APPEARANCE"))
             .child(appearance)
-            .child(heading("TELEGRAM").pt_6())
-            .child(telegram)
     }
 
     pub(super) fn render_gateways(&mut self, cx: &mut Context<Self>) -> impl IntoElement {

@@ -48,6 +48,7 @@ icons! {
     CircleAlert => "circle-alert",
     CircleCheck => "circle-check",
     CircleDot => "circle-dot",
+    Download => "download",
     CircleHelp => "circle-help",
     CircleEmpty => "circle",
     Clock => "clock",

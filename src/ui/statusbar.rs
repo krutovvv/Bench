@@ -80,6 +80,8 @@ impl HermesApp {
                       icon: Ico,
                       label: String,
                       note: Option<&'static str>,
+                      // (index of the first item, the group's name): a label above each group.
+                      sections: Vec<(usize, String)>,
                       items: Vec<(
             String,
             bool,
@@ -102,6 +104,12 @@ impl HermesApp {
                             menu = menu.label(note).separator();
                         }
                         for (k, (text, checked, _)) in items.iter().enumerate() {
+                            if let Some((_, name)) = sections.iter().find(|(at, _)| *at == k) {
+                                if k > 0 {
+                                    menu = menu.separator();
+                                }
+                                menu = menu.label(name.clone());
+                            }
                             let (items, view) = (items.clone(), view.clone());
                             menu = menu.item(
                                 PopupMenuItem::new(text.clone()).checked(*checked).on_click(
@@ -163,18 +171,24 @@ impl HermesApp {
             .profile_models
             .iter()
             .enumerate()
-            .map(|(i, (m, p))| {
+            .map(|(i, c)| {
                 let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
                     Box::new(move |this, _, cx| this.set_model(i, cx));
-                let checked = self.model_pick.map_or(*m == current_model, |k| k == i);
-                let tag = if i == 0 { "primary" } else { "fallback" };
-                let label = if p.is_empty() {
-                    format!("{m}  ·  {tag}")
+                let checked = self.model_pick.map_or(c.model == current_model, |k| k == i);
+                let label = if c.tag.is_empty() {
+                    c.model.clone()
                 } else {
-                    format!("{m}  ·  {p}, {tag}")
+                    format!("{}  ·  {}", c.model, c.tag)
                 };
                 (label, checked, f)
             })
+            .collect();
+        let model_groups: Vec<(usize, String)> = self
+            .profile_models
+            .iter()
+            .enumerate()
+            .filter(|(i, c)| *i == 0 || self.profile_models[i - 1].group != c.group)
+            .map(|(i, c)| (i, c.group.clone()))
             .collect();
         let profile_label = self
             .profiles
@@ -301,6 +315,7 @@ impl HermesApp {
                     Ico::UserRound,
                     profile_label,
                     None,
+                    vec![],
                     profiles,
                 ))
             })
@@ -324,6 +339,7 @@ impl HermesApp {
                     mode,
                     // Hermes keeps approvals in the profile's config, not per chat.
                     Some("All chats of this profile"),
+                    vec![],
                     approvals,
                 ))
             })
@@ -339,6 +355,7 @@ impl HermesApp {
                     } else {
                         "The new chat"
                     }),
+                    vec![],
                     efforts,
                 ))
             })
@@ -352,7 +369,14 @@ impl HermesApp {
                             .child(current_model),
                     )
                 } else {
-                    d.child(picker("model", Ico::Cpu, current_model, None, models))
+                    d.child(picker(
+                        "model",
+                        Ico::Cpu,
+                        current_model,
+                        None,
+                        model_groups,
+                        models,
+                    ))
                 }
             })
             .child(

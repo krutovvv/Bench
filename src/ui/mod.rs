@@ -4,8 +4,10 @@ mod asks;
 mod chat;
 mod composer;
 mod files;
+mod install;
 mod media;
 mod panels;
+mod providers;
 mod servers;
 mod sidebar;
 mod statusbar;
@@ -209,6 +211,8 @@ impl HermesApp {
             ("tab-skills", "Skills", Panel::Skills),
             ("tab-prompts", "Prompts", Panel::Prompts),
             ("tab-config", "Config", Panel::Config),
+            ("tab-providers", "Providers", Panel::Providers),
+            ("tab-messages", "Messages", Panel::Messages),
             ("tab-cron", "Cron", Panel::Cron),
             ("tab-gw", "Gateways", Panel::Gateways),
             ("tab-profiles", "Profiles", Panel::Profiles),
@@ -269,6 +273,20 @@ impl Render for HermesApp {
         let body = match self.panel {
             Panel::Chat if self.tools.on => self.render_tools_body(cx),
             Panel::Chat if ssh => self.render_ssh_body(window, cx),
+            // A setup in a terminal (installing Hermes, a Claude login) has the chat area.
+            Panel::Chat if self.setup.is_some() && self.setup_tab().is_some() => self
+                .render_setup(window, cx)
+                .unwrap_or_else(|| div().into_any_element()),
+            Panel::Chat if self.hermes_missing => v_flex()
+                .size_full()
+                .child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .child(self.render_hermes_missing(cx)),
+                )
+                .child(self.render_composer(window, cx))
+                .into_any_element(),
             // Files dropped anywhere on the chat or the input are attached.
             Panel::Chat => v_flex()
                 .id("chat-drop")
@@ -284,6 +302,8 @@ impl Render for HermesApp {
             Panel::Skills => self.render_skills(cx).into_any_element(),
             Panel::Mcp => self.render_mcp(cx).into_any_element(),
             Panel::Config => self.render_config(cx).into_any_element(),
+            Panel::Providers => self.render_providers(cx),
+            Panel::Messages => self.render_messages(cx),
             Panel::Cron => self.render_cron(cx).into_any_element(),
             Panel::Settings => self.render_settings(cx).into_any_element(),
             Panel::Profiles => self.render_profiles(cx).into_any_element(),

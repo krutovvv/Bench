@@ -134,16 +134,39 @@ pub fn search_sessions(conn: &Connection, profile: &str, q: &str) -> Result<Vec<
         .collect())
 }
 
-/// The profile's defaults from config.yaml: (`agent.reasoning_effort`, primary model,
-/// [(model, provider)] primary first then `fallback_providers`, `approvals.mode`,
-/// `model.context_length` or 0).
+/// One model the picker offers: which provider serves it, the group it is listed under, and
+/// whether it is the profile's main model or a fallback.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModelChoice {
+    pub model: String,
+    pub provider: String,
+    pub group: String,
+    pub tag: &'static str,
+}
+
+/// The profile's defaults from config.yaml: (`agent.reasoning_effort`, primary model, the
+/// models it offers — main first, then fallbacks, then the rest of each provider's list —
+/// `approvals.mode`, `model.context_length` or 0).
 pub type ProfileDefaults = (
     Option<String>,
     Option<String>,
-    Vec<(String, String)>,
+    Vec<ModelChoice>,
     String,
     u64,
 );
+
+/// A provider id as people read it.
+pub fn provider_group(provider: &str, yaml: &Value) -> String {
+    match provider {
+        "openrouter" => "OpenRouter".into(),
+        crate::connection::CLAUDE_PROVIDER => "Claude".into(),
+        "" => "Model".into(),
+        p => yaml["providers"][p]["name"]
+            .as_str()
+            .unwrap_or(p.strip_prefix("custom:").unwrap_or(p))
+            .to_string(),
+    }
+}
 
 pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefaults> {
     let raw = get(conn, "/api/config/raw", profile)?;
@@ -160,24 +183,53 @@ pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefau
             .map(str::to_string),
     }
     .filter(|m| !m.is_empty());
-    let mut models: Vec<(String, String)> = vec![];
+    let mut models: Vec<ModelChoice> = vec![];
+    let add = |models: &mut Vec<ModelChoice>, m: &str, p: &str, tag: &'static str| {
+        if m.is_empty() || models.iter().any(|c| c.model == m && c.provider == p) {
+            return;
+        }
+        models.push(ModelChoice {
+            model: m.to_string(),
+            provider: p.to_string(),
+            group: provider_group(p, &yaml),
+            tag,
+        });
+    };
     if let Some(m) = &model {
-        models.push((
-            m.clone(),
-            yaml["model"]["provider"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-        ));
+        let p = yaml["model"]["provider"].as_str().unwrap_or_default();
+        add(&mut models, m, p, "main");
     }
     for f in yaml["fallback_providers"].as_array().into_iter().flatten() {
         if let Some(m) = f["model"].as_str() {
-            let pair = (
-                m.to_string(),
-                f["provider"].as_str().unwrap_or_default().to_string(),
+            add(
+                &mut models,
+                m,
+                f["provider"].as_str().unwrap_or_default(),
+                "fallback",
             );
-            if !models.contains(&pair) {
-                models.push(pair);
+        }
+    }
+    // Every custom endpoint's models (`providers.<id>.models` keys, or its one model).
+    if let Some(map) = yaml["providers"].as_object() {
+        for (id, entry) in map {
+            if entry["base_url"]
+                .as_str()
+                .or(entry["api"].as_str())
+                .is_none()
+            {
+                continue;
+            }
+            let listed: Vec<String> = match &entry["models"] {
+                Value::Object(m) => m.keys().cloned().collect(),
+                Value::Array(a) => a
+                    .iter()
+                    .filter_map(|v| v.as_str().map(str::to_string))
+                    .collect(),
+                _ => vec![],
+            };
+            let one = entry["model"].as_str().or(entry["default_model"].as_str());
+            for m in listed.iter().map(String::as_str).chain(one) {
+                add(&mut models, m, id, "");
             }
         }
     }
@@ -866,6 +918,103 @@ pub fn upload_file(conn: &Connection, profile: &str, path: &str, bytes: &[u8]) -
         profile,
         json!({"path": path, "data_url": data_url("application/octet-stream", bytes), "overwrite": true}),
         600,
+    )?;
+    Ok(())
+}
+
+// ---- providers, keys, messaging ---------------------------------------------------------
+
+/// The profile's custom (OpenAI-compatible) endpoints: `{endpoints: [{id, name, base_url,
+/// model, models, context_length, has_api_key, api_key_preview, is_current}], current}`.
+pub fn custom_endpoints(conn: &Connection, profile: &str) -> Result<Value> {
+    get(conn, "/api/providers/custom-endpoints", profile)
+}
+
+/// Create or update an endpoint. `api_key: None` keeps the saved key.
+pub fn save_endpoint(conn: &Connection, profile: &str, body: Value) -> Result<Value> {
+    send(
+        conn,
+        "POST",
+        "/api/providers/custom-endpoints",
+        profile,
+        body,
+        30,
+    )
+}
+
+/// The endpoint becomes the profile's main model provider.
+pub fn activate_endpoint(conn: &Connection, profile: &str, id: &str) -> Result<()> {
+    send(
+        conn,
+        "POST",
+        &format!("/api/providers/custom-endpoints/{}/activate", enc(id)),
+        profile,
+        json!({}),
+        30,
+    )?;
+    Ok(())
+}
+
+/// Probe an endpoint's `/models`: `{ok, message, models}`.
+pub fn validate_endpoint(conn: &Connection, profile: &str, body: Value) -> Result<Value> {
+    send(
+        conn,
+        "POST",
+        "/api/providers/custom-endpoints/validate",
+        profile,
+        body,
+        30,
+    )
+}
+
+/// The profile's `.env` keys Hermes knows or holds: name → `{is_set, redacted_value,
+/// description, category, channel_managed, custom}`.
+pub fn env_vars(conn: &Connection, profile: &str) -> Result<Value> {
+    get(conn, "/api/env", profile)
+}
+
+pub fn set_env(conn: &Connection, profile: &str, key: &str, value: &str) -> Result<()> {
+    send(
+        conn,
+        "PUT",
+        "/api/env",
+        profile,
+        json!({"key": key, "value": value}),
+        30,
+    )?;
+    Ok(())
+}
+
+pub fn remove_env(conn: &Connection, profile: &str, key: &str) -> Result<()> {
+    send(conn, "DELETE", "/api/env", profile, json!({"key": key}), 30)?;
+    Ok(())
+}
+
+/// One `.env` value in full (Hermes allows a few per 30 s). None when it isn't set.
+pub fn reveal_env(conn: &Connection, profile: &str, key: &str) -> Result<Option<String>> {
+    match send(
+        conn,
+        "POST",
+        "/api/env/reveal",
+        profile,
+        json!({"key": key}),
+        30,
+    ) {
+        Ok(v) => Ok(v["value"].as_str().map(str::to_string)),
+        Err(e) if e.to_string().starts_with("404") => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
+/// Merge keys into config.yaml (Hermes deep-merges what is sent over the file).
+pub fn merge_config(conn: &Connection, profile: &str, config: Value) -> Result<()> {
+    send(
+        conn,
+        "PUT",
+        "/api/config",
+        profile,
+        json!({"config": config}),
+        30,
     )?;
     Ok(())
 }

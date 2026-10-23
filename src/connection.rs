@@ -619,3 +619,112 @@ pub fn ssh_hosts() -> Vec<String> {
     }
     hosts
 }
+
+/// Whether Hermes is installed on this Mac (the installer puts the launcher here).
+pub fn hermes_installed() -> bool {
+    home().join(".local/bin/hermes").exists()
+}
+
+/// The command that installs Hermes on this Mac, typed into a terminal so the person sees it
+/// work. `--skip-setup`: providers are set in Bench's settings, not in the installer's wizard.
+/// `pipefail`: a failed download must fail the command (bash on an empty pipe exits 0).
+pub const INSTALL_HERMES: &str = "bash -o pipefail -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup'";
+
+/// The official Hermes plugin that runs turns on a Claude Pro/Max subscription through the
+/// official `claude` CLI, and the provider id it registers.
+pub const CLAUDE_PLUGIN: &str = "claude-subscription-directsdk";
+pub const CLAUDE_PROVIDER: &str = "claude-subscription-directsdk-experimental";
+
+/// What a machine has for Claude: the `claude` CLI's version, whether it is logged in (and as
+/// how), and whether the Hermes plugin is installed.
+#[derive(Clone, Debug, Default)]
+pub struct ClaudeStatus {
+    pub cli: Option<String>,
+    pub logged_in: bool,
+    pub account: Option<String>,
+    pub plugin: bool,
+}
+
+/// Run a login-shell script on the machine; stdout, or the last line of the error.
+fn shell(target: &Target, script: &str) -> Result<String> {
+    let out = match target {
+        Target::Local => Command::new("/bin/zsh")
+            .args(["-lc", script])
+            .stdin(Stdio::null())
+            .output()?,
+        Target::Ssh(host) => Command::new("ssh")
+            .args([
+                "-o",
+                "BatchMode=yes",
+                "-o",
+                "ConnectTimeout=8",
+                host,
+                &format!("bash -lc {}", shell_quote(script)),
+            ])
+            .stdin(Stdio::null())
+            .output()?,
+    };
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        bail!(
+            "{}",
+            err.lines()
+                .filter(|l| !l.trim().is_empty())
+                .last()
+                .unwrap_or("failed")
+        );
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+pub fn claude_status(target: &Target) -> ClaudeStatus {
+    let mut s = ClaudeStatus {
+        cli: shell(target, "claude --version")
+            .ok()
+            .map(|v| v.split_whitespace().next().unwrap_or_default().to_string())
+            .filter(|v| !v.is_empty()),
+        ..Default::default()
+    };
+    if s.cli.is_some() {
+        if let Ok(v) = shell(target, "claude auth status --json")
+            .and_then(|t| Ok(serde_json::from_str::<Value>(&t)?))
+        {
+            s.logged_in = v["loggedIn"].as_bool().unwrap_or(false);
+            // "claude.ai" for a subscription login, else an API key or a cloud.
+            s.account = v["authMethod"].as_str().map(str::to_string);
+        }
+    }
+    s.plugin = hermes_cli(target, &["plugins", "list", "--json"])
+        .ok()
+        .and_then(|t| {
+            // The CLI may print notices around the JSON.
+            let start = t.find('[')?;
+            serde_json::from_str::<Value>(&t[start..t.rfind(']')? + 1]).ok()
+        })
+        .and_then(|v| {
+            v.as_array().map(|a| {
+                a.iter().any(|p| {
+                    p["name"]
+                        .as_str()
+                        .is_some_and(|n| n.starts_with(CLAUDE_PLUGIN))
+                        && p["status"].as_str() != Some("disabled")
+                })
+            })
+        })
+        .unwrap_or(false);
+    s
+}
+
+/// Install the Claude plugin from the Hermes catalog, enabled, dependencies accepted.
+pub fn install_claude_plugin(target: &Target) -> Result<String> {
+    hermes_cli(
+        target,
+        &[
+            "plugins",
+            "install",
+            CLAUDE_PLUGIN,
+            "--yes-deps",
+            "--enable",
+        ],
+    )
+}

@@ -298,9 +298,21 @@ impl HermesApp {
             }
             self.ssh.tabs.remove(t);
         }
+        if let Some(t) = self.spawn_terminal_tab(&alias, window, cx) {
+            self.activate_tab(t, window, cx);
+        }
+    }
+
+    /// A new terminal tab (ssh to `alias`, or a local shell for `term::LOCAL`); its index.
+    pub fn spawn_terminal_tab(
+        &mut self,
+        alias: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<usize> {
         let (tx, rx) = async_channel::bounded::<()>(1);
         let palette = crate::ui::terminal_palette(cx.theme());
-        match Session::spawn(&alias, palette, tx) {
+        match Session::spawn(alias, palette, tx) {
             Ok(session) => {
                 let wake = cx.spawn(async move |this, cx| {
                     while rx.recv().await.is_ok() {
@@ -312,15 +324,22 @@ impl HermesApp {
                 self.ssh.next_tab += 1;
                 self.ssh.tabs.push(Tab {
                     id: self.ssh.next_tab,
-                    alias: alias.clone(),
+                    alias: alias.to_string(),
                     session,
                     focus: cx.focus_handle(),
                     _wake: wake,
                 });
-                let t = self.ssh.tabs.len() - 1;
-                self.activate_tab(t, window, cx);
+                Some(self.ssh.tabs.len() - 1)
             }
-            Err(e) => self.toast(NotificationType::Error, format!("SSH: {e:#}"), window, cx),
+            Err(e) => {
+                self.toast(
+                    NotificationType::Error,
+                    format!("Terminal: {e:#}"),
+                    window,
+                    cx,
+                );
+                None
+            }
         }
     }
 
