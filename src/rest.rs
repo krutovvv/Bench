@@ -1046,3 +1046,44 @@ mod tests {
         assert_eq!(m["D"], "");
     }
 }
+
+/// The gateway's own state (`/api/status`): what the status bar's backend item shows.
+#[derive(Clone, Debug, Default)]
+pub struct GatewayStatus {
+    pub version: String,
+    pub running: bool,
+    /// "running", "starting", "draining", "stopped"…
+    pub state: String,
+    /// "ok" or "degraded".
+    pub overall: String,
+    pub active_agents: u64,
+    /// (name as Hermes keys it, state, error message)
+    pub platforms: Vec<(String, String, Option<String>)>,
+    pub exit_reason: Option<String>,
+}
+
+pub fn gateway_status(conn: &Connection, profile: &str) -> Result<GatewayStatus> {
+    let v = get(conn, "/api/status", profile)?;
+    let mut platforms: Vec<(String, String, Option<String>)> = v["gateway_platforms"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(name, p)| {
+            (
+                name.clone(),
+                p["state"].as_str().unwrap_or("unknown").to_string(),
+                p["error_message"].as_str().map(str::to_string),
+            )
+        })
+        .collect();
+    platforms.sort();
+    Ok(GatewayStatus {
+        version: v["version"].as_str().unwrap_or_default().to_string(),
+        running: v["gateway_running"].as_bool().unwrap_or(false),
+        state: v["gateway_state"].as_str().unwrap_or_default().to_string(),
+        overall: v["overall"].as_str().unwrap_or("ok").to_string(),
+        active_agents: v["active_agents"].as_u64().unwrap_or(0),
+        platforms,
+        exit_reason: v["gateway_exit_reason"].as_str().map(str::to_string),
+    })
+}

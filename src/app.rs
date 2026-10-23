@@ -163,6 +163,9 @@ pub struct HermesApp {
     pub pv: providers::Providers,
     /// Hermes isn't installed on this Mac (and this Mac is the target): offer to install it.
     pub hermes_missing: bool,
+    /// The gateway's state for the status bar's backend item (refreshed every 10 s):
+    /// None before the first answer, Err when the gateway didn't answer.
+    pub gw_status: Option<Result<rest::GatewayStatus, String>>,
     /// A setup running in a terminal in the chat area (installing Hermes, Claude login).
     pub setup: Option<install::Setup>,
     /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
@@ -575,7 +578,34 @@ impl HermesApp {
                 }
             }
         });
-        let mut tasks = vec![events, ticker, processes];
+        // The backend item in the status bar: the gateway's state, every 10 s while connected.
+        let backend = cx.spawn(async move |this, cx| {
+            loop {
+                let Ok(job) = this.update(cx, |this, _| {
+                    this.conn.clone().map(|c| (c, this.current_profile()))
+                }) else {
+                    break;
+                };
+                if let Some((conn, profile)) = job {
+                    let r = cx
+                        .background_spawn(async move { rest::gateway_status(&conn, &profile) })
+                        .await;
+                    if this
+                        .update(cx, |this, cx| {
+                            this.gw_status = Some(r.map_err(|e| format!("{e:#}")));
+                            cx.notify();
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                cx.background_executor()
+                    .timer(Duration::from_secs(10))
+                    .await;
+            }
+        });
+        let mut tasks = vec![events, ticker, processes, backend];
 
         // The gateway list keeps the SSH hosts that run Hermes (asked again when the menu opens).
         let ssh = servers::Ssh::new(window, cx);
@@ -637,6 +667,7 @@ impl HermesApp {
             profile_models: vec![],
             pv: Default::default(),
             hermes_missing: false,
+            gw_status: None,
             setup: None,
             catalog: vec![],
             slash_sel: 0,
@@ -773,6 +804,7 @@ impl HermesApp {
         self.skills.clear();
         self.reset_chat(cx);
         self.pv = Default::default();
+        self.gw_status = None;
         // Nothing to connect to: the chat offers to install Hermes instead.
         self.hermes_missing = target == Target::Local && !connection::hermes_installed();
         if self.hermes_missing {

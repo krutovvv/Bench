@@ -314,21 +314,14 @@ impl HermesApp {
                     "profile",
                     Ico::UserRound,
                     profile_label,
-                    None,
+                    Some("Profile: its own model, skills, prompts, chats"),
                     vec![],
                     profiles,
                 ))
             })
-            // Beside what it restarts: the gateway of this machine/server and profile.
-            .child(
-                button(
-                    "restart",
-                    Ico::RefreshCw,
-                    "Restart the Hermes gateway",
-                    false,
-                )
-                .on_click(cx.listener(|this, _, window, cx| this.restart_gateway(window, cx))),
-            )
+            // Beside the profile it serves: the backend's state; its panel reconnects or
+            // restarts the gateway.
+            .children(self.render_backend(cx))
             .child(div().flex_1())
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
@@ -571,4 +564,242 @@ fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, c
         panel = panel.child(row("Generation (last call)", format!("{g:.0} tok/s")));
     }
     panel
+}
+
+impl HermesApp {
+    /// "Backend ready" (or what is wrong) and, on click, the gateway's state, its messaging
+    /// platforms, Reconnect and Restart.
+    fn render_backend(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.hermes_missing {
+            return None;
+        }
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let status = match &self.gw_status {
+            Some(Ok(s)) if self.conn.is_some() => Some(s.clone()),
+            _ => None,
+        };
+        let (label, color): (String, Hsla) = if self.connecting {
+            ("Connecting…".into(), muted)
+        } else if self.conn.is_none() {
+            ("Backend offline".into(), theme.danger)
+        } else {
+            match (&self.gw_status, &status) {
+                (Some(Err(_)), _) => ("Backend unreachable".into(), theme.danger),
+                (_, Some(s)) if !s.running => ("Gateway stopped".into(), theme.danger),
+                (_, Some(s)) if s.state != "running" && !s.state.is_empty() => {
+                    (format!("Gateway {}", s.state), theme.warning)
+                }
+                (_, Some(s)) if s.overall != "ok" => ("Backend degraded".into(), theme.warning),
+                _ => ("Backend ready".into(), muted),
+            }
+        };
+        let connected = self.conn.is_some();
+        let error = match &self.gw_status {
+            Some(Err(e)) => Some(e.clone()),
+            _ => None,
+        };
+        let where_ = format!("{} · {}", self.target.label(), self.current_profile());
+        let view = cx.entity();
+        Some(
+            h_flex()
+                .h_full()
+                .items_center()
+                .pl_1()
+                .child(
+                    gpui_kit::component::popover::Popover::new("backend-pop")
+                        .anchor(gpui_kit::Anchor::BottomLeft)
+                        .trigger(
+                            Button::new("backend")
+                                .ghost()
+                                .xsmall()
+                                .icon(Ico::Activity.icon())
+                                .label(label)
+                                .text_color(color),
+                        )
+                        .content(move |_, _, cx| {
+                            let theme = cx.theme().clone();
+                            let muted = theme.muted_foreground;
+                            let dot = |ok: bool, warn: bool| {
+                                div().size(px(6.)).bg(if ok {
+                                    theme.primary
+                                } else if warn {
+                                    theme.warning
+                                } else {
+                                    theme.danger
+                                })
+                            };
+                            let line = |ok: bool, warn: bool, text: String| {
+                                h_flex()
+                                    .gap_2()
+                                    .items_center()
+                                    .text_xs()
+                                    .child(dot(ok, warn))
+                                    .child(div().child(text))
+                            };
+                            let icon = |id: &'static str, ico: Ico, tip: &'static str| {
+                                div()
+                                    .id(id)
+                                    .p_1()
+                                    .cursor_pointer()
+                                    .text_color(muted)
+                                    .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                                    .child(ico.icon().small())
+                                    .tooltip(move |window, cx| {
+                                        gpui_kit::component::tooltip::Tooltip::new(tip)
+                                            .build(window, cx)
+                                    })
+                            };
+                            let (v1, v2) = (view.clone(), view.clone());
+                            let mut lines = vec![line(
+                                connected,
+                                false,
+                                if connected {
+                                    "Connected".into()
+                                } else {
+                                    "Not connected".into()
+                                },
+                            )];
+                            if let Some(s) = &status {
+                                let ok = s.running && s.state == "running";
+                                let mut text = if s.running {
+                                    format!(
+                                        "Gateway {}",
+                                        if s.state.is_empty() {
+                                            "running"
+                                        } else {
+                                            &s.state
+                                        }
+                                    )
+                                } else {
+                                    "Gateway stopped".to_string()
+                                };
+                                if !s.version.is_empty() {
+                                    text.push_str(&format!(" · v{}", s.version));
+                                }
+                                if s.active_agents > 0 {
+                                    text.push_str(&format!(" · {} working", s.active_agents));
+                                }
+                                lines.push(line(ok, s.running, text));
+                                if let Some(r) = &s.exit_reason {
+                                    lines.push(line(false, false, r.clone()));
+                                }
+                            } else if let Some(e) = &error {
+                                lines.push(line(false, false, crate::ui::clip(e, 80)));
+                            }
+                            let platforms: Vec<AnyElement> = status
+                                .iter()
+                                .flat_map(|s| s.platforms.iter())
+                                .map(|(name, state, err)| {
+                                    // "assistant-tg:telegram" → "assistant-tg · Telegram"
+                                    let name = match name.split_once(':') {
+                                        Some((who, kind)) => {
+                                            let mut k = kind.to_string();
+                                            if let Some(f) = k.get_mut(0..1) {
+                                                f.make_ascii_uppercase();
+                                            }
+                                            format!("{who} · {k}")
+                                        }
+                                        None => name.replace('_', " "),
+                                    };
+                                    let ok = state == "connected";
+                                    v_flex()
+                                        .py_0p5()
+                                        .child(
+                                            h_flex()
+                                                .gap_2()
+                                                .items_center()
+                                                .text_xs()
+                                                .child(
+                                                    div().flex_1().min_w_0().truncate().child(name),
+                                                )
+                                                .child(dot(
+                                                    ok,
+                                                    state == "connecting" || state == "retrying",
+                                                ))
+                                                .child(
+                                                    div().text_color(muted).child(state.clone()),
+                                                ),
+                                        )
+                                        .children(err.clone().map(|e| {
+                                            div()
+                                                .text_xs()
+                                                .text_color(theme.danger)
+                                                .child(crate::ui::clip(&e, 90))
+                                        }))
+                                        .into_any_element()
+                                })
+                                .collect();
+                            v_flex()
+                                .w(px(300.))
+                                .child(
+                                    h_flex()
+                                        .px_3()
+                                        .py_2()
+                                        .gap_2()
+                                        .items_start()
+                                        .border_b_1()
+                                        .border_color(theme.border)
+                                        .child(v_flex().flex_1().min_w_0().gap_1().children(lines))
+                                        .child(
+                                            icon("backend-reconnect", Ico::RefreshCw, "Reconnect")
+                                                .on_click(move |_, window, cx| {
+                                                    v1.update(cx, |this, cx| {
+                                                        let t = this.target.clone();
+                                                        this.connect(t, window, cx)
+                                                    })
+                                                }),
+                                        )
+                                        .child(div().w(px(1.)).h(px(18.)).bg(theme.border))
+                                        .child(
+                                            icon(
+                                                "backend-restart",
+                                                Ico::Power,
+                                                "Restart the gateway",
+                                            )
+                                            .on_click(
+                                                move |_, window, cx| {
+                                                    v2.update(cx, |this, cx| {
+                                                        this.restart_gateway(window, cx)
+                                                    })
+                                                },
+                                            ),
+                                        ),
+                                )
+                                .child(
+                                    v_flex()
+                                        .px_3()
+                                        .py_2()
+                                        .gap_1()
+                                        .child(
+                                            div()
+                                                .text_xs()
+                                                .text_color(muted)
+                                                .child("MESSAGING PLATFORMS"),
+                                        )
+                                        .when(platforms.is_empty(), |d| {
+                                            d.child(
+                                                div()
+                                                    .text_xs()
+                                                    .text_color(muted)
+                                                    .child("None connected"),
+                                            )
+                                        })
+                                        .children(platforms),
+                                )
+                                .child(
+                                    div()
+                                        .px_3()
+                                        .py_1p5()
+                                        .border_t_1()
+                                        .border_color(theme.border)
+                                        .text_xs()
+                                        .text_color(muted)
+                                        .child(where_.clone()),
+                                )
+                        }),
+                )
+                .into_any_element(),
+        )
+    }
 }

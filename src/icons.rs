@@ -38,6 +38,7 @@ macro_rules! icons {
 }
 
 icons! {
+    Activity => "activity",
     AppWindow => "app-window",
     ArrowUpBold => "arrow-up-bold",
     Bot => "bot",
@@ -97,6 +98,7 @@ icons! {
     Pin => "pin",
     Play => "play",
     Plus => "plus",
+    Power => "power",
     RefreshCw => "refresh-cw",
     RotateCcw => "rotate-ccw",
     Server => "server",
