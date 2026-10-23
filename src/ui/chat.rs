@@ -1,5 +1,5 @@
 //! The conversation as one scrolling column: per turn the user message, folded steps
-//! (each unfoldable), the answer, sources and hover actions; after the last turn, the
+//! (each unfoldable), the answer, sources and hover actions; under the last answer, the
 //! files this session changed.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -188,11 +188,10 @@ impl HermesApp {
         let rows: Vec<AnyElement> = (0..self.turns.len())
             .map(|i| self.render_turn(i, cx))
             .collect();
-        let files = self.render_session_files(cx);
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
-        let trailing = files.is_some() || approval.is_some() || clarify.is_some();
+        let trailing = approval.is_some() || clarify.is_some();
 
         div()
             .relative()
@@ -209,7 +208,6 @@ impl HermesApp {
                     .children(rows)
                     .children(approval)
                     .children(clarify)
-                    .children(files)
                     // A scroll area ignores a last child's margin: a real 12px block (+ the
                     // column's 4) keeps the bottom edge at 16 when cards end the chat.
                     .when(trailing, |d| d.child(div().h_3().flex_none())),
@@ -357,6 +355,12 @@ impl HermesApp {
             .collect();
 
         let sources = self.render_sources(i, cx);
+        // The session's edited files hang under the last answer: the agent made them too.
+        let files = if i + 1 == self.turns.len() {
+            self.render_session_files(cx)
+        } else {
+            None
+        };
         // What the background review did with skills and memory, quietly under the answer.
         let reviews: Vec<AnyElement> = turn
             .reviews
@@ -464,17 +468,14 @@ impl HermesApp {
                     .children(summary)
                     .children(steps)
                     .children(answer)
+                    // What came with the answer, right under its text (the agent's side); the
+                    // hover actions below all of it.
+                    .children(sources)
+                    .children(files)
                     .when(!reviews.is_empty(), |d| {
                         d.child(v_flex().gap_1().children(reviews))
                     })
-                    .child(
-                        h_flex()
-                            .min_h(px(22.))
-                            .gap_2()
-                            .items_start()
-                            .child(div().flex_1().min_w_0().children(sources))
-                            .children(actions),
-                    ),
+                    .child(h_flex().min_h(px(22.)).justify_end().children(actions)),
             )
             .into_any_element()
     }
@@ -889,8 +890,6 @@ impl HermesApp {
             .collect();
         Some(
             v_flex()
-                .mx_4()
-                .mt_2()
                 .border_1()
                 .border_color(theme.border)
                 // Folded by default: one line with the totals; a click lists the files.

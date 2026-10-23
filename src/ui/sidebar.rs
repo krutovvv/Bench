@@ -130,6 +130,9 @@ impl HermesApp {
                                 .min_w_0()
                                 .truncate()
                                 .font_weight(FontWeight::MEDIUM)
+                                // Group names step back (muted, like the icon); the chats in
+                                // them are what is read.
+                                .text_color(muted)
                                 .child(label.clone()),
                         )
                         .child(div().flex_1())

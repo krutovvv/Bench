@@ -46,14 +46,26 @@ pub const ACCENTS: &[(&str, u32, u32)] = &[
     ("Rose", 0xC2457A, 0xEC86AE),
 ];
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Appearance {
     pub mode: Mode,
     pub accent: usize,
     pub size: Size,
-    /// Sidebar rows as their titles only, closer together.
+    /// Sidebar rows as their titles only, closer together (the default: the counts and
+    /// addresses are rarely needed and pull the eye).
     pub compact_sidebar: bool,
+}
+
+impl Default for Appearance {
+    fn default() -> Self {
+        Self {
+            mode: Mode::default(),
+            accent: 0,
+            size: Size::default(),
+            compact_sidebar: true,
+        }
+    }
 }
 
 fn prefs_path() -> std::path::PathBuf {

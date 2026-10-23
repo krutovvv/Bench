@@ -146,6 +146,8 @@ impl HermesApp {
                                 .min_w_0()
                                 .truncate()
                                 .font_weight(FontWeight::MEDIUM)
+                                // Muted like the icon, as the sessions' group names.
+                                .text_color(muted)
                                 .child(if folder.is_empty() {
                                     DEFAULT_FOLDER.to_string()
                                 } else {

@@ -133,11 +133,19 @@ pub(super) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
     TextView::markdown(ElementId::Name(id.into()), lines.join("  \n"))
 }
 
-/// Markdown as answers show it: with formulas.
+/// Markdown as answers show it: with formulas. Code blocks keep the monospace font (trees and
+/// columns stay aligned) at the chat text's size, not the theme's larger code size.
 pub(super) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
     TextView::markdown(ElementId::Name(id.into()), text)
         .plugin(InlineMath)
         .plugin(BlockMath)
+        .style(
+            gpui_kit::component::text::TextViewStyle::default().code_block(
+                StyleRefinement::default()
+                    .text_size(rems(0.8125))
+                    .line_height(relative(1.5)),
+            ),
+        )
 }
 
 impl HermesApp {
