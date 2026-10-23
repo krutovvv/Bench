@@ -379,10 +379,12 @@ impl HermesApp {
                     ))
                 }
             })
-            .child(
-                button("tools", Ico::Wrench, "Tools  ⌘3", self.tools.on)
-                    .on_click(cx.listener(|this, _, window, cx| this.toggle_tools(window, cx))),
-            )
+            .when(crate::bench::TOOLS, |d| {
+                d.child(
+                    button("tools", Ico::Wrench, "Tools  ⌘3", self.tools.on)
+                        .on_click(cx.listener(|this, _, window, cx| this.toggle_tools(window, cx))),
+                )
+            })
             .child(
                 button("new-window", Ico::AppWindow, "New window  ⌘⇧N", false)
                     .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),

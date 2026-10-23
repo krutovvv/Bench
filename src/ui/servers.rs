@@ -76,7 +76,8 @@ impl HermesApp {
         // Files of what the window shows (the open chat, the server's terminal) one click
         // away, as ⌘B and "Open files" in the "⋯" menu; gone while the IDE is open (its own
         // close button stands there).
-        let files = !self.ide_open()
+        let files = crate::bench::IDE
+            && !self.ide_open()
             && !self.tools.on
             && if ssh {
                 self.ssh.active_tab().is_some()
@@ -94,21 +95,23 @@ impl HermesApp {
                 )
             })
             // The mode switch comes last: it changes the whole window.
-            .child(
-                toggle(
-                    "mode-ssh",
-                    Ico::Terminal,
-                    ssh,
-                    if ssh {
-                        "Back to sessions  ⌘1"
-                    } else {
-                        "SSH servers  ⌘2"
-                    },
+            .when(crate::bench::SSH, |d| {
+                d.child(
+                    toggle(
+                        "mode-ssh",
+                        Ico::Terminal,
+                        ssh,
+                        if ssh {
+                            "Back to sessions  ⌘1"
+                        } else {
+                            "SSH servers  ⌘2"
+                        },
+                    )
+                    .on_click(
+                        cx.listener(move |this, _, window, cx| this.set_ssh_mode(!ssh, window, cx)),
+                    ),
                 )
-                .on_click(
-                    cx.listener(move |this, _, window, cx| this.set_ssh_mode(!ssh, window, cx)),
-                ),
-            )
+            })
     }
 
     pub(super) fn render_ssh_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {

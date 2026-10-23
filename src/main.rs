@@ -5,6 +5,7 @@
 mod app;
 mod attach;
 mod audio;
+mod bench;
 mod connection;
 mod devtools;
 mod diff;
