@@ -955,6 +955,18 @@ pub fn activate_endpoint(conn: &Connection, profile: &str, id: &str) -> Result<(
     Ok(())
 }
 
+pub fn delete_endpoint(conn: &Connection, profile: &str, id: &str) -> Result<()> {
+    send(
+        conn,
+        "DELETE",
+        &format!("/api/providers/custom-endpoints/{}", enc(id)),
+        profile,
+        json!({}),
+        30,
+    )?;
+    Ok(())
+}
+
 /// Probe an endpoint's `/models`: `{ok, message, models}`.
 pub fn validate_endpoint(conn: &Connection, profile: &str, body: Value) -> Result<Value> {
     send(
@@ -990,22 +1002,6 @@ pub fn remove_env(conn: &Connection, profile: &str, key: &str) -> Result<()> {
     Ok(())
 }
 
-/// One `.env` value in full (Hermes allows a few per 30 s). None when it isn't set.
-pub fn reveal_env(conn: &Connection, profile: &str, key: &str) -> Result<Option<String>> {
-    match send(
-        conn,
-        "POST",
-        "/api/env/reveal",
-        profile,
-        json!({"key": key}),
-        30,
-    ) {
-        Ok(v) => Ok(v["value"].as_str().map(str::to_string)),
-        Err(e) if e.to_string().starts_with("404") => Ok(None),
-        Err(e) => Err(e),
-    }
-}
-
 /// Merge keys into config.yaml (Hermes deep-merges what is sent over the file).
 pub fn merge_config(conn: &Connection, profile: &str, config: Value) -> Result<()> {
     send(
@@ -1017,4 +1013,36 @@ pub fn merge_config(conn: &Connection, profile: &str, config: Value) -> Result<(
         30,
     )?;
     Ok(())
+}
+
+pub fn parse_env(text: &str) -> std::collections::HashMap<String, String> {
+    text.lines()
+        .filter_map(|l| {
+            let l = l.trim();
+            let l = l.strip_prefix("export ").unwrap_or(l);
+            if l.starts_with('#') {
+                return None;
+            }
+            let (k, v) = l.split_once('=')?;
+            let v = v.trim();
+            let v = v
+                .strip_prefix('"')
+                .and_then(|v| v.strip_suffix('"'))
+                .or_else(|| v.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
+                .unwrap_or(v);
+            Some((k.trim().to_string(), v.to_string()))
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn env_lines() {
+        let m = super::parse_env("# c\nA=1\nexport B=\"two words\"\nC='x=y'\n\nD=\n");
+        assert_eq!(m["A"], "1");
+        assert_eq!(m["B"], "two words");
+        assert_eq!(m["C"], "x=y");
+        assert_eq!(m["D"], "");
+    }
 }

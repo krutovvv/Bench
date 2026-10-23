@@ -137,24 +137,25 @@ impl HermesApp {
             } else {
                 "New provider".into()
             };
-            let key_hint = match &e.key_preview {
-                // A reference to a .env value, not the key itself.
-                Some(p) if p.starts_with("${") => {
-                    format!(
-                        "From .env: {}",
-                        p.trim_start_matches("${").trim_end_matches('}')
-                    )
-                }
-                Some(p) => format!("Saved: {p}"),
+            let key_hint = match &e.key_env {
+                Some(name) => format!("In .env as {name}"),
                 None => "If the server asks for one".into(),
             };
+            let armed = saved && self.pv.armed.as_deref() == Some(e.id.as_str());
             let mut actions = vec![self.pv_button(
+                ("ep-delete", i),
+                if armed { "Confirm delete" } else { "Delete" },
+                false,
+                cx,
+                Box::new(move |this, w, cx| this.delete_endpoint(i, w, cx)),
+            )];
+            actions.push(self.pv_button(
                 ("ep-check", i),
                 "Check",
                 false,
                 cx,
                 Box::new(move |this, w, cx| this.check_endpoint(i, w, cx)),
-            )];
+            ));
             if saved && !current {
                 actions.push(self.pv_button(
                     ("ep-default", i),
@@ -238,20 +239,14 @@ impl HermesApp {
         // ---- OpenRouter ----
         page.push(self.pv_heading("OPENROUTER", cx).into_any_element());
         if let Some(k) = &self.pv.openrouter_key {
-            let (key, input) = (k.key.clone(), k.input.clone());
-            let hint = k
-                .preview
-                .clone()
-                .map_or("Not set".to_string(), |p| format!("Saved: {p}"));
+            let key = k.key.clone();
+            let hint = "OPENROUTER_API_KEY in .env";
             let save = self.pv_button(
                 "or-key-save",
                 "Save",
                 false,
                 cx,
-                Box::new(move |this, w, cx| {
-                    let v = input.read(cx).value().trim().to_string();
-                    this.save_key(key.clone(), v, w, cx)
-                }),
+                Box::new(move |this, w, cx| this.save_key(key.clone(), w, cx)),
             );
             page.push(
                 self.pv_row(
@@ -357,7 +352,7 @@ impl HermesApp {
                             )
                             .child(Input::new(&s).cleanable(true))
                     }))
-                    .when(loading || (!query.is_empty() && empty_catalog), |d| {
+                    .when(!query.is_empty() && (loading || empty_catalog), |d| {
                         d.child(
                             div()
                                 .text_xs()
@@ -622,14 +617,8 @@ impl HermesApp {
         for k in 0..self.pv.keys.len() {
             let f = &self.pv.keys[k];
             let (key, input) = (f.key.clone(), f.input.clone());
-            let hint = f
-                .preview
-                .clone()
-                .map_or("Not set".to_string(), |p| format!("Saved: {p}"));
-            let set = f.preview.is_some();
-            let armed = self.pv.armed.as_deref() == Some(&f.key);
-            let (k1, i1, k2) = (key.clone(), input.clone(), key.clone());
-            let mut controls = h_flex()
+            let k1 = key.clone();
+            let controls = h_flex()
                 .gap_2()
                 .child(div().flex_1().child(self.pv_input(&input)))
                 .child(self.pv_button(
@@ -637,44 +626,17 @@ impl HermesApp {
                     "Save",
                     false,
                     cx,
-                    Box::new(move |this, w, cx| {
-                        let v = i1.read(cx).value().trim().to_string();
-                        this.save_key(k1.clone(), v, w, cx)
-                    }),
+                    Box::new(move |this, w, cx| this.save_key(k1.clone(), w, cx)),
                 ));
-            if set {
-                controls = controls.child(
-                    div()
-                        .id(("key-remove", k))
-                        .h(rems(super::BAR_CONTROL_REMS))
-                        .px_2()
-                        .flex()
-                        .items_center()
-                        .text_xs()
-                        .cursor_pointer()
-                        .when(armed, |d| {
-                            d.bg(theme.danger)
-                                .text_color(theme.danger_foreground)
-                                .child("Confirm remove")
-                        })
-                        .when(!armed, |d| {
-                            d.text_color(muted)
-                                .hover(|s| s.bg(theme.list_hover))
-                                .child("Remove")
-                        })
-                        .on_click(
-                            cx.listener(move |this, _, w, cx| this.remove_key(k2.clone(), w, cx)),
-                        ),
-                );
-            }
+            let hint = if f.value.is_empty() {
+                "Not set · "
+            } else {
+                ""
+            };
             page.push(
                 self.pv_row(
                     key,
-                    if f.hint.is_empty() {
-                        hint
-                    } else {
-                        format!("{hint} · {}", crate::ui::clip(&f.hint, 60))
-                    },
+                    format!("{hint}{}", crate::ui::clip(&f.hint, 70)),
                     controls.into_any_element(),
                     cx,
                 )
@@ -707,11 +669,7 @@ impl HermesApp {
         ];
         if let Some(t) = &self.pv.telegram {
             let (token, users, proxy) = (t.token.input.clone(), t.users.clone(), t.proxy.clone());
-            let token_hint = t
-                .token
-                .preview
-                .clone()
-                .map_or("From @BotFather".to_string(), |p| format!("Saved: {p}"));
+            let token_hint = "From @BotFather · TELEGRAM_BOT_TOKEN";
             page.push(
                 self.pv_row("Bot token", token_hint, self.pv_input(&token), cx)
                     .into_any_element(),

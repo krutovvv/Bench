@@ -728,3 +728,20 @@ pub fn install_claude_plugin(target: &Target) -> Result<String> {
         ],
     )
 }
+
+/// The profile's `.env` on its machine (Hermes' file API doesn't serve it): name → value.
+pub fn env_file(target: &Target, profile: &str) -> std::collections::HashMap<String, String> {
+    let path = if profile.is_empty() || profile == "default" {
+        "$HOME/.hermes/.env".to_string()
+    } else if profile
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        format!("$HOME/.hermes/profiles/{profile}/.env")
+    } else {
+        return Default::default(); // not a profile name Hermes makes
+    };
+    shell(target, &format!("cat \"{path}\" 2>/dev/null || true"))
+        .map(|t| crate::rest::parse_env(&t))
+        .unwrap_or_default()
+}

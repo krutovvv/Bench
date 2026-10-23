@@ -26,11 +26,12 @@ const COMMON_KEYS: [&str; 5] = [
     "ELEVENLABS_API_KEY",
 ];
 
-/// One `.env` value with its field: what it is, a masked preview of the saved value.
+/// One `.env` value with its field: what it is and the value as saved (shown in full: it is the
+/// person's own machine). Saving an emptied field removes the key.
 pub struct KeyField {
     pub key: String,
     pub hint: String,
-    pub preview: Option<String>,
+    pub value: String,
     pub input: Entity<InputState>,
 }
 
@@ -39,7 +40,10 @@ pub struct EndpointForm {
     /// "" for one not saved yet.
     pub id: String,
     pub current: bool,
-    pub key_preview: Option<String>,
+    /// The key as saved (its `.env` value when the endpoint refers to one), to send only a change.
+    pub key_value: String,
+    /// Where the key lives when it is a `.env` reference (`${NAME}`).
+    pub key_env: Option<String>,
     pub name: Entity<InputState>,
     pub url: Entity<InputState>,
     pub model: Entity<InputState>,
@@ -92,7 +96,7 @@ pub struct Providers {
     pub or_loading: bool,
     pub claude: Option<ClaudeStatus>,
     pub claude_busy: Option<String>,
-    /// A key armed for removal (the second click removes it).
+    /// A provider armed for deletion (its id; the second click deletes it).
     pub armed: Option<String>,
     _subscriptions: Vec<Subscription>,
 }
@@ -109,28 +113,6 @@ fn field(
         let mut s = InputState::new(window, cx).placeholder(hint);
         s.set_value(text, window, cx);
         s
-    })
-}
-
-fn secret(
-    window: &mut Window,
-    cx: &mut Context<HermesApp>,
-    preview: Option<&str>,
-) -> Entity<InputState> {
-    let hint = if preview.is_some() {
-        "Saved · type to replace"
-    } else {
-        "Not set"
-    };
-    cx.new(|cx| InputState::new(window, cx).placeholder(hint).masked(true))
-}
-
-/// `«redacted:sk-o…1234»` → `sk-o…1234`.
-fn preview(row: &Value) -> Option<String> {
-    row["redacted_value"].as_str().map(|v| {
-        v.trim_start_matches("«redacted:")
-            .trim_end_matches('»')
-            .to_string()
     })
 }
 
@@ -227,22 +209,17 @@ impl HermesApp {
             self.pv.or_search = Some(search);
             self.pv._subscriptions.push(sub);
         }
+        let target = self.target.clone();
         self.rest(
             window,
             cx,
-            |conn, profile| {
+            move |conn, profile| {
                 let endpoints = rest::custom_endpoints(conn, profile)?;
                 let env = rest::env_vars(conn, profile)?;
                 let yaml: Value =
                     serde_yaml::from_str(&rest::config_raw(conn, profile)?).unwrap_or(Value::Null);
-                let mut shown = HashMap::new();
-                for key in ["TELEGRAM_ALLOWED_USERS", "TELEGRAM_PROXY"] {
-                    if env[key]["is_set"].as_bool() == Some(true) {
-                        if let Ok(Some(v)) = rest::reveal_env(conn, profile, key) {
-                            shown.insert(key, v);
-                        }
-                    }
-                }
+                // The values themselves, from the profile's .env.
+                let shown = connection::env_file(&target, profile);
                 Ok((endpoints, env, yaml, shown))
             },
             |this, r, window, cx| match r {
@@ -258,6 +235,8 @@ impl HermesApp {
             },
         );
         self.check_claude(window, cx);
+        // Ahead of the search field's first use, so nothing appears and vanishes under it.
+        self.load_openrouter_catalog(window, cx);
     }
 
     fn fill_providers(
@@ -265,7 +244,7 @@ impl HermesApp {
         endpoints: Value,
         env: Value,
         yaml: Value,
-        shown: HashMap<&'static str, String>,
+        shown: HashMap<String, String>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -279,7 +258,16 @@ impl HermesApp {
                     .as_u64()
                     .map(|n| n.to_string())
                     .unwrap_or_default();
-                let key_preview = e["api_key_preview"].as_str().map(str::to_string);
+                // `${NAME}`: the key lives in .env under NAME.
+                let preview = s("api_key_preview");
+                let key_env = preview
+                    .strip_prefix("${")
+                    .and_then(|p| p.strip_suffix('}'))
+                    .map(str::to_string);
+                let key_value = key_env
+                    .as_ref()
+                    .and_then(|k| shown.get(k).cloned())
+                    .unwrap_or_default();
                 EndpointForm {
                     id: s("id"),
                     current: e["is_current"].as_bool().unwrap_or(false),
@@ -287,22 +275,24 @@ impl HermesApp {
                     url: field(window, cx, &s("base_url"), "http://host:port/v1"),
                     model: field(window, cx, &s("model"), "Default model"),
                     context: field(window, cx, &context, "e.g. 131072"),
-                    key: secret(window, cx, key_preview.as_deref()),
-                    key_preview,
+                    key: field(window, cx, &key_value, "If the server asks for one"),
+                    key_value,
+                    key_env,
                     check: None,
                 }
             })
             .collect();
 
-        let row = |key: &str| &env[key];
         let key_field = |key: &str, window: &mut Window, cx: &mut Context<Self>| {
-            let r = row(key);
-            let p = preview(r);
+            let value = shown.get(key).cloned().unwrap_or_default();
             KeyField {
                 key: key.to_string(),
-                hint: r["description"].as_str().unwrap_or_default().to_string(),
-                input: secret(window, cx, p.as_deref()),
-                preview: p,
+                hint: env[key]["description"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
+                input: field(window, cx, &value, "Not set"),
+                value,
             }
         };
         // Set keys first, then the common ones not set yet. Not here: model provider keys
@@ -375,12 +365,11 @@ impl HermesApp {
                 &y(&["stt", "openai", "language"]),
                 "e.g. en, ru; empty = auto",
             ),
-            stt_key: secret(
+            stt_key: field(
                 window,
                 cx,
-                Some(&y(&["stt", "openai", "api_key"]))
-                    .filter(|k| !k.is_empty())
-                    .map(|_| "set"),
+                &y(&["stt", "openai", "api_key"]),
+                "If the server asks for one",
             ),
             tts_url: field(
                 window,
@@ -448,12 +437,13 @@ impl HermesApp {
         self.pv.endpoints.push(EndpointForm {
             id: String::new(),
             current: false,
-            key_preview: None,
+            key_value: String::new(),
+            key_env: None,
             name: field(window, cx, "", "Name, e.g. local"),
             url: field(window, cx, "", "http://host:port/v1"),
             model: field(window, cx, "", "Default model"),
             context: field(window, cx, "", "e.g. 131072"),
-            key: secret(window, cx, None),
+            key: field(window, cx, "", "If the server asks for one"),
             check: None,
         });
         cx.notify();
@@ -471,8 +461,9 @@ impl HermesApp {
         if let Ok(n) = text(&e.context, cx).parse::<u64>() {
             body["context_length"] = json!(n);
         }
+        // Only a changed key: an unchanged one stays where it is (often a .env reference).
         let key = text(&e.key, cx);
-        if !key.is_empty() {
+        if !key.is_empty() && key != e.key_value {
             body["api_key"] = json!(key);
         }
         body
@@ -555,21 +546,30 @@ impl HermesApp {
         );
     }
 
-    /// Save a key typed into its field (an empty field changes nothing).
-    pub fn save_key(
-        &mut self,
-        key: String,
-        value: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if value.is_empty() {
+    /// Save a key as its field shows it: a changed value is written, an emptied field removes
+    /// the key, an unchanged one does nothing.
+    pub fn save_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
+        let field = self
+            .pv
+            .keys
+            .iter()
+            .chain(self.pv.openrouter_key.iter())
+            .find(|f| f.key == key);
+        let Some(f) = field else { return };
+        let value = text(&f.input, cx);
+        if value == f.value {
             return;
         }
         self.rest(
             window,
             cx,
-            move |conn, profile| rest::set_env(conn, profile, &key, &value),
+            move |conn, profile| {
+                if value.is_empty() {
+                    rest::remove_env(conn, profile, &key)
+                } else {
+                    rest::set_env(conn, profile, &key, &value)
+                }
+            },
             |this, r, window, cx| match r {
                 Ok(()) => {
                     this.toast(NotificationType::Success, "Saved", window, cx);
@@ -580,10 +580,16 @@ impl HermesApp {
         );
     }
 
-    /// Remove a key: the first click arms, the second removes.
-    pub fn remove_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.pv.armed.as_deref() != Some(&key) {
-            self.pv.armed = Some(key);
+    /// Delete a provider: a form not saved yet just goes; a saved one goes on the second click.
+    pub fn delete_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let id = self.pv.endpoints[i].id.clone();
+        if id.is_empty() {
+            self.pv.endpoints.remove(i);
+            cx.notify();
+            return;
+        }
+        if self.pv.armed.as_deref() != Some(&id) {
+            self.pv.armed = Some(id);
             cx.notify();
             return;
         }
@@ -591,10 +597,15 @@ impl HermesApp {
         self.rest(
             window,
             cx,
-            move |conn, profile| rest::remove_env(conn, profile, &key),
+            move |conn, profile| rest::delete_endpoint(conn, profile, &id),
             |this, r, window, cx| match r {
-                Ok(()) => this.load_providers(window, cx),
-                Err(e) => this.toast(NotificationType::Error, format!("Key: {e:#}"), window, cx),
+                Ok(()) => this.providers_changed(window, cx),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Provider: {e:#}"),
+                    window,
+                    cx,
+                ),
             },
         );
     }
@@ -691,10 +702,7 @@ impl HermesApp {
             "model": text(&v.stt_model, cx),
             "language": text(&v.stt_lang, cx),
         });
-        let key = text(&v.stt_key, cx);
-        if !key.is_empty() {
-            stt["api_key"] = json!(key);
-        }
+        stt["api_key"] = json!(text(&v.stt_key, cx));
         let tts = json!({
             "base_url": text(&v.tts_url, cx),
             "model": text(&v.tts_model, cx),
@@ -741,7 +749,9 @@ impl HermesApp {
             window,
             cx,
             move |conn, profile| {
-                if !token.is_empty() {
+                if token.is_empty() {
+                    let _ = rest::remove_env(conn, profile, "TELEGRAM_BOT_TOKEN");
+                } else {
                     rest::set_env(conn, profile, "TELEGRAM_BOT_TOKEN", &token)?;
                 }
                 rest::set_env(conn, profile, "TELEGRAM_ALLOWED_USERS", &users)?;
