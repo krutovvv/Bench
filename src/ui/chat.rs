@@ -202,8 +202,8 @@ impl HermesApp {
                     .size_full()
                     .overflow_y_scroll()
                     .track_scroll(&self.chat_scroll)
-                    // Turns pad 12 top and bottom; 4 more makes the outer edges 16, like the sides.
-                    .pt_1()
+                    // The first question's band starts right under the header; the last
+                    // answer keeps 16 below (its own 12 + 4).
                     .pb_1()
                     .children(rows)
                     .children(approval)
@@ -427,24 +427,24 @@ impl HermesApp {
                 })
         });
 
-        // The question 16px in from the column's edge, the agent's side twice that, so each
-        // answer reads as hanging off its question.
+        // The session reads as strips: each question is a band from edge to edge (rules above
+        // and below, like the composer's), its text 16px in; the agent's side under it twice
+        // that, so the answer hangs off its question.
         v_flex()
             .id(("turn", i))
             .group(group)
             .w_full()
-            .px_4()
-            .py_3()
-            .gap_3()
             // Chat text matches the session titles: answers are skimmed, not read aloud.
             .text_sm()
             .child(
                 div()
                     .w_full()
-                    .px_3()
-                    .py_2()
+                    .px_4()
+                    .py_2p5()
                     .bg(theme.secondary)
-                    .border_1()
+                    // The first band sits under the header's own rule.
+                    .when(i > 0, |d| d.border_t_1())
+                    .border_b_1()
                     .border_color(theme.border)
                     .whitespace_normal()
                     // Selectable and copyable, like the answers (the same text view).
@@ -464,7 +464,10 @@ impl HermesApp {
             )
             .child(
                 v_flex()
-                    .pl_4()
+                    .pl_8()
+                    .pr_4()
+                    .pt_3()
+                    .pb_3()
                     .gap_3()
                     .children(summary)
                     .children(steps)
