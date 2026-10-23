@@ -3,6 +3,7 @@
 //! Markdown preview, a generator, the regex tester or the Base64 image.
 
 use gpui_kit::component::input::{Editor, Input};
+use gpui_kit::component::text::TextView;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -155,6 +156,65 @@ impl HermesApp {
             .into_any_element()
     }
 
+    /// Rich Text to Markdown's input: the paste rendered as it looked on the page (tables,
+    /// headings, links, images), or its HTML code to edit.
+    fn render_rich_input(
+        &mut self,
+        input_bar: impl Fn(Vec<AnyElement>, &mut Context<Self>) -> AnyElement,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let source = self.tools.html_source;
+        let toggle = segmented(
+            "tool-html-view",
+            &["Rendered", "HTML"],
+            source as usize,
+            cx,
+            |this, k, _, cx| {
+                this.tools.html_source = k == 1;
+                cx.notify();
+            },
+        );
+        let body = if source {
+            div()
+                .flex_1()
+                .min_h_0()
+                .child(Editor::new(&self.tools.input).appearance(false).h_full())
+                .into_any_element()
+        } else if self.tools.preview.trim().is_empty() {
+            div()
+                .flex_1()
+                .flex()
+                .items_center()
+                .justify_center()
+                .px_6()
+                .text_sm()
+                .text_color(theme.muted_foreground)
+                .child("Copy part of a web page, a Word document or a note, then press ⌘V")
+                .into_any_element()
+        } else {
+            div()
+                .id("tool-html")
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .px_4()
+                .py_3()
+                .text_sm()
+                .child(
+                    TextView::html("tool-html-view-body", self.tools.preview.clone())
+                        .selectable(true),
+                )
+                .into_any_element()
+        };
+        v_flex()
+            .flex_1()
+            .min_w_0()
+            .child(input_bar(vec![toggle], cx))
+            .child(body)
+            .into_any_element()
+    }
+
     pub(super) fn render_tools_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let tool = self.tools.tool;
@@ -206,7 +266,11 @@ impl HermesApp {
 
         match tool.kind() {
             Kind::Transform => {
-                let left = input_pane(vec![], self, cx).into_any_element();
+                let left = if tool == Tool::HtmlToMarkdown {
+                    self.render_rich_input(input_bar, cx)
+                } else {
+                    input_pane(vec![], self, cx).into_any_element()
+                };
                 let right = v_flex()
                     .flex_1()
                     .min_w_0()

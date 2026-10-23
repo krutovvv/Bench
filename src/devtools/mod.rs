@@ -118,7 +118,7 @@ impl Tool {
     pub fn hint(self) -> &'static str {
         match self {
             Tool::HtmlToMarkdown => {
-                "Copy from a web page, Word or Notes, press Paste: tables come out as Markdown tables"
+                "Copy from a web page, Word or Notes and press ⌘V: it shows as it looked, and comes out as Markdown"
             }
             Tool::MarkdownPreview => "Type or paste Markdown",
             Tool::Base64 => "UTF-8 text",

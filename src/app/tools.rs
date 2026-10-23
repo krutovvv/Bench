@@ -33,8 +33,10 @@ pub struct Tools {
     /// size and weight for the pane's title.
     pub image: Option<PathBuf>,
     pub image_info: Option<String>,
-    /// Markdown Preview: the text being rendered.
+    /// Markdown Preview: the text being rendered; Rich Text to Markdown: the pasted HTML,
+    /// shown as it looked on the page unless `html_source` asks for the code.
     pub preview: String,
+    pub html_source: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -88,6 +90,7 @@ impl Tools {
             image: None,
             image_info: None,
             preview: String::new(),
+            html_source: false,
             _subscriptions: subscriptions,
         }
     }
@@ -170,6 +173,9 @@ impl HermesApp {
     pub fn run_tool(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let tool = self.tools.tool;
         let input = self.tools.input.read(cx).value().to_string();
+        if tool == Tool::HtmlToMarkdown {
+            self.tools.preview = input.clone();
+        }
         let (out, error) = match tool.kind() {
             Kind::Transform => match devtools::transform(tool, &input, self.tools.mode(tool)) {
                 Ok(out) => (Some(out), None),

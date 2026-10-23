@@ -44,6 +44,16 @@ impl HermesApp {
                 cx.notify();
             }
             ("p", false) => self.open_quick_open(window, cx),
+            // Rich Text to Markdown shows the paste rendered (no editor has focus): ⌘V pastes
+            // the clipboard's formatting there.
+            ("v", false)
+                if self.tools.on
+                    && self.tools.tool == crate::devtools::Tool::HtmlToMarkdown
+                    && !self.tools.html_source
+                    && !self.tools.search.focus_handle(cx).is_focused(window) =>
+            {
+                self.paste_tool_input(window, cx)
+            }
             // In the mini IDE's editor: the next occurrence gets a cursor too.
             ("d", false) if self.file_editor.focus_handle(cx).is_focused(window) => {
                 self.select_next_occurrence(cx)

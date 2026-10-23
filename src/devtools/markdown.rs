@@ -14,19 +14,51 @@ pub fn html_to_markdown(html: &str) -> Result<String, String> {
         })
         .skip_tags(vec!["script", "style", "head", "meta", "link", "noscript"])
         .build();
-    let md = converter.convert(html).map_err(|e| e.to_string())?;
+    // Link tooltips (`title="…"`, on every Wikipedia link) only repeat the text.
+    let titles = regex::Regex::new(r#"\stitle\s*=\s*("[^"]*"|'[^']*')"#).expect("valid regex");
+    let html = titles.replace_all(html, "");
+    let md = converter.convert(&html).map_err(|e| e.to_string())?;
     // Converters leave runs of blank lines where layout divs were: one is enough.
     let mut out = String::with_capacity(md.len());
     let mut blank = 0;
+    let mut fenced = false;
     for line in md.lines() {
         let line = line.trim_end();
+        if line.trim_start().starts_with("```") {
+            fenced = !fenced;
+        }
         blank = if line.is_empty() { blank + 1 } else { 0 };
         if blank < 2 {
-            out.push_str(line);
+            match (fenced, compact_table_row(line)) {
+                (false, Some(row)) => out.push_str(&row),
+                _ => out.push_str(line),
+            }
             out.push('\n');
         }
     }
     Ok(out.trim().to_string())
+}
+
+/// A table row without the padding htmd adds to line columns up: one long cell would make
+/// every row of a page's table hundreds of spaces wide. `| a  | b |` → `| a | b |`,
+/// `| :---- |` → `| :--- |`. None for a line that isn't a table row.
+fn compact_table_row(line: &str) -> Option<String> {
+    let inner = line.strip_prefix('|')?.strip_suffix('|')?;
+    let cells: Vec<String> = inner
+        .split('|')
+        .map(|cell| {
+            let cell = cell.split_whitespace().collect::<Vec<_>>().join(" ");
+            let dashes = cell.trim_matches(':');
+            if !dashes.is_empty() && dashes.chars().all(|c| c == '-') {
+                let left = if cell.starts_with(':') { ":" } else { "" };
+                let right = if cell.ends_with(':') { ":" } else { "" };
+                format!("{left}---{right}")
+            } else {
+                cell
+            }
+        })
+        .collect();
+    Some(format!("| {} |", cells.join(" | ")))
 }
 
 /// The clipboard's rich text as HTML: its HTML flavor, else its RTF converted by macOS's
@@ -82,12 +114,12 @@ mod tests {
         let md = html_to_markdown(
             "<h2>Plans</h2><table><tr><th>Plan</th><th>Price</th></tr>\
              <tr><td>Basic</td><td>$10</td></tr></table><ul><li>a</li><li>b</li></ul>\
-             <p>x <b>y</b> <a href=\"https://e.com\">z</a></p><script>bad()</script>",
+             <p>x <b>y</b> <a href=\"https://e.com\" title=\"Z page\">z</a></p><script>bad()</script>",
         )
         .unwrap();
         assert!(md.contains("## Plans"));
-        // Columns come padded to one width.
-        assert!(md.contains("| Plan  | Price |\n| ----- | ----- |\n| Basic | $10   |"));
+        // Rows without the column padding.
+        assert!(md.contains("| Plan | Price |\n| --- | --- |\n| Basic | $10 |"));
         assert!(md.contains("- a\n- b"));
         assert!(md.contains("**y**") && md.contains("[z](https://e.com)"));
         assert!(!md.contains("bad()"));
