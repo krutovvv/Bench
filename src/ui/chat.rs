@@ -202,6 +202,17 @@ impl HermesApp {
                     .size_full()
                     .overflow_y_scroll()
                     .track_scroll(&self.chat_scroll)
+                    // ⌘C with the chat focused: the text selected in the user's messages (the
+                    // answers' TextViews copy their own).
+                    .track_focus(&self.chat_focus)
+                    .on_action(|_: &gpui_kit::component::input::Copy, window, cx| {
+                        let text = gpui_kit::base::TextSelection::selected_text(window, cx);
+                        if text.trim().is_empty() {
+                            cx.propagate();
+                        } else {
+                            cx.write_to_clipboard(ClipboardItem::new_string(text));
+                        }
+                    })
                     // Turns pad 12 top and bottom; 4 more makes the outer edges 16, like the sides.
                     .pt_1()
                     .pb_1()
@@ -443,10 +454,21 @@ impl HermesApp {
                     .whitespace_normal()
                     // Selectable and copyable, like the answers.
                     .when(!user.is_empty(), |d| {
-                        d.child(gpui_kit::base::SelectableText::new(
-                            SharedString::from(format!("user-{i}")),
-                            user,
-                        ))
+                        d.child(
+                            div()
+                                .cursor(CursorStyle::IBeam)
+                                // Focus leaves the composer, so ⌘C reaches the chat's copy.
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(|this, _, window, cx| {
+                                        this.chat_focus.focus(window, cx)
+                                    }),
+                                )
+                                .child(gpui_kit::base::SelectableText::new(
+                                    SharedString::from(format!("user-{i}")),
+                                    user,
+                                )),
+                        )
                     })
                     // The files that went with it.
                     .when(!attached.is_empty(), |d| {

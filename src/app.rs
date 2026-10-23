@@ -237,6 +237,9 @@ pub struct HermesApp {
     pub composer: Entity<TextareaState>,
     /// The chat column scrolls as one tall list (no virtualization: real heights, real bottom).
     pub chat_scroll: ScrollHandle,
+    /// The chat column takes focus when the user's own message is clicked, so ⌘C copies the
+    /// text selected there rather than going to the composer.
+    pub chat_focus: FocusHandle,
     /// Keep the view pinned to the newest content until the user scrolls up.
     pub follow: bool,
     pub last_max: Pixels,
@@ -657,6 +660,7 @@ impl HermesApp {
             mcp_error: None,
             composer,
             chat_scroll: ScrollHandle::new(),
+            chat_focus: cx.focus_handle(),
             follow: true,
             last_max: px(0.),
             open_steps: HashSet::new(),
