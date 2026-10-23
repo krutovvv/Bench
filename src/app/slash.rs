@@ -98,6 +98,7 @@ impl HermesApp {
         };
         self.composer
             .update(cx, |s, cx| s.set_value(value, window, cx));
+        self.note_draft(cx);
         cx.notify();
         true
     }

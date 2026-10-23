@@ -10,6 +10,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use super::media::plain_text;
 use super::{clip, clock, plural};
 use crate::app::{HermesApp, tool_label};
 use crate::history::host_of;
@@ -202,17 +203,6 @@ impl HermesApp {
                     .size_full()
                     .overflow_y_scroll()
                     .track_scroll(&self.chat_scroll)
-                    // ⌘C with the chat focused: the text selected in the user's messages (the
-                    // answers' TextViews copy their own).
-                    .track_focus(&self.chat_focus)
-                    .on_action(|_: &gpui_kit::component::input::Copy, window, cx| {
-                        let text = gpui_kit::base::TextSelection::selected_text(window, cx);
-                        if text.trim().is_empty() {
-                            cx.propagate();
-                        } else {
-                            cx.write_to_clipboard(ClipboardItem::new_string(text));
-                        }
-                    })
                     // Turns pad 12 top and bottom; 4 more makes the outer edges 16, like the sides.
                     .pt_1()
                     .pb_1()
@@ -452,23 +442,9 @@ impl HermesApp {
                     .border_1()
                     .border_color(theme.border)
                     .whitespace_normal()
-                    // Selectable and copyable, like the answers.
+                    // Selectable and copyable, like the answers (the same text view).
                     .when(!user.is_empty(), |d| {
-                        d.child(
-                            div()
-                                .cursor(CursorStyle::IBeam)
-                                // Focus leaves the composer, so ⌘C reaches the chat's copy.
-                                .on_mouse_down(
-                                    MouseButton::Left,
-                                    cx.listener(|this, _, window, cx| {
-                                        this.chat_focus.focus(window, cx)
-                                    }),
-                                )
-                                .child(gpui_kit::base::SelectableText::new(
-                                    SharedString::from(format!("user-{i}")),
-                                    user,
-                                )),
-                        )
+                        d.child(plain_text(format!("user-{i}"), &user))
                     })
                     // The files that went with it.
                     .when(!attached.is_empty(), |d| {
@@ -719,8 +695,8 @@ impl HermesApp {
                                 .font_family("Menlo")
                                 .text_xs()
                                 .text_color(theme.foreground)
-                                .whitespace_normal()
-                                .child(body),
+                                // Verbatim and selectable, like the user's messages.
+                                .child(plain_text(format!("step-{i}-{k}-{title}"), &body)),
                         )
                 }))
             })

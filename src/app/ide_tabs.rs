@@ -151,4 +151,59 @@ impl HermesApp {
             }
         }
     }
+
+    /// ⌘D, as in Zed: with nothing selected, select the word at the cursor; then add a cursor
+    /// on each next occurrence of the selected text (wrapping to the top), typed into all at once.
+    pub fn select_next_occurrence(&mut self, cx: &mut Context<Self>) {
+        let (text, range) = {
+            let s = self.file_editor.read(cx);
+            (s.value().to_string(), s.selected_range())
+        };
+        if range.is_empty() {
+            let is_word = |c: char| c.is_alphanumeric() || c == '_';
+            let at = range.start.min(text.len());
+            let start = text[..at]
+                .char_indices()
+                .rev()
+                .take_while(|(_, c)| is_word(*c))
+                .last()
+                .map_or(at, |(i, _)| i);
+            let end = text[at..]
+                .char_indices()
+                .find(|(_, c)| !is_word(*c))
+                .map_or(text.len(), |(i, _)| at + i);
+            if start < end {
+                self.file_editor
+                    .update(cx, |s, cx| s.set_selected_range(start..end, cx));
+                self.ide.next_match = Some((start, text[start..end].to_string(), vec![]));
+            }
+            return;
+        }
+        let needle = text[range.clone()].to_string();
+        // A new run when the first selection changed since the last ⌘D.
+        let mut added = match self.ide.next_match.take() {
+            Some((anchor, n, added)) if anchor == range.start && n == needle => added,
+            _ => vec![],
+        };
+        // From the last one added (or the first selection) to the end, then from the top; the
+        // ones already selected are skipped.
+        let from = added.last().map_or(range.end, |s| s + needle.len());
+        let starts: Vec<usize> = text
+            .match_indices(needle.as_str())
+            .map(|(i, _)| i)
+            .collect();
+        let next = starts
+            .iter()
+            .chain(starts.iter())
+            .skip_while(|s| **s < from)
+            .chain(starts.iter())
+            .find(|s| **s != range.start && !added.contains(s))
+            .copied();
+        if let Some(start) = next {
+            self.file_editor
+                .update(cx, |s, cx| s.add_selection(start..start + needle.len(), cx));
+            added.push(start);
+        }
+        self.ide.next_match = Some((range.start, needle, added));
+    }
 }

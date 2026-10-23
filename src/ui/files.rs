@@ -565,19 +565,19 @@ impl HermesApp {
     fn ide_window_buttons(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let expanded = self.ide.expanded;
-        // Even spacing between the buttons; the last one keeps a little room from the edge.
+        // The header's geometry (24px squares, 4px apart, 8px from the edge): the buttons that
+        // take turns in this corner (Open files / Close files, the mode switch) stay in place.
         h_flex()
             .h_full()
             .flex_none()
-            .pr_1()
+            .items_center()
+            .gap_1()
+            .pr_2()
             // When the mini IDE is not enough: the same folder (and file) in Zed.
             .child(
                 div()
                     .id("ide-zed")
-                    .h_full()
-                    .px_2()
-                    .flex()
-                    .items_center()
+                    .p_1()
                     .cursor_pointer()
                     .text_color(theme.muted_foreground)
                     .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
@@ -585,14 +585,26 @@ impl HermesApp {
                     .tooltip(|window, cx| Tooltip::new("Open in Zed").build(window, cx))
                     .on_click(cx.listener(|this, _, window, cx| this.open_in_zed(window, cx))),
             )
-            // The whole window for the IDE, and back (⌘⇧B).
+            // Hides the whole IDE (tree and editor). Second from the right, where "Open files"
+            // sits in the header: open and close without moving the pointer.
+            .child(
+                div()
+                    .id("ide-close")
+                    .p_1()
+                    .cursor_pointer()
+                    .text_color(theme.primary)
+                    .hover(|s| s.bg(theme.list_hover))
+                    .child(Ico::PanelRight.icon().small())
+                    .tooltip(|window, cx| Tooltip::new("Close files  ⌘B").build(window, cx))
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.request_close_ide(window, cx)),
+                    ),
+            )
+            // The whole window for the IDE, and back (⌘⇧B): last, at the window's edge.
             .child(
                 div()
                     .id("ide-expand")
-                    .h_full()
-                    .px_2()
-                    .flex()
-                    .items_center()
+                    .p_1()
                     .cursor_pointer()
                     .text_color(if expanded {
                         theme.primary
@@ -621,23 +633,6 @@ impl HermesApp {
                         this.ide.expanded = !this.ide.expanded;
                         cx.notify();
                     })),
-            )
-            // Hides the whole IDE (tree and editor); it is opened from a "⋯" menu.
-            .child(
-                div()
-                    .id("ide-close")
-                    .h_full()
-                    .px_2()
-                    .flex()
-                    .items_center()
-                    .cursor_pointer()
-                    .text_color(theme.primary)
-                    .hover(|s| s.bg(theme.list_hover))
-                    .child(Ico::PanelRight.icon().small())
-                    .tooltip(|window, cx| Tooltip::new("Close files  ⌘B").build(window, cx))
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.request_close_ide(window, cx)),
-                    ),
             )
     }
 

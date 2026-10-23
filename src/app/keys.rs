@@ -43,6 +43,10 @@ impl HermesApp {
                 cx.notify();
             }
             ("p", false) => self.open_quick_open(window, cx),
+            // In the mini IDE's editor: the next occurrence gets a cursor too.
+            ("d", false) if self.file_editor.focus_handle(cx).is_focused(window) => {
+                self.select_next_occurrence(cx)
+            }
             ("f", false) => {
                 let search = if self.ssh.on {
                     self.ssh.search.clone()

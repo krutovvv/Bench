@@ -304,6 +304,16 @@ impl HermesApp {
                     profiles,
                 ))
             })
+            // Beside what it restarts: the gateway of this machine/server and profile.
+            .child(
+                button(
+                    "restart",
+                    Ico::RefreshCw,
+                    "Restart the Hermes gateway",
+                    false,
+                )
+                .on_click(cx.listener(|this, _, window, cx| this.restart_gateway(window, cx))),
+            )
             .child(div().flex_1())
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
@@ -345,15 +355,6 @@ impl HermesApp {
                     d.child(picker("model", Ico::Cpu, current_model, None, models))
                 }
             })
-            .child(
-                button(
-                    "restart",
-                    Ico::RefreshCw,
-                    "Restart the Hermes gateway",
-                    false,
-                )
-                .on_click(cx.listener(|this, _, window, cx| this.restart_gateway(window, cx))),
-            )
             .child(
                 button("new-window", Ico::AppWindow, "New window  ⌘⇧N", false)
                     .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),

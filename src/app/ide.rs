@@ -76,6 +76,8 @@ pub struct Ide {
     pub armed_delete: Option<String>,
     /// The IDE has the whole window (sidebar and chat/terminal hidden, still running).
     pub expanded: bool,
+    /// ⌘D's run: the first selection's start and text, and the starts of those added since.
+    pub next_match: Option<(usize, String, Vec<usize>)>,
 }
 
 /// A tab that is not the active one.

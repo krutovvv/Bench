@@ -258,6 +258,8 @@ impl HermesApp {
 
 impl Render for HermesApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // The open chat's unsent text in the composer (app.rs, drafts).
+        self.sync_draft(window, cx);
         let theme = cx.theme().clone();
         let ssh = self.ssh.on && self.panel == Panel::Chat;
         let body = match self.panel {

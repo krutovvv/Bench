@@ -235,11 +235,12 @@ pub struct HermesApp {
     pub mcp_error: Option<SharedString>,
 
     pub composer: Entity<TextareaState>,
+    /// Unsent text per chat ("" = the new chat), kept on disk: switching chats or restarting
+    /// keeps it. `draft_key` is the chat whose draft the composer shows.
+    drafts: std::collections::HashMap<String, String>,
+    draft_key: Option<String>,
     /// The chat column scrolls as one tall list (no virtualization: real heights, real bottom).
     pub chat_scroll: ScrollHandle,
-    /// The chat column takes focus when the user's own message is clicked, so ⌘C copies the
-    /// text selected there rather than going to the composer.
-    pub chat_focus: FocusHandle,
     /// Keep the view pinned to the newest content until the user scrolls up.
     pub follow: bool,
     pub last_max: Pixels,
@@ -413,6 +414,7 @@ impl HermesApp {
                     InputEvent::PressEnter { shift: false, .. } => this.send(window, cx),
                     // New text: the command list starts over at its first row.
                     InputEvent::Change => {
+                        this.note_draft(cx);
                         this.slash_sel = 0;
                         // Esc hides the list for the current word; a new word may open it again.
                         let text = this.composer.read(cx).value();
@@ -659,8 +661,9 @@ impl HermesApp {
             mcp_status: "".into(),
             mcp_error: None,
             composer,
+            drafts: load_drafts(),
+            draft_key: None,
             chat_scroll: ScrollHandle::new(),
-            chat_focus: cx.focus_handle(),
             follow: true,
             last_max: px(0.),
             open_steps: HashSet::new(),
@@ -1438,6 +1441,7 @@ impl HermesApp {
         }
         self.composer
             .update(cx, |s, cx| s.set_value("", window, cx));
+        self.note_draft(cx);
         self.attachments.clear();
         let with_files = |text: &str, lines: Vec<String>| {
             std::iter::once(text.to_string())
@@ -2340,4 +2344,53 @@ fn branch_name(text: &str) -> String {
     } else {
         words.join(" ").to_lowercase()
     }
+}
+
+impl HermesApp {
+    /// The composer's text is the open chat's draft (called on every change).
+    pub(crate) fn note_draft(&mut self, cx: &mut Context<Self>) {
+        let Some(key) = self.draft_key.clone() else {
+            return;
+        };
+        let text = self.composer.read(cx).value().to_string();
+        let changed = if text.trim().is_empty() {
+            self.drafts.remove(&key).is_some()
+        } else {
+            self.drafts.insert(key, text.clone()).as_deref() != Some(text.as_str())
+        };
+        if changed {
+            save_drafts(&self.drafts);
+        }
+    }
+
+    /// Another chat is open (or the new one): the composer shows its draft.
+    pub(crate) fn sync_draft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let key = self.session.clone().unwrap_or_default();
+        if self.draft_key.as_ref() == Some(&key) {
+            return;
+        }
+        let text = self.drafts.get(&key).cloned().unwrap_or_default();
+        self.draft_key = Some(key);
+        self.composer
+            .update(cx, |s, cx| s.set_value(text, window, cx));
+    }
+}
+
+fn drafts_path() -> std::path::PathBuf {
+    crate::connection::state_dir().join("drafts.json")
+}
+
+fn load_drafts() -> std::collections::HashMap<String, String> {
+    std::fs::read(drafts_path())
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+
+fn save_drafts(drafts: &std::collections::HashMap<String, String>) {
+    let _ = std::fs::create_dir_all(crate::connection::state_dir());
+    let _ = std::fs::write(
+        drafts_path(),
+        serde_json::to_vec(drafts).unwrap_or_default(),
+    );
 }

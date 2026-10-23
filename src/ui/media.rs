@@ -102,6 +102,37 @@ impl MarkdownPlugin for BlockMath {
     }
 }
 
+/// Text exactly as written (the user's own message), selectable and copyable like an answer:
+/// Markdown's characters are escaped, line breaks kept, leading spaces made non-breaking.
+pub(super) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
+    let lines: Vec<String> = text
+        .lines()
+        .map(|line| {
+            let body = line.trim_start_matches([' ', '\t']);
+            let indent: String = line[..line.len() - body.len()]
+                .chars()
+                .map(|c| {
+                    if c == '\t' {
+                        "\u{a0}".repeat(4)
+                    } else {
+                        "\u{a0}".into()
+                    }
+                })
+                .collect();
+            let mut out = indent;
+            for c in body.chars() {
+                if c.is_ascii_punctuation() {
+                    out.push('\\');
+                }
+                out.push(c);
+            }
+            out
+        })
+        .collect();
+    // Two spaces before a newline: a line break inside the paragraph (blank lines stay paragraphs).
+    TextView::markdown(ElementId::Name(id.into()), lines.join("  \n"))
+}
+
 /// Markdown as answers show it: with formulas.
 pub(super) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
     TextView::markdown(ElementId::Name(id.into()), text)
