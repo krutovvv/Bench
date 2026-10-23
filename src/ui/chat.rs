@@ -429,7 +429,7 @@ impl HermesApp {
 
         // The session reads as strips: each question is a band from edge to edge (rules above
         // and below, like the composer's). Its text and the agent's side under it keep one
-        // inset, 32px on both sides (the right one also clears the turn rail).
+        // inset, 16px on both sides, like the composer and the header.
         v_flex()
             .id(("turn", i))
             .group(group)
@@ -439,7 +439,7 @@ impl HermesApp {
             .child(
                 div()
                     .w_full()
-                    .px_8()
+                    .px_4()
                     .py_2p5()
                     .bg(theme.secondary)
                     // The first band sits under the header's own rule.
@@ -464,7 +464,7 @@ impl HermesApp {
             )
             .child(
                 v_flex()
-                    .px_8()
+                    .px_4()
                     // As much air under the question as under the answer: there the gap, the
                     // 22px row of hover actions and the padding (12 + 22 + 12).
                     .pt(theme.font_size * 1.5 + px(22.))
