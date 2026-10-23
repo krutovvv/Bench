@@ -39,7 +39,7 @@ macro_rules! icons {
 
 icons! {
     AppWindow => "app-window",
-    ArrowUp => "arrow-up",
+    ArrowUpBold => "arrow-up-bold",
     Bot => "bot",
     Brain => "brain",
     Chat => "message-square-text",
@@ -87,9 +87,10 @@ icons! {
     Maximize => "maximize-2",
     MemoryStick => "memory-stick",
     Minimize => "minimize-2",
-    Mic => "mic",
+    MicFill => "mic-fill",
     PanelRight => "panel-right",
     Paperclip => "paperclip",
+    PaperclipBold => "paperclip-bold",
     Pause => "pause",
     Pencil => "pencil",
     Pin => "pin",

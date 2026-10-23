@@ -130,14 +130,17 @@ impl HermesApp {
             !self.composer.read(cx).value().trim().is_empty() || !self.attachments.is_empty();
 
         // The round buttons in a square UI: a quiet one (outline) and a filled one. Glyphs are
-        // Lucide at the UI's icon size (16px); Stop is a filled square, not an outline (an
-        // outlined square reads as a missing glyph).
+        // Lucide at the UI's icon size (16px) in a "bold" cut (assets/icons/*-bold, mic-fill:
+        // the mic's capsule filled, the clip and the arrow a little heavier), in the text's
+        // color; Stop is a filled square, not an outline (an outlined square reads as missing).
         let round =
             |id: &'static str, icon: Option<Ico>, tip: &'static str, filled: Option<Hsla>| {
+                // The text's own color, not the muted one: at 16px inside a ring the glyphs
+                // otherwise read as faint.
                 let fg = if filled.is_some() {
                     theme.primary_foreground
                 } else {
-                    theme.muted_foreground
+                    theme.foreground
                 };
                 div()
                     .id(id)
@@ -167,7 +170,7 @@ impl HermesApp {
         } else if recording {
             round("mic", None, "Stop and transcribe", Some(theme.danger))
         } else {
-            round("mic", Some(Ico::Mic), "Dictate", None)
+            round("mic", Some(Ico::MicFill), "Dictate", None)
         }
         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)));
 
@@ -177,7 +180,7 @@ impl HermesApp {
         } else {
             round(
                 "send",
-                Some(Ico::ArrowUp),
+                Some(Ico::ArrowUpBold),
                 "Send (Enter)",
                 // While dictating it sends what is being said.
                 (has_text || recording || self.transcribing).then_some(theme.primary),
@@ -188,7 +191,7 @@ impl HermesApp {
         let slash = self.render_slash(cx);
         let clip = round(
             "attach",
-            Some(Ico::Paperclip),
+            Some(Ico::PaperclipBold),
             "Attach files (or drop them, or ⌘V)",
             None,
         )
