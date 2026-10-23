@@ -331,6 +331,7 @@ impl HermesApp {
             _ => count,
         };
         let (open_id, del_id) = (s.id.clone(), s.id.clone());
+        let compact = self.appearance.compact_sidebar;
 
         let delete = if armed {
             h_flex()
@@ -447,7 +448,7 @@ impl HermesApp {
             })
             .when_some(guide, |d, last| d.child(super::nest_guide(cx, last)))
             .pr_3()
-            .py_2()
+            .map(|d| if compact { d.py_1() } else { d.py_2() })
             .cursor_pointer()
             .border_l_2()
             // A chosen color wins over the accent; it also tints the row lightly.
@@ -486,7 +487,10 @@ impl HermesApp {
                             d.child(s.title.clone())
                         }
                     }))
-                    .child(div().text_xs().text_color(muted).child(meta)),
+                    // Compact: the title alone (a working session still shimmers).
+                    .when(!compact, |d| {
+                        d.child(div().text_xs().text_color(muted).child(meta))
+                    }),
             )
             .child(delete)
             .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))

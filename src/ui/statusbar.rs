@@ -355,6 +355,10 @@ impl HermesApp {
                 .on_click(cx.listener(|this, _, window, cx| this.restart_gateway(window, cx))),
             )
             .child(
+                button("new-window", Ico::AppWindow, "New window  ⌘⇧N", false)
+                    .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),
+            )
+            .child(
                 button(
                     "settings",
                     Ico::Settings,

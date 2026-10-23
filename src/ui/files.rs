@@ -565,9 +565,11 @@ impl HermesApp {
     fn ide_window_buttons(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let expanded = self.ide.expanded;
+        // Even spacing between the buttons; the last one keeps a little room from the edge.
         h_flex()
             .h_full()
             .flex_none()
+            .pr_1()
             // When the mini IDE is not enough: the same folder (and file) in Zed.
             .child(
                 div()
@@ -625,7 +627,7 @@ impl HermesApp {
                 div()
                     .id("ide-close")
                     .h_full()
-                    .px_3()
+                    .px_2()
                     .flex()
                     .items_center()
                     .cursor_pointer()

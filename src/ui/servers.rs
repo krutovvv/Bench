@@ -77,10 +77,6 @@ impl HermesApp {
             .flex_none()
             .gap_1()
             .items_center()
-            .child(
-                toggle("new-window", Ico::AppWindow, false, "New window  ⌘⇧N")
-                    .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),
-            )
             // The mode switch comes last: it changes the whole window.
             .child(
                 toggle(
@@ -185,6 +181,7 @@ impl HermesApp {
                     .cloned()
                     .unwrap_or_else(|| s.hostname.clone());
                 let meta = format!("{target}{}", if open { " · connected" } else { "" });
+                let compact = self.appearance.compact_sidebar;
                 let (a1, a2, a3, a4) = (alias.clone(), alias.clone(), alias.clone(), alias.clone());
                 list.push(
                     h_flex()
@@ -195,7 +192,7 @@ impl HermesApp {
                         .pl(super::nest_pl(cx))
                         .child(super::nest_guide(cx, last))
                         .pr_3()
-                        .py_2()
+                        .map(|d| if compact { d.py_1() } else { d.py_2() })
                         .border_l_2()
                         .border_color(if selected {
                             theme.primary
@@ -209,14 +206,24 @@ impl HermesApp {
                             v_flex()
                                 .flex_1()
                                 .min_w_0()
-                                .child(div().text_sm().truncate().child(alias.clone()))
                                 .child(
                                     div()
-                                        .text_xs()
+                                        .text_sm()
                                         .truncate()
-                                        .text_color(if open { theme.primary } else { muted })
-                                        .child(meta),
-                                ),
+                                        // Compact: no address line, so a connected server says
+                                        // so in its name's color.
+                                        .when(compact && open, |d| d.text_color(theme.primary))
+                                        .child(alias.clone()),
+                                )
+                                .when(!compact, |d| {
+                                    d.child(
+                                        div()
+                                            .text_xs()
+                                            .truncate()
+                                            .text_color(if open { theme.primary } else { muted })
+                                            .child(meta),
+                                    )
+                                }),
                         )
                         // "⋯" on hover: edit, files, Zed, delete. An armed delete shows as a red
                         // trash button in its place until clicked again.

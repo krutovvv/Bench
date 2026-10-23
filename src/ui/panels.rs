@@ -2,6 +2,7 @@
 
 use gpui_kit::component::Disableable as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Editor, EditorState};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -792,6 +793,17 @@ impl HermesApp {
         .into_iter()
         .map(|(l, s)| (l, a.size == s, crate::theme::Appearance { size: s, ..a }))
         .collect();
+        let view = cx.entity();
+        let compact = Checkbox::new("compact-sidebar")
+            .checked(a.compact_sidebar)
+            .on_click(move |on, window, cx| {
+                let next = crate::theme::Appearance {
+                    compact_sidebar: *on,
+                    ..a
+                };
+                view.update(cx, |this, cx| this.set_appearance(next, window, cx));
+            })
+            .into_any_element();
         let dark = theme.mode.is_dark();
         let accents = h_flex()
             .gap_1()
@@ -837,6 +849,11 @@ impl HermesApp {
                     "Size",
                     "Text and spacing across the app.",
                     segmented("size", sizes, cx),
+                ))
+                .child(row(
+                    "Compact sidebar",
+                    "Chats and servers as titles only, closer together.",
+                    compact,
                 )),
         )
     }

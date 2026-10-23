@@ -52,6 +52,8 @@ pub struct Appearance {
     pub mode: Mode,
     pub accent: usize,
     pub size: Size,
+    /// Sidebar rows as their titles only, closer together.
+    pub compact_sidebar: bool,
 }
 
 fn prefs_path() -> std::path::PathBuf {
