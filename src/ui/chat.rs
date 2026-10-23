@@ -465,7 +465,9 @@ impl HermesApp {
             .child(
                 v_flex()
                     .px_8()
-                    .pt_3()
+                    // As much air under the question as under the answer: there the gap, the
+                    // 22px row of hover actions and the padding (12 + 22 + 12).
+                    .pt(theme.font_size * 1.5 + px(22.))
                     .pb_3()
                     .gap_3()
                     .children(summary)
