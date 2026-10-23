@@ -21,6 +21,7 @@ pub(crate) mod ide_ops;
 mod ide_tabs;
 mod keys;
 pub mod marks;
+mod processes;
 mod profiles;
 pub(crate) mod projects;
 mod prompts;
@@ -135,6 +136,11 @@ pub struct HermesApp {
     pub send_after_transcribe: bool,
     /// The "Changed files" list under the last turn is unfolded (folded by default).
     pub files_open: bool,
+    /// The open session's background processes (`app/processes.rs`), the card's fold, and
+    /// the process whose output is shown.
+    pub processes: Vec<crate::model::BgProcess>,
+    pub processes_open: bool,
+    pub process_open: Option<String>,
     /// Files waiting in the composer to go with the next message.
     pub attachments: Vec<std::path::PathBuf>,
     pub usage: Option<Usage>,
@@ -545,7 +551,16 @@ impl HermesApp {
                 }
             }
         });
-        let mut tasks = vec![events, ticker];
+        // The open session's background processes, every 3 s (the gateway has no event for them).
+        let processes = cx.spawn(async move |this, cx| {
+            loop {
+                cx.background_executor().timer(Duration::from_secs(3)).await;
+                if this.update(cx, |this, _| this.poll_processes()).is_err() {
+                    break;
+                }
+            }
+        });
+        let mut tasks = vec![events, ticker, processes];
 
         // The gateway list keeps the SSH hosts that run Hermes (asked again when the menu opens).
         let ssh = servers::Ssh::new(window, cx);
@@ -594,6 +609,9 @@ impl HermesApp {
             queued_images: vec![],
             attachments: vec![],
             files_open: false,
+            processes: vec![],
+            processes_open: false,
+            process_open: None,
             send_after_transcribe: false,
             usage: None,
             effort: EFFORTS.len() - 1,
@@ -993,6 +1011,7 @@ impl HermesApp {
                 cx.notify();
             }
             Evt::Catalog(list) => self.catalog = list,
+            Evt::Processes(sid, list) if self.is_current(&sid) => self.on_processes(list, cx),
             Evt::Review(sid, text) if self.is_current(&sid) => {
                 if let Some(i) = self.turns.len().checked_sub(1) {
                     self.turns[i].reviews.push(text.clone());
@@ -1140,6 +1159,8 @@ impl HermesApp {
             self.tree_root = None;
             self.tree.clear();
         }
+        self.processes.clear();
+        self.process_open = None;
         self.session = None;
         self.runtime = None;
         // A new chat starts on the profile's level.

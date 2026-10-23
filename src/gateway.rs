@@ -65,6 +65,17 @@ pub enum Cmd {
     Catalog {
         profile: String,
     },
+    /// The session's background processes (polled while it is open).
+    Processes {
+        profile: String,
+        session: String,
+    },
+    /// Stop one of them.
+    KillProcess {
+        profile: String,
+        session: String,
+        id: String,
+    },
     /// Run a slash command in a session.
     Dispatch {
         profile: String,
@@ -94,6 +105,8 @@ pub enum Cmd {
 
 pub enum Evt {
     Catalog(Vec<crate::model::SlashCommand>),
+    /// (runtime session, its background processes)
+    Processes(String, Vec<crate::model::BgProcess>),
     /// A slash command ran: either it printed something, or it wants a prompt sent.
     Dispatched {
         session: String,
@@ -182,6 +195,8 @@ enum Pending {
     Create,
     Delete,
     Catalog,
+    /// `process.list` for this runtime session.
+    Processes(String),
     Dispatch(String),
     /// Regenerate, step 1 done: the transcript (for the last user row id) has arrived.
     Regen {
@@ -340,6 +355,20 @@ impl Rpc {
                 "commands.catalog",
                 json!({"profile": profile}),
                 Pending::Catalog,
+            )?,
+            Cmd::Processes { profile, session } => self.call(
+                "process.list",
+                json!({"session_id": session, "profile": profile}),
+                Pending::Processes(session),
+            )?,
+            Cmd::KillProcess {
+                profile,
+                session,
+                id,
+            } => self.call(
+                "process.kill",
+                json!({"session_id": session, "process_id": id, "profile": profile}),
+                Pending::Ignore,
             )?,
             Cmd::Dispatch {
                 profile,
@@ -524,6 +553,8 @@ fn run(
                 log_error(&method, &err.to_string());
                 match kind {
                     Pending::Delete => emit(Evt::DeleteFailed(text)),
+                    // A poll every few seconds: logged above, never a toast.
+                    Pending::Processes(_) => {}
                     // Older gateways may lack the projection: show the turns without extras.
                     Pending::Meta {
                         session,
@@ -711,6 +742,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
         }
         Pending::Delete => emit(Evt::Deleted),
         Pending::Catalog => emit(Evt::Catalog(catalog(r))),
+        Pending::Processes(session) => emit(Evt::Processes(session, processes(r))),
         Pending::Dispatch(session) => {
             let s = |k: &str| {
                 r[k].as_str()
@@ -979,5 +1011,29 @@ fn todos(payload: &Value) -> Vec<crate::model::Todo> {
                 depth,
             }
         })
+        .collect()
+}
+
+/// `process.list`'s rows (the process id rides in `session_id`).
+fn processes(r: &Value) -> Vec<crate::model::BgProcess> {
+    r["processes"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|p| crate::model::BgProcess {
+            id: p["session_id"].as_str().unwrap_or_default().to_string(),
+            command: p["command"].as_str().unwrap_or_default().to_string(),
+            running: p["status"].as_str() != Some("exited"),
+            exit_code: p["exit_code"].as_i64(),
+            started: p["started_epoch"].as_f64(),
+            exited: p["exited_at"].as_f64(),
+            reason: p["completion_reason"].as_str().map(str::to_string),
+            tail: p["output_tail"]
+                .as_str()
+                .or(p["output_preview"].as_str())
+                .unwrap_or_default()
+                .to_string(),
+        })
+        .filter(|p| !p.id.is_empty())
         .collect()
 }

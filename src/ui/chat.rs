@@ -355,11 +355,12 @@ impl HermesApp {
             .collect();
 
         let sources = self.render_sources(i, cx);
-        // The session's edited files hang under the last answer: the agent made them too.
-        let files = if i + 1 == self.turns.len() {
-            self.render_session_files(cx)
+        // The session's edited files and background processes hang under the last answer: the
+        // agent made them too.
+        let (processes, files) = if i + 1 == self.turns.len() {
+            (self.render_processes(cx), self.render_session_files(cx))
         } else {
-            None
+            (None, None)
         };
         // What the background review did with skills and memory, quietly under the answer.
         let reviews: Vec<AnyElement> = turn
@@ -471,6 +472,7 @@ impl HermesApp {
                     // What came with the answer, right under its text (the agent's side); the
                     // hover actions below all of it.
                     .children(sources)
+                    .children(processes)
                     .children(files)
                     .when(!reviews.is_empty(), |d| {
                         d.child(v_flex().gap_1().children(reviews))
@@ -795,6 +797,210 @@ impl HermesApp {
             v_flex()
                 .child(h_flex().flex_wrap().gap_1().children(chips))
                 .children(list)
+                .into_any_element(),
+        )
+    }
+
+    /// Under the last answer: the background processes the agent started in this session —
+    /// running or finished, each with Stop (while it runs) and its latest output a click away.
+    fn render_processes(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.processes.is_empty() {
+            return None;
+        }
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0., |d| d.as_secs_f64());
+        let running = self.processes.iter().filter(|p| p.running).count();
+        let done = self.processes.len() - running;
+        let open = self.processes_open;
+        let mut head = vec![];
+        if running > 0 {
+            head.push(format!("{running} running"));
+        }
+        if done > 0 {
+            head.push(format!("{done} finished"));
+        }
+        let rows: Vec<AnyElement> = self
+            .processes
+            .iter()
+            .filter(|_| open)
+            .enumerate()
+            .map(|(k, p)| {
+                let failed = !p.running && p.exit_code.is_some_and(|c| c != 0);
+                let elapsed = p
+                    .started
+                    .map(|t| (p.exited.unwrap_or(now) - t).max(0.) as u64)
+                    .map(clock);
+                let state = if p.running {
+                    elapsed.unwrap_or_default()
+                } else {
+                    let code = p
+                        .exit_code
+                        .map_or("ended".to_string(), |c| format!("exit {c}"));
+                    // A reason that only says it ended adds nothing to "exit N".
+                    let reason = p.reason.as_deref().filter(|r| {
+                        !r.is_empty() && !matches!(*r, "exited" | "exit" | "completed")
+                    });
+                    match (reason, elapsed) {
+                        (Some(r), Some(e)) => format!("{code} · {r} · {e}"),
+                        (_, Some(e)) => format!("{code} · {e}"),
+                        _ => code,
+                    }
+                };
+                let shown = self.process_open.as_deref() == Some(p.id.as_str());
+                let (id_toggle, id_kill) = (p.id.clone(), p.id.clone());
+                // "cd <project> && cargo build": the folder is the session's, the rest is news.
+                let shown_cmd = match p.command.strip_prefix("cd ") {
+                    Some(rest) => rest
+                        .split_once(" && ")
+                        .map_or(p.command.as_str(), |(_, cmd)| cmd),
+                    None => p.command.as_str(),
+                }
+                .to_string();
+                let full_cmd = p.command.clone();
+                let tail: String = {
+                    let lines: Vec<&str> = p.tail.trim_end().lines().collect();
+                    lines[lines.len().saturating_sub(60)..].join("\n")
+                };
+                v_flex()
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .child(
+                        h_flex()
+                            .id(("proc", k))
+                            .px_2()
+                            .py_1()
+                            .gap_2()
+                            .items_center()
+                            .text_xs()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(theme.list_hover))
+                            .child(if p.running {
+                                Ico::Loader.live(false)
+                            } else if failed {
+                                Ico::CircleAlert
+                                    .icon()
+                                    .xsmall()
+                                    .text_color(theme.danger)
+                                    .into_any_element()
+                            } else {
+                                Ico::CircleCheck
+                                    .icon()
+                                    .xsmall()
+                                    .text_color(muted)
+                                    .into_any_element()
+                            })
+                            .child(
+                                div()
+                                    .id(("proc-cmd", k))
+                                    .flex_1()
+                                    .min_w_0()
+                                    .truncate()
+                                    .font_family("Menlo")
+                                    .child(shown_cmd)
+                                    .tooltip(move |window, cx| {
+                                        Tooltip::new(full_cmd.clone()).build(window, cx)
+                                    }),
+                            )
+                            .child(
+                                div()
+                                    .flex_none()
+                                    .text_color(if failed { theme.danger } else { muted })
+                                    .child(state),
+                            )
+                            .when(p.running, |d| {
+                                d.child(
+                                    div()
+                                        .id(("proc-stop", k))
+                                        .flex_none()
+                                        .px_1p5()
+                                        .text_color(muted)
+                                        .hover(|s| {
+                                            s.bg(theme.danger).text_color(theme.danger_foreground)
+                                        })
+                                        .child("Stop")
+                                        .tooltip(|window, cx| {
+                                            Tooltip::new("Stop this process").build(window, cx)
+                                        })
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            cx.stop_propagation();
+                                            this.kill_process(id_kill.clone(), cx)
+                                        })),
+                                )
+                            })
+                            .child(
+                                if shown {
+                                    Ico::ChevronDown
+                                } else {
+                                    Ico::ChevronRight
+                                }
+                                .icon()
+                                .xsmall()
+                                .text_color(muted),
+                            )
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.toggle_process_output(id_toggle.clone(), cx)
+                            })),
+                    )
+                    .when(shown, |d| {
+                        d.child(
+                            div()
+                                .mx_2()
+                                .mb_2()
+                                .p_2()
+                                .bg(theme.secondary)
+                                .border_1()
+                                .border_color(theme.border)
+                                .font_family("Menlo")
+                                .text_xs()
+                                .text_color(theme.foreground)
+                                .child(if tail.trim().is_empty() {
+                                    div()
+                                        .text_color(muted)
+                                        .child("No output yet")
+                                        .into_any_element()
+                                } else {
+                                    plain_text(format!("proc-out-{k}"), &tail).into_any_element()
+                                }),
+                        )
+                    })
+                    .into_any_element()
+            })
+            .collect();
+        Some(
+            v_flex()
+                .border_1()
+                .border_color(theme.border)
+                .child(
+                    h_flex()
+                        .id("procs-head")
+                        .px_2()
+                        .py_1()
+                        .gap_1p5()
+                        .items_center()
+                        .text_xs()
+                        .text_color(muted)
+                        .cursor_pointer()
+                        .hover(|s| s.text_color(theme.foreground))
+                        .child(
+                            if open {
+                                Ico::ChevronDown
+                            } else {
+                                Ico::ChevronRight
+                            }
+                            .icon()
+                            .xsmall(),
+                        )
+                        .child(format!("BACKGROUND · {}", head.join(" · ")))
+                        .when(running > 0, |d| d.child(Ico::Loader.live(false)))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.processes_open = !this.processes_open;
+                            cx.notify();
+                        })),
+                )
+                .children(rows)
                 .into_any_element(),
         )
     }
