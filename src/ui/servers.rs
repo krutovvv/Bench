@@ -224,13 +224,31 @@ impl HermesApp {
                                 .flex_1()
                                 .min_w_0()
                                 .child(
-                                    div()
+                                    h_flex()
+                                        .min_w_0()
+                                        .gap_2()
                                         .text_sm()
-                                        .truncate()
-                                        // Compact: no address line, so a connected server says
-                                        // so in its name's color.
-                                        .when(compact && open, |d| d.text_color(theme.primary))
-                                        .child(alias.clone()),
+                                        .child(
+                                            div()
+                                                .flex_none()
+                                                // Compact: no address line, so a connected
+                                                // server says so in its name's color.
+                                                .when(compact && open, |d| {
+                                                    d.text_color(theme.primary)
+                                                })
+                                                .child(alias.clone()),
+                                        )
+                                        // Compact: the row's free room tells where it goes —
+                                        // the address first, then the user (cut with "…").
+                                        .when(compact, |d| {
+                                            d.child(
+                                                div()
+                                                    .min_w_0()
+                                                    .truncate()
+                                                    .text_color(muted)
+                                                    .child(address_line(&target, &s.port)),
+                                            )
+                                        }),
                                 )
                                 .when(!compact, |d| {
                                     d.child(
@@ -497,23 +515,31 @@ impl HermesApp {
                 .text_color(muted)
                 .children(title),
         )
-        .when_some(exited, |d, note| {
+        .when_some(exited.clone(), |d, note| {
             d.child(div().text_xs().text_color(muted).child(note))
-                .child(
-                    toggle("reconnect", Ico::RotateCcw, "Reconnect").on_click(
-                        cx.listener(|this, _, window, cx| this.reconnect_server(window, cx)),
-                    ),
-                )
         })
+        // Every button on the right in one group, 4px apart like the header's own (the bar's
+        // 8px gap had pushed the × away from its neighbours).
         .child(
-            toggle(
-                "disconnect",
-                Ico::X,
-                if local { "Close" } else { "Disconnect" },
-            )
-            .on_click(cx.listener(|this, _, window, cx| this.close_server_tab(window, cx))),
+            h_flex()
+                .flex_none()
+                .gap_1()
+                .items_center()
+                .when(exited.is_some(), |d| {
+                    d.child(toggle("reconnect", Ico::RotateCcw, "Reconnect").on_click(
+                        cx.listener(|this, _, window, cx| this.reconnect_server(window, cx)),
+                    ))
+                })
+                .child(
+                    toggle(
+                        "disconnect",
+                        Ico::X,
+                        if local { "Close" } else { "Disconnect" },
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| this.close_server_tab(window, cx))),
+                )
+                .child(self.render_header_tail(cx)),
         )
-        .child(self.render_header_tail(cx))
         .into_any_element()
     }
 
@@ -684,5 +710,22 @@ impl HermesApp {
                     ),
             )
             .into_any_element()
+    }
+}
+
+/// "192.168.1.50 · ubuntu" from `ssh -G`'s "ubuntu@192.168.1.50" (and ":2222" for a port that
+/// isn't 22).
+fn address_line(target: &str, port: &str) -> String {
+    let (user, host) = target.split_once('@').unwrap_or(("", target));
+    let port = port.trim();
+    let host = if port.is_empty() || port == "22" {
+        host.to_string()
+    } else {
+        format!("{host}:{port}")
+    };
+    if user.is_empty() {
+        host
+    } else {
+        format!("{host} · {user}")
     }
 }
