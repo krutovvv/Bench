@@ -73,10 +73,25 @@ impl HermesApp {
                 .child(icon.icon().small())
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
         };
+        // Files of what the window shows (the open chat, the server's terminal) one click
+        // away, as ⌘B and "Open files" in the "⋯" menu; gone while the IDE is open (its own
+        // close button stands there).
+        let files = !self.ide_open()
+            && if ssh {
+                self.ssh.active_tab().is_some()
+            } else {
+                self.session.is_some()
+            };
         h_flex()
             .flex_none()
             .gap_1()
             .items_center()
+            .when(files, |d| {
+                d.child(
+                    toggle("open-files", Ico::PanelRight, false, "Open files  ⌘B")
+                        .on_click(cx.listener(|this, _, window, cx| this.toggle_ide(window, cx))),
+                )
+            })
             // The mode switch comes last: it changes the whole window.
             .child(
                 toggle(

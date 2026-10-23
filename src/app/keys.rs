@@ -90,7 +90,7 @@ impl HermesApp {
 
     /// ⌘B: hide the mini IDE, or open it on what the window shows (the server's terminal, else
     /// the open chat).
-    fn toggle_ide(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn toggle_ide(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.ide_open() {
             self.close_ide(cx);
         } else if self.ssh.on {
