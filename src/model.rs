@@ -35,6 +35,16 @@ pub struct SessionRow {
     pub source: String,
     /// What the thread is about, its live block: "tasks:today", "ssh:<host>"; "" = a plain chat.
     pub subject: String,
+    /// The project the thread belongs to (its id); "" = none.
+    pub project: String,
+}
+
+/// What the person works on: the sidebar's unit. A folder on disk (a codebase) is optional.
+#[derive(Clone, Debug, Default)]
+pub struct ProjectEntry {
+    pub id: String,
+    pub name: String,
+    pub folder: Option<String>,
 }
 
 /// Human name of a session source, for grouping the session list.
@@ -98,13 +108,16 @@ pub struct BgProcess {
     pub tail: String,
 }
 
-/// A slash command from the gateway's catalog.
-#[derive(Clone, Debug)]
+/// A slash command from the gateway's catalog, a saved prompt, or a tool to attach to the
+/// thread (`/ssh web-1`).
+#[derive(Clone, Debug, Default)]
 pub struct SlashCommand {
     /// "/goal".
     pub name: String,
     pub desc: String,
     pub category: String,
+    /// A tool's subject key ("ssh:web-1"); empty for commands and prompts.
+    pub key: String,
 }
 
 /// The agent asks before running something (approval mode manual/smart).

@@ -26,6 +26,8 @@ pub mod marks;
 mod processes;
 mod profiles;
 pub(crate) mod projects;
+pub(crate) mod project_list;
+pub use project_list::ProjectForm;
 mod prompts;
 pub(crate) mod providers;
 pub(crate) mod servers;
@@ -127,6 +129,12 @@ pub struct HermesApp {
     /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
     /// new one (the row's "+"), `Some(Some(id))` = that thread (a row under the subject).
     pub subject_target: Option<Option<String>>,
+    /// The project the open thread belongs to (a new one is created in it); "" = none.
+    pub thread_project: String,
+    /// The person's projects: the sidebar.
+    pub projects: Vec<crate::model::ProjectEntry>,
+    /// The new project's form, in the chat area while open (the sidebar's "+").
+    pub project_form: Option<ProjectForm>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -681,6 +689,9 @@ impl HermesApp {
             conn: None,
             new_subject: String::new(),
             subject_target: None,
+            thread_project: String::new(),
+            projects: vec![],
+            project_form: None,
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,
@@ -904,6 +915,7 @@ impl HermesApp {
                 self.restart_tasks(cx);
                 self.reload_servers(cx);
                 self.load_remote_hosts(window, cx);
+                self.load_projects(window, cx);
 
             }
             Evt::Error(e) => {
@@ -1024,6 +1036,7 @@ impl HermesApp {
                             running: true,
                             source: "desktop".into(),
                             subject: self.new_subject.clone(),
+                            project: self.thread_project.clone(),
                         },
                     );
                 }
@@ -1431,8 +1444,10 @@ impl HermesApp {
         self.confirm_delete = None;
         self.ssh.form = None;
         self.files_remote.form = false;
+        self.project_form = None;
         self.reset_chat(cx);
         self.session = Some(id.clone());
+        self.thread_project = self.sessions.iter().find(|s| s.id == id).map(|s| s.project.clone()).unwrap_or_default();
         if self.demo {
             self.turns = self.demo_threads.get(&id).cloned().unwrap_or_default();
             self.processes = if id == "d-landing" { crate::demo::processes(now_secs()) } else { Vec::new() };
@@ -1525,7 +1540,7 @@ impl HermesApp {
                 rest::worktree_add(&conn, &p, &root, &name)
             },
             move |this, r, window, cx| match r {
-                Ok((folder, _branch)) => this.cmd(Cmd::Create { profile, cwd: Some(folder), subject: this.new_subject.clone() }),
+                Ok((folder, _branch)) => this.cmd(Cmd::Create { profile, cwd: Some(folder), subject: this.new_subject.clone(), project: this.thread_project.clone() }),
                 Err(e) => {
                     this.live = None;
                     this.queued = None;
@@ -1777,7 +1792,7 @@ impl HermesApp {
                         cx,
                         move || connection::group_dir(&target, &group),
                         move |this, r, window, cx| match r {
-                            Ok(dir) => this.cmd(Cmd::Create { profile, cwd: Some(dir), subject: this.new_subject.clone() }),
+                            Ok(dir) => this.cmd(Cmd::Create { profile, cwd: Some(dir), subject: this.new_subject.clone(), project: this.thread_project.clone() }),
                             Err(e) => {
                                 this.toast(
                                     NotificationType::Error,
@@ -1785,7 +1800,7 @@ impl HermesApp {
                                     window,
                                     cx,
                                 );
-                                this.cmd(Cmd::Create { profile, cwd: None, subject: this.new_subject.clone() });
+                                this.cmd(Cmd::Create { profile, cwd: None, subject: this.new_subject.clone(), project: this.thread_project.clone() });
                             }
                         },
                     );
@@ -1801,7 +1816,7 @@ impl HermesApp {
                         let name = branch_name(&text);
                         self.rest_branch(conn, profile, root, name, window, cx);
                     }
-                    (root, _) => self.cmd(Cmd::Create { profile, cwd: root, subject: self.new_subject.clone() }),
+                    (root, _) => self.cmd(Cmd::Create { profile, cwd: root, subject: self.new_subject.clone(), project: self.thread_project.clone() }),
                 }
             }
         }

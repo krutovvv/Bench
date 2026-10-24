@@ -124,43 +124,12 @@ impl Ssh {
         }
     }
 
-    /// Folders in display order (top level first, then by name), each with the indices of its
-    /// servers that match the search.
-    pub fn groups(&self) -> Vec<(String, Vec<usize>)> {
-        let mut folders: Vec<String> = self.servers.iter().map(|s| s.folder.clone()).collect();
-        folders.sort_by_key(|f| (!f.is_empty(), f.to_lowercase()));
-        folders.dedup();
-        let q = &self.query;
-        folders
-            .into_iter()
-            .map(|f| {
-                let rows: Vec<usize> = (0..self.servers.len())
-                    .filter(|&i| {
-                        let s = &self.servers[i];
-                        s.folder == f
-                            && (q.is_empty()
-                                || s.alias.to_lowercase().contains(q)
-                                || s.hostname.to_lowercase().contains(q)
-                                || s.folder.to_lowercase().contains(q))
-                    })
-                    .collect();
-                (f, rows)
-            })
-            .filter(|(_, rows)| !rows.is_empty())
-            .collect()
-    }
-
     pub fn active_tab(&self) -> Option<&Tab> {
         self.active.and_then(|i| self.tabs.get(i))
     }
 
     pub fn tab_for(&self, alias: &str) -> Option<usize> {
         self.tabs.iter().position(|t| t.alias == alias)
-    }
-
-    pub fn is_open(&self, alias: &str) -> bool {
-        self.tab_for(alias)
-            .is_some_and(|t| !self.tabs[t].session.exited.load(Ordering::SeqCst))
     }
 }
 
@@ -619,30 +588,5 @@ impl HermesApp {
             });
         })
         .detach();
-    }
-
-    /// First press arms, the second removes the Host block (a backup of the file is kept).
-    pub fn delete_server(&mut self, alias: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ssh.armed_delete.as_deref() != Some(alias.as_str()) {
-            self.ssh.armed_delete = Some(alias);
-            cx.notify();
-            return;
-        }
-        self.ssh.armed_delete = None;
-        match sshconfig::delete(&alias) {
-            Ok(()) => {
-                if self.ssh.form == Some(Some(alias.clone())) {
-                    self.ssh.form = None;
-                }
-                self.reload_servers(cx);
-            }
-            Err(e) => self.toast(
-                NotificationType::Error,
-                format!("~/.ssh/config: {e:#}"),
-                window,
-                cx,
-            ),
-        }
-        cx.notify();
     }
 }

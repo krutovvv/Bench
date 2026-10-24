@@ -10,6 +10,7 @@ mod panels;
 mod providers;
 mod servers;
 mod remote_files;
+mod project_list;
 mod sites;
 mod sidebar;
 mod statusbar;
@@ -113,26 +114,11 @@ impl HermesApp {
                 } else {
                     "New session  ⌘N"
                 };
-                d.when(!self.tasks.on && !self.ssh.on, |d| {
-                    d.child(
-                        toggle("open-folder", crate::icons::Ico::FolderOpen, "New session in a folder…", false)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.new_session(cx);
-                                this.choose_project_folder(window, cx);
-                            })),
-                    )
-                })
-                .child(
-                    toggle("new-item", crate::icons::Ico::Plus, tip, false).on_click(cx.listener(
-                        |this, _, window, cx| {
-                            if this.tasks.on {
-                                this.new_task(window, cx)
-                            } else if this.ssh.on {
-                                this.edit_server(None, None, window, cx)
-                            } else {
-                                this.new_session(cx)
-                            }
-                        },
+                let _ = tip;
+                // "+": a new project (the sidebar holds projects only).
+                d.child(
+                    toggle("new-item", crate::icons::Ico::Plus, "New project", false).on_click(cx.listener(
+                        |this, _, window, cx| this.new_project_form(window, cx),
                     )),
                 )
             })
@@ -504,6 +490,7 @@ impl Render for HermesApp {
         let body = match self.panel {
             Panel::Chat if self.tasks.on => self.render_tasks_body(cx),
             Panel::Chat if self.tools.on => self.render_tools_body(cx),
+            Panel::Chat if self.project_form.is_some() => self.render_project_form(cx),
             Panel::Chat if self.files_remote.form => self.render_host_form(cx),
             Panel::Chat if ssh => self.render_ssh_body(window, cx),
             // Files dropped anywhere on the chat or the input are attached.

@@ -119,6 +119,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                         profile: p.clone(),
                         cwd: None,
                         subject: String::new(),
+                        project: String::new(),
                     });
                     continue;
                 }

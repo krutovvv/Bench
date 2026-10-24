@@ -100,7 +100,6 @@ icons! {
     RefreshCw => "refresh-cw",
     RotateCcw => "rotate-ccw",
     Server => "server",
-    Send => "send",
     Settings => "settings",
     Shield => "shield",
     Square => "square",
@@ -108,7 +107,6 @@ icons! {
     Trash => "trash",
     UserRound => "user-round",
     Volume => "volume-2",
-    Wrench => "wrench",
     Search => "search",
     X => "x",
     // Not Lucide: a Z in Lucide's style, for "open in Zed".
@@ -118,7 +116,6 @@ icons! {
     Check => "check",
     Flag => "flag",
     Layers => "layers",
-    ListTodo => "list-todo",
     Moon => "moon",
     Star => "star",
     Tag => "tag",

@@ -5,98 +5,14 @@
 use gpui_kit::component::input::{Editor, Input};
 use gpui_kit::component::text::TextView;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::HermesApp;
-use crate::devtools::{GROUPS, Kind, Tool};
-use crate::icons::Ico;
-
-fn group_icon(name: &str) -> Ico {
-    match name {
-        "Markdown" => Ico::FileText,
-        "Generate" => Ico::Pencil,
-        "Encode" => Ico::FileCode,
-        "Convert" => Ico::RefreshCw,
-        _ => Ico::Search,
-    }
-}
+use crate::devtools::{Kind, Tool};
 
 impl HermesApp {
-    pub(super) fn render_tools_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let compact = self.appearance.compact_sidebar;
-        let q = self.tools.query.clone();
-        let mut list: Vec<AnyElement> = vec![];
-        for (g, group) in GROUPS.iter().enumerate() {
-            let tools: Vec<Tool> = group
-                .tools
-                .iter()
-                .copied()
-                .filter(|t| q.is_empty() || t.name().to_lowercase().contains(&q))
-                .collect();
-            if tools.is_empty() {
-                continue;
-            }
-            list.push(
-                h_flex()
-                    .px_4()
-                    .pt(rems(if list.is_empty() { 0.5 } else { 0.75 }))
-                    .pb_1()
-                    .gap_1p5()
-                    .items_center()
-                    .text_base()
-                    .text_color(muted)
-                    .child(group_icon(group.name).icon().small())
-                    .child(div().font_weight(FontWeight::MEDIUM).child(group.name))
-                    .into_any_element(),
-            );
-            let n = tools.len();
-            for (k, tool) in tools.into_iter().enumerate() {
-                let selected = self.tools.tool == tool;
-                list.push(
-                    h_flex()
-                        .id(("tool-row", g * 100 + k))
-                        .relative()
-                        .pl(super::nest_pl(cx))
-                        .child(super::nest_guide(cx, k + 1 == n))
-                        .pr_3()
-                        .map(|d| if compact { d.py_1() } else { d.py_2() })
-                        .border_l_2()
-                        .border_color(if selected {
-                            theme.primary
-                        } else {
-                            theme.transparent
-                        })
-                        .when(selected, |d| d.bg(theme.sidebar_accent))
-                        .hover(|s| s.bg(theme.sidebar_accent))
-                        .cursor_pointer()
-                        .child(div().text_base().truncate().child(tool.name()))
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.select_tool(tool, window, cx)
-                        }))
-                        .into_any_element(),
-                );
-            }
-        }
-        v_flex()
-            .size_full()
-            .bg(theme.sidebar)
-            .child(self.render_sidebar_top(cx))
-            .child(super::search_band(&self.tools.search, cx))
-            .child(
-                v_flex()
-                    .id("tools-list")
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .py_1()
-                    .children(list),
-            )
-            .into_any_element()
-    }
 
     /// A tool as a thread's live block: its name, hint and modes, then the tool at a fixed height.
     pub(super) fn render_tool_block(&mut self, height: f32, cx: &mut Context<Self>) -> AnyElement {

@@ -17,6 +17,7 @@ impl HermesApp {
         // A form in the chat area (a new server) gives way to the thread.
         self.ssh.form = None;
         self.files_remote.form = false;
+        self.project_form = None;
         let target = match self.subject_target.take() {
             Some(t) => t,
             None => self.sessions.iter().find(|s| s.subject == key).map(|s| s.id.clone()),
@@ -52,23 +53,105 @@ impl HermesApp {
         }
     }
 
-    /// A new thread about `key` (the "+" on its row): its block ready, the conversation empty.
-    pub fn new_subject_thread(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.subject_target = Some(None);
-        self.open_subject_key(key, window, cx);
-        self.subject_target = None;
+    /// `/ssh`, `/ftp`, `/browser`, `/tasks`, `/tool` and what follows: the tools that can be
+    /// attached to this thread, filtered by the rest of the line. None when the line is not one.
+    pub fn tool_slash(&self, text: &str) -> Option<Vec<crate::model::SlashCommand>> {
+        let rest = text.strip_prefix('/')?;
+        let (word, q) = match rest.split_once(char::is_whitespace) {
+            Some((w, q)) => (w, q.trim().to_lowercase()),
+            None => return None,
+        };
+        let row = |name: String, desc: String, key: String| crate::model::SlashCommand {
+            name,
+            desc,
+            category: "Tool".into(),
+            key,
+        };
+        let mut rows: Vec<crate::model::SlashCommand> = match word.to_lowercase().as_str() {
+            "ssh" => {
+                let mut v = vec![row("/ssh Terminal".into(), "this Mac".into(), format!("ssh:{}", crate::term::LOCAL))];
+                v.extend(self.ssh.servers.iter().map(|s| row(format!("/ssh {}", s.alias), s.hostname.clone(), format!("ssh:{}", s.alias))));
+                v.push(row("/ssh New server…".into(), "add one to ~/.ssh/config".into(), "new:ssh".into()));
+                v
+            }
+            "ftp" => {
+                let mut v: Vec<_> = self
+                    .files_remote
+                    .hosts
+                    .iter()
+                    .map(|h| row(format!("/ftp {}", h.name), format!("{}@{}", h.user, h.host), format!("files:{}", h.id)))
+                    .collect();
+                v.push(row("/ftp New host…".into(), "FTP, FTPS or SFTP".into(), "new:ftp".into()));
+                v
+            }
+            "browser" => vec![row("/browser".into(), "the server's browser, each step's page live".into(), "browser:new".into())],
+            "tasks" => crate::tasks::LISTS
+                .iter()
+                .map(|l| row(format!("/tasks {}", l.name()), "the task list".into(), Self::tasks_subject(l)))
+                .collect(),
+            "tool" => GROUPS
+                .iter()
+                .flat_map(|g| g.tools.iter().map(move |t| (*t, g.name)))
+                .map(|(t, g)| row(format!("/tool {}", t.name()), g.to_string(), format!("tool:{}", tool_key(t))))
+                .collect(),
+            _ => return None,
+        };
+        if !q.is_empty() {
+            rows.retain(|r| r.name.to_lowercase().contains(&q) || r.desc.to_lowercase().contains(&q));
+        }
+        Some(rows)
     }
 
-    /// One thread about `key` (a row under its subject), its block ready.
-    pub fn open_subject_thread(&mut self, key: String, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.subject_target = Some(Some(id));
-        self.open_subject_key(key, window, cx);
-        self.subject_target = None;
+    /// The words that attach a tool, for the list of a bare `/word`.
+    pub fn tool_words() -> Vec<crate::model::SlashCommand> {
+        [
+            ("/ssh", "A server's terminal in this thread"),
+            ("/ftp", "A file host's folders and files in this thread"),
+            ("/browser", "The server's browser: each step's page live"),
+            ("/tasks", "A task list in this thread"),
+            ("/tool", "An everyday tool (Base64, regex, cron…) in this thread"),
+        ]
+        .into_iter()
+        .map(|(n, d)| crate::model::SlashCommand { name: n.into(), desc: d.into(), category: "Tool".into(), key: String::new() })
+        .collect()
     }
 
-    /// The threads about `key`, as the sessions list orders them (latest first).
-    pub fn threads_of(&self, key: &str) -> Vec<usize> {
-        (0..self.sessions.len()).filter(|&i| self.sessions[i].subject == key).collect()
+    /// A tool picked from the `/` list: its block, ready, at the top of this thread from now on
+    /// (a new chat carries it when it is created).
+    pub fn attach_tool(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
+        match key.as_str() {
+            "new:ssh" => return self.edit_server(None, None, window, cx),
+            "new:ftp" => return self.new_host_form(window, cx),
+            _ => {}
+        }
+        let key = if key == "browser:new" {
+            self.load_sites();
+            self.ensure_browser(cx);
+            format!("browser:{}", &uuid::Uuid::new_v4().simple().to_string()[..8])
+        } else {
+            key
+        };
+        if let Some(alias) = Self::subject_server(&key) {
+            self.ensure_terminal(&alias, window, cx);
+        } else if let Some(id) = Self::subject_files(&key) {
+            self.ensure_remote_listing(&id, window, cx);
+        } else if let Some(list) = Self::subject_list(&key) {
+            self.start_reminders(cx);
+            self.load_tasks();
+            self.select_task_list(list, window, cx);
+        } else if let Some(tool) = Self::subject_tool(&key) {
+            self.select_tool(tool, window, cx);
+        }
+        match self.session.clone() {
+            Some(id) => {
+                if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
+                    s.subject = key.clone();
+                }
+                self.cmd(crate::gateway::Cmd::SetSubject { session: id, subject: key });
+            }
+            None => self.new_subject = key,
+        }
+        cx.notify();
     }
 
     /// A server: its thread, the terminal on top (opened on first use, kept while the app runs).

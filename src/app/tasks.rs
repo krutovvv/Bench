@@ -188,11 +188,6 @@ impl TasksMode {
         counts.into_iter().map(|(n, _)| n).collect()
     }
 
-    pub fn count(&self, list: &List) -> usize {
-        let day = today();
-        self.items.iter().filter(|t| t.in_list(list, day)).count()
-    }
-
     fn send(&self, cmd: Cmd) {
         if let Some(r) = &self.reminders {
             r.send(cmd);
@@ -202,7 +197,7 @@ impl TasksMode {
 
 impl HermesApp {
     /// The Reminders thread, started the first time Tasks opens (macOS asks for access once).
-    fn start_reminders(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn start_reminders(&mut self, cx: &mut Context<Self>) {
         // The demo's tasks are made up; Reminders stays untouched.
         if self.tasks.reminders.is_some() || self.demo {
             return;

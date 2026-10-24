@@ -26,6 +26,7 @@ fn session(id: &str, title: &str, messages: u64, running: bool, source: &str) ->
         running,
         source: source.into(),
         subject: String::new(),
+        project: String::new(),
     }
 }
 
@@ -485,6 +486,28 @@ fewer form fields. Then check what it did to signups and give me a short summary
     app.session = Some("d-landing".into());
     other_modes(app);
     subject_threads(app, now);
+    // The demo's projects: each thread in one (the Telegram and cron ones stay without).
+    let project = |id: &str, name: &str, folder: Option<&str>| crate::model::ProjectEntry {
+        id: id.into(),
+        name: name.into(),
+        folder: folder.map(str::to_string),
+    };
+    app.projects = vec![
+        project("p-blog", "Northwind blog", None),
+        project("p-store", "Storefront", Some("/Users/demo/code/storefront")),
+        project("p-audit", "Competitor audit", None),
+        project("p-me", "Personal", None),
+    ];
+    for s in app.sessions.iter_mut() {
+        s.project = match s.id.as_str() {
+            "d-site" => "p-blog",
+            "d-landing" | "d-api" | "d-tests" | "d-web1" | "d-web1-tls" => "p-store",
+            "d-audit-1" | "d-audit-2" => "p-audit",
+            "d-today" | "d-tool" | "d-notes" => "p-me",
+            _ => "",
+        }
+        .into();
+    }
     // The demo's own folds, not the person's: every group open but the long Tools.
     app.ssh.collapsed = ["s:Tools".to_string()].into_iter().collect();
     // `BENCH_DEMO=tasks|server|browser|tool`: that thread open instead.

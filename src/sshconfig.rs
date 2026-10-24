@@ -266,32 +266,6 @@ fn save_in(file: &std::path::Path, old: Option<&str>, s: &Server) -> Result<()> 
     write(file, &out)
 }
 
-pub fn delete(alias: &str) -> Result<()> {
-    delete_in(&path(), alias)
-}
-
-fn delete_in(file: &std::path::Path, alias: &str) -> Result<()> {
-    let text = std::fs::read_to_string(file)?;
-    let lines: Vec<&str> = text.lines().collect();
-    let Some((start, end, names)) = blocks(&lines)
-        .into_iter()
-        .find(|b| b.2.iter().any(|n| n == alias))
-    else {
-        bail!("“{alias}” is not in ~/.ssh/config");
-    };
-    if names.len() > 1 {
-        bail!("this Host line names several hosts; edit ~/.ssh/config by hand");
-    }
-    let mut out: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
-    let mut end = end;
-    // Take one blank separator line with it.
-    if out.get(end).is_some_and(|l| l.trim().is_empty()) {
-        end += 1;
-    }
-    out.drain(start..end);
-    write(file, &out)
-}
-
 fn write(p: &std::path::Path, lines: &[String]) -> Result<()> {
     use std::io::Write as _;
     std::fs::create_dir_all(p.parent().unwrap())?;

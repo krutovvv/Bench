@@ -22,6 +22,7 @@ import { arm, describe, jobs, nextRun, runJob, type Job } from "./builtin/cron.t
 import { connectMcp, mcpStatus } from "./mcp.ts";
 import { tasks } from "./builtin/tasks.ts";
 import { hosts, importSshConfig, importTransmit, type Host } from "./builtin/hosts.ts";
+import { projects } from "./builtin/projects.ts";
 import * as remote from "./builtin/remote.ts";
 
 const STATE = path.join(AGENT_HOME, "server.json");
@@ -61,12 +62,20 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 		sessions: rt.store
 			.list({ profile: profile || "default", limit: limit ?? 80 })
 			.filter((s) => s.source !== "subagent")
-			.map((s) => ({ id: s.id, title: s.title, message_count: s.message_count, model: s.model, running: rt.isBusy(s.id), source: s.source, cwd: s.cwd, subject: s.subject ?? "", started_at: s.created, last_active: s.updated })),
+			.map((s) => ({ id: s.id, title: s.title, message_count: s.message_count, model: s.model, running: rt.isBusy(s.id), source: s.source, cwd: s.cwd, subject: s.subject ?? "", project: s.project ?? "", started_at: s.created, last_active: s.updated })),
 	}),
-	"session.create": async ({ profile, cwd, subject }) => {
-		const live = await rt.create(profile || "default", cwd, "local", subject ? { subject: String(subject) } : {});
+	"session.create": async ({ profile, cwd, subject, project }) => {
+		// A thread in a project works in the project's folder unless it asked for another.
+		const dir = cwd || (project ? projects.dir(String(project)) : undefined);
+		const live = await rt.create(profile || "default", dir, "local", { ...(subject ? { subject: String(subject) } : {}), ...(project ? { project: String(project) } : {}) });
 		broadcast(live.row.id, "sessions.changed", {});
 		return { session_id: live.row.id, stored_session_id: live.row.id, revision: 0, execution_generation: 0 };
+	},
+	// A tool attached to the thread (`/ssh web-1`, `/tasks`…): its block from now on.
+	"session.subject": async ({ session_id, subject }) => {
+		rt.setSubject(String(session_id), String(subject ?? ""));
+		broadcast(session_id, "sessions.changed", {});
+		return { ok: true };
 	},
 	"session.resume": async ({ session_id }) => {
 		const live = await rt.session(session_id);
@@ -374,6 +383,12 @@ const routes: Record<string, Route> = {
 	// The Tasks mode: open tasks and the ones done since ?done_since=YYYY-MM-DD.
 	"GET /api/tasks": (req) => ({ tasks: tasks.list(req.query.get("done_since") ?? undefined) }),
 	"POST /api/tasks": (req) => ({ task: tasks.save(req.body) }),
+	// Projects: the sidebar's unit; a folder on disk is optional.
+	"GET /api/projects": () => ({ projects: projects.list() }),
+	"POST /api/projects": (req) => {
+		if (!String(req.body?.name ?? "").trim()) throw new HttpError(400, "name is required");
+		return { project: projects.save({ ...req.body, name: String(req.body.name).trim() }) };
+	},
 	// Server accesses (SSH, SFTP, FTP, FTPS) with their passwords.
 	"GET /api/hosts": () => ({ hosts: hosts.list() }),
 	"POST /api/hosts": (req) => ({ host: hosts.save(req.body) }),
@@ -478,6 +493,10 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		const prev = hosts.get(decodeURIComponent(m[1]));
 		if (!prev) throw new HttpError(404, "no such host");
 		return { host: hosts.save({ ...prev, ...req.body, id: prev.id }) };
+	}],
+	["DELETE", /^\/api\/projects\/([^/]+)$/, (_req, m) => {
+		projects.remove(decodeURIComponent(m[1]));
+		return { ok: true };
 	}],
 	["DELETE", /^\/api\/hosts\/([^/]+)$/, (_req, m) => {
 		hosts.remove(decodeURIComponent(m[1]));

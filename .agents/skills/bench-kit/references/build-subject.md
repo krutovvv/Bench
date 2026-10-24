@@ -65,13 +65,13 @@ handlers; a click anywhere else in the thread focuses the composer). Rules:
 - State the block needs lives in the app, not in the view: `self.<kind>` (a struct in
   `src/app/<kind>.rs`, its field on `HermesApp`, its `new()` in `HermesApp::new`).
 
-**4. The sidebar group.** A head with an icon in a fixed square, a name, a chevron to fold and an
-optional "+" that adds a new thing to work on — a server, a host (`subject_head(id, icon, name,
-plus, cx)`, `src/ui/sidebar.rs`); then rows that call `open_<kind>_thread` (`subject_row`, with
-`Some(key)` for the hover "+" that starts a new thread about it); under the open subject's row,
-its threads (`thread_rows`, the latest first). One row per thing the person works on (a list, a server, a
-host); a single row when there is one block with a picker inside it (Tools). Groups are listed in
-`render_sidebar`.
+**4. Attaching it in a thread.** The sidebar holds **projects only** (2026-10-25: the person's
+work is project-centric — a project has its servers, hosts, browser sessions, tasks, tools;
+`src/app/project_list.rs`, `src/ui/sidebar.rs` `render_project`). A tool is attached inside a
+thread with `/`: `/ssh`, `/ftp`, `/browser`, `/tasks`, `/tool`, then a concrete one
+(`tool_slash` lists them, `attach_tool` prepares the block and sets the thread's subject —
+`session.subject` on the agent for an existing thread, `new_subject` for a new one). A new kind
+of tool adds its word to `tool_words` and its rows to `tool_slash`; "New …" rows open its form.
 
 **5. The agent's side.** Three parts, in `agent/`:
 - **A tool** that does the subject's work with the thread's value: `defineTool` in
@@ -143,7 +143,8 @@ From adding Files (FTP/SFTP), in order, `cargo build` after each line:
 5. `src/app/subjects.rs` — `open_subject_key`, `subject_title`, `block_context` (and
    `subject_<kind>`, here or in `app/<kind>.rs`).
 6. `src/ui/chat.rs` — the block's branch in `render_chat`.
-7. `src/ui/sidebar.rs` — the group (`subject_head` + rows) in `render_sidebar`.
+7. `src/app/subjects.rs` — its `/` word (`tool_words`) and rows (`tool_slash`), its preparation in
+   `attach_tool`.
 8. `agent/src/prompt.ts` — the subject's case in `subject()`.
 9. Icons: SVGs in `assets/icons/`, lines in `src/icons.rs` (`design-icons.md`).
 10. `src/demo.rs` — a demo thread; the web build still compiles

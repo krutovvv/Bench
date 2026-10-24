@@ -41,8 +41,13 @@ impl HermesApp {
                         .unwrap_or_default()
                         .to_string(),
                     category: "Prompt".into(),
+                    key: String::new(),
                 })
                 .collect();
+        }
+        // `/ssh web`, `/ftp`, `/tasks today`…: the tools this thread can attach.
+        if let Some(rows) = self.tool_slash(&text) {
+            return rows;
         }
         if !text.starts_with('/') || text.contains(char::is_whitespace) {
             return vec![];
@@ -50,7 +55,7 @@ impl HermesApp {
         let q = text.to_lowercase();
         let mut first: Vec<SlashCommand> = vec![];
         let mut rest: Vec<SlashCommand> = vec![];
-        for c in &self.catalog {
+        for c in Self::tool_words().iter().chain(&self.catalog) {
             let name = c.name.to_lowercase();
             if name.starts_with(&q) {
                 first.push(c.clone());
@@ -81,6 +86,13 @@ impl HermesApp {
         let Some(c) = matches.get(self.slash_sel.min(matches.len().saturating_sub(1))) else {
             return false;
         };
+        // A tool: attached to the thread at once; the line is cleared.
+        if !c.key.is_empty() {
+            let key = c.key.clone();
+            self.composer.update(cx, |s, cx| s.set_value("", window, cx));
+            self.attach_tool(key, window, cx);
+            return true;
+        }
         let text = self.composer.read(cx).value().to_string();
         let value = match (c.category.as_str(), Self::prompt_token(&text)) {
             // A prompt replaces the `@word` it was found by.

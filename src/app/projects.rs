@@ -176,33 +176,6 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// "Choose folder…": the macOS dialog for this Mac; a typed path for an SSH host.
-    pub fn choose_project_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !matches!(self.target, Target::Local) {
-            self.path_entry = true;
-            cx.notify();
-            return;
-        }
-        let picked = cx.prompt_for_paths(PathPromptOptions {
-            files: false,
-            directories: true,
-            multiple: false,
-            prompt: Some("Work in this folder".into()),
-        });
-        cx.spawn_in(window, async move |this, cx| {
-            let Ok(Ok(Some(paths))) = picked.await else {
-                return;
-            };
-            let Some(path) = paths.into_iter().next() else {
-                return;
-            };
-            let _ = this.update_in(cx, |this, window, cx| {
-                this.set_new_project(path.to_string_lossy().to_string(), window, cx)
-            });
-        })
-        .detach();
-    }
-
     /// Use `path` for the next new chat: its repo when it is in one, else the folder itself.
     pub fn set_new_project(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
         let target = self.target.clone();

@@ -56,7 +56,7 @@ pub fn forget_session(id: &str) {
 }
 
 impl HermesApp {
-    fn load_sites(&mut self) {
+    pub(crate) fn load_sites(&mut self) {
         if self.sites.loaded || self.demo {
             return;
         }

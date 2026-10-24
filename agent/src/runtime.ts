@@ -342,6 +342,13 @@ export class Runtime {
 
 	// ---- the tools' host ------------------------------------------------------
 
+	/** The thread's block changes (a tool attached in it): stored, and the live turn's prompt sees it. */
+	setSubject(id: string, subject: string): void {
+		this.store.update(id, { subject });
+		const live = this.live.get(id);
+		if (live) live.row.subject = subject;
+	}
+
 	private sessionInfo(row: SessionRow): SessionInfo {
 		return { id: row.id, profile: row.profile, cwd: row.cwd, source: row.source, chat_id: row.chat_id, subject: row.subject };
 	}

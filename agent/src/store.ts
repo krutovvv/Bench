@@ -29,6 +29,8 @@ export interface SessionRow {
 	display_name?: string;
 	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:<host id>", "folder:<path>"; "" = a plain chat. */
 	subject?: string;
+	/** The project the thread belongs to (`projects.id`); "" = none. */
+	project?: string;
 }
 
 export class Store {
@@ -49,9 +51,10 @@ export class Store {
 			);
 			CREATE INDEX IF NOT EXISTS messages_session ON messages(session_id, ts);
 		`);
-		try {
-			this.db.exec("ALTER TABLE sessions ADD COLUMN subject TEXT DEFAULT ''");
-		} catch {}
+		for (const col of ["subject", "project"])
+			try {
+				this.db.exec(`ALTER TABLE sessions ADD COLUMN ${col} TEXT DEFAULT ''`);
+			} catch {}
 		// Pi's conversation ids are integers; early rows kept them as "125.0".
 		this.db.exec("UPDATE sessions SET conversation = CAST(CAST(conversation AS REAL) AS INTEGER) WHERE conversation LIKE '%.%'");
 	}
@@ -63,8 +66,8 @@ export class Store {
 	create(s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "title"> & { title?: string }): SessionRow {
 		const now = Date.now() / 1000;
 		this.db
-			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, subject) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-			.run(s.id, String(s.conversation), s.profile, s.title ?? "", s.source, s.cwd, s.model, s.provider, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.subject ?? "");
+			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, subject, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+			.run(s.id, String(s.conversation), s.profile, s.title ?? "", s.source, s.cwd, s.model, s.provider, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.subject ?? "", s.project ?? "");
 		return this.get(s.id)!;
 	}
 

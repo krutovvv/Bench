@@ -25,6 +25,13 @@ pub enum Cmd {
         cwd: Option<String>,
         /// What the thread is about ("tasks:today", "ssh:<host>"); "" = a plain chat.
         subject: String,
+        /// The project it belongs to (its id); "" = none.
+        project: String,
+    },
+    /// A tool attached to the thread (`/ssh web-1`): its block from now on.
+    SetSubject {
+        session: String,
+        subject: String,
     },
     Send {
         profile: String,
@@ -295,8 +302,12 @@ impl Rpc {
                 profile,
                 cwd,
                 subject,
+                project,
             } => {
                 let mut params = json!({"profile": profile});
+                if !project.is_empty() {
+                    params["project"] = json!(project);
+                }
                 if let Some(cwd) = cwd {
                     params["cwd"] = json!(cwd);
                 }
@@ -322,6 +333,11 @@ impl Rpc {
                     Pending::Ignore,
                 )?
             }
+            Cmd::SetSubject { session, subject } => self.call(
+                "session.subject",
+                json!({"session_id": session, "subject": subject}),
+                Pending::Ignore,
+            )?,
             Cmd::SetEffort { session, effort } => self.call(
                 "config.set",
                 json!({"key": "reasoning", "value": effort, "session_id": session}),
@@ -620,6 +636,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                     running: s["running"].as_bool().unwrap_or(false),
                     source: s["source"].as_str().unwrap_or_default().into(),
                     subject: s["subject"].as_str().unwrap_or_default().into(),
+                    project: s["project"].as_str().unwrap_or_default().into(),
                 })
                 .collect(),
         )),
@@ -859,6 +876,7 @@ fn catalog(r: &Value) -> Vec<crate::model::SlashCommand> {
             name,
             desc: p[1].as_str().unwrap_or_default().trim().to_string(),
             category: category.to_string(),
+            key: String::new(),
         })
     };
     let mut out: Vec<crate::model::SlashCommand> = vec![];
