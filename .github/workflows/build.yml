@@ -1,0 +1,98 @@
+# Builds Bench for macOS, Linux and Windows and the browser demo. On every push to main: the
+# builds (as artifacts) and the web demo (to the gh-pages branch, GitHub Pages). On a tag v*:
+# also a Release with the three downloads.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            name: macos-arm64
+          - os: ubuntu-22.04
+            name: linux-x86_64
+          - os: windows-latest
+            name: windows-x86_64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
+      - name: Linux libraries (windowing, fonts, audio)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev \
+            libfontconfig-dev libfreetype-dev libx11-xcb-dev libxcb1-dev libasound2-dev \
+            libvulkan1 clang pkg-config
+      - name: Build
+        run: cargo build --release
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install imagemagick
+          scripts/bundle-macos.sh
+          APP=$(ls -d dist/Bench.*.app | head -1)
+          ditto -c -k --keepParent "$APP" "Bench-${{ matrix.name }}.zip"
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        run: tar -czf "Bench-${{ matrix.name }}.tar.gz" -C target/release bench
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path target/release/bench.exe -DestinationPath "Bench-${{ matrix.name }}.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Bench-${{ matrix.name }}
+          path: Bench-${{ matrix.name }}.*
+
+  web:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: web
+      - name: wasm-bindgen
+        run: |
+          V=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/version = "\(.*\)"/\1/p')
+          cargo install wasm-bindgen-cli --version "$V" --locked
+      - name: Build the demo
+        run: scripts/build-web.sh
+      - name: Publish to GitHub Pages (gh-pages)
+        if: github.ref == 'refs/heads/main'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: web/dist
+          force_orphan: true
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          generate_release_notes: true
