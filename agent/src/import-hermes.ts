@@ -151,8 +151,10 @@ export function importHermes(force = false): string[] {
 		try {
 			d.exec("CREATE TABLE IF NOT EXISTS sessions AS SELECT * FROM old.sessions WHERE 0");
 			d.exec("CREATE TABLE IF NOT EXISTS messages AS SELECT * FROM old.messages WHERE 0");
-			d.exec("INSERT OR IGNORE INTO sessions SELECT * FROM old.sessions");
-			d.exec("INSERT INTO messages SELECT * FROM old.messages WHERE session_id NOT IN (SELECT DISTINCT session_id FROM messages)");
+			// By the old table's columns: the new one may have more (subject, project).
+			const cols = (t: string) => (d.prepare(`PRAGMA old.table_info(${t})`).all() as any[]).map((c) => `"${c.name}"`).join(", ");
+			d.exec(`INSERT OR IGNORE INTO sessions (${cols("sessions")}) SELECT ${cols("sessions")} FROM old.sessions`);
+			d.exec(`INSERT INTO messages (${cols("messages")}) SELECT ${cols("messages")} FROM old.messages WHERE session_id NOT IN (SELECT DISTINCT session_id FROM messages)`);
 			log.push("session index: copied");
 		} finally {
 			d.exec("DETACH DATABASE old");

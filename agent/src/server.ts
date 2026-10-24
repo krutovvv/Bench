@@ -23,7 +23,7 @@ import { connectMcp, mcpStatus } from "./mcp.ts";
 import { tasks } from "./builtin/tasks.ts";
 import { hosts, importSshConfig, importTransmit, type Host } from "./builtin/hosts.ts";
 import { projects } from "./builtin/projects.ts";
-import { listSkills } from "./builtin/skills.ts";
+import { listSkills as skillsOf } from "./builtin/skills.ts";
 import * as remote from "./builtin/remote.ts";
 
 const STATE = path.join(AGENT_HOME, "server.json");
@@ -520,7 +520,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 				const s = status.find((x) => x.name === name);
 				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, tools: s?.tools ?? 0, error: s?.error ?? null };
 			}),
-			skills: listSkills(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
+			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
 		};
 	}],
 	["PUT", /^\/api\/projects\/([^/]+)\/soul$/, (req, m) => {
