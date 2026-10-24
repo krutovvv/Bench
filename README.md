@@ -49,10 +49,10 @@ Zap, much simpler), a mini IDE for
 the files the agent touches, a tools mode in place of DevUtils, and my tasks (moved from Things
 into the system's Reminders, which the agents read and write too). Nothing had to be copied
 exactly: the goal was never to clone a program, only to take the idea of each piece I actually
-use and give it one shape. We worked from screenshots and descriptions. A disassembler MCP such
-as [ReVa](https://github.com/cyberkaida/reverse-engineering-assistant) (Ghidra) could take
-this further — studying how a program does something before rebuilding just that part — but
-the simple tools here never needed it.
+use and give it one shape. Mostly we worked from screenshots and descriptions; here and there
+we looked deeper with [REA](https://github.com/morluto/rea) (Reverse Engineer Anything), an MCP
+for taking apart binaries and applications, to see how a program does something before
+rebuilding just that part. The same route works for any program you'd like to fold in.
 
 The interesting part turned out to be not the app but the way to make it: written down as
 agent skills, it works for anyone's set of programs.
