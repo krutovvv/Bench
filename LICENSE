@@ -30,3 +30,5 @@ Third-party material in this repository keeps its own license:
   and GPUI documentation (Apache License 2.0).
 - assets/themes/one-*.json — the One Light / One Dark color themes, after
   the Atom editor's (MIT License).
+- assets/fonts/ — Inter, Fira Mono and Noto Sans, bundled for the browser
+  build (SIL Open Font License 1.1, see the *-LICENSE files next to them).
