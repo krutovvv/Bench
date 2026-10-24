@@ -129,6 +129,11 @@ Open this folder as the working folder of an agent session (in Bench, or in Herm
 once with `hermes skills trust <path-to-this-repo>`), describe your work, and ask for your
 Bench. The agent starts from [`SKILL.md`](.agents/skills/bench-kit/SKILL.md).
 
+## License
+
+[MIT](LICENSE): use it, change it, build your own Bench from it. Nothing here is for sale; it's
+shared to show that this can be done.
+
 ---
 
 <sub>About the design: before this I built [iSite.app](https://isite.app), a platform where web
