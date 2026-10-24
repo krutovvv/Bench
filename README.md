@@ -4,7 +4,7 @@
 
 <h1 align="center">Bench</h1>
 
-<p align="center"><b>What about kits instead of programs? UI pieces and skills, from which AI builds what a person needs.</b></p>
+<p align="center"><b>Besides programs, what about kits? UI pieces and skills, from which AI builds what a person needs.</b></p>
 
 <p align="center">
   <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a> ·
@@ -20,8 +20,8 @@ click through the chat, Tasks, Tools and SSH.</sub>
 ## The idea
 
 If [ArtCraft](https://github.com/storytold) could rebuild Photoshop with AI
-([PhotoCraft](https://github.com/storytold/photocraft)), maybe we don't have to stop at copying
-existing programs. For some cases a kit might be handier than a program: UI pieces and skills,
+([PhotoCraft](https://github.com/storytold/photocraft)), maybe there is room for something else
+next to rebuilding programs. For some cases a kit might be handier than a program: UI pieces and skills,
 from which AI builds what a person needs for their own workflow — including the pieces the kit
 doesn't have, written from the examples in it.
 
