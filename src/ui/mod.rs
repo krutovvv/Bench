@@ -410,38 +410,7 @@ impl HermesApp {
                 .into_any_element();
         }
 
-        let current = self.panel;
-        let tabs = [
-            ("tab-providers", "Providers", Panel::Providers),
-            ("tab-messages", "Messages", Panel::Messages),
-            ("tab-settings", "Settings", Panel::Settings),
-        ]
-        .map(|(id, label, panel)| {
-            let active = panel == current;
-            div()
-                .id(id)
-                .h_full()
-                .px_4()
-                .flex()
-                .items_center()
-                // The bars' one size: the sidebar's group names, the header's title, the status bar.
-                .text_sm()
-                .cursor_pointer()
-                .border_r_1()
-                .border_color(theme.border)
-                .when(active, |d| {
-                    d.bg(theme.background).text_color(theme.foreground)
-                })
-                .when(!active, |d| {
-                    d.text_color(theme.muted_foreground)
-                        .hover(|s| s.text_color(theme.foreground))
-                })
-                .child(label)
-                .on_click(
-                    cx.listener(move |this, _, window, cx| this.open_panel(panel, window, cx)),
-                )
-        });
-        bar.children(tabs)
+        bar.child(div().px_4().text_sm().child("Settings"))
             .child(div().flex_1())
             .child(
                 div()
@@ -500,8 +469,6 @@ impl Render for HermesApp {
                 .children(self.render_plan(cx))
                 .into_any_element(),
             Panel::Providers => self.render_providers(cx),
-            Panel::Messages => self.render_messages(cx),
-            Panel::Settings => self.render_settings(cx).into_any_element(),
         };
 
         // The sidebar folded away: its corner joins the header — room for the window's buttons

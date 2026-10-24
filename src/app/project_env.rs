@@ -2,7 +2,7 @@
 //! skills and accesses, edited in place (a Save appears once something changed) or through the
 //! agent in the conversation under it.
 
-use gpui_kit::component::input::{EditorState, InputEvent, TextareaState};
+use gpui_kit::component::input::{EditorState, InputEvent, InputState, TextareaState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::{Value, json};
@@ -14,9 +14,16 @@ pub struct ProjectEnv {
     pub id: String,
     /// Where it lives (`~/.bench/projects/<id>`).
     pub dir: String,
-    /// Its soul (SYSTEM.md), edited in place.
+    /// Its soul (SYSTEM.md): a row, opened to edit.
     pub soul: Entity<TextareaState>,
+    pub soul_open: bool,
     pub soul_dirty: bool,
+    /// Its own Telegram bot: (@name, allowed user ids, has a token); a row, opened to edit.
+    pub telegram: Option<(String, Vec<String>, bool)>,
+    pub tg_open: bool,
+    pub tg_token: Entity<InputState>,
+    pub tg_users: Entity<InputState>,
+    pub tg_dirty: bool,
     /// MCP servers: (name, "http"/"stdio", enabled, connected, tools, error).
     pub mcp: Vec<(String, String, bool, bool, u64, Option<String>)>,
     /// Its mcp.json, shown on "JSON".
@@ -57,6 +64,8 @@ impl HermesApp {
         let soul = prose(window, cx);
         let skill_text = prose(window, cx);
         let mcp_json = cx.new(|cx| EditorState::new(window, cx).scroll_beyond_last_line(Some(0)).soft_wrap(true));
+        let tg_token = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Bot token from @BotFather (kept as is when empty)"));
+        let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
         mcp_json.update(cx, |s, cx| s.set_highlighter("json", cx));
         // A part typed in: its Save shows.
         fn dirty(this: &mut HermesApp, which: &str, ev: &InputEvent, cx: &mut Context<HermesApp>) {
@@ -64,6 +73,7 @@ impl HermesApp {
                 match which {
                     "soul" => e.soul_dirty = true,
                     "skill" => e.skill_dirty = true,
+                    "telegram" => e.tg_dirty = true,
                     _ => e.mcp_dirty = true,
                 }
                 cx.notify();
@@ -72,11 +82,19 @@ impl HermesApp {
         cx.subscribe(&soul, |this, _, ev, cx| dirty(this, "soul", ev, cx)).detach();
         cx.subscribe(&skill_text, |this, _, ev, cx| dirty(this, "skill", ev, cx)).detach();
         cx.subscribe(&mcp_json, |this, _, ev, cx| dirty(this, "mcp", ev, cx)).detach();
+        cx.subscribe(&tg_token, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
+        cx.subscribe(&tg_users, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
         ProjectEnv {
             id: id.to_string(),
             dir: String::new(),
             soul,
+            soul_open: false,
             soul_dirty: false,
+            telegram: None,
+            tg_open: false,
+            tg_token,
+            tg_users,
+            tg_dirty: false,
             mcp: vec![],
             mcp_json,
             mcp_open: false,
@@ -137,6 +155,15 @@ impl HermesApp {
         let (method, path, body) = match what {
             "soul" => ("PUT", format!("/api/projects/{id}/soul"), json!({"text": e.soul.read(cx).value().to_string()})),
             "mcp" => ("PUT", format!("/api/projects/{id}/mcp"), json!({"text": e.mcp_json.read(cx).value().to_string()})),
+            "telegram" => {
+                let token = e.tg_token.read(cx).value().trim().to_string();
+                let users: Vec<String> = e.tg_users.read(cx).value().split(',').map(|u| u.trim().to_string()).filter(|u| !u.is_empty()).collect();
+                let mut body = json!({"allowed_users": users});
+                if !token.is_empty() {
+                    body["token"] = json!(token);
+                }
+                ("PUT", format!("/api/projects/{id}/telegram"), body)
+            }
             _ => {
                 let Some(name) = e.skill_open.clone() else {
                     return;
@@ -155,6 +182,10 @@ impl HermesApp {
                         match what {
                             "soul" => e.soul_dirty = false,
                             "mcp" => e.mcp_dirty = false,
+                            "telegram" => {
+                                e.tg_dirty = false;
+                                e.tg_token.update(cx, |s, cx| s.set_value("", window, cx));
+                            }
                             _ => e.skill_dirty = false,
                         }
                     }
@@ -173,6 +204,10 @@ impl HermesApp {
         match what {
             "soul" => e.soul_dirty = false,
             "mcp" => e.mcp_dirty = false,
+            "telegram" => {
+                e.tg_dirty = false;
+                e.tg_token.update(cx, |s, cx| s.set_value("", window, cx));
+            }
             _ => {
                 e.skill_dirty = false;
                 if let Some(name) = e.skill_open.take() {
@@ -312,6 +347,17 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
             (s("id"), s("name"), s("kind"), at)
         })
         .collect();
+    e.telegram = v["telegram"].as_object().map(|t| {
+        (
+            t.get("username").and_then(Value::as_str).unwrap_or_default().to_string(),
+            t.get("allowed_users").and_then(Value::as_array).map(|a| a.iter().filter_map(|u| u.as_str().map(str::to_string)).collect()).unwrap_or_default(),
+            t.get("has_token").and_then(Value::as_bool).unwrap_or(false),
+        )
+    });
+    if !e.tg_dirty {
+        let users = e.telegram.as_ref().map(|t| t.1.join(", ")).unwrap_or_default();
+        e.tg_users.update(cx, |s, cx| s.set_value(users, window, cx));
+    }
     if !e.soul_dirty {
         let text = v["soul"].as_str().unwrap_or_default().to_string();
         e.soul.update(cx, |s, cx| s.set_value(text, window, cx));

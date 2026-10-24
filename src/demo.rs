@@ -205,6 +205,11 @@ pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>
         "hosts": [{"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"}]
     });
     crate::app::project_env::apply(e, &v, window, cx);
+    // `BENCH_DEMO=env-open`: the soul and a skill opened, as when they are being edited.
+    if std::env::var("BENCH_DEMO").as_deref() == Ok("env-open") && e.skill_open.is_none() {
+        e.soul_open = true;
+        app.env_open_skill("release-notes".into(), window, cx);
+    }
 }
 
 /// One thread per subject, so every sidebar group opens to something.
@@ -552,7 +557,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Ok("tasks") => Some("d-today"),
         Ok("server") => Some("d-web1"),
         Ok("tool") => Some("d-tool"),
-        Ok("env") => Some("d-env"),
+        Ok("env") | Ok("env-open") => Some("d-env"),
         Ok("landing") | Ok("top") => None,
         _ => Some("d-site"),
     };

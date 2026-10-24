@@ -100,10 +100,10 @@ impl HermesApp {
 }
 
 impl HermesApp {
-    /// A project's environment at the top of its thread, as a document: the soul (edit in
-    /// place), its MCP servers (JSON to edit), its skills (open one to read and edit), its
-    /// accesses. No frames: headings, rows, text. A Save appears once a part changed; "+ Add"
-    /// starts the request for the agent in the composer.
+    /// A project's environment at the top of its thread, as a document of rows: its soul, its
+    /// Telegram bot, its MCP servers and their JSON, its skills, its accesses. A row opens in
+    /// place (a rule on its left, the text to edit, Save / Revert under it) and closes again;
+    /// "+ Add" starts the request for the agent in the composer.
     pub(super) fn render_env_block(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let _ = window;
         let theme = cx.theme().clone();
@@ -121,27 +121,38 @@ impl HermesApp {
                 .hover(|s| s.text_color(if danger { theme.danger } else { theme.foreground }))
                 .child(label)
         };
-        let save = |id: &'static str, what: &'static str, cx: &mut Context<Self>| {
+        // Under an opened row: Save (live once something changed) and Revert.
+        let footer = |id: &'static str, what: &'static str, dirty: bool, cx: &mut Context<Self>| {
             h_flex()
+                .pt_1()
                 .gap_3()
-                .child(act(format!("{id}-revert").into(), "Revert".into(), false).on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
-                    this.env_revert(what, window, cx)
-                })))
                 .child(
                     div()
                         .id(SharedString::from(format!("{id}-save")))
                         .px_2()
-                        .cursor_pointer()
-                        .bg(theme.primary)
-                        .text_color(theme.primary_foreground)
-                        .hover(|s| s.bg(theme.primary_hover))
-                        .child("Save")
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.click_claimed = true;
-                            this.env_save(what, window, cx)
-                        })),
+                        .when(dirty, |d| {
+                            d.cursor_pointer()
+                                .bg(theme.primary)
+                                .text_color(theme.primary_foreground)
+                                .hover(|s| s.bg(theme.primary_hover))
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.click_claimed = true;
+                                    this.env_save(what, window, cx)
+                                }))
+                        })
+                        .when(!dirty, |d| d.border_1().border_color(theme.border).text_color(muted))
+                        .child("Save"),
                 )
+                .when(dirty, |d| {
+                    d.child(act(format!("{id}-revert").into(), "Revert".into(), false).on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.env_revert(what, window, cx)
+                    })))
+                })
+        };
+        // An opened row's body: a rule on its left, the content, its footer.
+        let opened = |content: AnyElement, foot: AnyElement| {
+            v_flex().mt_0p5().mb_2().pl_4().border_l_2().border_color(theme.primary.opacity(0.5)).child(content).child(foot)
         };
         let heading = |title: &'static str| div().font_weight(FontWeight::MEDIUM).child(title);
         let armed = e.armed.clone();
@@ -172,33 +183,53 @@ impl HermesApp {
                 .child(div().flex_none().child(name))
                 .child(div().flex_1().min_w_0().truncate().text_color(if bad { theme.danger } else { muted }).child(note))
         };
-
-        // The soul.
-        let mut out = v_flex().w_full().gap_1();
-        out = out
-            .child(h_flex().gap_3().child(heading("Soul")).child(div().flex_1()).when(e.soul_dirty, |d| d.child(save("soul", "soul", cx))))
-            // The field's own inset (12 / 10, as the composer's) pulled back: its text starts
-            // where the headings do.
-            .child(div().ml(px(-12.)).my(px(-10.)).child(gpui_kit::component::input::Textarea::new(&e.soul).appearance(false).large()));
-
-        // MCP servers.
-        let mcp_open = e.mcp_open;
-        out = out.child(
-            h_flex()
-                .pt_4()
-                .gap_3()
-                .child(heading("MCP servers"))
-                .child(add("env-mcp-add", "Add an MCP server to this project: ", cx))
-                .child(act("env-mcp-json".into(), if mcp_open { "Hide JSON".into() } else { "JSON".into() }, false).on_click(cx.listener(|this, _, _, cx| {
-                    this.click_claimed = true;
-                    if let Some(e) = this.project_env.as_mut() {
-                        e.mcp_open = !e.mcp_open;
+        let toggle = |which: &'static str| {
+            move |this: &mut Self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>| {
+                this.click_claimed = true;
+                if let Some(e) = this.project_env.as_mut() {
+                    match which {
+                        "soul" => e.soul_open = !e.soul_open,
+                        "telegram" => e.tg_open = !e.tg_open,
+                        _ => e.mcp_open = !e.mcp_open,
                     }
-                    cx.notify();
-                })))
-                .child(div().flex_1())
-                .when(e.mcp_dirty && mcp_open, |d| d.child(save("mcp", "mcp", cx))),
+                }
+                cx.notify();
+            }
+        };
+        let field = |content: AnyElement| div().ml(px(-12.)).my(px(-10.)).child(content);
+        let mut out = v_flex().w_full();
+
+        // The soul: a row with its first line; opened, the text to edit.
+        let soul_text = e.soul.read(cx).value().to_string();
+        let first = soul_text.lines().map(|l| l.trim_start_matches('#').trim()).find(|l| !l.is_empty()).unwrap_or("not described yet").to_string();
+        out = out.child(
+            row("env-soul".into(), "Soul".into(), if e.soul_open { "what the project is, how to work in it".into() } else { first }, false)
+                .cursor_pointer()
+                .on_click(cx.listener(toggle("soul"))),
         );
+        if e.soul_open {
+            let body = field(gpui_kit::component::input::Textarea::new(&e.soul).appearance(false).large().into_any_element()).into_any_element();
+            out = out.child(opened(body, footer("soul", "soul", e.soul_dirty, cx).into_any_element()));
+        }
+
+        // Its Telegram bot.
+        let tg_note = match &e.telegram {
+            Some((name, users, true)) => format!("{} · {} may write", if name.is_empty() { "a bot".to_string() } else { format!("@{name}") }, users.len()),
+            _ => "no bot of its own: open to set one".into(),
+        };
+        out = out.child(row("env-tg".into(), "Telegram".into(), tg_note, false).cursor_pointer().on_click(cx.listener(toggle("telegram"))));
+        if e.tg_open {
+            let body = v_flex()
+                .gap_2()
+                .child(gpui_kit::component::input::Input::new(&e.tg_token))
+                .child(gpui_kit::component::input::Input::new(&e.tg_users))
+                .child(div().text_color(muted).child("Its chats become this project's threads, with its soul, skills and servers."))
+                .into_any_element();
+            out = out.child(opened(body, footer("tg", "telegram", e.tg_dirty, cx).into_any_element()));
+        }
+
+        // MCP servers, and their JSON.
+        out = out.child(h_flex().pt_4().gap_3().child(heading("MCP servers")).child(add("env-mcp-add", "Add an MCP server to this project: ", cx)));
         if e.mcp.is_empty() {
             out = out.child(div().text_color(muted).child("None of its own: the general ones work here too."));
         }
@@ -212,14 +243,15 @@ impl HermesApp {
             let id = format!("env-mcp-{name}");
             out = out.child(row(id.clone(), name.clone(), note, error.is_some() && enabled).child(remove(id, "mcp", name, cx)));
         }
-        if mcp_open {
+        out = out.child(
+            row("env-mcp-json".into(), "mcp.json".into(), if e.mcp_open { "the servers as JSON".into() } else { "edit the servers as JSON".into() }, false)
+                .cursor_pointer()
+                .on_click(cx.listener(toggle("mcp"))),
+        );
+        if e.mcp_open {
             let lines = e.mcp_json.read(cx).value().lines().count().max(3) as f32;
-            out = out.child(
-                div()
-                    .mt_1()
-                    .h(px((lines + 1.) * 20.))
-                    .child(gpui_kit::component::input::Editor::new(&e.mcp_json).appearance(false).h_full()),
-            );
+            let body = div().h(px((lines + 1.) * 20.)).child(gpui_kit::component::input::Editor::new(&e.mcp_json).appearance(false).h_full()).into_any_element();
+            out = out.child(opened(body, footer("mcp", "mcp", e.mcp_dirty, cx).into_any_element()));
         }
 
         // Skills.
@@ -238,29 +270,16 @@ impl HermesApp {
                         this.click_claimed = true;
                         this.env_open_skill(n.clone(), window, cx)
                     }))
-                    .when(open && e.skill_dirty, |d| d.child(save("skill", "skill", cx)))
                     .child(remove(id, "skill", name, cx)),
             );
             if open {
-                out = out.child(
-                    div()
-                        .pl_4()
-                        .pb_2()
-                        .border_l_2()
-                        .border_color(theme.border)
-                        .child(div().ml(px(-12.)).my(px(-10.)).child(gpui_kit::component::input::Textarea::new(&e.skill_text).appearance(false).large())),
-                );
+                let body = field(gpui_kit::component::input::Textarea::new(&e.skill_text).appearance(false).large().into_any_element()).into_any_element();
+                out = out.child(opened(body, footer("skill", "skill", e.skill_dirty, cx).into_any_element()));
             }
         }
 
         // Accesses.
-        out = out.child(
-            h_flex()
-                .pt_4()
-                .gap_3()
-                .child(heading("Accesses"))
-                .child(add("env-host-add", "Add to this project the access: ", cx)),
-        );
+        out = out.child(h_flex().pt_4().gap_3().child(heading("Accesses")).child(add("env-host-add", "Add to this project the access: ", cx)));
         if e.hosts.is_empty() {
             out = out.child(div().text_color(muted).child("No servers or file hosts yet: /ssh and /ftp in its threads offer only these."));
         }
@@ -269,22 +288,18 @@ impl HermesApp {
             out = out.child(row(id.clone(), name, format!("{kind} · {at}"), false).child(remove(id, "host", hid, cx)));
         }
 
-        // Where it lives; the project's removal.
+        // The project's removal.
         let project_armed = is_armed("project:".into());
         out = out
             .when_some(e.error.clone(), |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
             .child(
-                h_flex()
-                    .pt_4()
-                    .gap_3()
-                    .child(div().flex_1().min_w_0().text_color(muted).truncate().child(e.dir.clone()))
-                    .child(
-                        act("env-remove-project".into(), if project_armed { "Remove the project? Its threads stay".into() } else { "Remove project".into() }, project_armed)
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.click_claimed = true;
-                                this.env_remove("project", String::new(), window, cx)
-                            })),
-                    ),
+                h_flex().pt_4().child(div().flex_1()).child(
+                    act("env-remove-project".into(), if project_armed { "Remove the project? Its threads stay".into() } else { "Remove project".into() }, project_armed)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.click_claimed = true;
+                            this.env_remove("project", String::new(), window, cx)
+                        })),
+                ),
             );
         out.into_any_element()
     }

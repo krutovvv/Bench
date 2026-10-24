@@ -13,29 +13,37 @@ export interface Project {
 	/** A folder on disk the project works in (a codebase), or null for a virtual project. */
 	folder: string | null;
 	created: number;
+	/** Its own Telegram bot: { token, allowed_users: [ids], username (once it ran) }. */
+	telegram?: { token: string; allowed_users: string[]; username?: string } | null;
 }
 
 function table() {
 	db().exec(`CREATE TABLE IF NOT EXISTS projects (
 		id TEXT PRIMARY KEY, name TEXT NOT NULL, folder TEXT, created INTEGER
 	)`);
+	try {
+		db().exec("ALTER TABLE projects ADD COLUMN telegram TEXT");
+	} catch {}
 }
+
+const row = (r: any): Project => ({ ...r, telegram: r.telegram ? JSON.parse(r.telegram) : null });
 
 export const projects = {
 	list(): Project[] {
 		table();
-		return db().prepare("SELECT * FROM projects ORDER BY created").all() as any[];
+		return (db().prepare("SELECT * FROM projects ORDER BY created").all() as any[]).map(row);
 	},
 	get(id: string): Project | undefined {
 		table();
-		return (db().prepare("SELECT * FROM projects WHERE id = ?").get(id) as any) ?? undefined;
+		const r = db().prepare("SELECT * FROM projects WHERE id = ?").get(id);
+		return r ? row(r) : undefined;
 	},
 	save(p: Partial<Project> & { name: string }): Project {
 		table();
-		const full: Project = { id: p.id || randomBytes(6).toString("hex"), name: p.name, folder: p.folder || null, created: p.created ?? Math.floor(Date.now() / 1000) };
+		const full: Project = { id: p.id || randomBytes(6).toString("hex"), name: p.name, folder: p.folder || null, created: p.created ?? Math.floor(Date.now() / 1000), telegram: p.telegram ?? null };
 		db()
-			.prepare("INSERT INTO projects (id, name, folder, created) VALUES (?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, folder=excluded.folder")
-			.run(full.id, full.name, full.folder, full.created);
+			.prepare("INSERT INTO projects (id, name, folder, created, telegram) VALUES (?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, folder=excluded.folder, telegram=excluded.telegram")
+			.run(full.id, full.name, full.folder, full.created, full.telegram ? JSON.stringify(full.telegram) : null);
 		return full;
 	},
 	/** The project goes; its threads stay, without a project. */
@@ -43,6 +51,11 @@ export const projects = {
 		table();
 		db().prepare("DELETE FROM projects WHERE id = ?").run(id);
 		db().prepare("UPDATE sessions SET project = '' WHERE project = ?").run(id);
+	},
+	/** The bot's @name, learned when it started (for the block to show). */
+	setBotName(id: string, username: string): void {
+		const p = projects.get(id);
+		if (p?.telegram && p.telegram.username !== username) projects.save({ ...p, telegram: { ...p.telegram, username } });
 	},
 	/** Where its threads work: its own folder, else files/ in its environment. */
 	dir(id: string): string {

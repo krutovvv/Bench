@@ -543,97 +543,11 @@ impl HermesApp {
             );
         }
 
+        // The rest of the settings on the same page: one page, no tabs.
+        page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
+        page.push(self.render_appearance(cx).into_any_element());
         v_flex()
             .id("providers")
-            .size_full()
-            .overflow_y_scroll()
-            .px_4()
-            .pb_6()
-            .child(v_flex().max_w(px(820.)).children(page))
-            .into_any_element()
-    }
-
-    pub(super) fn render_messages(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let muted = cx.theme().muted_foreground;
-        let mut page: Vec<AnyElement> = vec![
-            self.pv_heading(
-                format!(
-                    "TELEGRAM · {} · {}",
-                    self.target.label(),
-                    self.current_profile()
-                ),
-                cx,
-            )
-            .into_any_element(),
-        ];
-        if let Some(t) = &self.pv.telegram {
-            let (token, users, proxy) = (t.token.input.clone(), t.users.clone(), t.proxy.clone());
-            let token_hint = "From @BotFather · TELEGRAM_BOT_TOKEN";
-            page.push(
-                self.pv_row("Bot token", token_hint, self.pv_input(&token), cx)
-                    .into_any_element(),
-            );
-            page.push(
-                self.pv_row(
-                    "Who may write",
-                    "Numeric Telegram user IDs, comma-separated (@userinfobot)",
-                    self.pv_input(&users),
-                    cx,
-                )
-                .into_any_element(),
-            );
-            page.push(
-                self.pv_row(
-                    "Proxy",
-                    "Where Telegram is blocked: socks5:// or http://",
-                    self.pv_input(&proxy),
-                    cx,
-                )
-                .into_any_element(),
-            );
-            page.push(
-                h_flex()
-                    .py_2()
-                    .gap_2()
-                    .items_center()
-                    .child(
-                        div().flex_1().text_sm().text_color(muted).child(
-                            "The gateway reads these when it starts: restart it after saving.",
-                        ),
-                    )
-                    .child(self.pv_button(
-                        "tg-restart",
-                        "Restart gateway",
-                        false,
-                        cx,
-                        Box::new(|this, w, cx| this.restart_gateway(w, cx)),
-                    ))
-                    .child(self.pv_button(
-                        "tg-save",
-                        "Save",
-                        true,
-                        cx,
-                        Box::new(|this, w, cx| this.save_telegram(w, cx)),
-                    ))
-                    .into_any_element(),
-            );
-        } else {
-            page.push(
-                div()
-                    .py_2()
-                    .text_base()
-                    .text_color(muted)
-                    .child("Loading…")
-                    .into_any_element(),
-            );
-        }
-        page.push(
-            self.pv_heading("TELEGRAM CHATS IN THE LIST", cx)
-                .into_any_element(),
-        );
-        page.push(self.render_telegram(cx).into_any_element());
-        v_flex()
-            .id("messages")
             .size_full()
             .overflow_y_scroll()
             .px_4()

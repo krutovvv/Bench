@@ -61,15 +61,6 @@ pub struct Voice {
     pub tts_voice: Entity<InputState>,
 }
 
-pub struct Telegram {
-    pub token: KeyField,
-    pub users: Entity<InputState>,
-    pub proxy: Entity<InputState>,
-    /// The users and the proxy as shown (redacted), to save only what changed.
-    pub users_value: String,
-    pub proxy_value: String,
-}
-
 /// What Bench itself remembers per machine and profile: the OpenRouter models picked for the
 /// model list.
 #[derive(Default, serde::Serialize, serde::Deserialize)]
@@ -85,7 +76,6 @@ pub struct Providers {
     pub keys: Vec<KeyField>,
     pub openrouter_key: Option<KeyField>,
     pub voice: Option<Voice>,
-    pub telegram: Option<Telegram>,
     pub fallback: Option<(String, String)>,
     pub prefs: PickerPrefs,
     pub or_search: Option<Entity<InputState>>,
@@ -386,19 +376,6 @@ impl HermesApp {
             tts_voice: field(window, cx, &y(&["tts", "openai", "voice"]), "e.g. alloy"),
         });
 
-        let token = key_field("TELEGRAM_BOT_TOKEN", window, cx);
-        let users = shown
-            .get("TELEGRAM_ALLOWED_USERS")
-            .cloned()
-            .unwrap_or_default();
-        let proxy = shown.get("TELEGRAM_PROXY").cloned().unwrap_or_default();
-        self.pv.telegram = Some(Telegram {
-            token,
-            users: field(window, cx, &users, "Numeric user IDs, comma-separated"),
-            proxy: field(window, cx, &proxy, "socks5://host:port or http://host:port"),
-            users_value: users,
-            proxy_value: proxy,
-        });
         self.pv.loaded = true;
         cx.notify();
     }
@@ -697,76 +674,6 @@ impl HermesApp {
             |this, r, window, cx| match r {
                 Ok(()) => this.toast(NotificationType::Success, "Voice saved", window, cx),
                 Err(e) => this.toast(NotificationType::Error, format!("Voice: {e:#}"), window, cx),
-            },
-        );
-    }
-
-    pub fn save_telegram(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(t) = &self.pv.telegram else { return };
-        // The fields show redacted values: only what was changed is sent.
-        let token = text(&t.token.input, cx);
-        let token = (token != t.token.value).then_some(token);
-        let users_text = text(&t.users, cx);
-        let users_changed = users_text != t.users_value;
-        let users: Vec<String> = users_text
-            .split(|c: char| c == ',' || c.is_whitespace())
-            .filter(|s| !s.is_empty())
-            .map(str::to_string)
-            .collect();
-        if let Some(bad) = users
-            .iter()
-            .find(|u| users_changed && !u.chars().all(|c| c.is_ascii_digit()))
-        {
-            self.toast(
-                NotificationType::Error,
-                format!("Telegram: \"{bad}\" is not a numeric user ID"),
-                window,
-                cx,
-            );
-            return;
-        }
-        let users = users_changed.then(|| users.join(","));
-        let proxy = text(&t.proxy, cx);
-        let proxy = (proxy != t.proxy_value).then_some(proxy);
-        self.rest(
-            window,
-            cx,
-            move |conn, profile| {
-                match token.as_deref() {
-                    None => {}
-                    Some("") => {
-                        let _ = rest::remove_env(conn, profile, "TELEGRAM_BOT_TOKEN");
-                    }
-                    Some(token) => rest::set_env(conn, profile, "TELEGRAM_BOT_TOKEN", token)?,
-                }
-                if let Some(users) = &users {
-                    rest::set_env(conn, profile, "TELEGRAM_ALLOWED_USERS", users)?;
-                }
-                match proxy.as_deref() {
-                    None => {}
-                    Some("") => {
-                        let _ = rest::remove_env(conn, profile, "TELEGRAM_PROXY");
-                    }
-                    Some(proxy) => rest::set_env(conn, profile, "TELEGRAM_PROXY", proxy)?,
-                }
-                Ok(())
-            },
-            |this, r, window, cx| match r {
-                Ok(()) => {
-                    this.toast(
-                        NotificationType::Success,
-                        "Telegram saved · restart the agent to apply",
-                        window,
-                        cx,
-                    );
-                    this.load_providers(window, cx);
-                }
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Telegram: {e:#}"),
-                    window,
-                    cx,
-                ),
             },
         );
     }

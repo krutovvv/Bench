@@ -6,13 +6,17 @@
 // Questions (clarify) and approvals are buttons; voice is transcribed with the stt settings;
 // photos go to the model; MEDIA:/path files are sent as attachments; /new and /stop.
 //
-// Settings: "telegram" in bench.sqlite { token, allowed_users: [ids], profile }.
+// Bots: the general one ("telegram" in bench.sqlite { token, allowed_users: [ids], profile }) and
+// one per project that has its own (`projects.telegram`): a project's bot answers with the
+// project's environment and its chats are the project's threads. `syncTelegram` starts and stops
+// them as their settings change.
 
 import { Bot, InputFile, type Context as TgContext } from "grammy";
 import fs from "node:fs";
 import path from "node:path";
 import { transcribe } from "./audio.ts";
 import { BENCH_HOME, getSetting } from "./config.ts";
+import { projects } from "./builtin/projects.ts";
 import type { Emit, Runtime } from "./runtime.ts";
 
 const MAX = 4096;
@@ -44,9 +48,32 @@ function stepLine(name: string, detail: string): string {
 	return `${icon[name] ?? (name.startsWith("mcp__") ? "🔌" : "🔧")} ${label}${short ? `: ${short}` : ""}`;
 }
 
-export async function startTelegram(rt: Runtime): Promise<void> {
-	const cfg: Config | undefined = getSetting("telegram");
-	if (!cfg?.token) return;
+/** The bots running: "" the general one, else a project's id → its settings and how to stop it. */
+const running = new Map<string, { config: string; stop: () => void; send: (chat: number, text: string) => Promise<void> }>();
+
+/** Start the bots whose settings exist, stop the ones whose settings went or changed. */
+export async function syncTelegram(rt: Runtime): Promise<void> {
+	const wanted = new Map<string, Config>();
+	const general: Config | undefined = getSetting("telegram");
+	if (general?.token) wanted.set("", general);
+	for (const p of projects.list()) if (p.telegram?.token) wanted.set(p.id, { ...p.telegram, profile: `project:${p.id}` });
+	for (const [key, bot] of running)
+		if (JSON.stringify(wanted.get(key) ?? null) !== bot.config) {
+			bot.stop();
+			running.delete(key);
+		}
+	for (const [key, cfg] of wanted)
+		if (!running.has(key))
+			await startBot(rt, cfg, key).catch((e) => console.error(`[telegram] ${key || "general"}: ${(e as Error).message}`));
+	// Scheduled answers to a chat: through the general bot, else the first that runs.
+	rt.deliverers.set("telegram", async (to, text) => {
+		const bot = running.get("") ?? [...running.values()][0];
+		if (!bot) throw new Error("no Telegram bot runs");
+		await bot.send(Number(to), text);
+	});
+}
+
+async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void> {
 	const profile = cfg.profile || "default";
 	const allowed = new Set(cfg.allowed_users.map(String));
 	const bot = new Bot(cfg.token);
@@ -55,12 +82,15 @@ export async function startTelegram(rt: Runtime): Promise<void> {
 	const turns = new Map<string, Turn>(); // session id -> its running turn
 	const prompts = new Map<string, { session: string; promptId: string; kind: string; choices: string[] }>(); // "chat:message"
 
+	// This bot's chats only: a chat with another bot is another thread.
+	const ours = (s: { project?: string }) => (s.project ?? "") === project;
 	const chatOf = (sessionId: string): number | undefined => {
-		const id = rt.store.get(sessionId)?.chat_id;
-		return id && !id.includes(":") ? Number(id) : undefined;
+		const row = rt.store.get(sessionId);
+		const id = row?.chat_id;
+		return row && ours(row) && row.source === "telegram" && id && !id.includes(":") ? Number(id) : undefined;
 	};
 	const sessionFor = async (chat: number, name: string): Promise<string> => {
-		const row = rt.store.list({ source: "telegram", limit: 1000 }).find((s) => s.chat_id === String(chat));
+		const row = rt.store.list({ source: "telegram", limit: 1000 }).find((s) => s.chat_id === String(chat) && ours(s));
 		if (row) return row.id;
 		return (await rt.create(profile, undefined, "telegram", { chat_id: String(chat), display_name: name } as any)).row.id;
 	};
@@ -114,8 +144,6 @@ export async function startTelegram(rt: Runtime): Promise<void> {
 		else await api.sendDocument(chat, input);
 	};
 
-	// Scheduled answers and other deliveries to a chat.
-	rt.deliverers.set("telegram", (to, text) => sendAnswer(Number(to), text));
 
 	const listener: Emit = (sessionId, type, payload) => {
 		const chat = chatOf(sessionId);
@@ -171,7 +199,7 @@ export async function startTelegram(rt: Runtime): Promise<void> {
 	bot.command("start", (ctx) => ctx.reply("Hi! Write or send a voice message."));
 	bot.command("new", async (ctx) => {
 		const chat = ctx.chat.id;
-		const old = rt.store.list({ source: "telegram", limit: 1000 }).find((s) => s.chat_id === String(chat));
+		const old = rt.store.list({ source: "telegram", limit: 1000 }).find((s) => s.chat_id === String(chat) && ours(s));
 		if (old) rt.store.update(old.id, { chat_id: `${chat}:${Date.now()}` } as any);
 		await sessionFor(chat, nameOf(ctx));
 		await ctx.reply("New session.");
@@ -237,8 +265,17 @@ export async function startTelegram(rt: Runtime): Promise<void> {
 		{ command: "stop", description: "Stop the running turn" },
 	]).catch(() => {});
 	const me = await bot.api.getMe();
-	console.log(`[telegram] @${me.username}`);
+	console.log(`[telegram] @${me.username}${project ? ` (project ${project})` : ""}`);
 	void bot.start({ allowed_updates: ["message", "callback_query"] });
+	running.set(project, {
+		config: JSON.stringify(cfg),
+		stop: () => {
+			rt.listeners.delete(listener);
+			void bot.stop().catch(() => {});
+		},
+		send: (chat, text) => sendAnswer(chat, text),
+	});
+	if (project) projects.setBotName(project, me.username ?? "");
 }
 
 const nameOf = (ctx: TgContext) => [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(" ") || ctx.from?.username || String(ctx.from?.id ?? "");

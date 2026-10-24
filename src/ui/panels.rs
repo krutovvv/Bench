@@ -9,53 +9,6 @@ use crate::app::HermesApp;
 
 impl HermesApp {
 
-    pub(super) fn render_telegram(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let all = self.tg_visible.is_none();
-        let rows = self.tg_people.iter().enumerate().map(|(i, (user, name))| {
-            let on = all || self.tg_visible.as_ref().is_some_and(|v| v.contains(user));
-            let id = user.clone();
-            h_flex()
-                .id(("tg", i))
-                .gap_3()
-                .px_3()
-                .py_2()
-                .border_b_1()
-                .border_color(theme.border)
-                .cursor_pointer()
-                .hover(|s| s.bg(theme.list_hover))
-                .child(
-                    div()
-                        .size(px(14.))
-                        .border_1()
-                        .border_color(if on { theme.primary } else { theme.input })
-                        .when(on, |d| d.bg(theme.primary)),
-                )
-                .child(div().flex_1().text_base().child(name.clone()))
-                .child(div().text_sm().text_color(muted).child(user.clone()))
-                .on_click(
-                    cx.listener(move |this, _, _, cx| this.toggle_telegram_person(id.clone(), cx)),
-                )
-        });
-        v_flex()
-            .w_full()
-            .gap_3()
-            .child(div().text_base().text_color(muted).child(
-                "Whose Telegram sessions the list shows. Checked people are shown, the rest are hidden (the sessions themselves are not touched).",
-            ))
-            .child(
-                v_flex()
-                    .max_w(px(560.))
-                    .border_t_1()
-                    .border_color(theme.border)
-                    .children(rows)
-                    .when(self.tg_people.is_empty(), |d| {
-                        d.child(div().py_3().text_base().text_color(muted).child("No Telegram sessions for this agent."))
-                    }),
-            )
-    }
-
     pub(super) fn render_appearance(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         use crate::theme::{ACCENTS, Mode};
         let theme = cx.theme().clone();
@@ -171,20 +124,5 @@ impl HermesApp {
                     compact,
                 )),
         )
-    }
-
-    /// Settings: Appearance, one scrolling page.
-    pub(super) fn render_settings(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let muted = cx.theme().muted_foreground;
-        let heading = |t: &'static str| div().pt_4().pb_1().text_sm().text_color(muted).child(t);
-        let appearance = self.render_appearance(cx).into_any_element();
-        v_flex()
-            .id("settings")
-            .size_full()
-            .overflow_y_scroll()
-            .px_4()
-            .pb_6()
-            .child(heading("APPEARANCE"))
-            .child(appearance)
     }
 }

@@ -17,7 +17,7 @@ import { agentMcp, AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting
 import { importHermes, migrateCronFile } from "./import-hermes.ts";
 import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
-import { startTelegram } from "./telegram.ts";
+import { syncTelegram } from "./telegram.ts";
 import { arm, describe, jobs, nextRun, runJob, type Job } from "./builtin/cron.ts";
 import { connectMcp, mcpStatus } from "./mcp.ts";
 import { tasks } from "./builtin/tasks.ts";
@@ -528,7 +528,19 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
 			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
 			hosts: hosts.list().filter((h) => h.project === id).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
+			// The bot's token is not sent back, only whether there is one.
+			telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token } : null,
 		};
+	}],
+	// A project's own Telegram bot: its token and who may write to it; "" token = none.
+	["PUT", /^\/api\/projects\/([^/]+)\/telegram$/, async (req, m) => {
+		const p = projects.get(decodeURIComponent(m[1]));
+		if (!p) throw new HttpError(404, "no such project");
+		const token = String(req.body?.token ?? p.telegram?.token ?? "").trim();
+		const allowed = (req.body?.allowed_users ?? p.telegram?.allowed_users ?? []).map(String).filter(Boolean);
+		projects.save({ ...p, telegram: token ? { token, allowed_users: allowed } : null });
+		await syncTelegram(rt);
+		return { ok: true };
 	}],
 	// A project's MCP server: on / off, or gone.
 	["PUT", /^\/api\/projects\/([^/]+)\/mcp\/([^/]+)$/, (req, m) => {
@@ -836,7 +848,7 @@ server.on("error", (e: any) => {
 	else throw e;
 });
 
-void startTelegram(rt).catch((e) => console.error("[telegram]", e));
+void syncTelegram(rt).catch((e) => console.error("[telegram]", e));
 
 if (!process.env.BENCH_AGENT_NO_MCP) void connectMcp("default").then(() => {
 	rt.reloadMcp();

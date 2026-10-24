@@ -106,7 +106,7 @@ impl HermesApp {
                 let panel = if self.panel.is_settings() {
                     Panel::Chat
                 } else {
-                    Panel::Settings
+                    Panel::Providers
                 };
                 self.open_panel(panel, window, cx);
             }

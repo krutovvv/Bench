@@ -56,10 +56,6 @@ pub enum Panel {
     Chat,
     /// Model providers, fallback, voice, service keys.
     Providers,
-    /// Telegram: the bot, who may write to it, the proxy; whose chats the list shows.
-    Messages,
-    /// Appearance and the Telegram filter.
-    Settings,
 }
 
 impl Panel {
@@ -1972,21 +1968,6 @@ impl HermesApp {
         (!mine.is_empty()).then_some(mine)
     }
 
-    pub fn toggle_telegram_person(&mut self, user: String, cx: &mut Context<Self>) {
-        let all: HashSet<String> = self.tg_people.iter().map(|(u, _)| u.clone()).collect();
-        let mut visible = self.tg_visible.clone().unwrap_or(all);
-        if !visible.remove(&user) {
-            visible.insert(user);
-        }
-        let ids: Vec<&String> = visible.iter().collect();
-        let _ = std::fs::write(
-            self.telegram_prefs_path(),
-            serde_json::to_string(&ids).unwrap_or_default(),
-        );
-        self.tg_visible = Some(visible);
-        cx.notify();
-    }
-
     /// Indices into `sessions` the list should show (other people's Telegram chats filtered out).
     pub fn visible_sessions(&self) -> Vec<usize> {
         (0..self.sessions.len())
@@ -2148,13 +2129,8 @@ impl HermesApp {
     pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
         self.panel = panel;
         match panel {
-            Panel::Chat | Panel::Settings => {}
-            Panel::Providers | Panel::Messages => {
-                self.load_providers(window, cx);
-                if panel == Panel::Messages {
-                    self.load_telegram_owners(window, cx);
-                }
-            }
+            Panel::Chat => {}
+            Panel::Providers => self.load_providers(window, cx),
         }
         cx.notify();
     }
