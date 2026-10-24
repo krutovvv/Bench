@@ -55,6 +55,19 @@ await rt.open();
 
 // ---- JSON-RPC ----------------------------------------------------------------
 
+/** A project's environment, or "general": the agent's own (agents/default), what a remote
+ * project shows — the server's agent with its general soul, skills, MCP, shared hosts, the
+ * general Telegram bot. */
+function envOf(id: string): { agent: string; dir: string; project: { id: string; name: string; telegram?: { token: string; allowed_users: string[]; username?: string } | null } } {
+	if (id === "general") {
+		const tg = getSetting("telegram");
+		return { agent: "default", dir: agentDir("default"), project: { id, name: "General", telegram: tg?.token ? { token: tg.token, allowed_users: (tg.allowed_users ?? []).map(String) } : null } };
+	}
+	const p = projects.get(id);
+	if (!p) throw new HttpError(404, "no such project");
+	return { agent: `project:${id}`, dir: projects.env(id), project: p };
+}
+
 const methods: Record<string, (p: any) => Promise<any> | any> = {
 	"profiles.list": () => ({
 		profiles: agents().map((name) => ({ name, display_name: name, model: resolveModel(name).model })),
@@ -511,10 +524,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 	// What a project's threads get on top of the general agent: its soul, MCP servers, skills.
 	["GET", /^\/api\/projects\/([^/]+)\/env$/, (_req, m) => {
 		const id = decodeURIComponent(m[1]);
-		const p = projects.get(id);
-		if (!p) throw new HttpError(404, "no such project");
-		const agent = `project:${id}`;
-		const dir = projects.env(id);
+		const { agent, dir, project: p } = envOf(id);
 		const soulFile = path.join(dir, "SYSTEM.md");
 		const status = mcpStatus(agent);
 		return {
@@ -527,24 +537,25 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			}),
 			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
 			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
-			hosts: hosts.list().filter((h) => h.project === id).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
+			hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
 			// The bot's token is not sent back, only whether there is one.
 			telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token } : null,
 		};
 	}],
 	// A project's own Telegram bot: its token and who may write to it; "" token = none.
 	["PUT", /^\/api\/projects\/([^/]+)\/telegram$/, async (req, m) => {
-		const p = projects.get(decodeURIComponent(m[1]));
-		if (!p) throw new HttpError(404, "no such project");
+		const { project: p } = envOf(decodeURIComponent(m[1]));
 		const token = String(req.body?.token ?? p.telegram?.token ?? "").trim();
 		const allowed = (req.body?.allowed_users ?? p.telegram?.allowed_users ?? []).map(String).filter(Boolean);
-		projects.save({ ...p, telegram: token ? { token, allowed_users: allowed } : null });
+		// The general bot stays a setting; a project's is the project's.
+		if (p.id === "general") setSetting("telegram", token ? { ...(getSetting("telegram") ?? {}), token, allowed_users: allowed } : undefined);
+		else projects.save({ ...(projects.get(p.id) as any), telegram: token ? { token, allowed_users: allowed } : null });
 		await syncTelegram(rt);
 		return { ok: true };
 	}],
 	// A project's MCP server: on / off, or gone.
 	["PUT", /^\/api\/projects\/([^/]+)\/mcp\/([^/]+)$/, (req, m) => {
-		const agent = `project:${decodeURIComponent(m[1])}`;
+		const { agent } = envOf(decodeURIComponent(m[1]));
 		const name = decodeURIComponent(m[2]);
 		const servers = agentMcp(agent);
 		if (!servers[name]) throw new HttpError(404, "no such server");
@@ -553,7 +564,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		return { ok: true };
 	}],
 	["DELETE", /^\/api\/projects\/([^/]+)\/mcp\/([^/]+)$/, (_req, m) => {
-		const agent = `project:${decodeURIComponent(m[1])}`;
+		const { agent } = envOf(decodeURIComponent(m[1]));
 		const servers = agentMcp(agent);
 		delete servers[decodeURIComponent(m[2])];
 		writeAgentMcp(agent, servers);
@@ -562,15 +573,15 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 	// A skill of the project's threads (its own or a general one), to read.
 	["GET", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (_req, m) => {
 		const id = decodeURIComponent(m[1]);
-		const skill = skillsOf(`project:${id}`).find((k) => k.name === decodeURIComponent(m[2]));
+		const skill = skillsOf(envOf(id).agent).find((k) => k.name === decodeURIComponent(m[2]));
 		if (!skill) throw new HttpError(404, "no such skill");
 		return { name: skill.name, dir: skill.dir, text: fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8") };
 	}],
 	// A project's skill changed by hand (its SKILL.md as typed).
 	["PUT", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (req, m) => {
 		const id = decodeURIComponent(m[1]);
-		const dir = projects.env(id);
-		const skill = skillsOf(`project:${id}`).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
+		const { dir } = envOf(id);
+		const skill = skillsOf(envOf(id).agent).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
 		if (!skill) throw new HttpError(404, "no such skill of the project");
 		fs.writeFileSync(path.join(skill.dir, "SKILL.md"), String(req.body?.text ?? ""));
 		return { ok: true };
@@ -585,7 +596,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			throw new HttpError(400, `not JSON: ${(e as Error).message}`);
 		}
 		if (typeof parsed?.mcpServers !== "object") throw new HttpError(400, "it needs an mcpServers object");
-		writeAgentMcp(`project:${id}`, parsed.mcpServers);
+		writeAgentMcp(envOf(id).agent, parsed.mcpServers);
 		return { ok: true };
 	}],
 	// An access taken out of the project (it stays in the store).
@@ -597,16 +608,15 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 	// A project's own skill goes (its folder).
 	["DELETE", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (_req, m) => {
 		const id = decodeURIComponent(m[1]);
-		const dir = projects.env(id);
-		const skill = skillsOf(`project:${id}`).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
+		const { dir } = envOf(id);
+		const skill = skillsOf(envOf(id).agent).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
 		if (!skill) throw new HttpError(404, "no such skill");
 		fs.rmSync(skill.dir, { recursive: true, force: true });
 		return { ok: true };
 	}],
 	["PUT", /^\/api\/projects\/([^/]+)\/soul$/, (req, m) => {
 		const id = decodeURIComponent(m[1]);
-		if (!projects.get(id)) throw new HttpError(404, "no such project");
-		fs.writeFileSync(path.join(projects.env(id), "SYSTEM.md"), String(req.body?.text ?? ""));
+		fs.writeFileSync(path.join(envOf(id).dir, "SYSTEM.md"), String(req.body?.text ?? ""));
 		return { ok: true };
 	}],
 	["DELETE", /^\/api\/projects\/([^/]+)$/, (_req, m) => {

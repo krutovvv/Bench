@@ -29,6 +29,10 @@ test("the server starts and answers /api/projects", async () => {
 		fs.writeFileSync(path.join(skill, "SKILL.md"), "---\nname: publish\ndescription: d\n---\nSteps.");
 		const read = await call("GET", `/api/projects/${made.project.id}/skills/publish`);
 		assert.match(read.text, /Steps\./);
+		// A remote project shows the server agent's general environment.
+		const general = await call("GET", "/api/projects/general/env");
+		assert.equal(general.project.name, "General");
+		assert.ok(Array.isArray(general.skills) && Array.isArray(general.hosts));
 	} finally {
 		child.kill();
 	}
