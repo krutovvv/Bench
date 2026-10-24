@@ -158,11 +158,8 @@ pub struct ProjectEnv {
     pub id: String,
     /// Where it lives (`~/.bench/projects/<id>`).
     pub dir: String,
-    /// Its soul (SYSTEM.md), editable in the block.
-    pub soul: Entity<gpui_kit::component::input::TextareaState>,
-    pub dirty: bool,
-    /// The soul shows as text; Edit opens it in the editor.
-    pub editing: bool,
+    /// Its soul (SYSTEM.md), shown as text; the agent changes it when asked.
+    pub soul: String,
     /// A row's remove asked once ("mcp:<name>", "skill:<name>"): the second click removes.
     pub armed: Option<String>,
     /// The soul shown whole (else its first lines).
@@ -188,22 +185,11 @@ impl HermesApp {
     /// Read the environment for the block (again after the agent changed it).
     pub fn load_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.project_env.as_ref().is_none_or(|e| e.id != id) {
-            // Prose, like the composer: the thread's font, wrapped, no line numbers.
-            let soul = cx.new(|cx| gpui_kit::component::input::TextareaState::new(window, cx).submit_on_enter(false));
-            let sub = cx.subscribe(&soul, |this, _, ev: &gpui_kit::component::input::InputEvent, cx| {
-                if let gpui_kit::component::input::InputEvent::Change = ev {
-                    if let Some(e) = this.project_env.as_mut() {
-                        e.dirty = true;
-                    }
-                    cx.notify();
-                }
-            });
-            sub.detach();
-            self.project_env = Some(ProjectEnv { id: id.to_string(), dir: String::new(), soul, dirty: false, editing: false, armed: None, soul_all: false, skill_open: None, mcp: vec![], skills: vec![], error: None });
+            self.project_env = Some(ProjectEnv { id: id.to_string(), dir: String::new(), soul: String::new(), armed: None, soul_all: false, skill_open: None, mcp: vec![], skills: vec![], error: None });
         }
         // The demo's environment is made up (src/demo.rs).
         if self.demo {
-            crate::demo::env(self, window, cx);
+            crate::demo::env(self);
             return;
         }
         let Some(conn) = self.conn.clone() else {
@@ -216,7 +202,7 @@ impl HermesApp {
             window,
             cx,
             move || rest::get_raw(&conn, &profile, &path),
-            move |this, r, window, cx| {
+            move |this, r, _, cx| {
                 let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked) else {
                     return;
                 };
@@ -245,59 +231,13 @@ impl HermesApp {
                             .flatten()
                             .map(|k| (k["name"].as_str().unwrap_or_default().to_string(), k["description"].as_str().unwrap_or_default().to_string()))
                             .collect();
-                        // The soul as saved, unless the person is typing in it.
-                        if !e.dirty {
-                            let text = v["soul"].as_str().unwrap_or_default().to_string();
-                            e.soul.update(cx, |s, cx| s.set_value(text, window, cx));
-                            e.dirty = false;
-                        }
+                        e.soul = v["soul"].as_str().unwrap_or_default().to_string();
                     }
                     Err(err) => e.error = Some(format!("{err:#}")),
                 }
                 cx.notify();
             },
         );
-    }
-
-    /// The block's Save: the soul as typed.
-    pub fn save_soul(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(e)) = (self.conn.clone(), self.project_env.as_ref()) else {
-            return;
-        };
-        let text = e.soul.read(cx).value().to_string();
-        let (id, path) = (e.id.clone(), format!("/api/projects/{}/soul", e.id));
-        let profile = self.current_profile();
-        self.background(
-            window,
-            cx,
-            move || rest::send_json(&conn, "PUT", &path, &profile, json!({"text": text})),
-            move |this, r, window, cx| match r {
-                Ok(_) => {
-                    if let Some(e) = this.project_env.as_mut().filter(|e| e.id == id) {
-                        e.dirty = false;
-                        e.editing = false;
-                    }
-                    cx.notify();
-                }
-                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
-            },
-        );
-    }
-
-    /// Edit / Cancel on the soul: Cancel puts back what is saved.
-    pub fn edit_soul(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(e) = self.project_env.as_mut() else {
-            return;
-        };
-        e.editing = on;
-        if on {
-            e.soul.update(cx, |s, cx| s.focus(window, cx));
-        } else {
-            e.dirty = false;
-            let id = e.id.clone();
-            self.load_env(&id, window, cx);
-        }
-        cx.notify();
     }
 
     /// A server of the project on or off, or (twice: armed, then done) removed.
@@ -376,7 +316,7 @@ impl HermesApp {
             return;
         }
         if self.demo {
-            e.skill_open = Some((name.clone(), format!("---\nname: {name}\n---\n\n# {name}\n\nA made-up skill of the demo.")));
+            e.skill_open = Some((name.clone(), format!("# {name}\n\nA made-up skill of the demo.")));
             cx.notify();
             return;
         }
@@ -392,7 +332,7 @@ impl HermesApp {
             move |this, r, window, cx| match r {
                 Ok(v) => {
                     if let Some(e) = this.project_env.as_mut() {
-                        e.skill_open = Some((name.clone(), v["text"].as_str().unwrap_or_default().to_string()));
+                        e.skill_open = Some((name.clone(), without_front_matter(v["text"].as_str().unwrap_or_default())));
                     }
                     cx.notify();
                 }
@@ -402,8 +342,35 @@ impl HermesApp {
     }
 }
 
+/// The project's removal from its environment's block (twice: armed, then done).
+impl HermesApp {
+    pub fn env_remove_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        if e.armed.as_deref() != Some("project") {
+            e.armed = Some("project".into());
+            cx.notify();
+            return;
+        }
+        let id = e.id.clone();
+        self.project_env = None;
+        self.delete_project(id, window, cx);
+        self.new_session(cx);
+        self.thread_project = String::new();
+    }
+}
+
 /// A path segment for the agent's REST routes.
 fn enc(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
 
+/// A SKILL.md without its front matter (`---` name, description `---`): the text to read.
+fn without_front_matter(text: &str) -> String {
+    let t = text.trim_start();
+    match t.strip_prefix("---").and_then(|rest| rest.split_once("\n---")) {
+        Some((_, body)) => body.trim_start_matches(|c| c == '-').trim_start().to_string(),
+        None => t.to_string(),
+    }
+}

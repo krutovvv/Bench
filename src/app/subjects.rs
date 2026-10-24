@@ -327,11 +327,10 @@ impl HermesApp {
                 let mcp: Vec<&str> = e.mcp.iter().map(|m| m.0.as_str()).collect();
                 let skills: Vec<&str> = e.skills.iter().map(|k| k.0.as_str()).collect();
                 return format!(
-                    "The environment block shows the folder {}, MCP servers: {}, skills: {}{}.",
+                    "The environment block shows the folder {}, MCP servers: {}, skills: {}.",
                     e.dir,
                     if mcp.is_empty() { "none".to_string() } else { mcp.join(", ") },
                     if skills.is_empty() { "none".to_string() } else { skills.join(", ") },
-                    if e.dirty { "; the soul has unsaved edits in the block" } else { "" }
                 );
             }
         }

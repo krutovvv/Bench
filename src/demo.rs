@@ -185,7 +185,7 @@ fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn)
 }
 
 /// The blog project's environment, for its environment thread.
-pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>) {
+pub fn env(app: &mut HermesApp) {
     let Some(e) = app.project_env.as_mut() else {
         return;
     };
@@ -199,17 +199,10 @@ pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>
         ("release-notes".into(), "Turn a changelog into a post: what changed for the reader, not the commit list.".into()),
         ("cover-image".into(), "A 1600×900 cover in the blog's colors, from a photo or a gradient.".into()),
     ];
-    if !e.dirty {
-        e.soul.update(cx, |s, cx| {
-            s.set_value(
-                "The **Northwind blog**: product news and guides for our customers, published on Ghost.\n\n\
+    e.soul = "The **Northwind blog**: product news and guides for our customers, published on Ghost.\n\n\
 - Write plainly, for people who use the product, not for engineers.\n\
-- Every post gets a cover and two tags; drafts first, publish only when asked.",
-                window,
-                cx,
-            )
-        });
-    }
+- Every post gets a cover and two tags; drafts first, publish only when asked."
+        .into();
 }
 
 /// One thread per subject, so every sidebar group opens to something.

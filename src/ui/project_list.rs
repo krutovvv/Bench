@@ -1,7 +1,7 @@
 //! The new project's form (the sidebar's "+"): a name and, if it has one, a folder on disk.
 
 use gpui_kit::component::input::Input;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -143,56 +143,18 @@ impl HermesApp {
                 .child(div().flex_none().child(name))
                 .child(div().flex_1().min_w_0().truncate().text_color(if bad { theme.danger } else { muted }).child(note))
         };
-        let (editing, dirty) = (e.editing, e.dirty);
-        let soul_text = e.soul.read(cx).value().to_string();
+        let soul_text = e.soul.clone();
         let armed = e.armed.clone();
+        let project_armed = armed.as_deref() == Some("project");
         let soul_all = e.soul_all;
         let skill_open = e.skill_open.clone();
 
         let soul_head = h_flex()
             .gap_2()
             .child(div().font_weight(FontWeight::MEDIUM).child("Soul"))
-            .child(div().flex_1().min_w_0().truncate().text_color(muted).child("what the project is, how to work in it"))
-            .when(!editing, |d| {
-                d.child(act("soul-edit".into(), "Edit", false).on_click(cx.listener(|this, _, window, cx| {
-                    this.click_claimed = true;
-                    this.edit_soul(true, window, cx)
-                })))
-            })
-            .when(editing, |d| {
-                d.child(act("soul-cancel".into(), "Cancel", false).on_click(cx.listener(|this, _, window, cx| {
-                    this.click_claimed = true;
-                    this.edit_soul(false, window, cx)
-                })))
-                .when(dirty, |d| {
-                    d.child(
-                        div()
-                            .id("soul-save")
-                            .px_2()
-                            .cursor_pointer()
-                            .bg(theme.primary)
-                            .text_color(theme.primary_foreground)
-                            .hover(|s| s.bg(theme.primary_hover))
-                            .child("Save")
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.click_claimed = true;
-                                this.save_soul(window, cx)
-                            })),
-                    )
-                })
-            });
-        let soul_body = if editing {
-            div()
-                .mt_1()
-                .h(px(260.))
-                .px_3()
-                .py_2()
-                .border_1()
-                .border_color(theme.primary.opacity(0.5))
-                .child(gpui_kit::component::input::Textarea::new(&e.soul).appearance(false).large().h_full())
-                .into_any_element()
-        } else if soul_text.trim().is_empty() {
-            div().mt_1().text_color(muted).child("Not described yet: Edit, or ask below (“describe the project: …”).").into_any_element()
+            .child(div().flex_1().min_w_0().truncate().text_color(muted).child("what the project is, how to work in it: ask below to change it"));
+        let soul_body = if soul_text.trim().is_empty() {
+            div().mt_1().text_color(muted).child("Not described yet: ask below (“describe the project: …”).").into_any_element()
         } else {
             // No scroll of its own (the thread scrolls): the first lines, Show all for the rest.
             const SHOWN: usize = 12;
@@ -308,7 +270,19 @@ impl HermesApp {
             .when(skills_empty, |d| d.child(div().text_color(muted).child("None of its own: the general ones work here too.")))
             .children(skill_rows)
             .when_some(error, |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
-            .child(div().pt_4().text_color(muted).truncate().child(dir))
+            .child(
+                h_flex()
+                    .pt_4()
+                    .gap_2()
+                    .child(div().flex_1().min_w_0().text_color(muted).truncate().child(dir))
+                    .child(
+                        act("env-remove-project".into(), if project_armed { "Remove the project? Its threads stay" } else { "Remove project" }, project_armed)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.click_claimed = true;
+                                this.env_remove_project(window, cx)
+                            })),
+                    ),
+            )
             .into_any_element()
     }
 }
