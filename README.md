@@ -60,6 +60,15 @@ looked deeper with [REA](https://github.com/morluto/rea) (Reverse Engineer Anyth
 taking apart binaries and applications, to see how a program does something before rebuilding
 just that part. The same route works for any program, and any workflow, you'd like to fold in.
 
+Ideas came from anywhere, not only from the apps I replaced. Zed's
+[Delta](https://zed.dev/blog/introducing-deltadb) treats the agent's conversation, not the
+commit, as the unit of work: every change stays linked to the thread that produced it, so you
+can always see *why* the code is the way it is. I didn't build that, but I took the part I
+could use: in Bench a chat can work in a git branch of its own and be merged back when it's
+done, so each piece of work is one conversation. That's the way of working I'd like to share:
+you see a good idea somewhere, you add it to your bench in a few minutes, and you go back to
+your actual work. No extra programmer needed.
+
 The interesting part turned out to be not my app but the way to make one: written down as
 agent skills, it works for anyone's set of tools. Even if you never use the kit, that's the
 thought worth taking away: your own mix of tools can be one fast app, made for you.
