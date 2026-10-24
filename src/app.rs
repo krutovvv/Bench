@@ -188,6 +188,8 @@ pub struct HermesApp {
     /// The profile's own approvals, effort and model have arrived: until then the status bar
     /// shows none of them (defaults there would only mislead).
     pub profile_ready: bool,
+    /// A made-up session for screenshots (`BENCH_DEMO=1`, src/demo.rs): nothing is connected.
+    pub demo: bool,
     /// The gateway refused a restart over running work: the next press (within a minute)
     /// restarts anyway.
     pub restart_armed: Option<Instant>,
@@ -761,6 +763,7 @@ impl HermesApp {
             playing: None,
             speaking: None,
             profile_ready: false,
+            demo: false,
             restart_armed: None,
             media: HashMap::new(),
             diagrams: HashMap::new(),
@@ -773,7 +776,11 @@ impl HermesApp {
             _subscriptions: subs,
             _tasks: tasks,
         };
-        app.connect(initial, window, cx);
+        if std::env::var("BENCH_DEMO").is_ok() {
+            crate::demo::load(&mut app, cx);
+        } else {
+            app.connect(initial, window, cx);
+        }
         // A new window opened from SSH mode starts in SSH mode.
         if let Some(alias) = servers::NEXT_SSH.lock().unwrap().take() {
             cx.spawn_in(window, async move |this, cx| {
@@ -788,6 +795,11 @@ impl HermesApp {
             .detach();
         }
         app
+    }
+
+    /// Connected to a gateway — or showing the demo, which looks connected.
+    pub fn online(&self) -> bool {
+        self.conn.is_some() || self.demo
     }
 
     pub fn toast(

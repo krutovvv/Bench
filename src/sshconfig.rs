@@ -297,8 +297,7 @@ fn write(p: &std::path::Path, lines: &[String]) -> Result<()> {
     use std::os::unix::fs::OpenOptionsExt as _;
     std::fs::create_dir_all(p.parent().unwrap())?;
     if p.exists() {
-        std::fs::copy(&p, p.with_file_name("config.bak-bench"))
-            .context("back up ~/.ssh/config")?;
+        std::fs::copy(&p, p.with_file_name("config.bak-bench")).context("back up ~/.ssh/config")?;
     }
     let tmp = p.with_file_name(".config.bench.tmp");
     let mut f = std::fs::OpenOptions::new()

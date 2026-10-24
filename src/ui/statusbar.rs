@@ -165,7 +165,7 @@ impl HermesApp {
             })
             .collect();
         // Nothing about the profile until its own settings are in.
-        let ready = self.conn.is_some() && self.profile_ready;
+        let ready = self.online() && self.profile_ready;
         let current_model = self.model_name();
         let models: Vec<_> = self
             .profile_models
@@ -570,12 +570,12 @@ impl HermesApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let status = match &self.gw_status {
-            Some(Ok(s)) if self.conn.is_some() => Some(s.clone()),
+            Some(Ok(s)) if self.online() => Some(s.clone()),
             _ => None,
         };
         let (label, color): (String, Hsla) = if self.connecting {
             ("Connecting…".into(), muted)
-        } else if self.conn.is_none() {
+        } else if !self.online() {
             ("Backend offline".into(), theme.danger)
         } else {
             match (&self.gw_status, &status) {
@@ -588,7 +588,7 @@ impl HermesApp {
                 _ => ("Backend ready".into(), muted),
             }
         };
-        let connected = self.conn.is_some();
+        let connected = self.online();
         let error = match &self.gw_status {
             Some(Err(e)) => Some(e.clone()),
             _ => None,

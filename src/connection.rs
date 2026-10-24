@@ -297,7 +297,11 @@ pub fn migrate_state() {
     if new.exists() || !old.is_dir() {
         return;
     }
-    let _ = std::process::Command::new("cp").arg("-R").arg(&old).arg(&new).status();
+    let _ = std::process::Command::new("cp")
+        .arg("-R")
+        .arg(&old)
+        .arg(&new)
+        .status();
 }
 
 fn write_private(path: &PathBuf, text: &str) -> Result<()> {

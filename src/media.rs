@@ -276,6 +276,12 @@ pub fn fetch(conn: &Connection, target: &Target, profile: &str, path: &str) -> R
     prepare(local, path)
 }
 
+/// A local file prepared now (its video frame drawn), so the first paint already has it — for
+/// the demo, which has no gateway to fetch through.
+pub fn warm(path: &str) {
+    let _ = prepare(PathBuf::from(path), path);
+}
+
 fn prepare(local: PathBuf, path: &str) -> Result<Fetched> {
     let mut out = Fetched {
         local: local.clone(),

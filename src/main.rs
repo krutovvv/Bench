@@ -8,6 +8,7 @@ mod attach;
 mod audio;
 mod bench;
 mod connection;
+mod demo;
 mod devtools;
 mod diff;
 mod gateway;
