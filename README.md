@@ -4,7 +4,7 @@
 
 <h1 align="center">Bench</h1>
 
-<p align="center"><b>A personal workbench, and the kit an AI agent uses to build one for anyone.</b></p>
+<p align="center"><b>What about kits instead of programs? UI pieces and skills, from which AI builds what a person needs.</b></p>
 
 <p align="center">
   <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a> ·
@@ -19,23 +19,17 @@ click through the chat, Tasks, Tools and SSH.</sub>
 
 ## The idea
 
-Some people do their whole job in one big program — a video editor in Premiere, a designer in
-Figma. Many don't. Their work runs through a dozen small tools, and they use a little of each:
-a bit of a task manager, a few converters, an AI chat or two, an editor for quick fixes, an
-SSH client. Not because they don't know those tools, but because their workflow is built from
-many of them. Switching between them, and remembering what lives where, costs time every day.
+If [ArtCraft](https://github.com/storytold) could rebuild Photoshop with AI
+([PhotoCraft](https://github.com/storytold/photocraft)), maybe we don't have to stop at copying
+existing programs. For some cases a kit might be handier than a program: UI pieces and skills,
+from which AI builds what a person needs for their own workflow — including the pieces the kit
+doesn't have, written from the examples in it.
 
-The one tool that would hold exactly *their* pieces will never be made: the demand for it is
-one person. Nobody builds software for that. You could write it yourself — I'm a developer,
-and I have written such things — but writing was never the hard part. **Maintaining it was**:
-after the first version come fixes, changes, new needs, and there's a day job. Hiring someone
-for months, and then for every change, doesn't pay off either.
+A tool like that only one person needs, so nobody would make it, and keeping it up used to be
+the real cost. Maybe that changes when the same agent that builds it also maintains it.
 
-An AI agent changes both halves. It builds the tool from your description, and it maintains
-it: you ask for a change, and it's there. **That makes personal software possible — software
-for one specialist's way of working.** A Bench is that: one window with exactly the parts of
-your work you use, built and kept up by an agent. Everyone's tools are different, so
-everyone's Bench is different. They all have the same shape.
+This repository is an experiment along those lines, far from complete: a kit, and one app built
+with it (the [demo](https://krutovvv.github.io/bench/) is that app).
 
 ## How it started
 
@@ -47,13 +41,10 @@ another editor, tasks in [Things](https://culturedcode.com/things/), and
 [DevUtils](https://devutils.com) for Base64, regex, JSON and the like. Each of them is good.
 Together they meant switching windows all day.
 
-The push came from [ArtCraft](https://github.com/storytold): a studio that, with AI, rebuilt in
-pure Rust a whole collection of the heaviest programs there are — Photoshop, Premiere,
-Illustrator, After Effects, InDesign, Acrobat, Word, Excel, PowerPoint, Figma, AutoCAD, Pro
-Tools ([PhotoCraft](https://github.com/storytold/photocraft),
-[FilmCraft](https://github.com/storytold/filmcraft), CadCraft, GridCraft and the rest). If that
-could be done, then pretty much anything can — certainly the much simpler programs one person
-uses every day, brought together into one.
+The push came from ArtCraft: with AI they rebuilt in pure Rust a whole collection of the heaviest
+programs there are — Photoshop, Premiere, Illustrator, Word, Excel, Figma, AutoCAD, Pro Tools.
+If that could be done, maybe the much simpler programs one person uses every day could be
+brought together into one.
 
 So I tried. **Today I use one app instead of fifteen, and I spend much less time getting
 things done.** Nothing was cloned: the goal was to take the idea of each piece I actually use
