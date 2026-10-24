@@ -159,10 +159,14 @@ pub struct ProjectEnv {
     /// Where it lives (`~/.bench/projects/<id>`).
     pub dir: String,
     /// Its soul (SYSTEM.md), editable in the block.
-    pub soul: Entity<gpui_kit::component::input::EditorState>,
+    pub soul: Entity<gpui_kit::component::input::TextareaState>,
     pub dirty: bool,
-    /// MCP servers: (name, "http"/"stdio", enabled, tools, error).
-    pub mcp: Vec<(String, String, bool, u64, Option<String>)>,
+    /// The soul shows as text; Edit opens it in the editor.
+    pub editing: bool,
+    /// A row's remove asked once ("mcp:<name>", "skill:<name>"): the second click removes.
+    pub armed: Option<String>,
+    /// MCP servers: (name, "http"/"stdio", enabled, connected, tools, error).
+    pub mcp: Vec<(String, String, bool, bool, u64, Option<String>)>,
     /// Its own skills: (name, description).
     pub skills: Vec<(String, String)>,
     pub error: Option<String>,
@@ -179,16 +183,9 @@ impl HermesApp {
 
     /// Read the environment for the block (again after the agent changed it).
     pub fn load_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(conn) = self.conn.clone() else {
-            return;
-        };
         if self.project_env.as_ref().is_none_or(|e| e.id != id) {
-            let soul = cx.new(|cx| {
-                gpui_kit::component::input::EditorState::new(window, cx)
-                    .scroll_beyond_last_line(Some(1))
-                    .soft_wrap(true)
-            });
-            soul.update(cx, |s, cx| s.set_highlighter("markdown", cx));
+            // Prose, like the composer: the thread's font, wrapped, no line numbers.
+            let soul = cx.new(|cx| gpui_kit::component::input::TextareaState::new(window, cx).submit_on_enter(false));
             let sub = cx.subscribe(&soul, |this, _, ev: &gpui_kit::component::input::InputEvent, cx| {
                 if let gpui_kit::component::input::InputEvent::Change = ev {
                     if let Some(e) = this.project_env.as_mut() {
@@ -198,8 +195,16 @@ impl HermesApp {
                 }
             });
             sub.detach();
-            self.project_env = Some(ProjectEnv { id: id.to_string(), dir: String::new(), soul, dirty: false, mcp: vec![], skills: vec![], error: None });
+            self.project_env = Some(ProjectEnv { id: id.to_string(), dir: String::new(), soul, dirty: false, editing: false, armed: None, mcp: vec![], skills: vec![], error: None });
         }
+        // The demo's environment is made up (src/demo.rs).
+        if self.demo {
+            crate::demo::env(self, window, cx);
+            return;
+        }
+        let Some(conn) = self.conn.clone() else {
+            return;
+        };
         let profile = self.current_profile();
         let path = format!("/api/projects/{id}/env");
         let asked = id.to_string();
@@ -224,6 +229,7 @@ impl HermesApp {
                                     m["name"].as_str().unwrap_or_default().to_string(),
                                     m["kind"].as_str().unwrap_or_default().to_string(),
                                     m["enabled"].as_bool().unwrap_or(true),
+                                    m["connected"].as_bool().unwrap_or(false),
                                     m["tools"].as_u64().unwrap_or(0),
                                     m["error"].as_str().map(str::to_string),
                                 )
@@ -265,6 +271,7 @@ impl HermesApp {
                 Ok(_) => {
                     if let Some(e) = this.project_env.as_mut().filter(|e| e.id == id) {
                         e.dirty = false;
+                        e.editing = false;
                     }
                     cx.notify();
                 }
@@ -272,4 +279,89 @@ impl HermesApp {
             },
         );
     }
+
+    /// Edit / Cancel on the soul: Cancel puts back what is saved.
+    pub fn edit_soul(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        e.editing = on;
+        if on {
+            e.soul.update(cx, |s, cx| s.focus(window, cx));
+        } else {
+            e.dirty = false;
+            let id = e.id.clone();
+            self.load_env(&id, window, cx);
+        }
+        cx.notify();
+    }
+
+    /// A server of the project on or off, or (twice: armed, then done) removed.
+    pub fn env_mcp(&mut self, name: String, action: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(conn), Some(e)) = (self.conn.clone(), self.project_env.as_mut()) else {
+            return;
+        };
+        if action == "remove" && e.armed.as_deref() != Some(&format!("mcp:{name}")) {
+            e.armed = Some(format!("mcp:{name}"));
+            cx.notify();
+            return;
+        }
+        e.armed = None;
+        let id = e.id.clone();
+        let enabled = e.mcp.iter().find(|m| m.0 == name).is_some_and(|m| m.2);
+        let path = format!("/api/projects/{id}/mcp/{}", enc(&name));
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || match action {
+                "remove" => rest::send_json(&conn, "DELETE", &path, &profile, serde_json::Value::Null),
+                _ => rest::send_json(&conn, "PUT", &path, &profile, json!({"enabled": !enabled})),
+            },
+            move |this, r, window, cx| match r {
+                Ok(_) => this.load_env(&id, window, cx),
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+
+    /// A skill of the project removed (twice: armed, then done).
+    pub fn env_remove_skill(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(conn), Some(e)) = (self.conn.clone(), self.project_env.as_mut()) else {
+            return;
+        };
+        if e.armed.as_deref() != Some(&format!("skill:{name}")) {
+            e.armed = Some(format!("skill:{name}"));
+            cx.notify();
+            return;
+        }
+        e.armed = None;
+        let id = e.id.clone();
+        let path = format!("/api/projects/{id}/skills/{}", enc(&name));
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json(&conn, "DELETE", &path, &profile, serde_json::Value::Null),
+            move |this, r, window, cx| match r {
+                Ok(_) => this.load_env(&id, window, cx),
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+
+    /// A section's "+": the start of the request in the composer, for the agent to do.
+    pub fn ask_in_composer(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.composer.update(cx, |s, cx| {
+            s.set_value(text.to_string(), window, cx);
+            s.focus(window, cx);
+        });
+        cx.notify();
+    }
 }
+
+/// A path segment for the agent's REST routes.
+fn enc(s: &str) -> String {
+    percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
+}
+

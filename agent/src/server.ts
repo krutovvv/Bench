@@ -518,10 +518,36 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
 			mcp: Object.entries(agentMcp(agent)).map(([name, spec]: [string, any]) => {
 				const s = status.find((x) => x.name === name);
-				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, tools: s?.tools ?? 0, error: s?.error ?? null };
+				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null };
 			}),
 			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
 		};
+	}],
+	// A project's MCP server: on / off, or gone.
+	["PUT", /^\/api\/projects\/([^/]+)\/mcp\/([^/]+)$/, (req, m) => {
+		const agent = `project:${decodeURIComponent(m[1])}`;
+		const name = decodeURIComponent(m[2]);
+		const servers = agentMcp(agent);
+		if (!servers[name]) throw new HttpError(404, "no such server");
+		servers[name] = { ...servers[name], enabled: req.body?.enabled !== false };
+		writeAgentMcp(agent, servers);
+		return { ok: true };
+	}],
+	["DELETE", /^\/api\/projects\/([^/]+)\/mcp\/([^/]+)$/, (_req, m) => {
+		const agent = `project:${decodeURIComponent(m[1])}`;
+		const servers = agentMcp(agent);
+		delete servers[decodeURIComponent(m[2])];
+		writeAgentMcp(agent, servers);
+		return { ok: true };
+	}],
+	// A project's own skill goes (its folder).
+	["DELETE", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (_req, m) => {
+		const id = decodeURIComponent(m[1]);
+		const dir = projects.env(id);
+		const skill = skillsOf(`project:${id}`).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
+		if (!skill) throw new HttpError(404, "no such skill");
+		fs.rmSync(skill.dir, { recursive: true, force: true });
+		return { ok: true };
 	}],
 	["PUT", /^\/api\/projects\/([^/]+)\/soul$/, (req, m) => {
 		const id = decodeURIComponent(m[1]);

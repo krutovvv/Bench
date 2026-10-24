@@ -184,6 +184,34 @@ fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn)
     app.demo_threads.insert(id.into(), vec![turn]);
 }
 
+/// The blog project's environment, for its environment thread.
+pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>) {
+    let Some(e) = app.project_env.as_mut() else {
+        return;
+    };
+    e.dir = "~/.bench/projects/p-blog".into();
+    e.mcp = vec![
+        ("ghost".into(), "http".into(), true, true, 12, None),
+        ("unsplash".into(), "stdio".into(), true, true, 3, None),
+        ("search-console".into(), "stdio".into(), false, false, 0, None),
+    ];
+    e.skills = vec![
+        ("release-notes".into(), "Turn a changelog into a post: what changed for the reader, not the commit list.".into()),
+        ("cover-image".into(), "A 1600×900 cover in the blog's colors, from a photo or a gradient.".into()),
+    ];
+    if !e.dirty {
+        e.soul.update(cx, |s, cx| {
+            s.set_value(
+                "The **Northwind blog**: product news and guides for our customers, published on Ghost.\n\n\
+- Write plainly, for people who use the product, not for engineers.\n\
+- Every post gets a cover and two tags; drafts first, publish only when asked.",
+                window,
+                cx,
+            )
+        });
+    }
+}
+
 /// One thread per subject, so every sidebar group opens to something.
 fn subject_threads(app: &mut HermesApp, now: f64) {
     let done = |user: &str, steps: Vec<Step>, answer: &str, secs: f64| Turn {
@@ -278,6 +306,19 @@ is published.\n\nThe page is right here — click and type in it if something ne
     if let Some(img) = crate::remote_browser::image_of(include_bytes!("../assets/demo/site.jpg")) {
         app.sites.saved.insert("demo-tab".into(), img);
     }
+    thread(
+        app,
+        "d-env",
+        "Northwind blog: environment",
+        "env:p-blog",
+        done(
+            "Add the Ghost admin API, so you can publish without the browser.",
+            vec![tool("edit", "~/.bench/projects/p-blog/mcp.json")],
+            "Added **ghost** (12 tools: posts, tags, images) with the admin key as `${GHOST_ADMIN_KEY}`; \
+the key itself is in the agent's env. New threads of the blog can draft and publish through it.",
+            14.0,
+        ),
+    );
     thread(
         app,
         "d-tool",
@@ -501,7 +542,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
     ];
     for s in app.sessions.iter_mut() {
         s.project = match s.id.as_str() {
-            "d-site" => "p-blog",
+            "d-site" | "d-env" => "p-blog",
             "d-landing" | "d-api" | "d-tests" | "d-web1" | "d-web1-tls" => "p-store",
             "d-audit-1" | "d-audit-2" => "p-audit",
             "d-today" | "d-tool" | "d-notes" => "p-me",
@@ -516,6 +557,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Ok("tasks") => Some("d-today"),
         Ok("server") => Some("d-web1"),
         Ok("tool") => Some("d-tool"),
+        Ok("env") => Some("d-env"),
         Ok("landing") | Ok("top") => None,
         _ => Some("d-site"),
     };
