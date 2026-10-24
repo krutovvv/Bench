@@ -78,11 +78,6 @@ doesn't describe my tools; it describes *how to make anyone's*:
   with scripts that check the result to the pixel, so a modest model can do it without guessing;
 - proven libraries, ready recipes, and the mistakes already paid for.
 
-One small thing I found worth borrowing: [ponytail](https://github.com/DietrichGebert/ponytail),
-a short skill that makes an agent code like a lazy senior developer (does it need to exist? is
-it already there? is there a ready piece?). The kit's engineering rules follow it — a few
-lines of text with a visible effect.
-
 ## What stays the same in every Bench
 
 1. **One look, and the look is the method.** Flat, square, precise: a sidebar, a header, a status
