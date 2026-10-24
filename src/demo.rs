@@ -98,6 +98,7 @@ fn task(id: &str, title: &str, tags: &[&str], day: Option<i64>) -> crate::tasks:
         tags: tags.iter().map(|t| t.to_string()).collect(),
         day: day.map(|d| crate::tasks::today() + chrono::Duration::days(d)),
         created: crate::tasks::now(),
+        project: "p-me".into(),
         ..Default::default()
     }
 }

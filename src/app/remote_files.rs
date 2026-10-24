@@ -18,6 +18,8 @@ pub struct RemoteHost {
     pub kind: String,
     pub host: String,
     pub user: String,
+    /// The project it belongs to; "" = shared by every project.
+    pub project: String,
 }
 
 #[derive(Clone, Debug)]
@@ -100,6 +102,7 @@ fn host_of(v: &Value) -> RemoteHost {
         kind: s("kind"),
         host: s("host"),
         user: s("user"),
+        project: s("project"),
     }
 }
 
@@ -127,11 +130,15 @@ impl HermesApp {
             move || rest::get_raw(&conn, &profile, "/api/hosts"),
             |this, r, _, cx| {
                 if let Ok(v) = r {
-                    this.files_remote.hosts = v["hosts"]
-                        .as_array()
+                    let all: Vec<RemoteHost> = v["hosts"].as_array().into_iter().flatten().map(host_of).collect();
+                    // Which project each ~/.ssh/config server belongs to (its row in the store).
+                    this.ssh_projects = all
+                        .iter()
+                        .filter(|h| h.kind == "ssh" && !h.project.is_empty())
+                        .map(|h| (h.name.clone(), h.project.clone()))
+                        .collect();
+                    this.files_remote.hosts = all
                         .into_iter()
-                        .flatten()
-                        .map(host_of)
                         .filter(|h| matches!(h.kind.as_str(), "ftp" | "ftps" | "sftp"))
                         .collect();
                     this.files_remote
@@ -180,6 +187,8 @@ impl HermesApp {
             "user": v(&f.f_user),
             "password": if password.is_empty() { Value::Null } else { json!(password) },
             "path": if path.is_empty() { Value::Null } else { json!(path) },
+            // Made in a project's thread: that project's.
+            "project": self.thread_project,
         });
         let profile = self.current_profile();
         self.background(

@@ -25,6 +25,8 @@ pub const RANGES: [(&str, i64); 5] = [
 pub struct TasksMode {
     pub on: bool,
     pub list: List,
+    /// The open thread's project: the block shows its tasks only, new ones go into it ("" = all).
+    pub project: String,
     pub items: Vec<Task>,
     pub loaded: bool,
     pub error: Option<String>,
@@ -107,6 +109,7 @@ impl TasksMode {
             selected: None,
             range: 1,
             tag_filter: None,
+            project: String::new(),
             search,
             query: String::new(),
             title,
@@ -146,6 +149,7 @@ impl TasksMode {
         let mut out: Vec<Task> = self
             .items
             .iter()
+            .filter(|t| self.project.is_empty() || t.project == self.project)
             .filter(|t| {
                 if q.is_empty() {
                     t.in_list(list, day)
@@ -173,7 +177,7 @@ impl TasksMode {
     pub fn tags_in(&self, list: &List) -> Vec<String> {
         let day = today();
         let mut counts: Vec<(String, usize)> = vec![];
-        for t in self.items.iter().filter(|t| t.in_list(list, day)) {
+        for t in self.items.iter().filter(|t| t.in_list(list, day) && (self.project.is_empty() || t.project == self.project)) {
             for g in &t.tags {
                 match counts.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(g)) {
                     Some((_, c)) => *c += 1,
@@ -508,6 +512,7 @@ impl HermesApp {
         let mut t = Task {
             id: format!("new:{token}"),
             created: tasks::now(),
+            project: self.tasks.project.clone(),
             ..Default::default()
         };
         let list = if self.tasks.list == List::Logbook {

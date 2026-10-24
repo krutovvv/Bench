@@ -28,6 +28,8 @@ export interface Host {
 	/** "ssh_config" | "transmit:<id>" | null (made in Bench). */
 	source: string | null;
 	created: number;
+	/** The project it belongs to; "" = shared by every project. */
+	project: string;
 }
 
 function table() {
@@ -35,6 +37,9 @@ function table() {
 		id TEXT PRIMARY KEY, name TEXT NOT NULL, kind TEXT NOT NULL, host TEXT NOT NULL, port INTEGER, user TEXT DEFAULT '',
 		password TEXT, key_path TEXT, path TEXT, folder TEXT DEFAULT '', notes TEXT DEFAULT '', source TEXT UNIQUE, created INTEGER
 	)`);
+	try {
+		db().exec("ALTER TABLE hosts ADD COLUMN project TEXT DEFAULT ''");
+	} catch {}
 }
 
 const row = (r: any): Host => r;
@@ -50,14 +55,14 @@ export const hosts = {
 	},
 	save(h: Partial<Host> & { name: string; kind: Host["kind"]; host: string }): Host {
 		table();
-		const full: Host = { id: h.id || randomBytes(6).toString("hex"), name: h.name, kind: h.kind, host: h.host, port: h.port ?? null, user: h.user ?? "", password: h.password ?? null, key_path: h.key_path ?? null, path: h.path ?? null, folder: h.folder ?? "", notes: h.notes ?? "", source: h.source ?? null, created: h.created ?? Math.floor(Date.now() / 1000) };
+		const full: Host = { id: h.id || randomBytes(6).toString("hex"), name: h.name, kind: h.kind, host: h.host, port: h.port ?? null, user: h.user ?? "", password: h.password ?? null, key_path: h.key_path ?? null, path: h.path ?? null, folder: h.folder ?? "", notes: h.notes ?? "", source: h.source ?? null, created: h.created ?? Math.floor(Date.now() / 1000), project: h.project ?? "" };
 		db()
 			.prepare(
-				`INSERT INTO hosts (id, name, kind, host, port, user, password, key_path, path, folder, notes, source, created) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+				`INSERT INTO hosts (id, name, kind, host, port, user, password, key_path, path, folder, notes, source, created, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 				 ON CONFLICT(id) DO UPDATE SET name=excluded.name, kind=excluded.kind, host=excluded.host, port=excluded.port, user=excluded.user,
-				 password=excluded.password, key_path=excluded.key_path, path=excluded.path, folder=excluded.folder, notes=excluded.notes`,
+				 password=excluded.password, key_path=excluded.key_path, path=excluded.path, folder=excluded.folder, notes=excluded.notes, project=excluded.project`,
 			)
-			.run(full.id, full.name, full.kind, full.host, full.port, full.user, full.password, full.key_path, full.path, full.folder, full.notes, full.source, full.created);
+			.run(full.id, full.name, full.kind, full.host, full.port, full.user, full.password, full.key_path, full.path, full.folder, full.notes, full.source, full.created, full.project);
 		return full;
 	},
 	remove(id: string): void {

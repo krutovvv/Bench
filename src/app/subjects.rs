@@ -61,6 +61,9 @@ impl HermesApp {
             Some((w, q)) => (w, q.trim().to_lowercase()),
             None => return None,
         };
+        // A project's thread offers its own accesses and the shared ones.
+        let proj = self.thread_project.clone();
+        let ours = |p: &str| p.is_empty() || p == proj;
         let row = |name: String, desc: String, key: String| crate::model::SlashCommand {
             name,
             desc,
@@ -70,7 +73,13 @@ impl HermesApp {
         let mut rows: Vec<crate::model::SlashCommand> = match word.to_lowercase().as_str() {
             "ssh" => {
                 let mut v = vec![row("/ssh Terminal".into(), "this Mac".into(), format!("ssh:{}", crate::term::LOCAL))];
-                v.extend(self.ssh.servers.iter().map(|s| row(format!("/ssh {}", s.alias), s.hostname.clone(), format!("ssh:{}", s.alias))));
+                v.extend(
+                    self.ssh
+                        .servers
+                        .iter()
+                        .filter(|s| ours(self.ssh_projects.get(&s.alias).map(String::as_str).unwrap_or("")))
+                        .map(|s| row(format!("/ssh {}", s.alias), s.hostname.clone(), format!("ssh:{}", s.alias))),
+                );
                 v.push(row("/ssh New server…".into(), "add one to ~/.ssh/config".into(), "new:ssh".into()));
                 v
             }
@@ -79,6 +88,7 @@ impl HermesApp {
                     .files_remote
                     .hosts
                     .iter()
+                    .filter(|h| ours(&h.project))
                     .map(|h| row(format!("/ftp {}", h.name), format!("{}@{}", h.user, h.host), format!("files:{}", h.id)))
                     .collect();
                 v.push(row("/ftp New host…".into(), "FTP, FTPS or SFTP".into(), "new:ftp".into()));

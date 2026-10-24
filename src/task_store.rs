@@ -85,6 +85,7 @@ fn from_json(v: &Value) -> Task {
         spent: v["spent"].as_i64().unwrap_or(0),
         timer: v["timer"].as_i64(),
         created: v["created"].as_i64().unwrap_or(0),
+        project: s("project"),
     }
 }
 
@@ -94,6 +95,7 @@ fn to_json(t: &Task) -> Value {
         "title": t.title, "notes": t.notes, "tags": t.tags, "day": d(t.day),
         "evening": t.evening, "someday": t.someday, "important": t.important,
         "completed": d(t.completed), "spent": t.spent, "timer": t.timer, "created": t.created,
+        "project": t.project,
     })
 }
 

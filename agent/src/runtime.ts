@@ -17,6 +17,7 @@ import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort,
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { setHost, type Host, type SessionInfo } from "./host.ts";
+import { projects } from "./builtin/projects.ts";
 import { Store, type SessionRow, type Todo } from "./store.ts";
 
 const ctx = BACKGROUND_CONTEXT;
@@ -196,7 +197,11 @@ export class Runtime {
 	async create(profile: string, cwd: string | undefined, source = "local", extra: Partial<SessionRow> = {}): Promise<Live> {
 		await this.mcpFor(profile);
 		const choice = resolveModel(profile);
-		const dir = cwd && fs.existsSync(cwd) ? cwd : defaultCwd(profile);
+		// A session with a project's environment (a thread, a cron run) belongs to the project and
+		// works in its folder.
+		const project = profile.startsWith("project:") ? profile.slice(8) : "";
+		if (project && !extra.project) extra = { ...extra, project };
+		const dir = cwd && fs.existsSync(cwd) ? cwd : project ? projects.dir(project) : defaultCwd(profile);
 		const conversation = await this.harness.createConversation(
 			{ ownership: { kind: "ownerless" }, agent: { model: this.modelRef(profile, choice), thinkingLevel: this.thinking(reasoningEffort(profile)), cwd: dir, extensions: forAgent(readAgent(profile).extensions, profile) } } as any,
 			ctx,
@@ -352,7 +357,7 @@ export class Runtime {
 	}
 
 	private sessionInfo(row: SessionRow): SessionInfo {
-		return { id: row.id, profile: row.profile, cwd: row.cwd, source: row.source, chat_id: row.chat_id, subject: row.subject };
+		return { id: row.id, profile: row.profile, cwd: row.cwd, source: row.source, chat_id: row.chat_id, subject: row.subject, project: row.project ?? "" };
 	}
 
 	private host(): Host {

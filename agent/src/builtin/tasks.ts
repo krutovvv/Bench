@@ -7,9 +7,12 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { randomBytes } from "node:crypto";
 import { db } from "../config.ts";
+import { sessionOf } from "../host.ts";
 
 export interface Task {
 	id: string;
+	/** The project it belongs to; "" = none. */
+	project: string;
 	title: string;
 	notes: string;
 	tags: string[];
@@ -36,6 +39,9 @@ function table() {
 		evening INTEGER DEFAULT 0, someday INTEGER DEFAULT 0, important INTEGER DEFAULT 0, completed TEXT,
 		spent INTEGER DEFAULT 0, timer INTEGER, created INTEGER NOT NULL, source_id TEXT UNIQUE
 	)`);
+	try {
+		db().exec("ALTER TABLE tasks ADD COLUMN project TEXT DEFAULT ''");
+	} catch {}
 }
 
 const row = (r: any): Task => ({ ...r, tags: JSON.parse(r.tags || "[]"), evening: !!r.evening, someday: !!r.someday, important: !!r.important });
@@ -57,6 +63,7 @@ export const tasks = {
 		table();
 		const full: Task = {
 			id: t.id || randomBytes(6).toString("hex"),
+			project: t.project ?? "",
 			title: t.title,
 			notes: t.notes ?? "",
 			tags: t.tags ?? [],
@@ -72,12 +79,12 @@ export const tasks = {
 		};
 		db()
 			.prepare(
-				`INSERT INTO tasks (id, title, notes, tags, day, evening, someday, important, completed, spent, timer, created, source_id)
-				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, notes=excluded.notes, tags=excluded.tags,
+				`INSERT INTO tasks (id, title, notes, tags, day, evening, someday, important, completed, spent, timer, created, source_id, project)
+				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET title=excluded.title, notes=excluded.notes, tags=excluded.tags,
 				 day=excluded.day, evening=excluded.evening, someday=excluded.someday, important=excluded.important, completed=excluded.completed,
-				 spent=excluded.spent, timer=excluded.timer`,
+				 spent=excluded.spent, timer=excluded.timer, project=excluded.project`,
 			)
-			.run(full.id, full.title, full.notes, JSON.stringify(full.tags), full.day, +full.evening, +full.someday, +full.important, full.completed, full.spent, full.timer, full.created, full.source_id);
+			.run(full.id, full.title, full.notes, JSON.stringify(full.tags), full.day, +full.evening, +full.someday, +full.important, full.completed, full.spent, full.timer, full.created, full.source_id, full.project);
 		return full;
 	},
 	remove(id: string): void {
@@ -125,11 +132,18 @@ export const tasksTool = defineTool({
 		done_since: Type.Optional(Type.String({ description: "list: tasks done on or after this day (with status completed / all)" })),
 		done_until: Type.Optional(Type.String({ description: "list: tasks done on or before this day" })),
 	}),
-	execute: async (args) => {
+	execute: async (args, api) => {
+		// In a project's thread: that project's tasks only, and new ones go into it.
+		let project = "";
+		try {
+			project = sessionOf(api.conversationId).project ?? "";
+		} catch {}
+		const mine = (t: Task) => !project || t.project === project;
 		if (args.action === "list") {
 			const status = args.status ?? (args.done_since ? "all" : "open");
 			const all = tasks
 				.list(status === "open" ? undefined : (args.done_since ?? "0000"))
+				.filter(mine)
 				.filter((t) => (status === "open" ? !t.completed : status === "completed" ? !!t.completed : true))
 				.filter((t) => !t.completed || !args.done_until || t.completed <= args.done_until)
 				.filter((t) => !args.tag || t.tags.some((g) => g.toLowerCase() === args.tag!.toLowerCase()));
@@ -146,7 +160,7 @@ export const tasksTool = defineTool({
 		}
 		if (args.action === "add") {
 			if (!args.title?.trim()) throw new Error("title is required");
-			return text({ success: true, task: view(tasks.save({ title: args.title.trim(), notes: args.notes, tags: args.tags, day: args.day || null, evening: args.evening, someday: args.someday, important: args.important, completed: args.completed || null, spent: args.spent_minutes !== undefined ? Math.round(args.spent_minutes * 60) : 0 })) });
+			return text({ success: true, task: view(tasks.save({ project, title: args.title.trim(), notes: args.notes, tags: args.tags, day: args.day || null, evening: args.evening, someday: args.someday, important: args.important, completed: args.completed || null, spent: args.spent_minutes !== undefined ? Math.round(args.spent_minutes * 60) : 0 })) });
 		}
 		if ((args.action === "complete" || args.action === "remove") && args.ids?.length) {
 			const done: string[] = [];

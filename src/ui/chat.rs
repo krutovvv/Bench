@@ -61,6 +61,10 @@ impl HermesApp {
             if self.tasks.list != list {
                 self.tasks.list = list;
             }
+            // A project's thread: that project's tasks.
+            if self.tasks.project != self.thread_project {
+                self.tasks.project = self.thread_project.clone();
+            }
             Some(self.render_tasks_block(cx))
         } else if let Some(alias) = HermesApp::subject_server(&subject) {
             self.ensure_terminal(&alias, window, cx).map(|ix| {

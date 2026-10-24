@@ -13,6 +13,8 @@ export interface SessionInfo {
 	chat_id?: string;
 	/** What the thread is about ("tasks:today", "ssh:<host>", "files:<host id>", "folder:<path>"). */
 	subject?: string;
+	/** The project the thread belongs to; "" = none. */
+	project?: string;
 }
 
 export interface Host {

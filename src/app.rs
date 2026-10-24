@@ -135,6 +135,8 @@ pub struct HermesApp {
     pub project_form: Option<ProjectForm>,
     /// The open environment thread's project environment (its block).
     pub project_env: Option<ProjectEnv>,
+    /// ~/.ssh/config servers that belong to a project: alias → project id (the rest are shared).
+    pub ssh_projects: HashMap<String, String>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -681,6 +683,7 @@ impl HermesApp {
             projects: vec![],
             project_form: None,
             project_env: None,
+            ssh_projects: HashMap::new(),
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,

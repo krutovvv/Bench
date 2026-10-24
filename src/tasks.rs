@@ -39,6 +39,8 @@ pub struct Task {
     pub timer: Option<i64>,
     /// Unix seconds, for a stable order.
     pub created: i64,
+    /// The project it belongs to (its id); "" = none.
+    pub project: String,
 }
 
 pub fn now() -> i64 {
