@@ -1,6 +1,10 @@
-# Bench
+<p align="center">
+  <img src="assets/logo.svg" width="160" alt="Bench">
+</p>
 
-**A personal workbench, and the kit an AI agent uses to build one for anyone.**
+<h1 align="center">Bench</h1>
+
+<p align="center"><b>A personal workbench, and the kit an AI agent uses to build one for anyone.</b></p>
 
 ![A Bench made by the kit](.agents/skills/bench-kit/assets/gallery.png)
 
@@ -24,8 +28,9 @@ do different jobs. They all have the same shape.
 I'm a developer, and my day was spread over a dozen apps. I talk to my AI agent
 ([Hermes](https://hermes-agent.nousresearch.com)), and none of the clients I tried fit:
 [BoltAI](https://boltai.com), DeepSeek Harness, Hermes' own UI, Hermes One,
-[TypingMind](https://www.typingmind.com), [Open WebUI](https://openwebui.com). I keep servers
-in one SSH client and terminals in another, open small files in yet another editor, track my
+[TypingMind](https://www.typingmind.com), [Open WebUI](https://openwebui.com). My servers
+lived in [Warp](https://www.warp.dev), with ideas taken from Zap, its open-source fork that
+adds a few things of its own; small files opened in yet another editor; I tracked my
 tasks in [Things](https://culturedcode.com/things/), and reach for
 [DevUtils](https://devutils.com) for Base64, regex, JSON, Unix time and the like. Each of them is
 good. Together they meant switching windows all day, copying things from one into the next,
@@ -39,7 +44,8 @@ far with programs of that size, then the much simpler programs one person uses e
 certainly be brought together into one.
 
 So this is that experiment. **Bench now holds, in one fast native window, the parts I used of
-all of the above**: the chat with my agent, my SSH servers with their terminals, a mini IDE for
+all of the above**: the chat with my agent, my SSH servers with their terminals (after Warp and
+Zap, much simpler), a mini IDE for
 the files the agent touches, a tools mode in place of DevUtils, and my tasks (moved from Things
 into the system's Reminders, which the agents read and write too). Nothing had to be copied
 exactly: the goal was never to clone a program, only to take the idea of each piece I actually
