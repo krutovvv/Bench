@@ -165,6 +165,10 @@ pub struct ProjectEnv {
     pub editing: bool,
     /// A row's remove asked once ("mcp:<name>", "skill:<name>"): the second click removes.
     pub armed: Option<String>,
+    /// The soul shown whole (else its first lines).
+    pub soul_all: bool,
+    /// The skill opened to read: (name, its SKILL.md).
+    pub skill_open: Option<(String, String)>,
     /// MCP servers: (name, "http"/"stdio", enabled, connected, tools, error).
     pub mcp: Vec<(String, String, bool, bool, u64, Option<String>)>,
     /// Its own skills: (name, description).
@@ -195,7 +199,7 @@ impl HermesApp {
                 }
             });
             sub.detach();
-            self.project_env = Some(ProjectEnv { id: id.to_string(), dir: String::new(), soul, dirty: false, editing: false, armed: None, mcp: vec![], skills: vec![], error: None });
+            self.project_env = Some(ProjectEnv { id: id.to_string(), dir: String::new(), soul, dirty: false, editing: false, armed: None, soul_all: false, skill_open: None, mcp: vec![], skills: vec![], error: None });
         }
         // The demo's environment is made up (src/demo.rs).
         if self.demo {
@@ -350,13 +354,51 @@ impl HermesApp {
         );
     }
 
-    /// A section's "+": the start of the request in the composer, for the agent to do.
+    /// A section's "+": the start of the request in the composer, the caret after it and the
+    /// thread scrolled down to it, for the person to finish and the agent to do.
     pub fn ask_in_composer(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let end = gpui_kit::component::input::Position::new(0, text.chars().count() as u32);
         self.composer.update(cx, |s, cx| {
             s.set_value(text.to_string(), window, cx);
-            s.focus(window, cx);
+            s.set_cursor_position(end, window, cx);
         });
-        cx.notify();
+        self.jump_to_latest(cx);
+    }
+
+    /// A skill's row: its text opens under it (again: closes).
+    pub fn env_read_skill(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        if e.skill_open.as_ref().is_some_and(|(n, _)| *n == name) {
+            e.skill_open = None;
+            cx.notify();
+            return;
+        }
+        if self.demo {
+            e.skill_open = Some((name.clone(), format!("---\nname: {name}\n---\n\n# {name}\n\nA made-up skill of the demo.")));
+            cx.notify();
+            return;
+        }
+        let Some(conn) = self.conn.clone() else {
+            return;
+        };
+        let path = format!("/api/projects/{}/skills/{}", e.id, enc(&name));
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::get_raw(&conn, &profile, &path),
+            move |this, r, window, cx| match r {
+                Ok(v) => {
+                    if let Some(e) = this.project_env.as_mut() {
+                        e.skill_open = Some((name.clone(), v["text"].as_str().unwrap_or_default().to_string()));
+                    }
+                    cx.notify();
+                }
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
     }
 }
 

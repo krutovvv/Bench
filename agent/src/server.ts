@@ -540,6 +540,13 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		writeAgentMcp(agent, servers);
 		return { ok: true };
 	}],
+	// A skill of the project's threads (its own or a general one), to read.
+	["GET", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (_req, m) => {
+		const id = decodeURIComponent(m[1]);
+		const skill = skillsOf(`project:${id}`).find((k) => k.name === decodeURIComponent(m[2]));
+		if (!skill) throw new HttpError(404, "no such skill");
+		return { name: skill.name, dir: skill.dir, text: fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8") };
+	}],
 	// A project's own skill goes (its folder).
 	["DELETE", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (_req, m) => {
 		const id = decodeURIComponent(m[1]);

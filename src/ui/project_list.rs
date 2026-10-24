@@ -103,7 +103,8 @@ impl HermesApp {
     /// A project's environment at the top of its thread: the soul (as text; Edit opens it), its
     /// MCP servers (on/off, remove), its skills (remove). A section's "+" starts the request in the
     /// composer; the agent does the rest, and the block follows.
-    pub(super) fn render_env_block(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_env_block(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let _ = window;
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(e) = self.project_env.as_ref() else {
@@ -145,6 +146,8 @@ impl HermesApp {
         let (editing, dirty) = (e.editing, e.dirty);
         let soul_text = e.soul.read(cx).value().to_string();
         let armed = e.armed.clone();
+        let soul_all = e.soul_all;
+        let skill_open = e.skill_open.clone();
 
         let soul_head = h_flex()
             .gap_2()
@@ -191,16 +194,30 @@ impl HermesApp {
         } else if soul_text.trim().is_empty() {
             div().mt_1().text_color(muted).child("Not described yet: Edit, or ask below (“describe the project: …”).").into_any_element()
         } else {
-            div()
-                .id("soul-text")
+            // No scroll of its own (the thread scrolls): the first lines, Show all for the rest.
+            const SHOWN: usize = 12;
+            let lines = soul_text.lines().count();
+            let shown = if soul_all || lines <= SHOWN { soul_text.clone() } else { soul_text.lines().take(SHOWN).collect::<Vec<_>>().join("\n") };
+            v_flex()
                 .mt_1()
-                .max_h(px(220.))
-                .overflow_y_scroll()
                 .px_3()
                 .py_2()
                 .border_1()
                 .border_color(theme.border)
-                .child(super::media::markdown("env-soul", soul_text))
+                .child(super::media::markdown("env-soul", shown))
+                .when(lines > SHOWN, |d| {
+                    d.child(
+                        act("soul-all".into(), if soul_all { "Show less" } else { "Show all" }, false)
+                            .pt_1()
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.click_claimed = true;
+                                if let Some(e) = this.project_env.as_mut() {
+                                    e.soul_all = !e.soul_all;
+                                }
+                                cx.notify();
+                            })),
+                    )
+                })
                 .into_any_element()
         };
 
@@ -241,16 +258,39 @@ impl HermesApp {
                 let gid: SharedString = format!("env-skill-{name}").into();
                 let is_armed = armed.as_deref() == Some(&format!("skill:{name}"));
                 let n = name.clone();
-                row(gid.clone(), name.clone(), desc.clone(), false)
+                let open_name = name.clone();
+                let text = skill_open.as_ref().filter(|(o, _)| o == name).map(|(_, t)| t.clone());
+                let row = row(gid.clone(), name.clone(), desc.clone(), false)
+                    .cursor_pointer()
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.env_read_skill(open_name.clone(), window, cx)
+                    }))
                     .child(
                         div()
                             .flex_none()
                             .when(!is_armed, |d| d.opacity(0.).group_hover(gid.clone(), |s| s.opacity(1.)))
                             .child(act(format!("{gid}-rm").into(), if is_armed { "Remove?" } else { "Remove" }, is_armed).on_click(cx.listener(move |this, _, window, cx| {
                                 this.click_claimed = true;
+                                cx.stop_propagation();
                                 this.env_remove_skill(n.clone(), window, cx)
                             }))),
-                    )
+                    );
+                // Opened: its SKILL.md under the row, as text.
+                v_flex()
+                    .child(row)
+                    .when_some(text, |d, t| {
+                        d.child(
+                            div()
+                                .mt_1()
+                                .mb_2()
+                                .px_3()
+                                .py_2()
+                                .border_1()
+                                .border_color(theme.border)
+                                .child(super::media::markdown(format!("env-skill-text-{name}"), t)),
+                        )
+                    })
                     .into_any_element()
             })
             .collect();

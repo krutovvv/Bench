@@ -23,6 +23,12 @@ test("the server starts and answers /api/projects", async () => {
 		assert.equal(made.project.name, "Site");
 		const env = await call("GET", `/api/projects/${made.project.id}/env`);
 		assert.deepEqual([env.soul, env.mcp, env.skills], ["", [], []]);
+		// A skill of the project, read back by name.
+		const skill = path.join(env.dir, "skills", "publish");
+		fs.mkdirSync(skill, { recursive: true });
+		fs.writeFileSync(path.join(skill, "SKILL.md"), "---\nname: publish\ndescription: d\n---\nSteps.");
+		const read = await call("GET", `/api/projects/${made.project.id}/skills/publish`);
+		assert.match(read.text, /Steps\./);
 	} finally {
 		child.kill();
 	}
