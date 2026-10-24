@@ -42,18 +42,43 @@ pub struct RemoteFiles {
     pub dirty: bool,
     /// The host's password, typed when the server refused the login.
     pub password: Entity<InputState>,
+    /// The new host's form, in the chat area while open (the Files group's "+").
+    pub form: bool,
+    pub f_name: Entity<InputState>,
+    /// 0 FTP, 1 FTPS, 2 SFTP.
+    pub f_kind: usize,
+    pub f_host: Entity<InputState>,
+    pub f_port: Entity<InputState>,
+    pub f_user: Entity<InputState>,
+    pub f_password: Entity<InputState>,
+    pub f_path: Entity<InputState>,
 }
+
+/// The kinds a file host can be, in the form's order.
+pub const HOST_KINDS: [&str; 3] = ["ftp", "ftps", "sftp"];
 
 impl RemoteFiles {
     pub fn new(window: &mut Window, cx: &mut Context<HermesApp>) -> Self {
         let editor = cx.new(|cx| {
             EditorState::new(window, cx)
+                .scroll_beyond_last_line(Some(1))
                 .line_number(true)
                 .soft_wrap(false)
         });
         let password = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Password"));
+        let mut field = |cx: &mut Context<HermesApp>| cx.new(|cx| InputState::new(window, cx));
+        let (f_name, f_host, f_port, f_user, f_path) = (field(cx), field(cx), field(cx), field(cx), field(cx));
+        let f_password = cx.new(|cx| InputState::new(window, cx).masked(true));
         Self {
             password,
+            form: false,
+            f_name,
+            f_kind: 0,
+            f_host,
+            f_port,
+            f_user,
+            f_password,
+            f_path,
             hosts: vec![],
             host: None,
             path: String::new(),
@@ -118,21 +143,80 @@ impl HermesApp {
         );
     }
 
+    /// The Files group's "+": the new host's form takes the chat area.
+    pub fn new_host_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.panel = super::Panel::Chat;
+        self.ssh.form = None;
+        let f = &self.files_remote;
+        for e in [&f.f_name, &f.f_host, &f.f_port, &f.f_user, &f.f_password, &f.f_path] {
+            e.update(cx, |s, cx| s.set_value("", window, cx));
+        }
+        self.files_remote.f_kind = 0;
+        self.files_remote.form = true;
+        self.files_remote.f_name.update(cx, |s, cx| s.focus(window, cx));
+        cx.notify();
+    }
+
+    /// Save the form's host in the agent's store and open its thread.
+    pub fn save_host(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(conn) = self.conn.clone() else {
+            return;
+        };
+        let f = &self.files_remote;
+        let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
+        let (name, host) = (v(&f.f_name), v(&f.f_host));
+        if host.is_empty() {
+            self.toast(NotificationType::Error, "The host's address is empty".to_string(), window, cx);
+            return;
+        }
+        let port = v(&f.f_port).parse::<u16>().ok();
+        let password = f.f_password.read(cx).value().to_string();
+        let path = v(&f.f_path);
+        let body = json!({
+            "name": if name.is_empty() { host.clone() } else { name },
+            "kind": HOST_KINDS[f.f_kind.min(2)],
+            "host": host,
+            "port": port,
+            "user": v(&f.f_user),
+            "password": if password.is_empty() { Value::Null } else { json!(password) },
+            "path": if path.is_empty() { Value::Null } else { json!(path) },
+        });
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json(&conn, "POST", "/api/hosts", &profile, body),
+            |this, r, window, cx| match r {
+                Ok(v) => {
+                    this.files_remote.form = false;
+                    this.load_remote_hosts(window, cx);
+                    if let Some(id) = v["host"]["id"].as_str() {
+                        this.open_files_thread(id.to_string(), window, cx);
+                    }
+                }
+                Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+            },
+        );
+    }
+
     /// A file host in the sidebar: its thread, the files on top.
     pub fn open_files_thread(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.files_remote.host.as_deref() != Some(&id) {
-            self.files_remote.host = Some(id.clone());
-            self.files_remote.file = None;
-            self.list_remote(String::new(), window, cx);
-        }
+        self.ensure_remote_listing(&id, window, cx);
         self.open_subject(format!("files:{id}"), cx);
     }
 
     /// The thread's host is shown (after a restart, or opening the thread from elsewhere).
     pub fn ensure_remote_listing(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.files_remote.host.as_deref() != Some(id) {
-            self.files_remote.host = Some(id.to_string());
-            self.files_remote.file = None;
+            // Nothing of the previous host stays on screen (its folder, files, error, open file),
+            // whatever this one answers.
+            let f = &mut self.files_remote;
+            f.host = Some(id.to_string());
+            f.path = String::new();
+            f.entries.clear();
+            f.error = None;
+            f.file = None;
+            f.dirty = false;
             self.list_remote(String::new(), window, cx);
         }
     }
@@ -144,12 +228,17 @@ impl HermesApp {
         self.files_remote.loading = true;
         self.files_remote.error = None;
         let profile = self.current_profile();
+        let asked = id.clone();
         self.background(
             window,
             cx,
             move || rest::get_raw(&conn, &profile, &format!("/api/hosts/{id}/ls?path={}", enc(&path))),
-            |this, r, _, cx| {
+            move |this, r, _, cx| {
                 let f = &mut this.files_remote;
+                // A late answer from a host the block has left.
+                if f.host.as_deref() != Some(&asked) {
+                    return;
+                }
                 f.loading = false;
                 match r {
                     Ok(v) => {

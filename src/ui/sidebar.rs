@@ -3,6 +3,7 @@
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::shimmer::ShimmerText;
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -571,8 +572,11 @@ impl HermesApp {
         }
         let n = crate::tasks::LISTS.len();
         for (k, list) in crate::tasks::LISTS.iter().enumerate() {
-            let selected =
-                self.panel == Panel::Chat && current == HermesApp::tasks_subject(list);
+            let key = HermesApp::tasks_subject(list);
+            let selected = self.panel == Panel::Chat && current == key && self.session.is_none();
+            let threads = self.thread_rows(&key, k + 1 == n, cx);
+            let group: SharedString = format!("task-list-{k}").into();
+            let new_key = key.clone();
             let count = match list {
                 crate::tasks::List::Today
                 | crate::tasks::List::Upcoming
@@ -583,11 +587,12 @@ impl HermesApp {
             out.push(
                 h_flex()
                     .id(("task-list", k))
+                    .group(group.clone())
                     .relative()
                     .gap_1()
                     .pl(super::nest_pl(cx))
-                    .child(super::nest_guide(cx, k + 1 == n))
-                    .pr_3()
+                    .child(super::nest_guide(cx, k + 1 == n && threads.is_empty()))
+                    .pr_4()
                     .map(|d| if compact { d.py_1p5() } else { d.py(px(5.)) })
                     .cursor_pointer()
                     .border_l_2()
@@ -605,11 +610,21 @@ impl HermesApp {
                     .when(count > 0, |d| {
                         d.child(div().text_sm().text_color(muted).child(count.to_string()))
                     })
+                    // "+" on hover: a new thread about this list.
+                    .child(
+                        row_plus(format!("task-list-new-{k}").into(), group, cx).on_click(cx.listener(
+                            move |this, _, window, cx| {
+                                cx.stop_propagation();
+                                this.new_subject_thread(new_key.clone(), window, cx)
+                            },
+                        )),
+                    )
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_task_list(l.clone(), window, cx)
                     }))
                     .into_any_element(),
             );
+            out.extend(threads);
         }
         out
     }
@@ -662,7 +677,9 @@ impl HermesApp {
         (head, collapsed)
     }
 
-    /// A row under a subject group: the name, a quiet note, the open thread tinted.
+    /// A row under a subject group: the name, a quiet note, the open thread tinted. With
+    /// `plus` (the subject's key), a "+" on hover starts a new thread about it.
+    #[allow(clippy::too_many_arguments)]
     fn subject_row(
         &self,
         id: SharedString,
@@ -670,17 +687,29 @@ impl HermesApp {
         note: String,
         selected: bool,
         last: bool,
+        plus: Option<String>,
         cx: &mut Context<Self>,
     ) -> Stateful<Div> {
         let theme = cx.theme().clone();
         let compact = self.appearance.compact_sidebar;
+        let group = id.clone();
+        let plus_el = plus.map(|key| {
+            row_plus(SharedString::from(format!("{id}-new")), group.clone(), cx).on_click(cx.listener(
+                move |this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.new_subject_thread(key.clone(), window, cx)
+                },
+            ))
+        });
         h_flex()
             .id(id)
+            .group(group)
             .relative()
             .gap_2()
             .pl(super::nest_pl(cx))
             .child(super::nest_guide(cx, last))
-            .pr_3()
+            // The right column of the group heads ("+" at 16 from the edge).
+            .pr_4()
             .map(|d| if compact { d.py_1p5() } else { d.py(px(5.)) })
             .cursor_pointer()
             .border_l_2()
@@ -697,6 +726,48 @@ impl HermesApp {
                     .text_color(theme.muted_foreground)
                     .child(note),
             )
+            .children(plus_el)
+    }
+
+    /// The threads about `key`, listed under its row while it is the open subject: one job
+    /// each, the latest first; the open one tinted. `last`: the subject's row ends its group.
+    fn thread_rows(&self, key: &str, last: bool, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        if self.current_subject() != key || self.panel != Panel::Chat {
+            return vec![];
+        }
+        let theme = cx.theme().clone();
+        let compact = self.appearance.compact_sidebar;
+        let rows = self.threads_of(key);
+        let n = rows.len();
+        rows.into_iter()
+            .enumerate()
+            .map(|(k, i)| {
+                let s = &self.sessions[i];
+                let selected = self.session.as_deref() == Some(&s.id);
+                let title = if s.title.is_empty() { "New thread".to_string() } else { s.title.clone() };
+                let note = if s.running { "working…".to_string() } else { plural(s.messages as usize, "message", "messages", "messages") };
+                let (key, id) = (key.to_string(), s.id.clone());
+                h_flex()
+                    .id(SharedString::from(format!("thr-{}", s.id)))
+                    .relative()
+                    .gap_2()
+                    .pl(super::nest_pl(cx) + px(12.))
+                    .child(super::nest_guide(cx, last && k + 1 == n))
+                    .pr_4()
+                    .map(|d| if compact { d.py_1() } else { d.py(px(4.)) })
+                    .cursor_pointer()
+                    .border_l_2()
+                    .border_color(if selected { theme.primary } else { theme.transparent })
+                    .when(selected, |d| d.bg(theme.primary.opacity(0.12)))
+                    .hover(|h| h.bg(theme.sidebar_accent))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(SESSION_TITLE)).child(title))
+                    .child(div().flex_none().text_sm().text_color(theme.muted_foreground).child(note))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_subject_thread(key.clone(), id.clone(), window, cx)
+                    }))
+                    .into_any_element()
+            })
+            .collect()
     }
 
     /// The Servers group: every host of ~/.ssh/config; a click opens its thread, the terminal on top.
@@ -725,16 +796,19 @@ impl HermesApp {
             (s.alias.clone(), at)
         }));
         for (k, (alias, note)) in rows.into_iter().enumerate() {
-            let selected = self.panel == Panel::Chat && current == format!("ssh:{alias}");
+            let key = format!("ssh:{alias}");
+            let selected = self.panel == Panel::Chat && current == key && self.session.is_none();
             let name = if alias == crate::term::LOCAL { "Terminal".to_string() } else { alias.clone() };
             let a = alias.clone();
+            let threads = self.thread_rows(&key, k + 1 == n, cx);
             out.push(
-                self.subject_row(format!("srv-{k}").into(), name, note, selected, k + 1 == n, cx)
+                self.subject_row(format!("srv-{k}").into(), name, note, selected, k + 1 == n && threads.is_empty(), Some(key), cx)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_server_thread(a.clone(), window, cx)
                     }))
                     .into_any_element(),
             );
+            out.extend(threads);
         }
         out
     }
@@ -754,12 +828,14 @@ impl HermesApp {
         let n = tools.len();
         for (k, (tool, group)) in tools.into_iter().enumerate() {
             let key = format!("tool:{}", crate::app::subjects::tool_key(tool));
-            let selected = self.panel == Panel::Chat && current == key;
+            let selected = self.panel == Panel::Chat && current == key && self.session.is_none();
+            let threads = self.thread_rows(&key, k + 1 == n, cx);
             out.push(
-                self.subject_row(format!("tool-{k}").into(), tool.name().to_string(), group.to_string(), selected, k + 1 == n, cx)
+                self.subject_row(format!("tool-{k}").into(), tool.name().to_string(), group.to_string(), selected, k + 1 == n && threads.is_empty(), Some(key), cx)
                     .on_click(cx.listener(move |this, _, window, cx| this.open_tool_thread(tool, window, cx)))
                     .into_any_element(),
             );
+            out.extend(threads);
         }
         out
     }
@@ -767,10 +843,14 @@ impl HermesApp {
     /// The Files group: FTP, FTPS and SFTP hosts (from Transmit and the agent's store); a click
     /// opens the host's thread, its files on top. Folded at first: there are many.
     fn render_files_group(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        if self.files_remote.hosts.is_empty() {
-            return vec![];
-        }
-        let (head, collapsed) = self.subject_head("files-head", Ico::FolderOpen, "Files", None, cx);
+        let (head, collapsed) = self.subject_head(
+            "files-head",
+            Ico::FolderOpen,
+            "Files",
+            // "+": a new FTP / FTPS / SFTP host (its form takes the chat area).
+            Some(Box::new(|this: &mut Self, window, cx| this.new_host_form(window, cx))),
+            cx,
+        );
         let mut out = vec![head];
         if collapsed {
             return out;
@@ -779,16 +859,19 @@ impl HermesApp {
         let hosts = self.files_remote.hosts.clone();
         let n = hosts.len();
         for (k, h) in hosts.into_iter().enumerate() {
-            let selected = self.panel == Panel::Chat && current == format!("files:{}", h.id);
+            let key = format!("files:{}", h.id);
+            let selected = self.panel == Panel::Chat && current == key && self.session.is_none();
             let note = if h.user.is_empty() { h.host.clone() } else { format!("{}@{}", h.user, h.host) };
             let id = h.id.clone();
+            let threads = self.thread_rows(&key, k + 1 == n, cx);
             out.push(
-                self.subject_row(format!("fh-{k}").into(), h.name, note, selected, k + 1 == n, cx)
+                self.subject_row(format!("fh-{k}").into(), h.name, note, selected, k + 1 == n && threads.is_empty(), Some(key), cx)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_files_thread(id.clone(), window, cx)
                     }))
                     .into_any_element(),
             );
+            out.extend(threads);
         }
         out
     }
@@ -817,11 +900,38 @@ impl HermesApp {
             let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(&id);
             let note = format!("{messages} messages");
             out.push(
-                self.subject_row(format!("browser-{k}").into(), title, note, selected, k + 1 == n, cx)
+                self.subject_row(format!("browser-{k}").into(), title, note, selected, k + 1 == n, None, cx)
                     .on_click(cx.listener(move |this, _, _, cx| this.open_browser_thread(id.clone(), cx)))
                     .into_any_element(),
             );
         }
         out
     }
+}
+
+/// A row's "+" (a new thread about it): over the row's right end on hover, in the column of the
+/// group heads' "+" (16 from the edge), so the row's count or note keeps its place.
+fn row_plus(id: SharedString, group: SharedString, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme();
+    // Seen only on a hovered row: its hover color, covering what is under it.
+    let (muted, fg, bg) = (theme.muted_foreground, theme.foreground, theme.sidebar_accent);
+    div()
+        .id(id)
+        .absolute()
+        .top_0()
+        .bottom_0()
+        .right(px(16.))
+        .flex()
+        .items_center()
+        .opacity(0.)
+        .group_hover(group, |s| s.opacity(1.))
+        .cursor_pointer()
+        .child(
+            super::head_plus_slot()
+                .bg(bg)
+                .text_color(muted)
+                .hover(move |s| s.text_color(fg))
+                .child(Ico::Plus.icon().xsmall()),
+        )
+        .tooltip(|window, cx| Tooltip::new("New thread").build(window, cx))
 }

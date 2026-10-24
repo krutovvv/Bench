@@ -45,11 +45,13 @@ impl Tools {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools"));
         let input = cx.new(|cx| {
             EditorState::new(window, cx)
+                .scroll_beyond_last_line(Some(1))
                 .line_number(true)
                 .searchable(true)
         });
         let output = cx.new(|cx| {
             EditorState::new(window, cx)
+                .scroll_beyond_last_line(Some(1))
                 .line_number(true)
                 .searchable(true)
         });

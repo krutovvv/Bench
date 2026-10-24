@@ -124,6 +124,9 @@ pub struct HermesApp {
     pub conn: Option<Arc<Connection>>,
     /// The subject of the chat about to be created ("tasks:today"): it goes with session.create.
     pub new_subject: String,
+    /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
+    /// new one (the row's "+"), `Some(Some(id))` = that thread (a row under the subject).
+    pub subject_target: Option<Option<String>>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -677,6 +680,7 @@ impl HermesApp {
             gateway: None,
             conn: None,
             new_subject: String::new(),
+            subject_target: None,
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,
@@ -1007,6 +1011,22 @@ impl HermesApp {
                 }
             }
             Evt::Created { session, runtime } => {
+                // In the list at once with its subject: the first message's block state (and the
+                // block itself) depend on it, and the sessions list comes back only later.
+                if !self.sessions.iter().any(|s| s.id == session) {
+                    self.sessions.insert(
+                        0,
+                        crate::model::SessionRow {
+                            id: session.clone(),
+                            title: String::new(),
+                            messages: 0,
+                            model: String::new(),
+                            running: true,
+                            source: "desktop".into(),
+                            subject: self.new_subject.clone(),
+                        },
+                    );
+                }
                 self.opened.insert(session.clone(), runtime.clone());
                 self.session = Some(session);
                 self.save_place();
@@ -1409,6 +1429,8 @@ impl HermesApp {
         };
         self.panel = Panel::Chat;
         self.confirm_delete = None;
+        self.ssh.form = None;
+        self.files_remote.form = false;
         self.reset_chat(cx);
         self.session = Some(id.clone());
         if self.demo {

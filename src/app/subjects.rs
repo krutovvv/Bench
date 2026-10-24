@@ -1,6 +1,7 @@
 //! A thread's subject: what it is about, drawn live at its top, as in Zed's Delta (a notebook's
 //! cell): a task list (`tasks:today`), a server's terminal (`ssh:<alias>`), a tool (`tool:<name>`).
-//! The sidebar lists the subjects; a click opens the latest thread about one, or a new one.
+//! The sidebar lists the subjects; a subject has many threads (one job each): a click opens the
+//! latest, its "+" a new one, and the open subject's threads are listed under it.
 //! Nothing is a separate mode: everything is a thread.
 
 use gpui_kit::*;
@@ -9,15 +10,18 @@ use super::HermesApp;
 use crate::devtools::{GROUPS, Tool};
 
 impl HermesApp {
-    /// The latest thread about `key`, or a new chat that will carry it.
+    /// The latest thread about `key` (or the one `subject_target` names), or a new chat that
+    /// will carry it.
     pub fn open_subject(&mut self, key: String, cx: &mut Context<Self>) {
         self.panel = super::Panel::Chat;
-        match self
-            .sessions
-            .iter()
-            .find(|s| s.subject == key)
-            .map(|s| s.id.clone())
-        {
+        // A form in the chat area (a new server) gives way to the thread.
+        self.ssh.form = None;
+        self.files_remote.form = false;
+        let target = match self.subject_target.take() {
+            Some(t) => t,
+            None => self.sessions.iter().find(|s| s.subject == key).map(|s| s.id.clone()),
+        };
+        match target {
             Some(id) => self.open_session(id, cx),
             None => {
                 self.new_session(cx);
@@ -46,6 +50,25 @@ impl HermesApp {
         } else {
             self.open_subject(key, cx);
         }
+    }
+
+    /// A new thread about `key` (the "+" on its row): its block ready, the conversation empty.
+    pub fn new_subject_thread(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.subject_target = Some(None);
+        self.open_subject_key(key, window, cx);
+        self.subject_target = None;
+    }
+
+    /// One thread about `key` (a row under its subject), its block ready.
+    pub fn open_subject_thread(&mut self, key: String, id: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.subject_target = Some(Some(id));
+        self.open_subject_key(key, window, cx);
+        self.subject_target = None;
+    }
+
+    /// The threads about `key`, as the sessions list orders them (latest first).
+    pub fn threads_of(&self, key: &str) -> Vec<usize> {
+        (0..self.sessions.len()).filter(|&i| self.sessions[i].subject == key).collect()
     }
 
     /// A server: its thread, the terminal on top (opened on first use, kept while the app runs).

@@ -41,9 +41,15 @@ five pieces. Copy the subject closest to it.
 `subject_files` (`app/remote_files.rs`); add its branch to `open_subject_key` and
 `subject_title` in `subjects.rs`.
 
-**2. Opening it.** `open_<kind>_thread(value, window, cx)`: prepare the block's state (connect,
-load, start a terminal), then `self.open_subject(key, cx)`. That opens the latest thread about
-the subject, or a new chat that will carry it (`new_subject`). Bench's: `open_server_thread`,
+**2. Opening it.** A subject has **many threads, one job each** (the user: "first we did one
+thing on the server, then another, then a third by hand" — each its own thread, never one
+endless thread, and never split automatically). `open_<kind>_thread(value, window, cx)`:
+prepare the block's state (connect, load, start a terminal), then `self.open_subject(key, cx)`.
+That opens the latest thread about the subject, or a new chat that will carry it
+(`new_subject`); `new_subject_thread(key)` (the row's "+") always starts a new one, and
+`open_subject_thread(key, id)` opens a given one — both go through the same
+`open_<kind>_thread` path via `subject_target`, so the block is ready either way. The block
+belongs to the subject, not the thread: every thread about `web-1` shows the same terminal. Bench's: `open_server_thread`,
 `open_tool_thread` (`subjects.rs`), `open_task_list` (`app/tasks.rs`), `open_files_thread`
 (`app/remote_files.rs`), `open_browser_thread` / `new_browser_thread` (`app/sites.rs`).
 
@@ -60,8 +66,10 @@ handlers; a click anywhere else in the thread focuses the composer). Rules:
   `src/app/<kind>.rs`, its field on `HermesApp`, its `new()` in `HermesApp::new`).
 
 **4. The sidebar group.** A head with an icon in a fixed square, a name, a chevron to fold and an
-optional "+" (`subject_head(id, icon, name, plus, cx)`, `src/ui/sidebar.rs`), then rows that call
-`open_<kind>_thread` (`subject_row`). One row per thing the person works on (a list, a server, a
+optional "+" that adds a new thing to work on — a server, a host (`subject_head(id, icon, name,
+plus, cx)`, `src/ui/sidebar.rs`); then rows that call `open_<kind>_thread` (`subject_row`, with
+`Some(key)` for the hover "+" that starts a new thread about it); under the open subject's row,
+its threads (`thread_rows`, the latest first). One row per thing the person works on (a list, a server, a
 host); a single row when there is one block with a picker inside it (Tools). Groups are listed in
 `render_sidebar`.
 
@@ -69,7 +77,10 @@ host); a single row when there is one block with a picker inside it (Tools). Gro
 - **A tool** that does the subject's work with the thread's value: `defineTool` in
   `agent/src/builtin/<kind>.ts`, added to the assistant's `tools` (`agent/src/extensions/assistant.ts`).
   It reads the thread's subject from `sessionOf(api.conversationId).subject` (see `ssh.ts`), so
-  the agent never has to name the server or list. When an MCP server already does the job, use
+  the agent never has to name the server or list.
+  Watch the first message of a new thread: the thread is created first and the sessions list
+  arrives later, so the new row goes into `sessions` at once with its subject (`Evt::Created`),
+  or `block_context` finds no subject and the block's state is lost. When an MCP server already does the job, use
   it instead and write no tool (the browser).
 - **A prompt section** for the subject: a case in `subject()` (`agent/src/prompt.ts`): what the
   block is, which tool works on it, what "this" and "here" mean, what not to do (tasks: "never look

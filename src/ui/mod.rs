@@ -504,6 +504,7 @@ impl Render for HermesApp {
         let body = match self.panel {
             Panel::Chat if self.tasks.on => self.render_tasks_body(cx),
             Panel::Chat if self.tools.on => self.render_tools_body(cx),
+            Panel::Chat if self.files_remote.form => self.render_host_form(cx),
             Panel::Chat if ssh => self.render_ssh_body(window, cx),
             // Files dropped anywhere on the chat or the input are attached.
             Panel::Chat => v_flex()

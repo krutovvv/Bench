@@ -214,6 +214,19 @@ The RFC moved to tomorrow.",
     );
     thread(
         app,
+        "d-web1-tls",
+        "Renew the TLS certificates",
+        "ssh:web-1",
+        done(
+            "Renew the certificates before they expire on Friday.",
+            vec![tool("ssh_run", "certbot renew"), tool("ssh_run", "systemctl reload nginx")],
+            "Renewed both certificates (until **January 22**) and reloaded nginx; the site answers over \
+the new ones.",
+            31.0,
+        ),
+    );
+    thread(
+        app,
         "d-web1",
         "Why is the site slow",
         "ssh:web-1",
@@ -472,6 +485,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
     app.session = Some("d-landing".into());
     other_modes(app);
     subject_threads(app, now);
+    // The demo's own folds, not the person's: every group open but the long Tools.
+    app.ssh.collapsed = ["s:Tools".to_string()].into_iter().collect();
     // `BENCH_DEMO=tasks|server|browser|tool`: that thread open instead.
     let open = match std::env::var("BENCH_DEMO").as_deref() {
         Ok("tasks") => Some("d-today"),
