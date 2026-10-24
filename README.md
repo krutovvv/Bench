@@ -47,11 +47,13 @@ another editor, tasks in [Things](https://culturedcode.com/things/), and
 [DevUtils](https://devutils.com) for Base64, regex, JSON and the like. Each of them is good.
 Together they meant switching windows all day.
 
-The push came from [ArtCraft](https://thedieline.com/artcraft-launches-an-open-source-ai-powered-alternative-to-adobes-creative-cloud/):
-a developer used Claude to write open-source Rust look-alikes of Adobe's apps — PhotoCraft after
-Photoshop, FilmCraft after Premiere ([Phoronix](https://www.phoronix.com/news/Photocraft-Filmcraft-AI)).
-If an AI gets that far with programs of that size, the much simpler programs one person uses
-every day can certainly be brought together into one.
+The push came from [ArtCraft](https://github.com/storytold): a studio that, with AI, rebuilt in
+pure Rust a whole collection of the heaviest programs there are — Photoshop, Premiere,
+Illustrator, After Effects, InDesign, Acrobat, Word, Excel, PowerPoint, Figma, AutoCAD, Pro
+Tools ([PhotoCraft](https://github.com/storytold/photocraft),
+[FilmCraft](https://github.com/storytold/filmcraft), CadCraft, GridCraft and the rest). If that
+could be done, then pretty much anything can — certainly the much simpler programs one person
+uses every day, brought together into one.
 
 So I tried. **Today I use one app instead of fifteen, and I spend much less time getting
 things done.** Nothing was cloned: the goal was to take the idea of each piece I actually use
