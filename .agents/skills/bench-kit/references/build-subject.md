@@ -46,9 +46,7 @@ thing on the server, then another, then a third by hand" — each its own thread
 endless thread, and never split automatically). `open_<kind>_thread(value, window, cx)`:
 prepare the block's state (connect, load, start a terminal), then `self.open_subject(key, cx)`.
 That opens the latest thread about the subject, or a new chat that will carry it
-(`new_subject`); `new_subject_thread(key)` (the row's "+") always starts a new one, and
-`open_subject_thread(key, id)` opens a given one — both go through the same
-`open_<kind>_thread` path via `subject_target`, so the block is ready either way. The block
+(`new_subject`); in a project the usual way is `/` in the thread (piece 4). The block
 belongs to the subject, not the thread: every thread about `web-1` shows the same terminal. Bench's: `open_server_thread`,
 `open_tool_thread` (`subjects.rs`), `open_task_list` (`app/tasks.rs`), `open_files_thread`
 (`app/remote_files.rs`), `open_browser_thread` / `new_browser_thread` (`app/sites.rs`).
