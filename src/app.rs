@@ -16,7 +16,6 @@ use gpui_kit::*;
 
 mod asks;
 mod attachments;
-mod cron;
 pub(crate) mod ide;
 pub(crate) mod ide_find;
 pub(crate) mod ide_ops;
@@ -53,15 +52,10 @@ pub type Choice = SelectState<Vec<SharedString>>;
 #[derive(Clone, Copy, PartialEq)]
 pub enum Panel {
     Chat,
-    /// Settings tabs.
-    Mcp,
-    Skills,
-    Prompts,
     /// Model providers, fallback, voice, service keys.
     Providers,
     /// Telegram: the bot, who may write to it, the proxy; whose chats the list shows.
     Messages,
-    Cron,
     /// Appearance and the Telegram filter.
     Settings,
 }
@@ -270,22 +264,10 @@ pub struct HermesApp {
     pub panel: Panel,
     pub skills: Vec<SkillRow>,
     pub skill_open: Option<String>,
-    pub skill_editor: Entity<EditorState>,
-    pub skill_delete_armed: bool,
-    pub cron: Vec<rest::CronJob>,
-    pub cron_open: Option<String>,
     /// Settings → Prompts.
     pub prompts: Vec<crate::model::Prompt>,
     pub prompt_open: Option<usize>,
-    pub prompt_title: Entity<InputState>,
-    pub prompt_editor: Entity<EditorState>,
-    pub prompt_delete_armed: bool,
-    pub cron_editor: Entity<EditorState>,
-    pub cron_schedule: Entity<InputState>,
     pub effort_choice: Entity<Choice>,
-    pub mcp_editor: Entity<EditorState>,
-    pub mcp_status: SharedString,
-    pub mcp_error: Option<SharedString>,
 
     pub composer: Entity<TextareaState>,
     /// Unsent text per chat ("" = the new chat), kept on disk: switching chats or restarting
@@ -393,30 +375,6 @@ impl HermesApp {
         let project_path =
             cx.new(|cx| InputState::new(window, cx).placeholder("/home/you/project — Enter"));
         let group_name = cx.new(|cx| InputState::new(window, cx).placeholder("Name a group"));
-        let mcp_editor = cx.new(|cx| {
-            EditorState::new(window, cx)
-                .language("json")
-                .line_number(true)
-        });
-        let skill_editor = cx.new(|cx| {
-            EditorState::new(window, cx)
-                .language("markdown")
-                .line_number(true)
-        });
-        let prompt_title = cx.new(|cx| InputState::new(window, cx).placeholder("Name"));
-        let prompt_editor = cx.new(|cx| {
-            EditorState::new(window, cx)
-                .language("markdown")
-                .line_number(true)
-        });
-        let cron_editor = cx.new(|cx| {
-            EditorState::new(window, cx)
-                .language("markdown")
-                .line_number(true)
-        });
-        let cron_schedule = cx.new(|cx| {
-            InputState::new(window, cx).placeholder("30 10 * * 1-5  ·  every 2h  ·  daily at 9:00")
-        });
         let effort_labels: Vec<SharedString> =
             EFFORTS.iter().map(|e| SharedString::from(*e)).collect();
         let effort_choice = cx.new(|cx| {
@@ -508,13 +466,6 @@ impl HermesApp {
                     }
                 },
             ),
-            // An error shown after a failed save goes away once the text is edited.
-            cx.subscribe_in(&mcp_editor, window, |this, _, ev: &InputEvent, _, cx| {
-                if matches!(ev, InputEvent::Change) && this.mcp_error.is_some() {
-                    this.mcp_error = None;
-                    cx.notify();
-                }
-            }),
             cx.subscribe_in(
                 &effort_choice,
                 window,
@@ -761,21 +712,9 @@ impl HermesApp {
             panel: Panel::Chat,
             skills: vec![],
             skill_open: None,
-            cron_open: None,
             prompts: vec![],
             prompt_open: None,
-            prompt_title,
-            prompt_editor,
-            prompt_delete_armed: false,
-            cron_editor,
-            cron_schedule,
-            skill_editor,
-            skill_delete_armed: false,
-            cron: vec![],
             effort_choice,
-            mcp_editor,
-            mcp_status: "".into(),
-            mcp_error: None,
             composer,
             drafts: load_drafts(),
             draft_key: None,
@@ -2208,156 +2147,14 @@ impl HermesApp {
         self.panel = panel;
         match panel {
             Panel::Chat | Panel::Settings => {}
-            Panel::Prompts => self.load_prompts(window, cx),
             Panel::Providers | Panel::Messages => {
                 self.load_providers(window, cx);
                 if panel == Panel::Messages {
                     self.load_telegram_owners(window, cx);
                 }
             }
-            Panel::Cron => self.load_cron(window, cx),
-            Panel::Skills => self.rest(window, cx, rest::skills, |this, r, window, cx| match r {
-                Ok(list) => this.skills = list,
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Skills: {e:#}"),
-                    window,
-                    cx,
-                ),
-            }),
-            Panel::Mcp => {
-                self.mcp_status = "Loading…".into();
-                self.rest(window, cx, rest::mcp_json, |this, r, window, cx| match r {
-                    Ok(text) => {
-                        this.mcp_editor
-                            .update(cx, |s, cx| s.set_value(text, window, cx));
-                        this.mcp_status = "".into();
-                        this.mcp_error = None;
-                    }
-                    Err(e) => this.mcp_status = format!("Could not load: {e:#}").into(),
-                })
-            }
         }
         cx.notify();
-    }
-
-    pub fn open_skill(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.skill_open = Some(name.clone());
-        self.skill_delete_armed = false;
-        self.skill_editor
-            .update(cx, |s, cx| s.set_value("", window, cx));
-        self.rest(
-            window,
-            cx,
-            move |c, p| rest::skill_content(c, p, &name),
-            |this, r, window, cx| match r {
-                Ok(text) => this
-                    .skill_editor
-                    .update(cx, |s, cx| s.set_value(text, window, cx)),
-                Err(e) => this.toast(NotificationType::Error, format!("Skill: {e:#}"), window, cx),
-            },
-        );
-        cx.notify();
-    }
-
-    /// First press arms, second deletes the skill's folder.
-    pub fn delete_skill(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(name) = self.skill_open.clone() else {
-            return;
-        };
-        if !self.skill_delete_armed {
-            self.skill_delete_armed = true;
-            cx.notify();
-            return;
-        }
-        self.skill_delete_armed = false;
-        let n = name.clone();
-        self.rest(
-            window,
-            cx,
-            move |c, p| rest::delete_skill(c, p, &n),
-            move |this, r, window, cx| match r {
-                Ok(()) => {
-                    this.skills.retain(|s| s.name != name);
-                    this.skill_open = None;
-                    this.toast(
-                        NotificationType::Success,
-                        format!("Skill {name} deleted"),
-                        window,
-                        cx,
-                    );
-                }
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Skill not deleted: {e:#}"),
-                    window,
-                    cx,
-                ),
-            },
-        );
-    }
-
-    pub fn save_skill(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(name) = self.skill_open.clone() else {
-            return;
-        };
-        let text = self.skill_editor.read(cx).value().to_string();
-        self.rest(
-            window,
-            cx,
-            move |c, p| rest::save_skill(c, p, &name, &text),
-            |this, r, window, cx| match r {
-                Ok(()) => this.toast(NotificationType::Success, "Skill saved", window, cx),
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Skill not saved: {e:#}"),
-                    window,
-                    cx,
-                ),
-            },
-        );
-    }
-
-    /// JSON check run on save; an invalid document is not sent.
-    fn validate_mcp(&mut self, cx: &mut Context<Self>) {
-        let text = self.mcp_editor.read(cx).value().to_string();
-        self.mcp_error = match serde_json::from_str::<serde_json::Value>(&text) {
-            Ok(v) if v.is_object() => None,
-            Ok(_) => Some("Expected an object: { \"server-name\": { … } }".into()),
-            Err(e) => Some(format!("Line {}, column {}: {e}", e.line(), e.column()).into()),
-        };
-        cx.notify();
-    }
-
-    pub fn save_mcp(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.validate_mcp(cx);
-        if self.mcp_error.is_some() {
-            return;
-        }
-        let text = self.mcp_editor.read(cx).value().to_string();
-        self.mcp_status = "Saving…".into();
-        self.rest(
-            window,
-            cx,
-            move |c, p| rest::save_mcp_json(c, p, &text),
-            |this, r, window, cx| {
-                this.mcp_status = "".into();
-                match r {
-                    Ok(()) => this.toast(
-                        NotificationType::Success,
-                        "MCP servers saved. New sessions pick them up.",
-                        window,
-                        cx,
-                    ),
-                    Err(e) => this.toast(
-                        NotificationType::Error,
-                        format!("MCP not saved: {e:#}"),
-                        window,
-                        cx,
-                    ),
-                }
-            },
-        );
     }
 
     // ---- voice -----------------------------------------------------------

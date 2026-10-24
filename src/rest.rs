@@ -97,8 +97,6 @@ pub fn skills(conn: &Connection, profile: &str) -> Result<Vec<SkillRow>> {
                 .filter(|c| !c.is_empty())
                 .unwrap_or("other")
                 .into(),
-            description: s["description"].as_str().unwrap_or_default().into(),
-            enabled: s["enabled"].as_bool().unwrap_or(true),
         })
         .collect();
     rows.sort_by(|a, b| (&a.category, &a.name).cmp(&(&b.category, &b.name)));
@@ -255,11 +253,6 @@ pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefau
     Ok((effort, model, models, approval, context))
 }
 
-pub fn skill_content(conn: &Connection, profile: &str, name: &str) -> Result<String> {
-    let v = get(conn, &format!("/api/skills/content?name={name}"), profile)?;
-    Ok(v["content"].as_str().unwrap_or_default().to_string())
-}
-
 /// The profile's `mcp_servers` map as pretty JSON, read from the raw config
 /// (the summary endpoint masks secrets, and saving those masks would destroy them).
 pub fn mcp_json(conn: &Connection, profile: &str) -> Result<String> {
@@ -268,22 +261,6 @@ pub fn mcp_json(conn: &Connection, profile: &str) -> Result<String> {
         .context("parse config.yaml")?;
     let servers = yaml.get("mcp_servers").cloned().unwrap_or(json!({}));
     Ok(serde_json::to_string_pretty(&servers)?)
-}
-
-pub fn save_mcp_json(conn: &Connection, profile: &str, text: &str) -> Result<()> {
-    let servers: Value = serde_json::from_str(text).context("JSON")?;
-    if !servers.is_object() {
-        return Err(anyhow!("expected an object {{ \"name\": {{…}} }}"));
-    }
-    send(
-        conn,
-        "PUT",
-        "/api/mcp/servers",
-        profile,
-        json!({"servers": servers}),
-        30,
-    )?;
-    Ok(())
 }
 
 fn data_url_bytes(url: &str) -> Result<Vec<u8>> {
@@ -364,38 +341,6 @@ pub fn delete_session(conn: &Connection, profile: &str, id: &str) -> Result<()> 
     }
 }
 
-/// Delete a skill folder (there is no skill-delete API; the managed files route removes it).
-pub fn delete_skill(conn: &Connection, profile: &str, name: &str) -> Result<()> {
-    let found = get(conn, &format!("/api/skills/content?name={name}"), profile)?;
-    let skill_md = found["path"]
-        .as_str()
-        .ok_or_else(|| anyhow!("skill path unknown"))?;
-    let dir = std::path::Path::new(skill_md)
-        .parent()
-        .ok_or_else(|| anyhow!("bad skill path"))?;
-    send(
-        conn,
-        "DELETE",
-        "/api/files",
-        profile,
-        json!({"path": dir.to_string_lossy(), "recursive": true}),
-        30,
-    )?;
-    Ok(())
-}
-
-pub fn save_skill(conn: &Connection, profile: &str, name: &str, content: &str) -> Result<()> {
-    send(
-        conn,
-        "PUT",
-        "/api/skills/content",
-        profile,
-        json!({"name": name, "content": content}),
-        30,
-    )?;
-    Ok(())
-}
-
 /// The profile's config.yaml as text.
 pub fn config_raw(conn: &Connection, profile: &str) -> Result<String> {
     let raw = get(conn, "/api/config/raw", profile)?;
@@ -409,10 +354,7 @@ pub struct CronJob {
     pub expr: String,
     pub name: String,
     pub schedule: String,
-    pub enabled: bool,
     pub next_run: String,
-    pub last_status: String,
-    pub prompt: String,
 }
 
 /// Scheduled jobs of this profile (read-only view).
@@ -459,10 +401,7 @@ pub fn cron_jobs(conn: &Connection, profile: &str) -> Result<Vec<CronJob>> {
                 .unwrap_or_else(|| s(j, &["schedule_display"])),
             name: s(j, &["name", "id", "job_id"]),
             schedule: s(j, &["schedule_display", "schedule", "cron", "interval"]),
-            enabled: j["enabled"].as_bool().unwrap_or(j["state"] != "paused"),
             next_run: s(j, &["next_run_at", "next_run"]),
-            last_status: s(j, &["last_status", "last_result"]),
-            prompt: s(j, &["prompt", "task", "message"]),
         })
         .collect())
 }
@@ -630,54 +569,6 @@ pub fn worktree_remove(conn: &Connection, profile: &str, repo: &str, folder: &st
     Ok(())
 }
 
-fn cron_profile(profile: &str) -> &str {
-    if profile.is_empty() {
-        "default"
-    } else {
-        profile
-    }
-}
-
-/// Save a job's text and schedule (the gateway re-derives its next run).
-pub fn update_cron(
-    conn: &Connection,
-    profile: &str,
-    id: &str,
-    prompt: &str,
-    schedule: &str,
-) -> Result<()> {
-    send(
-        conn,
-        "PUT",
-        &format!(
-            "/api/cron/jobs/{}?profile={}",
-            enc(id),
-            enc(cron_profile(profile))
-        ),
-        profile,
-        json!({"updates": {"prompt": prompt, "schedule": schedule}}),
-        30,
-    )?;
-    Ok(())
-}
-
-/// "trigger" (run now), "pause" or "resume".
-pub fn cron_action(conn: &Connection, profile: &str, id: &str, action: &str) -> Result<()> {
-    send(
-        conn,
-        "POST",
-        &format!(
-            "/api/cron/jobs/{}/{action}?profile={}",
-            enc(id),
-            enc(cron_profile(profile))
-        ),
-        profile,
-        json!({}),
-        30,
-    )?;
-    Ok(())
-}
-
 /// The profile's folder in the agent's home on its machine: `~/.bench/profiles/<name>`
 /// (`default` for the default profile).
 pub fn profile_home(conn: &Connection, profile: &str) -> Result<String> {
@@ -715,53 +606,6 @@ pub fn prompts(conn: &Connection, profile: &str) -> Result<Vec<crate::model::Pro
     }
     out.sort_by_key(|p| p.title.to_lowercase());
     Ok(out)
-}
-
-/// Write a prompt as `prompts/<title>.md` (renaming its file when the title changed); its path.
-pub fn save_prompt(
-    conn: &Connection,
-    profile: &str,
-    old_path: &str,
-    title: &str,
-    body: &str,
-) -> Result<String> {
-    let dir = format!("{}/prompts", profile_home(conn, profile)?);
-    let _ = send(
-        conn,
-        "POST",
-        "/api/files/mkdir",
-        profile,
-        json!({"path": dir}),
-        30,
-    );
-    let file: String = title
-        .chars()
-        .map(|c| {
-            if matches!(c, '/' | '\\' | ':' | '\0') {
-                '-'
-            } else {
-                c
-            }
-        })
-        .collect();
-    let path = format!("{dir}/{}.md", file.trim());
-    write_text(conn, profile, &path, body)?;
-    if !old_path.is_empty() && old_path != path {
-        delete_prompt(conn, profile, old_path)?;
-    }
-    Ok(path)
-}
-
-pub fn delete_prompt(conn: &Connection, profile: &str, path: &str) -> Result<()> {
-    send(
-        conn,
-        "DELETE",
-        "/api/files",
-        profile,
-        json!({"path": path, "recursive": false}),
-        30,
-    )?;
-    Ok(())
 }
 
 

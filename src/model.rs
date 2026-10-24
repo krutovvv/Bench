@@ -230,8 +230,6 @@ impl Usage {
 pub struct SkillRow {
     pub name: String,
     pub category: String,
-    pub description: String,
-    pub enabled: bool,
 }
 
 pub const EFFORTS: &[&str] = &["low", "medium", "xhigh"];

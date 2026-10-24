@@ -412,12 +412,8 @@ impl HermesApp {
 
         let current = self.panel;
         let tabs = [
-            ("tab-mcp", "MCP", Panel::Mcp),
-            ("tab-skills", "Skills", Panel::Skills),
-            ("tab-prompts", "Prompts", Panel::Prompts),
             ("tab-providers", "Providers", Panel::Providers),
             ("tab-messages", "Messages", Panel::Messages),
-            ("tab-cron", "Cron", Panel::Cron),
             ("tab-settings", "Settings", Panel::Settings),
         ]
         .map(|(id, label, panel)| {
@@ -503,13 +499,9 @@ impl Render for HermesApp {
                 .child(div().flex_1().min_h_0().child(self.render_chat(window, cx)))
                 .children(self.render_plan(cx))
                 .into_any_element(),
-            Panel::Skills => self.render_skills(cx).into_any_element(),
-            Panel::Mcp => self.render_mcp(cx).into_any_element(),
             Panel::Providers => self.render_providers(cx),
             Panel::Messages => self.render_messages(cx),
-            Panel::Cron => self.render_cron(cx).into_any_element(),
             Panel::Settings => self.render_settings(cx).into_any_element(),
-            Panel::Prompts => self.render_prompts(cx).into_any_element(),
         };
 
         // The sidebar folded away: its corner joins the header — room for the window's buttons
