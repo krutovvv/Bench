@@ -71,6 +71,7 @@ impl HermesApp {
         self.setup = Some(Setup { kind, tab: id });
         self.ssh.on = false;
         self.tools.on = false;
+        self.tasks.on = false;
         self.panel = super::Panel::Chat;
         cx.notify();
 

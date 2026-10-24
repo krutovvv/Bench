@@ -79,6 +79,7 @@ impl HermesApp {
         let files = crate::bench::IDE
             && !self.ide_open()
             && !self.tools.on
+            && !self.tasks.on
             && if ssh {
                 self.ssh.active_tab().is_some()
             } else {
@@ -406,7 +407,7 @@ impl HermesApp {
         v_flex()
             .size_full()
             .bg(theme.sidebar)
-            .child(div().h(px(38.)).flex_none())
+            .child(self.render_sidebar_top(cx))
             .child(super::search_band(&self.ssh.search, cx))
             .child(
                 v_flex()
@@ -422,7 +423,7 @@ impl HermesApp {
                 // Same height as the composer, so the rules line up across the window.
                 h_flex()
                     .flex_none()
-                    .h(super::bar_h(cx))
+                    .h(super::bar_h(cx) + px(1.))
                     .child(new_server.flex_1().h_full()),
             )
             .into_any_element()

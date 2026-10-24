@@ -372,12 +372,6 @@ impl HermesApp {
                     ))
                 }
             })
-            .when(crate::bench::TOOLS, |d| {
-                d.child(
-                    button("tools", Ico::Wrench, "Tools  ⌘3", self.tools.on)
-                        .on_click(cx.listener(|this, _, window, cx| this.toggle_tools(window, cx))),
-                )
-            })
             .child(
                 button("new-window", Ico::AppWindow, "New window  ⌘⇧N", false)
                     .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),
@@ -691,7 +685,7 @@ impl HermesApp {
                                 .iter()
                                 .flat_map(|s| s.platforms.iter())
                                 .map(|(name, state, err)| {
-                                    // "assistant-tg:telegram" → "assistant-tg · Telegram"
+                                    // "inbox:telegram" → "inbox · Telegram"
                                     let name = match name.split_once(':') {
                                         Some((who, kind)) => {
                                             let mut k = kind.to_string();

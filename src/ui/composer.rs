@@ -102,18 +102,16 @@ impl HermesApp {
         let bars = levels.into_iter().map(|v| {
             div()
                 .flex_1()
-                .h(px(2. + v * 26.))
+                .h(px(2. + v * 20.))
                 .bg(theme.primary.opacity(0.35 + v * 0.65))
         });
         h_flex()
             .flex_1()
             .min_w_0()
-            .h(px(32.))
-            // The same gap on both sides: 24 from the divider, and 16 + the button column's 8
-            // to the round stop button.
-            // 20 from the window's divider, 20 to the buttons (12 + the buttons' own 8).
-            .pl_5()
-            .pr_3()
+            .h(px(26.))
+            // 24 from the window's divider, 24 to the buttons (16 + the buttons' own 8).
+            .pl_6()
+            .pr_4()
             .gap(px(2.))
             .items_center()
             .children(bars)
@@ -146,7 +144,7 @@ impl HermesApp {
             !self.composer.read(cx).value().trim().is_empty() || !self.attachments.is_empty();
 
         // The round buttons in a square UI: a quiet one (outline) and a filled one. Glyphs are
-        // Lucide at 15px in a "bold" cut (assets/icons/*-bold, mic-fill: the mic's capsule
+        // Lucide at 13px in a "bold" cut (assets/icons/*-bold, mic-fill: the mic's capsule
         // filled, a plain two-loop clip; the clip and the arrow at 2.25 instead of 2); Stop is a
         // filled square, not an outline (an outlined square reads as missing).
         let round =
@@ -160,7 +158,7 @@ impl HermesApp {
                 };
                 div()
                     .id(id)
-                    .size(px(30.))
+                    .size(px(26.))
                     .flex()
                     .items_center()
                     .justify_center()
@@ -175,10 +173,10 @@ impl HermesApp {
                             .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground)),
                     })
                     .map(|d| match icon {
-                        // 15px: the bold cut reads at a smaller size than the UI's thin 16px.
+                        // 13px in a 26 circle: the bold cut reads at a smaller size than the UI's thin 16px.
                         Some(Ico::Loader) => d.child(Ico::Loader.live(true)),
-                        Some(icon) => d.child(icon.icon().size(px(15.))),
-                        None => d.child(div().size(px(10.)).rounded(px(1.5)).bg(fg)),
+                        Some(icon) => d.child(icon.icon().size(px(13.))),
+                        None => d.child(div().size(px(9.)).rounded(px(1.5)).bg(fg)),
                     })
                     .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
             };
@@ -258,7 +256,7 @@ impl HermesApp {
             .border_color(theme.border)
             // Files waiting to go: one row of chips over the text, at the text's inset.
             .when(!chips.is_empty(), |d| {
-                d.child(h_flex().flex_wrap().gap_1p5().px_5().pt_2().children(chips))
+                d.child(h_flex().flex_wrap().gap_1p5().px_6().pt_2().children(chips))
             })
             .child(
                 h_flex()
@@ -271,10 +269,11 @@ impl HermesApp {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                // The chat's text starts 20 in; with the textarea's own padding,
-                                // 7 more lands it there (measured).
-                                .pl(px(7.))
-                                .py_1()
+                                // The chat's text starts 24 in; with the textarea's own padding,
+                                // 11 more lands it there (measured at 20 with 7).
+                                .pl(px(11.))
+                                // No padding of its own: the textarea's keeps one line inside
+                                // the 35 bar (more lines grow it).
                                 .child(Textarea::new(&self.composer).appearance(false)),
                         )
                     })
@@ -283,8 +282,8 @@ impl HermesApp {
                             .flex_none()
                             .gap_2()
                             .pl_2()
-                            // A little more room right of the send button than the 8 it had.
-                            .pr_3()
+                            // As far from the window's edge as the text is from the divider.
+                            .pr_4()
                             .items_center()
                             .when(!recording, |d| d.child(clip))
                             .child(mic)

@@ -27,7 +27,7 @@ impl HermesApp {
         let label = chosen
             .as_deref()
             .map(|r| r.rsplit('/').next().unwrap_or(r).to_string())
-            .unwrap_or_else(|| "No project".into());
+            .unwrap_or_else(|| "Select folder".into());
         let view = cx.entity();
         let picker = Button::new("new-project")
             .ghost()
@@ -74,11 +74,25 @@ impl HermesApp {
                 menu
             });
         let on = self.new_branch;
-        h_flex()
-            .mt_4()
+        // One line: "Group name  or  Select folder". The group is typed in place (a folder in
+        // ~/Research, made on send): a field with no frame, its placeholder reading as text.
+        let group = (self.new_project.is_none() && !self.path_entry).then(|| {
+            h_flex()
+                .gap_3()
+                .items_center()
+                .child(
+                    div().w(px(118.)).child(
+                        gpui_kit::component::input::Input::new(&self.group_name)
+                            .small()
+                            .appearance(false)
+                            .prefix(Ico::Layers.icon().small().text_color(muted)),
+                    ),
+                )
+                .child(div().text_color(muted).child("or"))
+        });
+        let row = h_flex()
             .gap_3()
             .items_center()
-            .text_sm()
             .child(picker)
             .when(self.path_entry, |d| {
                 d.child(
@@ -114,7 +128,14 @@ impl HermesApp {
                             cx.notify();
                         })),
                 )
-            })
+            });
+        h_flex()
+            .mt_4()
+            .gap_3()
+            .items_center()
+            .text_sm()
+            .children(group)
+            .child(row)
     }
 
     pub(super) fn render_chat(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -203,7 +224,7 @@ impl HermesApp {
                     .overflow_y_scroll()
                     .track_scroll(&self.chat_scroll)
                     // The first question's band starts right under the header; the last
-                    // answer keeps 16 below (its own 12 + 4).
+                    // answer keeps 28 below (its own 24 + 4).
                     .pb_1()
                     .children(rows)
                     .children(approval)
@@ -386,8 +407,8 @@ impl HermesApp {
             // cleanly when there is no summary line to sit beside.
             h_flex()
                 .absolute()
-                .top(px(19.))
-                .right_5()
+                .top(px(23.))
+                .right_6()
                 .pl_1()
                 .gap_0p5()
                 .items_center()
@@ -438,7 +459,7 @@ impl HermesApp {
 
         // The session reads as strips: each question is a band from edge to edge (rules above
         // and below, like the composer's). Its text and the agent's side under it keep one
-        // inset, 20px on both sides; the composer's text starts there too.
+        // inset, 24px on both sides; the composer's text starts there too.
         v_flex()
             .id(("turn", i))
             .group(group)
@@ -448,8 +469,8 @@ impl HermesApp {
             .child(
                 div()
                     .w_full()
-                    .px_5()
-                    .py_3()
+                    .px_6()
+                    .py_4()
                     .bg(theme.secondary)
                     // The first band sits under the header's own rule.
                     .when(i > 0, |d| d.border_t_1())
@@ -477,10 +498,10 @@ impl HermesApp {
                     .w_full()
                     .child(
                         v_flex()
-                            .px_5()
-                            // 20px all round: the hover actions float over the corner,
+                            .px_6()
+                            // 24px all round: the hover actions float over the corner,
                             // they don't take a row of their own.
-                            .py_5()
+                            .py_6()
                             .gap_3()
                             .children(summary)
                             .children(steps)

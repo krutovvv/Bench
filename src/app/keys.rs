@@ -26,6 +26,12 @@ impl HermesApp {
             // Save the file open in the mini IDE.
             ("s", false) if self.file.is_some() => self.save_file(window, cx),
             // New chat / new server, as the mode's bottom button.
+            ("n", false) if self.tasks.on => self.new_task(window, cx),
+            // Done / not done for the open task.
+            ("k", false) if self.tasks.on && self.tasks.selected.is_some() => {
+                let id = self.tasks.selected.clone().unwrap_or_default();
+                self.toggle_task_done(id, window, cx);
+            }
             ("n", false) => {
                 if self.ssh.on {
                     self.edit_server(None, None, window, cx);
@@ -38,6 +44,7 @@ impl HermesApp {
             ("1", false) => self.set_ssh_mode(false, window, cx),
             ("2", false) if crate::bench::SSH => self.set_ssh_mode(true, window, cx),
             ("3", false) if crate::bench::TOOLS => self.toggle_tools(window, cx),
+            ("4", false) if crate::bench::TASKS => self.toggle_tasks(window, cx),
             ("b", false) if crate::bench::IDE => self.toggle_ide(window, cx),
             ("b", true) if self.ide_open() => {
                 self.ide.expanded = !self.ide.expanded;
@@ -59,7 +66,9 @@ impl HermesApp {
                 self.select_next_occurrence(cx)
             }
             ("f", false) => {
-                let search = if self.ssh.on {
+                let search = if self.tasks.on {
+                    self.tasks.search.clone()
+                } else if self.ssh.on {
                     self.ssh.search.clone()
                 } else {
                     self.search.clone()

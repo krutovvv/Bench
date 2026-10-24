@@ -4,11 +4,12 @@
 
 use std::path::PathBuf;
 
+use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::text::{
     MarkdownNode, MarkdownParseContext, MarkdownPlugin, TextView, markdown_ast,
 };
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -148,6 +149,73 @@ pub(super) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
         )
 }
 
+/// A code block in an answer, as chat UIs show one: a header with the language on the left and
+/// a copy button on the right, the highlighted code under it (one frame around both).
+fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    let muted = theme.muted_foreground;
+    let fence = if code.contains("```") { "~~~~" } else { "```" };
+    let body = TextView::markdown(
+        ElementId::Name(format!("code-{i}-{k}").into()),
+        format!("{fence}{lang}\n{code}{fence}"),
+    )
+    // Any action, even an empty one, keeps the language out of the code's own corner.
+    .code_block_actions(|_, _, _| div())
+    .style(
+        gpui_kit::component::text::TextViewStyle::default().code_block(
+            StyleRefinement::default()
+                .text_size(rems(0.8125))
+                .line_height(relative(1.5))
+                .border_0()
+                // No fill, like the audio, video and changed-files cards: the frame alone.
+                .bg(gpui_kit::transparent_black()),
+        ),
+    );
+    let copy = code.trim_end_matches('\n').to_string();
+    v_flex()
+        .w_full()
+        .border_1()
+        .border_color(theme.border)
+        .child(
+            // As tall as the changed-files card's line: small text, 4 above and below.
+            h_flex()
+                .py_1()
+                .pl_4()
+                .pr_2()
+                .items_center()
+                .justify_between()
+                .border_b_1()
+                .border_color(theme.border)
+                .text_xs()
+                .text_color(muted)
+                .child(if lang.is_empty() {
+                    "code".to_string()
+                } else {
+                    lang
+                })
+                .child(
+                    h_flex()
+                        .id(SharedString::from(format!("code-copy-{i}-{k}")))
+                        .gap_1()
+                        .px_1p5()
+                        .items_center()
+                        .cursor_pointer()
+                        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                        .child(Ico::Copy.icon().xsmall())
+                        .child("Copy")
+                        .on_click(move |_, window, cx| {
+                            cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
+                            window.push_notification(
+                                (NotificationType::Success, SharedString::from("Copied")),
+                                cx,
+                            );
+                        }),
+                ),
+        )
+        .child(body)
+        .into_any_element()
+}
+
 impl HermesApp {
     pub(super) fn render_answer(&mut self, i: usize, cx: &mut Context<Self>) -> Vec<AnyElement> {
         media::segments(&self.turns[i].answer)
@@ -157,6 +225,7 @@ impl HermesApp {
                 Segment::Text(text) => markdown(format!("answer-{i}-{k}"), text).into_any_element(),
                 Segment::Media(path) => self.render_media(i, k, path, cx),
                 Segment::Mermaid(code) => self.render_diagram(i, k, code, cx),
+                Segment::Code { lang, code } => render_code(i, k, lang, code, cx),
             })
             .collect()
     }

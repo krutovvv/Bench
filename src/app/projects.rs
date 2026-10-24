@@ -318,7 +318,7 @@ impl HermesApp {
         );
     }
 
-    fn current_title(&self) -> String {
+    pub(crate) fn current_title(&self) -> String {
         self.session
             .as_ref()
             .and_then(|id| self.sessions.iter().find(|s| &s.id == id))

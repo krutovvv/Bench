@@ -29,6 +29,7 @@ mod prompts;
 pub(crate) mod providers;
 pub(crate) mod servers;
 mod slash;
+pub(crate) mod tasks;
 pub(crate) mod tools;
 pub use projects::GitArm;
 
@@ -213,6 +214,8 @@ pub struct HermesApp {
     /// Typing a folder path (SSH hosts have no native folder dialog here).
     pub path_entry: bool,
     pub project_path: Entity<InputState>,
+    /// New chat: a group to put it in (`~/Research/<name>`) when it has no project.
+    pub group_name: Entity<InputState>,
     pub git_armed: Option<GitArm>,
     /// Settings → Gateways: each machine's install, by target label.
     pub installs: HashMap<String, crate::model::Install>,
@@ -299,6 +302,8 @@ pub struct HermesApp {
     pub ssh: servers::Ssh,
     /// Tools mode (⌘3): the utilities of `crate::devtools`.
     pub tools: tools::Tools,
+    /// Tasks mode (⌘4): Apple Reminders as a task list.
+    pub tasks: tasks::TasksMode,
     /// The mini IDE's source and the server file it keeps in sync.
     pub ide: ide::Ide,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
@@ -318,6 +323,8 @@ pub struct HermesApp {
 
 impl HermesApp {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        // "The agent finished" notifications: macOS asks once.
+        crate::notify::request();
         let (evt_tx, evt_rx) = async_channel::unbounded();
 
         let mut targets = vec![Target::Local];
@@ -354,6 +361,7 @@ impl HermesApp {
             cx.new(|cx| InputState::new(window, cx).placeholder("Your own answer — Enter to send"));
         let project_path =
             cx.new(|cx| InputState::new(window, cx).placeholder("/home/you/project — Enter"));
+        let group_name = cx.new(|cx| InputState::new(window, cx).placeholder("Name a group"));
         let mcp_editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("json")
@@ -563,6 +571,7 @@ impl HermesApp {
                     if this.live.is_some() || this.recorder.is_some() {
                         cx.notify();
                     }
+                    this.tick_tasks(cx);
                 });
                 if alive.is_err() {
                     break;
@@ -610,6 +619,7 @@ impl HermesApp {
         // The gateway list keeps the SSH hosts that run Hermes (asked again when the menu opens).
         let ssh = servers::Ssh::new(window, cx);
         let tools = tools::Tools::new(window, cx);
+        let tasks_mode = tasks::TasksMode::new(window, cx);
         for host in targets.iter().filter_map(|t| match t {
             Target::Ssh(h) => Some(h.clone()),
             Target::Local => None,
@@ -626,6 +636,7 @@ impl HermesApp {
         let mut app = Self {
             ssh,
             tools,
+            tasks: tasks_mode,
             ide: Default::default(),
             sidebar_w: px(280.),
             ide_w: px(640.),
@@ -693,6 +704,7 @@ impl HermesApp {
             new_project_repo: true,
             path_entry: false,
             project_path,
+            group_name,
             git_armed: None,
             installs: HashMap::new(),
             appearance: crate::theme::Appearance::load(),
@@ -884,6 +896,7 @@ impl HermesApp {
                     let unknown_tg = rows
                         .iter()
                         .any(|s| s.source == "telegram" && !self.tg_owner.contains_key(&s.id));
+                    self.notify_finished(&rows);
                     self.sessions = rows;
                     if let Some(id) = self.resume_session.take() {
                         if self.session.is_none() && self.sessions.iter().any(|s| s.id == id) {
@@ -1195,6 +1208,16 @@ impl HermesApp {
                 self.usage = Some(usage);
             }
             Evt::Complete { session, text } if self.is_current(&session) => {
+                // Bench in the background: say the open chat is done (in front, it's on screen).
+                if !window.is_window_active() {
+                    let first = text
+                        .lines()
+                        .map(str::trim)
+                        .find(|l| !l.is_empty())
+                        .unwrap_or("Done");
+                    let id = self.session.clone().unwrap_or_default();
+                    crate::notify::post(&id, &self.current_title(), &crate::ui::clip(first, 140));
+                }
                 self.live = None;
                 self.speed.finish();
                 if let Some(turn) = self.turns.last_mut() {
@@ -1209,6 +1232,27 @@ impl HermesApp {
             _ => {}
         }
         cx.notify();
+    }
+
+    /// One of the person's own chats (not Telegram, cron or API) went from working to done in a
+    /// sessions refresh, and it isn't the one on screen: a notification. The open chat is told
+    /// by its own `Complete` (with the answer's first line).
+    fn notify_finished(&self, rows: &[crate::model::SessionRow]) {
+        for old in self.sessions.iter().filter(|s| s.running) {
+            let done = rows
+                .iter()
+                .find(|r| r.id == old.id)
+                .is_some_and(|r| !r.running);
+            let own = crate::model::source_label(&old.source) == "Hermes";
+            if done && own && self.session.as_deref() != Some(old.id.as_str()) {
+                let title = if old.title.is_empty() {
+                    "Hermes"
+                } else {
+                    &old.title
+                };
+                crate::notify::post(&old.id, title, "The agent finished");
+            }
+        }
     }
 
     // ---- chat ------------------------------------------------------------
@@ -1623,6 +1667,35 @@ impl HermesApp {
                 self.effort_pending = true;
                 self.queued = Some(text.clone());
                 self.queued_images = images;
+                let group = self.group_name.read(cx).value().trim().to_string();
+                if self.new_project.is_none() && !group.is_empty() {
+                    // A named group: its folder first (made where the gateway lives), then the chat.
+                    self.group_name
+                        .update(cx, |s, cx| s.set_value("", window, cx));
+                    let target = self.target.clone();
+                    self.background(
+                        window,
+                        cx,
+                        move || connection::group_dir(&target, &group),
+                        move |this, r, window, cx| match r {
+                            Ok(dir) => this.cmd(Cmd::Create {
+                                profile,
+                                cwd: Some(dir),
+                            }),
+                            Err(e) => {
+                                this.toast(
+                                    NotificationType::Error,
+                                    format!("Couldn't make the group's folder: {e}"),
+                                    window,
+                                    cx,
+                                );
+                                this.cmd(Cmd::Create { profile, cwd: None });
+                            }
+                        },
+                    );
+                    cx.notify();
+                    return;
+                }
                 match (self.new_project.clone(), self.new_branch) {
                     (Some(root), true) => {
                         // Its own branch: a fresh folder named after the request.

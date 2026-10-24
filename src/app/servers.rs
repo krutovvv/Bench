@@ -185,6 +185,7 @@ impl HermesApp {
         self.ssh.on = on;
         // Sessions or servers: either leaves Tools.
         self.tools.on = false;
+        self.tasks.on = false;
         self.panel = super::Panel::Chat;
         if on {
             self.reload_servers(cx);

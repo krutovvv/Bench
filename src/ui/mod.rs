@@ -11,6 +11,7 @@ mod providers;
 mod servers;
 mod sidebar;
 mod statusbar;
+mod tasks;
 mod terminal;
 mod tools;
 
@@ -25,9 +26,6 @@ use gpui_kit::*;
 
 use crate::app::{HermesApp, Panel};
 
-/// Height of the bars that face each other across the window: the sidebar's search and
-/// "New session" rows and the composer (one line). A 2-rem control (the input's own height)
-/// with 8px above and below, so it follows the Appearance size.
 /// A sidebar's search: a band from edge to edge (rules above and below, the content's
 /// background between), no frame of its own; the magnifier right over the group icons.
 pub fn search_band(input: &Entity<gpui_kit::component::input::InputState>, cx: &App) -> Div {
@@ -35,7 +33,8 @@ pub fn search_band(input: &Entity<gpui_kit::component::input::InputState>, cx: &
     h_flex()
         .flex_none()
         .w_full()
-        .h(bar_h(cx))
+        // As tall as the title bar: 36 with its two rules.
+        .h(bar_h(cx) + px(1.))
         // Measured: the input's own padding plus the icon's side bearing put it 2.5 right of
         // the group icons at 6.
         .pl(px(3.5))
@@ -58,13 +57,99 @@ pub fn search_band(input: &Entity<gpui_kit::component::input::InputState>, cx: &
         )
 }
 
+/// Height of every bar (search band, "New session", the composer, a tag strip): the header's 36
+/// less the 1px rule the bar draws (or shares) — 35 at the 14px font, following the
+/// Appearance size. A bar with its rule is `bar_h + 1`.
 pub fn bar_h(cx: &App) -> Pixels {
-    cx.theme().font_size * 2. + px(16.)
+    cx.theme().font_size * 2.5
 }
 
 /// Rows under a group header (sessions of a project, servers of a folder) start where the
 /// header's name does: 1rem inset + 1rem icon + 0.375rem gap, less the row's 2px stripe and
 /// 2px the icon box is narrower than 1rem (measured).
+impl HermesApp {
+    /// The strip beside the window buttons at the top of every sidebar, with the mode toggles
+    /// (Tools, then Tasks) in its top-right corner (the sidebar's own corner, as SSH has the
+    /// window's).
+    pub(super) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        // A mode's toggle: its icon, lit while it is on; the tooltip says how to get back.
+        let toggle = |id: &'static str, icon: crate::icons::Ico, name: &'static str, on: bool| {
+            div()
+                .id(id)
+                .p_1()
+                .cursor_pointer()
+                .text_color(if on {
+                    theme.primary
+                } else {
+                    theme.muted_foreground
+                })
+                .when(on, |d| d.bg(theme.list_active))
+                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                .child(icon.icon().small())
+                .tooltip(move |window, cx| {
+                    let tip = toggle_tip(name, on);
+                    gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx)
+                })
+        };
+        // 35 + the search band's top rule = the header's 36 with its bottom rule: the two rules
+        // are one line across the window.
+        h_flex()
+            .h(px(35.))
+            .flex_none()
+            .justify_end()
+            .items_center()
+            .gap_1()
+            // The icon's 4px box padding + 12 = the sidebar's 16px inset.
+            .pr(px(12.))
+            // The two utilities over the sidebar: Tools, then Tasks.
+            .when(crate::bench::TOOLS, |d| {
+                d.child(
+                    toggle(
+                        "mode-tools",
+                        crate::icons::Ico::Wrench,
+                        "Tools  ⌘3",
+                        self.tools.on,
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| this.toggle_tools(window, cx))),
+                )
+            })
+            .when(crate::bench::TASKS, |d| {
+                d.child(
+                    toggle(
+                        "mode-tasks",
+                        crate::icons::Ico::ListTodo,
+                        "Tasks  ⌘4",
+                        self.tasks.on,
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| this.toggle_tasks(window, cx))),
+                )
+            })
+            .into_any_element()
+    }
+}
+
+/// A mode toggle's tooltip: its name and shortcut, or "Back" and the shortcut while it is on.
+/// Split at the double space, never by bytes: ⌘ is 3 bytes, and a byte slice through it panics,
+/// which aborts the app (it did, on hovering the lit-up Tools toggle).
+fn toggle_tip(name: &str, on: bool) -> String {
+    match (on, name.rsplit_once("  ")) {
+        (true, Some((_, keys))) => format!("Back  {keys}"),
+        _ => name.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn toggle_tip_keeps_the_shortcut_whole() {
+        assert_eq!(super::toggle_tip("Tools  ⌘3", false), "Tools  ⌘3");
+        assert_eq!(super::toggle_tip("Tools  ⌘3", true), "Back  ⌘3");
+        assert_eq!(super::toggle_tip("Tasks  ⌘4", true), "Back  ⌘4");
+        assert_eq!(super::toggle_tip("New window", true), "New window");
+    }
+}
+
 pub fn nest_pl(cx: &App) -> Pixels {
     cx.theme().font_size * 2.375 - px(4.)
 }
@@ -103,7 +188,8 @@ pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl Int
         )
 }
 
-/// The control inside those bars: the search field and the "New session" button.
+/// A 2-rem control's height (a filled button outside a bar, e.g. "Add server"). The bars
+/// themselves are `bar_h`: a button that fills one takes `.h_full()` instead.
 pub const BAR_CONTROL_REMS: f32 = 2.;
 
 /// "1 action", "3 actions" (the `few` form is kept for call-site symmetry).
@@ -193,6 +279,9 @@ impl HermesApp {
 
     /// Header strip: the session title, or the settings tabs.
     fn render_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.tasks.on && self.panel == Panel::Chat {
+            return self.render_tasks_header(cx);
+        }
         if self.tools.on && self.panel == Panel::Chat {
             return self.render_tools_header(cx);
         }
@@ -301,6 +390,7 @@ impl Render for HermesApp {
         let theme = cx.theme().clone();
         let ssh = self.ssh.on && self.panel == Panel::Chat;
         let body = match self.panel {
+            Panel::Chat if self.tasks.on => self.render_tasks_body(cx),
             Panel::Chat if self.tools.on => self.render_tools_body(cx),
             Panel::Chat if ssh => self.render_ssh_body(window, cx),
             // A setup in a terminal (installing Hermes, a Claude login) has the chat area.
@@ -428,7 +518,10 @@ impl HermesApp {
             .child(left.child(self.render_sidebar(cx)))
             .child(resizable_panel().child(main))
             .when(
-                self.right.is_some() && self.panel == Panel::Chat && !self.tools.on,
+                self.right.is_some()
+                    && self.panel == Panel::Chat
+                    && !self.tools.on
+                    && !self.tasks.on,
                 |d| {
                     d.child(
                         resizable_panel()

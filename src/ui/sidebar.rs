@@ -14,6 +14,9 @@ use crate::model::source_label;
 
 impl HermesApp {
     pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        if self.tasks.on {
+            return self.render_tasks_sidebar(cx);
+        }
         if self.tools.on {
             return self.render_tools_sidebar(cx);
         }
@@ -103,6 +106,8 @@ impl HermesApp {
                 let icon = match (label.as_str(), &home) {
                     ("Pinned", _) => Ico::Pin,
                     (_, Some((_, _, true))) => Ico::FolderGit,
+                    // A named group of chats (the composer's "Group" field), not a folder you made.
+                    (_, Some((_, path, _))) if path.contains("/Research/") => Ico::Layers,
                     (_, Some(_)) => Ico::Folder,
                     ("Telegram", _) => Ico::Send,
                     ("Cron", _) => Ico::Clock,
@@ -145,6 +150,9 @@ impl HermesApp {
                         .when(home.is_some() || label == "Hermes", |d| {
                             let tip = match &home {
                                 Some((_, _, true)) => "New chat in this project",
+                                Some((_, path, _)) if path.contains("/Research/") => {
+                                    "New chat in this group"
+                                }
                                 Some(_) => "New chat in this folder",
                                 None => "New chat",
                             };
@@ -226,7 +234,7 @@ impl HermesApp {
             .size_full()
             .bg(theme.sidebar)
             // Under the window buttons: the search as a band, the button at the bottom as one.
-            .child(div().h(px(38.)).flex_none())
+            .child(self.render_sidebar_top(cx))
             .child(super::search_band(&self.search, cx))
             .child(
                 v_flex()
@@ -248,10 +256,11 @@ impl HermesApp {
                     }),
             )
             .child(
-                // Same height as the composer, so the two top rules line up across the window.
+                // As tall as the composer with its 1px top rule, so the button's top edge
+                // lines up with that rule across the window.
                 h_flex()
                     .flex_none()
-                    .h(super::bar_h(cx))
+                    .h(super::bar_h(cx) + px(1.))
                     .child(new_session.flex_1().h_full()),
             )
             .into_any_element()

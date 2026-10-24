@@ -76,10 +76,15 @@ pub enum Segment {
     Media(String),
     /// A closed ```mermaid block (an unclosed one, still streaming, stays text).
     Mermaid(String),
+    /// Any other closed code block: its language (may be empty) and its code. Shown with a
+    /// header of its own (the language, a copy button); an unclosed one stays text.
+    Code {
+        lang: String,
+        code: String,
+    },
 }
 
-/// Split an answer into text, delivered files and diagrams. Code blocks are left alone, except
-/// mermaid ones.
+/// Split an answer into text, delivered files, diagrams and code blocks.
 pub fn segments(answer: &str) -> Vec<Segment> {
     let mut out = vec![];
     let mut text = String::new();
@@ -89,22 +94,26 @@ pub fn segments(answer: &str) -> Vec<Segment> {
         }
         text.clear();
     };
-    // The open code fence: its char and length, and a mermaid block's lines (body, raw).
+    // The open code fence: its char and length, and its block (language, body, raw lines).
     let mut fence: Option<(char, usize)> = None;
-    let mut diagram: Option<(String, String)> = None;
+    let mut block: Option<(String, String, String)> = None;
     for line in answer.split_inclusive('\n') {
         let t = line.trim();
         let lead = line.trim_start();
         let run = |c: char| lead.chars().take_while(|x| *x == c).count();
         if let Some((c, n)) = fence {
             let closes = run(c) >= n && lead.trim_start_matches(c).trim().is_empty();
-            match &mut diagram {
+            match &mut block {
                 Some(_) if closes => {
-                    let (body, _) = diagram.take().unwrap();
+                    let (lang, body, _) = block.take().unwrap();
                     flush(&mut text, &mut out);
-                    out.push(Segment::Mermaid(body));
+                    out.push(if lang.eq_ignore_ascii_case("mermaid") {
+                        Segment::Mermaid(body)
+                    } else {
+                        Segment::Code { lang, code: body }
+                    });
                 }
-                Some((body, raw)) => {
+                Some((_, body, raw)) => {
                     body.push_str(line);
                     raw.push_str(line);
                 }
@@ -118,11 +127,13 @@ pub fn segments(answer: &str) -> Vec<Segment> {
         if let Some(c) = ['`', '~'].into_iter().find(|c| run(*c) >= 3) {
             let n = run(c);
             fence = Some((c, n));
-            if lead[n..].trim().eq_ignore_ascii_case("mermaid") {
-                diagram = Some((String::new(), line.to_string()));
-            } else {
-                text.push_str(line);
-            }
+            // The info string's first word is the language ("```rust ignore" is rust).
+            let lang = lead[n..]
+                .split_whitespace()
+                .next()
+                .unwrap_or("")
+                .to_string();
+            block = Some((lang, String::new(), line.to_string()));
             continue;
         }
         if t == "[[audio_as_voice]]" {
@@ -153,7 +164,7 @@ pub fn segments(answer: &str) -> Vec<Segment> {
         }
         text.push_str(line);
     }
-    if let Some((_, raw)) = diagram {
+    if let Some((_, _, raw)) = block {
         text.push_str(&raw);
     }
     flush(&mut text, &mut out);
@@ -499,9 +510,53 @@ mod tests {
     }
 
     #[test]
+    fn splits_code_blocks_and_keeps_an_open_one_as_text() {
+        let a = "Run:
+```bash
+ls -la
+```
+then
+```py
+print(1)
+";
+        assert_eq!(
+            segments(a),
+            vec![
+                Segment::Text(
+                    "Run:
+"
+                    .into()
+                ),
+                Segment::Code {
+                    lang: "bash".into(),
+                    code: "ls -la
+"
+                    .into()
+                },
+                Segment::Text(
+                    "then
+```py
+print(1)
+"
+                    .into()
+                ),
+            ]
+        );
+    }
+
+    #[test]
     fn leaves_code_and_open_diagrams_alone() {
         let a = "```\nMEDIA:/x.png\n```\n~~~mermaid\ngraph TD\n";
-        assert_eq!(segments(a), vec![Segment::Text(a.into())]);
+        assert_eq!(
+            segments(a),
+            vec![
+                Segment::Code {
+                    lang: "".into(),
+                    code: "MEDIA:/x.png\n".into()
+                },
+                Segment::Text("~~~mermaid\ngraph TD\n".into()),
+            ]
+        );
     }
 
     #[test]

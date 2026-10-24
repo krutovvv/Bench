@@ -115,4 +115,14 @@ icons! {
     X => "x",
     // Not Lucide: a Z in Lucide's style, for "open in Zed".
     Zed => "zed",
+    Archive => "archive",
+    BookCheck => "book-check",
+    CalendarDays => "calendar-days",
+    Check => "check",
+    Flag => "flag",
+    Layers => "layers",
+    ListTodo => "list-todo",
+    Moon => "moon",
+    Star => "star",
+    Tag => "tag",
 }

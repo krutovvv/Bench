@@ -30,6 +30,13 @@ image = { version = "0.25", default-features = false }
 # Tools mode (src/tools/): text and data utilities.
 regex = "1"
 chrono = "0.4"
+# Tasks live in Apple Reminders (iCloud, iPhone, Calendar): EventKit through objc2.
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSArray", "NSDate", "NSError", "NSPredicate", "NSCalendar", "NSObject", "NSURL", "NSTimeZone"] }
+objc2-event-kit = { version = "0.3", default-features = false, features = ["std", "block2", "EKCalendar", "EKCalendarItem", "EKError", "EKEventStore", "EKObject", "EKReminder", "EKSource", "EKTypes"] }
+# "The agent finished" as a macOS notification (src/notify.rs).
+objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }
 chrono-tz = "0.10"
 croner = "4"
 md-5 = "0.10"

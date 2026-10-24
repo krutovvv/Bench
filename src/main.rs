@@ -15,11 +15,14 @@ mod icons;
 mod lang;
 mod media;
 mod model;
+mod notify;
+mod reminders;
 mod remote;
 mod rest;
 mod speed;
 mod ssh;
 mod sshconfig;
+mod tasks;
 mod term;
 mod theme;
 mod ui;
@@ -219,6 +222,18 @@ fn main() {
             eprintln!("probe-git failed: {e:#}");
             std::process::exit(1);
         }
+        return;
+    }
+    // Run inside the .app (`open -n dist/Bench.app --args --probe-reminders`): macOS asks for
+    // Reminders access on behalf of the bundle. The result goes to a log file.
+    if args.get(1).map(String::as_str) == Some("--probe-reminders") {
+        let text = match reminders::probe() {
+            Ok(t) => t,
+            Err(e) => format!("probe failed: {e:#}\n"),
+        };
+        let _ = std::fs::create_dir_all(connection::state_dir());
+        let _ = std::fs::write(connection::state_dir().join("reminders-probe.log"), &text);
+        print!("{text}");
         return;
     }
     if args.get(1).map(String::as_str) == Some("--probe") {

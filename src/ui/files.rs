@@ -653,7 +653,7 @@ impl HermesApp {
         v_flex()
             .size_full()
             .bg(theme.sidebar)
-            .child(div().h(px(38.)).flex_none())
+            .child(self.render_sidebar_top(cx))
             .child(div().flex_1().min_h_0().child(list))
             .into_any_element()
     }

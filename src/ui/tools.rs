@@ -84,7 +84,7 @@ impl HermesApp {
         v_flex()
             .size_full()
             .bg(theme.sidebar)
-            .child(div().h(px(38.)).flex_none())
+            .child(self.render_sidebar_top(cx))
             .child(super::search_band(&self.tools.search, cx))
             .child(
                 v_flex()
@@ -463,7 +463,7 @@ impl HermesApp {
 }
 
 /// The strip above a pane: its name (or an error in red), then its buttons.
-fn pane_bar(
+pub(super) fn pane_bar(
     title: &str,
     error: Option<String>,
     buttons: Vec<AnyElement>,
@@ -492,7 +492,7 @@ fn pane_bar(
 }
 
 /// A small square text button in a pane's strip.
-fn small_button(
+pub(super) fn small_button(
     id: &'static str,
     label: &'static str,
     cx: &mut Context<HermesApp>,
@@ -515,7 +515,7 @@ fn small_button(
 }
 
 /// Pick one: square cells sharing borders, the chosen one in the accent.
-fn segmented(
+pub(super) fn segmented(
     id: &'static str,
     labels: &[&'static str],
     chosen: usize,
@@ -531,7 +531,7 @@ fn segmented(
     )
 }
 
-fn segmented_owned(
+pub(super) fn segmented_owned(
     id: &'static str,
     labels: Vec<String>,
     chosen: usize,

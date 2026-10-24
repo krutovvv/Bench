@@ -114,6 +114,9 @@ impl HermesApp {
         self.tools.on = !self.tools.on;
         self.panel = super::Panel::Chat;
         if self.tools.on {
+            self.tasks.on = false;
+        }
+        if self.tools.on {
             self.select_tool(self.tools.tool, window, cx);
         }
         cx.notify();

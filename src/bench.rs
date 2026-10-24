@@ -6,5 +6,7 @@
 pub const SSH: bool = true;
 /// The mini IDE beside a chat or a terminal: file tree, editor, tabs (⌘B, ⌘P, "Open files").
 pub const IDE: bool = true;
-/// The Tools mode of everyday utilities (⌘3, the wrench in the status bar).
+/// The Tools mode of everyday utilities (⌘3, the wrench in the sidebar's top-right corner).
 pub const TOOLS: bool = true;
+/// The Tasks mode: Apple Reminders as a Things-like task list (⌘4, the list icon in the sidebar's top-right corner).
+pub const TASKS: bool = true;

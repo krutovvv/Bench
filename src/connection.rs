@@ -525,6 +525,39 @@ fn strip_ansi(s: &str) -> String {
     out
 }
 
+/// A group of chats with no project of its own ("Audit X", a few deep researches): a plain
+/// folder `~/Research/<name>` where the gateway lives, made if missing. The sidebar groups the
+/// chats by it, and what they write lands there. Returns the folder's absolute path.
+pub fn group_dir(target: &Target, name: &str) -> Result<String> {
+    let name = name.trim().replace('/', "-");
+    if name.is_empty() || name.starts_with('.') {
+        bail!("not a group name: {name:?}");
+    }
+    match target {
+        Target::Local => {
+            let dir = PathBuf::from(std::env::var("HOME").unwrap_or_default())
+                .join("Research")
+                .join(&name);
+            std::fs::create_dir_all(&dir)?;
+            Ok(dir.to_string_lossy().into_owned())
+        }
+        Target::Ssh(host) => {
+            let cmd = format!(
+                "d=\"$HOME\"/Research/{} && mkdir -p \"$d\" && cd \"$d\" && pwd",
+                shell_quote(&name)
+            );
+            let out = Command::new("ssh")
+                .args(["-o", "BatchMode=yes", host, &cmd])
+                .stdin(Stdio::null())
+                .output()?;
+            if !out.status.success() {
+                bail!("mkdir: {}", String::from_utf8_lossy(&out.stderr).trim());
+            }
+            Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
+        }
+    }
+}
+
 /// Run `git -C dir args…` where the gateway lives (this Mac, or the SSH host); stdout trimmed.
 pub fn git(target: &Target, dir: &str, args: &[&str]) -> Result<String> {
     let out = match target {
