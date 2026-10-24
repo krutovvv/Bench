@@ -199,6 +199,10 @@ impl HermesApp {
         if Self::subject_browser(&s).is_some() {
             return Some("Browser".into());
         }
+        if let Some(id) = s.strip_prefix("env:") {
+            let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_default();
+            return Some(format!("{name}: environment"));
+        }
         Self::subject_tool(&s).map(|t| t.name().to_string())
     }
 
@@ -306,6 +310,20 @@ impl HermesApp {
                 clip(&input, 6000),
                 clip(&output, 6000)
             );
+        }
+        // A project's environment: what its block lists (the soul is in the agent's prompt already).
+        if subject.starts_with("env:") {
+            if let Some(e) = &self.project_env {
+                let mcp: Vec<&str> = e.mcp.iter().map(|m| m.0.as_str()).collect();
+                let skills: Vec<&str> = e.skills.iter().map(|k| k.0.as_str()).collect();
+                return format!(
+                    "The environment block shows the folder {}, MCP servers: {}, skills: {}{}.",
+                    e.dir,
+                    if mcp.is_empty() { "none".to_string() } else { mcp.join(", ") },
+                    if skills.is_empty() { "none".to_string() } else { skills.join(", ") },
+                    if e.dirty { "; the soul has unsaved edits in the block" } else { "" }
+                );
+            }
         }
         // A site: the page the latest step is on.
         if Self::subject_browser(&subject).is_some() {

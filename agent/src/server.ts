@@ -13,7 +13,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import YAML from "yaml";
 import pkg from "../package.json" with { type: "json" };
 import { timezone } from "./config.ts";
-import { AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting, agentDir, agents, providers, readConfig, readEnv, readAgent, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp, migrateProfiles } from "./config.ts";
+import { agentMcp, AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting, agentDir, agents, providers, readConfig, readEnv, readAgent, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp, migrateProfiles } from "./config.ts";
 import { importHermes, migrateCronFile } from "./import-hermes.ts";
 import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
@@ -23,6 +23,7 @@ import { connectMcp, mcpStatus } from "./mcp.ts";
 import { tasks } from "./builtin/tasks.ts";
 import { hosts, importSshConfig, importTransmit, type Host } from "./builtin/hosts.ts";
 import { projects } from "./builtin/projects.ts";
+import { listSkills } from "./builtin/skills.ts";
 import * as remote from "./builtin/remote.ts";
 
 const STATE = path.join(AGENT_HOME, "server.json");
@@ -60,14 +61,17 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 	}),
 	"session.list": ({ limit, profile }) => ({
 		sessions: rt.store
-			.list({ profile: profile || "default", limit: limit ?? 80 })
+			// Every thread, whatever agent or project it runs with: the sidebar groups them by project.
+			.list({ limit: limit ?? 200 })
 			.filter((s) => s.source !== "subagent")
 			.map((s) => ({ id: s.id, title: s.title, message_count: s.message_count, model: s.model, running: rt.isBusy(s.id), source: s.source, cwd: s.cwd, subject: s.subject ?? "", project: s.project ?? "", started_at: s.created, last_active: s.updated })),
 	}),
 	"session.create": async ({ profile, cwd, subject, project }) => {
 		// A thread in a project works in the project's folder unless it asked for another.
 		const dir = cwd || (project ? projects.dir(String(project)) : undefined);
-		const live = await rt.create(profile || "default", dir, "local", { ...(subject ? { subject: String(subject) } : {}), ...(project ? { project: String(project) } : {}) });
+		// A project's thread runs with the project's environment (general + its own).
+		const agent = project ? `project:${project}` : profile || "default";
+		const live = await rt.create(agent, dir, "local", { ...(subject ? { subject: String(subject) } : {}), ...(project ? { project: String(project) } : {}) });
 		broadcast(live.row.id, "sessions.changed", {});
 		return { session_id: live.row.id, stored_session_id: live.row.id, revision: 0, execution_generation: 0 };
 	},
@@ -493,6 +497,37 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		const prev = hosts.get(decodeURIComponent(m[1]));
 		if (!prev) throw new HttpError(404, "no such host");
 		return { host: hosts.save({ ...prev, ...req.body, id: prev.id }) };
+	}],
+	["PUT", /^\/api\/projects\/([^/]+)$/, (req, m) => {
+		const prev = projects.get(decodeURIComponent(m[1]));
+		if (!prev) throw new HttpError(404, "no such project");
+		return { project: projects.save({ ...prev, ...req.body, id: prev.id }) };
+	}],
+	// What a project's threads get on top of the general agent: its soul, MCP servers, skills.
+	["GET", /^\/api\/projects\/([^/]+)\/env$/, (_req, m) => {
+		const id = decodeURIComponent(m[1]);
+		const p = projects.get(id);
+		if (!p) throw new HttpError(404, "no such project");
+		const agent = `project:${id}`;
+		const dir = projects.env(id);
+		const soulFile = path.join(dir, "SYSTEM.md");
+		const status = mcpStatus(agent);
+		return {
+			project: p,
+			dir,
+			soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
+			mcp: Object.entries(agentMcp(agent)).map(([name, spec]: [string, any]) => {
+				const s = status.find((x) => x.name === name);
+				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, tools: s?.tools ?? 0, error: s?.error ?? null };
+			}),
+			skills: listSkills(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
+		};
+	}],
+	["PUT", /^\/api\/projects\/([^/]+)\/soul$/, (req, m) => {
+		const id = decodeURIComponent(m[1]);
+		if (!projects.get(id)) throw new HttpError(404, "no such project");
+		fs.writeFileSync(path.join(projects.env(id), "SYSTEM.md"), String(req.body?.text ?? ""));
+		return { ok: true };
 	}],
 	["DELETE", /^\/api\/projects\/([^/]+)$/, (_req, m) => {
 		projects.remove(decodeURIComponent(m[1]));

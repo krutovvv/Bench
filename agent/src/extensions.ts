@@ -136,9 +136,11 @@ export async function loadExtensions(registry: { install(e: pi.Extension): void 
 /** An agent's extensions, as objects for `configure()`: its own by name, else the built-in one; always its MCP and tool search. */
 export function forAgent(names: string[] | undefined, agent: string): pi.Extension[] {
 	const wanted = [...new Set([...(names?.length ? names : ["assistant"]), "tool-search"])];
-	const list = wanted.map((n) => loaded.get(`${agent}:${n}`)?.extension ?? loaded.get(n)?.extension).filter(Boolean) as pi.Extension[];
-	const mcp = loaded.get(`mcp:${agent}`)?.extension;
-	return mcp ? [...list, mcp] : list;
+	const own = agent.startsWith("project:") ? "default" : agent;
+	const list = wanted.map((n) => loaded.get(`${own}:${n}`)?.extension ?? loaded.get(n)?.extension).filter(Boolean) as pi.Extension[];
+	// A project's threads: the general MCP servers and the project's own.
+	const mcp = [...new Set([own, agent])].map((a) => loaded.get(`mcp:${a}`)?.extension).filter(Boolean) as pi.Extension[];
+	return [...list, ...mcp];
 }
 
 /** After an agent's MCP servers reconnected. */

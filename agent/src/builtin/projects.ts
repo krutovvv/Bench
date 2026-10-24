@@ -44,12 +44,18 @@ export const projects = {
 		db().prepare("DELETE FROM projects WHERE id = ?").run(id);
 		db().prepare("UPDATE sessions SET project = '' WHERE project = ?").run(id);
 	},
-	/** Where its threads work: its own folder, else the one Bench keeps for it. */
+	/** Where its threads work: its own folder, else files/ in its environment. */
 	dir(id: string): string {
 		const p = projects.get(id);
 		if (p?.folder && fs.existsSync(p.folder)) return p.folder;
-		const own = path.join(BENCH_HOME, "projects", id);
+		const own = path.join(projects.env(id), "files");
 		fs.mkdirSync(own, { recursive: true });
 		return own;
+	},
+	/** Its environment, an agent directory in Pi's terms: SYSTEM.md (its soul), mcp.json, skills/, prompts/. */
+	env(id: string): string {
+		const dir = path.join(BENCH_HOME, "projects", id);
+		for (const sub of ["skills", "prompts"]) fs.mkdirSync(path.join(dir, sub), { recursive: true });
+		return dir;
 	},
 };

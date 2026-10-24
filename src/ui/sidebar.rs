@@ -94,7 +94,7 @@ impl HermesApp {
             Some(_) => Ico::Folder,
             None => Ico::Layers,
         };
-        let (new_id, del_id) = (p.id.clone(), p.id.clone());
+        let (new_id, del_id, env_id) = (p.id.clone(), p.id.clone(), p.id.clone());
         let mut out = vec![h_flex()
             .id(("phead", g))
             .group(group.clone())
@@ -109,6 +109,22 @@ impl HermesApp {
             .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child(p.name.clone()))
             .child(div().flex_1())
             .child(super::group_chevron(collapsed, group.clone(), cx))
+            // The pencil (on hover): the project's environment — its soul, MCP, skills.
+            .child(
+                super::head_plus_slot()
+                    .id(("penv", g))
+                    .cursor_pointer()
+                    .text_color(muted)
+                    .opacity(0.)
+                    .group_hover(group.clone(), |s| s.opacity(1.))
+                    .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
+                    .child(Ico::Pencil.icon().xsmall())
+                    .tooltip(|window, cx| Tooltip::new("The project's environment").build(window, cx))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.open_project_env(env_id.clone(), window, cx)
+                    })),
+            )
             .child(
                 super::head_plus_slot()
                     .id(("pnew", g))

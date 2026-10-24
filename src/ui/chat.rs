@@ -89,6 +89,11 @@ impl HermesApp {
                 ),
                 None => None,
             }
+        } else if let Some(id) = subject.strip_prefix("env:") {
+            if self.project_env.as_ref().is_none_or(|e| e.id != id) {
+                self.load_env(id, window, cx);
+            }
+            Some(self.render_env_block(cx))
         } else if let Some(tool) = HermesApp::subject_tool(&subject) {
             if self.tools.tool != tool {
                 self.select_tool(tool, window, cx);

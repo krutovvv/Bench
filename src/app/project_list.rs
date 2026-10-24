@@ -152,3 +152,124 @@ impl HermesApp {
         );
     }
 }
+
+/// A project's environment as its thread's block shows it (`env:<project id>`).
+pub struct ProjectEnv {
+    pub id: String,
+    /// Where it lives (`~/.bench/projects/<id>`).
+    pub dir: String,
+    /// Its soul (SYSTEM.md), editable in the block.
+    pub soul: Entity<gpui_kit::component::input::EditorState>,
+    pub dirty: bool,
+    /// MCP servers: (name, "http"/"stdio", enabled, tools, error).
+    pub mcp: Vec<(String, String, bool, u64, Option<String>)>,
+    /// Its own skills: (name, description).
+    pub skills: Vec<(String, String)>,
+    pub error: Option<String>,
+}
+
+impl HermesApp {
+    /// A project's pencil: its environment's thread (the latest, or a new one in the project).
+    pub fn open_project_env(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.load_env(&id, window, cx);
+        self.thread_project = id.clone();
+        self.open_subject(format!("env:{id}"), cx);
+        self.thread_project = id;
+    }
+
+    /// Read the environment for the block (again after the agent changed it).
+    pub fn load_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(conn) = self.conn.clone() else {
+            return;
+        };
+        if self.project_env.as_ref().is_none_or(|e| e.id != id) {
+            let soul = cx.new(|cx| {
+                gpui_kit::component::input::EditorState::new(window, cx)
+                    .scroll_beyond_last_line(Some(1))
+                    .soft_wrap(true)
+            });
+            soul.update(cx, |s, cx| s.set_highlighter("markdown", cx));
+            let sub = cx.subscribe(&soul, |this, _, ev: &gpui_kit::component::input::InputEvent, cx| {
+                if let gpui_kit::component::input::InputEvent::Change = ev {
+                    if let Some(e) = this.project_env.as_mut() {
+                        e.dirty = true;
+                    }
+                    cx.notify();
+                }
+            });
+            sub.detach();
+            self.project_env = Some(ProjectEnv { id: id.to_string(), dir: String::new(), soul, dirty: false, mcp: vec![], skills: vec![], error: None });
+        }
+        let profile = self.current_profile();
+        let path = format!("/api/projects/{id}/env");
+        let asked = id.to_string();
+        self.background(
+            window,
+            cx,
+            move || rest::get_raw(&conn, &profile, &path),
+            move |this, r, window, cx| {
+                let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked) else {
+                    return;
+                };
+                match r {
+                    Ok(v) => {
+                        e.error = None;
+                        e.dir = v["dir"].as_str().unwrap_or_default().to_string();
+                        e.mcp = v["mcp"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .map(|m| {
+                                (
+                                    m["name"].as_str().unwrap_or_default().to_string(),
+                                    m["kind"].as_str().unwrap_or_default().to_string(),
+                                    m["enabled"].as_bool().unwrap_or(true),
+                                    m["tools"].as_u64().unwrap_or(0),
+                                    m["error"].as_str().map(str::to_string),
+                                )
+                            })
+                            .collect();
+                        e.skills = v["skills"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .map(|k| (k["name"].as_str().unwrap_or_default().to_string(), k["description"].as_str().unwrap_or_default().to_string()))
+                            .collect();
+                        // The soul as saved, unless the person is typing in it.
+                        if !e.dirty {
+                            let text = v["soul"].as_str().unwrap_or_default().to_string();
+                            e.soul.update(cx, |s, cx| s.set_value(text, window, cx));
+                            e.dirty = false;
+                        }
+                    }
+                    Err(err) => e.error = Some(format!("{err:#}")),
+                }
+                cx.notify();
+            },
+        );
+    }
+
+    /// The block's Save: the soul as typed.
+    pub fn save_soul(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(conn), Some(e)) = (self.conn.clone(), self.project_env.as_ref()) else {
+            return;
+        };
+        let text = e.soul.read(cx).value().to_string();
+        let (id, path) = (e.id.clone(), format!("/api/projects/{}/soul", e.id));
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json(&conn, "PUT", &path, &profile, json!({"text": text})),
+            move |this, r, window, cx| match r {
+                Ok(_) => {
+                    if let Some(e) = this.project_env.as_mut().filter(|e| e.id == id) {
+                        e.dirty = false;
+                    }
+                    cx.notify();
+                }
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+}

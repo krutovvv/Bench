@@ -24,10 +24,9 @@ mod ide_tabs;
 mod keys;
 pub mod marks;
 mod processes;
-mod profiles;
 pub(crate) mod projects;
 pub(crate) mod project_list;
-pub use project_list::ProjectForm;
+pub use project_list::{ProjectEnv, ProjectForm};
 mod prompts;
 pub(crate) mod providers;
 pub(crate) mod servers;
@@ -63,7 +62,6 @@ pub enum Panel {
     /// Telegram: the bot, who may write to it, the proxy; whose chats the list shows.
     Messages,
     Cron,
-    Profiles,
     /// Appearance and the Telegram filter.
     Settings,
 }
@@ -135,6 +133,8 @@ pub struct HermesApp {
     pub projects: Vec<crate::model::ProjectEntry>,
     /// The new project's form, in the chat area while open (the sidebar's "+").
     pub project_form: Option<ProjectForm>,
+    /// The open environment thread's project environment (its block).
+    pub project_env: Option<ProjectEnv>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -278,12 +278,6 @@ pub struct HermesApp {
     pub prompt_title: Entity<InputState>,
     pub prompt_editor: Entity<EditorState>,
     pub prompt_delete_armed: bool,
-    /// Settings → Profiles.
-    pub prof_rows: Vec<rest::ProfileRow>,
-    pub prof_open: Option<String>,
-    pub prof_name: Entity<InputState>,
-    pub soul_editor: Entity<EditorState>,
-    pub prof_delete_armed: bool,
     pub cron_editor: Entity<EditorState>,
     pub cron_schedule: Entity<InputState>,
     pub effort_choice: Entity<Choice>,
@@ -408,12 +402,6 @@ impl HermesApp {
                 .line_number(true)
         });
         let prompt_title = cx.new(|cx| InputState::new(window, cx).placeholder("Name"));
-        let prof_name = cx.new(|cx| InputState::new(window, cx).placeholder("Profile name"));
-        let soul_editor = cx.new(|cx| {
-            EditorState::new(window, cx)
-                .language("markdown")
-                .line_number(true)
-        });
         let prompt_editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .language("markdown")
@@ -692,6 +680,7 @@ impl HermesApp {
             thread_project: String::new(),
             projects: vec![],
             project_form: None,
+            project_env: None,
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,
@@ -775,11 +764,6 @@ impl HermesApp {
             prompt_title,
             prompt_editor,
             prompt_delete_armed: false,
-            prof_rows: vec![],
-            prof_open: None,
-            prof_name,
-            soul_editor,
-            prof_delete_armed: false,
             cron_editor,
             cron_schedule,
             skill_editor,
@@ -1144,8 +1128,11 @@ impl HermesApp {
             } if self.is_current(&session) => {
                 self.speed.request();
                 // The agent may have changed the list this thread is about.
-                if self.current_subject().starts_with("tasks:") {
+                let subject = self.current_subject();
+                if subject.starts_with("tasks:") {
                     self.load_tasks();
+                } else if let Some(id) = subject.strip_prefix("env:") {
+                    self.load_env(id, window, cx);
                 }
                 let mut changed = None;
                 if let Some(turn) = self.turns.last_mut() {
@@ -2218,7 +2205,6 @@ impl HermesApp {
         self.panel = panel;
         match panel {
             Panel::Chat | Panel::Settings => {}
-            Panel::Profiles => self.load_profiles_admin(window, cx),
             Panel::Prompts => self.load_prompts(window, cx),
             Panel::Providers | Panel::Messages => {
                 self.load_providers(window, cx);

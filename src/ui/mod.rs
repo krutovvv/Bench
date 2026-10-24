@@ -418,7 +418,6 @@ impl HermesApp {
             ("tab-providers", "Providers", Panel::Providers),
             ("tab-messages", "Messages", Panel::Messages),
             ("tab-cron", "Cron", Panel::Cron),
-            ("tab-profiles", "Agents", Panel::Profiles),
             ("tab-settings", "Settings", Panel::Settings),
         ]
         .map(|(id, label, panel)| {
@@ -510,7 +509,6 @@ impl Render for HermesApp {
             Panel::Messages => self.render_messages(cx),
             Panel::Cron => self.render_cron(cx).into_any_element(),
             Panel::Settings => self.render_settings(cx).into_any_element(),
-            Panel::Profiles => self.render_profiles(cx).into_any_element(),
             Panel::Prompts => self.render_prompts(cx).into_any_element(),
         };
 

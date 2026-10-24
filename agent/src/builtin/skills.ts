@@ -7,7 +7,7 @@ import { defineTool } from "@earendil-works/pi-durable";
 import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
-import { agentDir } from "../config.ts";
+import { agentDir, homeAgent, isProject } from "../config.ts";
 import { sessionOf } from "../host.ts";
 
 export interface Skill {
@@ -27,6 +27,15 @@ export function frontMatter(text: string): Record<string, any> {
 }
 
 export function listSkills(profile: string): Skill[] {
+	// A project's threads have the general skills and the project's own (its own win by name).
+	if (isProject(profile)) {
+		const own = skillsIn(profile);
+		return [...listSkills(homeAgent(profile)).filter((g) => !own.some((o) => o.name === g.name)), ...own].sort((a, b) => a.name.localeCompare(b.name));
+	}
+	return skillsIn(profile);
+}
+
+function skillsIn(profile: string): Skill[] {
 	const root = path.join(agentDir(profile), "skills");
 	const out: Skill[] = [];
 	const walk = (d: string, category: string, depth: number) => {

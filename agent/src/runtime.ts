@@ -188,7 +188,9 @@ export class Runtime {
 
 	/** The agent's MCP servers, connected before its first turn. */
 	private async mcpFor(agent: string): Promise<void> {
-		if (await ensureMcp(agent).catch(() => false)) installMcp(this.registry, agent);
+		// A project's threads use the general servers too.
+		for (const a of agent.startsWith("project:") ? ["default", agent] : [agent])
+			if (await ensureMcp(a).catch(() => false)) installMcp(this.registry, a);
 	}
 
 	async create(profile: string, cwd: string | undefined, source = "local", extra: Partial<SessionRow> = {}): Promise<Live> {

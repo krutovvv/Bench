@@ -124,16 +124,6 @@ impl HermesApp {
             )
         };
 
-        let profiles = self
-            .profiles
-            .iter()
-            .map(|p| {
-                let name = p.name.clone();
-                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
-                    Box::new(move |this, window, cx| this.select_profile(name.clone(), window, cx));
-                (p.label.clone(), self.profile.as_deref() == Some(&p.name), f)
-            })
-            .collect();
         let efforts = EFFORTS
             .iter()
             .enumerate()
@@ -190,12 +180,6 @@ impl HermesApp {
             .filter(|(i, c)| *i == 0 || self.profile_models[i - 1].group != c.group)
             .map(|(i, c)| (i, c.group.clone()))
             .collect();
-        let profile_label = self
-            .profiles
-            .iter()
-            .find(|p| Some(&p.name) == self.profile.as_ref())
-            .map(|p| p.label.clone())
-            .unwrap_or_else(|| "Agent".into());
 
         // Context: the agent's numbers once a turn has run; before that (a reopened chat) a rough
         // estimate from the transcript, marked "~". The limit falls back to model.context_length.
@@ -309,18 +293,8 @@ impl HermesApp {
             .border_color(theme.border)
             .text_sm()
             .child(self.render_target_picker(cx))
-            .when(!self.profiles.is_empty(), |d| {
-                d.child(picker(
-                    "profile",
-                    Ico::UserRound,
-                    profile_label,
-                    Some("Agent: its own model, MCP servers, skills, prompts, chats"),
-                    vec![],
-                    profiles,
-                ))
-            })
-            // Beside the profile it serves: the backend's state; its panel reconnects or
-            // restarts the gateway.
+            // No agent to pick: a thread runs with its project's environment. The backend's
+            // state; its panel reconnects or restarts the gateway.
             .children(self.render_backend(cx))
             .child(div().flex_1())
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))

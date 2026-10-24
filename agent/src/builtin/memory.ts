@@ -6,7 +6,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import fs from "node:fs";
 import path from "node:path";
-import { getSetting, agentDir } from "../config.ts";
+import { getSetting, agentDir, homeAgent } from "../config.ts";
 import { sessionOf } from "../host.ts";
 
 const SEP = "\n§\n";
@@ -17,7 +17,8 @@ export const LIMITS = () => {
 };
 
 export function memoryFile(profile: string, target: "memory" | "user"): string {
-	return path.join(agentDir(profile), "memories", target === "user" ? "USER.md" : "MEMORY.md");
+	// One memory for every project's threads: the general agent's.
+	return path.join(agentDir(homeAgent(profile)), "memories", target === "user" ? "USER.md" : "MEMORY.md");
 }
 
 export function readEntries(profile: string, target: "memory" | "user"): string[] {

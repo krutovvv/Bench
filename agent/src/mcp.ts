@@ -9,8 +9,10 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
 import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent } from "@earendil-works/pi-mcp";
 import { createHash } from "node:crypto";
+import fs from "node:fs";
 import os from "node:os";
-import { agentMcp, agents, profileEnv } from "./config.ts";
+import path from "node:path";
+import { agentDir, agentMcp, agents, profileEnv } from "./config.ts";
 
 /** Without `exposure`: servers with more tools than this are deferred behind tool_search. */
 const DEFER_OVER = 12;
@@ -53,18 +55,28 @@ const fill = (v: unknown, env: Record<string, string>): any =>
 	typeof v === "string" ? v.replace(/\$\{(\w+)\}/g, (_m, k) => env[k] ?? "") : Array.isArray(v) ? v.map((x) => fill(x, env)) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, fill(x, env)])) : v;
 
 const connected = new Set<string>();
+/** mcp.json's modification time when an agent's servers connected: an edit reconnects them. */
+const connectedAt = new Map<string, number>();
+const mcpMtime = (agent: string): number => {
+	try {
+		return fs.statSync(path.join(agentDir(agent), "mcp.json")).mtimeMs;
+	} catch {
+		return 0;
+	}
+};
 
 /** Connects the servers of one agent (or of every agent), replacing what was connected before. */
 export async function connectMcp(agent?: string, timeoutMs = 30000): Promise<void> {
 	for (const name of agent ? [agent] : agents()) {
 		connected.add(name);
+		connectedAt.set(name, mcpMtime(name));
 		await connectAgent(name, timeoutMs);
 	}
 }
 
 /** An agent's servers connect with its first session, not all at the server's start. */
 export async function ensureMcp(agent: string): Promise<boolean> {
-	if (connected.has(agent)) return false;
+	if (connected.has(agent) && connectedAt.get(agent) === mcpMtime(agent)) return false;
 	await connectMcp(agent);
 	return true;
 }

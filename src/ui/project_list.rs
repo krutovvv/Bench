@@ -98,3 +98,72 @@ impl HermesApp {
             .into_any_element()
     }
 }
+
+impl HermesApp {
+    /// A project's environment at the top of its thread: the soul (editable), its MCP servers,
+    /// its skills. The conversation under it changes the same things through the agent.
+    pub(super) fn render_env_block(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let Some(e) = self.project_env.as_ref() else {
+            return div().text_color(muted).child("Loading…").into_any_element();
+        };
+        let section = |title: &'static str| div().pt_3().pb_1().text_color(muted).child(title);
+        let row = |name: String, note: String, bad: bool| {
+            h_flex()
+                .gap_2()
+                .py_0p5()
+                .child(div().flex_none().child(name))
+                .child(div().min_w_0().truncate().text_color(if bad { theme.danger } else { muted }).child(note))
+        };
+        let dirty = e.dirty;
+        v_flex()
+            .w_full()
+            .child(
+                h_flex()
+                    .gap_2()
+                    .child(div().text_color(muted).child("Soul: what the project is, how to work in it"))
+                    .child(div().flex_1())
+                    .when(dirty, |d| {
+                        d.child(
+                            div()
+                                .id("soul-save")
+                                .px_2()
+                                .cursor_pointer()
+                                .bg(theme.primary)
+                                .text_color(theme.primary_foreground)
+                                .hover(|s| s.bg(theme.primary_hover))
+                                .child("Save")
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.click_claimed = true;
+                                    this.save_soul(window, cx)
+                                })),
+                        )
+                    }),
+            )
+            .child(
+                div()
+                    .mt_1()
+                    .h(px(180.))
+                    .border_1()
+                    .border_color(theme.border)
+                    .child(gpui_kit::component::input::Editor::new(&e.soul).appearance(false).h_full()),
+            )
+            .child(section("MCP servers"))
+            .when(e.mcp.is_empty(), |d| d.child(div().text_color(muted).child("None of its own yet: ask below to add one.")))
+            .children(e.mcp.iter().map(|(name, kind, enabled, tools, error)| {
+                let note = match (enabled, error) {
+                    (false, _) => format!("{kind} · off"),
+                    (_, Some(err)) => format!("{kind} · {err}"),
+                    _ => format!("{kind} · {tools} tools"),
+                };
+                row(name.clone(), note, error.is_some())
+            }))
+            .child(section("Skills"))
+            .when(e.skills.is_empty(), |d| d.child(div().text_color(muted).child("None of its own yet: ask below to write one.")))
+            .children(e.skills.iter().map(|(name, desc)| row(name.clone(), desc.clone(), false)))
+            .when_some(e.error.clone(), |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
+            .child(div().pt_3().text_color(muted).truncate().child(e.dir.clone()))
+            .into_any_element()
+    }
+}

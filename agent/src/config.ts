@@ -120,7 +120,14 @@ export interface AgentSettings {
 	approvals?: string;
 }
 
+/** A project's environment is an agent directory too ("project:<id>"), in projects/<id>/. */
+export const isProject = (agent: string): boolean => agent.startsWith("project:");
+
+/** What a project's threads share with every other thread: the general agent's memory, model, settings. */
+export const homeAgent = (agent: string): string => (isProject(agent) ? "default" : agent);
+
 export function agentDir(agent: string): string {
+	if (isProject(agent)) return path.join(BENCH_HOME, "projects", agent.slice(8));
 	return path.join(BENCH_HOME, "agents", agent || "default");
 }
 
@@ -131,6 +138,14 @@ export function agents(): string[] {
 }
 
 export function readAgent(agent: string): AgentSettings {
+	// A project runs with the general agent's model and settings (its own settings.json may refine them).
+	if (isProject(agent)) {
+		let own: Partial<AgentSettings> = {};
+		try {
+			own = JSON.parse(fs.readFileSync(path.join(agentDir(agent), "settings.json"), "utf8"));
+		} catch {}
+		return { ...readAgent("default"), ...own };
+	}
 	try {
 		return JSON.parse(fs.readFileSync(path.join(agentDir(agent), "settings.json"), "utf8"));
 	} catch {

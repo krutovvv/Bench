@@ -7,9 +7,10 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, timezone } from "./config.ts";
+import { agentDir, homeAgent, isProject, timezone } from "./config.ts";
 import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
+import { projects } from "./builtin/projects.ts";
 import { hosts } from "./builtin/hosts.ts";
 import type { SessionInfo } from "./host.ts";
 
@@ -19,8 +20,16 @@ const read = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim(
 
 /** The agent's SYSTEM.md (who it is), as in Pi; then its AGENTS.md (standing instructions). */
 export function soul(s: SessionInfo): string {
-	const instructions = read(path.join(agentDir(s.profile), "AGENTS.md"));
-	return [read(path.join(agentDir(s.profile), "SYSTEM.md")) || IDENTITY, instructions && `# Standing instructions\n\n${instructions}`].filter(Boolean).join("\n\n");
+	const home = agentDir(homeAgent(s.profile));
+	const instructions = read(path.join(home, "AGENTS.md"));
+	const parts = [read(path.join(home, "SYSTEM.md")) || IDENTITY, instructions && `# Standing instructions\n\n${instructions}`];
+	// A project's own soul: what it is, how to work in it.
+	if (isProject(s.profile)) {
+		const own = read(path.join(agentDir(s.profile), "SYSTEM.md"));
+		const name = projects.get(s.profile.slice(8))?.name ?? "this project";
+		parts.push(`# The project: ${name}\n\n${own || "(no description yet)"}`);
+	}
+	return parts.filter(Boolean).join("\n\n");
 }
 
 const PLATFORM: Record<string, string> = {
@@ -97,6 +106,11 @@ export function subject(s: SessionInfo): string | undefined {
 	if (kind === "files") {
 		const h = hosts.get(value);
 		return `# This thread\nIt is about the files of ${h ? `${h.name} (${h.kind})` : `the host ${value}`}, shown live above the conversation. Work with them with remote_files.${block}`;
+	}
+	if (kind === "env") {
+		const p = projects.get(value);
+		const dir = path.join(path.dirname(agentDir("project:x")), value);
+		return `# This thread\nIt is about the environment of the project "${p?.name ?? value}", shown above the conversation: what every thread of this project gets on top of the general agent. It lives in ${dir}: SYSTEM.md (the project's soul: what it is, for whom, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}, optional "exposure": "direct" | "deferred" | "hidden"}}), skills/<name>/SKILL.md (front matter with name and description), prompts/. Change them there with read, write and edit when the person asks: describe the project, add or remove a server or a skill. Keys and passwords go into mcp.json as \${NAME} references, the values into the agent's env (ask for them). New threads of the project see the changes; a changed mcp.json reconnects its servers.${block}`;
 	}
 	if (kind === "folder")
 		return `# This thread\nIt is about the folder ${value}, shown above the conversation. Work in it with read, write, edit and bash.`;
