@@ -9,7 +9,6 @@ metadata:
   hermes:
     tags: [Rust, GPUI, gpui-kit, Desktop, Bench, Workbench, UI-Kit, Design-System, Zed, macOS]
     category: desktop-dev
-    related_skills: [ponytail]
 ---
 
 # Bench Kit
@@ -100,7 +99,7 @@ itself** while you change Bench. So:
 
 Rules that keep it right:
 - **One UI language: English**, short labels, tooltips on icons with their shortcut.
-- **Engineering ladder** (after the open-source "ponytail" skill): need it at all? → already in
+- **Engineering ladder**: need it at all? → already in
   the app? → a ready component? → a proven crate? → otherwise the minimum, in the house style.
   Logic with branches, parsers, time or money gets a small test; errors are shown, never
   swallowed; nothing that can lose data runs without a confirmation.

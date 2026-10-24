@@ -107,9 +107,8 @@ the views thin — the next addition copies the shape of the last one.
 
 ## How to build (the engineering rules)
 
-Write code like a lazy senior developer (after the open-source "ponytail" skill,
-github.com/DietrichGebert/ponytail): understand the task and the code it touches first, then take
-the first rung that fully works:
+Write code like a lazy senior developer: understand the task and the code it touches first, then
+take the first rung that fully works:
 
 1. **Does it need to exist?** Build what the person asked for; name extra ideas in one line.
 2. **Is it already in the app?** Reuse Bench's code and the template's `kit.rs` the way nearby
