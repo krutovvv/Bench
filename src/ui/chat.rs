@@ -629,7 +629,7 @@ impl HermesApp {
                         div()
                             .p_2()
                             .bg(theme.secondary)
-                            .font_family("Menlo")
+                            .font_family(crate::theme::MONO)
                             .text_xs()
                             .child(req.command.clone()),
                     )
@@ -733,7 +733,7 @@ impl HermesApp {
                                 .bg(theme.secondary)
                                 .border_1()
                                 .border_color(theme.border)
-                                .font_family("Menlo")
+                                .font_family(crate::theme::MONO)
                                 .text_xs()
                                 .text_color(theme.foreground)
                                 // Verbatim and selectable, like the user's messages.
@@ -847,8 +847,8 @@ impl HermesApp {
         }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
+        let now = web_time::SystemTime::now()
+            .duration_since(web_time::UNIX_EPOCH)
             .map_or(0., |d| d.as_secs_f64());
         let running = self.processes.iter().filter(|p| p.running).count();
         let done = self.processes.len() - running;
@@ -936,7 +936,7 @@ impl HermesApp {
                                     .flex_1()
                                     .min_w_0()
                                     .truncate()
-                                    .font_family("Menlo")
+                                    .font_family(crate::theme::MONO)
                                     .child(shown_cmd)
                                     .tooltip(move |window, cx| {
                                         Tooltip::new(full_cmd.clone()).build(window, cx)
@@ -991,7 +991,7 @@ impl HermesApp {
                                 .bg(theme.secondary)
                                 .border_1()
                                 .border_color(theme.border)
-                                .font_family("Menlo")
+                                .font_family(crate::theme::MONO)
                                 .text_xs()
                                 .text_color(theme.foreground)
                                 .child(if tail.trim().is_empty() {

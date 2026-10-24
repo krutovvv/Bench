@@ -37,6 +37,127 @@ fn tool(name: &str, detail: &str) -> Step {
     }
 }
 
+/// The answer's media. On the desktop: files the agent delivered (`MEDIA:` lines), a Mermaid
+/// diagram drawn here, a video and a voice note that play inline. In the browser there is no
+/// disk and no ffmpeg: the chart and the (pre-drawn) diagram come by URL next to the page, and
+/// the clips are named instead.
+#[cfg(not(target_family = "wasm"))]
+fn media() -> (String, String, String) {
+    let video = demo_file("preview.mp4");
+    crate::media::warm(&video);
+    (
+        format!("MEDIA:{}", demo_file("chart.png")),
+        "```mermaid\ngraph LR\n  A[Visit] --> B[Hero]\n  B --> C[Quotes]\n  C --> D[Pricing]\n  D --> E[Signup]\n```".into(),
+        format!(
+            "A 4-second preview of the hero animation, and the summary as a voice note:\n\nMEDIA:{video}\n\nMEDIA:{}\n",
+            demo_file("summary.m4a")
+        ),
+    )
+}
+
+#[cfg(target_family = "wasm")]
+fn media() -> (String, String, String) {
+    // The page's folder: …/bench/ on GitHub Pages, / locally.
+    let href = web_sys::window()
+        .and_then(|w| w.location().href().ok())
+        .unwrap_or_default();
+    let base = match href.split(['?', '#']).next().unwrap_or("").rsplit_once('/') {
+        Some((dir, _)) => format!("{dir}/"),
+        None => String::new(),
+    };
+    (
+        format!("![Weekly signups]({base}assets/demo/chart.png)"),
+        format!("![The flow]({base}assets/demo/flow.png)"),
+        "In the desktop app a 4-second video preview and the summary as a voice note play right \
+here; the browser demo leaves them out.\n"
+            .into(),
+    )
+}
+
+fn server(alias: &str, hostname: &str, folder: &str) -> crate::sshconfig::Server {
+    crate::sshconfig::Server {
+        alias: alias.into(),
+        hostname: hostname.into(),
+        identity: String::new(),
+        user: "deploy".into(),
+        port: String::new(),
+        folder: folder.into(),
+        path: String::new(),
+        shared: false,
+    }
+}
+
+fn task(id: &str, title: &str, tags: &[&str], day: Option<i64>) -> crate::tasks::Task {
+    crate::tasks::Task {
+        id: id.into(),
+        title: title.into(),
+        tags: tags.iter().map(|t| t.to_string()).collect(),
+        day: day.map(|d| crate::tasks::today() + chrono::Duration::days(d)),
+        created: crate::tasks::now(),
+        ..Default::default()
+    }
+}
+
+/// Made-up servers (SSH mode) and tasks (Tasks mode), so every mode has something to show.
+fn other_modes(app: &mut HermesApp) {
+    app.ssh.servers = vec![
+        server("web-1", "203.0.113.10", "Production"),
+        server("web-2", "203.0.113.11", "Production"),
+        server("db-main", "203.0.113.20", "Production"),
+        server("staging", "198.51.100.5", "Staging"),
+        server("ci-runner", "198.51.100.9", "Staging"),
+        server("homelab", "192.168.1.50", ""),
+    ];
+    let today = crate::tasks::today();
+    let mut done = task("t-done", "Renew the TLS certificates", &["ops"], Some(-1));
+    done.completed = Some(today - chrono::Duration::days(1));
+    done.spent = 25 * 60;
+    let mut flagged = task("t-tax", "Send the quarterly report", &["finance"], Some(0));
+    flagged.important = true;
+    let mut evening = task(
+        "t-read",
+        "Read the RFC on rate limits",
+        &["reading"],
+        Some(0),
+    );
+    evening.evening = true;
+    let mut timed = task(
+        "t-api",
+        "Rate limiting for the public API",
+        &["storefront"],
+        Some(0),
+    );
+    timed.spent = 95 * 60;
+    timed.notes = "Token bucket per API key; 429 with Retry-After.".into();
+    app.tasks.items = vec![
+        flagged,
+        timed,
+        task(
+            "t-copy",
+            "Review the landing page copy",
+            &["storefront", "marketing"],
+            Some(0),
+        ),
+        evening,
+        task(
+            "t-demo",
+            "Prepare the demo for Friday",
+            &["storefront"],
+            Some(2),
+        ),
+        task("t-1on1", "One-on-ones: agenda", &["team"], Some(3)),
+        task("t-trip", "Book the conference trip", &["travel"], Some(9)),
+        task(
+            "t-idea",
+            "Try a local model for code review",
+            &["ideas"],
+            None,
+        ),
+        done,
+    ];
+    app.tasks.loaded = true;
+}
+
 /// Fill the window with the demo instead of connecting.
 pub fn load(app: &mut HermesApp, cx: &mut Context<HermesApp>) {
     let now = crate::app::now_secs();
@@ -136,10 +257,7 @@ pub fn load(app: &mut HermesApp, cx: &mut Context<HermesApp>) {
         app.places.insert(id.into(), p);
     }
 
-    let chart = demo_file("chart.png");
-    let video = demo_file("preview.mp4");
-    let voice = demo_file("summary.m4a");
-    crate::media::warm(&video);
+    let (chart, flow, clips) = media();
     let top = std::env::var("BENCH_DEMO").as_deref() == Ok("top");
     let answer = format!(
         "The new landing page is **live**, and the numbers so far look good.\n\n\
@@ -148,15 +266,13 @@ pub fn load(app: &mut HermesApp, cx: &mut Context<HermesApp>) {
 - Social proof moved up: three customer quotes before the feature list.\n\
 - The signup form lost two fields (company size, phone).\n\n\
 Weekly signups, three weeks before and after:\n\n\
-MEDIA:{chart}\n\n\
+{chart}\n\n\
 The flow the page now follows:\n\n\
-```mermaid\ngraph LR\n  A[Visit] --> B[Hero]\n  B --> C[Quotes]\n  C --> D[Pricing]\n  D --> E[Signup]\n```\n\n\
+{flow}\n\n\
 Conversion went from $c_0 = 2.1\\%$ to $c_1 = 2.8\\%$, a lift of $\\frac{{c_1 - c_0}}{{c_0}} \\approx 33\\%$.\n\n\
 To run it locally:\n\n\
 ```bash\nnpm install\nnpm run dev -- --port 5173\n```\n\n\
-A 4-second preview of the hero animation, and the summary as a voice note:\n\n\
-MEDIA:{video}\n\n\
-MEDIA:{voice}\n"
+{clips}"
     );
     app.turns = vec![Turn {
         user: "Ship the spring landing page we discussed: shorter hero, quotes first, two \
@@ -217,6 +333,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         .detach();
     }
     app.session = Some("d-landing".into());
+    other_modes(app);
     app.processes = vec![BgProcess {
         id: "p-1".into(),
         command: "npm run dev -- --port 5173".into(),

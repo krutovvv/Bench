@@ -10,7 +10,9 @@
 //! tokens with a characters-per-token ratio calibrated on each finished call (Hermes reports the
 //! exact token count only per call). The per-second samples of the current answer feed a chart.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use web_time::Instant;
 
 use crate::model::Usage;
 

@@ -135,7 +135,7 @@ impl HermesApp {
             .child(
                 div()
                     .text_xs()
-                    .font_family("Menlo")
+                    .font_family(crate::theme::MONO)
                     .text_color(muted)
                     .child(connection::INSTALL_HERMES),
             )

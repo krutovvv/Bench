@@ -3,7 +3,9 @@
 //! evening") Bench keeps as text lines in a reminder's notes.
 
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use web_time::Instant;
 
 use anyhow::{Result, anyhow, bail};
 use block2::RcBlock;

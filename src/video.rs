@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError, sync_channel};
-use std::time::Instant;
+use web_time::Instant;
 
 use anyhow::{Context as _, Result, anyhow};
 use gpui_kit::RenderImage;

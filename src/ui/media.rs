@@ -267,7 +267,7 @@ impl HermesApp {
                 match bytes {
                     Some(bytes) => {
                         this.stop_video(None, cx);
-                        this.media_since = std::time::Instant::now();
+                        this.media_since = web_time::Instant::now();
                         this.media_playing = Some((key, Playback::start(bytes)));
                     }
                     // A format playback cannot decode: the system player can.

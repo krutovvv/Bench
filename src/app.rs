@@ -2,7 +2,9 @@
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use web_time::Instant;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
@@ -776,7 +778,8 @@ impl HermesApp {
             _subscriptions: subs,
             _tasks: tasks,
         };
-        if std::env::var("BENCH_DEMO").is_ok() {
+        // The browser build is always the demo: there is nothing to connect to there.
+        if cfg!(target_family = "wasm") || std::env::var("BENCH_DEMO").is_ok() {
             crate::demo::load(&mut app, cx);
         } else {
             app.connect(initial, window, cx);
@@ -2454,8 +2457,8 @@ pub(super) fn common_dir(paths: &[String]) -> Option<String> {
 }
 
 pub fn now_secs() -> f64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
         .map(|d| d.as_secs_f64())
         .unwrap_or_default()
 }

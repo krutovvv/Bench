@@ -3,7 +3,7 @@
 //! sidebar, the tasks in the middle, the open task's card on the right. Every change goes to
 //! Reminders (`crate::reminders`); what another device or the agent changes there shows up here.
 
-use std::time::Instant;
+use web_time::Instant;
 
 use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
 use gpui_kit::*;
@@ -214,7 +214,8 @@ impl HermesApp {
 
     /// The Reminders thread, started the first time Tasks opens (macOS asks for access once).
     fn start_reminders(&mut self, cx: &mut Context<Self>) {
-        if self.tasks.reminders.is_some() {
+        // The demo's tasks are made up; Reminders stays untouched.
+        if self.tasks.reminders.is_some() || self.demo {
             return;
         }
         let (tx, rx) = async_channel::unbounded();

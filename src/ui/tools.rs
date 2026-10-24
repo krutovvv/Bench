@@ -346,7 +346,7 @@ impl HermesApp {
                         .px_1p5()
                         .py_0p5()
                         .text_xs()
-                        .font_family("Menlo")
+                        .font_family(crate::theme::MONO)
                         .border_1()
                         .border_color(theme.border)
                         .cursor_pointer()

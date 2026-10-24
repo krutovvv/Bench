@@ -612,7 +612,7 @@ impl HermesApp {
                             div().w(px(240.)).child(
                                 gpui_kit::component::input::Input::new(&self.cron_schedule)
                                     .small()
-                                    .font_family("Menlo"),
+                                    .font_family(crate::theme::MONO),
                             ),
                         )
                         .child(div().text_xs().child(status))
@@ -925,7 +925,7 @@ impl HermesApp {
                                             .font_weight(FontWeight::MEDIUM)
                                             .child(target.label()),
                                     )
-                                    .child(div().text_sm().font_family("Menlo").child(
+                                    .child(div().text_sm().font_family(crate::theme::MONO).child(
                                         if i.version.is_empty() {
                                             "—".to_string()
                                         } else {

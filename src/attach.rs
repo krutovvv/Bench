@@ -89,8 +89,8 @@ pub fn prepare(
 ) -> Result<Prepared> {
     let mut out = Prepared::default();
     let mut home: Option<String> = None;
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let stamp = web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
     for file in files {
         let name = file
@@ -132,8 +132,8 @@ pub fn prepare(
 pub fn save_pasted(bytes: &[u8], ext: &str) -> Result<PathBuf> {
     let dir = state_dir().join("pasted");
     std::fs::create_dir_all(&dir)?;
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+    let stamp = web_time::SystemTime::now()
+        .duration_since(web_time::UNIX_EPOCH)
         .map_or(0, |d| d.as_millis());
     let path = dir.join(format!("Screenshot-{stamp}.{ext}"));
     std::fs::write(&path, bytes)?;

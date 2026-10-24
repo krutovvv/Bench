@@ -40,7 +40,7 @@ impl HermesApp {
                 .child(
                     div()
                         .flex_none()
-                        .font_family("Menlo")
+                        .font_family(crate::theme::MONO)
                         .text_xs()
                         .child(c.name),
                 )

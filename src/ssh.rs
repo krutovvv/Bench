@@ -7,7 +7,9 @@
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use web_time::Instant;
 
 use anyhow::{Result, bail};
 
@@ -33,9 +35,12 @@ pub fn control_dir() -> PathBuf {
     // Short: a Unix socket path must stay under 104 bytes.
     let dir = home().join(".ssh/cm");
     if !dir.exists() {
-        use std::os::unix::fs::PermissionsExt as _;
         let _ = std::fs::create_dir_all(&dir);
-        let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let _ = std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700));
+        }
     }
     dir
 }

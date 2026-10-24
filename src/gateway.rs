@@ -222,7 +222,7 @@ impl Gateway {
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             if let Err(err) = run(&target, &rx, &evts) {
-                let _ = evts.send_blocking(Evt::Error(format!("{err:#}")));
+                let _ = evts.try_send(Evt::Error(format!("{err:#}")));
             }
         });
         Self { tx }
@@ -508,7 +508,7 @@ fn run(
     evts: &async_channel::Sender<Evt>,
 ) -> Result<()> {
     let emit = |e: Evt| {
-        let _ = evts.send_blocking(e);
+        let _ = evts.try_send(e);
     };
     let conn = Arc::new(Connection::open(target)?);
     let ws = conn.websocket()?;

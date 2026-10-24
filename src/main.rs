@@ -3,6 +3,10 @@
 //! (local.bench) and state folder are all "bench" (formerly hermes-gpui: its state is copied
 //! over on the first start, `connection::migrate_state`).
 
+// The browser build (web/) leaves out what needs a real system (terminals, probes, the state
+// folder); what only the desktop calls is unused there.
+#![cfg_attr(target_family = "wasm", allow(dead_code, unused_imports))]
+
 mod app;
 mod attach;
 mod audio;
@@ -17,7 +21,15 @@ mod icons;
 mod lang;
 mod media;
 mod model;
+#[cfg(target_os = "macos")]
 mod notify;
+#[cfg(not(target_os = "macos"))]
+#[path = "notify_other.rs"]
+mod notify;
+#[cfg(target_os = "macos")]
+mod reminders;
+#[cfg(not(target_os = "macos"))]
+#[path = "reminders_other.rs"]
 mod reminders;
 mod remote;
 mod rest;
@@ -25,6 +37,10 @@ mod speed;
 mod ssh;
 mod sshconfig;
 mod tasks;
+#[cfg(not(target_family = "wasm"))]
+mod term;
+#[cfg(target_family = "wasm")]
+#[path = "term_web.rs"]
 mod term;
 mod theme;
 mod ui;
@@ -33,6 +49,7 @@ mod video;
 use gpui_kit::*;
 
 /// `bench --probe [local|<ssh-host>]`: connect without a window and print what the gateway has.
+#[cfg(not(target_family = "wasm"))]
 fn probe(target: &str) -> anyhow::Result<()> {
     let target = if target == "local" {
         model::Target::Local
@@ -217,6 +234,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn main() {
     connection::migrate_state();
     let args: Vec<String> = std::env::args().collect();
@@ -257,6 +275,42 @@ fn main() {
         });
 }
 
+/// The browser build (web/): always the demo — nothing to connect to there. gpui-kit's own
+/// icons come over HTTP from `./assets/icons/` next to the page; the browser has no system
+/// fonts, so Inter, Fira Mono and Noto Sans (OFL, assets/fonts/) are built in.
+#[cfg(target_family = "wasm")]
+fn main() {
+    console_error_panic_hook::set_once();
+    gpui_kit::application()
+        .with_assets(gpui_kit::assets::Assets::new("."))
+        .run(|cx| {
+            gpui_kit::init(cx);
+            let fonts = vec![
+                std::borrow::Cow::Borrowed(
+                    include_bytes!("../assets/fonts/InterVariable.ttf").as_slice(),
+                ),
+                std::borrow::Cow::Borrowed(
+                    include_bytes!("../assets/fonts/FiraMono-Medium.ttf").as_slice(),
+                ),
+                // GPUI's default text style asks for the system font; Noto Sans is on its
+                // fallback list, so whatever isn't styled by the theme still has a font.
+                std::borrow::Cow::Borrowed(
+                    include_bytes!("../assets/fonts/NotoSans-Regular.ttf").as_slice(),
+                ),
+            ];
+            if let Err(e) = cx.text_system().add_fonts(fonts) {
+                log_error(&format!("fonts: {e:#}"));
+            }
+            theme::apply(theme::Appearance::load(), None, cx);
+            open_main_window(cx);
+        });
+}
+
+#[cfg(target_family = "wasm")]
+fn log_error(text: &str) {
+    eprintln!("{text}");
+}
+
 /// A Hermes window: its own gateway connection, profile and chat.
 pub fn open_main_window(cx: &mut App) {
     let options = WindowOptions {
@@ -280,6 +334,7 @@ pub fn open_main_window(cx: &mut App) {
 }
 
 /// End-to-end check of the branch flow on a scratch repo, through the local gateway.
+#[cfg(not(target_family = "wasm"))]
 fn probe_git(repo: &str) -> anyhow::Result<()> {
     use model::{Project, Target};
     let conn = connection::Connection::open(&Target::Local)?;

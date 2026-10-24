@@ -5,17 +5,13 @@ edition = "2024"
 
 [dependencies]
 similar = "2"
-gpui-kit = { version = "0.8.0", features = ["tree-sitter", "tree-sitter-rust", "tree-sitter-python", "tree-sitter-javascript", "tree-sitter-typescript", "tree-sitter-tsx", "tree-sitter-html", "tree-sitter-css", "tree-sitter-bash", "tree-sitter-go", "tree-sitter-php", "tree-sitter-ruby", "tree-sitter-swift", "tree-sitter-java", "tree-sitter-kotlin", "tree-sitter-c", "tree-sitter-cpp", "tree-sitter-toml", "tree-sitter-yaml", "tree-sitter-markdown", "tree-sitter-lua", "tree-sitter-sql", "tree-sitter-make", "tree-sitter-cmake", "tree-sitter-diff", "tree-sitter-csharp", "tree-sitter-scala", "tree-sitter-zig", "tree-sitter-graphql", "tree-sitter-proto", "tree-sitter-elixir", "tree-sitter-erb", "tree-sitter-ejs", "tree-sitter-svelte", "tree-sitter-astro"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 tungstenite = "0.30"
-ureq = { version = "2.12", features = ["json"] }
 async-channel = "2"
 anyhow = "1"
 # The SSH terminal: VT parsing + grid (Apache-2.0) and the PTY ssh runs in.
-alacritty_terminal = "0.26"
-portable-pty = "0.9"
 uuid = { version = "1", features = ["v4"] }
 base64 = "0.22"
 cpal = "0.15"
@@ -30,13 +26,9 @@ image = { version = "0.25", default-features = false }
 # Tools mode (src/tools/): text and data utilities.
 regex = "1"
 chrono = "0.4"
-# Tasks live in Apple Reminders (iCloud, iPhone, Calendar): EventKit through objc2.
-objc2 = "0.6"
-block2 = "0.6"
-objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSArray", "NSDate", "NSError", "NSPredicate", "NSCalendar", "NSObject", "NSURL", "NSTimeZone"] }
-objc2-event-kit = { version = "0.3", default-features = false, features = ["std", "block2", "EKCalendar", "EKCalendarItem", "EKError", "EKEventStore", "EKObject", "EKReminder", "EKSource", "EKTypes"] }
-# "The agent finished" as a macOS notification (src/notify.rs).
-objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }
+# Time that works in the browser build too (std's Instant/SystemTime panic there; on the desktop
+# this is std's).
+web-time = "1"
 chrono-tz = "0.10"
 croner = "4"
 md-5 = "0.10"
@@ -52,3 +44,39 @@ htmd = "0.5"
 opt-level = 1
 [profile.dev.package."*"]
 opt-level = 2
+
+# macOS only: tasks live in Apple Reminders (EventKit) and "the agent finished" is a system
+# notification (src/reminders.rs, src/notify.rs). Elsewhere src/reminders_other.rs and
+# src/notify_other.rs stand in.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSArray", "NSDate", "NSError", "NSPredicate", "NSCalendar", "NSObject", "NSURL", "NSTimeZone"] }
+objc2-event-kit = { version = "0.3", default-features = false, features = ["std", "block2", "EKCalendar", "EKCalendarItem", "EKError", "EKEventStore", "EKObject", "EKReminder", "EKSource", "EKTypes"] }
+objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }
+
+# Desktop only: the syntax grammars (C code), HTTP with TLS, the terminal (a PTY and a VT parser).
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+gpui-kit = { version = "0.8.0", features = ["tree-sitter", "tree-sitter-rust", "tree-sitter-python", "tree-sitter-javascript", "tree-sitter-typescript", "tree-sitter-tsx", "tree-sitter-html", "tree-sitter-css", "tree-sitter-bash", "tree-sitter-go", "tree-sitter-php", "tree-sitter-ruby", "tree-sitter-swift", "tree-sitter-java", "tree-sitter-kotlin", "tree-sitter-c", "tree-sitter-cpp", "tree-sitter-toml", "tree-sitter-yaml", "tree-sitter-markdown", "tree-sitter-lua", "tree-sitter-sql", "tree-sitter-make", "tree-sitter-cmake", "tree-sitter-diff", "tree-sitter-csharp", "tree-sitter-scala", "tree-sitter-zig", "tree-sitter-graphql", "tree-sitter-proto", "tree-sitter-elixir", "tree-sitter-erb", "tree-sitter-ejs", "tree-sitter-svelte", "tree-sitter-astro"] }
+ureq = { version = "2.12", features = ["json"] }
+alacritty_terminal = "0.26"
+portable-pty = "0.9"
+
+# The browser build (the demo, web/): HTTP without TLS (nothing is fetched), random numbers from
+# the browser.
+[target.'cfg(target_family = "wasm")'.dependencies]
+gpui-kit = "0.8.0"
+chrono = { version = "0.4", features = ["wasmbind"] }
+ureq = { version = "2.12", default-features = false, features = ["json"] }
+wasm-bindgen = "0.2"
+console_error_panic_hook = "0.1"
+web-sys = { version = "0.3", features = ["Window", "Location"] }
+getrandom02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
+# GPUI's web backend runs single-threaded here: its threads need nightly Rust and server headers
+# that GitHub Pages can't send. Two crates with that one default changed, nothing else.
+[patch.crates-io]
+gpui-pre-web = { path = "vendor/gpui-pre-web" }
+gpui-pre-platform = { path = "vendor/gpui-pre-platform" }

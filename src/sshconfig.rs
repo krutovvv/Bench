@@ -294,18 +294,19 @@ fn delete_in(file: &std::path::Path, alias: &str) -> Result<()> {
 
 fn write(p: &std::path::Path, lines: &[String]) -> Result<()> {
     use std::io::Write as _;
-    use std::os::unix::fs::OpenOptionsExt as _;
     std::fs::create_dir_all(p.parent().unwrap())?;
     if p.exists() {
         std::fs::copy(&p, p.with_file_name("config.bak-bench")).context("back up ~/.ssh/config")?;
     }
     let tmp = p.with_file_name(".config.bench.tmp");
-    let mut f = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(&tmp)?;
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.mode(0o600);
+    }
+    let mut f = options.open(&tmp)?;
     let end = lines
         .iter()
         .rposition(|l| !l.trim().is_empty())

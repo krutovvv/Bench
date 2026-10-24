@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bench — demo</title>
+  <link rel="icon" href="assets/logo.svg">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #fafafa; }
+    canvas { display: block; }
+    #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      font: 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #6e7781; }
+  </style>
+</head>
+<body>
+  <div id="loading">Loading Bench… (a native Rust app, compiled for the browser)</div>
+  <script type="module">
+    import init from "./bench.js?v=__BUILD__";
+    init({ module_or_path: "./bench_bg.wasm?v=__BUILD__" }).then(() => document.getElementById("loading")?.remove());
+  </script>
+</body>
+</html>

@@ -121,6 +121,14 @@ fn shade(color: Hsla, dl: f32) -> Hsla {
 }
 
 /// Apply the appearance to every window.
+/// The monospace font for code, terminals and paths: Menlo on the desktop, the built-in Fira
+/// Mono in the browser build (no system fonts there).
+pub const MONO: &str = if cfg!(target_family = "wasm") {
+    "Fira Mono"
+} else {
+    "Menlo"
+};
+
 pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
     let dark = a.is_dark(window, cx);
     Theme::change(
@@ -145,6 +153,11 @@ pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
     let (ui, mono) = a.size.fonts();
 
     Theme::update(cx, |t| {
+        // The browser has no system fonts: the built-in ones (main.rs adds them).
+        if cfg!(target_family = "wasm") {
+            t.font_family = "Inter Variable".into();
+            t.mono_font_family = MONO.into();
+        }
         t.radius = px(0.);
         t.radius_lg = px(0.);
         t.shadow = false;

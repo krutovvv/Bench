@@ -210,6 +210,10 @@ impl HermesApp {
 
     /// Re-read `~/.ssh/config` (edited elsewhere too) and resolve the targets.
     pub fn reload_servers(&mut self, cx: &mut Context<Self>) {
+        // The demo shows made-up servers, never the person's ~/.ssh/config.
+        if self.demo {
+            return;
+        }
         self.ssh.servers = sshconfig::load();
         let aliases: Vec<String> = self.ssh.servers.iter().map(|s| s.alias.clone()).collect();
         cx.spawn(async move |this, cx| {
@@ -311,6 +315,10 @@ impl HermesApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<usize> {
+        // The desktop demo never opens a real shell or ssh (the browser one shows a note).
+        if self.demo && cfg!(not(target_family = "wasm")) {
+            return None;
+        }
         let (tx, rx) = async_channel::bounded::<()>(1);
         let palette = crate::ui::terminal_palette(cx.theme());
         match Session::spawn(alias, palette, tx) {

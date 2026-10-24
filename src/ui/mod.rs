@@ -12,6 +12,10 @@ mod servers;
 mod sidebar;
 mod statusbar;
 mod tasks;
+#[cfg(not(target_family = "wasm"))]
+mod terminal;
+#[cfg(target_family = "wasm")]
+#[path = "terminal_web.rs"]
 mod terminal;
 mod tools;
 
