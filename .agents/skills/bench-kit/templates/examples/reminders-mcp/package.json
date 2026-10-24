@@ -1,0 +1,17 @@
+{
+  "name": "reminders-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Apple Reminders as a task list (EventKit): tasks with tags, time spent, This Evening / Someday, important flag and back-dated completion — the same lines in a reminder's notes that Bench shows.",
+  "type": "module",
+  "bin": { "reminders-mcp": "src/index.js" },
+  "engines": { "node": ">=18.0.0" },
+  "scripts": {
+    "build:helper": "bash helper/build.sh",
+    "start": "node src/index.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.24.0"
+  }
+}

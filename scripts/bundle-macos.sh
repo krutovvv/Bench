@@ -1,13 +1,41 @@
 #!/bin/bash
-# Build "Bench.app" (release binary + icon + Info.plist) into dist/.
-# The name shown is Bench; the bundle id stays local.hermes-gpui (macOS grants — local network,
-# microphone — and the state folder belong to it), and so does the binary's name.
+# Build the current commit as its own app: "dist/Bench.<commit>.app" (release binary + icon +
+# Info.plist), <commit> = the first 7 characters of the commit's hash, as in `git log --oneline`.
+#
+# Bench is developed from inside Bench, so a build never replaces or quits the app that runs:
+# every commit gets a new app next to the others; the person tries it (open
+# "dist/Bench.<commit>.app") and moves the Dock icon over when it's good. The last KEEP builds
+# stay for rolling back; older ones are removed, but never one that is running, and never
+# "Bench.app".
+#
+# Commit first: a build is one commit, so uncommitted changes stop it. For a quick experiment,
+# BENCH_DIRTY=1 scripts/bundle-macos.sh builds "Bench.<commit>-dirty.app" anyway.
+# All versions share the bundle id local.hermes-gpui (macOS grants — Reminders, notifications,
+# microphone, local network — and the state folder belong to it) and the binary's name.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+KEEP=6
+
+HASH=$(git rev-parse --short=7 HEAD)
+if [[ -n "$(git status --porcelain --untracked-files=normal -- . ':!dist')" ]]; then
+    if [[ "${BENCH_DIRTY:-}" == 1 ]]; then
+        HASH="$HASH-dirty"
+    else
+        echo "Uncommitted changes — commit them first (a build is one commit's), or BENCH_DIRTY=1:" >&2
+        git status --short -- . ':!dist' | head -20 >&2
+        exit 1
+    fi
+fi
+APP="dist/Bench.$HASH.app"
+if pgrep -f "$PWD/$APP/Contents/MacOS/" >/dev/null; then
+    echo "$APP is running — it is this commit's build already; quit it to rebuild it" >&2
+    exit 1
+fi
+COUNT=$(git rev-list --count HEAD)
 
 cargo build --release
 
-APP="dist/Bench.app"
+mkdir -p dist
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp target/release/hermes-gpui "$APP/Contents/MacOS/hermes-gpui"
@@ -40,11 +68,15 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleExecutable</key><string>hermes-gpui</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleShortVersionString</key><string>1.$COUNT</string>
+  <key>CFBundleVersion</key><string>$COUNT</string>
+  <key>BenchCommit</key><string>$HASH</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Dictating messages to Hermes</string>
   <key>NSLocalNetworkUsageDescription</key><string>Connecting to Hermes gateways on your local network over SSH</string>
+  <key>NSRemindersUsageDescription</key><string>Your tasks live in Reminders: Bench shows and edits them</string>
+  <key>NSRemindersFullAccessUsageDescription</key><string>Your tasks live in Reminders: Bench shows and edits them</string>
 </dict>
 </plist>
 PLIST
@@ -53,4 +85,16 @@ PLIST
 # rather than to one particular build.
 codesign --force --sign - --identifier local.hermes-gpui "$APP"
 
+# Keep the newest KEEP builds (by date); skip any that is running, never touch "Bench.app".
+OLD_BUILDS=$(ls -dt dist/Bench.*.app 2>/dev/null | tail -n +$((KEEP + 1)))
+printf '%s\n' "$OLD_BUILDS" | while read -r old; do
+    [[ -z "$old" ]] && continue
+    if pgrep -f "$PWD/$old/Contents/MacOS/" >/dev/null; then
+        echo "kept (running): $old"
+    else
+        rm -rf "$old" && echo "removed old build: $old"
+    fi
+done
+
 echo "Built: $APP"
+echo "Try it next to the running one: open \"$APP\""
