@@ -209,23 +209,6 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// Ask a server whether the agent can run there (in the background; one check at a time per host).
-    pub fn check_host(&mut self, alias: String, cx: &mut Context<Self>) {
-        if matches!(self.ssh.status.get(&alias), Some(None)) {
-            return;
-        }
-        self.ssh.status.insert(alias.clone(), None);
-        cx.spawn(async move |this, cx| {
-            let a = alias.clone();
-            let r = cx
-                .background_spawn(async move { connection::host_check(&a) })
-                .await;
-            let _ = this.update(cx, |this, cx| this.host_checked(alias, r, cx));
-        })
-        .detach();
-        cx.notify();
-    }
-
     pub fn host_checked(&mut self, alias: String, r: HostCheck, cx: &mut Context<Self>) {
         self.ssh.status.insert(alias, Some(r));
         self.rebuild_targets();
@@ -247,24 +230,6 @@ impl HermesApp {
             targets.push(self.target.clone());
         }
         self.targets = targets;
-    }
-
-    /// Called when the gateway menu opens: re-read `~/.ssh/config` and ask its servers again;
-    /// one that now can run the agent joins the list, one that stopped leaves it.
-    pub fn refresh_targets(&mut self, cx: &mut Context<Self>) {
-        self.reload_servers(cx);
-        self.rebuild_targets();
-        for s in self.ssh.servers.clone() {
-            self.check_host(s.alias, cx);
-        }
-    }
-
-    pub fn pick_target(&mut self, t: Target, window: &mut Window, cx: &mut Context<Self>) {
-        self.ssh.on = false;
-        if self.target != t || self.conn.is_none() {
-            self.connect(t, window, cx);
-        }
-        cx.notify();
     }
 
     /// One click: open the server's terminal (or bring back the one already open).

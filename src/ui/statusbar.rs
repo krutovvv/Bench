@@ -292,9 +292,8 @@ impl HermesApp {
             .border_t_1()
             .border_color(theme.border)
             .text_sm()
-            .child(self.render_target_picker(cx))
-            // No agent to pick: a thread runs with its project's environment. The backend's
-            // state; its panel reconnects or restarts the gateway.
+            // Nothing about where the agent runs or which one: a thread runs with its project.
+            // The backend shows up only when something is wrong (its panel reconnects).
             .children(self.render_backend(cx))
             .child(div().flex_1())
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
@@ -570,7 +569,7 @@ impl HermesApp {
                     (format!("Gateway {}", s.state), theme.warning)
                 }
                 (_, Some(s)) if s.overall != "ok" => ("Backend degraded".into(), theme.warning),
-                _ => ("Backend ready".into(), muted),
+                _ => return None,
             }
         };
         let connected = self.online();

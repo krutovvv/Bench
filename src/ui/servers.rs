@@ -3,9 +3,7 @@
 
 use std::sync::atomic::Ordering;
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -15,39 +13,6 @@ use crate::app::HermesApp;
 use crate::icons::Ico;
 
 impl HermesApp {
-    /// The gateway menu in the status bar: This Mac + the servers of `~/.ssh/config` that can
-    /// run the agent. Opening it re-reads the file and asks the servers again (for the next look).
-    pub(super) fn render_target_picker(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let muted = cx.theme().muted_foreground;
-        let view = cx.entity();
-        h_flex().h_full().items_center().pl_1().child(
-            Button::new("target")
-                .ghost()
-                .small()
-                .icon(Ico::Server.icon())
-                .label(self.target.label())
-                .text_color(muted)
-                .dropdown_menu(move |menu, _, cx| {
-                    view.update(cx, |this, cx| this.refresh_targets(cx));
-                    let targets = view.read(cx).targets.clone();
-                    let current = view.read(cx).target.clone();
-                    let mut menu = menu;
-                    for t in targets {
-                        let (v, t2) = (view.clone(), t.clone());
-                        menu = menu.item(
-                            PopupMenuItem::new(t.label())
-                                .checked(t == current)
-                                .on_click(move |_, window, cx| {
-                                    v.update(cx, |this, cx| {
-                                        this.pick_target(t2.clone(), window, cx)
-                                    })
-                                }),
-                        );
-                    }
-                    menu
-                }),
-        )
-    }
 
     /// The header's right end in both modes: the SSH switch (pressed = SSH mode: servers and
     /// their terminals; released = sessions) and a new window. The IDE keeps its own close
