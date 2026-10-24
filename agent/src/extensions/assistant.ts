@@ -13,6 +13,7 @@ import { skillManage, skillView } from "../builtin/skills.ts";
 import { delegate } from "../builtin/subagent.ts";
 import { remoteFiles } from "../builtin/remote.ts";
 import { sshRun } from "../builtin/ssh.ts";
+import { hostsTool } from "../builtin/hosts.ts";
 import { tasksTool } from "../builtin/tasks.ts";
 import { host } from "../host.ts";
 import { environment, notes, projectContext, skills, soul, subject } from "../prompt.ts";
@@ -37,7 +38,7 @@ const Coding = createCodingTools();
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...(Coding.tools ?? []), clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, remoteFiles],
+	tools: [...(Coding.tools ?? []), clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, remoteFiles, hostsTool],
 	tasks: [CronTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),

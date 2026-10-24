@@ -185,24 +185,26 @@ fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn)
 }
 
 /// The blog project's environment, for its environment thread.
-pub fn env(app: &mut HermesApp) {
+pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>) {
     let Some(e) = app.project_env.as_mut() else {
         return;
     };
-    e.dir = "~/.bench/projects/p-blog".into();
-    e.mcp = vec![
-        ("ghost".into(), "http".into(), true, true, 12, None),
-        ("unsplash".into(), "stdio".into(), true, true, 3, None),
-        ("search-console".into(), "stdio".into(), false, false, 0, None),
-    ];
-    e.skills = vec![
-        ("release-notes".into(), "Turn a changelog into a post: what changed for the reader, not the commit list.".into()),
-        ("cover-image".into(), "A 1600×900 cover in the blog's colors, from a photo or a gradient.".into()),
-    ];
-    e.soul = "The **Northwind blog**: product news and guides for our customers, published on Ghost.\n\n\
-- Write plainly, for people who use the product, not for engineers.\n\
-- Every post gets a cover and two tags; drafts first, publish only when asked."
-        .into();
+    let v = serde_json::json!({
+        "dir": "~/.bench/projects/p-blog",
+        "soul": "The Northwind blog: product news and guides for our customers, published on Ghost.\n\nWrite plainly, for people who use the product, not for engineers. Every post gets a cover and two tags; drafts first, publish only when asked.",
+        "mcp": [
+            {"name": "ghost", "kind": "http", "enabled": true, "connected": true, "tools": 12},
+            {"name": "unsplash", "kind": "stdio", "enabled": true, "connected": true, "tools": 3},
+            {"name": "search-console", "kind": "stdio", "enabled": false, "connected": false, "tools": 0}
+        ],
+        "mcp_json": "{\n  \"mcpServers\": {\n    \"ghost\": { \"url\": \"https://blog.example.com/ghost/mcp\", \"headers\": { \"Authorization\": \"${GHOST_ADMIN_KEY}\" } },\n    \"unsplash\": { \"command\": \"npx\", \"args\": [\"unsplash-mcp\"] },\n    \"search-console\": { \"command\": \"uvx\", \"args\": [\"gsc-mcp\"], \"enabled\": false }\n  }\n}\n",
+        "skills": [
+            {"name": "release-notes", "description": "Turn a changelog into a post: what changed for the reader, not the commit list."},
+            {"name": "cover-image", "description": "A 1600×900 cover in the blog's colors, from a photo or a gradient."}
+        ],
+        "hosts": [{"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"}]
+    });
+    crate::app::project_env::apply(e, &v, window, cx);
 }
 
 /// One thread per subject, so every sidebar group opens to something.

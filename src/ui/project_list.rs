@@ -1,7 +1,7 @@
 //! The new project's form (the sidebar's "+"): a name and, if it has one, a folder on disk.
 
 use gpui_kit::component::input::Input;
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -100,9 +100,10 @@ impl HermesApp {
 }
 
 impl HermesApp {
-    /// A project's environment at the top of its thread: the soul (as text; Edit opens it), its
-    /// MCP servers (on/off, remove), its skills (remove). A section's "+" starts the request in the
-    /// composer; the agent does the rest, and the block follows.
+    /// A project's environment at the top of its thread, as a document: the soul (edit in
+    /// place), its MCP servers (JSON to edit), its skills (open one to read and edit), its
+    /// accesses. No frames: headings, rows, text. A Save appears once a part changed; "+ Add"
+    /// starts the request for the agent in the composer.
     pub(super) fn render_env_block(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let _ = window;
         let theme = cx.theme().clone();
@@ -110,179 +111,181 @@ impl HermesApp {
         let Some(e) = self.project_env.as_ref() else {
             return div().text_color(muted).child("Loading…").into_any_element();
         };
-        // A quiet text action: muted, the foreground on hover.
-        let act = |id: SharedString, label: &'static str, danger: bool| {
+        // A quiet text action: muted, the foreground on hover; red when it asks to confirm.
+        let act = |id: SharedString, label: String, danger: bool| {
             div()
                 .id(id)
                 .flex_none()
-                .px_1()
                 .cursor_pointer()
                 .text_color(if danger { theme.danger } else { muted })
                 .hover(|s| s.text_color(if danger { theme.danger } else { theme.foreground }))
                 .child(label)
         };
-        let head = |title: &'static str, add: Option<(&'static str, &'static str)>, cx: &mut Context<Self>| {
+        let save = |id: &'static str, what: &'static str, cx: &mut Context<Self>| {
             h_flex()
-                .pt_4()
-                .pb_1()
-                .gap_2()
-                .child(div().font_weight(FontWeight::MEDIUM).child(title))
-                .children(add.map(|(id, ask)| {
-                    act(id.into(), "+ Add", false).on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        this.ask_in_composer(ask, window, cx)
-                    }))
-                }))
+                .gap_3()
+                .child(act(format!("{id}-revert").into(), "Revert".into(), false).on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    this.env_revert(what, window, cx)
+                })))
+                .child(
+                    div()
+                        .id(SharedString::from(format!("{id}-save")))
+                        .px_2()
+                        .cursor_pointer()
+                        .bg(theme.primary)
+                        .text_color(theme.primary_foreground)
+                        .hover(|s| s.bg(theme.primary_hover))
+                        .child("Save")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            this.env_save(what, window, cx)
+                        })),
+                )
         };
-        let row = |id: SharedString, name: String, note: String, bad: bool| {
+        let heading = |title: &'static str| div().font_weight(FontWeight::MEDIUM).child(title);
+        let armed = e.armed.clone();
+        let is_armed = |k: String| armed.as_deref() == Some(&k);
+        let remove = |id: String, what: &'static str, name: String, cx: &mut Context<Self>| {
+            let on = is_armed(format!("{what}:{name}"));
+            div()
+                .flex_none()
+                .when(!on, |d| d.opacity(0.).group_hover(SharedString::from(id.clone()), |s| s.opacity(1.)))
+                .child(act(format!("{id}-rm").into(), if on { "Remove?".into() } else { "Remove".into() }, on).on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    cx.stop_propagation();
+                    this.env_remove(what, name.clone(), window, cx)
+                })))
+        };
+        let add = |id: &'static str, ask: &'static str, cx: &mut Context<Self>| {
+            act(id.into(), "+ Add".into(), false).on_click(cx.listener(move |this, _, window, cx| {
+                this.click_claimed = true;
+                this.ask_in_composer(ask, window, cx)
+            }))
+        };
+        let row = |id: String, name: String, note: String, bad: bool| {
             h_flex()
-                .id(id.clone())
-                .group(id)
+                .id(SharedString::from(id.clone()))
+                .group(SharedString::from(id))
                 .gap_2()
                 .py_0p5()
                 .child(div().flex_none().child(name))
                 .child(div().flex_1().min_w_0().truncate().text_color(if bad { theme.danger } else { muted }).child(note))
         };
-        let soul_text = e.soul.clone();
-        let armed = e.armed.clone();
-        let project_armed = armed.as_deref() == Some("project");
-        let soul_all = e.soul_all;
-        let skill_open = e.skill_open.clone();
 
-        let soul_head = h_flex()
-            .gap_2()
-            .child(div().font_weight(FontWeight::MEDIUM).child("Soul"))
-            .child(div().flex_1().min_w_0().truncate().text_color(muted).child("what the project is, how to work in it: ask below to change it"));
-        let soul_body = if soul_text.trim().is_empty() {
-            div().mt_1().text_color(muted).child("Not described yet: ask below (“describe the project: …”).").into_any_element()
-        } else {
-            // No scroll of its own (the thread scrolls): the first lines, Show all for the rest.
-            const SHOWN: usize = 12;
-            let lines = soul_text.lines().count();
-            let shown = if soul_all || lines <= SHOWN { soul_text.clone() } else { soul_text.lines().take(SHOWN).collect::<Vec<_>>().join("\n") };
-            v_flex()
-                .mt_1()
-                .px_3()
-                .py_2()
-                .border_1()
-                .border_color(theme.border)
-                .child(super::media::markdown("env-soul", shown))
-                .when(lines > SHOWN, |d| {
-                    d.child(
-                        act("soul-all".into(), if soul_all { "Show less" } else { "Show all" }, false)
-                            .pt_1()
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.click_claimed = true;
-                                if let Some(e) = this.project_env.as_mut() {
-                                    e.soul_all = !e.soul_all;
-                                }
-                                cx.notify();
-                            })),
-                    )
-                })
-                .into_any_element()
-        };
+        // The soul.
+        let mut out = v_flex().w_full().gap_1();
+        out = out
+            .child(h_flex().gap_3().child(heading("Soul")).child(div().flex_1()).when(e.soul_dirty, |d| d.child(save("soul", "soul", cx))))
+            // The field's own inset (12 / 10, as the composer's) pulled back: its text starts
+            // where the headings do.
+            .child(div().ml(px(-12.)).my(px(-10.)).child(gpui_kit::component::input::Textarea::new(&e.soul).appearance(false).large()));
 
-        let mcp_rows: Vec<AnyElement> = e
-            .mcp
-            .iter()
-            .map(|(name, kind, enabled, connected, tools, error)| {
-                let note = match (enabled, error, connected) {
-                    (false, _, _) => format!("{kind} · off"),
-                    (_, Some(err), _) => format!("{kind} · {err}"),
-                    (_, _, true) => format!("{kind} · {tools} tools"),
-                    _ => format!("{kind} · connects with the project's first thread"),
-                };
-                let gid: SharedString = format!("env-mcp-{name}").into();
-                let is_armed = armed.as_deref() == Some(&format!("mcp:{name}"));
-                let (n1, n2) = (name.clone(), name.clone());
-                row(gid.clone(), name.clone(), note, error.is_some() && *enabled)
-                    .child(
-                        h_flex()
-                            .flex_none()
-                            .when(!is_armed, |d| d.opacity(0.).group_hover(gid.clone(), |s| s.opacity(1.)))
-                            .child(act(format!("{gid}-on").into(), if *enabled { "Turn off" } else { "Turn on" }, false).on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                this.env_mcp(n1.clone(), "toggle", window, cx)
-                            })))
-                            .child(act(format!("{gid}-rm").into(), if is_armed { "Remove?" } else { "Remove" }, is_armed).on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                this.env_mcp(n2.clone(), "remove", window, cx)
-                            }))),
-                    )
-                    .into_any_element()
-            })
-            .collect();
-        let skill_rows: Vec<AnyElement> = e
-            .skills
-            .iter()
-            .map(|(name, desc)| {
-                let gid: SharedString = format!("env-skill-{name}").into();
-                let is_armed = armed.as_deref() == Some(&format!("skill:{name}"));
-                let n = name.clone();
-                let open_name = name.clone();
-                let text = skill_open.as_ref().filter(|(o, _)| o == name).map(|(_, t)| t.clone());
-                let row = row(gid.clone(), name.clone(), desc.clone(), false)
+        // MCP servers.
+        let mcp_open = e.mcp_open;
+        out = out.child(
+            h_flex()
+                .pt_4()
+                .gap_3()
+                .child(heading("MCP servers"))
+                .child(add("env-mcp-add", "Add an MCP server to this project: ", cx))
+                .child(act("env-mcp-json".into(), if mcp_open { "Hide JSON".into() } else { "JSON".into() }, false).on_click(cx.listener(|this, _, _, cx| {
+                    this.click_claimed = true;
+                    if let Some(e) = this.project_env.as_mut() {
+                        e.mcp_open = !e.mcp_open;
+                    }
+                    cx.notify();
+                })))
+                .child(div().flex_1())
+                .when(e.mcp_dirty && mcp_open, |d| d.child(save("mcp", "mcp", cx))),
+        );
+        if e.mcp.is_empty() {
+            out = out.child(div().text_color(muted).child("None of its own: the general ones work here too."));
+        }
+        for (name, kind, enabled, connected, tools, error) in e.mcp.clone() {
+            let note = match (enabled, &error, connected) {
+                (false, _, _) => format!("{kind} · off (\"enabled\": false)"),
+                (_, Some(err), _) => format!("{kind} · {err}"),
+                (_, _, true) => format!("{kind} · {tools} tools"),
+                _ => format!("{kind} · connects with the project's first thread"),
+            };
+            let id = format!("env-mcp-{name}");
+            out = out.child(row(id.clone(), name.clone(), note, error.is_some() && enabled).child(remove(id, "mcp", name, cx)));
+        }
+        if mcp_open {
+            let lines = e.mcp_json.read(cx).value().lines().count().max(3) as f32;
+            out = out.child(
+                div()
+                    .mt_1()
+                    .h(px((lines + 1.) * 20.))
+                    .child(gpui_kit::component::input::Editor::new(&e.mcp_json).appearance(false).h_full()),
+            );
+        }
+
+        // Skills.
+        out = out.child(h_flex().pt_4().gap_3().child(heading("Skills")).child(add("env-skill-add", "Write a skill for this project: ", cx)));
+        if e.skills.is_empty() {
+            out = out.child(div().text_color(muted).child("None of its own: the general ones work here too."));
+        }
+        for (name, desc) in e.skills.clone() {
+            let id = format!("env-skill-{name}");
+            let open = e.skill_open.as_deref() == Some(&name);
+            let n = name.clone();
+            out = out.child(
+                row(id.clone(), name.clone(), desc, false)
                     .cursor_pointer()
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
-                        this.env_read_skill(open_name.clone(), window, cx)
+                        this.env_open_skill(n.clone(), window, cx)
                     }))
-                    .child(
-                        div()
-                            .flex_none()
-                            .when(!is_armed, |d| d.opacity(0.).group_hover(gid.clone(), |s| s.opacity(1.)))
-                            .child(act(format!("{gid}-rm").into(), if is_armed { "Remove?" } else { "Remove" }, is_armed).on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                cx.stop_propagation();
-                                this.env_remove_skill(n.clone(), window, cx)
-                            }))),
-                    );
-                // Opened: its SKILL.md under the row, as text.
-                v_flex()
-                    .child(row)
-                    .when_some(text, |d, t| {
-                        d.child(
-                            div()
-                                .mt_1()
-                                .mb_2()
-                                .px_3()
-                                .py_2()
-                                .border_1()
-                                .border_color(theme.border)
-                                .child(super::media::markdown(format!("env-skill-text-{name}"), t)),
-                        )
-                    })
-                    .into_any_element()
-            })
-            .collect();
-        let (mcp_empty, skills_empty) = (mcp_rows.is_empty(), skill_rows.is_empty());
-        let error = e.error.clone();
-        let dir = e.dir.clone();
-        v_flex()
-            .w_full()
-            .child(soul_head)
-            .child(soul_body)
-            .child(head("MCP servers", Some(("env-mcp-add", "Add an MCP server to this project: ")), cx))
-            .when(mcp_empty, |d| d.child(div().text_color(muted).child("None of its own: the general ones work here too.")))
-            .children(mcp_rows)
-            .child(head("Skills", Some(("env-skill-add", "Write a skill for this project: ")), cx))
-            .when(skills_empty, |d| d.child(div().text_color(muted).child("None of its own: the general ones work here too.")))
-            .children(skill_rows)
-            .when_some(error, |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
+                    .when(open && e.skill_dirty, |d| d.child(save("skill", "skill", cx)))
+                    .child(remove(id, "skill", name, cx)),
+            );
+            if open {
+                out = out.child(
+                    div()
+                        .pl_4()
+                        .pb_2()
+                        .border_l_2()
+                        .border_color(theme.border)
+                        .child(div().ml(px(-12.)).my(px(-10.)).child(gpui_kit::component::input::Textarea::new(&e.skill_text).appearance(false).large())),
+                );
+            }
+        }
+
+        // Accesses.
+        out = out.child(
+            h_flex()
+                .pt_4()
+                .gap_3()
+                .child(heading("Accesses"))
+                .child(add("env-host-add", "Add to this project the access: ", cx)),
+        );
+        if e.hosts.is_empty() {
+            out = out.child(div().text_color(muted).child("No servers or file hosts yet: /ssh and /ftp in its threads offer only these."));
+        }
+        for (hid, name, kind, at) in e.hosts.clone() {
+            let id = format!("env-host-{hid}");
+            out = out.child(row(id.clone(), name, format!("{kind} · {at}"), false).child(remove(id, "host", hid, cx)));
+        }
+
+        // Where it lives; the project's removal.
+        let project_armed = is_armed("project:".into());
+        out = out
+            .when_some(e.error.clone(), |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
             .child(
                 h_flex()
                     .pt_4()
-                    .gap_2()
-                    .child(div().flex_1().min_w_0().text_color(muted).truncate().child(dir))
+                    .gap_3()
+                    .child(div().flex_1().min_w_0().text_color(muted).truncate().child(e.dir.clone()))
                     .child(
-                        act("env-remove-project".into(), if project_armed { "Remove the project? Its threads stay" } else { "Remove project" }, project_armed)
+                        act("env-remove-project".into(), if project_armed { "Remove the project? Its threads stay".into() } else { "Remove project".into() }, project_armed)
                             .on_click(cx.listener(|this, _, window, cx| {
                                 this.click_claimed = true;
-                                this.env_remove_project(window, cx)
+                                this.env_remove("project", String::new(), window, cx)
                             })),
                     ),
-            )
-            .into_any_element()
+            );
+        out.into_any_element()
     }
 }

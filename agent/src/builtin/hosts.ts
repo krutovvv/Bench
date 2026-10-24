@@ -3,12 +3,15 @@
 // (their passwords live in the keychain and come separately, when the person approves macOS'
 // prompts). Bench's Servers mode shows them: SSH with a terminal, the others as a file browser.
 
+import { Type } from "@earendil-works/pi-ai";
+import { defineTool } from "@earendil-works/pi-durable";
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { db } from "../config.ts";
+import { sessionOf } from "../host.ts";
 
 export interface Host {
 	id: string;
@@ -120,3 +123,38 @@ export function importTransmit(): number {
 	}
 	return n;
 }
+
+// `hosts`: the accesses (SSH servers, FTP / FTPS / SFTP hosts) and which project has them. In a
+// project's thread, `/ssh` and `/ftp` offer only the project's own; this is how one is added to
+// the project, or taken out of it. Passwords are never shown.
+
+const shown = (h: Host) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user, project: h.project || null });
+
+export const hostsTool = defineTool({
+	name: "hosts",
+	description:
+		"The person's server accesses (SSH servers, FTP/FTPS/SFTP hosts) and the project each belongs to. list: all, or with `query` (name or address). " +
+		"assign / unassign: add the hosts in `ids` to this thread's project (or take them out). In a project's thread only its own accesses are offered to the person.",
+	parameters: Type.Object({
+		action: Type.Union([Type.Literal("list"), Type.Literal("assign"), Type.Literal("unassign")]),
+		query: Type.Optional(Type.String()),
+		ids: Type.Optional(Type.Array(Type.String())),
+	}),
+	execute: async (args, api) => {
+		const text = (t: unknown) => ({ output: [{ type: "text" as const, text: JSON.stringify(t) }] });
+		if (args.action === "list") {
+			const q = (args.query ?? "").toLowerCase();
+			return text({ hosts: hosts.list().filter((h) => !q || `${h.name} ${h.host}`.toLowerCase().includes(q)).map(shown) });
+		}
+		const project = sessionOf(api.conversationId).project ?? "";
+		if (!project) throw new Error("this thread is not in a project");
+		const done: string[] = [];
+		for (const id of args.ids ?? []) {
+			const h = hosts.get(id);
+			if (!h) continue;
+			hosts.save({ ...h, project: args.action === "assign" ? project : "" });
+			done.push(h.name);
+		}
+		return text({ success: true, [args.action === "assign" ? "added" : "removed"]: done });
+	},
+});

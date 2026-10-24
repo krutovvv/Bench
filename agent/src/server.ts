@@ -136,7 +136,8 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 		}
 		return { ok: true };
 	},
-	"commands.catalog": ({ profile }) => ({ categories: [{ name: "Session", pairs: COMMANDS.map((c) => [c[0], c[1]]) }], pairs: skillPairs(profile || "default") }),
+	// The session's commands only: skills are found and loaded by the agent itself, not typed.
+	"commands.catalog": () => ({ categories: [{ name: "Session", pairs: COMMANDS.map((c) => [c[0], c[1]]) }], pairs: [] }),
 	"slash.exec": async (p) => slash(p),
 	"command.dispatch": async ({ session_id, profile, name, arg }) => slash({ session_id, profile, command: `/${String(name).replace(/^\//, "")} ${arg ?? ""}`.trim() }),
 	// Pi's bash has no background processes.
@@ -395,7 +396,11 @@ const routes: Record<string, Route> = {
 	},
 	// Server accesses (SSH, SFTP, FTP, FTPS) with their passwords.
 	"GET /api/hosts": () => ({ hosts: hosts.list() }),
-	"POST /api/hosts": (req) => ({ host: hosts.save(req.body) }),
+	// By `source` when given ("ssh_config:<alias>"): the row already imported is updated, not doubled.
+	"POST /api/hosts": (req) => {
+		const prev = req.body?.source ? hosts.bySource(String(req.body.source)) : undefined;
+		return { host: hosts.save(prev ? { ...prev, ...req.body, id: prev.id } : req.body) };
+	},
 	"POST /api/hosts/import": () => ({ ssh_config: importSshConfig(), transmit: importTransmit() }),
 	/** Bench's one-time move from Apple Reminders: items carry source_id (the reminder's id). */
 	"POST /api/tasks/import": (req) => ({ imported: tasks.import(req.body?.tasks ?? []) }),
@@ -521,6 +526,8 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null };
 			}),
 			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
+			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
+			hosts: hosts.list().filter((h) => h.project === id).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
 		};
 	}],
 	// A project's MCP server: on / off, or gone.
@@ -546,6 +553,34 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		const skill = skillsOf(`project:${id}`).find((k) => k.name === decodeURIComponent(m[2]));
 		if (!skill) throw new HttpError(404, "no such skill");
 		return { name: skill.name, dir: skill.dir, text: fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8") };
+	}],
+	// A project's skill changed by hand (its SKILL.md as typed).
+	["PUT", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (req, m) => {
+		const id = decodeURIComponent(m[1]);
+		const dir = projects.env(id);
+		const skill = skillsOf(`project:${id}`).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
+		if (!skill) throw new HttpError(404, "no such skill of the project");
+		fs.writeFileSync(path.join(skill.dir, "SKILL.md"), String(req.body?.text ?? ""));
+		return { ok: true };
+	}],
+	// The project's mcp.json as typed: it must be JSON with mcpServers.
+	["PUT", /^\/api\/projects\/([^/]+)\/mcp$/, (req, m) => {
+		const id = decodeURIComponent(m[1]);
+		let parsed: any;
+		try {
+			parsed = JSON.parse(String(req.body?.text ?? ""));
+		} catch (e) {
+			throw new HttpError(400, `not JSON: ${(e as Error).message}`);
+		}
+		if (typeof parsed?.mcpServers !== "object") throw new HttpError(400, "it needs an mcpServers object");
+		writeAgentMcp(`project:${id}`, parsed.mcpServers);
+		return { ok: true };
+	}],
+	// An access taken out of the project (it stays in the store).
+	["DELETE", /^\/api\/projects\/([^/]+)\/hosts\/([^/]+)$/, (_req, m) => {
+		const h = hosts.get(decodeURIComponent(m[2]));
+		if (h && h.project === decodeURIComponent(m[1])) hosts.save({ ...h, project: "" });
+		return { ok: true };
 	}],
 	// A project's own skill goes (its folder).
 	["DELETE", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (_req, m) => {

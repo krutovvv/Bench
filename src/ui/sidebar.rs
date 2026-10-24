@@ -108,7 +108,6 @@ impl HermesApp {
             .child(super::head_icon(icon, cx))
             .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child(p.name.clone()))
             .child(div().flex_1())
-            .child(super::group_chevron(collapsed, group.clone(), cx))
             // The pencil (on hover): the project's environment — its soul, MCP, skills.
             .child(
                 super::head_plus_slot()
@@ -138,6 +137,8 @@ impl HermesApp {
                         this.new_thread_in(new_id.clone(), cx)
                     })),
             )
+            // The fold, always the rightmost: the rest stands to its left.
+            .child(super::group_chevron(collapsed, group.clone(), cx))
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
             .context_menu({
                 let view = cx.entity();
@@ -179,7 +180,6 @@ impl HermesApp {
             .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child("Without a project"))
             .child(div().flex_1())
             .child(super::group_chevron(!open, group, cx))
-            .child(super::head_plus_slot())
             // Folded by default: the key marks it open.
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
             .into_any_element()];

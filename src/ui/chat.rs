@@ -122,7 +122,12 @@ impl HermesApp {
                     div()
                         .flex_1()
                         .min_w_0()
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| this.click_claimed = true))
+                        // Working in the block (opening a skill, typing) must not pull the
+                        // thread to its end when the block grows.
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| {
+                            this.click_claimed = true;
+                            this.follow = false;
+                        }))
                         .child(content),
                 )
                 .into_any_element()

@@ -61,9 +61,10 @@ impl HermesApp {
             Some((w, q)) => (w, q.trim().to_lowercase()),
             None => return None,
         };
-        // A project's thread offers its own accesses and the shared ones.
+        // A project's thread offers the project's own accesses only (a thread outside projects:
+        // all of them). This Mac's terminal is always there.
         let proj = self.thread_project.clone();
-        let ours = |p: &str| p.is_empty() || p == proj;
+        let ours = |p: &str| proj.is_empty() || p == proj;
         let row = |name: String, desc: String, key: String| crate::model::SlashCommand {
             name,
             desc,
@@ -71,6 +72,7 @@ impl HermesApp {
             key,
         };
         let mut rows: Vec<crate::model::SlashCommand> = match word.to_lowercase().as_str() {
+            "terminal" => vec![row("/terminal".into(), "this Mac's terminal".into(), format!("ssh:{}", crate::term::LOCAL))],
             "ssh" => {
                 let mut v = vec![row("/ssh Terminal".into(), "this Mac".into(), format!("ssh:{}", crate::term::LOCAL))];
                 v.extend(
@@ -115,6 +117,7 @@ impl HermesApp {
     /// The words that attach a tool, for the list of a bare `/word`.
     pub fn tool_words() -> Vec<crate::model::SlashCommand> {
         [
+            ("/terminal", "This Mac's terminal in this thread"),
             ("/ssh", "A server's terminal in this thread"),
             ("/ftp", "A file host's folders and files in this thread"),
             ("/browser", "The server's browser: each step's page live"),
@@ -122,7 +125,13 @@ impl HermesApp {
             ("/tool", "An everyday tool (Base64, regex, cron…) in this thread"),
         ]
         .into_iter()
-        .map(|(n, d)| crate::model::SlashCommand { name: n.into(), desc: d.into(), category: "Tool".into(), key: String::new() })
+        // /terminal has nothing to choose: picking it attaches it.
+        .map(|(n, d)| crate::model::SlashCommand {
+            name: n.into(),
+            desc: d.into(),
+            category: "Tool".into(),
+            key: if n == "/terminal" { format!("ssh:{}", crate::term::LOCAL) } else { String::new() },
+        })
         .collect()
     }
 

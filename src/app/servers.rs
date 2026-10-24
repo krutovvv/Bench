@@ -528,7 +528,20 @@ impl HermesApp {
         }
         self.ssh.form = None;
         self.reload_servers(cx);
-        self.open_server_thread(s.alias, window, cx);
+        // Added in a project's thread: the project's server (its row in the agent's store).
+        if !self.thread_project.is_empty() {
+            if let Some(conn) = self.conn.clone() {
+                let body = serde_json::json!({
+                    "name": s.alias, "kind": "ssh", "host": if s.hostname.is_empty() { s.alias.clone() } else { s.hostname.clone() },
+                    "user": s.user, "source": format!("ssh_config:{}", s.alias), "project": self.thread_project,
+                });
+                self.ssh_projects.insert(s.alias.clone(), self.thread_project.clone());
+                let profile = self.current_profile();
+                self.background(window, cx, move || crate::rest::send_json(&conn, "POST", "/api/hosts", &profile, body), |_, _, _, _| {});
+            }
+        }
+        // Into the thread it was added from.
+        self.attach_tool(format!("ssh:{}", s.alias), window, cx);
     }
 
     /// "Choose…" beside the key field: the system file picker; a key in the home folder is
