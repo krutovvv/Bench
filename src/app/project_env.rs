@@ -120,11 +120,11 @@ impl HermesApp {
             crate::demo::env(self, window, cx);
             return;
         }
-        let Some(conn) = self.conn.clone() else {
+        let Some((conn, eid)) = self.env_target(id) else {
             return;
         };
         let profile = self.current_profile();
-        let path = format!("/api/projects/{id}/env");
+        let path = format!("/api/projects/{eid}/env");
         let asked = id.to_string();
         self.background(
             window,
@@ -148,13 +148,16 @@ impl HermesApp {
 
     /// Save what changed in the block: "soul", "mcp" (mcp.json), "skill" (the open one).
     pub fn env_save(&mut self, what: &'static str, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(e)) = (self.conn.clone(), self.project_env.as_ref()) else {
+        let Some(e) = self.project_env.as_ref() else {
             return;
         };
         let id = e.id.clone();
+        let Some((conn, eid)) = self.env_target(&id) else {
+            return;
+        };
         let (method, path, body) = match what {
-            "soul" => ("PUT", format!("/api/projects/{id}/soul"), json!({"text": e.soul.read(cx).value().to_string()})),
-            "mcp" => ("PUT", format!("/api/projects/{id}/mcp"), json!({"text": e.mcp_json.read(cx).value().to_string()})),
+            "soul" => ("PUT", format!("/api/projects/{eid}/soul"), json!({"text": e.soul.read(cx).value().to_string()})),
+            "mcp" => ("PUT", format!("/api/projects/{eid}/mcp"), json!({"text": e.mcp_json.read(cx).value().to_string()})),
             "telegram" => {
                 let token = e.tg_token.read(cx).value().trim().to_string();
                 let users: Vec<String> = e.tg_users.read(cx).value().split(',').map(|u| u.trim().to_string()).filter(|u| !u.is_empty()).collect();
@@ -162,13 +165,13 @@ impl HermesApp {
                 if !token.is_empty() {
                     body["token"] = json!(token);
                 }
-                ("PUT", format!("/api/projects/{id}/telegram"), body)
+                ("PUT", format!("/api/projects/{eid}/telegram"), body)
             }
             _ => {
                 let Some(name) = e.skill_open.clone() else {
                     return;
                 };
-                ("PUT", format!("/api/projects/{id}/skills/{}", enc(&name)), json!({"text": e.skill_text.read(cx).value().to_string()}))
+                ("PUT", format!("/api/projects/{eid}/skills/{}", enc(&name)), json!({"text": e.skill_text.read(cx).value().to_string()}))
             }
         };
         let profile = self.current_profile();
@@ -222,7 +225,7 @@ impl HermesApp {
     /// A row's Remove, twice: armed, then done. `what`: "mcp", "skill", "host" (out of the
     /// project), "project".
     pub fn env_remove(&mut self, what: &'static str, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(e)) = (self.conn.clone(), self.project_env.as_mut()) else {
+        let Some(e) = self.project_env.as_mut() else {
             return;
         };
         let key = format!("{what}:{name}");
@@ -240,10 +243,13 @@ impl HermesApp {
             self.thread_project = String::new();
             return;
         }
+        let Some((conn, eid)) = self.env_target(&id) else {
+            return;
+        };
         let path = match what {
-            "mcp" => format!("/api/projects/{id}/mcp/{}", enc(&name)),
-            "skill" => format!("/api/projects/{id}/skills/{}", enc(&name)),
-            _ => format!("/api/projects/{id}/hosts/{}", enc(&name)),
+            "mcp" => format!("/api/projects/{eid}/mcp/{}", enc(&name)),
+            "skill" => format!("/api/projects/{eid}/skills/{}", enc(&name)),
+            _ => format!("/api/projects/{eid}/hosts/{}", enc(&name)),
         };
         let profile = self.current_profile();
         self.background(
@@ -278,10 +284,11 @@ impl HermesApp {
             cx.notify();
             return;
         }
-        let Some(conn) = self.conn.clone() else {
+        let pid = e.id.clone();
+        let Some((conn, eid)) = self.env_target(&pid) else {
             return;
         };
-        let path = format!("/api/projects/{}/skills/{}", e.id, enc(&name));
+        let path = format!("/api/projects/{eid}/skills/{}", enc(&name));
         let profile = self.current_profile();
         self.background(
             window,

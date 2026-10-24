@@ -27,6 +27,7 @@ fn session(id: &str, title: &str, messages: u64, running: bool, source: &str) ->
         source: source.into(),
         subject: String::new(),
         project: String::new(),
+        host: String::new(),
     }
 }
 
@@ -533,6 +534,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         id: id.into(),
         name: name.into(),
         folder: folder.map(str::to_string),
+        host: None,
     };
     app.projects = vec![
         project("p-blog", "Northwind blog", None),

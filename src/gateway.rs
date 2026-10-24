@@ -637,6 +637,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                     source: s["source"].as_str().unwrap_or_default().into(),
                     subject: s["subject"].as_str().unwrap_or_default().into(),
                     project: s["project"].as_str().unwrap_or_default().into(),
+                    host: String::new(),
                 })
                 .collect(),
         )),

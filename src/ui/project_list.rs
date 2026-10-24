@@ -40,6 +40,30 @@ impl HermesApp {
                 .child(text)
         };
         let folder = form.folder.clone();
+        let host = form.host.clone();
+        // Where its agent runs: this Mac, or one of the ~/.ssh/config servers.
+        let mut places: Vec<(Option<String>, String)> = vec![(None, "This Mac".into())];
+        places.extend(self.ssh.servers.iter().map(|s| (Some(s.alias.clone()), s.alias.clone())));
+        let where_row = h_flex().flex_wrap().gap_1().children(places.into_iter().enumerate().map(|(k, (h, label))| {
+            let on = h == host;
+            div()
+                .id(("project-where", k))
+                .px_2()
+                .py_0p5()
+                .text_sm()
+                .cursor_pointer()
+                .border_1()
+                .border_color(if on { theme.primary } else { theme.border })
+                .when(on, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
+                .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
+                .child(label)
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if let Some(f) = this.project_form.as_mut() {
+                        f.host = h.clone();
+                    }
+                    cx.notify();
+                }))
+        }));
         v_flex()
             .id("project-form")
             .size_full()
@@ -67,6 +91,16 @@ impl HermesApp {
                             .items_center()
                             .border_b_1()
                             .border_color(theme.border)
+                            .child(label("Where", "This Mac, or a server: its agent there keeps the threads, skills and MCP."))
+                            .child(div().flex_1().child(where_row)),
+                    )
+                    .when(host.is_none(), |d| d.child(
+                        h_flex()
+                            .gap_4()
+                            .py_3()
+                            .items_center()
+                            .border_b_1()
+                            .border_color(theme.border)
                             .child(label("Folder", "Its code or files on disk, if it has any. Optional."))
                             .child(
                                 div()
@@ -80,11 +114,15 @@ impl HermesApp {
                             .child(button("project-folder", "Choose…", false).on_click(
                                 cx.listener(|this, _, window, cx| this.pick_project_codebase(window, cx)),
                             )),
-                    )
-                    .child(div().py_3().text_xs().text_color(muted).child(
-                        "Its threads work in its folder. Servers, file hosts, the browser, tasks and \
-                         tools are attached inside a thread with /.",
                     ))
+                    .child(div().py_3().text_xs().text_color(muted).child(if host.is_some() {
+                        "Bench installs and starts the agent on that server over SSH (Node.js 22.18+ there) \
+                         and works with it through a tunnel; on its first start it takes over what Hermes \
+                         kept there: the default profile's skills, MCP servers, sessions."
+                    } else {
+                        "Its threads work in its folder. Servers, file hosts, the browser, tasks and \
+                         tools are attached inside a thread with /."
+                    }))
                     .child(
                         h_flex()
                             .gap_2()

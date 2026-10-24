@@ -35,14 +35,28 @@ impl HermesApp {
             // Projects, each with its threads: the sidebar's only unit.
             let visible = self.visible_sessions();
             for (g, p) in self.projects.clone().into_iter().enumerate() {
-                let rows: Vec<usize> = visible.iter().copied().filter(|&i| self.sessions[i].project == p.id).collect();
+                // A remote project's threads are its server agent's; a local one's, its own.
+                let rows: Vec<usize> = visible
+                    .iter()
+                    .copied()
+                    .filter(|&i| {
+                        let s = &self.sessions[i];
+                        match &p.host {
+                            Some(h) => &s.host == h,
+                            None => s.host.is_empty() && s.project == p.id,
+                        }
+                    })
+                    .collect();
                 list.extend(self.render_project(g, &p, rows, cx));
             }
             // Threads from before projects, Telegram's and cron's: together at the end, folded.
             let loose: Vec<usize> = visible
                 .iter()
                 .copied()
-                .filter(|&i| self.sessions[i].project.is_empty() || !self.projects.iter().any(|p| p.id == self.sessions[i].project))
+                .filter(|&i| {
+                    let s = &self.sessions[i];
+                    s.host.is_empty() && (s.project.is_empty() || !self.projects.iter().any(|p| p.id == s.project))
+                })
                 .collect();
             if !loose.is_empty() {
                 list.extend(self.render_loose(loose, cx));
@@ -89,11 +103,18 @@ impl HermesApp {
         let key = format!("p:{}", p.id);
         let collapsed = self.ssh.collapsed.contains(&key);
         let group: SharedString = format!("phead{g}").into();
-        let icon = match &p.folder {
-            Some(f) if std::path::Path::new(f).join(".git").exists() => Ico::FolderGit,
-            Some(_) => Ico::Folder,
-            None => Ico::Layers,
+        let icon = match (&p.host, &p.folder) {
+            (Some(_), _) => Ico::Server,
+            (_, Some(f)) if std::path::Path::new(f).join(".git").exists() => Ico::FolderGit,
+            (_, Some(_)) => Ico::Folder,
+            _ => Ico::Layers,
         };
+        // A remote project's agent: connecting, or why it is not there.
+        let remote_note = p.host.as_ref().and_then(|h| match self.remotes.get(h) {
+            Some(r) if r.conn.is_some() => None,
+            Some(r) => Some(r.error.clone().map(|e| format!("{h}: {e}")).unwrap_or_else(|| format!("Connecting to {h}…"))),
+            None => Some(format!("{h}: not connected")),
+        });
         let (new_id, del_id, env_id) = (p.id.clone(), p.id.clone(), p.id.clone());
         let mut out = vec![h_flex()
             .id(("phead", g))
@@ -152,6 +173,19 @@ impl HermesApp {
             .into_any_element()];
         if collapsed {
             return out;
+        }
+        if let Some(note) = remote_note {
+            out.push(
+                div()
+                    .pl(super::nest_pl(cx))
+                    .pr_4()
+                    .py_1()
+                    .text_sm()
+                    .text_color(muted)
+                    .truncate()
+                    .child(note)
+                    .into_any_element(),
+            );
         }
         let n = rows.len();
         for (k, i) in rows.into_iter().enumerate() {

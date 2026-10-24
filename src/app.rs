@@ -26,6 +26,7 @@ mod processes;
 pub(crate) mod projects;
 pub(crate) mod project_list;
 pub(crate) mod project_env;
+pub(crate) mod remotes;
 pub use project_env::ProjectEnv;
 pub use project_list::ProjectForm;
 mod prompts;
@@ -129,6 +130,8 @@ pub struct HermesApp {
     pub project_env: Option<ProjectEnv>,
     /// ~/.ssh/config servers that belong to a project: alias → project id (the rest are shared).
     pub ssh_projects: HashMap<String, String>,
+    /// The agents of remote projects, by server.
+    pub remotes: HashMap<String, remotes::RemoteAgent>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -633,6 +636,7 @@ impl HermesApp {
             project_form: None,
             project_env: None,
             ssh_projects: HashMap::new(),
+            remotes: HashMap::new(),
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,
@@ -807,10 +811,9 @@ impl HermesApp {
         cx.notify();
     }
 
+    /// To the agent the command concerns (`remotes.rs`): this Mac's, or a remote project's.
     fn cmd(&self, cmd: Cmd) {
-        if let Some(g) = &self.gateway {
-            g.send(cmd);
-        }
+        self.route(cmd);
     }
 
     pub fn current_profile(&self) -> String {
@@ -882,7 +885,9 @@ impl HermesApp {
                         .iter()
                         .any(|s| s.source == "telegram" && !self.tg_owner.contains_key(&s.id));
                     self.notify_finished(&rows);
-                    self.sessions = rows;
+                    // The servers' threads stay (they come from their own agents).
+                    self.sessions.retain(|s| !s.host.is_empty());
+                    self.sessions.extend(rows);
                     if let Some(id) = self.resume_session.take() {
                         if self.session.is_none() && self.sessions.iter().any(|s| s.id == id) {
                             self.open_session(id, cx);
@@ -961,6 +966,7 @@ impl HermesApp {
                             source: "desktop".into(),
                             subject: self.new_subject.clone(),
                             project: self.thread_project.clone(),
+                            host: self.thread_host(),
                         },
                     );
                 }
@@ -1467,7 +1473,7 @@ impl HermesApp {
                 rest::worktree_add(&conn, &p, &root, &name)
             },
             move |this, r, window, cx| match r {
-                Ok((folder, _branch)) => this.cmd(Cmd::Create { profile, cwd: Some(folder), subject: this.new_subject.clone(), project: this.thread_project.clone() }),
+                Ok((folder, _branch)) => this.cmd(this.create_cmd(profile, Some(folder))),
                 Err(e) => {
                     this.live = None;
                     this.queued = None;
@@ -1719,7 +1725,7 @@ impl HermesApp {
                         cx,
                         move || connection::group_dir(&target, &group),
                         move |this, r, window, cx| match r {
-                            Ok(dir) => this.cmd(Cmd::Create { profile, cwd: Some(dir), subject: this.new_subject.clone(), project: this.thread_project.clone() }),
+                            Ok(dir) => this.cmd(this.create_cmd(profile, Some(dir))),
                             Err(e) => {
                                 this.toast(
                                     NotificationType::Error,
@@ -1727,7 +1733,7 @@ impl HermesApp {
                                     window,
                                     cx,
                                 );
-                                this.cmd(Cmd::Create { profile, cwd: None, subject: this.new_subject.clone(), project: this.thread_project.clone() });
+                                this.cmd(this.create_cmd(profile, None));
                             }
                         },
                     );
@@ -1743,7 +1749,7 @@ impl HermesApp {
                         let name = branch_name(&text);
                         self.rest_branch(conn, profile, root, name, window, cx);
                     }
-                    (root, _) => self.cmd(Cmd::Create { profile, cwd: root, subject: self.new_subject.clone(), project: self.thread_project.clone() }),
+                    (root, _) => self.cmd(self.create_cmd(profile, root)),
                 }
             }
         }

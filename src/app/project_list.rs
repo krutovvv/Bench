@@ -17,6 +17,8 @@ pub struct ProjectForm {
     pub name: Entity<InputState>,
     /// A codebase on disk, if it has one.
     pub folder: Option<String>,
+    /// A server whose agent the project is (an ~/.ssh/config host); None = this Mac.
+    pub host: Option<String>,
 }
 
 impl HermesApp {
@@ -29,7 +31,7 @@ impl HermesApp {
             window,
             cx,
             move || rest::get_raw(&conn, &profile, "/api/projects"),
-            |this, r, _, cx| {
+            |this, r, window, cx| {
                 if let Ok(v) = r {
                     this.projects = v["projects"]
                         .as_array()
@@ -39,8 +41,11 @@ impl HermesApp {
                             id: p["id"].as_str().unwrap_or_default().into(),
                             name: p["name"].as_str().unwrap_or_default().into(),
                             folder: p["folder"].as_str().filter(|f| !f.is_empty()).map(str::to_string),
+                            host: p["host"].as_str().filter(|h| !h.is_empty()).map(str::to_string),
                         })
                         .collect();
+                    // The remote projects' agents, connected beside this Mac's.
+                    this.connect_remotes(window, cx);
                 }
                 cx.notify();
             },
@@ -54,7 +59,7 @@ impl HermesApp {
         self.files_remote.form = false;
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
         name.update(cx, |s, cx| s.focus(window, cx));
-        self.project_form = Some(ProjectForm { name, folder: None });
+        self.project_form = Some(ProjectForm { name, folder: None, host: None });
         cx.notify();
     }
 
@@ -99,7 +104,7 @@ impl HermesApp {
             self.toast(NotificationType::Error, "The project needs a name".to_string(), window, cx);
             return;
         }
-        let body = json!({"name": name, "folder": form.folder});
+        let body = json!({"name": name, "folder": form.folder, "host": form.host});
         let profile = self.current_profile();
         self.background(
             window,
@@ -109,7 +114,9 @@ impl HermesApp {
                 Ok(v) => {
                     this.project_form = None;
                     this.load_projects(window, cx);
-                    if let Some(id) = v["project"]["id"].as_str() {
+                    // A local project starts with its first thread; a remote one with its
+                    // server agent's threads (they show once it is connected).
+                    if let (Some(id), None) = (v["project"]["id"].as_str(), v["project"]["host"].as_str()) {
                         this.new_thread_in(id.to_string(), cx);
                     }
                 }

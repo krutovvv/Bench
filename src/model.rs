@@ -37,6 +37,8 @@ pub struct SessionRow {
     pub subject: String,
     /// The project the thread belongs to (its id); "" = none.
     pub project: String,
+    /// The server whose agent keeps it (an ~/.ssh/config alias); "" = this Mac's.
+    pub host: String,
 }
 
 /// What the person works on: the sidebar's unit. A folder on disk (a codebase) is optional.
@@ -45,6 +47,8 @@ pub struct ProjectEntry {
     pub id: String,
     pub name: String,
     pub folder: Option<String>,
+    /// A server whose agent the project is (its threads, environment and files live there).
+    pub host: Option<String>,
 }
 
 /// Human name of a session source, for grouping the session list.
