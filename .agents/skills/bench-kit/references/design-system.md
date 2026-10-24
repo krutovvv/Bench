@@ -1,8 +1,8 @@
 # Design system (Zed / Delta style)
 
 Reference: the Zed editor and its "Delta" look — flat, square, dense, quiet chrome, content first.
-Working copy of everything below: `templates/app/src/theme.rs`, `templates/app/assets/themes/one-light.json`,
-`templates/app/assets/themes/one-dark.json`.
+Working copy of everything below: Bench's `src/theme.rs`, `assets/themes/one-light.json`,
+`assets/themes/one-dark.json`.
 
 ## Base switches
 
@@ -41,7 +41,7 @@ not propagate to already-built windows; `Theme::update` does.
 
 Dark (One Dark): content `#282C33`, panels `#2F343E`, chrome `#3B414D`, borders `#464B57`,
 text `#DCE0E5`, muted `#A9AFBC`; accent lightened (blue `#74A5F2`), primary_foreground dark
-`#1E2127`. Full list in `templates/app/src/theme.rs` → `dark_palette`.
+`#1E2127`. Full list in Bench's `src/theme.rs` → `dark_palette`.
 
 Accent presets (light, dark): Blue `#4F6FD8/#74A5F2`, Violet `#7A5BD0/#A98BF0`, Green
 `#3F8A50/#86C08A`, Teal `#16848A/#5FC0C4`, Amber `#B7700F/#E2B05A`, Coral `#CF5A3C/#EE8C6C`,
@@ -68,7 +68,7 @@ Key colors (light): keyword `#A626A4`, function `#4078F2`, string `#50A14F`, num
   titles and the header.
 - Code: Menlo (`font_family("Menlo")`), `mono_font_size` 12 — editors, diffs, command names,
   cron schedules, version strings.
-- Size presets (Settings → Appearance): Small 13/11, Normal 14/12, Large 15/13. Because the UI
+- Size presets (⌘+ / ⌘−; no longer in Settings): Small 13/11, Normal 14/12, Large 15/13. Because the UI
   font is the rem, rem-based spacing scales with it; fixed `px()` sizes don't — use rems for
   anything that must keep proportions (bars, controls).
 - Line height: default GPUI ≈1.6 is too loose for wrapped titles → `line_height(relative(1.25))`

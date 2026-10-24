@@ -112,7 +112,7 @@ impl HermesApp {
         match key {
             "up" => self.slash_sel = (self.slash_sel + n - 1) % n,
             "down" => self.slash_sel = (self.slash_sel + 1) % n,
-            "tab" => return self.complete_slash(window, cx),
+            "tab" | "enter" => return self.complete_slash(window, cx),
             "escape" => self.slash_closed = true,
             _ => return false,
         }

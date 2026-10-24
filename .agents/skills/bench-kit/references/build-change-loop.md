@@ -2,7 +2,7 @@
 
 Every change to a Bench goes through these steps, in this order. Doing them every time is what
 makes the person's "1px off" complaints stop; skipping one is how a change ships unchecked.
-Paths: the project is usually `~/Projects/<crate>` (made by `new-bench.sh` or `new-app.sh`;
+Paths: the project is usually `~/Projects/<crate>` (made by `new-bench.sh`;
 anywhere else works the same); the kit's scripts are `~/Projects/bench-kit/.agents/skills/bench-kit/scripts/` (`K=`
 below). Run every command from the project folder. Units: the scripts that end in `.py` take
 **points** (as in the code), except `measure.py`, which takes **pixels** (pt × 2).
@@ -19,15 +19,15 @@ Write one line for yourself before touching code, with numbers where the request
   bottom button's top edge at the same y*.
 - "Paddings a bit bigger" → *24 → 28 on every side of the question, the answer and the composer
   text* (one 4pt step, `build-workflow.md`).
-- "Move Tools up next to Tasks" → *Tools then Tasks in the top strip, in every mode; nothing
-  left in the status bar but New window and Settings*.
+- "Put the folder button next to +" → *Open folder then + in the top strip, on every sidebar;
+  the strip's last icon still 16 from the divider*.
 - "The card closes by itself" → *the card is still open 10 s after New task*.
 Which area and which procedure: `ui-areas.md` (put / move / fit).
 
 ## 2. Find the code
 
 - Grep a unique visible string: a label, a tooltip, a placeholder:
-  `grep -rn '"Message Hermes' src/`, `grep -rn 'Tools  ⌘3' src/`.
+  `grep -rn '"Search sessions' src/`, `grep -rn 'Hide sidebar  ⌘' src/`.
 - Find the same piece in the reference Bench, `~/Projects/bench-kit/src` (same paths). If the
   person's code differs from the reference, the reference is usually the fix
   (`build-workflow.md`).
@@ -43,9 +43,9 @@ app keeps running untouched.
 cargo build --release 2>&1 | grep -E '^(warning|error)|Finished'
 $K/shot.sh target/release/<crate> /tmp/before.png 8          # prints the size in px and pt
 ```
-- The copy opens where the person left off: their last session or mode. To show another state
-  (a mode, a list, a dialog, a new task), add a temporary hook (step 5) first.
-- The data sits behind a macOS permission (Reminders, Calendar, the microphone)? A bare binary
+- The copy opens where the person left off: their last thread. To show another state
+  (a subject's thread, a list, a dialog, a new task), add a temporary hook (step 5) first.
+- The data sits behind a macOS permission (Calendar, Contacts, the microphone)? A bare binary
   is refused. Bundle and shoot the app instead: `scripts/bundle-macos.sh`, then
   `$K/shot.sh dist/<Title>.app /tmp/before.png 8 DEBUG_X=1`. The script starts a separate copy
   with `open -n` and leaves the person's copy alone.
@@ -67,7 +67,7 @@ python3 -I $K/measure.py /tmp/before.png row 1500 560 2480  # raw color runs, in
   area and read y off it (crop coordinates are the window's, in pt).
 - `spans.py <png> <y0> <y1> [x0 x1]`: each icon, word or button along the band, its position,
   and the gaps between them and to both ends — the tool for "is the icon 16 from the edge", "is
-  the label centered", "did Tools move".
+  the label centered", "did the + move".
 - `textx.py`'s first number is the divider's x (the sidebar's width, 280 by default). Each pair
   after it is a band (y from, y to) in pt.
 - Look at crops of the area, never at the whole screen: other windows get into a full-screen shot.
@@ -95,12 +95,12 @@ state, each with its own hook.
 
 One line, marked, at the end of the app's `new()` (or where the data arrives):
 ```rust
-if std::env::var("DEBUG_UPCOMING").is_ok() { app.toggle_tasks(window, cx); app.select_task_list(List::Upcoming, window, cx); } // DEBUG-TMP
+if std::env::var("DEBUG_UPCOMING").is_ok() { app.open_task_list(List::Upcoming, window, cx); } // DEBUG-TMP
 ```
 Call the same methods the buttons call: never post clicks.
 
 **Where the hook goes matters.** At the end of `new()` it runs before anything has loaded; data
-that arrives later (the sessions list, a chat's history, Reminders) **overwrites** what the hook
+that arrives later (the sessions list, a chat's history, the tasks) **overwrites** what the hook
 did. Then put it where that data arrives (right after `self.sessions = rows;`), or for fake
 content at the top of the view's render, guarded so it runs once:
 ```rust
@@ -111,7 +111,7 @@ if std::env::var("DEBUG_CHAT").is_ok() && self.turns.is_empty() { self.turns.pus
 vec![FileEdit { path: "/tmp/x.rs".into(), diff: None }]`; both in `src/model.rs`.)
 
 Hooks that worked:
-- open a mode or a list;
+- open a subject's thread (`open_subject_key`) or a list;
 - start a new session;
 - open a session by title (in the handler that receives the sessions list);
 - press New task and shoot twice, 10 s apart (for bugs that need time).
@@ -139,7 +139,7 @@ Compare with the target from step 1:
 - "Doesn't close by itself": a second shot after the wait shows the same state.
 Off? Back to step 4 with the measured difference, not a guess.
 
-Also shoot what the change could have touched: the other modes (shared bars and strips), a long
+Also shoot what the change could have touched: other subjects' threads (shared bars and strips), a long
 list, the dark theme if colors changed.
 
 ## 8. Clean up
@@ -184,7 +184,7 @@ was rebuilt. Tell them the app's name (`Bench.3f2a91c.app`) so they know which o
 4. one exact edit
 5. hook if needed
 6. build, zero warnings
-7. shot + numbers after = target; other modes
+7. shot + numbers after = target; other threads
 8. hooks out, fmt, build, test
 9. `ship.sh`
 10. report with numbers

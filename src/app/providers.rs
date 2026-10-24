@@ -1,7 +1,7 @@
-//! Settings → Providers and Messages, for the current machine and profile, through Hermes' own
+//! Settings → Providers and Messages, for the current machine and profile, through the agent's
 //! API: custom (OpenAI-compatible) endpoints, OpenRouter with the models picked for the model
-//! list, Claude on the subscription through the official plugin, the fallback model, voice
-//! (speech to text, text to speech), service keys from `.env`, and Telegram.
+//! list, the fallback model, voice (speech to text, text to speech), service keys from `.env`,
+//! and Telegram.
 
 use std::collections::HashMap;
 
@@ -11,13 +11,10 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::HermesApp;
-use crate::connection::{self, CLAUDE_PROVIDER, ClaudeStatus};
+use crate::connection;
 use crate::rest::{self, ModelChoice};
 
-/// Models the Claude plugin answers to (Claude Code's aliases: always the newest of each).
-pub const CLAUDE_MODELS: [&str; 3] = ["sonnet", "opus", "haiku"];
-
-/// Service keys shown even when not set: the ones Hermes' tools use most.
+/// Service keys shown even when not set: the ones the agent's tools use most.
 const COMMON_KEYS: [&str; 5] = [
     "TAVILY_API_KEY",
     "BRAVE_SEARCH_API_KEY",
@@ -26,8 +23,8 @@ const COMMON_KEYS: [&str; 5] = [
     "ELEVENLABS_API_KEY",
 ];
 
-/// One `.env` value with its field: what it is and the value as saved (shown in full: it is the
-/// person's own machine). Saving an emptied field removes the key.
+/// One `.env` value with its field: what it is and the value as the agent shows it (redacted:
+/// it says the key is set). Saving an unchanged field does nothing; an emptied one removes the key.
 pub struct KeyField {
     pub key: String,
     pub hint: String,
@@ -40,7 +37,8 @@ pub struct EndpointForm {
     /// "" for one not saved yet.
     pub id: String,
     pub current: bool,
-    /// The key as saved (its `.env` value when the endpoint refers to one), to send only a change.
+    /// The key as shown (its redacted `.env` value when the endpoint refers to one), to send only
+    /// a change.
     pub key_value: String,
     /// Where the key lives when it is a `.env` reference (`${NAME}`).
     pub key_env: Option<String>,
@@ -67,16 +65,17 @@ pub struct Telegram {
     pub token: KeyField,
     pub users: Entity<InputState>,
     pub proxy: Entity<InputState>,
+    /// The users and the proxy as shown (redacted), to save only what changed.
+    pub users_value: String,
+    pub proxy_value: String,
 }
 
 /// What Bench itself remembers per machine and profile: the OpenRouter models picked for the
-/// model list, and whether the Claude plugin is there.
+/// model list.
 #[derive(Default, serde::Serialize, serde::Deserialize)]
 pub struct PickerPrefs {
     #[serde(default)]
     pub openrouter: Vec<String>,
-    #[serde(default)]
-    pub claude: bool,
 }
 
 #[derive(Default)]
@@ -94,8 +93,6 @@ pub struct Providers {
     /// OpenRouter's whole model list (ids), fetched once when needed.
     pub or_catalog: Vec<String>,
     pub or_loading: bool,
-    pub claude: Option<ClaudeStatus>,
-    pub claude_busy: Option<String>,
     /// A provider armed for deletion (its id; the second click deletes it).
     pub armed: Option<String>,
     _subscriptions: Vec<Subscription>,
@@ -142,14 +139,14 @@ impl HermesApp {
         }
     }
 
-    /// After the profile's own models: the OpenRouter models picked here and Claude's, then
+    /// After the profile's own models: the OpenRouter models picked here, then
     /// each provider's models kept together (the main model's group first).
     pub(super) fn add_picker_models(&mut self) {
         self.pv.prefs = std::fs::read_to_string(self.picker_prefs_path())
             .ok()
             .and_then(|t| serde_json::from_str(&t).ok())
             .unwrap_or_default();
-        let mut extra: Vec<ModelChoice> = self
+        let extra: Vec<ModelChoice> = self
             .pv
             .prefs
             .openrouter
@@ -161,14 +158,6 @@ impl HermesApp {
                 tag: "",
             })
             .collect();
-        if self.pv.prefs.claude {
-            extra.extend(CLAUDE_MODELS.iter().map(|m| ModelChoice {
-                model: m.to_string(),
-                provider: CLAUDE_PROVIDER.into(),
-                group: "Claude".into(),
-                tag: "",
-            }));
-        }
         for c in extra {
             if !self
                 .profile_models
@@ -191,7 +180,7 @@ impl HermesApp {
 
     // ---- loading ----------------------------------------------------------------------
 
-    /// Fill both tabs from the gateway (and Claude's state from the machine).
+    /// Fill both tabs from the agent.
     pub(super) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.pv.or_search.is_none() {
             let search =
@@ -209,7 +198,6 @@ impl HermesApp {
             self.pv.or_search = Some(search);
             self.pv._subscriptions.push(sub);
         }
-        let target = self.target.clone();
         self.rest(
             window,
             cx,
@@ -218,14 +206,10 @@ impl HermesApp {
                 let env = rest::env_vars(conn, profile)?;
                 let yaml: Value =
                     serde_yaml::from_str(&rest::config_raw(conn, profile)?).unwrap_or(Value::Null);
-                // The values themselves, from the profile's .env.
-                let shown = connection::env_file(&target, profile);
-                Ok((endpoints, env, yaml, shown))
+                Ok((endpoints, env, yaml))
             },
             |this, r, window, cx| match r {
-                Ok((endpoints, env, yaml, shown)) => {
-                    this.fill_providers(endpoints, env, yaml, shown, window, cx)
-                }
+                Ok((endpoints, env, yaml)) => this.fill_providers(endpoints, env, yaml, window, cx),
                 Err(e) => this.toast(
                     NotificationType::Error,
                     format!("Providers: {e:#}"),
@@ -234,7 +218,6 @@ impl HermesApp {
                 ),
             },
         );
-        self.check_claude(window, cx);
         // Ahead of the search field's first use, so nothing appears and vanishes under it.
         self.load_openrouter_catalog(window, cx);
     }
@@ -244,10 +227,27 @@ impl HermesApp {
         endpoints: Value,
         env: Value,
         yaml: Value,
-        shown: HashMap<String, String>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // What `GET /api/env` shows of each set value: its redacted form.
+        let shown: HashMap<String, String> = env
+            .as_object()
+            .into_iter()
+            .flatten()
+            .filter(|(_, v)| v["is_set"].as_bool() == Some(true))
+            .map(|(k, v)| {
+                let value = v["redacted_value"].as_str().unwrap_or_default();
+                (
+                    k.clone(),
+                    if value.is_empty() {
+                        "set".into()
+                    } else {
+                        value.to_string()
+                    },
+                )
+            })
+            .collect();
         self.pv.endpoints = endpoints["endpoints"]
             .as_array()
             .into_iter()
@@ -316,7 +316,7 @@ impl HermesApp {
                     && v["category"].as_str() != Some("provider")
                     // Keys and tokens only: .env also holds plain settings (timeouts, flags).
                     && ["_KEY", "_TOKEN", "_SECRET"].iter().any(|e| k.ends_with(e))
-                    // Model endpoints' keys belong to their cards; the API server's is Hermes' own.
+                    // Model endpoints' keys belong to their cards; the API server's is the agent's own.
                     && !k.contains("CUSTOM_")
                     && *k != "API_SERVER_KEY"
             })
@@ -396,33 +396,11 @@ impl HermesApp {
             token,
             users: field(window, cx, &users, "Numeric user IDs, comma-separated"),
             proxy: field(window, cx, &proxy, "socks5://host:port or http://host:port"),
+            users_value: users,
+            proxy_value: proxy,
         });
         self.pv.loaded = true;
         cx.notify();
-    }
-
-    pub fn check_claude(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let target = self.target.clone();
-        self.pv.claude_busy = Some("Checking…".into());
-        self.background(
-            window,
-            cx,
-            move || Ok(connection::claude_status(&target)),
-            |this, r: anyhow::Result<ClaudeStatus>, _, cx| {
-                this.pv.claude_busy = None;
-                if let Ok(s) = r {
-                    if s.plugin != this.pv.prefs.claude {
-                        this.pv.prefs.claude = s.plugin;
-                        this.save_picker_prefs();
-                        this.profile_models
-                            .retain(|c| c.provider != CLAUDE_PROVIDER);
-                        this.add_picker_models();
-                    }
-                    this.pv.claude = Some(s);
-                }
-                cx.notify();
-            },
-        );
     }
 
     // ---- actions ----------------------------------------------------------------------
@@ -725,15 +703,19 @@ impl HermesApp {
 
     pub fn save_telegram(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(t) = &self.pv.telegram else { return };
+        // The fields show redacted values: only what was changed is sent.
         let token = text(&t.token.input, cx);
-        let users: Vec<String> = text(&t.users, cx)
+        let token = (token != t.token.value).then_some(token);
+        let users_text = text(&t.users, cx);
+        let users_changed = users_text != t.users_value;
+        let users: Vec<String> = users_text
             .split(|c: char| c == ',' || c.is_whitespace())
             .filter(|s| !s.is_empty())
             .map(str::to_string)
             .collect();
         if let Some(bad) = users
             .iter()
-            .find(|u| !u.chars().all(|c| c.is_ascii_digit()))
+            .find(|u| users_changed && !u.chars().all(|c| c.is_ascii_digit()))
         {
             self.toast(
                 NotificationType::Error,
@@ -743,22 +725,29 @@ impl HermesApp {
             );
             return;
         }
-        let users = users.join(",");
+        let users = users_changed.then(|| users.join(","));
         let proxy = text(&t.proxy, cx);
+        let proxy = (proxy != t.proxy_value).then_some(proxy);
         self.rest(
             window,
             cx,
             move |conn, profile| {
-                if token.is_empty() {
-                    let _ = rest::remove_env(conn, profile, "TELEGRAM_BOT_TOKEN");
-                } else {
-                    rest::set_env(conn, profile, "TELEGRAM_BOT_TOKEN", &token)?;
+                match token.as_deref() {
+                    None => {}
+                    Some("") => {
+                        let _ = rest::remove_env(conn, profile, "TELEGRAM_BOT_TOKEN");
+                    }
+                    Some(token) => rest::set_env(conn, profile, "TELEGRAM_BOT_TOKEN", token)?,
                 }
-                rest::set_env(conn, profile, "TELEGRAM_ALLOWED_USERS", &users)?;
-                if proxy.is_empty() {
-                    let _ = rest::remove_env(conn, profile, "TELEGRAM_PROXY");
-                } else {
-                    rest::set_env(conn, profile, "TELEGRAM_PROXY", &proxy)?;
+                if let Some(users) = &users {
+                    rest::set_env(conn, profile, "TELEGRAM_ALLOWED_USERS", users)?;
+                }
+                match proxy.as_deref() {
+                    None => {}
+                    Some("") => {
+                        let _ = rest::remove_env(conn, profile, "TELEGRAM_PROXY");
+                    }
+                    Some(proxy) => rest::set_env(conn, profile, "TELEGRAM_PROXY", proxy)?,
                 }
                 Ok(())
             },
@@ -766,7 +755,7 @@ impl HermesApp {
                 Ok(()) => {
                     this.toast(
                         NotificationType::Success,
-                        "Telegram saved · restart the gateway to apply",
+                        "Telegram saved · restart the agent to apply",
                         window,
                         cx,
                     );
@@ -778,37 +767,6 @@ impl HermesApp {
                     window,
                     cx,
                 ),
-            },
-        );
-    }
-
-    pub fn install_claude_plugin(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let target = self.target.clone();
-        self.pv.claude_busy = Some("Installing the plugin…".into());
-        cx.notify();
-        self.background(
-            window,
-            cx,
-            move || connection::install_claude_plugin(&target),
-            |this, r, window, cx| {
-                this.pv.claude_busy = None;
-                match r {
-                    Ok(_) => {
-                        this.toast(
-                            NotificationType::Success,
-                            "Claude plugin installed · restart the gateway to load it",
-                            window,
-                            cx,
-                        );
-                        this.check_claude(window, cx);
-                    }
-                    Err(e) => this.toast(
-                        NotificationType::Error,
-                        format!("Claude: {e:#}"),
-                        window,
-                        cx,
-                    ),
-                }
             },
         );
     }

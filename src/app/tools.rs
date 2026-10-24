@@ -23,7 +23,7 @@ pub struct Tools {
     pub pattern: Entity<InputState>,
     pub flags: RegexFlags,
     pub matches: usize,
-    inputs: HashMap<Tool, String>,
+    pub inputs: HashMap<Tool, String>,
     /// Each tool's choice in its segmented control, and a generator's count.
     pub modes: HashMap<Tool, usize>,
     pub counts: HashMap<Tool, usize>,
@@ -109,19 +109,6 @@ impl Tools {
 }
 
 impl HermesApp {
-    /// ⌘3 / the wrench: Tools over the sessions or servers, and back.
-    pub fn toggle_tools(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.tools.on = !self.tools.on;
-        self.panel = super::Panel::Chat;
-        if self.tools.on {
-            self.tasks.on = false;
-        }
-        if self.tools.on {
-            self.select_tool(self.tools.tool, window, cx);
-        }
-        cx.notify();
-    }
-
     pub fn select_tool(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
         let t = &mut self.tools;
         let old = t.input.read(cx).value().to_string();

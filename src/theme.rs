@@ -178,6 +178,11 @@ pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
         t.primary_hover = shade(accent, hover);
         t.primary_active = shade(accent, hover * 2.);
         t.primary_foreground = if dark { c(0x1E2127) } else { c(0xFFFFFF) };
+        // Primary buttons (Save, Send, …) in the accent too, not the kit's black.
+        t.button_primary = t.primary;
+        t.button_primary_hover = t.primary_hover;
+        t.button_primary_active = t.primary_active;
+        t.button_primary_foreground = t.primary_foreground;
         t.ring = accent;
         t.link = accent;
         t.caret = accent;
@@ -193,16 +198,18 @@ fn light_palette(t: &mut Theme) {
     // Surfaces: editor-white content, one step darker chrome, thin neutral borders.
     t.background = c(0xFAFAFA);
     t.foreground = c(0x242529);
-    t.sidebar = c(0xEFEFF0);
+    // The chrome half a step darker than it was (EFEFF0 / E9E9EA): the sidebar needs no rule
+    // against the chat, and the middle reads as the page.
+    t.sidebar = c(0xEAEAEC);
     t.sidebar_foreground = c(0x242529);
     t.sidebar_border = c(0xD9D9DA);
-    t.sidebar_accent = c(0xE2E2E4);
+    t.sidebar_accent = c(0xDEDEE1);
     t.sidebar_accent_foreground = c(0x242529);
-    t.title_bar = c(0xE9E9EA);
+    t.title_bar = c(0xE4E4E6);
     t.title_bar_border = c(0xD9D9DA);
-    t.status_bar = c(0xE9E9EA);
+    t.status_bar = c(0xE4E4E6);
     t.status_bar_border = c(0xD9D9DA);
-    t.tab_bar = c(0xE9E9EA);
+    t.tab_bar = c(0xE4E4E6);
     t.border = c(0xD9D9DA);
     t.input = c(0xC9C9CB);
     t.window_border = c(0xC9C9CB);

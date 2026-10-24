@@ -184,11 +184,20 @@ pub fn pretty(v: &Value) -> String {
     }
 }
 
-/// A file edit from a file tool's result: its path and, for `patch`, the unified diff.
+/// A file edit from a file tool's result: its path (`resolved_path`) and the unified diff when
+/// the tool gives one. The agent's tools are Pi's `edit` and `write`; the rest are older names
+/// still found in stored sessions.
 pub fn file_edit(name: &str, result: &Value) -> Option<FileEdit> {
     if !matches!(
         name,
-        "patch" | "write_file" | "edit_file" | "apply_patch" | "str_replace" | "create_file"
+        "edit"
+            | "write"
+            | "patch"
+            | "write_file"
+            | "edit_file"
+            | "apply_patch"
+            | "str_replace"
+            | "create_file"
     ) {
         return None;
     }
@@ -367,5 +376,25 @@ pub fn attach(turns: &mut [Turn], metas: Vec<Meta>) {
         turn.sources = meta.sources;
         turn.started = meta.started;
         turn.finished = meta.finished;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    #[test]
+    fn file_edits_of_the_agents_tools() {
+        let r = json!({"resolved_path": "/p/a.rs", "diff": "--- a\n+++ b\n"});
+        let e = super::file_edit("edit", &r).unwrap();
+        assert_eq!(
+            (e.path.as_str(), e.diff.as_deref()),
+            ("/p/a.rs", Some("--- a\n+++ b\n"))
+        );
+        let w = super::file_edit("write", &json!({"resolved_path": "/p/b.md"})).unwrap();
+        assert_eq!((w.path.as_str(), w.diff), ("/p/b.md", None));
+        assert!(super::file_edit("patch", &json!({"path": "/p/c"})).is_some());
+        assert!(super::file_edit("read", &r).is_none());
+        assert!(super::file_edit("edit", &json!({"error": "no match"})).is_none());
     }
 }

@@ -1,9 +1,8 @@
 #!/bin/bash
-# A new person's Bench: a copy of the reference Bench (the Hermes chat, settings, providers,
-# SSH terminals, mini IDE, Tools), renamed so it lives beside other apps. The name in the
-# window and the Dock stays "Bench", the icon stays Bench's: every Bench looks the same
-# outside and differs inside. Then remove the modes the person doesn't need
-# (references/bench-modes-remove.md) and add theirs (references/build-modes.md).
+# A Bench for another person: a copy of this Bench (the agent client, its threads and tools,
+# the agent in agent/), renamed so it lives beside other apps. The name in the window and the
+# Dock stays "Bench", the icon stays Bench's. Then hide the groups they don't use (src/bench.rs)
+# and add their tools as threads (references/build-subject.md).
 # Usage: new-bench.sh [crate-name] [dest-dir]
 #   crate-name  lowercase, dashes; the binary, the data folder and the bundle id local.<crate>
 #               (default: bench)

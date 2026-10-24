@@ -4,157 +4,157 @@
 
 <h1 align="center">Bench</h1>
 
-<p align="center"><b>A personal workbench, and an experiment: what if an app came with the kit it's built from?</b></p>
+<p align="center"><b>A client for an AI agent, shaped like Zed's Delta: the agent's work shows up live in the thread — a web page you can click, a terminal, a task list.</b></p>
 
 <p align="center">
   <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a> ·
   <a href="https://github.com/krutovvv/bench/releases">Download for macOS, Linux, Windows</a>
 </p>
 
-![A Bench at work: the agent's steps, then its answer](docs/chat-steps.png)
+![A browser thread: the agent's step is the live page, right in its answer](docs/thread-browser.png)
 
 <sub>A made-up session (demo mode): nothing in these screenshots is real data. The
 [browser demo](https://krutovvv.github.io/bench/) is the same app compiled to WebAssembly —
-click through the chat, Tasks, Tools and SSH.</sub>
+click through the threads in the sidebar.</sub>
 
 ## The idea
 
-Most apps are made for most people, and that's fair: plenty of people are happy with what's
-there. But some would like it their own way — something gets in the way, something is missing,
-something works differently from how they work. Usually the choice is to live with it or to
-rewrite it from scratch.
+Zed's [Delta](https://zed.dev/blog/introducing-deltadb) treats the conversation with the agent as
+the unit of work. Bench takes that shape — one chat app, no modes, everything a thread — and
+shows it best in the **browser thread**.
 
-What if an app came with the kit it's built from — the same UI, its pieces, examples, and skills
-for an AI agent — so it could be rebuilt around how you work? The parts the kit doesn't have, the
-agent could write from its examples, in the same look.
+You ask the agent to do something on a website: "open the blog's admin, make a draft from the
+release notes, stop before publishing". The agent works in a real browser on a server. Each of
+its steps shows up **as the page itself, live, inside its answer**, with no browser chrome
+around it. You see what it did, and you can click and type in that page yourself: fix a word,
+tick a box, sign in. Then ask for the next step. Earlier steps keep the last picture of their
+page, so the thread reads like a record of the work.
 
-An agent can build something without a kit too, but usually something ordinary. My guess is that
-the richer the kit, and the more experience goes into it, the more useful the result.
+The same idea covers my other everyday tools: **each one is a kind of thread**. The sidebar lists
+what I work on. A thread about one has it live at the top and the conversation underneath. The
+agent knows what the thread is about, sees what the block shows with every message, and has a
+tool to act on it.
 
-This repository is one such attempt by one developer, far from complete: a kit, and the app I
-built with it for myself. It's called Bench, as in workbench.
-
-## How it started
-
-I'm a developer, and my day was spread over a dozen apps: an AI chat client
-([BoltAI](https://boltai.com), DeepSeek Harness, Hermes' own UI, Hermes One,
-[TypingMind](https://www.typingmind.com), [Open WebUI](https://openwebui.com) — none fit quite
-right), SSH servers in [Warp](https://www.warp.dev) (with ideas from Zap, its open-source fork),
-small files in yet another editor, tasks in [Things](https://culturedcode.com/things/), and
-[DevUtils](https://devutils.com) for Base64, regex, JSON and the like. Each of them is good.
-Together they meant switching windows all day, and each did a few things not the way I work.
-
-What made me try was [ArtCraft](https://github.com/storytold): with AI they rebuilt in pure Rust
-a whole collection of heavy programs — Photoshop
-([PhotoCraft](https://github.com/storytold/photocraft)), Premiere, Illustrator, Word, Excel,
-Figma, AutoCAD. If that could be done, maybe the much simpler programs I use every day could be
-brought together into one.
-
-So I tried, starting with the chat client, and now I work in one window. Nothing was cloned: the
-goal was to take the idea of each piece I actually use and shape it the way I work. Mostly we
-worked from screenshots and descriptions; here and there we looked deeper with
-[REA](https://github.com/morluto/rea) (Reverse Engineer Anything), an MCP for taking apart
-binaries and applications, to see how a program does something before rebuilding just that part.
-
-Ideas came from other places too. Zed's [Delta](https://zed.dev/blog/introducing-deltadb) treats
-the agent's conversation, not the commit, as the unit of work: every change stays linked to the
-thread that produced it. I didn't build that, but took the part I could use — in Bench a chat can
-work in a git branch of its own and be merged back when it's done. Seeing an idea somewhere and
-having it in the bench a few minutes later turned out to be the nicest part of all this.
-
-Along the way the agent wrote down what worked as skills, so that another agent could build a
-different app from them. That is the kit.
-
-## The kit
-
-[`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md) is a set of agent skills. It
-doesn't describe my tools; it describes *how to make anyone's*:
-
-- **how to interview a person** about their work and turn the answers into the shape of an app;
-- **one look for every Bench**, written down to the pixel: the frame, a catalog of every piece
-  (buttons, rows, bars, forms, panes, cards) with pictures and code, the rules behind them;
-- **how to grow it**: add a mode, a tool, a card, a native data source, a connection to an agent;
-- **how to change it safely**: a fixed loop of measuring, editing, building and measuring again,
-  with scripts that check the result to the pixel, so a modest model can do it without guessing;
-- proven libraries, ready recipes, and the mistakes already paid for.
-
-## What stays the same in every Bench
-
-1. **One look, and the look is the method.** Flat, square, precise: a sidebar, a header, a status
-   bar, exact spacing, one accent color. A job placed into "a list on the left, a strip of small
-   controls, a few panes, a status line" splits into the right pieces by itself. The agent
-   doesn't design, it assembles, which helps even a mid-level model build one well.
-2. **Native and light.** Rust with [GPUI](https://www.gpui.rs) (the UI framework behind the Zed
-   editor) through [gpui-kit](https://crates.io/crates/gpui-kit): GPU-drawn, no Electron, no
-   bundled browser. This whole Bench — chat, terminals, editor, tools, tasks, every icon, font
-   and highlighting grammar — is one 75 MB binary that starts instantly.
-3. **It aggregates; your data stays where it lives.** In my case tasks stay in the system's
-   Reminders, servers in `~/.ssh/config`, files in their folders. A Bench keeps no database of its
-   own, and everything is still there if you open the native app instead.
-4. **An AI agent, if you want one.** Most workbenches turn around an agent that takes over the
-   steps between your tools; the kit has a complete client for [Hermes Agent](https://hermes-agent.nousresearch.com).
-   An app without one is just as much a Bench.
-5. **You grow it yourself.** When you need something new, you ask the agent again, and it is
-   added the same way, in the same look.
-
-![The same answer, further down: code, a video, a voice note, sources, a running process, changed files](docs/chat-media.png)
-
-## The code here is mine — and the agent's
-
-The app in `src/` is **my** Bench. It fits my work, not yours, and you don't need its pieces.
-It's here because an agent building *your* Bench works better with a real, finished one at hand:
-every page of the kit points into this code. Take what's useful, delete the rest. The pieces:
-
-| Piece | What it is | Files (in `src/`) |
+| Thread | What's live | What the agent does there |
 |---|---|---|
-| **Frame** | window, sidebar, header, status bar, theme, icons, shortcuts | `main.rs`, `theme.rs`, `icons.rs`, `ui/mod.rs`, `app/keys.rs`, `bench.rs` |
-| **AI agent client** (the most reusable part) | chat with Hermes: sessions, steps, subagents, media, voice, files it changed, background processes, profiles, providers, prompts, skills, cron, notifications | `gateway.rs`, `rest.rs`, `connection.rs`, `history.rs`, `media.rs`, `audio.rs`, `video.rs`, `attach.rs`, `notify.rs`, `app.rs`, `app/{asks,attachments,cron,gateways,install,marks,processes,profiles,projects,prompts,providers,slash}.rs`, `ui/{chat,composer,media,asks,sidebar,statusbar,panels,providers,install}.rs` |
-| SSH and terminals | servers from `~/.ssh/config`, a terminal per server | `ssh.rs`, `sshconfig.rs`, `term.rs`, `remote.rs`, `app/servers.rs`, `ui/servers.rs`, `ui/terminal.rs` |
-| Mini IDE | file tree, editor, tabs, diffs | `app/{ide,ide_ops,ide_tabs}.rs`, `ui/files.rs`, `diff.rs`, `lang.rs` |
-| Tools | everyday utilities (Base64, regex, JSON, cron…) as tested pure functions | `devtools/`, `app/tools.rs`, `ui/tools.rs` |
-| Tasks | a task list over the system's Reminders | `tasks.rs`, `reminders.rs`, `app/tasks.rs`, `ui/tasks.rs` |
-| Demo | the made-up session in these screenshots | `demo.rs` (its media: `assets/demo/`) |
+| **Browser** — sessions in a shared server browser | each step's page, in the answer: click and type in it | drives the page (Playwright), one tab per turn |
+| **Tasks** — Today, Upcoming, Anytime, Logbook | the task list | adds, moves, completes, sums the hours ("how much did I work for this client in October?") |
+| **Servers** — every `~/.ssh/config` host, and this Mac | the server's terminal | runs commands there and reads what's on screen |
+| **Files** — FTP, FTPS and SFTP hosts | the folder and an editor for the open file | lists, reads, edits, renames |
+| **Tools** — Base64, regex, cron, JSON, Markdown from a web page… | the tool's input and output | explains, fixes, works with what's in it |
 
-SSH, the mini IDE, Tools and Tasks can each be switched off with one flag in
-[`src/bench.rs`](src/bench.rs);
-the kit's [`bench-modes-remove.md`](.agents/skills/bench-kit/references/bench-modes-remove.md)
-explains what goes with each.
+Ordinary threads work in a project folder, with a git branch of their own when needed. Scheduled
+jobs and Telegram chats are threads too.
+
+<table>
+<tr>
+<td><img src="docs/thread-server.png" alt="A thread about a server: its terminal live at the top"></td>
+<td><img src="docs/thread-tasks.png" alt="A thread about today's tasks"></td>
+</tr>
+<tr>
+<td><img src="docs/thread-tool.png" alt="A thread about the cron parser"></td>
+<td><img src="docs/chat-media.png" alt="An answer with code, a video, a voice note, sources, a running process, changed files"></td>
+</tr>
+</table>
+
+## The agent
+
+Bench is a client. The agent is [`agent/`](agent/README.md), a small Node server on
+[Pi Durable](https://github.com/earendil-works/pi). It is used the way its authors describe it
+and extended with their packages and popular ones; about 3k lines are our own. Pi keeps every
+step on disk, so a turn survives a crash, and cron jobs and Telegram answers keep working with
+Bench closed. Bench installs and starts the agent on this Mac (`~/.bench`), or over SSH on a
+server; it needs Node.js 22.18 or newer.
+
+A thread about something is three small pieces on the agent's side:
+- a **tool** that acts on the subject (`tasks`, `ssh_run`, `remote_files`, or an MCP server);
+- two or three sentences of **prompt** saying what "this" and "here" mean in that thread;
+- the **block's state** that Bench sends with each message (the terminal's last lines, the open
+  file, the tool's input and output). It goes to the model and is kept out of the history.
+
+The browser threads use a shared Chrome on a server, which the agent drives through the
+Playwright MCP. People watch and step in through a small gateway. All three come as one Docker
+setup in [`browser-server/`](browser-server/README.md), ready to deploy. Each person gets their own
+key, no SSH needed. It allows a narrow set of operations and keeps a log. Frames come at 2 per
+second at most, and only while someone is watching. Idle tabs sleep to keep the server within
+its memory budget.
+
+## How it got here
+
+My day used to be spread over a dozen apps: an AI chat client (none fit quite right), SSH
+servers in [Warp](https://www.warp.dev), FTP in Transmit, tasks in
+[Things](https://culturedcode.com/things/), [DevUtils](https://devutils.com) for Base64 and
+regex, a browser for the sites we publish on by hand. Each is good. Together they meant
+switching windows all day.
+
+The first plan was bigger than this: a collection of skills from which an agent would build
+*anyone* a different app from a description of their work. ArtCraft's
+[rebuilds in pure Rust](https://github.com/storytold) of whole heavy programs made that seem
+possible. Along the way it got simpler. The modes, the separate panels and the "build any app"
+went away, one at a time. What stayed is a Delta-like agent client where each tool is a thread.
+It wasn't a straight road, but that's where it landed, and it's what I now work in all day.
+
+## The kit: add your own tools as threads
+
+Your tools are not mine. One person has clients, another the shop's orders, a third a build
+queue. [`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md) is a set of agent skills
+for **adding such a tool to Bench**: one more kind of thread, made the same way as the five
+above, in the same look:
+
+- **the recipe** ([`build-subject.md`](.agents/skills/bench-kit/references/build-subject.md)):
+  the subject's key, the live block, the sidebar group, the agent's tool, its prompt section
+  and the block's state, with the browser thread as the main worked example and the other four after it and a checklist of
+  every file a new one touches;
+- **how to ask** a person about their work and turn the answers into threads;
+- **one look, written down to the pixel**: a catalog of every piece with pictures and code, the
+  rules behind them, and what I liked and rejected along the way;
+- **how to change it safely**: a fixed loop of measuring, editing, building and measuring again,
+  with scripts that check the result, so even a modest model can do it without guessing;
+- proven libraries, the agent's side on Pi, and the mistakes already paid for.
+
+Open this folder in an agent session (in Bench, or another agent that reads skills), describe
+what you work on, and ask for it. For someone else's Bench, `scripts/new-bench.sh` makes a copy
+to grow.
+
+## The code
+
+The app in `src/` is my Bench. The kit points into it everywhere, because a real, finished app
+is the best example. Take what's useful.
+
+| Piece | Files (in `src/` unless noted) |
+|---|---|
+| **Frame**: window, sidebar, header, status bar, theme, icons, shortcuts | `main.rs`, `theme.rs`, `icons.rs`, `ui/mod.rs`, `ui/sidebar.rs`, `ui/statusbar.rs`, `app/keys.rs`, `bench.rs` |
+| **Agent client**: threads, steps, subagents, media, voice, changed files, background processes, profiles, providers, prompts, skills, cron | `gateway.rs`, `rest.rs`, `connection.rs`, `pi_agent.rs`, `history.rs`, `media.rs`, `audio.rs`, `video.rs`, `app.rs`, `app/*.rs`, `ui/chat.rs`, `ui/composer.rs`, `ui/media.rs`, `ui/asks.rs`, `ui/panels.rs` |
+| **Threads about something** | `app/subjects.rs`, the block in `ui/chat.rs` |
+| Tasks | `tasks.rs`, `task_store.rs`, `app/tasks.rs`, `ui/tasks.rs` · agent: `builtin/tasks.ts` |
+| Servers | `sshconfig.rs`, `ssh.rs`, `term.rs`, `app/servers.rs`, `ui/servers.rs`, `ui/terminal.rs` · agent: `builtin/ssh.ts` |
+| Files | `app/remote_files.rs`, `ui/remote_files.rs` · agent: `builtin/remote.ts`, `builtin/hosts.ts` |
+| Browser | `remote_browser.rs`, `app/sites.rs`, `ui/sites.rs` · the server: [`browser-server/`](browser-server/README.md) |
+| Tools | `devtools/` (19 tools as tested pure functions), `app/tools.rs`, `ui/tools.rs` |
+| Mini IDE beside a thread: tree, editor, tabs, diffs | `app/ide*.rs`, `ui/files.rs`, `diff.rs`, `lang.rs` |
+| Demo: the made-up session in these screenshots | `demo.rs` (media in `assets/demo/`) |
+| The agent | [`agent/`](agent/README.md) |
 
 ## Developed from inside itself
 
-This Bench is developed from inside itself: I talk to the agent in Bench, the agent changes
-Bench's code, and every commit becomes its own app next to the one I'm running. I try the new
-one; when it's good I switch to it; the previous builds stay for rolling back.
+I talk to the agent in Bench, and the agent changes Bench's code. Every commit becomes its own
+app next to the one I'm running. I try the new one and switch to it when it's good; the
+previous builds stay for rolling back.
 
 ## Build
 
 ```bash
 cargo build --release && ./target/release/bench    # run it
-BENCH_DEMO=1 ./target/release/bench                # the made-up session from the screenshots
-```
-
-```bash
+BENCH_DEMO=1 ./target/release/bench                # the made-up session, on the browser thread (also: tasks, server, tool, landing)
 scripts/build-web.sh                               # the browser demo, into web/dist
 ```
 
 GPUI runs on macOS, Linux and Windows, and in the browser; GitHub builds all of them on every
-push (`.github/workflows/build.yml`). I use Bench on macOS; the Reminders tasks and
-notifications talk to macOS directly, so elsewhere they say they're unavailable — the rest is
-the same Rust everywhere.
-
-## Use the kit
-
-Open this folder as the working folder of an agent session (in Bench, or in Hermes — trust it
-once with `hermes skills trust <path-to-this-repo>`), describe your work, and ask for your
-Bench. The agent starts from [`SKILL.md`](.agents/skills/bench-kit/SKILL.md).
-
-## About me
-
-Before this I built [iSite.app](https://isite.app), a platform for making websites and online
-stores, its visual editor included. That's where my feel for interfaces comes from, and much of
-how Bench looks and is put together.
+push (`.github/workflows/build.yml`). I use Bench on macOS. Notifications and the one-time
+import of tasks from Apple Reminders talk to macOS directly; the rest is the same Rust
+everywhere.
 
 ## License
 
-[MIT](LICENSE): use it, change it, build your own Bench from it. Nothing here is for sale; it's
-shared as an experiment.
+[MIT](LICENSE): use it, change it, grow your own. Nothing here is for sale; it's shared as an
+experiment.

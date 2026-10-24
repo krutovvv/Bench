@@ -1,18 +1,13 @@
-//! Where the gateway lives and how to authenticate to it.
-//!
-//! * Local: `hermes gateway ensure --json` names the endpoint; Hermes' own Python
-//!   (`hermes_cli.gateway_client._session_ticket`) mints one-shot tickets, sent as a
-//!   WebSocket subprotocol or the `X-Hermes-Gateway-Ticket` header — exactly what
-//!   Hermes Desktop does.
-//! * SSH: like Desktop's remote mode — a dedicated `hermes serve --isolated --port 0`
-//!   on the host, started with our own session token, reached through `ssh -L`.
-//!   Port and token are remembered so the next launch reattaches.
+//! Where the agent lives and how to reach it: on this Mac `pi_agent::ensure()` starts it and
+//! names its port; over SSH `pi_agent::ensure_remote()` does the same on the host, reached
+//! through `ssh -L`. Either way it is a session token, sent as `?token=` on the WebSocket and as
+//! the `X-Hermes-Session-Token` header on REST. Port and token of a host are remembered so the
+//! next launch reattaches.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::sync::Mutex;
+use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 
 use web_time::Instant;
@@ -24,68 +19,8 @@ use tungstenite::client::IntoClientRequest;
 
 use crate::model::Target;
 
-const TICKET_SCRIPT: &str = r#"
-import json, sys
-from contextlib import redirect_stdout
-from pathlib import Path
-from types import SimpleNamespace
-with redirect_stdout(sys.stderr):
-    from hermes_cli.gateway_client import _session_ticket
-for line in sys.stdin:
-    try:
-        req = json.loads(line)
-        ep = req['endpoint']
-        with redirect_stdout(sys.stderr):
-            t = _session_ticket(Path(ep['profile_id']), SimpleNamespace(**{'control_home': None, **ep}),
-                                purpose=req['purpose'], scope='host' if req['purpose'] == 'interactive' else None)
-        print(json.dumps({'ticket': t}), flush=True)
-    except Exception as exc:
-        print(json.dumps({'error': str(exc)}), flush=True)
-"#;
-
 fn home() -> PathBuf {
     PathBuf::from(std::env::var("HOME").unwrap_or_default())
-}
-
-/// A long-lived Python helper that mints tickets on request (one per line).
-struct TicketHelper {
-    _child: Child,
-    stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
-}
-
-impl TicketHelper {
-    fn start() -> Result<Self> {
-        let mut child = Command::new(home().join(".hermes/hermes-agent/venv/bin/python"))
-            .args(["-I", "-u", "-c", TICKET_SCRIPT])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .spawn()
-            .context("start Hermes ticket helper")?;
-        let stdin = child.stdin.take().unwrap();
-        let stdout = BufReader::new(child.stdout.take().unwrap());
-        Ok(Self {
-            _child: child,
-            stdin,
-            stdout,
-        })
-    }
-
-    fn mint(&mut self, endpoint: &Value, purpose: &str) -> Result<String> {
-        writeln!(
-            self.stdin,
-            "{}",
-            json!({"endpoint": endpoint, "purpose": purpose})
-        )?;
-        let mut line = String::new();
-        self.stdout.read_line(&mut line)?;
-        let v: Value = serde_json::from_str(&line).context("ticket helper reply")?;
-        v["ticket"]
-            .as_str()
-            .map(str::to_string)
-            .ok_or_else(|| anyhow!("ticket: {}", v["error"]))
-    }
 }
 
 /// An `ssh -N -L` child; dropped => tunnel closed.
@@ -97,18 +32,10 @@ impl Drop for Tunnel {
     }
 }
 
-enum Auth {
-    Ticket {
-        endpoint: Value,
-        helper: Mutex<TicketHelper>,
-    },
-    Token(String),
-}
-
 pub struct Connection {
     /// `http://127.0.0.1:<port>` reachable from this machine.
     pub base: String,
-    auth: Auth,
+    token: String,
     _tunnel: Option<Tunnel>,
 }
 
@@ -120,62 +47,18 @@ impl Connection {
         }
     }
 
-    /// Ticket mode speaks the canonical protocol (prompts carry profile + submission id).
-    pub fn canonical(&self) -> bool {
-        matches!(self.auth, Auth::Ticket { .. })
-    }
-
     fn open_local() -> Result<Self> {
-        // A gateway that is restarting (draining a running turn, starting up) gets time to come back.
-        let deadline = Instant::now() + Duration::from_secs(180);
-        let v = loop {
-            let out = Command::new(home().join(".local/bin/hermes"))
-                .args(["gateway", "ensure", "--json"])
-                .output()
-                .context("run `hermes gateway ensure`")?;
-            let v: Value =
-                serde_json::from_slice(&out.stdout).context("parse `gateway ensure` output")?;
-            match v["state"].as_str() {
-                Some("ready") => break v,
-                Some("draining" | "starting") if Instant::now() < deadline => {
-                    std::thread::sleep(Duration::from_secs(3))
-                }
-                other => bail!("local gateway is not ready: {}", other.unwrap_or("?")),
-            }
-        };
-        let endpoint = v["endpoint"].clone();
-        let base = endpoint["api_origin"]
-            .as_str()
-            .ok_or_else(|| anyhow!("no api_origin"))?
-            .trim_end_matches('/')
-            .to_string();
+        let (port, token) = crate::pi_agent::ensure()?;
         Ok(Self {
-            base,
-            auth: Auth::Ticket {
-                endpoint,
-                helper: Mutex::new(TicketHelper::start()?),
-            },
+            base: format!("http://127.0.0.1:{port}"),
+            token,
             _tunnel: None,
         })
     }
 
     pub fn websocket(&self) -> Result<WebSocket<TcpStream>> {
         let host = self.base.trim_start_matches("http://").to_string();
-        let req = match &self.auth {
-            Auth::Ticket { endpoint, helper } => {
-                let ticket = helper.lock().unwrap().mint(endpoint, "interactive")?;
-                let mut req =
-                    format!("ws://{host}/api/ws?native_dial=unminted").into_client_request()?;
-                req.headers_mut().insert(
-                    "Sec-WebSocket-Protocol",
-                    format!("hermes-gateway-v1, hermes-gateway-ticket.{ticket}").parse()?,
-                );
-                req
-            }
-            Auth::Token(token) => {
-                format!("ws://{host}/api/ws?token={token}").into_client_request()?
-            }
-        };
+        let req = format!("ws://{host}/api/ws?token={}", self.token).into_client_request()?;
         let stream = TcpStream::connect(&host)?;
         let (ws, _) = tungstenite::client(req, stream).map_err(|e| anyhow!("websocket: {e}"))?;
         ws.get_ref()
@@ -183,27 +66,9 @@ impl Connection {
         Ok(ws)
     }
 
-    /// Auth header for one REST call scoped to `profile`, with the ticket `purpose` the route
-    /// needs ("native-http", or "native-profile-create" / "native-profile-registry").
-    pub fn rest_auth(&self, profile: &str, purpose: &str) -> Result<(&'static str, String)> {
-        match &self.auth {
-            Auth::Token(token) => Ok(("X-Hermes-Session-Token", token.clone())),
-            Auth::Ticket { endpoint, helper } => {
-                let mut ep = endpoint.clone();
-                if !profile.is_empty() && profile != "default" {
-                    let root = endpoint["profile_id"]
-                        .as_str()
-                        .unwrap_or_default()
-                        .to_string();
-                    ep["profile_id"] = json!(format!("{root}/profiles/{profile}"));
-                    ep["control_home"] = json!(root);
-                }
-                Ok((
-                    "X-Hermes-Gateway-Ticket",
-                    helper.lock().unwrap().mint(&ep, purpose)?,
-                ))
-            }
-        }
+    /// Auth header for one REST call (the profile and purpose no longer matter).
+    pub fn rest_auth(&self, _profile: &str, _purpose: &str) -> Result<(&'static str, String)> {
+        Ok(("X-Hermes-Session-Token", self.token.clone()))
     }
 
     // ---- SSH -------------------------------------------------------------
@@ -214,16 +79,16 @@ impl Connection {
             HostCheck::Unreachable => bail!(
                 "{host}: SSH could not connect (offline, or macOS has not allowed local network access)"
             ),
-            HostCheck::NoHermes => bail!("{host}: no working Hermes at ~/.local/bin/hermes"),
+            HostCheck::NoNode => bail!("{host}: Bench's agent needs Node.js 22.18 or newer there"),
         }
         let state_path = state_dir().join(format!("ssh-{host}.json"));
-        // Reattach to the backend we started last time, if it still answers.
+        // Reattach to the agent we started last time, if it still answers.
         if let Ok(saved) = std::fs::read(&state_path)
             .map_err(anyhow::Error::from)
             .and_then(|b| Ok(serde_json::from_slice::<Value>(&b)?))
         {
             if let (Some(port), Some(token)) = (saved["port"].as_u64(), saved["token"].as_str()) {
-                // The saved token must still open the WebSocket (a restarted backend rejects it with 403).
+                // The saved token must still open the WebSocket (a restarted agent rejects it).
                 if let Ok(conn) = Self::attach_ssh(host, port as u16, token) {
                     if conn.websocket().is_ok() {
                         return Ok(conn);
@@ -231,7 +96,7 @@ impl Connection {
                 }
             }
         }
-        let (port, token) = spawn_remote_backend(host)?;
+        let (port, token) = crate::pi_agent::ensure_remote(host)?;
         std::fs::create_dir_all(state_dir())?;
         write_private(
             &state_path,
@@ -281,29 +146,51 @@ impl Connection {
         }
         Ok(Self {
             base,
-            auth: Auth::Token(token.into()),
+            token: token.into(),
             _tunnel: Some(tunnel),
         })
     }
 }
 
+/// Bench's own state (last place, drafts, marks, settings, SSH reattach files): `~/.bench/ui`,
+/// beside the agent's home.
 pub fn state_dir() -> PathBuf {
-    home().join("Library/Application Support/bench")
+    crate::pi_agent::agent_home().join("ui")
 }
 
-/// The app was called hermes-gpui before: its state folder (last place, drafts, marks, settings)
-/// is copied over the first time, not moved — an older build may still run from it.
+/// Bench kept its state in `~/Library/Application Support/bench` before (and, as hermes-gpui,
+/// in `…/hermes-gpui`): the first of those found is copied to `state_dir()` the first time, not
+/// moved — an older build may still run from it.
 pub fn migrate_state() {
     let new = state_dir();
-    let old = home().join("Library/Application Support/hermes-gpui");
-    if new.exists() || !old.is_dir() {
+    if new.exists() {
         return;
+    }
+    let support = home().join("Library/Application Support");
+    let Some(old) = [support.join("bench"), support.join("hermes-gpui")]
+        .into_iter()
+        .find(|d| d.is_dir())
+    else {
+        return;
+    };
+    if let Some(parent) = new.parent() {
+        let _ = std::fs::create_dir_all(parent);
     }
     let _ = std::process::Command::new("cp")
         .arg("-R")
         .arg(&old)
         .arg(&new)
         .status();
+    // The hosts' saved ports and tokens named the backends started before (Hermes): the agent is
+    // started afresh on each host.
+    if let Ok(dir) = std::fs::read_dir(&new) {
+        for f in dir.flatten() {
+            let name = f.file_name().to_string_lossy().into_owned();
+            if name.starts_with("ssh-") && name.ends_with(".json") {
+                let _ = std::fs::remove_file(f.path());
+            }
+        }
+    }
 }
 
 fn write_private(path: &PathBuf, text: &str) -> Result<()> {
@@ -318,93 +205,6 @@ fn write_private(path: &PathBuf, text: &str) -> Result<()> {
     let mut f = options.open(path)?;
     f.write_all(text.as_bytes())?;
     Ok(())
-}
-
-fn hex(n: usize) -> String {
-    let mut s = String::new();
-    while s.len() < n {
-        s.push_str(&uuid::Uuid::new_v4().simple().to_string());
-    }
-    s.truncate(n);
-    s
-}
-
-/// Start `hermes serve --isolated --port 0` on the host with a fresh token
-/// (passed on stdin, written 0600 where `serve` expects it) and read its port.
-fn spawn_remote_backend(host: &str) -> Result<(u16, String)> {
-    let token = hex(64);
-    let dir = format!("$HOME/.hermes/desktop-ssh/{}", hex(32));
-    let file = format!("{dir}/{}.token", hex(16));
-    let script = format!(
-        r#"umask 077; mkdir -p "{dir}"; chmod 700 "{dir}"; cat > "{file}"; cd ~
-nohup setsid bash -lc '$HOME/.local/bin/hermes serve --port 0 --skip-build --isolated --ssh-session-token-file "{file}"' > "{dir}/serve.log" 2>&1 < /dev/null &
-for i in $(seq 1 150); do p=$(grep -o 'HERMES_DASHBOARD_READY port=[0-9]*' "{dir}/serve.log" | head -1); [ -n "$p" ] && {{ echo "$p"; exit 0; }}; sleep 1; done
-tail -3 "{dir}/serve.log"; exit 1"#
-    );
-    let mut child = Command::new("ssh")
-        .args(["-o", "BatchMode=yes", host, "bash", "-c"])
-        .arg(shell_quote(&script))
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("ssh to host")?;
-    child.stdin.take().unwrap().write_all(token.as_bytes())?;
-    let out = child.wait_with_output()?;
-    let text = String::from_utf8_lossy(&out.stdout);
-    let port = text
-        .split("port=")
-        .nth(1)
-        .and_then(|s| s.trim().split_whitespace().next())
-        .and_then(|s| s.parse::<u16>().ok())
-        .ok_or_else(|| {
-            anyhow!(
-                "{host}: backend did not start: {}{}",
-                text.trim(),
-                String::from_utf8_lossy(&out.stderr).trim()
-            )
-        })?;
-    Ok((port, token))
-}
-
-/// Run the `hermes` CLI on a machine; stdout and stderr together (the CLI reports on both).
-pub fn hermes_cli(target: &Target, args: &[&str]) -> Result<String> {
-    let out = match target {
-        Target::Local => Command::new(home().join(".local/bin/hermes"))
-            .args(args)
-            .stdin(Stdio::null())
-            .output()?,
-        Target::Ssh(host) => {
-            let quoted: Vec<String> = args.iter().map(|a| shell_quote(a)).collect();
-            let script = format!("\"$HOME/.local/bin/hermes\" {}", quoted.join(" "));
-            Command::new("ssh")
-                .args([
-                    "-o",
-                    "BatchMode=yes",
-                    "-o",
-                    "ConnectTimeout=8",
-                    host,
-                    &format!("bash -lc {}", shell_quote(&script)),
-                ])
-                .stdin(Stdio::null())
-                .output()?
-        }
-    };
-    let text = format!(
-        "{}{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    if !out.status.success() {
-        let last = text
-            .lines()
-            .map(str::trim)
-            .filter(|l| !l.is_empty())
-            .last()
-            .unwrap_or("failed");
-        bail!("hermes {}: {last}", args.first().unwrap_or(&""));
-    }
-    Ok(text)
 }
 
 /// Keep branch folders (`.worktrees/`) out of the main checkout's status: a local-only exclude
@@ -452,96 +252,27 @@ fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
 
-/// `hermes gateway restart` locally or on the SSH host (the messaging gateway service).
-/// What `hermes gateway restart` did.
+/// What a restart did.
 pub enum Restart {
     Done,
-    /// It refused: work is running (turns, cron jobs, delegations), as Hermes describes it.
-    /// Restarting anyway (`interrupt`) stops that work.
+    /// Kept for the UI's "busy" branch; the agent's runs are durable, so it never refuses.
+    #[allow(dead_code)]
     Busy(String),
 }
 
-/// `hermes gateway restart`; with `interrupt`, also while work is running (`--yes`).
-pub fn restart_gateway(target: &Target, interrupt: bool) -> Result<Restart> {
-    let flags = if interrupt { " --yes" } else { "" };
-    let out = match target {
-        Target::Local => {
-            let mut cmd = Command::new(home().join(".local/bin/hermes"));
-            cmd.args(["gateway", "restart", "--detach"]);
-            if interrupt {
-                cmd.arg("--yes");
-            }
-            cmd.stdin(Stdio::null()).output()?
-        }
-        Target::Ssh(host) => Command::new("ssh")
-            .args([
-                "-o",
-                "BatchMode=yes",
-                host,
-                &format!("bash -lc '\"$HOME/.local/bin/hermes\" gateway restart --detach{flags}'"),
-            ])
-            .stdin(Stdio::null())
-            .output()?,
-    };
-    if out.status.success() {
-        return Ok(Restart::Done);
-    }
-    // Hermes prints its refusal on stdout, colored.
-    let text = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
-    let lines: Vec<String> = text
-        .lines()
-        .map(strip_ansi)
-        .map(|l| {
-            l.trim()
-                .trim_start_matches(['✗', '⚠', '•', '-'])
-                .trim()
-                .to_string()
-        })
-        .filter(|l| !l.is_empty())
-        .collect();
-    if let Some(at) = lines
-        .iter()
-        .position(|l| l.starts_with("Refusing to restart"))
-    {
-        let summary = lines[at]
-            .trim_start_matches("Refusing to restart the gateway")
-            .trim_start_matches([':', ' ', '—', '-'])
-            .trim_end_matches('.')
-            .to_string();
-        return Ok(Restart::Busy(if summary.is_empty() {
-            "work is running".into()
-        } else {
-            summary
-        }));
-    }
-    bail!(
-        "{}",
-        lines
-            .last()
-            .map(String::as_str)
-            .unwrap_or("hermes gateway restart failed")
-    )
-}
-
-fn strip_ansi(s: &str) -> String {
-    let mut out = String::new();
-    let mut chars = s.chars();
-    while let Some(c) = chars.next() {
-        if c == '\x1b' {
-            for c in chars.by_ref() {
-                if c.is_ascii_alphabetic() {
-                    break;
-                }
-            }
-        } else {
-            out.push(c);
+/// Restarts the agent (its unfinished runs continue after the start).
+pub fn restart_gateway(target: &Target, _interrupt: bool) -> Result<Restart> {
+    match target {
+        Target::Local => crate::pi_agent::restart()?,
+        Target::Ssh(host) => {
+            let _ = Command::new("ssh")
+                .args(["-o", "BatchMode=yes", host, "kill $(sed -n 's/.*\"pid\":\\([0-9]*\\).*/\\1/p' ~/.bench/server.json) 2>/dev/null; true"])
+                .stdin(Stdio::null())
+                .output();
+            let _ = std::fs::remove_file(state_dir().join(format!("ssh-{host}.json")));
         }
     }
-    out
+    Ok(Restart::Done)
 }
 
 /// A group of chats with no project of its own ("Audit X", a few deep researches): a plain
@@ -608,35 +339,21 @@ pub fn git(target: &Target, dir: &str, args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
 }
 
-/// Whether `host` answers over SSH and has a working Hermes (a stale wrapper is not enough).
+/// Whether `host` answers over SSH and has a Node the agent can run on.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HostCheck {
     Ready,
-    /// SSH itself failed (exit 255): offline, no route, no network permission yet.
+    /// SSH itself failed: offline, no route, no network permission yet.
     Unreachable,
-    /// Reached the host, but Hermes is missing or broken there.
-    NoHermes,
+    /// Reached the host, but its Node is missing or too old.
+    NoNode,
 }
 
 /// Checks a host over SSH; the result is also appended to `hosts.log` for diagnosis.
 pub fn host_check(host: &str) -> HostCheck {
-    let status = Command::new("/usr/bin/ssh")
-        .args([
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "ConnectTimeout=5",
-            host,
-            "timeout 30 \"$HOME/.local/bin/hermes\" --version >/dev/null 2>&1",
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    let result = match &status {
-        Ok(s) if s.success() => HostCheck::Ready,
-        Ok(s) if s.code() == Some(255) => HostCheck::Unreachable,
-        Ok(_) => HostCheck::NoHermes,
+    let result = match crate::pi_agent::remote_node(host) {
+        Ok(true) => HostCheck::Ready,
+        Ok(false) => HostCheck::NoNode,
         Err(_) => HostCheck::Unreachable,
     };
     let _ = std::fs::create_dir_all(state_dir());
@@ -645,8 +362,7 @@ pub fn host_check(host: &str) -> HostCheck {
         .append(true)
         .open(state_dir().join("hosts.log"))
     {
-        use std::io::Write as _;
-        let _ = writeln!(f, "{host}: {result:?} ({status:?})");
+        let _ = writeln!(f, "{host}: {result:?}");
     }
     result
 }
@@ -670,130 +386,4 @@ pub fn ssh_hosts() -> Vec<String> {
         }
     }
     hosts
-}
-
-/// Whether Hermes is installed on this Mac (the installer puts the launcher here).
-pub fn hermes_installed() -> bool {
-    home().join(".local/bin/hermes").exists()
-}
-
-/// The command that installs Hermes on this Mac, typed into a terminal so the person sees it
-/// work. `--skip-setup`: providers are set in Bench's settings, not in the installer's wizard.
-/// `pipefail`: a failed download must fail the command (bash on an empty pipe exits 0).
-pub const INSTALL_HERMES: &str = "bash -o pipefail -c 'curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup'";
-
-/// The official Hermes plugin that runs turns on a Claude Pro/Max subscription through the
-/// official `claude` CLI, and the provider id it registers.
-pub const CLAUDE_PLUGIN: &str = "claude-subscription-directsdk";
-pub const CLAUDE_PROVIDER: &str = "claude-subscription-directsdk-experimental";
-
-/// What a machine has for Claude: the `claude` CLI's version, whether it is logged in (and as
-/// how), and whether the Hermes plugin is installed.
-#[derive(Clone, Debug, Default)]
-pub struct ClaudeStatus {
-    pub cli: Option<String>,
-    pub logged_in: bool,
-    pub account: Option<String>,
-    pub plugin: bool,
-}
-
-/// Run a login-shell script on the machine; stdout, or the last line of the error.
-fn shell(target: &Target, script: &str) -> Result<String> {
-    let out = match target {
-        Target::Local => Command::new("/bin/zsh")
-            .args(["-lc", script])
-            .stdin(Stdio::null())
-            .output()?,
-        Target::Ssh(host) => Command::new("ssh")
-            .args([
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "ConnectTimeout=8",
-                host,
-                &format!("bash -lc {}", shell_quote(script)),
-            ])
-            .stdin(Stdio::null())
-            .output()?,
-    };
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        bail!(
-            "{}",
-            err.lines()
-                .filter(|l| !l.trim().is_empty())
-                .last()
-                .unwrap_or("failed")
-        );
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-}
-
-pub fn claude_status(target: &Target) -> ClaudeStatus {
-    let mut s = ClaudeStatus {
-        cli: shell(target, "claude --version")
-            .ok()
-            .map(|v| v.split_whitespace().next().unwrap_or_default().to_string())
-            .filter(|v| !v.is_empty()),
-        ..Default::default()
-    };
-    if s.cli.is_some() {
-        if let Ok(v) = shell(target, "claude auth status --json")
-            .and_then(|t| Ok(serde_json::from_str::<Value>(&t)?))
-        {
-            s.logged_in = v["loggedIn"].as_bool().unwrap_or(false);
-            // "claude.ai" for a subscription login, else an API key or a cloud.
-            s.account = v["authMethod"].as_str().map(str::to_string);
-        }
-    }
-    s.plugin = hermes_cli(target, &["plugins", "list", "--json"])
-        .ok()
-        .and_then(|t| {
-            // The CLI may print notices around the JSON.
-            let start = t.find('[')?;
-            serde_json::from_str::<Value>(&t[start..t.rfind(']')? + 1]).ok()
-        })
-        .and_then(|v| {
-            v.as_array().map(|a| {
-                a.iter().any(|p| {
-                    p["name"]
-                        .as_str()
-                        .is_some_and(|n| n.starts_with(CLAUDE_PLUGIN))
-                        && p["status"].as_str() != Some("disabled")
-                })
-            })
-        })
-        .unwrap_or(false);
-    s
-}
-
-/// Install the Claude plugin from the Hermes catalog, enabled, dependencies accepted.
-pub fn install_claude_plugin(target: &Target) -> Result<String> {
-    hermes_cli(
-        target,
-        &[
-            "plugins",
-            "install",
-            CLAUDE_PLUGIN,
-            "--yes-deps",
-            "--enable",
-        ],
-    )
-}
-
-/// The profile's `.env` on its machine (Hermes' file API doesn't serve it): name → value.
-pub fn env_file(target: &Target, profile: &str) -> std::collections::HashMap<String, String> {
-    let path = if profile.is_empty() || profile == "default" {
-        "$HOME/.hermes/.env".to_string()
-    } else if profile
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
-    {
-        format!("$HOME/.hermes/profiles/{profile}/.env")
-    } else {
-        return Default::default(); // not a profile name Hermes makes
-    };
-    shell(target, &format!("cat \"{path}\" 2>/dev/null || true"))
-        .map(|t| crate::rest::parse_env(&t))
-        .unwrap_or_default()
 }

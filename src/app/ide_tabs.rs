@@ -46,6 +46,7 @@ impl HermesApp {
         self.file = Some(p.view);
         self.ide.baseline = p.baseline;
         self.ide.dirty = p.dirty;
+        self.ide.changed_outside = false;
         let watch = p.remote.is_some();
         self.ide.remote_file = p.remote;
         if watch {

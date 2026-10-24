@@ -8,7 +8,7 @@ Most requests about a Bench's look or behaviour ("the border is 1px off", "move 
 "more air", "the card closes by itself") were already solved once in the reference Bench. Before
 writing code:
 1. Find the same piece in the reference Bench, `~/Projects/bench-kit/src`:
-   `grep -rn` the visible label ("New session", "Message Hermes", "Copy") or the helper the
+   `grep -rn` the visible label ("Search sessions", "Hide sidebar", "Copy") or the helper the
    catalog names.
 2. Compare the person's code with it. Different → bring theirs to the reference (that is the
    fix, with the reason on the page that describes it). The same → the request goes *further*

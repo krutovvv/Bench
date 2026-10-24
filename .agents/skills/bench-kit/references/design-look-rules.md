@@ -6,13 +6,19 @@
    one exception: buttons that float inside a field (composer Dictate / Send) are circles.
 2. **Light One Light by default** (dark One Dark and "System" optional): content `#FAFAFA`,
    sidebar `#EFEFF0`, title/status bars `#E9E9EA`, borders `#D9D9DA`, text `#242529`, muted
-   `#6E6F75`, one accent (blue `#4F6FD8`). Exact palettes in `templates/app/src/theme.rs`.
+   `#6E6F75`, one accent (blue `#4F6FD8`). Exact palettes in Bench's `src/theme.rs`.
 3. **One accent, only errors red.** Accent marks the active thing (selected row stripe, primary
    button, focus, live values). Red is for errors only — counts, failed steps. Warnings amber.
 4. **Fonts:** UI 14px (it is also the rem, so spacing scales with it), code/mono 12px.
    Size presets S/M/L = 13/14/15 UI and 11/12/13 mono. System font for UI, Menlo for code.
-   Reading text that is skimmed (chat answers, the user's messages) is `text_sm`, the same as
-   list titles — the user found 14px "too big" next to the sidebar.
+   The conversation (answers and the user's messages) is `text_base` — a size up from the
+   sidebar's `text_sm` lists, so the eye goes to the middle (2026-10-24, after Zed's Delta; it was
+   `text_sm` before). Turns are told apart by avatars in a gutter, not by a colored band.
+   The chrome (sidebar `#EAEAEC`, header / status bar `#E4E4E6`) is half a step darker than it
+   was, and the sidebar meets the chat with **no rule**: the window's column dividers are
+   transparent at rest and an accent line on hover (`ui/mod.rs` `quiet_divider`); the IDE panel
+   draws its own left rule. The whole thread uses one size, the messages' `text_base`: steps, meta lines, cards' headers too; secondary things are muted, never smaller. One family everywhere in the chat: no
+   monospace or bigger fonts jumping between blocks except real code.
 5. **One inset per area:** 16px in the sidebar and in headers; 24px around reading content in
    the main area (the chat's question band and answer, the composer's text, task rows and the
    task card) — one number, the same left, right, top and bottom. Vertical rhythm on a 4/8

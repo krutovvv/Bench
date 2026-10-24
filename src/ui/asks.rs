@@ -31,7 +31,7 @@ impl HermesApp {
                         .gap_2()
                         .py_1()
                         .items_center()
-                        .text_sm()
+                        .text_base()
                         .cursor_pointer()
                         .hover(|s| s.text_color(theme.foreground))
                         .child(
@@ -62,7 +62,8 @@ impl HermesApp {
         let any_picked = !picked.is_empty();
         Some(
             v_flex()
-                .mx_4()
+                .ml(px(super::CHAT_TEXT))
+                .mr(px(super::CHAT_RIGHT))
                 .mt_2()
                 .p_3()
                 .gap_2()
@@ -72,7 +73,7 @@ impl HermesApp {
                     h_flex()
                         .gap_2()
                         .items_start()
-                        .text_sm()
+                        .text_base()
                         .child(
                             Ico::CircleHelp
                                 .icon()
@@ -172,7 +173,7 @@ impl HermesApp {
                         .py_0p5()
                         .pl(px(16. * t.depth as f32))
                         .items_start()
-                        .text_sm()
+                        .text_base()
                         .child(icon.icon().xsmall().text_color(color).mt(px(3.)))
                         .child(
                             div()
@@ -198,54 +199,61 @@ impl HermesApp {
                 .border_t_1()
                 .border_color(theme.border)
                 .bg(theme.background)
+                // The rule spans the window; the content starts at the thread's text.
                 .child(
-                    h_flex()
-                        .id("plan-head")
-                        .px_4()
-                        .py_1p5()
-                        .gap_1p5()
-                        .items_center()
-                        .text_xs()
-                        .text_color(muted)
-                        .cursor_pointer()
-                        .hover(|s| s.text_color(theme.foreground))
+                    v_flex()
+                        .w_full()
                         .child(
-                            if open {
-                                Ico::ChevronDown
-                            } else {
-                                Ico::ChevronRight
-                            }
-                            .icon()
-                            .xsmall(),
+                            h_flex()
+                                .id("plan-head")
+                                .pl(px(super::CHAT_TEXT))
+                                .pr(px(super::CHAT_RIGHT))
+                                .py_1p5()
+                                .gap_1p5()
+                                .items_center()
+                                .text_base()
+                                .text_color(muted)
+                                .cursor_pointer()
+                                .hover(|s| s.text_color(theme.foreground))
+                                .child(
+                                    if open {
+                                        Ico::ChevronDown
+                                    } else {
+                                        Ico::ChevronRight
+                                    }
+                                    .icon()
+                                    .xsmall(),
+                                )
+                                .child(Ico::ListChecks.icon().xsmall())
+                                .child(div().flex_none().child(format!("PLAN · {done}/{total}")))
+                                .when_some(current.filter(|_| !open), |d, step| {
+                                    d.child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .truncate()
+                                            .text_color(theme.foreground)
+                                            .child(format!("· {step}")),
+                                    )
+                                })
+                                .on_click(cx.listener(|this, _, _, cx| {
+                                    this.plan_open = !this.plan_open;
+                                    cx.notify();
+                                })),
                         )
-                        .child(Ico::ListChecks.icon().xsmall())
-                        .child(div().flex_none().child(format!("PLAN · {done}/{total}")))
-                        .when_some(current.filter(|_| !open), |d, step| {
+                        .when(open, |d| {
                             d.child(
-                                div()
-                                    .flex_1()
-                                    .min_w_0()
-                                    .truncate()
-                                    .text_color(theme.foreground)
-                                    .child(format!("· {step}")),
+                                v_flex()
+                                    .id("plan-steps")
+                                    .pl(px(super::CHAT_TEXT))
+                                    .pr(px(super::CHAT_RIGHT))
+                                    .pb_2()
+                                    .max_h(px(240.))
+                                    .overflow_y_scroll()
+                                    .children(steps),
                             )
-                        })
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.plan_open = !this.plan_open;
-                            cx.notify();
-                        })),
+                        }),
                 )
-                .when(open, |d| {
-                    d.child(
-                        v_flex()
-                            .id("plan-steps")
-                            .px_4()
-                            .pb_2()
-                            .max_h(px(240.))
-                            .overflow_y_scroll()
-                            .children(steps),
-                    )
-                })
                 .into_any_element(),
         )
     }

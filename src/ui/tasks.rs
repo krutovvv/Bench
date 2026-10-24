@@ -1,4 +1,4 @@
-//! Tasks mode's views, after Things: the lists (Today, Upcoming, Anytime, Someday, Logbook) in the
+//! Tasks mode's views, after Things: the lists (Today, Upcoming, Anytime, Logbook) in the
 //! sidebar; the open list in the middle with its tags as a filter strip, Today with "This
 //! Evening", Upcoming as the next seven days then months, the Logbook by day then month; the open
 //! task's card on the right.
@@ -9,7 +9,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::tools::{segmented, small_button};
+use super::tools::segmented;
 use crate::app::HermesApp;
 use crate::app::tasks::RANGES;
 use crate::icons::Ico;
@@ -20,18 +20,11 @@ fn list_icon(list: &List) -> Ico {
         List::Today => Ico::Star,
         List::Upcoming => Ico::CalendarDays,
         List::Anytime => Ico::Layers,
-        List::Someday => Ico::Archive,
         List::Logbook => Ico::BookCheck,
     }
 }
 
-const LISTS: [List; 5] = [
-    List::Today,
-    List::Upcoming,
-    List::Anytime,
-    List::Someday,
-    List::Logbook,
-];
+use crate::tasks::LISTS;
 
 impl HermesApp {
     pub(super) fn render_tasks_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -66,9 +59,9 @@ impl HermesApp {
                 } else {
                     muted
                 }))
-                .child(div().flex_1().min_w_0().text_sm().truncate().child(label))
+                .child(div().flex_1().min_w_0().text_base().truncate().child(label))
                 .when_some(count.filter(|c| *c > 0), |d, c| {
-                    d.child(div().text_xs().text_color(muted).child(c.to_string()))
+                    d.child(div().text_sm().text_color(muted).child(c.to_string()))
                 })
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.select_task_list(list.clone(), window, cx)
@@ -122,7 +115,6 @@ impl HermesApp {
                 List::Today => "Planned for today and earlier".into(),
                 List::Upcoming => "Planned for later days".into(),
                 List::Anytime => "No day yet".into(),
-                List::Someday => "Not now".into(),
                 List::Logbook => "Done, newest first".into(),
             }
         };
@@ -144,7 +136,7 @@ impl HermesApp {
                     .flex_none()
                     .gap_1p5()
                     .items_center()
-                    .text_sm()
+                    .text_base()
                     .font_weight(FontWeight::MEDIUM)
                     .child(
                         list_icon(&list)
@@ -159,7 +151,7 @@ impl HermesApp {
                     .flex_1()
                     .min_w_0()
                     .truncate()
-                    .text_xs()
+                    .text_sm()
                     .text_color(theme.muted_foreground)
                     .child(hint),
             )
@@ -172,17 +164,21 @@ impl HermesApp {
                     |this, k, _, cx| this.set_task_range(k, cx),
                 ))
             })
-            .child(small_button(
-                "task-new",
-                "+ New task",
-                cx,
-                |this, window, cx| this.new_task(window, cx),
-            ))
             .child(self.render_header_tail(cx))
             .into_any_element()
     }
 
+    /// A task list as a thread's live block: the same rows, no scroll of its own (the thread
+    /// scrolls), the open task's card right under the list, the text at the thread's column.
+    pub(super) fn render_tasks_block(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        self.tasks_view(true, cx)
+    }
+
     pub(super) fn render_tasks_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        self.tasks_view(false, cx)
+    }
+
+    fn tasks_view(&mut self, inline: bool, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let day = today();
@@ -276,7 +272,7 @@ impl HermesApp {
                                 .font_weight(FontWeight::SEMIBOLD)
                                 .child(num.to_string()),
                         )
-                        .child(div().text_sm().text_color(muted).child(name.to_string()))
+                        .child(div().text_base().text_color(muted).child(name.to_string()))
                         .into_any_element(),
                 );
             } else if let Some(title) = title {
@@ -288,7 +284,7 @@ impl HermesApp {
                         .pb_1()
                         .gap_1p5()
                         .items_center()
-                        .text_xs()
+                        .text_sm()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(muted)
                         .border_b_1()
@@ -305,12 +301,29 @@ impl HermesApp {
             for t in list_tasks {
                 rows.push(self.render_task_row(n, &t, cx));
                 n += 1;
+                // The open task's card right under its row, whatever the list (the Logbook's
+                // thousand rows would push a card at the end out of sight).
+                if self.tasks.selected.as_deref() == Some(t.id.as_str()) {
+                    if let Some(open) = self.tasks.selected_task().cloned() {
+                        let card = self.render_task_card(&open, cx);
+                        rows.push(
+                            div()
+                                .flex_none()
+                                .mx_6()
+                                .my_1()
+                                .border_1()
+                                .border_color(theme.border)
+                                .child(card)
+                                .into_any_element(),
+                        );
+                    }
+                }
             }
         }
         let note = if let Some(e) = &self.tasks.error {
             Some((e.clone(), theme.danger))
         } else if !self.tasks.loaded {
-            Some(("Reading Reminders…".to_string(), muted))
+            Some(("Loading tasks…".to_string(), muted))
         } else if empty {
             Some((
                 if self.tasks.query.is_empty() {
@@ -342,7 +355,7 @@ impl HermesApp {
                         .flex_none()
                         .px_2()
                         .py_0p5()
-                        .text_xs()
+                        .text_sm()
                         .cursor_pointer()
                         .when(on, |d| {
                             d.bg(theme.primary).text_color(theme.primary_foreground)
@@ -391,6 +404,28 @@ impl HermesApp {
                 .child(Ico::Tag.icon().xsmall().text_color(muted).mr_1())
                 .children(chips)
         });
+        if inline {
+            // The rows' own px_6 is pulled back so their text starts at the thread's column.
+            // In the agent's row: the rows' own px_6 pulled back, so their text starts at the
+            // row's text column.
+            return v_flex()
+                .w_full()
+                .ml(px(-24.))
+                .mr(px(-24.))
+                .child(
+                    div()
+                        .px_6()
+                        .pb_1()
+                        .text_lg()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(list.name()),
+                )
+                .children(strip)
+                .child(v_flex().pt_1().children(rows).when_some(note, |d, (text, color)| {
+                    d.child(div().px_6().py_3().text_base().text_color(color).child(text))
+                }))
+                .into_any_element();
+        }
         let list_pane = v_flex().flex_1().min_w_0().h_full().children(strip).child(
             v_flex()
                 .id("tasks-rows")
@@ -401,23 +436,10 @@ impl HermesApp {
                 .pb_4()
                 .children(rows)
                 .when_some(note, |d, (text, color)| {
-                    d.child(div().px_6().py_3().text_sm().text_color(color).child(text))
+                    d.child(div().px_6().py_3().text_base().text_color(color).child(text))
                 }),
         );
-        let card = self
-            .tasks
-            .selected_task()
-            .cloned()
-            .map(|t| self.render_task_card(&t, cx));
-        h_flex()
-            .size_full()
-            .items_stretch()
-            .child(list_pane)
-            .when_some(card, |d, card| {
-                d.child(div().w(px(1.)).h_full().bg(theme.border))
-                    .child(card)
-            })
-            .into_any_element()
+        h_flex().size_full().items_stretch().child(list_pane).into_any_element()
     }
 
     fn render_task_row(&mut self, n: usize, t: &Task, cx: &mut Context<Self>) -> AnyElement {
@@ -489,7 +511,7 @@ impl HermesApp {
                 d.child(
                     div()
                         .flex_none()
-                        .text_sm()
+                        .text_base()
                         .text_color(theme.primary)
                         .child(on),
                 )
@@ -499,7 +521,7 @@ impl HermesApp {
                     .flex_shrink(1.)
                     .min_w_0()
                     .truncate()
-                    .text_sm()
+                    .text_base()
                     .when(done && !logbook, |d| d.text_color(muted))
                     .child(if t.title.trim().is_empty() {
                         "New task".to_string()
@@ -514,7 +536,7 @@ impl HermesApp {
                 div()
                     .flex_none()
                     .px_1p5()
-                    .text_xs()
+                    .text_sm()
                     .text_color(muted)
                     .border_1()
                     .border_color(theme.border)
@@ -530,7 +552,7 @@ impl HermesApp {
                         .flex_none()
                         .gap_1()
                         .items_center()
-                        .text_xs()
+                        .text_sm()
                         .text_color(if running { theme.primary } else { muted })
                         .child(Ico::Clock.icon().xsmall())
                         .child(tasks::show_spent(spent)),
@@ -540,7 +562,7 @@ impl HermesApp {
                 d.child(
                     div()
                         .flex_none()
-                        .text_xs()
+                        .text_sm()
                         .text_color(if overdue { theme.danger } else { muted })
                         .child(w),
                 )
@@ -554,14 +576,12 @@ impl HermesApp {
     }
 
     /// The open task: title, when, important, tags, time (with the timer), the day it was done
-    /// (back-dating), notes; Delete and "Open in Reminders" at the bottom.
+    /// (back-dating), notes; Delete at the bottom.
     fn render_task_card(&mut self, t: &Task, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let day = today();
-        let when = if t.someday {
-            4
-        } else if t.evening && t.day == Some(day) {
+        let when = if t.evening && t.day == Some(day) {
             1
         } else if t.day == Some(day) {
             0
@@ -576,7 +596,7 @@ impl HermesApp {
             div()
                 .w(px(64.))
                 .flex_none()
-                .text_xs()
+                .text_sm()
                 .text_color(muted)
                 .child(text)
         };
@@ -593,12 +613,10 @@ impl HermesApp {
         let armed = self.tasks.delete_armed.as_deref() == Some(id.as_str());
         let running = t.timer.is_some();
         let spent_now = t.spent_now();
+        // In a thread: the thread's width, as tall as its content (the thread scrolls).
         v_flex()
             .id("task-card")
-            .w(px(404.))
-            .flex_none()
-            .h_full()
-            .overflow_y_scroll()
+            .w_full()
             .px_6()
             .py_5()
             .gap_3()
@@ -630,7 +648,7 @@ impl HermesApp {
                 "When",
                 segmented(
                     "task-when",
-                    &["Today", "Evening", "Tomorrow", "Anytime", "Someday"],
+                    &["Today", "Evening", "Tomorrow", "Anytime"],
                     when,
                     cx,
                     move |this, k, window, cx| this.set_task_when(i2.clone(), k, window, cx),
@@ -664,7 +682,7 @@ impl HermesApp {
                             .gap_1()
                             .flex()
                             .items_center()
-                            .text_xs()
+                            .text_sm()
                             .border_1()
                             .border_color(if running { theme.primary } else { theme.border })
                             .text_color(if running {
@@ -697,7 +715,7 @@ impl HermesApp {
                 ))
             })
             .when_some(self.tasks.field_error.clone(), |d, e| {
-                d.child(div().text_xs().text_color(theme.danger).child(e))
+                d.child(div().text_sm().text_color(theme.danger).child(e))
             })
             .child(
                 div()
@@ -715,7 +733,7 @@ impl HermesApp {
                             .id("task-done")
                             .px_2()
                             .py_0p5()
-                            .text_xs()
+                            .text_sm()
                             .border_1()
                             .border_color(theme.border)
                             .cursor_pointer()
@@ -729,28 +747,13 @@ impl HermesApp {
                                 this.toggle_task_done(i4.clone(), window, cx)
                             })),
                     )
-                    .child(
-                        div()
-                            .id("task-open-reminders")
-                            .px_2()
-                            .py_0p5()
-                            .text_xs()
-                            .text_color(muted)
-                            .cursor_pointer()
-                            .hover(|s| s.text_color(theme.foreground))
-                            .child("Open in Reminders")
-                            .on_click(cx.listener({
-                                let id = id.clone();
-                                move |this, _, _, cx| this.open_task_in_reminders(&id, cx)
-                            })),
-                    )
                     .child(div().flex_1())
                     .child(
                         div()
                             .id("task-delete")
                             .px_2()
                             .py_0p5()
-                            .text_xs()
+                            .text_sm()
                             .border_1()
                             .border_color(if armed { theme.danger } else { theme.border })
                             .text_color(if armed { theme.danger } else { muted })

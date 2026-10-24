@@ -70,7 +70,7 @@ impl HermesApp {
                 .cursor_pointer()
                 .when(active, |d| d.text_color(theme.primary))
                 .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(icon.icon().xsmall())
+                .child(icon.icon().small())
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
         };
 
@@ -93,7 +93,7 @@ impl HermesApp {
             h_flex().h_full().items_center().pl_1().child(
                 Button::new(id)
                     .ghost()
-                    .xsmall()
+                    .small()
                     .icon(icon.icon())
                     .label(label)
                     // One tone across the bar, like the model and the icon buttons.
@@ -195,9 +195,9 @@ impl HermesApp {
             .iter()
             .find(|p| Some(&p.name) == self.profile.as_ref())
             .map(|p| p.label.clone())
-            .unwrap_or_else(|| "Profile".into());
+            .unwrap_or_else(|| "Agent".into());
 
-        // Context: Hermes' numbers once a turn has run; before that (a reopened chat) a rough
+        // Context: the agent's numbers once a turn has run; before that (a reopened chat) a rough
         // estimate from the transcript, marked "~". The limit falls back to model.context_length.
         let usage = self.usage.clone();
         let real = usage.as_ref().filter(|u| u.context_used > 0);
@@ -235,7 +235,7 @@ impl HermesApp {
                 .trigger(
                     Button::new("context")
                         .ghost()
-                        .xsmall()
+                        .small()
                         .icon(Ico::MemoryStick.icon())
                         .label(label)
                         .text_color(color),
@@ -250,7 +250,7 @@ impl HermesApp {
                                 .px_3()
                                 .py_0p5()
                                 .gap_4()
-                                .text_xs()
+                                .text_sm()
                                 .child(
                                     div()
                                         .flex_1()
@@ -262,7 +262,7 @@ impl HermesApp {
                 })
         });
 
-        // Speed: our own split (prefill / generation) when measured, else Hermes' blended average.
+        // Speed: our own split (prefill / generation) when measured, else the agent's blended average.
         let rate = |v: f64| {
             if v >= 1000. {
                 format!("{:.1}k", v / 1000.)
@@ -271,7 +271,7 @@ impl HermesApp {
             }
         };
         // Speed: live (last second) while text streams; else the last call's measured prefill /
-        // generation; else Hermes' blended average. Click: the chart of this answer.
+        // generation; else the agent's blended average. Click: the chart of this answer.
         let label = match (self.speed.live, self.speed.prefill, self.speed.generation) {
             (Some(l), _, _) => Some(format!("{} t/s", rate(l))),
             (None, Some(p), Some(g)) => Some(format!("{} · {} t/s", rate(p), rate(g))),
@@ -292,7 +292,7 @@ impl HermesApp {
                 .trigger(
                     Button::new("speed")
                         .ghost()
-                        .xsmall()
+                        .small()
                         .icon(Ico::Gauge.icon())
                         .label(label)
                         .text_color(if live { theme.primary } else { muted }),
@@ -307,14 +307,14 @@ impl HermesApp {
             .bg(theme.status_bar)
             .border_t_1()
             .border_color(theme.border)
-            .text_xs()
+            .text_sm()
             .child(self.render_target_picker(cx))
             .when(!self.profiles.is_empty(), |d| {
                 d.child(picker(
                     "profile",
                     Ico::UserRound,
                     profile_label,
-                    Some("Profile: its own model, skills, prompts, chats"),
+                    Some("Agent: its own model, MCP servers, skills, prompts, chats"),
                     vec![],
                     profiles,
                 ))
@@ -330,8 +330,8 @@ impl HermesApp {
                     "approvals",
                     Ico::Shield,
                     mode,
-                    // Hermes keeps approvals in the profile's config, not per chat.
-                    Some("All chats of this profile"),
+                    // The agent keeps approvals in the profile's config, not per chat.
+                    Some("All chats of this agent"),
                     vec![],
                     approvals,
                 ))
@@ -358,7 +358,7 @@ impl HermesApp {
                 } else if models.is_empty() || self.session.is_some() {
                     d.child(
                         item("model")
-                            .child(Ico::Cpu.icon().xsmall())
+                            .child(Ico::Cpu.icon().small())
                             .child(current_model),
                     )
                 } else {
@@ -371,6 +371,20 @@ impl HermesApp {
                         models,
                     ))
                 }
+            })
+            // Dictation: a red square while recording, a spinner while transcribing.
+            .child({
+                let recording = self.recorder.is_some();
+                let (icon, tip) = if self.transcribing {
+                    (Ico::Loader, "Transcribing…")
+                } else if recording {
+                    (Ico::Square, "Stop and transcribe  ⌘⇧D")
+                } else {
+                    (Ico::MicFill, "Dictate  ⌘⇧D")
+                };
+                button("mic", icon, tip, false)
+                    .when(recording, |d| d.text_color(cx.theme().danger))
+                    .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
             })
             .child(
                 button("new-window", Ico::AppWindow, "New window  ⌘⇧N", false)
@@ -495,7 +509,7 @@ fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, c
             .px_3()
             .py_0p5()
             .gap_4()
-            .text_xs()
+            .text_sm()
             .child(
                 div()
                     .flex_1()
@@ -510,7 +524,7 @@ fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, c
             div()
                 .px_3()
                 .pb_1()
-                .text_xs()
+                .text_sm()
                 .text_color(theme.muted_foreground)
                 .child("The chart fills in while the next answer is written."),
         );
@@ -564,9 +578,6 @@ impl HermesApp {
     /// "Backend ready" (or what is wrong) and, on click, the gateway's state, its messaging
     /// platforms, Reconnect and Restart.
     fn render_backend(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.hermes_missing {
-            return None;
-        }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let status = match &self.gw_status {
@@ -606,7 +617,7 @@ impl HermesApp {
                         .trigger(
                             Button::new("backend")
                                 .ghost()
-                                .xsmall()
+                                .small()
                                 .icon(Ico::Activity.icon())
                                 .label(label)
                                 .text_color(color),
@@ -627,7 +638,7 @@ impl HermesApp {
                                 h_flex()
                                     .gap_2()
                                     .items_center()
-                                    .text_xs()
+                                    .text_sm()
                                     .child(dot(ok, warn))
                                     .child(div().child(text))
                             };
@@ -703,7 +714,7 @@ impl HermesApp {
                                             h_flex()
                                                 .gap_2()
                                                 .items_center()
-                                                .text_xs()
+                                                .text_sm()
                                                 .child(
                                                     div().flex_1().min_w_0().truncate().child(name),
                                                 )
@@ -717,7 +728,7 @@ impl HermesApp {
                                         )
                                         .children(err.clone().map(|e| {
                                             div()
-                                                .text_xs()
+                                                .text_sm()
                                                 .text_color(theme.danger)
                                                 .child(crate::ui::clip(&e, 90))
                                         }))
@@ -767,14 +778,14 @@ impl HermesApp {
                                         .gap_1()
                                         .child(
                                             div()
-                                                .text_xs()
+                                                .text_sm()
                                                 .text_color(muted)
                                                 .child("MESSAGING PLATFORMS"),
                                         )
                                         .when(platforms.is_empty(), |d| {
                                             d.child(
                                                 div()
-                                                    .text_xs()
+                                                    .text_sm()
                                                     .text_color(muted)
                                                     .child("None connected"),
                                             )
@@ -787,7 +798,7 @@ impl HermesApp {
                                         .py_1p5()
                                         .border_t_1()
                                         .border_color(theme.border)
-                                        .text_xs()
+                                        .text_sm()
                                         .text_color(muted)
                                         .child(where_.clone()),
                                 )

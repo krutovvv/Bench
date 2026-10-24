@@ -1,7 +1,7 @@
 //! The mini IDE: the right panel's file tree + editor, one per window, independent of the mode
 //! (Sessions / SSH) — opened from a session's or a server's "⋯", closed from the header.
 //!
-//! Its files come either through the gateway (this Mac, or a machine running Hermes) or from a
+//! Its files come either through the gateway (this Mac, or a machine running the agent) or from a
 //! server of `~/.ssh/config` over plain ssh. A server's file is edited as a local copy in the
 //! cache (`remote::cache_path`); every change of that copy is written back to the server —
 //! whether it was saved here or edited by the agent, which gets the copy's path ("Add to chat").
@@ -78,6 +78,18 @@ pub struct Ide {
     pub expanded: bool,
     /// ⌘D's run: the first selection's start and text, and the starts of those added since.
     pub next_match: Option<(usize, String, Vec<usize>)>,
+    /// ⌃G's field, ⌘⇧F's search, a line to show once its file has loaded (`ide_find.rs`).
+    pub goto: Option<super::ide_find::GoLine>,
+    pub find: Option<super::ide_find::Find>,
+    pub pending_line: Option<(String, usize)>,
+    /// The agent changed the open file while it had unsaved edits here.
+    pub changed_outside: bool,
+    /// Long lines wrap (⌥Z).
+    pub wrap: bool,
+    /// The tree's folder being typed (the root row's pencil).
+    pub root_edit: Option<super::ide_find::RootEdit>,
+    /// The editor's last ⌘C and where it came from: pasted in the chat it becomes a chip.
+    pub copied: Option<super::snippets::Snippet>,
 }
 
 /// A tab that is not the active one.
@@ -112,7 +124,7 @@ impl HermesApp {
     }
 
     /// The tree of a session's folder: its own folder, else (the open chat) its project or the
-    /// folder of the files it touched, else Hermes' working directory.
+    /// folder of the files it touched, else the agent's working directory.
     pub fn open_ide_for_session(
         &mut self,
         id: String,
@@ -272,6 +284,7 @@ impl HermesApp {
                             s.set_highlighter(language, cx);
                             s.set_value(text, window, cx)
                         });
+                        this.apply_pending_line(window, cx);
                         this.ide.remote_file = Some(RemoteFile {
                             alias,
                             remote: path,
@@ -609,6 +622,7 @@ impl HermesApp {
         }
         self.ide.baseline.clear();
         self.ide.dirty = false;
+        self.ide.changed_outside = false;
         let diffs = self
             .session_files()
             .into_iter()
@@ -683,6 +697,7 @@ impl HermesApp {
                             s.set_highlighter(language, cx);
                             s.set_value(file.text, window, cx)
                         });
+                        this.apply_pending_line(window, cx);
                     }
                     // Deleted or moved since (old sessions): no error, just the recorded edits.
                     Err(_) => {

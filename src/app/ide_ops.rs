@@ -15,7 +15,7 @@ use crate::ssh::{q, run};
 
 /// Where the tree's files are, for file operations.
 #[derive(Clone)]
-enum Fs {
+pub(super) enum Fs {
     Local,
     Ssh(String),
 }
@@ -44,7 +44,7 @@ pub struct TreeEdit {
 }
 
 const MAX_LISTED: usize = 20_000;
-const SKIP_DIRS: [&str; 6] = [
+pub(super) const SKIP_DIRS: [&str; 6] = [
     ".git",
     "node_modules",
     "target",
@@ -61,7 +61,7 @@ fn parent(path: &str) -> String {
     }
 }
 
-fn list_files(fs: &Fs, root: &str) -> Result<Vec<String>> {
+pub(super) fn list_files(fs: &Fs, root: &str) -> Result<Vec<String>> {
     match fs {
         Fs::Ssh(alias) => {
             let prune = SKIP_DIRS
@@ -192,7 +192,7 @@ pub fn fuzzy(query: &str, path: &str) -> Option<i32> {
 }
 
 impl HermesApp {
-    fn fs(&self) -> Fs {
+    pub(super) fn fs(&self) -> Fs {
         match (&self.ide.server, &self.target) {
             (Some(alias), _) => Fs::Ssh(alias.clone()),
             (None, Target::Local) => Fs::Local,
@@ -270,6 +270,16 @@ impl HermesApp {
         };
         let query = q.input.read(cx).value().trim().to_string();
         let root = self.tree_root.clone().unwrap_or_default();
+        // Nothing typed: the open tabs first (the last opened on top), then the rest.
+        if query.is_empty() {
+            let tabs: Vec<String> = self.ide.tabs.iter().rev().cloned().collect();
+            return tabs
+                .iter()
+                .cloned()
+                .chain(files.iter().filter(|f| !tabs.contains(f)).cloned())
+                .take(n)
+                .collect();
+        }
         let mut hits: Vec<(i32, &String)> = files
             .iter()
             .filter_map(|f| {

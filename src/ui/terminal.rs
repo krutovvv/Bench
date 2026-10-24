@@ -138,6 +138,8 @@ fn snapshot(session: &Session, pal: &Palette, focused: bool) -> Frame {
         }
     }
     let block_cursor = focused && matches!(cursor.shape, CursorShape::Block);
+    // ⌘ held over a path or URL: it is underlined, like a link.
+    let hover = *session.hover.lock().unwrap();
 
     for indexed in content.display_iter {
         let row = indexed.point.line.0 + offset;
@@ -193,11 +195,12 @@ fn snapshot(session: &Session, pal: &Palette, focused: bool) -> Frame {
         if ch == ' ' && cell.extra.is_none() {
             continue;
         }
+        let linked = hover.is_some_and(|(r, a, b)| r == row && (a..=b).contains(&col));
         let style = (
             hsla(fg),
             cell.flags.contains(Flags::BOLD),
             cell.flags.contains(Flags::ITALIC),
-            cell.flags.intersects(Flags::ALL_UNDERLINES),
+            linked || cell.flags.intersects(Flags::ALL_UNDERLINES),
             cell.flags.contains(Flags::STRIKEOUT),
         );
         let mut text = String::new();
@@ -355,6 +358,7 @@ impl HermesApp {
         let s_down = session.clone();
         let s_move = session.clone();
         let s_wheel = session.clone();
+        let s_mods = session.clone();
         let (s_up, s_right, s_right_up) = (session.clone(), session.clone(), session.clone());
         let alias = tab.alias.clone();
         div()
@@ -364,7 +368,11 @@ impl HermesApp {
             .px_4()
             .py_2()
             .track_focus(&focus)
-            .cursor(CursorStyle::IBeam)
+            .cursor(if session.hover.lock().unwrap().is_some() {
+                CursorStyle::PointingHand
+            } else {
+                CursorStyle::IBeam
+            })
             .on_key_down(cx.listener(move |_, ev: &KeyDownEvent, _, cx| {
                 let ks = &ev.keystroke;
                 if ks.modifiers.platform {
@@ -442,8 +450,18 @@ impl HermesApp {
                     }
                 }),
             )
+            // ⌘ let go: the link is no longer underlined.
+            .on_modifiers_changed(cx.listener(move |_, ev: &ModifiersChangedEvent, _, cx| {
+                if !ev.modifiers.platform && s_mods.hover_at(None) {
+                    cx.notify();
+                }
+            }))
             .on_mouse_move(cx.listener(move |_, ev: &MouseMoveEvent, _, cx| {
                 let (x, y) = (f32::from(ev.position.x), f32::from(ev.position.y));
+                let cell = ev.modifiers.platform.then(|| s_move.cell_at(x, y));
+                if s_move.hover_at(cell) {
+                    cx.notify();
+                }
                 if s_move.wants_mouse() && !ev.modifiers.shift {
                     if ev.pressed_button == Some(MouseButton::Left) {
                         let (col, row) = s_move.cell_at(x, y);

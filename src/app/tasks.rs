@@ -1,5 +1,5 @@
-//! Tasks mode (⌘4, the list icon in the sidebar's top-right corner): Apple Reminders shown the way Things shows
-//! to-dos — Today (with This Evening), Upcoming, Anytime, Someday, Logbook and tags in the
+//! Tasks mode (⌘4, the list icon in the sidebar's top-right corner): tasks in Bench's own store (`crate::task_store`, the agent's bench.sqlite; moved once from Apple Reminders) shown the way Things shows
+//! to-dos — Today (with This Evening), Upcoming, Anytime, Logbook and tags in the
 //! sidebar, the tasks in the middle, the open task's card on the right. Every change goes to
 //! Reminders (`crate::reminders`); what another device or the agent changes there shows up here.
 
@@ -9,7 +9,8 @@ use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
 use gpui_kit::*;
 
 use super::HermesApp;
-use crate::reminders::{Cmd, Evt, Reminders};
+use crate::reminders::{Cmd, Evt};
+use crate::task_store::TaskStore;
 use crate::tasks::{self, List, Task, today};
 
 /// How far back the Logbook (and a tag's done tasks) reaches.
@@ -46,7 +47,7 @@ pub struct TasksMode {
     dirty: Option<Instant>,
     /// Delete was pressed once for this task.
     pub delete_armed: Option<String>,
-    reminders: Option<Reminders>,
+    pub(crate) reminders: Option<TaskStore>,
     last_load: Option<Instant>,
     next_token: u64,
     _subscriptions: Vec<Subscription>,
@@ -66,7 +67,8 @@ impl TasksMode {
         let completed = input("today, yesterday, 21.10", window, cx);
         let notes = cx.new(|cx| {
             TextareaState::new(window, cx)
-                .auto_grow(4, 16)
+                // Grows with the notes: the thread scrolls, not the field.
+                .auto_grow(4, 100_000)
                 .placeholder("Notes")
         });
         let mut subscriptions =
@@ -199,27 +201,18 @@ impl TasksMode {
 }
 
 impl HermesApp {
-    pub fn toggle_tasks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.tasks.on = !self.tasks.on;
-        self.panel = super::Panel::Chat;
-        if self.tasks.on {
-            self.ssh.on = false;
-            self.tools.on = false;
-            self.start_reminders(cx);
-            self.load_tasks();
-            let _ = window;
-        }
-        cx.notify();
-    }
-
     /// The Reminders thread, started the first time Tasks opens (macOS asks for access once).
     fn start_reminders(&mut self, cx: &mut Context<Self>) {
         // The demo's tasks are made up; Reminders stays untouched.
         if self.tasks.reminders.is_some() || self.demo {
             return;
         }
+        // The tasks live in the agent's store: wait for the connection.
+        let Some(conn) = self.conn.clone() else {
+            return;
+        };
         let (tx, rx) = async_channel::unbounded();
-        self.tasks.reminders = Some(Reminders::start(tx));
+        self.tasks.reminders = Some(TaskStore::start(conn, self.current_profile(), tx));
         cx.spawn(async move |this, cx| {
             while let Ok(evt) = rx.recv().await {
                 if this
@@ -342,6 +335,52 @@ impl HermesApp {
         }
         self.save_task(t);
         cx.notify();
+    }
+
+    /// A new connection (another machine, or the agent restarted): read its tasks.
+    pub fn restart_tasks(&mut self, cx: &mut Context<Self>) {
+        self.tasks.reminders = None;
+        self.tasks.items.clear();
+        self.tasks.loaded = false;
+        self.start_reminders(cx);
+        self.load_tasks();
+    }
+
+    /// What the open thread is about: its session's subject, or the new chat's.
+    pub fn current_subject(&self) -> String {
+        match &self.session {
+            Some(id) => self
+                .sessions
+                .iter()
+                .find(|s| &s.id == id)
+                .map(|s| s.subject.clone())
+                .unwrap_or_default(),
+            None => self.new_subject.clone(),
+        }
+    }
+
+    /// The subject key of a task list's thread: "tasks:today".
+    pub fn tasks_subject(list: &List) -> String {
+        format!("tasks:{}", list.name().to_lowercase())
+    }
+
+    /// The list a thread is about, from its subject.
+    pub fn subject_list(subject: &str) -> Option<List> {
+        let name = subject.strip_prefix("tasks:")?;
+        crate::tasks::LISTS
+            .iter()
+            .find(|l| l.name().eq_ignore_ascii_case(name))
+            .cloned()
+    }
+
+    /// A task list in the sidebar: its thread — the list live at the top, the conversation under
+    /// it. The latest thread about that list, or a new one.
+    pub fn open_task_list(&mut self, list: List, window: &mut Window, cx: &mut Context<Self>) {
+        let key = Self::tasks_subject(&list);
+        self.start_reminders(cx);
+        self.load_tasks();
+        self.select_task_list(list, window, cx);
+        self.open_subject(key, cx);
     }
 
     pub fn select_task_list(&mut self, list: List, window: &mut Window, cx: &mut Context<Self>) {
@@ -514,7 +553,7 @@ impl HermesApp {
         self.change_task(&id, |t| t.important = !t.important, cx);
     }
 
-    /// "When": 0 Today, 1 This Evening, 2 Tomorrow, 3 Anytime, 4 Someday.
+    /// "When": 0 Today, 1 This Evening, 2 Tomorrow, 3 Anytime.
     pub fn set_task_when(
         &mut self,
         id: String,
@@ -526,7 +565,7 @@ impl HermesApp {
         self.change_task(
             &id,
             |t| {
-                t.someday = when == 4;
+                t.someday = false;
                 t.evening = when == 1;
                 t.day = match when {
                     0 | 1 => Some(day),
@@ -593,10 +632,4 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// The task in the Reminders app.
-    pub fn open_task_in_reminders(&mut self, id: &str, cx: &mut Context<Self>) {
-        if !id.starts_with("new:") {
-            cx.open_url(&format!("x-apple-reminderkit://REMCDReminder/{id}"));
-        }
-    }
 }

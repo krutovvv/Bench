@@ -17,8 +17,6 @@ use crate::rest;
 pub struct Prepared {
     /// `[attached: …]` lines for the text.
     pub lines: Vec<String>,
-    /// (path on the gateway's machine, mime) for `prompt.submit`.
-    pub images: Vec<(String, String)>,
 }
 
 pub const PREFIX: &str = "[attached: ";
@@ -51,21 +49,6 @@ pub fn split(text: &str) -> (String, Vec<String>) {
 /// The gateway's own note for an image attachment, stored in the message.
 const GATEWAY_IMAGE: &str = "[Image attached at: ";
 
-/// An image type the gateway takes as an attachment, by content.
-fn image_mime(bytes: &[u8]) -> Option<&'static str> {
-    if bytes.starts_with(b"\x89PNG\r\n\x1a\n") {
-        Some("image/png")
-    } else if bytes.starts_with(b"\xff\xd8\xff") {
-        Some("image/jpeg")
-    } else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
-        Some("image/gif")
-    } else if bytes.len() > 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
-        Some("image/webp")
-    } else {
-        None
-    }
-}
-
 fn is_temporary(path: &Path) -> bool {
     let p = path.to_string_lossy();
     [
@@ -79,12 +62,11 @@ fn is_temporary(path: &Path) -> bool {
         || p.starts_with(&state_dir().join("pasted").to_string_lossy().to_string())
 }
 
-/// Blocking: call off the UI thread. `canonical`: the gateway takes image attachments.
+/// Blocking: call off the UI thread.
 pub fn prepare(
     conn: &Connection,
     target: &Target,
     profile: &str,
-    canonical: bool,
     files: &[PathBuf],
 ) -> Result<Prepared> {
     let mut out = Prepared::default();
@@ -98,12 +80,6 @@ pub fn prepare(
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "file".into());
         let bytes = std::fs::read(file).with_context(|| format!("read {name}"))?;
-        if canonical {
-            if let Some(mime) = image_mime(&bytes) {
-                let staged = rest::upload_image(conn, profile, &name, mime, &bytes)?;
-                out.images.push((staged, mime.to_string()));
-            }
-        }
         let path = if *target == Target::Local && !is_temporary(file) {
             file.to_string_lossy().to_string()
         } else {

@@ -1,4 +1,4 @@
-//! Settings → Prompts: the user's text snippets, kept per Hermes profile as Markdown files
+//! Settings → Prompts: the user's text snippets, kept per agent profile as Markdown files
 //! (`<profile home>/prompts/<title>.md`, like skills) and inserted from the composer with `@`.
 
 use gpui_kit::component::notification::NotificationType;

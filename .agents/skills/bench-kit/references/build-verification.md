@@ -26,14 +26,14 @@ zoomed).
   state, use a temporary env hook instead of editing the user's state files. One line at the end
   of the app's `new()`, marked so it can't be forgotten, removed before the final build:
   ```rust
-  if std::env::var("DEBUG_UPCOMING").is_ok() { app.toggle_tasks(window, cx); app.select_task_list(List::Upcoming, window, cx); } // DEBUG-TMP
+  if std::env::var("DEBUG_UPCOMING").is_ok() { app.open_task_list(List::Upcoming, window, cx); } // DEBUG-TMP
   ```
   or in the handler where the data arrives (`self.sessions = rows;` → open the session whose
   title contains `$DEBUG_OPEN`). Afterwards: `sed -i '' '/DEBUG-TMP/d' src/app.rs` and
-  `grep -c DEBUG_ src/app.rs` must print 0. Hooks that worked: open a mode/list, open a session
+  `grep -c DEBUG_ src/app.rs` must print 0. Hooks that worked: open a subject's thread or a list, open a session
   by title, start a new session, press "New task" and screenshot twice 10 s apart (a bug that
   needs time to appear).
-- **Data behind a macOS permission** (Reminders, Calendar, Contacts, the microphone): the grant
+- **Data behind a macOS permission** (Calendar, Contacts, the microphone): the grant
   belongs to the .app, so a binary run from a terminal is refused. Bundle, then launch YOUR copy
   as the app: `open -n dist/<App>.app --env DEBUG_X=1`, find it with
   `pgrep -nf "<App>.app/Contents/MacOS"` (the newest), capture by that PID, `kill` it after.
@@ -94,9 +94,6 @@ numpy rather than guessing coordinates; crops of a full-screen shot catch other 
 - Protocol/API behaviour confirmed with the headless `--probe` mode, read-only where the data is
   the user's (create-and-delete only throwaway items, and say so).
 - Bundle rebuilt, commit made.
-- `hermes verify` auto-detect assumes an HTTP server (polls a port after `start`) and reports
-  `ok:false` for a GUI app. Write `.hermes/environment.json` with the build/test commands and
-  `"start": null` — the readiness phase is then skipped and a passing run records the evidence.
 - Report: what was measured/seen, what only compiles, what needs the user's click.
 
 ## Editing code safely

@@ -1,4 +1,4 @@
-# The interview: from "what I do" to a Bench
+# The interview: from "what I do" to the threads they need
 
 Ask in the person's language, a few questions at a time, in plain words (they may not be
 programmers). Don't propose anything until you have the picture.
@@ -6,78 +6,72 @@ programmers). Don't propose anything until you have the picture.
 ## 1. Questions
 
 **The work**
-- What is your job? What does a normal working day look like, from start to end?
-- What do you produce (code, texts, images, models, reports, deals…)? For whom?
+- What is your job? What does a normal day look like, from start to end?
+- What do you produce (code, texts, posts, reports, deals…)? For whom?
 
-**The programs** — for each program they name:
-- Why do you open it? What exactly do you do there (the 2–3 actions you repeat)?
-- What do you never use in it?
-- What do you copy from it, and where to?
+**What you work on** — the things that would become the sidebar's groups:
+- What do you keep coming back to all day: a list of tasks, servers, sites you sign in to,
+  folders on a host, clients, orders, tickets, documents?
+- For each: where does it live now (an app, a website, a server, a file)? What exactly do you do
+  with it (the 2–3 actions you repeat)? What do you copy from it, and where to?
 
-**The routine**
-- What do you do many times a day that feels mechanical (convert, rename, look up, paste,
-  check, send)?
+**The agent**
+- What do you ask an AI for most often? What would you like it to do on its own, or on a
+  schedule, or from your phone (Telegram)?
+- Which steps between your tools feel mechanical (look up, paste, convert, check, send)?
+
+**The small things**
 - Which small sites or utilities do you open for one quick thing (converters, generators,
-  calculators, validators)?
-- What do you ask an AI for most often? What would you like it to do on its own?
-
-**The data**
-- Where do your files live (this Mac, servers, cloud folders, a git repo)?
-- Which services do you log into for work (a CRM, a server, a database, an API)?
-
-**The feel**
-- Which app's look and feel do you like? (Ours is Zed-like: flat, light, dense — keep it unless
-  they object.)
-- What annoys you most in the programs you use now?
+  validators)? These become tools in Tools.
 
 ## 2. Write it back
 
-A short list in their words: "1. Every morning you open the server logs over SSH and search for
-errors. 2. You convert tables from the client's site to Markdown for the AI. 3. …" Ask them to
-correct it. This list is the specification; build exactly this.
+A short list in their words: "1. Every morning you check the server logs over SSH for errors.
+2. You publish posts on three sites by hand. 3. …" Ask them to correct it. This list is the
+specification; build exactly this.
 
-## 3. Turn answers into modes
+## 3. Turn the answers into threads
 
-A **mode** is a top-level place of the window (a button in the header or status bar and a
-shortcut, ⌘1 ⌘2 ⌘3…), with its own sidebar and main area. Group the jobs by *what the sidebar
-lists*:
+Bench is one chat with the agent; each thing they work on becomes a **kind of thread**: a group
+in the sidebar, a live block at the thread's top, the agent's tool for it
+(`build-subject.md`). First see whether one of the five that exist covers it:
 
-| The person works with a list of… | Mode | Sidebar | Main area |
+| They work with… | Thread | What the block shows | What the agent does |
 |---|---|---|---|
-| conversations with an AI agent | Sessions | chats by project | the chat |
-| servers, hosts | SSH | servers by folder | a terminal |
-| files of a project | IDE (a panel, not a mode) | the tree | an editor |
-| small utilities | Tools | tools by group | input → output |
-| records in a service (clients, tickets, posts) | e.g. "CRM" | records, filters | the record, actions |
-| media (screenshots, renders, clips) | e.g. "Assets" | folders, recent | a preview, actions |
+| their tasks | Tasks (`tasks:<list>`) | the list: Today, Upcoming, Anytime, Logbook | adds, moves, completes, sums the time spent |
+| servers | Servers (`ssh:<alias>`) | the server's terminal | runs commands there (`ssh_run`) |
+| files on hosts (FTP, SFTP) | Files (`files:<host id>`) | the folder and the open file | lists, reads, writes, renames (`remote_files`) |
+| websites they sign in to | Browser (`browser:<id>`) | each step's page, live; they click and type in it | drives the page through the browser MCP |
+| small utilities | Tools (`tool:<name>`) | the tool's input and output | explains, fixes, works with what's in it |
+| a project, a question | an ordinary thread (in a folder) | — | reads, edits, runs, searches |
 
-One-off jobs without a list become **tools** inside the Tools mode. Jobs that link two places
-become **actions** ("open in the editor", "send to the agent", "use as input").
-
-The AI agent is the automation center: in Bench it sees the open files, writes to servers through
-an MCP server, and the person sends anything to it from any mode ("Add to chat").
+What none of these covers becomes **a new kind of thread**, in the same shape: say what its
+sidebar lists, what its block shows, which tool the agent gets (or which MCP server already
+exists for that service), what Bench sends with each message. Examples: "my clients" (a CRM's
+records, the agent through the CRM's MCP), "the shop's orders" (a list re-read from the shop's
+API), "the build queue" (a list of runs with their logs).
 
 ## When the job lives in a website or a cloud service
 
-Google Docs, Telegram, a uniqueness checker, stock photo sites, a CRM: the Bench doesn't embed
-them (no web views, no headless browser — the user rejected those as heavy). Three honest
-options, in this order — say which one each job gets:
-1. **The agent does it.** Hermes reaches the service through an MCP server or a skill (Telegram
-   intake, Google Drive, an API with a key in the profile's `.env`); the Bench shows the result
-   (a chat answer, a task, a file). Most such jobs land here.
-2. **A tool for the local step** around the service: HTML → Markdown of a copied page, crop to
-   1200×630 for a cover, clean up pasted text — pure functions in the Tools mode.
-3. **A link out**: a row action "Open in Google Docs" (`cx.open_url`) — the Bench keeps the
-   list, the website keeps the editing.
-Never build a half-copy of the website inside the Bench.
+In order, say which one each job gets:
+1. **The agent does it through an MCP server or an API** (most such jobs): the thread shows
+   the result; no page needed.
+2. **The browser thread**, when there is no API or the person needs to see and touch the page
+   (sign-ins, publishing on sites without an API): the agent drives the server's browser, the
+   person watches each step live and steps in.
+3. **A tool in Tools** for the local step around the service (HTML → Markdown of a copied page,
+   clean up pasted text).
+Never a half-copy of the website inside Bench.
 
 ## 4. Example: how the user's Bench came out of their answers
 
-- "I talk to a local AI agent all day" → **Sessions** (Hermes client).
-- "I keep many servers and I'm always in a terminal" → **SSH** (servers from `~/.ssh/config`,
-  terminals, a local one too).
-- "I open Zed only to look at a file and fix a line" → the **mini IDE** panel (tree, editor,
-  tabs, ⌘P, ⌘D), local and remote files; Zed one click away for more.
-- "I use DevUtils for Base64, regex, cron, Unix time; I copy tables from sites for the AI" →
-  **Tools** (Rich Text to Markdown first).
-- "I want to see what the agent runs in the background" → a card under the answer, not a mode.
+- "I talk to an agent all day, in projects" → ordinary threads, in folders, with git branches.
+- "I keep my tasks in a task app and log the hours" → **Tasks**: the lists as threads, the
+  agent's `tasks` tool; "how many hours this month for the client" is one question.
+- "Many servers, always in a terminal" → **Servers**: each `~/.ssh/config` host a thread with its
+  terminal; the agent runs commands in it and reads what's on screen.
+- "Sites on old hosting, FTP passwords in Transmit" → **Files**: hosts imported once, a folder and
+  an editor in the block, the agent edits through `remote_files`.
+- "We publish on sites without an API, a whole team" → **Browser**: a shared server browser,
+  each person with their own key, each step's page live in the answer.
+- "DevUtils for Base64, regex, cron; tables from sites for the AI" → **Tools**, one thread per tool.

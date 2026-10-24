@@ -24,22 +24,6 @@ impl HermesApp {
         }
     }
 
-    /// The paperclip: the system file picker, several files at once.
-    pub fn pick_attachments(&mut self, cx: &mut Context<Self>) {
-        let picked = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: true,
-            prompt: Some("Attach".into()),
-        });
-        cx.spawn(async move |this, cx| {
-            if let Ok(Ok(Some(paths))) = picked.await {
-                let _ = this.update(cx, |this, cx| this.add_attachments(paths, cx));
-            }
-        })
-        .detach();
-    }
-
     /// ⌘V with an image (a screenshot copied with ⌃⇧⌘4) or files copied in Finder attaches them;
     /// returns false when the clipboard holds only text (the text field pastes it).
     pub fn paste_attachments(&mut self, cx: &mut Context<Self>) -> bool {

@@ -1,7 +1,8 @@
-//! Bench — one window for a local Hermes agent, its sessions, the user's servers (terminal over
-//! SSH), their files (a mini IDE), everyday tools and tasks. Crate, binary, bundle id
-//! (local.bench) and state folder are all "bench" (formerly hermes-gpui: its state is copied
-//! over on the first start, `connection::migrate_state`).
+//! Bench — one window for its own agent (bench-agent, `agent/`), its sessions, the user's servers
+//! (terminal over SSH), their files (a mini IDE), everyday tools and tasks. Crate, binary and
+//! bundle id (local.bench) are "bench"; its state lives in `~/.bench/ui` (copied over from
+//! `~/Library/Application Support/bench` or `…/hermes-gpui` on the first start,
+//! `connection::migrate_state`).
 
 // The browser build (web/) leaves out what needs a real system (terminals, probes, the state
 // folder); what only the desktop calls is unused there.
@@ -26,14 +27,17 @@ mod notify;
 #[cfg(not(target_os = "macos"))]
 #[path = "notify_other.rs"]
 mod notify;
+mod pi_agent;
 #[cfg(target_os = "macos")]
 mod reminders;
 #[cfg(not(target_os = "macos"))]
 #[path = "reminders_other.rs"]
 mod reminders;
 mod remote;
+mod remote_browser;
 mod rest;
 mod speed;
+mod task_store;
 mod ssh;
 mod sshconfig;
 mod tasks;
@@ -114,6 +118,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     gw.send(gateway::Cmd::Create {
                         profile: p.clone(),
                         cwd: None,
+                        subject: String::new(),
                     });
                     continue;
                 }
@@ -172,6 +177,43 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     "open: stored={session} runtime={runtime} turns={}",
                     turns.len()
                 );
+                // PROBE_SEND: one prompt into this session, printing the events Bench reads.
+                if let Ok(text) = std::env::var("PROBE_SEND") {
+                    gw.send(gateway::Cmd::Send {
+                        profile: std::env::var("PROBE_PROFILE").unwrap_or_default(),
+                        session: runtime.clone(),
+                        text,
+                        effort: None,
+                        context: std::env::var("PROBE_CONTEXT").unwrap_or_default(),
+                    });
+                    while let Ok(evt) = rx.recv_blocking() {
+                        match evt {
+                            gateway::Evt::Delta(_, t) => print!("{t}"),
+                            gateway::Evt::ToolStart { name, detail, .. } => {
+                                println!("\n[tool] {name}: {detail}")
+                            }
+                            gateway::Evt::ToolDone {
+                                failed,
+                                output,
+                                edit,
+                                ..
+                            } => println!(
+                                "[done] failed={failed} edit={:?} {}",
+                                edit.map(|e| e.path),
+                                output.chars().take(160).collect::<String>()
+                            ),
+                            gateway::Evt::Usage(_, u) => {
+                                println!("\n[usage] {}/{}", u.context_used, u.context_max)
+                            }
+                            gateway::Evt::Complete { text, .. } => {
+                                println!("\n[complete] {} chars", text.len());
+                                return Ok(());
+                            }
+                            gateway::Evt::Error(e) => anyhow::bail!(e),
+                            _ => {}
+                        }
+                    }
+                }
                 if let Ok(cmd) = std::env::var("PROBE_DISPATCH") {
                     let (name, arg) = cmd.split_once(' ').unwrap_or((&cmd, ""));
                     gw.send(gateway::Cmd::Dispatch {
@@ -311,7 +353,7 @@ fn log_error(text: &str) {
     eprintln!("{text}");
 }
 
-/// A Hermes window: its own gateway connection, profile and chat.
+/// A Bench window: its own connection to the agent, profile and chat.
 pub fn open_main_window(cx: &mut App) {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

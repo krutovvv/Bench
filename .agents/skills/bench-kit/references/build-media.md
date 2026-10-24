@@ -154,7 +154,7 @@ Reference: `src/app/attachments.rs`, `src/attach.rs`, chips in `src/ui/media.rs`
 
 ## Splitting content
 
-Hermes answers deliver files as `MEDIA:/abs/path` lines (paths may contain spaces: take the
+The agent's answers deliver files as `MEDIA:/abs/path` lines (paths may contain spaces: take the
 rest of the line, strip quotes/backticks and trailing punctuation). Also accept a standalone
 `![alt](/local/file.png)` line. Inline `…MEDIA:/x.png.` inside prose: replace with `` `x.png` ``
 and append the file after the paragraph; accept only absolute paths there. Never parse inside

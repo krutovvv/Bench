@@ -7,7 +7,7 @@ Five kinds, each with one job. Don't style a button yourself and don't add a six
 | Primary (filled, accent) | the one main action: bottom of the sidebar | `kit::primary_button` |
 | Icon button (small square) | header, inside rows, toggles | `kit::icon_button` |
 | Status button | status bar: New window, Settings | `kit::status_button` |
-| Mode toggle | the sidebar's top strip: Tools, Tasks | `kit::mode_toggle` |
+| Strip toggle | the sidebar's top strip: Open folder, +, Hide sidebar | `kit::mode_toggle` |
 | Small text button | a pane's strip: Paste, Copy, Clear, Generate | `kit::small_button` |
 | Arm-then-delete | deleting a row, without a dialog | `kit::arm_delete_button` |
 
@@ -47,8 +47,8 @@ A button inside a clickable row must not also click the row: start its handler w
 
 **`kit::status_button(id, icon, tip, active, cx, on_click)`** — full bar height, extra-small
 icon, the bar's muted tone; `active` = what it opens is on (accent). Only the window's own
-buttons: New window, then the settings gear last. Mode toggles are not status buttons — they sit
-over the sidebar (`kit::mode_toggle`, below).
+buttons: New window, then the settings gear last. The sidebar's own buttons are not status buttons —
+they sit in its top strip (`kit::mode_toggle`, below).
 
 ## Small text button
 
@@ -97,9 +97,12 @@ The composer's Attach / Dictate / Send / Stop buttons float inside the text fiel
 the filled one in the accent. 26 so the composer stays the header's 36 (at 30 it grew to 44 and
 "bulged"). Nothing else in a Bench is round. Code: Bench `src/ui/composer.rs`.
 
-## Mode toggle (over the sidebar)
+## Strip toggle (over the sidebar)
 
-`kit::mode_toggle(id, icon, "Tools  ⌘3", on, cx, on_click)` in `kit::sidebar_top(vec![…])`:
-a 24px square icon button, muted; while its mode is on it is accent on `list_active` and its
-tooltip reads "Back  ⌘3". Order left to right = the order of the shortcuts (Tools ⌘3, Tasks ⌘4).
-The same strip is on top of every mode's sidebar, so the toggles stay put when you switch.
+`kit::mode_toggle(id, icon, "Hide sidebar  ⌘\\", on, cx, on_click)` in `kit::sidebar_top(vec![…])`
+(Bench: the `toggle` closure in `render_sidebar_top`, `src/ui/mod.rs`): a 24px square icon
+button, muted; while `on` it is accent on `list_active` and its tooltip reads "Back" + the
+shortcut. Bench's strip, left to right: Open folder ("New session in a folder…"), + ("New
+session  ⌘N"), Hide sidebar; all open or hide something, so `on` is always false. It is not a
+mode switch: there are no modes, a tool is a subject (`build-subject.md`). The same strip is on
+top of every sidebar variant, so its icons stay put.

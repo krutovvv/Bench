@@ -2,19 +2,19 @@
 
 Like a component library's docs: each piece has a picture, when to use it, and the call. Build
 every screen ONLY from these pieces. If something seems missing, it is almost always one of them
-in another place (a mode, a pane, a row action, a card): look again before making a new one,
+in another place (a thread's block, a pane, a row action, a card): look again before making a new one,
 and ask the person before inventing a new kind of control.
 
 Where the code lives:
-- **`kit::…`** — `src/ui/kit.rs` of every app made by `scripts/new-app.sh`
-  (source: `templates/app/src/ui/kit.rs`). `use super::kit;` in a `src/ui/*.rs` file. A Bench
-  made by `scripts/new-bench.sh` has the same pieces in Bench's own files (`src/ui/mod.rs`
+- **`kit::…`** — `templates/app/src/ui/kit.rs`, the piece library (not a way to start an
+  app): copy the piece you need into your `src/ui/`. A Bench made by `scripts/new-bench.sh`
+  has the same pieces in Bench's own files (`src/ui/mod.rs`
   `search_band`, `render_sidebar_top`; `src/ui/tools.rs` `pane_bar`, `small_button`, `segmented`).
 - **gpui-kit components** — `gpui_kit::component::…` (editor, inputs, menus, Markdown…).
 - **Bench** — `~/Projects/bench-kit/src`, the reference app, for bigger pieces to copy.
 
 The whole frame in one picture: `assets/gallery.png` (its code: `templates/examples/gallery.rs`,
-compiled and checked). A real mode built from these pieces: `assets/ui/tools-mode.png`.
+compiled and checked). A real block built from these pieces: `assets/ui/tools-mode.png` (the Tools block's two panes).
 
 Where each piece goes in the window, and how to move or fit one: `ui-areas.md`.
 
@@ -22,10 +22,10 @@ Where each piece goes in the window, and how to move or fit one: `ui-areas.md`.
 
 | Piece | Picture | Call | Page |
 |---|---|---|---|
-| Window frame: sidebar, header, body, status bar | `assets/gallery.png` | the template | `ui-frame.md` |
+| Window frame: sidebar, header, body, status bar | `assets/gallery.png` | Bench `src/ui/mod.rs` | `ui-frame.md` |
 | Header bar (36px, title + icon buttons) | `assets/ui/header-bar.png` | `kit::header_bar` | `ui-frame.md` |
 | Status bar (28px, facts left, pickers right) | `assets/ui/status-bar.png`, `assets/ui/bench-status-bar.png` | `kit::status_text`, `kit::status_button` | `ui-frame.md` |
-| Top strip over the sidebar with mode toggles | — | `kit::sidebar_top`, `kit::mode_toggle` | `ui-frame.md`, `ui-buttons.md` |
+| Top strip over the sidebar (Open folder, +, Hide sidebar) | — | `kit::sidebar_top`, `kit::mode_toggle` (its icon button; Bench `render_sidebar_top`) | `ui-frame.md`, `ui-buttons.md` |
 | Search band (36, rules above and below) | `assets/ui/search.png` | `kit::search_band` | `ui-frame.md` |
 | Bottom button filling its bar | `assets/ui/primary-button.png` | `kit::bottom_bar(kit::primary_button(..))` | `ui-frame.md` |
 | Primary button (the one filled button) | `assets/ui/primary-button.png` | `kit::primary_button` | `ui-buttons.md` |
@@ -48,7 +48,7 @@ Where each piece goes in the window, and how to move or fit one: `ui-areas.md`.
 | Code / text editor | `assets/ui/tools-mode.png` (right pane) | `EditorState` + `Editor` | `ui-content.md` |
 | Markdown, HTML, plain selectable text | `assets/ui/tools-mode.png` (left pane: HTML) | `TextView::markdown` / `::html` | `ui-content.md` |
 | Code block with a header (language, Copy) | — | Bench `render_code` | `ui-content.md` |
-| A list re-read from its source (Tasks) | — | Bench `src/ui/tasks.rs` | `build-modes.md` §8 |
+| A list re-read from its source (Tasks) | — | Bench `src/ui/tasks.rs` | `build-subject.md` |
 | Image, diff, terminal | — | `img`, `Diff`, Bench `term.rs` | `ui-content.md` |
 | Empty state ("Open a file to start") | `assets/ui/empty-state.png` | `kit::empty_state` | `ui-content.md` |
 | Tooltip, toast, popover, popup list, loader | — | `Tooltip`, `push_notification`, `Popover` | `ui-overlays.md` |

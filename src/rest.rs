@@ -18,8 +18,8 @@ fn url(conn: &Connection, path: &str, profile: &str) -> String {
     }
 }
 
-/// The ticket a route needs (Hermes Desktop's `nativeGrantPurpose`): creating a profile and
-/// renaming/deleting the one a path names are registry operations with grants of their own.
+/// The purpose a route's auth names (from the ticket protocol, Hermes Desktop's
+/// `nativeGrantPurpose`); with the agent's session token it no longer matters.
 fn purpose(method: &str, path: &str) -> &'static str {
     let path = path
         .split('?')
@@ -42,7 +42,20 @@ fn get(conn: &Connection, path: &str, profile: &str) -> Result<Value> {
         .set(h, &v)
         .timeout(Duration::from_secs(30))
         .call();
-    Ok(resp.map_err(|e| anyhow!("{path}: {e}"))?.into_json()?)
+    match resp {
+        Ok(r) => Ok(r.into_json()?),
+        // The agent's own message ("501 Login incorrect."), not the URL.
+        Err(ureq::Error::Status(code, r)) => {
+            let body: Value = r.into_json().unwrap_or(Value::Null);
+            Err(anyhow!("{}", body["detail"].as_str().map(str::to_string).unwrap_or_else(|| format!("{path}: status {code}"))))
+        }
+        Err(e) => Err(anyhow!("{path}: {e}")),
+    }
+}
+
+/// A JSON request (POST, PUT, DELETE) with a 30 s timeout.
+pub fn send_json(conn: &Connection, method: &str, path: &str, profile: &str, body: Value) -> Result<Value> {
+    send(conn, method, path, profile, body, 30)
 }
 
 fn send(
@@ -159,7 +172,6 @@ pub type ProfileDefaults = (
 pub fn provider_group(provider: &str, yaml: &Value) -> String {
     match provider {
         "openrouter" => "OpenRouter".into(),
-        crate::connection::CLAUDE_PROVIDER => "Claude".into(),
         "" => "Model".into(),
         p => yaml["providers"][p]["name"]
             .as_str()
@@ -233,7 +245,7 @@ pub fn profile_defaults(conn: &Connection, profile: &str) -> Result<ProfileDefau
             }
         }
     }
-    // Hermes' default is manual; a YAML 1.1 writer may have stored `off` as false.
+    // The default is manual; a YAML 1.1 writer may have stored `off` as false.
     let approval = match &yaml["approvals"]["mode"] {
         Value::String(s) => s.to_lowercase(),
         Value::Bool(false) => "off".into(),
@@ -315,9 +327,8 @@ pub fn transcribe(conn: &Connection, profile: &str, wav: &[u8]) -> Result<String
         .to_string())
 }
 
-/// Delete a stored session the way Hermes Desktop does: read its mutation snapshot, then
-/// DELETE fenced on that revision (the gateway refuses an unfenced edit). Older gateways
-/// without the snapshot route take a plain DELETE.
+/// Delete a stored session: read its mutation snapshot, then DELETE fenced on that revision;
+/// a gateway without the snapshot route (the agent) takes a plain DELETE.
 pub fn delete_session(conn: &Connection, profile: &str, id: &str) -> Result<()> {
     let path = format!("/api/sessions/{id}");
     let fence = match get(conn, &format!("{path}/mutation-snapshot"), profile) {
@@ -389,18 +400,6 @@ pub fn save_skill(conn: &Connection, profile: &str, name: &str, content: &str) -
 pub fn config_raw(conn: &Connection, profile: &str) -> Result<String> {
     let raw = get(conn, "/api/config/raw", profile)?;
     Ok(raw["yaml"].as_str().unwrap_or_default().to_string())
-}
-
-pub fn save_config_raw(conn: &Connection, profile: &str, text: &str) -> Result<()> {
-    send(
-        conn,
-        "PUT",
-        "/api/config/raw",
-        profile,
-        json!({"yaml_text": text}),
-        30,
-    )?;
-    Ok(())
 }
 
 #[derive(Clone, Debug)]
@@ -679,18 +678,19 @@ pub fn cron_action(conn: &Connection, profile: &str, id: &str, action: &str) -> 
     Ok(())
 }
 
-/// The profile's Hermes home on the gateway's machine: `~/.hermes`, or
-/// `~/.hermes/profiles/<name>` for a named profile.
+/// The profile's folder in the agent's home on its machine: `~/.bench/profiles/<name>`
+/// (`default` for the default profile).
 pub fn profile_home(conn: &Connection, profile: &str) -> Result<String> {
     let v = get(conn, "/api/chat/workspaces", profile)?;
     let home = v["home"]
         .as_str()
         .ok_or_else(|| anyhow!("home folder unknown"))?;
-    Ok(if profile.is_empty() || profile == "default" {
-        format!("{home}/.hermes")
+    let name = if profile.is_empty() {
+        "default"
     } else {
-        format!("{home}/.hermes/profiles/{profile}")
-    })
+        profile
+    };
+    Ok(format!("{home}/.bench/profiles/{name}"))
 }
 
 /// The profile's prompts (`prompts/*.md`), by name.
@@ -877,29 +877,6 @@ fn data_url(mime: &str, bytes: &[u8]) -> String {
     )
 }
 
-/// Stage an image where `prompt.submit` attachments must live (the profile's image cache);
-/// the path on the gateway's machine.
-pub fn upload_image(
-    conn: &Connection,
-    profile: &str,
-    name: &str,
-    mime: &str,
-    bytes: &[u8],
-) -> Result<String> {
-    let v = send(
-        conn,
-        "POST",
-        "/api/chat/image-upload",
-        profile,
-        json!({"data_url": data_url(mime, bytes), "filename": name}),
-        120,
-    )?;
-    v["path"]
-        .as_str()
-        .map(str::to_string)
-        .ok_or_else(|| anyhow!("upload: no path"))
-}
-
 /// Write a file on the gateway's machine (inside the profile's managed files).
 pub fn upload_file(conn: &Connection, profile: &str, path: &str, bytes: &[u8]) -> Result<()> {
     let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or(path);
@@ -979,7 +956,7 @@ pub fn validate_endpoint(conn: &Connection, profile: &str, body: Value) -> Resul
     )
 }
 
-/// The profile's `.env` keys Hermes knows or holds: name → `{is_set, redacted_value,
+/// The profile's `.env` keys the agent knows or holds: name → `{is_set, redacted_value,
 /// description, category, channel_managed, custom}`.
 pub fn env_vars(conn: &Connection, profile: &str) -> Result<Value> {
     get(conn, "/api/env", profile)
@@ -1002,7 +979,7 @@ pub fn remove_env(conn: &Connection, profile: &str, key: &str) -> Result<()> {
     Ok(())
 }
 
-/// Merge keys into config.yaml (Hermes deep-merges what is sent over the file).
+/// Merge keys into the profile's config (the agent deep-merges what is sent over it).
 pub fn merge_config(conn: &Connection, profile: &str, config: Value) -> Result<()> {
     send(
         conn,
@@ -1015,38 +992,6 @@ pub fn merge_config(conn: &Connection, profile: &str, config: Value) -> Result<(
     Ok(())
 }
 
-pub fn parse_env(text: &str) -> std::collections::HashMap<String, String> {
-    text.lines()
-        .filter_map(|l| {
-            let l = l.trim();
-            let l = l.strip_prefix("export ").unwrap_or(l);
-            if l.starts_with('#') {
-                return None;
-            }
-            let (k, v) = l.split_once('=')?;
-            let v = v.trim();
-            let v = v
-                .strip_prefix('"')
-                .and_then(|v| v.strip_suffix('"'))
-                .or_else(|| v.strip_prefix('\'').and_then(|v| v.strip_suffix('\'')))
-                .unwrap_or(v);
-            Some((k.trim().to_string(), v.to_string()))
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn env_lines() {
-        let m = super::parse_env("# c\nA=1\nexport B=\"two words\"\nC='x=y'\n\nD=\n");
-        assert_eq!(m["A"], "1");
-        assert_eq!(m["B"], "two words");
-        assert_eq!(m["C"], "x=y");
-        assert_eq!(m["D"], "");
-    }
-}
-
 /// The gateway's own state (`/api/status`): what the status bar's backend item shows.
 #[derive(Clone, Debug, Default)]
 pub struct GatewayStatus {
@@ -1057,7 +1002,7 @@ pub struct GatewayStatus {
     /// "ok" or "degraded".
     pub overall: String,
     pub active_agents: u64,
-    /// (name as Hermes keys it, state, error message)
+    /// (name as the agent keys it, state, error message)
     pub platforms: Vec<(String, String, Option<String>)>,
     pub exit_reason: Option<String>,
 }

@@ -1,0 +1,27 @@
+{
+  "name": "bench-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A Hermes-compatible agent server on Pi Durable, for Bench",
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "start": "node src/server.ts",
+    "test": "node --test test/*.ts"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-durable": "1.4.0",
+    "@earendil-works/pi-mcp": "1.1.0",
+    "basic-ftp": "6.2.3",
+    "croner": "10.0.1",
+    "grammy": "1.46.0",
+    "ssh2-sftp-client": "12.1.1",
+    "ws": "8.18.3",
+    "yaml": "2.8.1"
+  }
+}

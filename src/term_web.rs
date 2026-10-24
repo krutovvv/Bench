@@ -39,4 +39,34 @@ impl Session {
     pub fn input(&self, _bytes: &[u8]) {}
 
     pub fn kill(&self) {}
+
+    pub fn write(&self, _bytes: &[u8]) {}
+
+    pub fn layout(&self) -> Layout {
+        Layout::default()
+    }
+
+    pub fn screen_text(&self, _n: usize) -> String {
+        String::new()
+    }
+
+    pub fn used_rows(&self) -> usize {
+        0
+    }
+}
+
+/// Where the cells are on screen (nothing is drawn here).
+#[derive(Clone, Copy, Default, Debug)]
+pub struct Layout {
+    pub origin_x: f32,
+    pub origin_y: f32,
+    pub cell_w: f32,
+    pub line_h: f32,
+}
+
+/// A link under the pointer (none in the browser build).
+pub struct TermLink {
+    pub target: String,
+    pub line: Option<usize>,
+    pub cwd: Option<String>,
 }

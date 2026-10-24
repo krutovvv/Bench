@@ -7,7 +7,7 @@ The user explicitly liked this set; do not mix in other icon families or emoji a
 
 Each icon is the original Lucide SVG file in `assets/icons/<name>.svg` (24×24 viewBox,
 `stroke="currentColor"`, stroke-width 2), compiled into the binary by a macro that generates an
-`Ico` enum (`templates/app/src/icons.rs`):
+`Ico` enum (Bench's `src/icons.rs`):
 
 ```rust
 icons! {
@@ -23,27 +23,19 @@ Ico::Loader.live(true)   // spinning variant for loaders (see references/ui-gotc
 Adding an icon = download the SVG from lucide.dev into `assets/icons/`, add one line to the
 macro, keep the list alphabetical. Icons take color from `text_color` (currentColor).
 
-## The "bold cut" for key controls (the composer's circles)
+## The composer's buttons (history)
 
-Lucide's thin strokes read as "tiny, not loaded" inside the composer's round buttons. The user
-asked for a bold version **in the Font Awesome sense — parts filled, not just thicker lines**,
-still Lucide underneath. Three hand-edited copies, same 24×24 grid, named `<name>-bold`/`-fill`:
-- `mic-fill.svg`: Lucide's mic with the capsule a filled `rect` (`fill="currentColor"
-  stroke="none"`, `x=8.5 y=3 w=7 h=11.5 rx=3.5`), the stand stays a stroke.
-- `arrow-up-bold.svg`: Lucide's arrow-up at `stroke-width="2.25"`, the head slightly lower
-  (`m6.5 10.5 5.5-5.5 5.5 5.5`).
-- `paperclip-bold.svg`: a simpler clip (two loops, no extra curls) at `stroke-width="2.25"`.
-- Stop is not an icon: a filled 9–10px square `div` (`rounded(px(1.5))`), never an outlined
-  square (that reads as a missing glyph).
-Size 13px in a 26px circle, colored like the circle's outline (`muted_foreground` at 75%), not
-black. `fill`/`stroke` come from the SVG itself (currentColor), so the `icons!` macro needs
-nothing special. Use this cut only where the user asked for it; everything else stays Lucide.
+For a while the composer had round 26px buttons with a hand-made "bold cut" of Lucide (a filled
+mic capsule, thicker arrow and clip). The user found them noise; since 2026-10-24 the composer
+uses the same small quiet buttons as an answer's actions (`chat::icon_button`, plain Lucide,
+hover only — `design-layout.md`, Composer). Only `mic-fill.svg` remains (the mic glyph); don't
+bring back circles or bold cuts unless asked.
 
 ## Sizes
 
 - `xsmall()` (about 12px): status bar, sidebar row buttons, meta lines, step icons.
-- `small()` (about 16px): header toggles, mode toggles, editor toolbars.
-- The composer's round buttons: 13px icons in 26px circles (`.size(px(13.))`, see below).
+- `small()` (about 16px): header toggles, the sidebar's top strip, editor toolbars.
+- The composer's buttons: `xsmall()`, as an answer's actions (`chat::icon_button`).
 - Never larger in chrome. Icon-only buttons always get a tooltip.
 
 ## The vocabulary we used

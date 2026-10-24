@@ -1,128 +1,102 @@
-# A personal Bench: every professional's own workbench
+# What Bench is, and what this kit is for
 
-## What we are doing, and why
+## Bench: a client for Pi, shaped like Delta, grown around one person's work
 
-Big professional tools already exist and serve everyone a little: an IDE, an SSH client, a chat
-with an AI, a converter site, Photoshop, Blender. Each person uses a small, specific part of each
-of them — the part their own work needs — and pays for the rest with clutter, switching windows and
-copying between apps.
+Bench is a native desktop client for an AI agent built on [Pi Durable](https://github.com/earendil-works/pi),
+written from scratch in Rust with GPUI. Its shape is taken from Zed's Delta: **the thread with
+the agent is the unit of work**. One chat app, no modes, no separate windows for separate jobs.
 
-**A Bench is the opposite: one window holding exactly the parts one person uses, built for that
-person.** Nobody else can build it for them: nobody else knows their processes, and no company
-makes software for one person. An AI agent with these skills can. The person describes how they
-work; the agent turns that into an app that looks and feels professional, because the look, the
-stack and the building blocks are already decided here.
+What it adds to that is the person's own tools, **each as a kind of thread**. The sidebar lists
+what the person works on — task lists, servers, file hosts, browser sessions, small utilities —
+and each opens a thread about it: the thing itself live at the top (the task list, the server's
+terminal, the folder on the FTP host, the page in the browser, the tool's input and output), the
+conversation with the agent under it. The agent knows what the thread is about, sees what the
+block shows with every message, and has a tool to act on it. The person can do the work by hand
+in the block, ask the agent, or both, in the same place.
 
-The reference Bench is the user's own (`~/Projects/bench-kit`, the app is called **Bench**):
-a chat with a local AI agent (Hermes), SSH servers with terminals, a mini IDE (a file tree and an
-editor — not Zed, just "open, look, fix"), and a Tools mode of everyday utilities (Markdown from
-copied web pages, passwords, Base64, regex, cron, Unix time…). The user's whole working day now
-happens in that one window. That is the result to aim for, for anyone.
+The user's Bench (this repository) has five such tools: **Tasks** (their task manager), **Servers**
+(SSH terminals), **Files** (FTP/SFTP hosts), **Browser** (a shared server browser the agent drives,
+the person watches and steps into) and **Tools** (everyday utilities: Base64, regex, cron, JSON…).
+Plus ordinary project threads, cron jobs and Telegram — all threads too.
 
-What a Bench is **not**: a replacement for a big product, or a tool for everybody. It holds the
-person's *subset* — "why do I open Photoshop? to crop and export screenshots" — implemented
-simply, without anything they don't use, often with the agent automating the steps between.
+It did not start this way. The first plan was a collection of skills that would build anyone a
+different app from a description of their work; along the way the modes, panels and separate
+apps fell away one by one, and what stayed is this: a Delta-like agent client where a tool is a
+thread. That is the result to keep, not to rebuild differently each time.
+
+## What the kit is for
+
+**Growing this Bench.** A person's needs differ from the user's: one has clients, another the
+shop's orders, a third a build queue. Each of those becomes one more kind of thread, made the
+same way as the five that exist (`build-subject.md`): a subject key, a live block, a sidebar
+group, an agent tool, a short prompt section, the block's state sent with each message. The kit
+holds the look, the pieces, the recipes and the mistakes already paid for, so an agent — even a
+modest model — adds a tool that looks and works like the others.
+
+What the kit is **not** for: designing a different app, a new layout, a mode, a window of its own
+for one job. If a job seems not to fit a thread, find which thread it is (a block, a step in the
+answer, a card under it, a tool in Tools) and ask before inventing anything.
 
 ## The look is the method
 
-Every Bench looks like the reference one, whatever the person's job: **the same frame and the
-same small, square, precisely spaced pieces**, after the Zed editor — a sidebar, a header bar on
-top, a status bar at the bottom, flat panes split by 1px lines, small exact icons, dense rows,
-one accent, nothing rounded or decorative. Like an IDE built for one person's work.
+Every part of Bench has the same look: Zed-like, flat, square, precisely spaced, one accent; a
+sidebar, a header bar, a status bar; in the thread one font size, the messages' (secondary things
+muted, never smaller). A new tool that has to fit into "a block at the top of a thread, a group in
+the sidebar, an answer under it" gets split into the right pieces by itself: what the sidebar
+lists, what the block shows, which few actions earn a button, what the agent does. So:
+- **Never invent a look or a control.** Pieces from `ui-catalog.md`, rules from
+  `design-look-rules.md`, the person's preferences in `design-user-preferences.md`.
+- The block is built from the same pieces as the rest; the agent's answer under it is the same
+  Markdown as everywhere.
 
-This is not a theme on top of the code; it decides the code. A job that has to fit into "a list
-on the left, a strip of small controls, two panes, a status line" gets broken into the right
-pieces: what the sidebar lists, which few actions earn a button, what input goes in and what
-comes out. Designing the screen in these terms first is how the logic of the job becomes clear —
-and why a small model can build it: it doesn't invent a UI, it places the job into a known one.
+## The agent is the core
 
-So:
-- **Never invent a new look**, a new kind of control or a different layout for a new job. Take
-  the frame from `scripts/new-bench.sh` (or `new-app.sh` for an app without the agent), the pieces from `references/ui-catalog.md` and `references/ui-content.md`, the rules
-  from `references/design-look-rules.md`. If the job seems not to fit, find which existing piece it is
-  (a mode, a tool, a pane, a card under a chat answer, a row action) — ask before making a new one.
-- Two people's Benches do different things and still look like one family. That shared look is
-  the collection's value: anyone who has used one Bench can use another.
+Bench is a client: the agent (`agent/`, Pi Durable, `build-pi-backend.md`) does the work, keeps
+the sessions, runs on this Mac or on a server, answers in Telegram and on schedules with Bench
+closed. Build on Pi the way its authors describe it, extend it with their packages or popular
+community ones, write as little of our own as possible. A tool's logic that the agent needs lives
+in the agent (a tool or an MCP server), not in Bench; Bench shows it and lets the person act.
 
-## The agent is in by default
+## Where the data lives
 
-Almost every Bench is unthinkable without an AI agent: the work turns around it, and the agent
-automates the steps between the person's tools. Hermes is the agent — local, profiles, skills,
-cron, MCP — and the reference Bench already has a complete, tuned client for it (sessions,
-steps, media, background processes, files it changed, voice, providers, install).
-So a Bench starts with it (`scripts/new-bench.sh`). But build what was asked: if the person
-wants "just a text editor", they get one without a chat (`scripts/new-app.sh`); when they later
-want AI in it, the chat comes as a panel beside the open document ("edit this with the agent"),
-from the same client code (`build-hermes-client.md`).
+Bench's own records live in one home, `~/.bench` (`bench.sqlite`: tasks, hosts, settings,
+providers, sessions), reached through the agent, so the agent works with them with Bench closed.
+What already has a home stays there: servers in `~/.ssh/config`, files in their folders and on
+their hosts, sign-ins in the browser's profile. `build-native-data.md`.
 
-## A Bench aggregates; the sources stay native
+## The person grows it
 
-A Bench shows and edits data that lives somewhere else, in the place the person already trusts
-and could open without the Bench: the agent's sessions stay in Hermes, servers in `~/.ssh/config`,
-code in the editor's folders, tasks in Apple Reminders. The Bench keeps no database of its own
-(only its look and last place). If the person opened the native app instead, everything would be
-there. What the native store has no field for is kept as plain lines it does have (comments in
-the SSH config, `Tags:` / `Spent:` lines in a reminder's notes) — readable anywhere, parsed by
-the Bench. The agents write to the same source directly (their own MCP, configured in the agent,
-never inside the Bench), and the Bench shows it.
-
-The user's tasks are the worked example: years in Things (a third-party app; the agents reached
-it by reverse-engineering its database, time kept in titles as "- 2 часа") moved into Apple
-Reminders (1318 tasks, back-dated completions, time moved out of the titles into `Spent:`); the
-Bench got a Things-like Tasks mode on top of EventKit; the Hermes profiles got a small Node MCP
-(`~/Projects/reminders-mcp`, EventKit via a background helper app) and rewritten skills. One window
-for control, native storage, agents working through the same storage.
-
-When choosing where a new kind of data lives: prefer what the OS or the person's long-lived
-tools already keep (Reminders, Calendar, files, config files) over anything new; pick a
-proprietary third-party app or an own database only when nothing native can hold it.
-
-## The person grows their Bench themselves
-
-Nobody can design anyone's whole system in advance, and no developer should stand between the
-person and their tools. The person describes their work to the agent with these skills and gets
-their Bench; later, when they need something new ("a tool that turns this report into a table",
-"a mode for my clients"), they ask the agent again and it is added the same way, in the same look.
-Write the code so that this stays easy: one mode per module, tools as pure functions with tests,
-the views thin — the next addition copies the shape of the last one.
+Nobody designs anyone's whole system in advance. When the person needs something new, they ask
+the agent with this kit, and it is added the same way, in the same look. Keep the code so that
+stays easy: one module per tool on each side (`src/app/<kind>.rs`, `src/ui/<kind>.rs`,
+`agent/src/builtin/<kind>.ts`), logic as tested pure functions, views thin — the next tool copies
+the shape of the last one.
 
 ## How to work with the person
 
-1. **Listen first, then interview** (`references/start-interview.md`): their job, a normal day, which
-   programs they open and *what exactly they do there*, what they copy between apps, what they
-   repeat, what annoys them. Write it back as a short list in their words and confirm it.
-2. **Propose the shape** if they have no picture of it: which **modes** (the window's top-level
-   places, like Sessions / SSH / Tools in Bench), what each mode's sidebar lists and what its main
-   area shows, which actions the AI agent could take over. Small and concrete beats complete: the
-   first version covers the core of each job, the rest comes later. They choose; you build.
-3. **Build in order**: a copy of the reference Bench from `scripts/new-bench.sh` (same look, same
-   icon; `new-app.sh` only for an app they asked to have without the agent) → switch off the
-   modes they don't use (`bench-modes-remove.md`) →
-   one mode at a time (`references/build-modes.md`) → each mode's parts from ready
-   recipes and crates. After every mode: build, run, screenshot, bundle, show the person.
-4. **Grow it when they ask.** New needs become new modes or tools, built the same way and in the
-   same look; links between parts ("open this file in the editor", "send this to the agent",
-   "this tool's output into that tool") come as the person discovers them. Never remove what
-   works for them.
+1. **Listen, then ask** (`start-interview.md`): what they work on all day, in which programs,
+   what exactly they do there, what they'd like the agent to take over.
+2. **Propose threads**: for each job, which kind of thread it is — one of the five, or a new one
+   (what its sidebar lists, what its block shows, what the agent's tool does). Small and concrete:
+   the core of each job first.
+3. **Build one tool at a time** (`build-subject.md`), each through the change loop
+   (`build-change-loop.md`): build, run, screenshot, commit, a new app next to the running one.
+4. **Grow it when they ask.** Never remove what works for them.
 
 ## How to build (the engineering rules)
 
-Write code like a lazy senior developer: understand the task and the code it touches first, then
-take the first rung that fully works:
-
-1. **Does it need to exist?** Build what the person asked for; name extra ideas in one line.
-2. **Is it already in the app?** Reuse Bench's code and the template's `kit.rs` the way nearby
-   code does.
+Like a lazy senior developer: understand the task and the code it touches, then take the first
+rung that fully works:
+1. **Does it need to exist?** Build what was asked; name extra ideas in one line.
+2. **Is it already in Bench?** Reuse the nearest subject's code the way it is written.
 3. **Does a ready component cover it?** gpui-kit's editor, Markdown view, inputs, menus
-   (`references/ui-content.md`).
-4. **Does a proven crate solve it?** For real problems — HTML to Markdown, time zones, cron,
-   regex, hashing, a terminal — use the crate from `references/build-crates.md`
-   (already chosen, already compiling together) instead of writing your own. Not for a few lines.
-5. **Otherwise** write the minimum that works, in the house style.
+   (`ui-content.md`).
+4. **Does a proven crate or package solve it?** `build-crates.md` on Bench's side; Pi's packages
+   and popular ones on the agent's.
+5. **Otherwise** the minimum that works, in the house style.
 
-Always: logic with branches, parsers, time or money gets a small test; errors are shown to the
-person, never swallowed; nothing that can lose their data runs without a confirmation; the report
-says what was checked and what was not. Keep logic in plain Rust modules (pure functions, tested)
-and the views thin — Bench's `src/devtools/` is the example.
+Always: logic with branches, parsers, time or money gets a small test; errors are shown, never
+swallowed; nothing that can lose data runs without a confirmation; the report says what was
+checked and what was not.
 
 Where everything is: the map in `SKILL.md`.

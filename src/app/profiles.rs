@@ -67,7 +67,7 @@ impl HermesApp {
                     .update(cx, |s, cx| s.set_value(text, window, cx)),
                 Err(e) => this.toast(
                     NotificationType::Error,
-                    format!("SOUL.md: {e:#}"),
+                    format!("SYSTEM.md: {e:#}"),
                     window,
                     cx,
                 ),
@@ -114,7 +114,7 @@ impl HermesApp {
                 }
                 Err(e) => this.toast(
                     NotificationType::Error,
-                    format!("New profile: {e:#}"),
+                    format!("New agent: {e:#}"),
                     window,
                     cx,
                 ),
@@ -164,7 +164,7 @@ impl HermesApp {
                 }
                 Err(e) => this.toast(
                     NotificationType::Error,
-                    format!("Profile: {e:#}"),
+                    format!("Agent: {e:#}"),
                     window,
                     cx,
                 ),

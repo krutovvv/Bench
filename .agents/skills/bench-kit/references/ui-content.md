@@ -1,6 +1,6 @@
 # Content: what the body shows
 
-The body of a mode shows the thing being worked on. Pick the ready piece:
+A thread's block (at its top, `build-subject.md`) or the body shows the thing being worked on. Pick the ready piece:
 
 | The person asks for | Use | Section |
 |---|---|---|
@@ -54,7 +54,7 @@ h_flex().size_full().items_stretch()
 
 The output follows the input as it is typed: subscribe to the input's `InputEvent::Change` and
 recompute (`ui-forms.md`). Wrong input → the error in the output strip, the output empty — no
-toast. The full working example: Bench Tools (`templates/examples/tools-mode/`).
+toast. The full working example: Bench's Tools block (`src/app/tools.rs`, `src/ui/tools.rs`, the tools in `src/devtools/`).
 
 ## Text views
 
@@ -119,7 +119,17 @@ Bench `src/diff.rs`, `src/ui/files.rs`.
 ## Terminal
 
 Copy Bench `src/term.rs` (a PTY with `portable-pty` + the VT parser `alacritty_terminal`) and
-`src/ui/terminal.rs` (the grid drawn by a custom element) whole; don't write one. Notes on the
+`src/ui/terminal.rs` (the grid drawn by a custom element) whole; don't write one.
+
+**Paths in a terminal open in the mini IDE** (as Warp does, without Warp): ⌘-hover underlines
+a link (pointer cursor), ⌘-click opens it — a URL in the browser, a folder as the IDE's tree, a
+file in its editor at its `:line` (compiler errors, grep). Recognized: absolute, `~/…`,
+relative (`src/main.rs`) and bare file names from `ls` (`wp-config.php`, `nginx.conf`; not
+`1.5`). Relative ones are resolved against the terminal's folder: a local shell's own (`lsof -a
+-p <pid> -d cwd -Fn`), a server's from the last prompt on screen (`user@host:/var/www$`,
+`[user@host /etc]#`), else home. A server answers "file or folder" over ssh. A file under the
+tree already open keeps that tree. Code: `term.rs` `link_span`, `prompt_folder`, `cwd`,
+`hover_at`; `app/servers.rs` `open_terminal_link`. Notes on the
 custom element: `build-custom-render.md`.
 
 ## Editor
@@ -130,19 +140,60 @@ keys, copy / cut / paste, undo ⌘Z / redo ⌘⇧Z, search ⌘F, replace ⌘⇧F
 vertical and horizontal scrolling. "Select next occurrence" (⌘D) is not built in: Bench adds it in
 `src/app/ide_tabs.rs` (`select_next_occurrence`) — copy that.
 
+Turn on in the builder: `.folding(true)` (fold arrows in the gutter); `.soft_wrap(false)` in a
+narrow panel, toggled with `set_soft_wrap(wrap, window, cx)` (Bench: ⌥Z and "Wrap" in the line
+under the editor).
+
+**The window must not take the editor's keys.** A window-wide ⌘F that focuses a sidebar search
+stole the editor's own find & replace bar for weeks: in `global_key`, when the editor has focus,
+return `false` for ⌘F so it reaches the editor (`src/app/keys.rs`, `in_editor`). Same for any
+⌃-key you bind (⌃G, ⌃Tab): only while the editor has focus — a terminal needs ⌃-keys.
+
+What Bench adds around the editor, each small (copy the files):
+- **The line under it, as in Zed** — `Ln 12, Col 5 · 3 selected · rust · Wrap`, 24px,
+  `status_bar` bg, `text_xs` muted: `src/ui/editor_status.rs`. It is its own small view that
+  `cx.observe`s the editor (the editor sends no cursor event; observing from the app would repaint
+  the whole window on every cursor move). Click "Ln, Col" = go to line.
+- **Go to line ⌃G**: a field over the editor's top like ⌘P's; Enter →
+  `set_cursor_position(gpui_kit::component::input::Position::new(line - 1, col - 1), window, cx)`
+  (0-based, focuses and scrolls). Count lines from `value()` (`matches('\n')`): the rope's
+  `len_lines` needs a `LineType` in ropey 2. A line for a file still loading waits in
+  `pending_line` and is applied after `set_value` (`src/app/ide_find.rs`).
+- **Find in files ⌘⇧F**: a third tab "Search" beside Changes / Files — a field, "N in M
+  files", hits grouped by file (Menlo line number + the line, truncated); a click opens the file
+  at the line. Smart case (a capital = exact). Local: walk the tree (skip `.git`,
+  `node_modules`, `target`…, files > 4 MB, binaries); a server: `grep -rnIF --exclude-dir=…`
+  over ssh. Cap 2000 hits.
+- **The agent edits the open file** (a tool's `edit.path` = the open path): reload it, cursor
+  line kept; with unsaved edits show a warning bar "The agent changed this file" + Reload.
+- **⌘W** closes the tab, **⌃Tab / ⌃⇧Tab** cycle tabs, empty ⌘P lists the open tabs first.
+- **The tree goes anywhere, like Transmit**: its first row is the folder as a path,
+  `… / skills / bench-kit / references` — a click on a folder above moves the tree there (`/` at
+  the top); the pencil types a path (`/etc/nginx`, `~/site`). A server's tree too, so a theme
+  folder's IDE reaches the nginx config.
+
+**Code into the chat, as in Zed's agent panel** (`src/app/snippets.rs`): ⌘⇧. (or the toolbar's
+chat icon) puts the selection — or the cursor's line — over the input as a chip
+`main.rs:12–20` (FileCode icon, Menlo, ×). ⌘C in the editor remembers where the text came from;
+⌘V in the input with that same text on the clipboard adds the chip instead of bare text. Sent,
+each chip becomes `[selection: <path>:<start>-<end>]` + the code fenced with its language; the
+sent message shows the chip again (split the blocks out before rendering), and a click opens
+the file at those lines. A server file's path is `alias:/path`.
+
 Limits to tell the user honestly (do not try to "fix" them by writing your own editor):
 the editor is smooth up to a few MB of text. For bigger files open the first 2 MB (recipe 1
 does this) and say that the rest is not shown. A 100+ MB editor is a big project of its own:
 ask the user before starting anything like that.
 
-**The whole app, finished**: `templates/examples/text-viewer/` (README + the five changed files
-+ a screenshot) — "just a text editor" from `new-app.sh` with recipes 1–5, Recent files in the
-sidebar, the file name in the header. Copy it instead of assembling the recipes by hand.
+The finished editor in Bench is the mini IDE (`src/app/ide*.rs`, `src/ui/files.rs`); copy from
+it rather than assembling the recipes by hand.
 
 ### Recipe 1 — code view in the main area
 
-All four places below are in a project made by `scripts/new-app.sh`. Verified: compiles and runs.
-The template already has `_subscriptions` — add only `editor` and `file`.
+The recipes were written and verified (compiles and runs) in the template app, `templates/app/`
+(`MainApp`) — now only the piece library, not a way to start an app. In a Bench the same code goes
+on `HermesApp`, and the editor is shown in a subject's block (`build-subject.md`) instead of
+`render_body`. The template already has `_subscriptions` — add only `editor` and `file`.
 
 `src/app.rs` — import, field, creation, loading:
 

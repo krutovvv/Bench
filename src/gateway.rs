@@ -21,16 +21,19 @@ pub enum Cmd {
     },
     Create {
         profile: String,
-        /// The working folder (a project, or a branch folder of one); None = Hermes' default.
+        /// The working folder (a project, or a branch folder of one); None = the agent's default.
         cwd: Option<String>,
+        /// What the thread is about ("tasks:today", "ssh:<host>"); "" = a plain chat.
+        subject: String,
     },
     Send {
         profile: String,
         session: String,
         text: String,
-        /// Staged images: (path on the gateway's machine, mime).
-        images: Vec<(String, String)>,
         effort: Option<String>,
+        /// What the thread's live block shows now (terminal lines, the tool's input…), for the
+        /// agent only: it is not part of the message the person sees.
+        context: String,
     },
     Interrupt {
         profile: String,
@@ -198,11 +201,6 @@ enum Pending {
     /// `process.list` for this runtime session.
     Processes(String),
     Dispatch(String),
-    /// Regenerate, step 1 done: the transcript (for the last user row id) has arrived.
-    Regen {
-        profile: String,
-        text: String,
-    },
     Ignore,
 }
 
@@ -239,9 +237,8 @@ struct Rpc {
     pending: HashMap<u64, Pending>,
     /// Method of each pending call, for error reports.
     methods: HashMap<u64, String>,
-    canonical: bool,
-    /// runtime session id -> (revision, execution generation), for fenced mutations.
-    fences: HashMap<String, (i64, i64)>,
+    /// runtime session id -> its execution generation: the turn Stop and answers name.
+    fences: HashMap<String, i64>,
 }
 
 impl Rpc {
@@ -255,32 +252,10 @@ impl Rpc {
         Ok(())
     }
 
-    /// A fenced session mutation (canonical protocol): model, reasoning, …
-    fn mutate(&mut self, session: &str, operation: &str, payload: Value) -> Result<()> {
-        let (revision, generation) = self.fences.get(session).copied().unwrap_or((0, 0));
-        let params = json!({
-            "session_id": session,
-            "request_id": uuid::Uuid::new_v4().to_string(),
-            "expected_revision": revision,
-            "expected_generation": generation,
-            "operation": operation,
-            "payload": payload,
-        });
-        self.call("session.mutate", params, Pending::Ignore)
-    }
-
-    /// Remember a session's revision/generation from a snapshot-shaped value.
+    /// Remember a session's execution generation from a snapshot-shaped value.
     fn note_fence(&mut self, session: &str, v: &Value) {
-        let rev = v["revision"].as_i64();
-        let generation = v["execution_generation"].as_i64();
-        if rev.is_some() || generation.is_some() {
-            let entry = self.fences.entry(session.to_string()).or_insert((0, 0));
-            if let Some(r) = rev {
-                entry.0 = r;
-            }
-            if let Some(g) = generation {
-                entry.1 = g;
-            }
+        if let Some(g) = v["execution_generation"].as_i64() {
+            self.fences.insert(session.to_string(), g);
         }
     }
 
@@ -316,10 +291,17 @@ impl Rpc {
                     Pending::Delete,
                 )?
             }
-            Cmd::Create { profile, cwd } => {
+            Cmd::Create {
+                profile,
+                cwd,
+                subject,
+            } => {
                 let mut params = json!({"profile": profile});
                 if let Some(cwd) = cwd {
                     params["cwd"] = json!(cwd);
+                }
+                if !subject.is_empty() {
+                    params["subject"] = json!(subject);
                 }
                 self.call("session.create", params, Pending::Create)?
             }
@@ -329,28 +311,22 @@ impl Rpc {
                 model,
                 provider,
             } => {
-                if self.canonical {
-                    self.mutate(
-                        &session,
-                        "model",
-                        json!({"model": model, "provider": provider}),
-                    )?
+                let command = if provider.is_empty() {
+                    format!("/model {model}")
                 } else {
-                    let command = if provider.is_empty() {
-                        format!("/model {model}")
-                    } else {
-                        format!("/model {model} --provider {provider}")
-                    };
-                    self.call(
-                        "slash.exec",
-                        json!({"session_id": session, "profile": profile, "command": command}),
-                        Pending::Ignore,
-                    )?
-                }
+                    format!("/model {model} --provider {provider}")
+                };
+                self.call(
+                    "slash.exec",
+                    json!({"session_id": session, "profile": profile, "command": command}),
+                    Pending::Ignore,
+                )?
             }
-            Cmd::SetEffort { session, effort } => {
-                self.mutate(&session, "reasoning", json!({"effort": effort}))?
-            }
+            Cmd::SetEffort { session, effort } => self.call(
+                "config.set",
+                json!({"key": "reasoning", "value": effort, "session_id": session}),
+                Pending::Ignore,
+            )?,
             Cmd::Catalog { profile } => self.call(
                 "commands.catalog",
                 json!({"profile": profile}),
@@ -376,22 +352,13 @@ impl Rpc {
                 name,
                 arg,
             } => {
-                let params = if self.canonical {
-                    json!({"session_id": session, "profile": profile, "name": name, "arg": arg})
+                let command = if arg.is_empty() {
+                    name
                 } else {
-                    let command = if arg.is_empty() {
-                        name
-                    } else {
-                        format!("{name} {arg}")
-                    };
-                    json!({"session_id": session, "profile": profile, "command": command})
+                    format!("{name} {arg}")
                 };
-                let method = if self.canonical {
-                    "command.dispatch"
-                } else {
-                    "slash.exec"
-                };
-                self.call(method, params, Pending::Dispatch(session))?
+                let params = json!({"session_id": session, "profile": profile, "command": command});
+                self.call("slash.exec", params, Pending::Dispatch(session))?
             }
             Cmd::SetApproval { profile, mode } => self.call(
                 "config.set",
@@ -405,14 +372,11 @@ impl Rpc {
             } => {
                 let generation = req
                     .generation
-                    .or_else(|| self.fences.get(&req.session).map(|f| f.1))
+                    .or_else(|| self.fences.get(&req.session).copied())
                     .unwrap_or(0);
-                let mut params = json!({"session_id": req.session, "execution_generation": generation,
-                                        "prompt_id": req.prompt_id, "answer": answer});
-                if !self.canonical {
-                    params["request_id"] = json!(req.prompt_id);
-                    params["profile"] = json!(profile);
-                }
+                let params = json!({"session_id": req.session, "execution_generation": generation,
+                                    "prompt_id": req.prompt_id, "request_id": req.prompt_id,
+                                    "answer": answer, "profile": profile});
                 self.call("clarify.respond", params, Pending::Ignore)?
             }
             Cmd::Approve {
@@ -420,17 +384,8 @@ impl Rpc {
                 req,
                 choice,
             } => {
-                let params = if self.canonical {
-                    let generation = req
-                        .generation
-                        .or_else(|| self.fences.get(&req.session).map(|f| f.1))
-                        .unwrap_or(0);
-                    json!({"session_id": req.session, "execution_generation": generation,
-                           "prompt_id": req.prompt_id, "choice": choice})
-                } else {
-                    json!({"session_id": req.session, "request_id": req.prompt_id,
-                           "choice": choice, "profile": profile})
-                };
+                let params = json!({"session_id": req.session, "request_id": req.prompt_id,
+                                    "choice": choice, "profile": profile});
                 self.call("approval.respond", params, Pending::Ignore)?
             }
             Cmd::Send {
@@ -438,31 +393,21 @@ impl Rpc {
                 session,
                 text,
                 effort,
-                images,
+                context,
             } => {
                 if let Some(value) = effort {
-                    if self.canonical {
-                        self.mutate(&session, "reasoning", json!({"effort": value}))?;
-                    } else {
-                        let params = json!({"key": "reasoning", "value": value, "session_id": session, "profile": profile});
-                        self.call("config.set", params, Pending::Ignore)?;
-                    }
+                    let params = json!({"key": "reasoning", "value": value, "session_id": session, "profile": profile});
+                    self.call("config.set", params, Pending::Ignore)?;
                 }
                 let mut params = json!({"session_id": session, "text": text, "profile": profile});
-                if self.canonical {
-                    params["submission_id"] = json!(uuid::Uuid::new_v4().to_string());
-                    if !images.is_empty() {
-                        params["attachments"] = images
-                            .iter()
-                            .map(|(path, mime)| json!({"path": path, "mime": mime}))
-                            .collect();
-                    }
+                if !context.is_empty() {
+                    params["context"] = json!(context);
                 }
                 self.call("prompt.submit", params, Pending::Ignore)?
             }
             // Stop names the turn it stops: the gateway refuses any other generation.
             Cmd::Interrupt { profile, session } => {
-                let generation = self.fences.get(&session).map_or(0, |f| f.1);
+                let generation = self.fences.get(&session).copied().unwrap_or(0);
                 self.call(
                     "session.interrupt",
                     json!({"session_id": session, "profile": profile,
@@ -470,17 +415,6 @@ impl Rpc {
                     Pending::Ignore,
                 )?
             }
-            // The owner protocol has no undo: re-read the transcript for the last user row, cut
-            // there (a fenced `rewind`), then submit the same text again.
-            Cmd::Regenerate {
-                profile,
-                session,
-                text,
-            } if self.canonical => self.call(
-                "session.resume",
-                json!({"session_id": session, "profile": profile}),
-                Pending::Regen { profile, text },
-            )?,
             Cmd::Regenerate {
                 profile,
                 session,
@@ -491,10 +425,7 @@ impl Rpc {
                     json!({"session_id": session, "profile": profile, "intent": "retry"}),
                     Pending::Ignore,
                 )?;
-                let mut params = json!({"session_id": session, "text": text, "profile": profile});
-                if self.canonical {
-                    params["submission_id"] = json!(uuid::Uuid::new_v4().to_string());
-                }
+                let params = json!({"session_id": session, "text": text, "profile": profile});
                 self.call("prompt.submit", params, Pending::Ignore)?
             }
         }
@@ -517,7 +448,6 @@ fn run(
         next_id: 0,
         pending: HashMap::new(),
         methods: HashMap::new(),
-        canonical: conn.canonical(),
         fences: HashMap::new(),
     };
     emit(Evt::Connected(conn.clone()));
@@ -582,27 +512,6 @@ fn run(
                 }
                 continue;
             }
-            if let Pending::Regen { profile, text } = kind {
-                let r = &msg["result"];
-                let Some(sid) = r["session_id"].as_str().map(str::to_string) else {
-                    continue;
-                };
-                rpc.note_fence(&sid, r);
-                let row = r["messages"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .rev()
-                    .find(|m| m["role"] == "user" && m["row_id"].is_i64())
-                    .and_then(|m| m["row_id"].as_i64());
-                if let Some(row) = row {
-                    rpc.mutate(&sid, "rewind", json!({"target_message_id": row}))?;
-                }
-                let params = json!({"session_id": sid, "text": text, "profile": profile,
-                                    "submission_id": uuid::Uuid::new_v4().to_string()});
-                rpc.call("prompt.submit", params, Pending::Ignore)?;
-                continue;
-            }
             // Resume -> fetch the history projection for sources and timing.
             if let Pending::Resume(session, profile) = kind {
                 let r = &msg["result"];
@@ -659,7 +568,7 @@ fn run(
         // is stamped with the generation of the turn it belongs to.
         if let Some(sid) = msg["params"]["session_id"].as_str() {
             if let Some(g) = msg["params"]["execution_generation"].as_i64() {
-                rpc.fences.entry(sid.to_string()).or_insert((0, 0)).1 = g;
+                rpc.fences.insert(sid.to_string(), g);
             }
             if msg["params"]["type"] == "session.info" {
                 let payload = msg["params"]["payload"].clone();
@@ -710,6 +619,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                     model: s["model"].as_str().unwrap_or_default().into(),
                     running: s["running"].as_bool().unwrap_or(false),
                     source: s["source"].as_str().unwrap_or_default().into(),
+                    subject: s["subject"].as_str().unwrap_or_default().into(),
                 })
                 .collect(),
         )),
@@ -762,7 +672,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                 }),
             }
         }
-        Pending::Ignore | Pending::Regen { .. } => {}
+        Pending::Ignore => {}
     }
 }
 
@@ -825,7 +735,6 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
                 .or(payload["request_id"].as_str())
                 .unwrap_or_default()
                 .to_string(),
-            generation: payload["execution_generation"].as_i64(),
             command: payload["command"].as_str().unwrap_or_default().to_string(),
             description: payload["description"]
                 .as_str()

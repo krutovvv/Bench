@@ -2,7 +2,7 @@
 
 Read when something behaves oddly or doesn't compile. Paths: widgets `gpui_kit::component::*`,
 core `gpui_kit::*`. One exact name you can't find: hover it with the `rust_lsp` tools
-(`build-hermes-tools.md`) — don't read the framework's sources to learn it.
+(an MCP server in the agent's `~/.bench/agents/<agent>/mcp.json`) — don't read the framework's sources to learn it.
 
 ## Compile errors that already happened (and the fix)
 
@@ -100,7 +100,7 @@ already recognizes `$…$` (`Node::InlineMath`) and `$$…$$` (`Node::Math`). md
 
 - **A periodic re-read replaced the whole list** and dropped a new, not-yet-saved item: its card
   closed by itself a few seconds after "New task". Keep local-only items across re-reads
-  (`build-modes.md`, section 8).
+  (`build-subject.md`, "Patterns for a block").
 - **A bar sized by its contents**: 30px round buttons made the composer 44 tall next to a 36
   header — the user saw it "bulge". Size the contents to the bar.
 - **A 1px step between facing bars**: the composer drew its top rule *on top of* `bar_h` while the

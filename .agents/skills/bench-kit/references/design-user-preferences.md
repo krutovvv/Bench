@@ -8,7 +8,9 @@
   Only controls that hang inside a field (composer Dictate / Send) are round circles.
 - Light theme by default; dark is optional (Light / Dark / System + accent + S/M/L size).
 - Fonts: happy with 14 UI / 12 code; adjust only by small steps, never big redesigns. Chat text
-  (answers and own messages) at `text_sm`, like session titles — "идеально".
+  (answers and own messages) was `text_sm` like session titles ("идеально"), then on
+  2026-10-24 one size up, `text_base`, with a bit more inset: the middle is what is read (Zed's
+  Delta does this). Disliked there: slight rounding, mixed fonts between blocks.
 - Syntax: One Light (One Dark in dark mode), the same in every editor and diff.
 - Icons: Lucide, monochrome, small. Liked them a lot.
 - Spacing is the most frequent complaint. Wants one rhythm ("like a step / golden ratio"):
@@ -22,13 +24,14 @@
   after the first frame.
 - One tone per bar: every label and icon in the status bar the same muted color.
 - Q&A reads as strips: the user's message a band from edge to edge, the agent's side under it,
-  both at one inset (now 24 on every side — it was 16/32 "forum thread" once, then one number;
-  see "Insets in small steps").
+  both at one inset (now 2rem on every side — it was 16/32 "forum thread" once, then 24; see
+  "Insets in small steps"). Then (2026-10-24) the band went: avatars in a left gutter, as in
+  Delta; the sidebar's right rule went too ("олдскульно") and the chrome got darker.
 - The user's own messages are selectable/copyable like the answers.
 - Media in the chat itself — images, video playing in place, audio, Markdown, diagrams,
   formulas; anything else opens in its default app on a click. All with the lightest possible
   implementation (no browsers), see `references/build-media.md`.
-- New desktop apps: the same stack and the same look as Hermes GPUI, only the icon differs
+- New desktop apps: the same stack and the same look as Bench, only the icon differs
   (`references/build-new-app.md`).
 - Color labels: thin stripe + light tint of the row background, for quick scanning.
 - Working items (a session whose agent runs) show a moving highlight over their title
@@ -45,11 +48,14 @@
 - **Every bar the header's height, every crossing rule one line.** The user spots a 1px step
   between the composer and "New session" and calls it "бесит". All bars 36; the composer's
   buttons shrank (30 → 26) so the bar could, and the waveform with them.
+- **No text-size setting** (removed 2026-10-24): one size, tuned; ⌘+ / ⌘− still zoom.
 - **Insets in small steps.** "Чуточку больше" means one step (16 → 20 → 24 over two rounds),
   the same number on every side and in every place of the area (question, answer, composer, task
   list, task card). A big app's generous padding (Claude Desktop) is the direction, not the target.
 - **Mode toggles over the sidebar**, in the strip beside the window buttons (Tools, then Tasks);
-  the status bar's right corner holds only New window and Settings.
+  the status bar's right corner holds only New window and Settings. *Superseded 2026-10-24:*
+  there are no modes; Tasks, Servers, Tools are sidebar groups, each opening a thread
+  (`build-subject.md`); the strip holds Open folder, + and Hide sidebar. The status bar rule stands.
 - **Cards are frames, not fills**: code blocks, audio, video, Changed files — a 1px frame, no
   background; header lines all the same height. A darker code background read as "тёмный вид".
 - **Code in answers has a header**: language left, Copy right, like every AI chat.
@@ -93,10 +99,12 @@
 - Lightweight first, the heavy tool one click away: open in the built-in mini IDE first, Zed
   from inside it.
 
-- **The Bench aggregates; data stays native** (tasks in Apple Reminders, servers in
-  `~/.ssh/config`, sessions in Hermes). The user rejected a JSON store, then SQLite, then a
+- **The Bench aggregates; data stays native** (servers in `~/.ssh/config`; tasks were in Apple
+  Reminders and sessions in the former agent, Hermes). The user rejected a JSON store, then SQLite, then a
   third-party app (Things) as the store, then an MCP built into the Bench: the agents' MCP lives
-  in Hermes, the Bench only shows and edits (`build-native-data.md`).
+  in the agent, the Bench only shows and edits (`build-native-data.md`). *Updated 2026-10-24:*
+  tasks and sessions now live in `~/.bench/bench.sqlite`, owned by the agent (`agent/`), which
+  Bench reads and writes through it; still no store of Bench's own.
 - No iPhone notifications from tasks (no alarms); back-dated completion is welcome; tags matter
   more than lists or priorities.
 - After moving data, the scheduled reports must keep working: check every cron job and skill
@@ -117,3 +125,17 @@
   the Dock icon themselves and keep the older builds for a while to roll back.
 - When an approach turns out heavier than expected (a browser engine, a big runtime), stop and
   say so before shipping it; the user prefers dropping a feature to carrying weight.
+- **The composer is part of the thread** (2026-10-24): the messages' font size, no buttons
+  (⌘Enter, ⌘⇧D, drag-and-drop), no scroll of its own, there while history loads; the thread
+  scrolls past its end like a code editor. The mic lives in the status bar.
+- **The sidebar is an IDE's tree**: no big "New session" button; "+" on a group or in the top strip.
+- **Fold strips (Background, Changed files) are as tall as a source chip.**
+- **One size in the thread** (2026-10-24): the thread is one document in one font size — the
+  messages' (`text_base`). Step summaries ("Sending… · 17s", "Done · N actions"), step rows,
+  site labels, file and fold strips, source chips, plan and asks: all `text_base`, set apart by
+  color (muted) only. Code stays monospaced. "это единый документ. Он одним шрифтом идет."
+- **One size in the bars**: header title, settings tabs, the branch chip, every status bar item
+  are the sidebar's group-name size (`text_sm`, buttons `.small()`, icons `.small()`).
+- **No centering, no max width** for the thread: full width from the left, like an IDE.
+- **Primary buttons in the accent** (`button_primary = primary` in `theme.rs`), never the kit's black.
+

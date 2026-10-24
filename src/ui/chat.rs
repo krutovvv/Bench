@@ -3,7 +3,6 @@
 //! files this session changed.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -17,183 +16,150 @@ use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
+/// Below the composer the thread can scroll on, as a code editor past its last line.
+const SCROLL_PAST_END: f32 = 240.;
+/// A tool's block at a thread's top.
+const SUBJECT_H: f32 = 440.;
+/// A terminal's most: under it, it fits its text.
+const TERMINAL_MAX: f32 = 280.;
+
+/// A terminal as tall as what it shows, one free line under the cursor, up to SUBJECT_H.
+pub(super) fn terminal_height(session: &crate::term::Session) -> f32 {
+    let line = match session.layout().line_h {
+        h if h > 1. => h,
+        _ => 20.,
+    };
+    let used = session.used_rows().min(1000) as f32;
+    // The view's own padding (py_2) and the border.
+    ((used + 1.).max(3.) * line + 18.).min(TERMINAL_MAX)
+}
+
+/// The demo's server: a terminal's last screen, as text (no shell runs in the demo).
+fn demo_terminal(alias: &str, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    div()
+        .border_1()
+        .border_color(theme.border)
+        .px_3()
+        .py_2()
+        .font_family(crate::theme::MONO)
+        .text_sm()
+        .whitespace_nowrap()
+        .overflow_hidden()
+        .children(crate::demo::terminal(alias).lines().map(|l| div().h(px(20.)).child(l.to_string())))
+        .into_any_element()
+}
+
 impl HermesApp {
     /// New chat: optionally work in a git project, optionally in a branch of its own.
-    fn render_project_choice(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let projects = self.known_projects();
-        let chosen = self.new_project.clone();
-        let label = chosen
-            .as_deref()
-            .map(|r| r.rsplit('/').next().unwrap_or(r).to_string())
-            .unwrap_or_else(|| "Select folder".into());
-        let view = cx.entity();
-        let picker = Button::new("new-project")
-            .ghost()
-            .small()
-            .icon(Ico::Folder.icon())
-            .label(label)
-            .dropdown_menu(move |menu, _, _| {
-                let mut menu = menu;
-                let none = view.clone();
-                menu = menu.item(
-                    PopupMenuItem::new("No project")
-                        .checked(chosen.is_none())
-                        .on_click(move |_, _, cx| {
-                            none.update(cx, |this, cx| {
-                                this.new_project = None;
-                                this.new_branch = false;
-                                cx.notify();
-                            })
-                        }),
-                );
-                let browse = view.clone();
-                menu = menu.item(PopupMenuItem::new("Choose folder…").on_click(
-                    move |_, window, cx| {
-                        browse.update(cx, |this, cx| this.choose_project_folder(window, cx))
-                    },
-                ));
-                if !projects.is_empty() {
-                    menu = menu.separator();
-                }
-                for root in &projects {
-                    let (view, r) = (view.clone(), root.clone());
-                    menu = menu.item(
-                        PopupMenuItem::new(root.clone())
-                            .checked(chosen.as_deref() == Some(root))
-                            .on_click(move |_, _, cx| {
-                                view.update(cx, |this, cx| {
-                                    this.new_project = Some(r.clone());
-                                    this.new_project_repo = true;
-                                    cx.notify();
-                                })
-                            }),
-                    );
-                }
-                menu
-            });
-        let on = self.new_branch;
-        // One line: "Group name  or  Select folder". The group is typed in place (a folder in
-        // ~/Research, made on send): a field with no frame, its placeholder reading as text.
-        let group = (self.new_project.is_none() && !self.path_entry).then(|| {
-            h_flex()
-                .gap_3()
-                .items_center()
-                .child(
-                    div().w(px(118.)).child(
-                        gpui_kit::component::input::Input::new(&self.group_name)
-                            .small()
-                            .appearance(false)
-                            .prefix(Ico::Layers.icon().small().text_color(muted)),
-                    ),
-                )
-                .child(div().text_color(muted).child("or"))
-        });
-        let row = h_flex()
-            .gap_3()
-            .items_center()
-            .child(picker)
-            .when(self.path_entry, |d| {
-                d.child(
-                    div().w(px(320.)).child(
-                        gpui_kit::component::input::Input::new(&self.project_path).small(),
-                    ),
-                )
+    pub(super) fn render_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        // A thread with no turns yet still is a thread: "Loading history…" while it opens, then
+        // the composer; a new chat is the composer alone.
+        // A thread about something starts with it, live: a task list, a server's terminal, a tool.
+        let subject = self.current_subject();
+        let block = if let Some(list) = HermesApp::subject_list(&subject) {
+            if self.tasks.list != list {
+                self.tasks.list = list;
+            }
+            Some(self.render_tasks_block(cx))
+        } else if let Some(alias) = HermesApp::subject_server(&subject) {
+            self.ensure_terminal(&alias, window, cx).map(|ix| {
+                let theme = cx.theme().clone();
+                let h = terminal_height(&self.ssh.tabs[ix].session);
+                div()
+                    .h(px(h))
+                    .border_1()
+                    .border_color(theme.border)
+                    .child(self.render_terminal(ix, window, cx))
+                    .into_any_element()
             })
-            .when(self.new_project.is_some() && self.new_project_repo, |d| {
-                d.child(
-                    h_flex()
-                        .id("new-branch")
-                        .gap_1p5()
-                        .items_center()
-                        .cursor_pointer()
-                        .text_color(if on { theme.foreground } else { muted })
-                        .hover(|s| s.text_color(theme.foreground))
-                        .child(
-                            div()
-                                .size(px(14.))
-                                .border_1()
-                                .border_color(if on { theme.primary } else { theme.input })
-                                .when(on, |d| d.bg(theme.primary)),
-                        )
-                        .child(Ico::GitBranch.icon().xsmall())
-                        .child("In a new branch")
-                        .tooltip(|window, cx| {
-                            Tooltip::new("A branch of its own in a separate folder (git worktree): main stays untouched until you merge")
-                                .build(window, cx)
-                        })
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.new_branch = !this.new_branch;
-                            cx.notify();
-                        })),
-                )
-            });
-        h_flex()
-            .mt_4()
-            .gap_3()
-            .items_center()
-            .text_sm()
-            .children(group)
-            .child(row)
-    }
-
-    pub(super) fn render_chat(&mut self, cx: &mut Context<Self>) -> AnyElement {
+            .or_else(|| self.demo.then(|| demo_terminal(&alias, cx)))
+        } else if let Some(id) = HermesApp::subject_files(&subject) {
+            Some(self.render_files_block(&id, window, cx))
+        } else if HermesApp::subject_browser(&subject).is_some() {
+            // Until the agent's first step: what this thread is for.
+            match &self.sites_error {
+                Some(e) => Some(div().text_base().text_color(cx.theme().danger).child(e.clone()).into_any_element()),
+                None if self.turns.is_empty() => Some(
+                    div()
+                        .text_base()
+                        .text_color(cx.theme().muted_foreground)
+                        .child("The server's browser. Ask for a step — “open the blog’s admin and sign in”, “publish the draft” — and each step's page shows here, live: click and type in it, or ask again.")
+                        .into_any_element(),
+                ),
+                None => None,
+            }
+        } else if let Some(tool) = HermesApp::subject_tool(&subject) {
+            if self.tools.tool != tool {
+                self.select_tool(tool, window, cx);
+            }
+            Some(self.render_tool_block(SUBJECT_H, cx))
+        } else {
+            None
+        };
+        // The block comes from the agent: its row, its avatar, like an answer.
         let theme = cx.theme().clone();
-        if self.turns.is_empty() && self.session.is_some() {
-            return div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .child(
-                    ShimmerText::new("Loading history…")
-                        .text_sm()
-                        .text_color(theme.muted_foreground),
-                )
-                .into_any_element();
-        }
-        if self.turns.is_empty() {
-            return v_flex()
-                .size_full()
-                .items_center()
-                .justify_center()
-                .gap_2()
-                // The app's mark (assets/logo.svg's two slabs at 64px), square like the rest of the
-                // window, in a quiet grey.
-                .child(
-                    v_flex()
-                        .mb_4()
-                        .size(px(64.))
-                        .bg(theme.muted_foreground.opacity(0.22))
-                        .justify_center()
-                        .pl(px(14.8))
-                        .gap(px(3.4))
-                        .child(div().w(px(25.6)).h(px(14.8)).bg(theme.background))
-                        .child(div().w(px(34.5)).h(px(14.8)).bg(theme.background)),
-                )
+        let subject_block = block.map(|content| {
+            h_flex()
+                .w_full()
+                .pl(px(super::CHAT_LEFT))
+                .pr(px(super::CHAT_RIGHT))
+                .py(px(super::TURN_Y))
+                .gap(px(super::CHAT_TEXT - super::CHAT_LEFT - super::AVATAR))
+                .items_start()
+                .child(super::avatar(true, &theme))
+                // Typing in a block keeps the focus there (see the thread's click below).
                 .child(
                     div()
-                        .text_2xl()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child("What are we working on?"),
+                        .flex_1()
+                        .min_w_0()
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| this.click_claimed = true))
+                        .child(content),
                 )
-                .child(
-                    div()
-                        .text_sm()
-                        .text_color(theme.muted_foreground)
-                        .child(format!(
-                            "{} · {}",
-                            self.target.label(),
-                            self.current_profile()
-                        )),
-                )
-                .child(self.render_project_choice(cx))
-                .into_any_element();
-        }
+                .into_any_element()
+        });
+        let placeholder: Option<AnyElement> = if subject_block.is_some() {
+            None
+        } else if !self.turns.is_empty() {
+            None
+        } else if self.session.is_some() {
+            Some(
+                h_flex()
+                    .w_full()
+                    .pl(px(super::CHAT_TEXT))
+                    .py(px(super::TURN_Y))
+                    .child(
+                        ShimmerText::new("Loading history…")
+                            .text_base()
+                            .text_color(theme.muted_foreground),
+                    )
+                    .into_any_element(),
+            )
+        } else if self.path_entry {
+            // A folder on a remote machine: typed (there is no picker for it).
+            Some(
+                h_flex()
+                    .w_full()
+                    .pl(px(super::CHAT_TEXT))
+                    .pr(px(super::CHAT_RIGHT))
+                    .py(px(super::TURN_Y))
+                    .child(
+                        div().w(px(360.)).child(
+                            gpui_kit::component::input::Input::new(&self.project_path).small(),
+                        ),
+                    )
+                    .into_any_element(),
+            )
+        } else {
+            // A new chat is a clean sheet, as in Delta: only the composer. Its folder is the
+            // group's "+" or the sidebar's "Open folder…".
+            None
+        };
 
-        // Follow the tail: stay pinned to the bottom until the user scrolls up.
-        let max = self.chat_scroll.max_offset().y;
+        // Follow the tail: stay pinned to the composer until the user scrolls up. "The bottom" is
+        // the composer's, not the room the thread scrolls on past it (SCROLL_PAST_END), so a
+        // short thread stays put and nothing calls for "Jump to latest".
+        let max = (self.chat_scroll.max_offset().y - px(SCROLL_PAST_END)).max(px(0.));
         let at_bottom = -self.chat_scroll.offset().y >= max - px(4.);
         if self.follow && !at_bottom && max == self.last_max {
             self.follow = false; // the user scrolled away
@@ -202,7 +168,7 @@ impl HermesApp {
             self.follow = true;
         }
         if self.follow && !at_bottom {
-            self.chat_scroll.scroll_to_bottom();
+            self.chat_scroll.set_offset(point(px(0.), -max));
         }
         self.last_max = max;
 
@@ -212,7 +178,26 @@ impl HermesApp {
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
-        let trailing = approval.is_some() || clarify.is_some();
+        // A terminal "!" opened in this thread: under the conversation, as tall as its text.
+        let thread_term = self.thread_terminal().map(|ix| {
+            let theme = cx.theme().clone();
+            let h = terminal_height(&self.ssh.tabs[ix].session);
+            div()
+                .w_full()
+                .pl(px(super::CHAT_TEXT - 16.))
+                .pr(px(super::CHAT_RIGHT))
+                .py(px(super::TURN_Y))
+                .child(
+                    div()
+                        .h(px(h))
+                        .border_1()
+                        .border_color(theme.border)
+                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| this.click_claimed = true))
+                        .child(self.render_terminal(ix, window, cx)),
+                )
+                .into_any_element()
+        });
+        let composer = self.render_composer(cx);
 
         div()
             .relative()
@@ -221,17 +206,46 @@ impl HermesApp {
                 v_flex()
                     .id("chat")
                     .size_full()
+                    // A click anywhere in the thread means "I'm about to type": the composer takes
+                    // the focus, unless the click went into something that types itself, or the
+                    // mouse moved (a drag selects text).
+                    .capture_any_mouse_down(cx.listener(|this, ev: &MouseDownEvent, _, _| {
+                        this.click_claimed = false;
+                        this.click_at = Some(ev.position);
+                    }))
+                    .on_mouse_up(
+                        MouseButton::Left,
+                        cx.listener(|this, ev: &MouseUpEvent, window, cx| {
+                            let still = this.click_at.take().is_some_and(|p| {
+                                (p.x - ev.position.x).abs() < px(4.) && (p.y - ev.position.y).abs() < px(4.)
+                            });
+                            if still && !this.click_claimed {
+                                this.composer.update(cx, |s, cx| s.focus(window, cx));
+                            }
+                        }),
+                    )
                     .overflow_y_scroll()
                     .track_scroll(&self.chat_scroll)
-                    // The first question's band starts right under the header; the last
-                    // answer keeps 28 below (its own 24 + 4).
-                    .pb_1()
-                    .children(rows)
-                    .children(approval)
-                    .children(clarify)
-                    // A scroll area ignores a last child's margin: a real 12px block (+ the
-                    // column's 4) keeps the bottom edge at 16 when cards end the chat.
-                    .when(trailing, |d| d.child(div().h_3().flex_none())),
+                    // Room above the first turn (as much as the sides), and below the composer as a
+                    // code editor scrolls past its end.
+                    // With the first row's own TURN_Y: the avatar's top is CHAT_LEFT down.
+                    .pt(px(super::CHAT_LEFT - super::TURN_Y))
+                    .pb(px(SCROLL_PAST_END))
+                    // The window's whole width from its left edge, as an editor's text (no cap,
+                    // no centering).
+                    .child(
+                        v_flex()
+                            .w_full()
+                            .children(subject_block)
+                            .children(placeholder)
+                            .children(rows)
+                            .children(approval)
+                            .children(clarify)
+                            .children(thread_term)
+                            // The next message is the thread's last row, as in Delta: it scrolls
+                            // away with the thread, "Jump to latest" brings it back.
+                            .child(composer),
+                    ),
             )
             .children(rail)
             .when(!self.follow, |d| {
@@ -244,7 +258,7 @@ impl HermesApp {
                         .gap_1()
                         .px_2()
                         .py_1()
-                        .text_xs()
+                        .text_base()
                         .bg(theme.background)
                         .border_1()
                         .border_color(theme.border)
@@ -304,7 +318,7 @@ impl HermesApp {
                 .id(("steps", i))
                 .gap_1p5()
                 .items_center()
-                .text_sm()
+                .text_base()
                 .text_color(muted)
                 .min_w_0()
                 .when(has_steps, |d| {
@@ -316,9 +330,10 @@ impl HermesApp {
                     } else {
                         Ico::ChevronRight
                     })
+                    // Shown from the start: an invisible one read as a stray indent before the
+                    // first step arrived.
                     .icon()
-                    .xsmall()
-                    .when(!has_steps, |i| i.text_color(theme.transparent)),
+                    .xsmall(),
                 )
                 .map(|d| match &live {
                     // One line: what the agent says it is doing, cut with "…" before the counters.
@@ -355,11 +370,16 @@ impl HermesApp {
                 .gap_1()
                 .border_l_1()
                 .border_color(theme.border)
-                .text_sm()
+                .text_base()
                 .children(items)
         });
 
         let answer = self.render_answer(i, cx);
+        // A site thread: the tab this turn worked in (its latest), live or its last frame.
+        let site_step = self
+            .steps_of(i)
+            .pop()
+            .map(|st| self.render_site_step(st.tab, i, st.url, cx));
         let turn: &Turn = &self.turns[i];
         let has_answer = !turn.answer.trim().is_empty();
         let time = match (turn.started, turn.finished) {
@@ -367,13 +387,22 @@ impl HermesApp {
             _ => String::new(),
         };
         let when = turn.finished.or(turn.started).unwrap_or_default();
-        let (user, attached_paths) = crate::attach::split(&turn.user);
+        let (rest, snippet_refs) = crate::app::snippets::split(&turn.user);
+        let (user, attached_paths) = crate::attach::split(&rest);
         let has_text = !user.is_empty();
-        let attached: Vec<AnyElement> = attached_paths
+        let mut attached: Vec<AnyElement> = snippet_refs
             .iter()
             .enumerate()
-            .map(|(k, p)| self.attachment_chip(format!("sent-{i}-{k}").into(), p, None, cx))
+            .map(|(k, (p, a, b))| {
+                self.snippet_chip(format!("sent-snip-{i}-{k}").into(), p, *a, *b, None, cx)
+            })
             .collect();
+        attached.extend(
+            attached_paths
+                .iter()
+                .enumerate()
+                .map(|(k, p)| self.attachment_chip(format!("sent-{i}-{k}").into(), p, None, cx)),
+        );
 
         let sources = self.render_sources(i, cx);
         // The session's edited files and background processes hang under the last answer: the
@@ -392,7 +421,7 @@ impl HermesApp {
                 h_flex()
                     .gap_2()
                     .items_start()
-                    .text_xs()
+                    .text_base()
                     .text_color(muted)
                     .child(Ico::Save.icon().xsmall().mt(px(2.)))
                     .child(div().flex_1().min_w_0().child(text))
@@ -407,7 +436,7 @@ impl HermesApp {
             // cleanly when there is no summary line to sit beside.
             h_flex()
                 .absolute()
-                .top(px(23.))
+                .top(px(super::TURN_Y + 3.))
                 .right_6()
                 .pl_1()
                 .gap_0p5()
@@ -421,7 +450,7 @@ impl HermesApp {
                         div()
                             .id(("time", i))
                             .px_1()
-                            .text_xs()
+                            .text_base()
                             .text_color(muted)
                             .child(time)
                             .tooltip(move |window, cx| {
@@ -457,62 +486,76 @@ impl HermesApp {
                 })
         });
 
-        // The session reads as strips: each question is a band from edge to edge (rules above
-        // and below, like the composer's). Its text and the agent's side under it keep one
-        // inset, 24px on both sides; the composer's text starts there too.
+        // As in Zed's Delta: who speaks is an avatar in the left gutter, no band, no rules. The
+        // question's text and the agent's side start at one x (CHAT_TEXT); the composer's text,
+        // its chips and the cards start there too.
+        use super::{AVATAR, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT};
+        let avatar = |agent: bool| super::avatar(agent, &theme);
         v_flex()
             .id(("turn", i))
             .group(group)
             .w_full()
-            // Chat text matches the session titles: answers are skimmed, not read aloud.
-            .text_sm()
+            // The conversation is what the window is for: a size up from the sidebar's lists.
+            .text_base()
             .child(
-                div()
+                h_flex()
                     .w_full()
-                    .px_6()
-                    .py_4()
-                    .bg(theme.secondary)
-                    // The first band sits under the header's own rule.
-                    .when(i > 0, |d| d.border_t_1())
-                    .border_b_1()
-                    .border_color(theme.border)
-                    .whitespace_normal()
-                    // Selectable and copyable, like the answers (the same text view).
-                    .when(!user.is_empty(), |d| {
-                        d.child(plain_text(format!("user-{i}"), &user))
-                    })
-                    // The files that went with it.
-                    .when(!attached.is_empty(), |d| {
-                        d.child(
-                            h_flex()
-                                .flex_wrap()
-                                .gap_1p5()
-                                .when(has_text, |d| d.mt_2())
-                                .children(attached),
-                        )
-                    }),
+                    .pl(px(CHAT_LEFT))
+                    .pr(px(CHAT_RIGHT))
+                    .py(px(super::TURN_Y))
+                    .gap(px(CHAT_TEXT - CHAT_LEFT - AVATAR))
+                    .items_start()
+                    .child(avatar(false))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .whitespace_normal()
+                            // Selectable and copyable, like the answers (the same text view).
+                            .when(!user.is_empty(), |d| {
+                                d.child(plain_text(format!("user-{i}"), &user))
+                            })
+                            // The files that went with it.
+                            .when(!attached.is_empty(), |d| {
+                                d.child(
+                                    h_flex()
+                                        .flex_wrap()
+                                        .gap_1p5()
+                                        .when(has_text, |d| d.mt_2())
+                                        .children(attached),
+                                )
+                            }),
+                    ),
             )
             .child(
                 div()
                     .relative()
                     .w_full()
                     .child(
-                        v_flex()
-                            .px_6()
-                            // 24px all round: the hover actions float over the corner,
-                            // they don't take a row of their own.
-                            .py_6()
-                            .gap_3()
-                            .children(summary)
-                            .children(steps)
-                            .children(answer)
-                            // What came with the answer, right under its text (the agent's side).
-                            .children(sources)
-                            .children(processes)
-                            .children(files)
-                            .when(!reviews.is_empty(), |d| {
-                                d.child(v_flex().gap_1().children(reviews))
-                            }),
+                        h_flex()
+                            .pl(px(CHAT_LEFT))
+                            .pr(px(CHAT_RIGHT))
+                            .py(px(super::TURN_Y))
+                            .gap(px(CHAT_TEXT - CHAT_LEFT - AVATAR))
+                            .items_start()
+                            .child(avatar(true))
+                            .child(
+                                v_flex()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .gap_3()
+                                    .children(summary)
+                                    .children(steps)
+                                    .children(answer)
+                                    // What came with the answer, right under its text (the agent's side).
+                                    .children(sources)
+                                    .children(site_step)
+                                    .children(processes)
+                                    .children(files)
+                                    .when(!reviews.is_empty(), |d| {
+                                        d.child(v_flex().gap_1().children(reviews))
+                                    }),
+                            ),
                     )
                     // After the column, so the actions paint over it.
                     .children(actions),
@@ -605,7 +648,8 @@ impl HermesApp {
         });
         Some(
             v_flex()
-                .mx_4()
+                .ml(px(super::CHAT_TEXT))
+                .mr(px(super::CHAT_RIGHT))
                 .mt_2()
                 .p_3()
                 .gap_2()
@@ -615,11 +659,11 @@ impl HermesApp {
                     h_flex()
                         .gap_2()
                         .items_center()
-                        .text_sm()
+                        .text_base()
                         .font_weight(FontWeight::MEDIUM)
                         .child(Ico::CircleAlert.icon().small().text_color(theme.warning))
                         .child(if req.description.is_empty() {
-                            "Hermes asks to run this".to_string()
+                            "The agent asks to run this".to_string()
                         } else {
                             req.description.clone()
                         }),
@@ -630,7 +674,7 @@ impl HermesApp {
                             .p_2()
                             .bg(theme.secondary)
                             .font_family(crate::theme::MONO)
-                            .text_xs()
+                            .text_base()
                             .child(req.command.clone()),
                     )
                 })
@@ -725,7 +769,7 @@ impl HermesApp {
                         .ml_5()
                         .mt_1()
                         .mb_1()
-                        .child(div().text_xs().text_color(muted).child(title))
+                        .child(div().text_base().text_color(muted).child(title))
                         .child(
                             div()
                                 .mt_0p5()
@@ -734,7 +778,7 @@ impl HermesApp {
                                 .border_1()
                                 .border_color(theme.border)
                                 .font_family(crate::theme::MONO)
-                                .text_xs()
+                                .text_base()
                                 .text_color(theme.foreground)
                                 // Verbatim and selectable, like the user's messages.
                                 .child(plain_text(format!("step-{i}-{k}-{title}"), &body)),
@@ -786,7 +830,7 @@ impl HermesApp {
                     .py_0p5()
                     .border_1()
                     .border_color(if active { theme.primary } else { theme.border })
-                    .text_xs()
+                    .text_base()
                     .text_color(if active {
                         theme.foreground
                     } else {
@@ -817,7 +861,7 @@ impl HermesApp {
                     let open = url.clone();
                     div()
                         .id(SharedString::from(format!("page-{i}-{k}")))
-                        .text_xs()
+                        .text_base()
                         .text_color(theme.link)
                         .truncate()
                         .cursor_pointer()
@@ -912,7 +956,7 @@ impl HermesApp {
                             .py_1()
                             .gap_2()
                             .items_center()
-                            .text_xs()
+                            .text_base()
                             .cursor_pointer()
                             .hover(|s| s.bg(theme.list_hover))
                             .child(if p.running {
@@ -992,7 +1036,7 @@ impl HermesApp {
                                 .border_1()
                                 .border_color(theme.border)
                                 .font_family(crate::theme::MONO)
-                                .text_xs()
+                                .text_base()
                                 .text_color(theme.foreground)
                                 .child(if tail.trim().is_empty() {
                                     div()
@@ -1014,11 +1058,12 @@ impl HermesApp {
                 .child(
                     h_flex()
                         .id("procs-head")
-                        .px_2()
-                        .py_1()
+                        // As tall as a source chip (px_1p5 py_0p5 around text_xs).
+                        .px_1p5()
+                        .py_0p5()
                         .gap_1p5()
                         .items_center()
-                        .text_xs()
+                        .text_base()
                         .text_color(muted)
                         .cursor_pointer()
                         .hover(|s| s.text_color(theme.foreground))
@@ -1082,7 +1127,7 @@ impl HermesApp {
                     .px_2()
                     .py_1()
                     .items_center()
-                    .text_sm()
+                    .text_base()
                     .cursor_pointer()
                     .border_l_2()
                     .border_color(if selected {
@@ -1097,7 +1142,7 @@ impl HermesApp {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_xs()
+                            .text_base()
                             .text_color(theme.muted_foreground)
                             .truncate()
                             .child(dir),
@@ -1105,7 +1150,7 @@ impl HermesApp {
                     .when(add > 0, |d| {
                         d.child(
                             div()
-                                .text_xs()
+                                .text_base()
                                 .text_color(theme.success)
                                 .child(format!("+{add}")),
                         )
@@ -1113,7 +1158,7 @@ impl HermesApp {
                     .when(del > 0, |d| {
                         d.child(
                             div()
-                                .text_xs()
+                                .text_base()
                                 .text_color(theme.danger)
                                 .child(format!("−{del}")),
                         )
@@ -1121,7 +1166,7 @@ impl HermesApp {
                     .when(diffs.is_empty(), |d| {
                         d.child(
                             div()
-                                .text_xs()
+                                .text_base()
                                 .text_color(theme.muted_foreground)
                                 .child("written"),
                         )
@@ -1140,11 +1185,12 @@ impl HermesApp {
                 .child(
                     h_flex()
                         .id("files-head")
-                        .px_2()
-                        .py_1()
+                        // As tall as a source chip (px_1p5 py_0p5 around text_xs).
+                        .px_1p5()
+                        .py_0p5()
                         .gap_1p5()
                         .items_center()
-                        .text_xs()
+                        .text_base()
                         .text_color(theme.muted_foreground)
                         .cursor_pointer()
                         .hover(|s| s.text_color(theme.foreground))
@@ -1179,7 +1225,12 @@ impl HermesApp {
     }
 }
 
-fn icon_button(id: impl Into<ElementId>, icon: Ico, tip: &'static str, cx: &App) -> Stateful<Div> {
+pub(super) fn icon_button(
+    id: impl Into<ElementId>,
+    icon: Ico,
+    tip: &'static str,
+    cx: &App,
+) -> Stateful<Div> {
     let theme = cx.theme();
     div()
         .id(id)

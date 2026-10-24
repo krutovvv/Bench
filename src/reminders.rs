@@ -14,7 +14,7 @@ use objc2::rc::Retained;
 use objc2::runtime::Bool;
 use objc2_event_kit::{EKAuthorizationStatus, EKEntityType, EKEventStore, EKReminder};
 use objc2_foundation::{
-    NSArray, NSDate, NSDateComponentUndefined, NSDateComponents, NSError, NSString,
+    NSArray, NSDate, NSDateComponentUndefined, NSError, NSString,
 };
 
 use crate::tasks::Task;
@@ -39,43 +39,7 @@ pub enum Evt {
     Error(String),
 }
 
-/// A thread that owns the store (EventKit objects stay on it) and answers commands.
-pub struct Reminders {
-    tx: mpsc::Sender<Cmd>,
-}
 
-impl Reminders {
-    pub fn start(evt: async_channel::Sender<Evt>) -> Self {
-        let (tx, rx) = mpsc::channel::<Cmd>();
-        std::thread::spawn(move || {
-            let store = match open() {
-                Ok(s) => s,
-                Err(e) => {
-                    let _ = evt.send_blocking(Evt::Error(format!("{e:#}")));
-                    return;
-                }
-            };
-            for cmd in rx {
-                let r = match cmd {
-                    Cmd::Load { done_since } => load(&store, done_since).map(Evt::Loaded),
-                    Cmd::Save { task, token } => {
-                        save(&store, &task).map(|id| Evt::Created { token, id })
-                    }
-                    Cmd::Delete(id) => delete(&store, &id).map(|_| Evt::Created { token: 0, id }),
-                };
-                let e = r.unwrap_or_else(|e| Evt::Error(format!("{e:#}")));
-                if evt.send_blocking(e).is_err() {
-                    break;
-                }
-            }
-        });
-        Self { tx }
-    }
-
-    pub fn send(&self, cmd: Cmd) {
-        let _ = self.tx.send(cmd);
-    }
-}
 
 fn day_of(date: &NSDate) -> NaiveDate {
     let secs = date.timeIntervalSince1970() as i64;
@@ -124,49 +88,6 @@ fn to_task(r: &EKReminder) -> Task {
     t
 }
 
-fn apply(r: &EKReminder, t: &Task) {
-    unsafe {
-        r.setTitle(Some(&NSString::from_str(&t.title)));
-        let notes = t.stored_notes();
-        r.setNotes(
-            (!notes.is_empty())
-                .then(|| NSString::from_str(&notes))
-                .as_deref(),
-        );
-        match t.day {
-            Some(day) => {
-                let c = NSDateComponents::new();
-                c.setYear(chrono::Datelike::year(&day) as isize);
-                c.setMonth(chrono::Datelike::month(&day) as isize);
-                c.setDay(chrono::Datelike::day(&day) as isize);
-                r.setDueDateComponents(Some(&c));
-            }
-            None => r.setDueDateComponents(None),
-        }
-        let p = r.priority();
-        if t.important {
-            r.setPriority(1);
-        } else if (1..=4).contains(&p) {
-            r.setPriority(0);
-        }
-        match t.completed {
-            Some(day) => {
-                if !r.isCompleted() {
-                    r.setCompleted(true);
-                }
-                // Completed on a day of the person's choosing (back-dating works).
-                if r.completionDate().is_none_or(|d| day_of(&d) != day) {
-                    r.setCompletionDate(Some(&ns_date(day)));
-                }
-            }
-            None => {
-                if r.isCompleted() {
-                    r.setCompleted(false);
-                }
-            }
-        }
-    }
-}
 
 fn find(store: &EKEventStore, id: &str) -> Option<Retained<EKReminder>> {
     let item = unsafe { store.calendarItemWithIdentifier(&NSString::from_str(id)) }?;
@@ -190,21 +111,14 @@ fn load(store: &EKEventStore, done_since: NaiveDate) -> Result<Vec<Task>> {
     Ok(out)
 }
 
-/// Bench never adds alarms: a task in Reminders does not ring on the phone unless you set one.
-fn save(store: &EKEventStore, t: &Task) -> Result<String> {
-    let r = if t.id.is_empty() {
-        let r = unsafe { EKReminder::reminderWithEventStore(store) };
-        let list = unsafe { store.defaultCalendarForNewReminders() }
-            .ok_or_else(|| anyhow!("Reminders has no default list"))?;
-        unsafe { r.setCalendar(Some(&list)) };
-        r
-    } else {
-        find(store, &t.id).ok_or_else(|| anyhow!("the task is no longer in Reminders"))?
-    };
-    apply(&r, t);
-    unsafe { store.saveReminder_commit_error(&r, true) }
-        .map_err(|e| anyhow!("{}", e.localizedDescription()))?;
-    Ok(unsafe { r.calendarItemIdentifier() }.to_string())
+
+/// Every reminder, open and done (the one-time move into Bench's own store).
+pub fn load_all(store: &EKEventStore) -> Result<Vec<Task>> {
+    load(store, NaiveDate::from_ymd_opt(1971, 1, 1).unwrap_or_default())
+}
+
+pub fn remove(store: &EKEventStore, id: &str) -> Result<()> {
+    delete(store, id)
 }
 
 fn delete(store: &EKEventStore, id: &str) -> Result<()> {

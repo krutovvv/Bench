@@ -2364,8 +2364,6 @@ dependencies = [
 [[package]]
 name = "gpui-base"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5cd7de73d5b2d3d18b94a928abf343922091fa77bc472f77b7d2e7e8b1823a7"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -7855,8 +7853,11 @@ dependencies = [
  "httparse",
  "log",
  "rand 0.10.3",
+ "rustls",
+ "rustls-pki-types",
  "sha1 0.11.0",
  "thiserror 2.0.21",
+ "webpki-roots 0.26.11",
 ]
 
 [[package]]

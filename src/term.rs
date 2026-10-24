@@ -130,6 +130,22 @@ pub struct Session {
     pub exited: AtomicBool,
     /// Why the session ended (exit status), shown in the header.
     pub exit_note: Mutex<Option<String>>,
+    /// The link under the pointer while ⌘ is held: (row, first col, last col), underlined.
+    pub hover: Mutex<Option<(usize, usize, usize)>>,
+    /// The shell (or ssh) process, to read a local shell's folder.
+    pid: Option<u32>,
+    local: bool,
+}
+
+/// What ⌘-click found in a terminal line.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TermLink {
+    /// A URL, or a path as written (absolute, `~/`, or relative to `cwd`).
+    pub target: String,
+    /// `path:12` / `path:12:5` — the line to open at.
+    pub line: Option<usize>,
+    /// The folder the terminal was in, when it can be told.
+    pub cwd: Option<String>,
 }
 
 /// The host name of the terminal on this machine: the user's own login shell, no ssh.
@@ -181,6 +197,7 @@ impl Session {
             .with_context(|| format!("start {program}"))?;
         drop(pair.slave);
         let killer = child.clone_killer();
+        let pid = child.process_id();
         let mut reader = pair.master.try_clone_reader()?;
         let writer = pair.master.take_writer()?;
 
@@ -202,6 +219,9 @@ impl Session {
             size: Mutex::new(size),
             exited: AtomicBool::new(false),
             exit_note: Mutex::new(None),
+            hover: Mutex::new(None),
+            pid,
+            local,
         });
 
         let this = session.clone();
@@ -271,6 +291,48 @@ impl Session {
         let _ = self.master.lock().unwrap().resize(pty_size(size));
     }
 
+    /// The screen's text, its last `n` non-blank lines (for the agent: what the terminal shows).
+    pub fn screen_text(&self, n: usize) -> String {
+        let term = self.term.lock().unwrap();
+        let mut lines: Vec<String> = (0..term.screen_lines())
+            .map(|r| {
+                let line = &term.grid()[Line(r as i32)];
+                (0..term.columns())
+                    .map(|c| match line[Column(c)].c {
+                        '\0' => ' ',
+                        ch => ch,
+                    })
+                    .collect::<String>()
+                    .trim_end()
+                    .to_string()
+            })
+            .collect();
+        while lines.last().is_some_and(|l| l.is_empty()) {
+            lines.pop();
+        }
+        let from = lines.len().saturating_sub(n);
+        lines[from..].join("\n")
+    }
+
+    /// Lines in use on the screen: through the cursor, or the last non-blank line below it; all
+    /// of them in a full-screen program (vim, top). For a terminal sized to its content.
+    pub fn used_rows(&self) -> usize {
+        let term = self.term.lock().unwrap();
+        let rows = term.screen_lines();
+        if term.mode().contains(TermMode::ALT_SCREEN) {
+            return usize::MAX;
+        }
+        let cursor = term.grid().cursor.point.line.0.max(0) as usize;
+        let mut last = cursor;
+        for r in (cursor + 1)..rows {
+            let line = &term.grid()[Line(r as i32)];
+            if (0..term.columns()).any(|c| !matches!(line[Column(c)].c, ' ' | '\0')) {
+                last = r;
+            }
+        }
+        last + 1
+    }
+
     pub fn size(&self) -> Size {
         *self.size.lock().unwrap()
     }
@@ -337,14 +399,53 @@ impl Session {
         self.write(&bytes);
     }
 
-    /// The word at a cell, for ⌘-click: a URL, else a path-like token (has a `/`).
-    pub fn link_at(&self, col: usize, row: usize) -> Option<String> {
+    fn row_chars(&self, row: usize) -> Vec<char> {
         let term = self.term.lock().unwrap();
         let offset = term.grid().display_offset() as i32;
+        if row >= term.screen_lines() {
+            return vec![];
+        }
         let line = &term.grid()[Line(row as i32 - offset)];
-        let chars: Vec<char> = (0..term.columns()).map(|c| line[Column(c)].c).collect();
-        drop(term);
-        link_in(&chars, col)
+        (0..term.columns()).map(|c| line[Column(c)].c).collect()
+    }
+
+    /// The link at a cell, for ⌘-click: a URL, a path (with its `:line`), and the folder a
+    /// relative path is relative to.
+    pub fn link_at(&self, col: usize, row: usize) -> Option<TermLink> {
+        let (_, _, target, line) = link_span(&self.row_chars(row), col)?;
+        let cwd = (!target.contains("://") && !target.starts_with('/') && !target.starts_with('~'))
+            .then(|| self.cwd(row))
+            .flatten();
+        Some(TermLink { target, line, cwd })
+    }
+
+    /// ⌘ held over a cell: underline the link there (true when that changed what is shown).
+    pub fn hover_at(&self, cell: Option<(usize, usize)>) -> bool {
+        let span = cell.and_then(|(col, row)| {
+            link_span(&self.row_chars(row), col).map(|(a, b, _, _)| (row, a, b))
+        });
+        let mut h = self.hover.lock().unwrap();
+        let changed = *h != span;
+        *h = span;
+        changed
+    }
+
+    /// The folder the terminal is in: a local shell's own (lsof), else the last prompt at or
+    /// above `row` that shows one (`user@host:/var/www$`, `[user@host /etc]#`).
+    pub fn cwd(&self, row: usize) -> Option<String> {
+        if let Some(pid) = self.pid.filter(|_| self.local) {
+            let out = std::process::Command::new("/usr/sbin/lsof")
+                .args(["-a", "-p", &pid.to_string(), "-d", "cwd", "-Fn"])
+                .output()
+                .ok()?;
+            return String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .find_map(|l| l.strip_prefix('n').map(str::to_string));
+        }
+        (0..=row).rev().find_map(|r| {
+            let text: String = self.row_chars(r).into_iter().collect();
+            prompt_folder(&text)
+        })
     }
 
     pub fn select_start(&self, x: f32, y: f32, clicks: usize) {
@@ -485,7 +586,36 @@ pub fn key_bytes(ks: &Keystroke, mode: TermMode) -> Option<Vec<u8>> {
 
 /// The link around `col` in a terminal line: a URL, else a path-like token (has a `/`), without
 /// trailing punctuation or a `:line[:col]` suffix.
+#[cfg(test)]
 pub fn link_in(chars: &[char], col: usize) -> Option<String> {
+    link_span(chars, col).map(|(_, _, target, _)| target)
+}
+
+/// The folder a shell prompt in this line shows (the last one): `user@host:/var/www$`,
+/// `user@host:~/site$`, `[user@host /etc]#`.
+fn prompt_folder(line: &str) -> Option<String> {
+    static PROMPT: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(r"[\w.-]+@[\w.-]+[: ]((?:~|/)[^\s$#%>\]]*)\]?\s*[$#%>]").unwrap()
+    });
+    PROMPT.captures_iter(line).last().map(|c| c[1].to_string())
+}
+
+/// A file name alone (`wp-config.php`, `nginx.conf`, `.env`): a name and an extension of letters.
+fn looks_like_file(w: &str) -> bool {
+    let Some((name, ext)) = w.rsplit_once('.') else {
+        return false;
+    };
+    !ext.is_empty()
+        && ext.len() <= 10
+        && ext.chars().all(|c| c.is_ascii_alphanumeric())
+        && ext.chars().any(|c| c.is_ascii_alphabetic())
+        && name
+            .chars()
+            .all(|c| c.is_alphanumeric() || "._-+@".contains(c))
+}
+
+/// The link around `col`: its first and last column, the target, and a `:line` it names.
+pub fn link_span(chars: &[char], col: usize) -> Option<(usize, usize, String, Option<usize>)> {
     let stop = |c: char| c.is_whitespace() || "\"'<>()[]{}`|,;".contains(c);
     if col >= chars.len() || stop(chars[col]) {
         return None;
@@ -500,16 +630,21 @@ pub fn link_in(chars: &[char], col: usize) -> Option<String> {
     }
     let word: String = chars[a..=b].iter().collect();
     // Trailing punctuation and a `path:line` suffix are not part of it.
-    let word = word.trim_end_matches(['.', ':', '!', '?']);
-    let word = match word.split_once(':') {
+    let trimmed = word.trim_end_matches(['.', ':', '!', '?']);
+    let (path, line) = match trimmed.split_once(':') {
         Some((p, rest))
-            if !word.contains("://") && rest.chars().all(|c| c.is_ascii_digit() || c == ':') =>
+            if !trimmed.contains("://")
+                && !rest.is_empty()
+                && rest.chars().all(|c| c.is_ascii_digit() || c == ':') =>
         {
-            p
+            (p, rest.split(':').next().and_then(|n| n.parse().ok()))
         }
-        _ => word,
+        _ => (trimmed, None),
     };
-    (word.contains("://") || word.contains('/')).then(|| word.to_string())
+    let is_link = path.contains("://") || path.contains('/') || looks_like_file(path);
+    // The underline covers what was found (not the trailing punctuation).
+    let last = a + trimmed.chars().count().max(1) - 1;
+    is_link.then(|| (a, last, path.to_string(), line))
 }
 
 /// Pasted text, bracketed when the program asked for it.
@@ -524,7 +659,41 @@ pub fn paste_bytes(text: &str, mode: TermMode) -> Vec<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::link_in;
+    use super::{link_in, link_span};
+
+    #[test]
+    fn file_names_lines_and_spans() {
+        let span = |line: &str, at: &str| {
+            let chars: Vec<char> = line.chars().collect();
+            link_span(
+                &chars,
+                line.find(at).map(|b| line[..b].chars().count()).unwrap(),
+            )
+        };
+        // A bare name from `ls`, a compiler's path:line:col, prose is not a link.
+        assert_eq!(
+            span("index.php  wp-config.php  wp-content", "wp-c"),
+            Some((11, 23, "wp-config.php".into(), None))
+        );
+        assert_eq!(
+            span("error at src/main.rs:42:7: oops", "main"),
+            Some((9, 24, "src/main.rs".into(), Some(42)))
+        );
+        assert_eq!(span("version 1.5 is out", "1.5"), None);
+        assert_eq!(span("hello world", "world"), None);
+    }
+
+    #[test]
+    fn prompt_folders() {
+        let cwd = super::prompt_folder;
+        assert_eq!(
+            cwd("root@web:/var/www/html# ls"),
+            Some("/var/www/html".into())
+        );
+        assert_eq!(cwd("vlad@box:~/site$ "), Some("~/site".into()));
+        assert_eq!(cwd("[root@web /etc/nginx]# "), Some("/etc/nginx".into()));
+        assert_eq!(cwd("just some output"), None);
+    }
 
     fn at(line: &str, word: &str) -> Option<String> {
         let chars: Vec<char> = line.chars().collect();

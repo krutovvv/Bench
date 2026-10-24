@@ -1,7 +1,7 @@
 //! Git projects: which repo (and branch) a session works in, and the few git actions on it —
 //! a chat in its own branch (a worktree folder), merge back, delete.
 //!
-//! The project comes from the session's folder when Hermes recorded one, else from the files
+//! The project comes from the session's folder when the agent recorded one, else from the files
 //! the agent edited (their repo), remembered per profile. Chats without files have none.
 
 use std::collections::HashMap;
@@ -35,7 +35,7 @@ impl HermesApp {
         connection::state_dir().join(format!("projects-{key}.json"))
     }
 
-    /// Load what Hermes knows about each session's folder, plus our own inferences.
+    /// Load what the agent knows about each session's folder, plus our own inferences.
     pub(super) fn load_places(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.inferred = std::fs::read(self.projects_path())
             .ok()
@@ -64,7 +64,8 @@ impl HermesApp {
         if let Some(p) = place.filter(|p| !p.repo.is_empty()) {
             return Some(Project::from_top(&p.repo, &p.branch));
         }
-        // A branch folder is recognizable before Hermes records its repo.
+        // A branch folder is recognizable before its repo is recorded (Hermes named the branches
+        // `hermes/<folder>`).
         if let Some(p) = place.filter(|p| p.cwd.contains("/.worktrees/")) {
             let branch = if p.branch.is_empty() {
                 format!("hermes/{}", p.cwd.rsplit('/').next().unwrap_or_default())
@@ -78,34 +79,16 @@ impl HermesApp {
             .map(|top| Project::from_top(top, place.map(|p| p.branch.as_str()).unwrap_or("")))
     }
 
-    /// The folder a session was started in, when it is not Hermes' default (the user chose it).
+    /// The folder a session was started in, when it is not the agent's default (the user chose it).
     pub fn folder_of(&self, session: &str) -> Option<String> {
-        // Until Hermes' default folder is known, nothing counts as chosen (and nothing is probed).
+        // Until the agent's default folder is known, nothing counts as chosen (and nothing is probed).
         let default = self.default_cwd.as_ref()?;
         let cwd = &self.places.get(session)?.cwd;
         (!cwd.is_empty() && cwd != default).then(|| cwd.clone())
     }
 
-    /// Every project seen in this profile (for the new-chat picker), by name.
-    pub fn known_projects(&self) -> Vec<String> {
-        let mut roots: Vec<String> = self
-            .places
-            .values()
-            .filter(|p| !p.repo.is_empty())
-            .map(|p| Project::from_top(&p.repo, "").root)
-            .chain(
-                self.inferred
-                    .values()
-                    .map(|t| Project::from_top(t, "").root),
-            )
-            .collect();
-        roots.sort_by_key(|r| r.rsplit('/').next().unwrap_or(r).to_lowercase());
-        roots.dedup();
-        roots
-    }
-
     /// Work out the open session's project (and its live branch); infer it from edited files
-    /// when Hermes has none.
+    /// when the agent has none.
     pub(super) fn resolve_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(session) = self.session.clone() else {
             self.project = None;
@@ -162,7 +145,7 @@ impl HermesApp {
                             this.load_tree_root(window, cx);
                         }
                     }
-                    // The folder is gone or not a repo: keep what Hermes recorded, if anything.
+                    // The folder is gone or not a repo: keep what the agent recorded, if anything.
                     Err(_) => {}
                 }
                 cx.notify();
@@ -324,7 +307,7 @@ impl HermesApp {
             .and_then(|id| self.sessions.iter().find(|s| &s.id == id))
             .map(|s| s.title.clone())
             .filter(|t| !t.is_empty())
-            .unwrap_or_else(|| "Hermes changes".into())
+            .unwrap_or_else(|| "Bench changes".into())
     }
 }
 

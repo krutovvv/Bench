@@ -17,11 +17,10 @@ use gpui_kit::*;
 mod asks;
 mod attachments;
 mod cron;
-mod gateways;
 pub(crate) mod ide;
+pub(crate) mod ide_find;
 pub(crate) mod ide_ops;
 mod ide_tabs;
-pub(crate) mod install;
 mod keys;
 pub mod marks;
 mod processes;
@@ -31,6 +30,10 @@ mod prompts;
 pub(crate) mod providers;
 pub(crate) mod servers;
 mod slash;
+pub(crate) mod snippets;
+pub(crate) mod remote_files;
+pub(crate) mod sites;
+pub(crate) mod subjects;
 pub(crate) mod tasks;
 pub(crate) mod tools;
 pub use projects::GitArm;
@@ -53,13 +56,11 @@ pub enum Panel {
     Mcp,
     Skills,
     Prompts,
-    Config,
     /// Model providers, fallback, voice, service keys.
     Providers,
     /// Telegram: the bot, who may write to it, the proxy; whose chats the list shows.
     Messages,
     Cron,
-    Gateways,
     Profiles,
     /// Appearance and the Telegram filter.
     Settings,
@@ -75,6 +76,8 @@ impl Panel {
 pub enum RightTab {
     Changes,
     Files,
+    /// ⌘⇧F: text in every file under the tree's root.
+    Search,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -119,6 +122,23 @@ pub struct HermesApp {
     _target_choice: Entity<Choice>,
     gateway: Option<Gateway>,
     pub conn: Option<Arc<Connection>>,
+    /// The subject of the chat about to be created ("tasks:today"): it goes with session.create.
+    pub new_subject: String,
+    /// BENCH_SUBJECT was opened (once).
+    pub subject_opened: bool,
+    /// Sites on the server's browser: each turn's tab, live or as its last frame.
+    pub sites: sites::Sites,
+    pub sites_error: Option<String>,
+    /// A step's tab being reopened: (thread, turn, url, the tabs before).
+    pub sites_pending: Option<(String, usize, String, Vec<String>)>,
+    /// A click in the thread landed in something that types (a terminal, an editor): it keeps the focus.
+    pub click_claimed: bool,
+    /// Where the left button went down in the thread (a drag selects text: no focus move).
+    pub click_at: Option<Point<Pixels>>,
+    /// Terminals opened in a thread with "!": thread key (session id, or "draft") -> tab alias.
+    pub thread_terms: std::collections::HashMap<String, String>,
+    /// The composer shows a new chat (no placeholder) — what render last set.
+    pub composer_fresh: bool,
     evt_tx: async_channel::Sender<Evt>,
     pub connecting: bool,
 
@@ -141,7 +161,6 @@ pub struct HermesApp {
     pub turns: Vec<Turn>,
     pub live: Option<Live>,
     queued: Option<String>,
-    queued_images: Vec<(String, String)>,
     /// Send was pressed while dictating: send once the speech is recognized.
     pub send_after_transcribe: bool,
     /// The "Changed files" list under the last turn is unfolded (folded by default).
@@ -153,6 +172,10 @@ pub struct HermesApp {
     pub process_open: Option<String>,
     /// Files waiting in the composer to go with the next message.
     pub attachments: Vec<std::path::PathBuf>,
+    /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
+    pub sidebar_hidden: bool,
+    /// Code from the IDE going with the next message (`snippets.rs`).
+    pub snippets: Vec<snippets::Snippet>,
     pub usage: Option<Usage>,
     pub effort: usize,
     /// The open session's effort when it is none of EFFORTS (set elsewhere, e.g. `high`; "" is the
@@ -164,13 +187,9 @@ pub struct HermesApp {
     pub profile_models: Vec<rest::ModelChoice>,
     /// Settings → Providers and Messages.
     pub pv: providers::Providers,
-    /// Hermes isn't installed on this Mac (and this Mac is the target): offer to install it.
-    pub hermes_missing: bool,
     /// The gateway's state for the status bar's backend item (refreshed every 10 s):
     /// None before the first answer, Err when the gateway didn't answer.
     pub gw_status: Option<Result<rest::GatewayStatus, String>>,
-    /// A setup running in a terminal in the chat area (installing Hermes, Claude login).
-    pub setup: Option<install::Setup>,
     /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
     pub catalog: Vec<crate::model::SlashCommand>,
     pub slash_sel: usize,
@@ -192,6 +211,8 @@ pub struct HermesApp {
     pub profile_ready: bool,
     /// A made-up session for screenshots (`BENCH_DEMO=1`, src/demo.rs): nothing is connected.
     pub demo: bool,
+    /// The demo's threads by session id (opening one shows its turns; nothing is fetched).
+    pub demo_threads: HashMap<String, Vec<Turn>>,
     /// The gateway refused a restart over running work: the next press (within a minute)
     /// restarts anyway.
     pub restart_armed: Option<Instant>,
@@ -201,12 +222,12 @@ pub struct HermesApp {
     pub marks: HashMap<String, marks::Mark>,
     /// This window was opened for a given profile/session (else: where the app was last).
     start_place: Option<(Option<String>, Option<String>)>,
-    /// Session folders/repos as Hermes recorded them, and repos inferred from edited files.
+    /// Session folders/repos as the agent recorded them, and repos inferred from edited files.
     pub places: HashMap<String, crate::model::Place>,
     pub inferred: HashMap<String, String>,
     /// The open session's project (None for chats that touch no repo).
     pub project: Option<crate::model::Project>,
-    /// Hermes' default working folder (sessions started there have no folder of their own).
+    /// The agent's default working folder (sessions started there have no folder of their own).
     pub default_cwd: Option<String>,
     /// Reopen this session once the list arrives (where the app was last closed).
     resume_session: Option<String>,
@@ -221,8 +242,6 @@ pub struct HermesApp {
     /// New chat: a group to put it in (`~/Research/<name>`) when it has no project.
     pub group_name: Entity<InputState>,
     pub git_armed: Option<GitArm>,
-    /// Settings → Gateways: each machine's install, by target label.
-    pub installs: HashMap<String, crate::model::Install>,
     pub appearance: crate::theme::Appearance,
     pub speed: crate::speed::Meter,
     /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
@@ -240,8 +259,6 @@ pub struct HermesApp {
     pub skill_open: Option<String>,
     pub skill_editor: Entity<EditorState>,
     pub skill_delete_armed: bool,
-    pub config_editor: Entity<EditorState>,
-    pub config_error: Option<SharedString>,
     pub cron: Vec<rest::CronJob>,
     pub cron_open: Option<String>,
     /// Settings → Prompts.
@@ -280,6 +297,8 @@ pub struct HermesApp {
     pub right: Option<RightTab>,
     pub file: Option<FileView>,
     pub file_editor: Entity<EditorState>,
+    /// The line under the IDE editor (cursor, selection, language), repainted on its own.
+    pub editor_status: Entity<crate::ui::editor_status::EditorStatus>,
     pub tree_root: Option<String>,
     pub tree: HashMap<String, Vec<(String, String, bool)>>,
     pub tree_open: HashSet<String>,
@@ -308,6 +327,8 @@ pub struct HermesApp {
     pub tools: tools::Tools,
     /// Tasks mode (⌘4): Apple Reminders as a task list.
     pub tasks: tasks::TasksMode,
+    /// The files of an FTP / SFTP host, shown in its thread.
+    pub files_remote: remote_files::RemoteFiles,
     /// The mini IDE's source and the server file it keeps in sync.
     pub ide: ide::Ide,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
@@ -319,7 +340,7 @@ pub struct HermesApp {
     pub layout_ide_state: Entity<gpui_kit::component::resizable::ResizableState>,
     /// The layout shape (maximized IDE, IDE on the right) the left width was last applied to;
     /// a new shape gets it again.
-    pub layout_synced: Option<(bool, bool)>,
+    pub layout_synced: Option<(bool, bool, bool)>,
 
     _subscriptions: Vec<Subscription>,
     _tasks: Vec<Task<()>>,
@@ -353,11 +374,10 @@ impl HermesApp {
 
         let composer = cx.new(|cx| {
             TextareaState::new(window, cx)
-                .auto_grow(1, 10)
-                .submit_on_enter(true)
-                .placeholder("Message Hermes…")
+                .auto_grow(1, 100_000)
+                .submit_on_enter(false)
         });
-        if let Ok(v) = std::env::var("HERMES_GPUI_PREFILL") {
+        if let Ok(v) = std::env::var("BENCH_PREFILL") {
             composer.update(cx, |s, cx| s.set_value(v, window, cx));
         }
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sessions"));
@@ -396,11 +416,6 @@ impl HermesApp {
         let cron_schedule = cx.new(|cx| {
             InputState::new(window, cx).placeholder("30 10 * * 1-5  ·  every 2h  ·  daily at 9:00")
         });
-        let config_editor = cx.new(|cx| {
-            EditorState::new(window, cx)
-                .language("yaml")
-                .line_number(true)
-        });
         let effort_labels: Vec<SharedString> =
             EFFORTS.iter().map(|e| SharedString::from(*e)).collect();
         let effort_choice = cx.new(|cx| {
@@ -416,7 +431,11 @@ impl HermesApp {
             EditorState::new(window, cx)
                 .line_number(true)
                 .soft_wrap(false)
+                .folding(true)
         });
+        let app = cx.entity().downgrade();
+        let editor_status =
+            cx.new(|cx| crate::ui::editor_status::EditorStatus::new(file_editor.clone(), app, cx));
 
         let subs = vec![
             // The IDE's editor: unsaved edits show as a dot on the tab.
@@ -447,7 +466,10 @@ impl HermesApp {
             ),
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
                 match ev {
-                    InputEvent::PressEnter { shift: false, .. } => this.send(window, cx),
+                    // Enter is a new line; ⌘Enter sends (as in Delta).
+                    InputEvent::PressEnter {
+                        secondary: true, ..
+                    } => this.send(window, cx),
                     // New text: the command list starts over at its first row.
                     InputEvent::Change => {
                         this.note_draft(cx);
@@ -620,10 +642,11 @@ impl HermesApp {
         });
         let mut tasks = vec![events, ticker, processes, backend];
 
-        // The gateway list keeps the SSH hosts that run Hermes (asked again when the menu opens).
+        // The gateway list keeps the SSH hosts that can run the agent (asked again when the menu opens).
         let ssh = servers::Ssh::new(window, cx);
         let tools = tools::Tools::new(window, cx);
         let tasks_mode = tasks::TasksMode::new(window, cx);
+        let files_remote = remote_files::RemoteFiles::new(window, cx);
         for host in targets.iter().filter_map(|t| match t {
             Target::Ssh(h) => Some(h.clone()),
             Target::Local => None,
@@ -640,6 +663,7 @@ impl HermesApp {
         let mut app = Self {
             ssh,
             tools,
+            files_remote,
             tasks: tasks_mode,
             ide: Default::default(),
             sidebar_w: px(280.),
@@ -652,6 +676,15 @@ impl HermesApp {
             _target_choice: target_choice,
             gateway: None,
             conn: None,
+            new_subject: String::new(),
+            subject_opened: false,
+            sites: Default::default(),
+            sites_error: None,
+            sites_pending: None,
+            click_claimed: false,
+            click_at: None,
+            thread_terms: Default::default(),
+            composer_fresh: false,
             evt_tx,
             connecting: false,
             profiles: vec![],
@@ -668,8 +701,9 @@ impl HermesApp {
             turns: vec![],
             live: None,
             queued: None,
-            queued_images: vec![],
             attachments: vec![],
+            sidebar_hidden: false,
+            snippets: vec![],
             files_open: false,
             processes: vec![],
             processes_open: false,
@@ -681,9 +715,7 @@ impl HermesApp {
             profile_effort: EFFORTS.len() - 1,
             profile_models: vec![],
             pv: Default::default(),
-            hermes_missing: false,
             gw_status: None,
-            setup: None,
             catalog: vec![],
             slash_sel: 0,
             slash_closed: false,
@@ -710,7 +742,6 @@ impl HermesApp {
             project_path,
             group_name,
             git_armed: None,
-            installs: HashMap::new(),
             appearance: crate::theme::Appearance::load(),
             speed: crate::speed::Meter::fresh(),
             search,
@@ -738,8 +769,6 @@ impl HermesApp {
             cron_schedule,
             skill_editor,
             skill_delete_armed: false,
-            config_editor,
-            config_error: None,
             cron: vec![],
             effort_choice,
             mcp_editor,
@@ -756,6 +785,7 @@ impl HermesApp {
             right: None,
             file: None,
             file_editor,
+            editor_status,
             tree_root: None,
             tree: HashMap::new(),
             tree_open: HashSet::new(),
@@ -766,6 +796,7 @@ impl HermesApp {
             speaking: None,
             profile_ready: false,
             demo: false,
+            demo_threads: HashMap::new(),
             restart_armed: None,
             media: HashMap::new(),
             diagrams: HashMap::new(),
@@ -788,11 +819,9 @@ impl HermesApp {
         if let Some(alias) = servers::NEXT_SSH.lock().unwrap().take() {
             cx.spawn_in(window, async move |this, cx| {
                 let _ = this.update_in(cx, |this, window, cx| {
-                    // The server first: SSH mode with nothing open starts this machine's terminal.
-                    if !alias.is_empty() {
-                        this.open_server(alias, window, cx);
-                    }
-                    this.set_ssh_mode(true, window, cx);
+                    // The server's thread (this machine's terminal when none was named).
+                    let alias = if alias.is_empty() { crate::term::LOCAL.to_string() } else { alias };
+                    this.open_server_thread(alias, window, cx);
                 });
             })
             .detach();
@@ -832,13 +861,6 @@ impl HermesApp {
         self.reset_chat(cx);
         self.pv = Default::default();
         self.gw_status = None;
-        // Nothing to connect to: the chat offers to install Hermes instead.
-        self.hermes_missing = target == Target::Local && !connection::hermes_installed();
-        if self.hermes_missing {
-            self.connecting = false;
-            cx.notify();
-            return;
-        }
         let dir = connection::state_dir();
         let _ = std::fs::create_dir_all(&dir)
             .and_then(|_| std::fs::write(dir.join("last-target"), target.label()));
@@ -874,6 +896,11 @@ impl HermesApp {
             Evt::Connected(conn) => {
                 self.conn = Some(conn);
                 self.connecting = false;
+                // Tasks live with the agent: another machine, its own tasks.
+                self.restart_tasks(cx);
+                self.reload_servers(cx);
+                self.load_remote_hosts(window, cx);
+
             }
             Evt::Error(e) => {
                 self.connecting = false;
@@ -907,6 +934,9 @@ impl HermesApp {
                 }
             }
             Evt::Sessions(p, rows) => {
+                // BENCH_SUBJECT=tool:base64 (or tasks:today, ssh:rpi, browser:<id>…): open that
+                // thread once the sessions are known, for screenshots of each block.
+                let subject_at_start = std::env::var("BENCH_SUBJECT").ok().filter(|_| !self.subject_opened);
                 if self.profile.as_deref() == Some(&p) {
                     let unknown_tg = rows
                         .iter()
@@ -923,13 +953,16 @@ impl HermesApp {
                     }
                     self.load_places(window, cx);
                 }
+                if let Some(key) = subject_at_start {
+                    self.subject_opened = true;
+                    self.open_subject_key(key, window, cx);
+                }
             }
             Evt::SessionsChanged => self.refresh_sessions(),
             Evt::Deleted => self.refresh_sessions(),
             Evt::DeleteFailed(e) => {
                 let msg = if e.contains("active") {
-                    "The session is open in another client (Hermes.app, Telegram) — close it there"
-                        .to_string()
+                    "The session is open in another client (Telegram) — close it there".to_string()
                 } else {
                     format!("Could not delete: {e}")
                 };
@@ -981,21 +1014,23 @@ impl HermesApp {
                 if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
                     self.apply_model_pick(&profile, &runtime);
                     let effort = self.take_effort();
-                    let images = std::mem::take(&mut self.queued_images);
-                    match self.parse_command(&text).filter(|_| images.is_empty()) {
+                    match self.parse_command(&text) {
                         Some((name, arg)) => self.cmd(Cmd::Dispatch {
                             profile,
                             session: runtime,
                             name,
                             arg,
                         }),
-                        None => self.cmd(Cmd::Send {
-                            profile,
-                            session: runtime,
-                            text,
-                            effort,
-                            images,
-                        }),
+                        None => {
+                            let context = self.block_context(cx);
+                            self.cmd(Cmd::Send {
+                                profile,
+                                session: runtime,
+                                text,
+                                effort,
+                                context,
+                            })
+                        }
                     }
                 }
                 // Show the new session in the list right away.
@@ -1075,6 +1110,11 @@ impl HermesApp {
                 edit,
             } if self.is_current(&session) => {
                 self.speed.request();
+                // The agent may have changed the list this thread is about.
+                if self.current_subject().starts_with("tasks:") {
+                    self.load_tasks();
+                }
+                let mut changed = None;
                 if let Some(turn) = self.turns.last_mut() {
                     let step = turn.steps.iter_mut().rev().find(|s| match s {
                         Step::Tool { call_id: id, .. } => call_id.is_empty() || *id == call_id,
@@ -1090,11 +1130,16 @@ impl HermesApp {
                         *o = output;
                     }
                     if let Some(edit) = edit {
+                        changed = Some(edit.path.clone());
                         turn.files.push(edit);
                         if self.project.is_none() {
                             self.resolve_project(window, cx);
                         }
                     }
+                }
+                // The agent wrote the file open in the IDE: it follows.
+                if let Some(path) = changed {
+                    self.file_changed_outside(&path, window, cx);
                 }
                 cx.notify();
             }
@@ -1116,12 +1161,13 @@ impl HermesApp {
                 Some(message) => {
                     if let Some(profile) = self.profile.clone() {
                         self.speed.request();
+                        let context = self.block_context(cx);
                         self.cmd(Cmd::Send {
                             profile,
                             session,
                             text: message,
                             effort: None,
-                            images: vec![],
+                            context,
                         });
                     }
                 }
@@ -1258,10 +1304,10 @@ impl HermesApp {
                 .iter()
                 .find(|r| r.id == old.id)
                 .is_some_and(|r| !r.running);
-            let own = crate::model::source_label(&old.source) == "Hermes";
+            let own = crate::model::source_label(&old.source) == "Bench";
             if done && own && self.session.as_deref() != Some(old.id.as_str()) {
                 let title = if old.title.is_empty() {
-                    "Hermes"
+                    "Bench"
                 } else {
                     &old.title
                 };
@@ -1318,8 +1364,9 @@ impl HermesApp {
     }
 
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
+        // The next frame scrolls to the composer (render_chat follows the tail).
         self.follow = true;
-        self.chat_scroll.scroll_to_bottom();
+        self.last_max = px(-1.);
         cx.notify();
     }
 
@@ -1364,6 +1411,12 @@ impl HermesApp {
         self.confirm_delete = None;
         self.reset_chat(cx);
         self.session = Some(id.clone());
+        if self.demo {
+            self.turns = self.demo_threads.get(&id).cloned().unwrap_or_default();
+            self.processes = if id == "d-landing" { crate::demo::processes(now_secs()) } else { Vec::new() };
+            cx.notify();
+            return;
+        }
         self.save_place();
         self.cmd(Cmd::Open {
             profile,
@@ -1394,6 +1447,8 @@ impl HermesApp {
             self.reset_chat(cx);
         }
         self.sessions.retain(|s| s.id != id);
+        // Its own files (browser steps' frames) go with it.
+        sites::forget_session(&id);
         let runtime = self.opened.remove(&id);
         let rid = id.clone();
         self.rest(
@@ -1448,10 +1503,7 @@ impl HermesApp {
                 rest::worktree_add(&conn, &p, &root, &name)
             },
             move |this, r, window, cx| match r {
-                Ok((folder, _branch)) => this.cmd(Cmd::Create {
-                    profile,
-                    cwd: Some(folder),
-                }),
+                Ok((folder, _branch)) => this.cmd(Cmd::Create { profile, cwd: Some(folder), subject: this.new_subject.clone() }),
                 Err(e) => {
                     this.live = None;
                     this.queued = None;
@@ -1567,18 +1619,32 @@ impl HermesApp {
             cx.notify();
             return;
         }
-        let text = self.composer.read(cx).value().trim().to_string();
+        let typed = self.composer.read(cx).value().trim().to_string();
         let Some(profile) = self.profile.clone() else {
             return;
         };
         let files = self.attachments.clone();
-        if (text.is_empty() && files.is_empty()) || self.live.is_some() {
+        if (typed.is_empty() && files.is_empty() && self.snippets.is_empty()) || self.live.is_some()
+        {
             return;
         }
         // Enter in the command list picks the command instead of sending.
-        if files.is_empty() && self.complete_slash(window, cx) {
+        if files.is_empty() && self.snippets.is_empty() && self.complete_slash(window, cx) {
             return;
         }
+        // "!command": run it in this thread's terminal (opened under the thread), as in Delta.
+        if let Some(command) = typed.strip_prefix('!') {
+            let command = command.trim().to_string();
+            self.composer.update(cx, |s, cx| s.set_value("", window, cx));
+            self.run_bang(command, window, cx);
+            return;
+        }
+        // Code from the IDE follows the words, each block naming its file and lines.
+        let text = std::iter::once(typed)
+            .filter(|t| !t.is_empty())
+            .chain(self.snippets.drain(..).map(|s| s.block()))
+            .collect::<Vec<_>>()
+            .join("\n\n");
         self.composer
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.note_draft(cx);
@@ -1612,19 +1678,17 @@ impl HermesApp {
             .into(),
         });
         if files.is_empty() {
-            self.submit(profile, text, vec![], window, cx);
+            self.submit(profile, text, window, cx);
             return;
         }
         let Some(conn) = self.conn.clone() else {
             return;
         };
-        let (target, canonical) = (self.target.clone(), conn.canonical());
+        let target = self.target.clone();
         cx.spawn_in(window, async move |this, cx| {
             let p = profile.clone();
             let prepared = cx
-                .background_spawn(
-                    async move { attach::prepare(&conn, &target, &p, canonical, &files) },
-                )
+                .background_spawn(async move { attach::prepare(&conn, &target, &p, &files) })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match prepared {
                 Ok(prep) => {
@@ -1632,7 +1696,7 @@ impl HermesApp {
                         live.label = "Sending…".into();
                     }
                     let full = with_files(&text, prep.lines);
-                    this.submit(profile, full, prep.images, window, cx);
+                    this.submit(profile, full, window, cx);
                 }
                 Err(e) => {
                     this.live = None;
@@ -1648,18 +1712,16 @@ impl HermesApp {
         .detach();
     }
 
-    /// The message (with its files named in the text, images staged) to the session, or to a
-    /// new one.
+    /// The message (with its files named in the text) to the session, or to a new one.
     fn submit(
         &mut self,
         profile: String,
         text: String,
-        images: Vec<(String, String)>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         match self.runtime.clone() {
-            Some(session) => match self.parse_command(&text).filter(|_| images.is_empty()) {
+            Some(session) => match self.parse_command(&text) {
                 Some((name, arg)) => self.cmd(Cmd::Dispatch {
                     profile,
                     session,
@@ -1668,12 +1730,13 @@ impl HermesApp {
                 }),
                 None => {
                     let effort = self.take_effort();
+                    let context = self.block_context(cx);
                     self.cmd(Cmd::Send {
                         profile,
                         session,
                         text,
                         effort,
-                        images,
+                        context,
                     });
                 }
             },
@@ -1681,7 +1744,6 @@ impl HermesApp {
                 // A new session is created on the first message; the effort goes with it.
                 self.effort_pending = true;
                 self.queued = Some(text.clone());
-                self.queued_images = images;
                 let group = self.group_name.read(cx).value().trim().to_string();
                 if self.new_project.is_none() && !group.is_empty() {
                     // A named group: its folder first (made where the gateway lives), then the chat.
@@ -1693,10 +1755,7 @@ impl HermesApp {
                         cx,
                         move || connection::group_dir(&target, &group),
                         move |this, r, window, cx| match r {
-                            Ok(dir) => this.cmd(Cmd::Create {
-                                profile,
-                                cwd: Some(dir),
-                            }),
+                            Ok(dir) => this.cmd(Cmd::Create { profile, cwd: Some(dir), subject: this.new_subject.clone() }),
                             Err(e) => {
                                 this.toast(
                                     NotificationType::Error,
@@ -1704,7 +1763,7 @@ impl HermesApp {
                                     window,
                                     cx,
                                 );
-                                this.cmd(Cmd::Create { profile, cwd: None });
+                                this.cmd(Cmd::Create { profile, cwd: None, subject: this.new_subject.clone() });
                             }
                         },
                     );
@@ -1720,7 +1779,7 @@ impl HermesApp {
                         let name = branch_name(&text);
                         self.rest_branch(conn, profile, root, name, window, cx);
                     }
-                    (root, _) => self.cmd(Cmd::Create { profile, cwd: root }),
+                    (root, _) => self.cmd(Cmd::Create { profile, cwd: root, subject: self.new_subject.clone() }),
                 }
             }
         }
@@ -1764,9 +1823,9 @@ impl HermesApp {
         }
     }
 
-    /// `hermes gateway restart` on the machine we are connected to, then reconnect.
-    /// Restart the gateway. While Hermes is running work it refuses and says what runs; the
-    /// next press within a minute restarts anyway, interrupting that work.
+    /// Restart the agent on the machine we are connected to, then reconnect. Its runs are
+    /// durable, so it never refuses (the `Busy` branch: a backend that refused while work ran,
+    /// pressed again within a minute, restarted anyway).
     pub fn restart_gateway(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let target = self.target.clone();
         let interrupt = self
@@ -1776,9 +1835,9 @@ impl HermesApp {
         self.toast(
             NotificationType::Info,
             if interrupt {
-                "Interrupting running work and restarting the gateway…"
+                "Interrupting running work and restarting the agent…"
             } else {
-                "Restarting the gateway…"
+                "Restarting the agent…"
             },
             window,
             cx,
@@ -1790,7 +1849,7 @@ impl HermesApp {
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match result {
                 Ok(connection::Restart::Done) => {
-                    this.toast(NotificationType::Success, "Gateway restarted", window, cx);
+                    this.toast(NotificationType::Success, "Agent restarted", window, cx);
                     this.connect(target, window, cx);
                 }
                 Ok(connection::Restart::Busy(what)) => {
@@ -2035,7 +2094,7 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// Hermes sends review notes only live; keep them per chat (turn index → notes) to show again.
+    /// The agent sends review notes only live; keep them per chat (turn index → notes) to show again.
     fn reviews_path(&self) -> std::path::PathBuf {
         connection::state_dir().join("reviews.json")
     }
@@ -2085,6 +2144,9 @@ impl HermesApp {
 
     /// Remember the profile and session for this target (called whenever either changes).
     fn save_place(&self) {
+        if self.demo {
+            return;
+        }
         let path = connection::state_dir().join("last-place.json");
         let mut all: HashMap<String, (Option<String>, Option<String>)> = std::fs::read(&path)
             .ok()
@@ -2118,30 +2180,9 @@ impl HermesApp {
     pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
         self.panel = panel;
         match panel {
-            // Gateways check versions only on their button: a check runs `hermes` on every
-            // machine, too slow and busy to start on a tab click.
-            Panel::Chat | Panel::Settings | Panel::Gateways => {}
+            Panel::Chat | Panel::Settings => {}
             Panel::Profiles => self.load_profiles_admin(window, cx),
             Panel::Prompts => self.load_prompts(window, cx),
-            Panel::Config => {
-                self.config_error = None;
-                self.rest(
-                    window,
-                    cx,
-                    rest::config_raw,
-                    |this, r, window, cx| match r {
-                        Ok(text) => this
-                            .config_editor
-                            .update(cx, |s, cx| s.set_value(text, window, cx)),
-                        Err(e) => this.toast(
-                            NotificationType::Error,
-                            format!("Config: {e:#}"),
-                            window,
-                            cx,
-                        ),
-                    },
-                )
-            }
             Panel::Providers | Panel::Messages => {
                 self.load_providers(window, cx);
                 if panel == Panel::Messages {
@@ -2244,40 +2285,6 @@ impl HermesApp {
                 Err(e) => this.toast(
                     NotificationType::Error,
                     format!("Skill not saved: {e:#}"),
-                    window,
-                    cx,
-                ),
-            },
-        );
-    }
-
-    /// YAML is parsed before saving; a broken document is not sent.
-    pub fn save_config(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let text = self.config_editor.read(cx).value().to_string();
-        self.config_error = match serde_yaml::from_str::<serde_yaml::Value>(&text) {
-            Ok(serde_yaml::Value::Mapping(_)) => None,
-            Ok(_) => Some("config.yaml must be a YAML mapping".into()),
-            Err(e) => Some(
-                match e.location() {
-                    Some(l) => format!("Line {}, column {}: {e}", l.line(), l.column()),
-                    None => e.to_string(),
-                }
-                .into(),
-            ),
-        };
-        cx.notify();
-        if self.config_error.is_some() {
-            return;
-        }
-        self.rest(
-            window,
-            cx,
-            move |c, p| rest::save_config_raw(c, p, &text),
-            |this, r, window, cx| match r {
-                Ok(()) => this.toast(NotificationType::Success, "config.yaml saved", window, cx),
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Config not saved: {e:#}"),
                     window,
                     cx,
                 ),
@@ -2474,8 +2481,13 @@ pub fn last_line(text: &str) -> String {
         .collect()
 }
 
+/// A step's label: the tool's name in words ("session search"; an MCP tool
+/// `mcp__<server>__<tool>` as "<server> · <tool>"), then what it worked on.
 pub fn tool_label(name: &str, detail: &str) -> String {
-    let name = name.replace('_', " ");
+    let name = match name.strip_prefix("mcp__").and_then(|n| n.split_once("__")) {
+        Some((server, tool)) => format!("{server} · {}", tool.replace('_', " ")),
+        None => name.replace('_', " "),
+    };
     if detail.is_empty() {
         name
     } else {
@@ -2503,7 +2515,7 @@ fn clip_line(s: &str) -> String {
 }
 
 /// A branch/folder name from the request: its first Latin words ("fix login bug"), else a short
-/// unique "chat-1a2b" (Hermes keeps only ASCII in the slug).
+/// unique "chat-1a2b" (the slug keeps only ASCII).
 fn branch_name(text: &str) -> String {
     let words: Vec<String> = text
         .split_whitespace()
@@ -2569,4 +2581,17 @@ fn save_drafts(drafts: &std::collections::HashMap<String, String>) {
         drafts_path(),
         serde_json::to_vec(drafts).unwrap_or_default(),
     );
+}
+
+#[cfg(test)]
+mod tool_label_tests {
+    #[test]
+    fn labels() {
+        assert_eq!(super::tool_label("bash", "ls"), "bash: ls");
+        assert_eq!(super::tool_label("session_search", ""), "session search");
+        assert_eq!(
+            super::tool_label("mcp__reminders__list_items", "Today"),
+            "reminders · list items: Today"
+        );
+    }
 }

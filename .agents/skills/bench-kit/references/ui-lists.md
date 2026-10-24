@@ -1,6 +1,6 @@
 # Lists: group headers, rows, tabs
 
-The sidebar lists what the mode works with (chats, servers, tools, files, clients…). It looks
+The sidebar lists the subjects and the threads (Tasks, servers, files, tools, project chats…). It looks
 like a file explorer: groups with an icon of their kind, rows hanging on a thin guide line, the
 selected row with an accent stripe on the left.
 

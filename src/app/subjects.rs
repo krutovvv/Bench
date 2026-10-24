@@ -1,0 +1,250 @@
+//! A thread's subject: what it is about, drawn live at its top, as in Zed's Delta (a notebook's
+//! cell): a task list (`tasks:today`), a server's terminal (`ssh:<alias>`), a tool (`tool:<name>`).
+//! The sidebar lists the subjects; a click opens the latest thread about one, or a new one.
+//! Nothing is a separate mode: everything is a thread.
+
+use gpui_kit::*;
+
+use super::HermesApp;
+use crate::devtools::{GROUPS, Tool};
+
+impl HermesApp {
+    /// The latest thread about `key`, or a new chat that will carry it.
+    pub fn open_subject(&mut self, key: String, cx: &mut Context<Self>) {
+        self.panel = super::Panel::Chat;
+        match self
+            .sessions
+            .iter()
+            .find(|s| s.subject == key)
+            .map(|s| s.id.clone())
+        {
+            Some(id) => self.open_session(id, cx),
+            None => {
+                self.new_session(cx);
+                self.new_subject = key;
+            }
+        }
+        cx.notify();
+    }
+
+    /// Any subject by its key, as the sidebar would open it.
+    pub fn open_subject_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(list) = Self::subject_list(&key) {
+            self.open_task_list(list, window, cx);
+        } else if let Some(alias) = Self::subject_server(&key) {
+            self.open_server_thread(alias, window, cx);
+        } else if let Some(id) = Self::subject_files(&key) {
+            self.open_files_thread(id, window, cx);
+        } else if let Some(tool) = Self::subject_tool(&key) {
+            self.open_tool_thread(tool, window, cx);
+        } else if Self::subject_browser(&key).is_some() {
+            // That browser session if it exists, else a new one.
+            match self.sessions.iter().find(|s| s.subject == key).map(|s| s.id.clone()) {
+                Some(id) => self.open_browser_thread(id, cx),
+                None => self.new_browser_thread(cx),
+            }
+        } else {
+            self.open_subject(key, cx);
+        }
+    }
+
+    /// A server: its thread, the terminal on top (opened on first use, kept while the app runs).
+    pub fn open_server_thread(&mut self, alias: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.ensure_terminal(&alias, window, cx);
+        self.open_subject(format!("ssh:{alias}"), cx);
+        if let Some(t) = self.ssh.tab_for(&alias) {
+            self.ssh.tabs[t].focus.focus(window, cx);
+        }
+    }
+
+    /// The terminal tab of `alias`, started if there is none (or it ended).
+    pub fn ensure_terminal(&mut self, alias: &str, window: &mut Window, cx: &mut Context<Self>) -> Option<usize> {
+        if let Some(t) = self.ssh.tab_for(alias) {
+            if !self.ssh.tabs[t]
+                .session
+                .exited
+                .load(std::sync::atomic::Ordering::SeqCst)
+            {
+                return Some(t);
+            }
+            self.ssh.tabs.remove(t);
+        }
+        self.spawn_terminal_tab(alias, window, cx)
+    }
+
+    /// A tool: its thread, the tool on top.
+    pub fn open_tool_thread(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
+        self.select_tool(tool, window, cx);
+        self.open_subject(format!("tool:{}", tool_key(tool)), cx);
+    }
+
+    /// A subject thread's name until it has a title of its own: the list, server, host or tool.
+    pub fn subject_title(&self) -> Option<String> {
+        let s = self.current_subject();
+        if let Some(l) = Self::subject_list(&s) {
+            return Some(l.name());
+        }
+        if let Some(a) = Self::subject_server(&s) {
+            return Some(if a == crate::term::LOCAL { "Terminal".into() } else { a });
+        }
+        if let Some(id) = Self::subject_files(&s) {
+            return self.files_remote.hosts.iter().find(|h| h.id == id).map(|h| h.name.clone());
+        }
+        if Self::subject_browser(&s).is_some() {
+            return Some("Browser".into());
+        }
+        Self::subject_tool(&s).map(|t| t.name().to_string())
+    }
+
+    /// The open thread's key for things kept per thread: its session id, or "draft".
+    pub fn thread_key(&self) -> String {
+        self.session.clone().unwrap_or_else(|| "draft".into())
+    }
+
+    /// The terminal "!" opened in this thread (a tab of its own).
+    pub fn thread_terminal(&self) -> Option<usize> {
+        let alias = self.thread_terms.get(&self.thread_key())?;
+        self.ssh.tab_for(alias)
+    }
+
+    /// "!command": a server thread types it into its terminal; any other thread opens a terminal
+    /// of its own (this Mac, in the thread's folder) under the conversation and runs it there.
+    pub fn run_bang(&mut self, command: String, window: &mut Window, cx: &mut Context<Self>) {
+        let subject = self.current_subject();
+        let tab = if let Some(alias) = Self::subject_server(&subject) {
+            self.ensure_terminal(&alias, window, cx)
+        } else {
+            match self.thread_terminal().filter(|t| {
+                !self.ssh.tabs[*t].session.exited.load(std::sync::atomic::Ordering::SeqCst)
+            }) {
+                Some(t) => Some(t),
+                None => {
+                    let t = self.spawn_terminal_tab(crate::term::LOCAL, window, cx);
+                    if let Some(t) = t {
+                        let alias = format!("thread:{}", self.thread_key());
+                        self.ssh.tabs[t].alias = alias.clone();
+                        self.thread_terms.insert(self.thread_key(), alias);
+                        // Start where the thread works.
+                        if let Some(dir) = self.folder_of_current() {
+                            self.ssh.tabs[t].session.write(format!("cd {}\r", shell_quote(&dir)).as_bytes());
+                        }
+                    }
+                    t
+                }
+            }
+        };
+        if let Some(t) = tab {
+            if !command.is_empty() {
+                self.ssh.tabs[t].session.write(format!("{command}\r").as_bytes());
+            }
+            self.ssh.tabs[t].focus.focus(window, cx);
+        }
+        cx.notify();
+    }
+
+    /// The open thread's folder, when it works in one.
+    fn folder_of_current(&self) -> Option<String> {
+        self.session.as_ref().and_then(|id| self.folder_of(id)).or_else(|| self.new_project.clone())
+    }
+
+    /// What the thread's live block shows right now, for the agent (sent with each message, not
+    /// shown): the terminal's last lines, the folder and open file of a host, the tool's input
+    /// and output. Task lists need none: the agent reads them with its tool.
+    pub fn block_context(&self, cx: &App) -> String {
+        let subject = self.current_subject();
+        let clip = |s: &str, n: usize| -> String {
+            if s.chars().count() <= n {
+                s.to_string()
+            } else {
+                format!("{}… [cut]", s.chars().take(n).collect::<String>())
+            }
+        };
+        if let Some(alias) = Self::subject_server(&subject) {
+            let name = if alias == crate::term::LOCAL { "this Mac".to_string() } else { alias.clone() };
+            return match self.ssh.tab_for(&alias) {
+                Some(t) => format!(
+                    "The terminal of {name} shows (its last lines):\n```\n{}\n```",
+                    self.ssh.tabs[t].session.screen_text(60)
+                ),
+                None => String::new(),
+            };
+        }
+        if let Some(id) = Self::subject_files(&subject) {
+            let f = &self.files_remote;
+            if f.host.as_deref() != Some(&id) {
+                return String::new();
+            }
+            let names: Vec<String> = f
+                .entries
+                .iter()
+                .take(80)
+                .map(|e| if e.dir { format!("{}/", e.name) } else { e.name.clone() })
+                .collect();
+            let mut out = format!("The files block is in the folder {} (host id {id}). It lists: {}", f.path, names.join(", "));
+            if let Some(file) = &f.file {
+                out.push_str(&format!(
+                    "\nOpen in its editor: {file}{}\n```\n{}\n```",
+                    if f.dirty { " (edited, not saved)" } else { "" },
+                    clip(&f.editor.read(cx).value(), 6000)
+                ));
+            }
+            return out;
+        }
+        if let Some(tool) = Self::subject_tool(&subject) {
+            let input = self.tools.input.read(cx).value().to_string();
+            let output = self.tools.output.read(cx).value().to_string();
+            return format!(
+                "The tool block is {} ({}).\nIts input:\n```\n{}\n```\nIts output:\n```\n{}\n```",
+                tool.name(),
+                tool.hint(),
+                clip(&input, 6000),
+                clip(&output, 6000)
+            );
+        }
+        // A site: the page the latest step is on.
+        if Self::subject_browser(&subject).is_some() {
+            if let Some(b) = &self.sites.browser {
+                let st = b.state.lock().unwrap();
+                if let Some(page) = st.active.as_ref().and_then(|id| st.pages.iter().find(|p| &p.id == id)) {
+                    return format!("The site's live tab is at {} (title: {}).", page.url, page.title);
+                }
+            }
+        }
+        // A terminal "!" opened in this thread.
+        match self.thread_terminal() {
+            Some(t) => format!("The terminal opened in this thread shows (its last lines):\n```\n{}\n```", self.ssh.tabs[t].session.screen_text(60)),
+            None => String::new(),
+        }
+    }
+
+    /// The server a thread is about (`ssh:<alias>`).
+    pub fn subject_server(subject: &str) -> Option<String> {
+        subject.strip_prefix("ssh:").map(str::to_string)
+    }
+
+    /// The tool a thread is about (`tool:<name>`).
+    pub fn subject_tool(subject: &str) -> Option<Tool> {
+        let name = subject.strip_prefix("tool:")?;
+        GROUPS
+            .iter()
+            .flat_map(|g| g.tools.iter().copied())
+            .find(|t| tool_key(*t) == name)
+    }
+}
+
+/// A tool's name in a subject: "base64-image".
+pub fn tool_key(tool: Tool) -> String {
+    tool.name()
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+fn shell_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', r"'\''"))
+}

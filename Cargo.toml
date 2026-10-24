@@ -22,7 +22,7 @@ imagesize = "0.13"
 unicodeit = "0.2"
 mermaid-rs-renderer = { version = "0.3", default-features = false }
 # The same image crate gpui decodes with: video frames are handed to it as RenderImages.
-image = { version = "0.25", default-features = false }
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
 # Tools mode (src/tools/): text and data utilities.
 regex = "1"
 chrono = "0.4"
@@ -59,6 +59,8 @@ objc2-user-notifications = { version = "0.3", default-features = false, features
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 gpui-kit = { version = "0.8.0", features = ["tree-sitter", "tree-sitter-rust", "tree-sitter-python", "tree-sitter-javascript", "tree-sitter-typescript", "tree-sitter-tsx", "tree-sitter-html", "tree-sitter-css", "tree-sitter-bash", "tree-sitter-go", "tree-sitter-php", "tree-sitter-ruby", "tree-sitter-swift", "tree-sitter-java", "tree-sitter-kotlin", "tree-sitter-c", "tree-sitter-cpp", "tree-sitter-toml", "tree-sitter-yaml", "tree-sitter-markdown", "tree-sitter-lua", "tree-sitter-sql", "tree-sitter-make", "tree-sitter-cmake", "tree-sitter-diff", "tree-sitter-csharp", "tree-sitter-scala", "tree-sitter-zig", "tree-sitter-graphql", "tree-sitter-proto", "tree-sitter-elixir", "tree-sitter-erb", "tree-sitter-ejs", "tree-sitter-svelte", "tree-sitter-astro"] }
 ureq = { version = "2.12", features = ["json"] }
+# wss:// (the server browser's gateway): rustls does not build for the browser.
+tungstenite = { version = "0.30", features = ["rustls-tls-webpki-roots"] }
 alacritty_terminal = "0.26"
 portable-pty = "0.9"
 
@@ -80,3 +82,5 @@ getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 [patch.crates-io]
 gpui-pre-web = { path = "vendor/gpui-pre-web" }
 gpui-pre-platform = { path = "vendor/gpui-pre-platform" }
+# The text caret 2px wide (1px upstream), as Zed and Delta draw it: one constant changed.
+gpui-base = { path = "vendor/gpui-base" }

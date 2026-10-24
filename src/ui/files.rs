@@ -27,10 +27,10 @@ impl HermesApp {
         let theme = cx.theme().clone();
         // A server's tree has no session changes.
         let server = self.ide.server.clone();
-        let tab = if server.is_some() {
-            RightTab::Files
-        } else {
-            self.right.unwrap_or(RightTab::Changes)
+        let tab = match (server.is_some(), self.right) {
+            (_, Some(RightTab::Search)) => RightTab::Search,
+            (true, _) => RightTab::Files,
+            (false, t) => t.unwrap_or(RightTab::Changes),
         };
 
         let tab_button = |id: &'static str, label: &'static str, active: bool| {
@@ -57,9 +57,11 @@ impl HermesApp {
         let list = match tab {
             RightTab::Changes => self.render_changes_list(cx).into_any_element(),
             RightTab::Files => self.render_tree(cx).into_any_element(),
+            RightTab::Search => self.render_find(cx).into_any_element(),
         };
 
         let quick = self.render_quick(cx);
+        let goto = self.render_goto(cx);
         // ⌘P's list floats over the panel: drawn last, on top.
         let panel = v_flex()
             .size_full()
@@ -86,6 +88,15 @@ impl HermesApp {
                                 this.toggle_right_tab(RightTab::Files, window, cx)
                             }),
                         ),
+                    )
+                    .child(
+                        tab_button("rt-search", "Search", tab == RightTab::Search)
+                            .tooltip(|window, cx| {
+                                Tooltip::new("Find in files  ⌘⇧F").build(window, cx)
+                            })
+                            .on_click(
+                                cx.listener(|this, _, window, cx| this.open_find(window, cx)),
+                            ),
                     )
                     .when_some(server, |d, alias| {
                         d.child(
@@ -134,7 +145,15 @@ impl HermesApp {
                         .into_any_element()
                 },
             ));
-        div().size_full().relative().child(panel).children(quick)
+        div()
+            .size_full()
+            .relative()
+            // Its own left rule: the window's dividers draw none (`quiet_divider`).
+            .border_l_1()
+            .border_color(theme.border)
+            .child(panel)
+            .children(quick)
+            .children(goto)
     }
 
     fn render_viewer(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -229,8 +248,15 @@ impl HermesApp {
                         .on_click(cx.listener(|this, _, window, cx| this.save_file(window, cx))),
                 )
             })
+            .when(mode == FileMode::After && !missing, |d| {
+                d.child(
+                    icon_action("add-selection", Ico::Chat, "Selection to chat  ⌘⇧.").on_click(
+                        cx.listener(|this, _, window, cx| this.add_selection_to_chat(window, cx)),
+                    ),
+                )
+            })
             .child(
-                icon_action("attach", Ico::Paperclip, "Add to chat")
+                icon_action("attach", Ico::Paperclip, "Whole file to chat")
                     .on_click(cx.listener(|this, _, window, cx| this.attach_open_file(window, cx))),
             )
             .children(win_buttons);
@@ -252,13 +278,14 @@ impl HermesApp {
                 .child(text)
                 .into_any_element()
         };
-        let body = match (mode, &view.diff_view, &view.before_view) {
-            (FileMode::Diff, Some(state), _) => diff_of(state),
-            (FileMode::Before, _, Some(state)) => diff_of(state),
-            _ if missing => note("This file is no longer on disk."),
-            (FileMode::After, _, _) => {
-                let warn = view.truncated.then(|| {
-                    div()
+        let body =
+            match (mode, &view.diff_view, &view.before_view) {
+                (FileMode::Diff, Some(state), _) => diff_of(state),
+                (FileMode::Before, _, Some(state)) => diff_of(state),
+                _ if missing => note("This file is no longer on disk."),
+                (FileMode::After, _, _) => {
+                    let warn = view.truncated.then(|| {
+                        div()
                         .px_2()
                         .py_1()
                         .text_xs()
@@ -269,24 +296,51 @@ impl HermesApp {
                         } else {
                             "Large file: only the beginning is loaded, saving is disabled."
                         })
-                });
-                // The server's file changed since it was opened: nothing is written until the
-                // user picks a side.
-                let conflict = self.ide.remote_file.as_ref().is_some_and(|rf| rf.conflict);
-                let choice = |id: &'static str, label: &'static str| {
-                    div()
-                        .id(id)
-                        .px_2()
-                        .py_0p5()
-                        .cursor_pointer()
-                        .border_1()
-                        .border_color(theme.border)
-                        .text_color(theme.foreground)
-                        .hover(|s| s.bg(theme.list_hover))
-                        .child(label)
-                };
-                let conflict = conflict.then(|| {
-                    h_flex()
+                    });
+                    // The server's file changed since it was opened: nothing is written until the
+                    // user picks a side.
+                    let conflict = self.ide.remote_file.as_ref().is_some_and(|rf| rf.conflict);
+                    let choice = |id: &'static str, label: &'static str| {
+                        div()
+                            .id(id)
+                            .px_2()
+                            .py_0p5()
+                            .cursor_pointer()
+                            .border_1()
+                            .border_color(theme.border)
+                            .text_color(theme.foreground)
+                            .hover(|s| s.bg(theme.list_hover))
+                            .child(label)
+                    };
+                    let conflict = conflict.then(|| {
+                        h_flex()
+                            .px_2()
+                            .py_1()
+                            .gap_2()
+                            .items_center()
+                            .text_xs()
+                            .text_color(theme.warning)
+                            .border_b_1()
+                            .border_color(theme.border)
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .child("Changed on the server since it was opened. Not saved."),
+                            )
+                            .child(choice("conflict-reload", "Reload").on_click(cx.listener(
+                                |this, _, window, cx| this.reload_remote_file(window, cx),
+                            )))
+                            .child(
+                                choice("conflict-overwrite", "Overwrite").on_click(cx.listener(
+                                    |this, _, window, cx| this.overwrite_remote_file(window, cx),
+                                )),
+                            )
+                    });
+                    // The agent changed the file while it had unsaved edits here.
+                    let outside = (self.ide.changed_outside && !remote)
+                        .then(|| {
+                            h_flex()
                         .px_2()
                         .py_1()
                         .gap_2()
@@ -295,35 +349,57 @@ impl HermesApp {
                         .text_color(theme.warning)
                         .border_b_1()
                         .border_color(theme.border)
+                        .child(div().flex_1().min_w_0().child(
+                            "The agent changed this file. Your unsaved edits are kept here.",
+                        ))
+                        .child(choice("outside-reload", "Reload").on_click(
+                            cx.listener(|this, _, window, cx| this.reload_open_file(window, cx)),
+                        ))
+                        })
+                        .map(|d| d.into_any_element());
+                    let wrap = self.ide.wrap;
+                    let status = h_flex()
+                        .h(px(24.))
+                        .flex_none()
+                        .px_2()
+                        .gap_3()
+                        .items_center()
+                        .border_t_1()
+                        .border_color(theme.border)
+                        .bg(theme.status_bar)
+                        .text_xs()
+                        .text_color(muted)
+                        .child(self.editor_status.clone())
+                        .child(
+                            div()
+                                .id("status-wrap")
+                                .cursor_pointer()
+                                .when(wrap, |d| d.text_color(theme.foreground))
+                                .hover(|s| s.text_color(theme.foreground))
+                                .child("Wrap")
+                                .tooltip(|window, cx| {
+                                    Tooltip::new("Wrap long lines  ⌥Z").build(window, cx)
+                                })
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.toggle_soft_wrap(window, cx)
+                                })),
+                        );
+                    v_flex()
+                        .size_full()
+                        .children(conflict)
+                        .children(outside)
+                        .children(warn)
                         .child(
                             div()
                                 .flex_1()
-                                .min_w_0()
-                                .child("Changed on the server since it was opened. Not saved."),
+                                .min_h_0()
+                                .child(Editor::new(&self.file_editor).appearance(false).h_full()),
                         )
-                        .child(choice("conflict-reload", "Reload").on_click(
-                            cx.listener(|this, _, window, cx| this.reload_remote_file(window, cx)),
-                        ))
-                        .child(
-                            choice("conflict-overwrite", "Overwrite").on_click(cx.listener(
-                                |this, _, window, cx| this.overwrite_remote_file(window, cx),
-                            )),
-                        )
-                });
-                v_flex()
-                    .size_full()
-                    .children(conflict)
-                    .children(warn)
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_h_0()
-                            .child(Editor::new(&self.file_editor).appearance(false).h_full()),
-                    )
-                    .into_any_element()
-            }
-            _ => note("Loading…"),
-        };
+                        .child(status)
+                        .into_any_element()
+                }
+                _ => note("Loading…"),
+            };
 
         v_flex()
             .size_full()
@@ -419,12 +495,34 @@ impl HermesApp {
                             .small()
                             .text_color(theme.muted_foreground),
                     )
-                    .child(div().truncate().child(if name.is_empty() {
-                        root.clone()
-                    } else {
-                        name
-                    }))
-                    .child(div().flex_1())
+                    .map(|d| match self.ide.root_edit.as_ref() {
+                        // The folder being typed.
+                        Some(edit) => d.child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .child(Input::new(&edit.input).xsmall()),
+                        ),
+                        None => d
+                            .child(self.render_breadcrumb(&root, &name, cx))
+                            .child(div().flex_1())
+                            .child(
+                                div()
+                                    .id("tree-goto")
+                                    .p_0p5()
+                                    .cursor_pointer()
+                                    .text_color(theme.muted_foreground)
+                                    .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                                    .child(Ico::Pencil.icon().xsmall())
+                                    .tooltip(|window, cx| {
+                                        Tooltip::new("Go to a folder…").build(window, cx)
+                                    })
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        cx.stop_propagation();
+                                        this.start_root_edit(window, cx)
+                                    })),
+                            ),
+                    })
                     .child(
                         div()
                             .id("tree-refresh")
@@ -453,6 +551,74 @@ impl HermesApp {
             .py_1()
             .children(rows)
             .child(div().h_2().flex_none())
+    }
+
+    /// The tree's folder as a path, like Transmit: every folder above it is a click away (the
+    /// tree moves up there); a long path keeps its last three folders, "…" for the rest.
+    fn render_breadcrumb(&self, root: &str, name: &str, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let parts: Vec<&str> = root.split('/').filter(|p| !p.is_empty()).collect();
+        // (label, the folder it stands for), the last one being the root itself.
+        let mut crumbs: Vec<(String, String)> = vec![];
+        if root.starts_with('/') {
+            // The root by a word: a bare "/" next to the separators reads as "//".
+            crumbs.push(("Disk".into(), "/".into()));
+        }
+        for (k, p) in parts.iter().enumerate() {
+            let prefix = if root.starts_with('/') { "/" } else { "" };
+            crumbs.push((p.to_string(), format!("{prefix}{}", parts[..=k].join("/"))));
+        }
+        if crumbs.is_empty() {
+            crumbs.push((name.to_string(), root.to_string()));
+        }
+        if crumbs.len() > 4 {
+            let hidden = crumbs.len() - 3;
+            let up = crumbs[hidden - 1].1.clone();
+            crumbs = std::iter::once(("…".to_string(), up))
+                .chain(crumbs.into_iter().skip(hidden))
+                .collect();
+        }
+        let n = crumbs.len();
+        h_flex()
+            .min_w_0()
+            .overflow_hidden()
+            .gap_0p5()
+            .items_center()
+            .children(
+                crumbs
+                    .into_iter()
+                    .enumerate()
+                    .flat_map(|(k, (label, dir))| {
+                        let last = k + 1 == n;
+                        let sep = (k > 0 && label != "/").then(|| {
+                            div()
+                                .flex_none()
+                                .text_color(muted)
+                                .child("/")
+                                .into_any_element()
+                        });
+                        let crumb = div()
+                            .id(("crumb", k))
+                            .flex_none()
+                            .when(last, |d| d.flex_shrink(1.).min_w_0().truncate())
+                            .text_color(if last { theme.foreground } else { muted })
+                            .when(!last, |d| {
+                                d.cursor_pointer()
+                                    .hover(|s| s.text_color(theme.foreground).underline())
+                            })
+                            .child(label)
+                            .when(!last, |d| {
+                                d.on_click(cx.listener(move |this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.go_to_folder(dir.clone(), window, cx)
+                                }))
+                            })
+                            .into_any_element();
+                        sep.into_iter().chain(std::iter::once(crumb))
+                    }),
+            )
+            .into_any_element()
     }
 
     /// One row per entry, Zed-style: indent guides, an icon by kind, folders whose only entry is
@@ -641,14 +807,15 @@ impl HermesApp {
     /// needs no label saying where it is.
     pub(super) fn render_ide_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        let tab = if self.ide.server.is_some() {
-            RightTab::Files
-        } else {
-            self.right.unwrap_or(RightTab::Changes)
+        let tab = match (self.ide.server.is_some(), self.right) {
+            (_, Some(RightTab::Search)) => RightTab::Search,
+            (true, _) => RightTab::Files,
+            (false, t) => t.unwrap_or(RightTab::Changes),
         };
         let list = match tab {
             RightTab::Changes => self.render_changes_list(cx).into_any_element(),
             RightTab::Files => self.render_tree(cx).into_any_element(),
+            RightTab::Search => self.render_find(cx).into_any_element(),
         };
         v_flex()
             .size_full()
@@ -663,6 +830,7 @@ impl HermesApp {
     pub(super) fn render_ide_main(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let quick = self.render_quick(cx);
+        let goto = self.render_goto(cx);
         let body = if self.file.is_some() {
             self.render_viewer(cx)
         } else {
@@ -696,6 +864,7 @@ impl HermesApp {
             .bg(theme.background)
             .child(body)
             .children(quick)
+            .children(goto)
             .into_any_element()
     }
 
@@ -778,6 +947,146 @@ impl HermesApp {
                 }))
                 .into_any_element(),
         )
+    }
+
+    /// ⌃G: a line number field over the editor's top (Enter goes, Esc closes).
+    fn render_goto(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let g = self.ide.goto.as_ref()?;
+        let theme = cx.theme().clone();
+        Some(
+            div()
+                .id("go-line")
+                .absolute()
+                .top(px(36.))
+                .left_0()
+                .right_0()
+                .p_2()
+                .bg(theme.popover)
+                .border_b_1()
+                .border_color(theme.border)
+                .child(Input::new(&g.input).prefix(Ico::ChevronRight.icon().small()))
+                .into_any_element(),
+        )
+    }
+
+    /// The Search tab: a field, then the matches grouped by file (a click opens the file at
+    /// that line).
+    fn render_find(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let Some(f) = self.ide.find.as_ref() else {
+            return div().into_any_element();
+        };
+        let root = self.tree_root.clone().unwrap_or_default();
+        let files = {
+            let mut seen: Vec<&str> = vec![];
+            for h in &f.hits {
+                if !seen.contains(&h.path.as_str()) {
+                    seen.push(&h.path);
+                }
+            }
+            seen.len()
+        };
+        let summary = if f.running {
+            "Searching…".to_string()
+        } else if f.searched.is_empty() {
+            "Text in every file under the folder. Smart case: a capital letter makes it exact."
+                .to_string()
+        } else if f.hits.is_empty() {
+            format!("Nothing found for “{}”", f.searched)
+        } else {
+            format!(
+                "{}{} in {} {}",
+                f.hits.len(),
+                if f.capped { "+" } else { "" },
+                files,
+                if files == 1 { "file" } else { "files" }
+            )
+        };
+        let mut rows: Vec<AnyElement> = vec![];
+        let mut last: Option<&str> = None;
+        for (k, h) in f.hits.iter().enumerate() {
+            if last != Some(h.path.as_str()) {
+                last = Some(&h.path);
+                let rel = h
+                    .path
+                    .strip_prefix(&root)
+                    .unwrap_or(&h.path)
+                    .trim_start_matches('/')
+                    .to_string();
+                rows.push(
+                    h_flex()
+                        .px_3()
+                        .pt_2()
+                        .pb_0p5()
+                        .gap_1p5()
+                        .items_center()
+                        .text_xs()
+                        .child(file_icon(&h.path).icon().xsmall().text_color(muted))
+                        .child(div().min_w_0().truncate().child(rel))
+                        .into_any_element(),
+                );
+            }
+            let hit = h.clone();
+            rows.push(
+                h_flex()
+                    .id(("hit", k))
+                    .pl(px(28.))
+                    .pr_3()
+                    .py_0p5()
+                    .gap_2()
+                    .items_baseline()
+                    .text_xs()
+                    .cursor_pointer()
+                    .hover(|s| s.bg(theme.list_hover))
+                    .child(
+                        div()
+                            .flex_none()
+                            .min_w(px(28.))
+                            .font_family("Menlo")
+                            .text_color(muted)
+                            .child(h.line.to_string()),
+                    )
+                    .child(
+                        div()
+                            .min_w_0()
+                            .truncate()
+                            .font_family("Menlo")
+                            .child(h.text.clone()),
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_hit(hit.clone(), window, cx)
+                    }))
+                    .into_any_element(),
+            );
+        }
+        v_flex()
+            .size_full()
+            .child(
+                div().p_2().border_b_1().border_color(theme.border).child(
+                    Input::new(&f.input)
+                        .small()
+                        .prefix(Ico::Search.icon().xsmall()),
+                ),
+            )
+            .child(
+                div()
+                    .px_3()
+                    .py_1()
+                    .text_xs()
+                    .text_color(muted)
+                    .child(summary),
+            )
+            .child(
+                v_flex()
+                    .id("find-hits")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .pb_2()
+                    .children(rows),
+            )
+            .into_any_element()
     }
 
     /// The open files as tabs (the toolbar's left part): name, a dot for unsaved edits, ×.

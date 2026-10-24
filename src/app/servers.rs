@@ -1,6 +1,7 @@
 //! SSH mode: the servers of `~/.ssh/config` in the sidebar, a terminal per server in the main
-//! area — only a terminal. The same file feeds the gateway list: a server there that runs
-//! Hermes shows up as a gateway by itself; nothing is installed from the app.
+//! area — only a terminal. The same file feeds the gateway list: the servers there that can
+//! run the agent (Node 22.18+) show up as gateways by themselves; Bench installs and starts the
+//! agent there on connect.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,7 +36,7 @@ pub struct Ssh {
     pub servers: Vec<Server>,
     /// alias -> `user@hostname` (`ssh -G`).
     pub resolved: HashMap<String, String>,
-    /// alias -> whether Hermes runs there (for the gateway list only); None while checking.
+    /// alias -> whether the agent can run there (for the gateway list only); None while checking.
     pub status: HashMap<String, Option<HostCheck>>,
     pub tabs: Vec<Tab>,
     pub active: Option<usize>,
@@ -234,7 +235,7 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// Ask a server whether Hermes is there (in the background; one check at a time per host).
+    /// Ask a server whether the agent can run there (in the background; one check at a time per host).
     pub fn check_host(&mut self, alias: String, cx: &mut Context<Self>) {
         if matches!(self.ssh.status.get(&alias), Some(None)) {
             return;
@@ -257,8 +258,8 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// Gateways: This Mac + the servers of `~/.ssh/config` that answered with a working Hermes
-    /// (+ the one in use, whatever it answers).
+    /// Gateways: This Mac + the servers of `~/.ssh/config` that answered with a Node the agent
+    /// runs on (+ the one in use, whatever it answers).
     fn rebuild_targets(&mut self) {
         let mut targets = vec![Target::Local];
         targets.extend(
@@ -275,7 +276,7 @@ impl HermesApp {
     }
 
     /// Called when the gateway menu opens: re-read `~/.ssh/config` and ask its servers again;
-    /// one that now runs Hermes joins the list, one that stopped leaves it.
+    /// one that now can run the agent joins the list, one that stopped leaves it.
     pub fn refresh_targets(&mut self, cx: &mut Context<Self>) {
         self.reload_servers(cx);
         self.rebuild_targets();
@@ -379,30 +380,39 @@ impl HermesApp {
         cx.notify();
     }
 
-    /// ⌘-click in a server's terminal: a URL opens in the browser; a path (absolute, or `~/…`)
-    /// opens in the mini IDE on that server — a file in the editor, a folder as the tree.
+    /// ⌘-click in a terminal: a URL opens in the browser; a path — absolute, `~/…`, or relative
+    /// to the terminal's folder (`wp-config.php` in an `ls`) — opens in the mini IDE on that
+    /// machine: a file in the editor (at its `:line`), a folder as the tree. A file under the
+    /// tree already open keeps that tree.
     pub fn open_terminal_link(
         &mut self,
         alias: String,
-        link: String,
+        link: crate::term::TermLink,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if link.contains("://") {
+        if link.target.contains("://") {
             let _ = std::process::Command::new("/usr/bin/open")
-                .arg(&link)
+                .arg(&link.target)
                 .spawn();
             return;
         }
-        if !(link.starts_with('/') || link.starts_with("~/")) {
-            return;
-        }
+        let path = if link.target.starts_with('/') || link.target.starts_with('~') {
+            link.target.clone()
+        } else {
+            match link.cwd.as_deref() {
+                Some(cwd) => format!("{}/{}", cwd.trim_end_matches('/'), link.target),
+                // No folder known: relative to home (where a new shell and `ssh host cmd` start).
+                None => format!("~/{}", link.target),
+            }
+        };
+        let line = link.line;
         if alias == crate::term::LOCAL {
-            self.open_local_link(&link, window, cx);
+            self.open_local_link(&path, line, window, cx);
             return;
         }
         let a = alias.clone();
-        let l = link.clone();
+        let l = path.clone();
         // `~` and "file or folder" are the server's to answer.
         self.background(
             window,
@@ -411,7 +421,7 @@ impl HermesApp {
                 let out = crate::ssh::run(
                     &a,
                     &format!(
-                        "p={}; case \"$p\" in \"~/\"*) p=\"$HOME/${{p#??}}\";; esac; \
+                        "p={}; case \"$p\" in \"~\") p=\"$HOME\";; \"~/\"*) p=\"$HOME/${{p#??}}\";; esac; \
                          if [ -d \"$p\" ]; then echo \"d $p\"; elif [ -f \"$p\" ]; then echo \"f $p\"; fi",
                         crate::ssh::q(&l)
                     ),
@@ -426,13 +436,19 @@ impl HermesApp {
                 }
                 Some(("f", file)) => {
                     let file = file.to_string();
-                    let dir = file.rsplit_once('/').map_or("/".to_string(), |(d, _)| d.to_string());
-                    this.open_ide_server_at(alias.clone(), Some(dir), window, cx);
-                    this.open_file(file, window, cx);
+                    let same_tree = this.ide_open()
+                        && this.ide.server.as_deref() == Some(alias.as_str())
+                        && this.tree_root.as_ref().is_some_and(|r| file.starts_with(r.as_str()));
+                    if !same_tree {
+                        let dir =
+                            file.rsplit_once('/').map_or("/".to_string(), |(d, _)| d.to_string());
+                        this.open_ide_server_at(alias.clone(), Some(dir), window, cx);
+                    }
+                    this.open_file_at(file, line, window, cx);
                 }
                 _ => this.toast(
                     NotificationType::Info,
-                    format!("{alias}: no file or folder at {link}"),
+                    format!("{alias}: no file or folder at {path}"),
                     window,
                     cx,
                 ),
@@ -440,22 +456,53 @@ impl HermesApp {
         );
     }
 
+    /// Open a file in the IDE, at `line` once it has loaded.
+    fn open_file_at(
+        &mut self,
+        file: String,
+        line: Option<usize>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(line) = line {
+            self.ide.pending_line = Some((file.clone(), line));
+        }
+        self.open_file(file, window, cx);
+        self.apply_pending_line(window, cx);
+    }
+
     /// ⌘-click on a path in this machine's terminal: a folder opens as the IDE's tree, a file in
     /// its editor (with its folder as the tree).
-    fn open_local_link(&mut self, link: &str, window: &mut Window, cx: &mut Context<Self>) {
+    fn open_local_link(
+        &mut self,
+        link: &str,
+        line: Option<usize>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let home = std::env::var("HOME").unwrap_or_default();
         let path = match link.strip_prefix("~/") {
-            Some(rest) => format!("{}/{rest}", std::env::var("HOME").unwrap_or_default()),
+            Some(rest) => format!("{home}/{rest}"),
+            None if link == "~" => home,
             None => link.to_string(),
         };
         let p = std::path::Path::new(&path);
         if p.is_dir() {
             self.open_ide(Some(path), window, cx);
         } else if p.is_file() {
-            let dir = p
-                .parent()
-                .map_or("/".into(), |d| d.to_string_lossy().to_string());
-            self.open_ide(Some(dir), window, cx);
-            self.open_file(path, window, cx);
+            let same_tree = self.ide_open()
+                && self.ide.server.is_none()
+                && self
+                    .tree_root
+                    .as_ref()
+                    .is_some_and(|r| path.starts_with(r.as_str()));
+            if !same_tree {
+                let dir = p
+                    .parent()
+                    .map_or("/".into(), |d| d.to_string_lossy().to_string());
+                self.open_ide(Some(dir), window, cx);
+            }
+            self.open_file_at(path, line, window, cx);
         } else {
             self.toast(
                 NotificationType::Info,
@@ -540,7 +587,9 @@ impl HermesApp {
                 self.ssh.tabs[t].alias = s.alias.clone();
             }
         }
-        self.open_server(s.alias, window, cx);
+        self.ssh.form = None;
+        self.reload_servers(cx);
+        self.open_server_thread(s.alias, window, cx);
     }
 
     /// "Choose…" beside the key field: the system file picker; a key in the home folder is

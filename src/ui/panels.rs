@@ -1,6 +1,5 @@
-//! Settings panels: skills and config (editable text), MCP (JSON), cron (read-only), Telegram filter.
+//! Settings panels: skills (editable text), MCP (JSON), prompts, profiles, cron, Telegram, appearance.
 
-use gpui_kit::component::Disableable as _;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Editor, EditorState};
@@ -40,14 +39,14 @@ fn editor_page(
                     div()
                         .flex_1()
                         .min_w_0()
-                        .text_sm()
+                        .text_base()
                         .text_color(theme.muted_foreground)
                         .truncate()
                         .child(left),
                 )
                 .children(error.map(|e| {
                     div()
-                        .text_sm()
+                        .text_base()
                         .text_color(theme.danger)
                         .truncate()
                         .max_w(px(520.))
@@ -79,7 +78,7 @@ impl HermesApp {
                         .pt_4()
                         .pb_1()
                         .px_4()
-                        .text_xs()
+                        .text_sm()
                         .text_color(muted)
                         .child(category.to_uppercase())
                         .into_any_element(),
@@ -104,14 +103,14 @@ impl HermesApp {
                     .hover(|d| d.bg(theme.list_hover))
                     .child(
                         div()
-                            .text_sm()
+                            .text_base()
                             .line_height(relative(TITLE_LINE))
                             .when(!s.enabled, |d| d.text_color(muted))
                             .child(s.name.clone()),
                     )
                     .child(
                         div()
-                            .text_xs()
+                            .text_sm()
                             .text_color(muted)
                             .line_clamp(2)
                             .child(s.description.clone()),
@@ -160,7 +159,7 @@ impl HermesApp {
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_sm()
+                .text_base()
                 .text_color(muted)
                 .child(if self.skills.is_empty() {
                     "Loading skills…".to_string()
@@ -191,7 +190,7 @@ impl HermesApp {
         let status = self.mcp_status.clone();
         editor_page(
             &self.mcp_editor,
-            format!("mcp_servers from config.yaml {status}").into_any_element(),
+            format!("MCP servers {status}").into_any_element(),
             self.mcp_error.clone(),
             vec![
                 Button::new("mcp-reload")
@@ -207,33 +206,6 @@ impl HermesApp {
                     .primary()
                     .label("Save")
                     .on_click(cx.listener(|this, _, window, cx| this.save_mcp(window, cx)))
-                    .into_any_element(),
-            ],
-            cx,
-        )
-    }
-
-    pub(super) fn render_config(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        editor_page(
-            &self.config_editor,
-            format!("config.yaml · {}", self.current_profile()).into_any_element(),
-            self.config_error.clone(),
-            vec![
-                Button::new("cfg-reload")
-                    .small()
-                    .ghost()
-                    .label("Reload")
-                    .on_click(
-                        cx.listener(|this, _, window, cx| {
-                            this.open_panel(Panel::Config, window, cx)
-                        }),
-                    )
-                    .into_any_element(),
-                Button::new("cfg-save")
-                    .small()
-                    .primary()
-                    .label("Save")
-                    .on_click(cx.listener(|this, _, window, cx| this.save_config(window, cx)))
                     .into_any_element(),
             ],
             cx,
@@ -272,11 +244,11 @@ impl HermesApp {
                     .hover(|d| d.bg(theme.list_hover))
                     .child(
                         div()
-                            .text_sm()
+                            .text_base()
                             .line_height(relative(TITLE_LINE))
                             .child(p.title.clone()),
                     )
-                    .child(div().text_xs().text_color(muted).truncate().child(first))
+                    .child(div().text_sm().text_color(muted).truncate().child(first))
                     .on_click(
                         cx.listener(move |this, _, window, cx| this.open_prompt(i, window, cx)),
                     )
@@ -324,7 +296,7 @@ impl HermesApp {
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_sm()
+                .text_base()
                 .text_color(muted)
                 .child(if self.prompts.is_empty() {
                     "No prompts yet. Add one, then type @ in the chat to insert it."
@@ -361,7 +333,7 @@ impl HermesApp {
                             .px_4()
                             .gap_2()
                             .items_center()
-                            .text_sm()
+                            .text_base()
                             .text_color(muted)
                             .cursor_pointer()
                             .border_t_1()
@@ -414,11 +386,11 @@ impl HermesApp {
                     .hover(|d| d.bg(theme.list_hover))
                     .child(
                         div()
-                            .text_sm()
+                            .text_base()
                             .line_height(relative(TITLE_LINE))
                             .child(p.label.clone()),
                     )
-                    .child(div().text_xs().text_color(muted).truncate().child(meta))
+                    .child(div().text_sm().text_color(muted).truncate().child(meta))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_profile_admin(name.clone(), window, cx)
                     }))
@@ -437,7 +409,7 @@ impl HermesApp {
                             .child(div().w(px(240.)).child(
                                 gpui_kit::component::input::Input::new(&self.prof_name).small(),
                             ))
-                            .child(div().text_xs().child("SOUL.md"))
+                            .child(div().text_sm().child("SYSTEM.md"))
                             .into_any_element(),
                         None,
                         vec![
@@ -477,9 +449,9 @@ impl HermesApp {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .text_sm()
+                    .text_base()
                     .text_color(muted)
-                    .child("Loading profiles…")
+                    .child("Loading agents…")
                     .into_any_element(),
             };
 
@@ -510,17 +482,17 @@ impl HermesApp {
                             .px_4()
                             .gap_2()
                             .items_center()
-                            .text_sm()
+                            .text_base()
                             .text_color(muted)
                             .cursor_pointer()
                             .border_t_1()
                             .border_color(theme.border)
                             .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
                             .child(Ico::Plus.icon().small())
-                            .child("New profile")
+                            .child("New agent")
                             .tooltip(move |window, cx| {
                                 gpui_kit::component::tooltip::Tooltip::new(format!(
-                                    "A copy of “{}” (the status bar's profile): config, skills, SOUL",
+                                    "A copy of “{}” (the status bar's agent): model, MCP servers, SYSTEM.md",
                                     if from.is_empty() { "default" } else { &from }
                                 ))
                                 .build(window, cx)
@@ -566,12 +538,12 @@ impl HermesApp {
                     .hover(|d| d.bg(theme.list_hover))
                     .child(
                         div()
-                            .text_sm()
+                            .text_base()
                             .line_height(relative(TITLE_LINE))
                             .when(!j.enabled, |d| d.text_color(muted))
                             .child(j.name.clone()),
                     )
-                    .child(div().text_xs().text_color(muted).truncate().child(when))
+                    .child(div().text_sm().text_color(muted).truncate().child(when))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.open_cron(id.clone(), window, cx)
                     }))
@@ -615,7 +587,7 @@ impl HermesApp {
                                     .font_family(crate::theme::MONO),
                             ),
                         )
-                        .child(div().text_xs().child(status))
+                        .child(div().text_sm().child(status))
                         .into_any_element(),
                     None,
                     vec![
@@ -654,10 +626,10 @@ impl HermesApp {
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_sm()
+                .text_base()
                 .text_color(muted)
                 .child(if self.cron.is_empty() {
-                    "No scheduled jobs in this profile."
+                    "No scheduled jobs for this agent."
                 } else {
                     "Pick a job on the left"
                 })
@@ -704,8 +676,8 @@ impl HermesApp {
                         .border_color(if on { theme.primary } else { theme.input })
                         .when(on, |d| d.bg(theme.primary)),
                 )
-                .child(div().flex_1().text_sm().child(name.clone()))
-                .child(div().text_xs().text_color(muted).child(user.clone()))
+                .child(div().flex_1().text_base().child(name.clone()))
+                .child(div().text_sm().text_color(muted).child(user.clone()))
                 .on_click(
                     cx.listener(move |this, _, _, cx| this.toggle_telegram_person(id.clone(), cx)),
                 )
@@ -713,7 +685,7 @@ impl HermesApp {
         v_flex()
             .w_full()
             .gap_3()
-            .child(div().text_sm().text_color(muted).child(
+            .child(div().text_base().text_color(muted).child(
                 "Whose Telegram sessions the list shows. Checked people are shown, the rest are hidden (the sessions themselves are not touched).",
             ))
             .child(
@@ -723,13 +695,13 @@ impl HermesApp {
                     .border_color(theme.border)
                     .children(rows)
                     .when(self.tg_people.is_empty(), |d| {
-                        d.child(div().py_3().text_sm().text_color(muted).child("No Telegram sessions in this profile."))
+                        d.child(div().py_3().text_base().text_color(muted).child("No Telegram sessions for this agent."))
                     }),
             )
     }
 
     pub(super) fn render_appearance(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        use crate::theme::{ACCENTS, Mode, Size};
+        use crate::theme::{ACCENTS, Mode};
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let a = self.appearance;
@@ -745,8 +717,8 @@ impl HermesApp {
                     v_flex()
                         .flex_1()
                         .gap_0p5()
-                        .child(div().text_sm().child(title))
-                        .child(div().text_xs().text_color(muted).child(hint)),
+                        .child(div().text_base().child(title))
+                        .child(div().text_sm().text_color(muted).child(hint)),
                 )
                 .child(control)
         };
@@ -762,7 +734,7 @@ impl HermesApp {
                         .id((id, k))
                         .px_3()
                         .py_1()
-                        .text_sm()
+                        .text_base()
                         .cursor_pointer()
                         .when(k > 0, |d| d.border_l_1().border_color(theme.border))
                         .when(on, |d| {
@@ -784,14 +756,6 @@ impl HermesApp {
         ]
         .into_iter()
         .map(|(l, m)| (l, a.mode == m, crate::theme::Appearance { mode: m, ..a }))
-        .collect();
-        let sizes = [
-            ("Small", Size::Small),
-            ("Normal", Size::Normal),
-            ("Large", Size::Large),
-        ]
-        .into_iter()
-        .map(|(l, s)| (l, a.size == s, crate::theme::Appearance { size: s, ..a }))
         .collect();
         let view = cx.entity();
         let compact = Checkbox::new("compact-sidebar")
@@ -846,11 +810,6 @@ impl HermesApp {
                 ))
                 .child(row("Accent", "Buttons, selection, links.", accents))
                 .child(row(
-                    "Size",
-                    "Text and spacing across the app.",
-                    segmented("size", sizes, cx),
-                ))
-                .child(row(
                     "Compact sidebar",
                     "Chats and servers as titles only, closer together.",
                     compact,
@@ -858,10 +817,10 @@ impl HermesApp {
         )
     }
 
-    /// Settings: Appearance, then the Telegram filter, one scrolling page.
+    /// Settings: Appearance, one scrolling page.
     pub(super) fn render_settings(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;
-        let heading = |t: &'static str| div().pt_4().pb_1().text_xs().text_color(muted).child(t);
+        let heading = |t: &'static str| div().pt_4().pb_1().text_sm().text_color(muted).child(t);
         let appearance = self.render_appearance(cx).into_any_element();
         v_flex()
             .id("settings")
@@ -871,128 +830,6 @@ impl HermesApp {
             .pb_6()
             .child(heading("APPEARANCE"))
             .child(appearance)
-    }
-
-    pub(super) fn render_gateways(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let checking = self.installs.values().any(|i| i.busy.is_some());
-        let rows: Vec<AnyElement> = self
-            .targets
-            .clone()
-            .into_iter()
-            .enumerate()
-            .map(|(k, target)| {
-                let i = self
-                    .installs
-                    .get(&target.label())
-                    .cloned()
-                    .unwrap_or_default();
-                let status: SharedString = match (&i.busy, &i.error, &i.available) {
-                    (Some(b), _, _) => b.clone().into(),
-                    (_, Some(e), _) => e.clone().into(),
-                    (_, _, Some(v)) if v.starts_with('v') => format!("{v} is available").into(),
-                    (_, _, Some(v)) => format!("Update available: {v}").into(),
-                    _ if i.checked => "Up to date".into(),
-                    _ => "".into(),
-                };
-                let status_color = if i.error.is_some() {
-                    theme.danger
-                } else if i.available.is_some() {
-                    theme.primary
-                } else {
-                    muted
-                };
-                let t2 = target.clone();
-                h_flex()
-                    .gap_4()
-                    .py_3()
-                    .items_center()
-                    .border_b_1()
-                    .border_color(theme.border)
-                    .child(
-                        v_flex()
-                            .flex_1()
-                            .min_w_0()
-                            .gap_0p5()
-                            .child(
-                                h_flex()
-                                    .gap_2()
-                                    .items_baseline()
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .font_weight(FontWeight::MEDIUM)
-                                            .child(target.label()),
-                                    )
-                                    .child(div().text_sm().font_family(crate::theme::MONO).child(
-                                        if i.version.is_empty() {
-                                            "—".to_string()
-                                        } else {
-                                            i.version.clone()
-                                        },
-                                    ))
-                                    .when(!i.channel.is_empty(), |d| {
-                                        d.child(
-                                            div()
-                                                .text_xs()
-                                                .text_color(muted)
-                                                .child(i.channel.clone()),
-                                        )
-                                    }),
-                            )
-                            .child(
-                                div()
-                                    .text_xs()
-                                    .text_color(status_color)
-                                    .truncate()
-                                    .child(status),
-                            ),
-                    )
-                    .when(i.available.is_some() && i.busy.is_none(), |d| {
-                        d.child(
-                            Button::new(("gw-update", k))
-                                .small()
-                                .primary()
-                                .label("Update")
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    this.update_install(t2.clone(), window, cx)
-                                })),
-                        )
-                    })
-            })
-            .map(|r| r.into_any_element())
-            .collect();
-        v_flex()
-            .id("gateways")
-            .size_full()
-            .overflow_y_scroll()
-            .px_4()
-            .py_2()
-            .child(
-                v_flex()
-                    .max_w(px(720.))
-                    .child(
-                        v_flex()
-                            .py_2()
-                            .gap_2()
-                            .items_start()
-                            .child(div().text_xs().text_color(muted).child(
-                                "Hermes on each machine. Updating takes a full backup first, then restarts that gateway; going back to an older release means restoring that backup.",
-                            ))
-                            .child(
-                                Button::new("gw-check")
-                                    .small()
-                                    .outline()
-                                    .label("Check versions")
-                                    .disabled(checking)
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.check_installs(window, cx)
-                                    })),
-                            ),
-                    )
-                    .children(rows),
-            )
     }
 }
 

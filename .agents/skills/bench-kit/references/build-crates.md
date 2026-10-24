@@ -66,8 +66,8 @@ fn crops_to_1200x630() {
     assert_eq!(image::open(&b).unwrap().dimensions(), (1200, 630));
 }
 ```
-(`use image::GenericImageView as _;` for `.dimensions()`.) Its UI is a Tools-mode tool: drop or
-paste an image in, the cropped preview out, Save as… (`build-modes.md` §6–7).
+(`use image::GenericImageView as _;` for `.dimensions()`.) Its UI is a tool in the Tools group: drop or
+paste an image in, the cropped preview out, Save as… (`build-subject.md`).
 
 ## macOS without crates
 

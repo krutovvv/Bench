@@ -3,12 +3,14 @@
 mod asks;
 mod chat;
 mod composer;
+pub(crate) mod editor_status;
 mod files;
-mod install;
 mod media;
 mod panels;
 mod providers;
 mod servers;
+mod remote_files;
+mod sites;
 mod sidebar;
 mod statusbar;
 mod tasks;
@@ -30,24 +32,19 @@ use gpui_kit::*;
 
 use crate::app::{HermesApp, Panel};
 
-/// A sidebar's search: a band from edge to edge (rules above and below, the content's
-/// background between), no frame of its own; the magnifier right over the group icons.
+/// A sidebar's search: a transparent band on the sidebar's own color, no rules, no frame; the
+/// magnifier right over the group icons. Always there (⌘F focuses it).
 pub fn search_band(input: &Entity<gpui_kit::component::input::InputState>, cx: &App) -> Div {
     let theme = cx.theme();
     h_flex()
         .flex_none()
         .w_full()
-        // As tall as the title bar: 36 with its two rules.
-        .h(bar_h(cx) + px(1.))
+        .h(bar_h(cx))
         // Measured: the input's own padding plus the icon's side bearing put it 2.5 right of
         // the group icons at 6.
         .pl(px(3.5))
         .pr_2()
         .items_center()
-        .bg(theme.background)
-        .border_t_1()
-        .border_b_1()
-        .border_color(theme.sidebar_border)
         .child(
             gpui_kit::component::input::Input::new(input)
                 .appearance(false)
@@ -106,29 +103,48 @@ impl HermesApp {
             .gap_1()
             // The icon's 4px box padding + 12 = the sidebar's 16px inset.
             .pr(px(12.))
-            // The two utilities over the sidebar: Tools, then Tasks.
-            .when(crate::bench::TOOLS, |d| {
-                d.child(
-                    toggle(
-                        "mode-tools",
-                        crate::icons::Ico::Wrench,
-                        "Tools  ⌘3",
-                        self.tools.on,
+            // "+": a new item of the mode (a chat, a server, a task), then folding the sidebar
+            // away (⌘\\), then the two utilities. One style everywhere: no big buttons.
+            .when(!self.tools.on, |d| {
+                let tip = if self.tasks.on {
+                    "New task  ⌘N"
+                } else if self.ssh.on {
+                    "New server"
+                } else {
+                    "New session  ⌘N"
+                };
+                d.when(!self.tasks.on && !self.ssh.on, |d| {
+                    d.child(
+                        toggle("open-folder", crate::icons::Ico::FolderOpen, "New session in a folder…", false)
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.new_session(cx);
+                                this.choose_project_folder(window, cx);
+                            })),
                     )
-                    .on_click(cx.listener(|this, _, window, cx| this.toggle_tools(window, cx))),
+                })
+                .child(
+                    toggle("new-item", crate::icons::Ico::Plus, tip, false).on_click(cx.listener(
+                        |this, _, window, cx| {
+                            if this.tasks.on {
+                                this.new_task(window, cx)
+                            } else if this.ssh.on {
+                                this.edit_server(None, None, window, cx)
+                            } else {
+                                this.new_session(cx)
+                            }
+                        },
+                    )),
                 )
             })
-            .when(crate::bench::TASKS, |d| {
-                d.child(
-                    toggle(
-                        "mode-tasks",
-                        crate::icons::Ico::ListTodo,
-                        "Tasks  ⌘4",
-                        self.tasks.on,
-                    )
-                    .on_click(cx.listener(|this, _, window, cx| this.toggle_tasks(window, cx))),
+            .child(
+                toggle(
+                    "sidebar-hide",
+                    crate::icons::Ico::PanelLeft,
+                    "Hide sidebar  ⌘\\",
+                    false,
                 )
-            })
+                .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
+            )
             .into_any_element()
     }
 }
@@ -174,6 +190,23 @@ pub fn nest_guide(cx: &App, last: bool) -> impl IntoElement {
 
 /// A group header's fold chevron, at the right before its "+": shown on a folded group, and
 /// on hover of an open one.
+/// A sidebar head's icon in a fixed square, centered: icons of any drawing size line up, and
+/// the names after them start at one x.
+pub fn head_icon(icon: crate::icons::Ico, cx: &App) -> impl IntoElement {
+    div()
+        .flex_none()
+        .size(px(16.))
+        .flex()
+        .items_center()
+        .justify_center()
+        .child(icon.icon().small().text_color(cx.theme().muted_foreground))
+}
+
+/// The room a head's "+" takes, kept when it has none, so every chevron sits at one x.
+pub fn head_plus_slot() -> Div {
+    div().flex_none().size(px(16.)).flex().items_center().justify_center()
+}
+
 pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl IntoElement {
     div()
         .flex_none()
@@ -195,6 +228,66 @@ pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl Int
 /// A 2-rem control's height (a filled button outside a bar, e.g. "Add server"). The bars
 /// themselves are `bar_h`: a button that fills one takes `.h_full()` instead.
 pub const BAR_CONTROL_REMS: f32 = 2.;
+
+/// The window's column dividers draw no line at rest: the sidebar is darker than the chat, so
+/// the edge is its color (an old-school rule there was the eyesore). Hovered or dragged, the
+/// divider shows as an accent line, so it can still be found and pulled. The IDE panel draws
+/// its own left rule (content meets content there).
+fn quiet_divider() -> gpui_kit::base::ResizeHandleRenderer {
+    std::rc::Rc::new(|handle, _, cx| {
+        let rest = matches!(handle.state(), gpui_kit::base::ResizeHandleState::Idle);
+        Some(
+            div()
+                .flex_none()
+                .w(px(1.))
+                .h_full()
+                .bg(if rest {
+                    gpui_kit::transparent_black()
+                } else {
+                    cx.theme().primary.opacity(0.6)
+                })
+                .into_any_element(),
+        )
+    })
+}
+
+/// The chat as in Zed's Delta: who speaks is an avatar in a left gutter, not a colored band.
+/// The avatar sits `CHAT_LEFT` from the column's edge; text starts at `CHAT_TEXT`; the right
+/// side keeps `CHAT_RIGHT` (more than the left: a line ends well before the edge).
+/// The thread's side room, equal to the room above its first turn (the user asked for both alike).
+pub const CHAT_LEFT: f32 = 38.;
+pub const AVATAR: f32 = 24.;
+pub const CHAT_TEXT: f32 = CHAT_LEFT + AVATAR + 14.;
+pub const CHAT_RIGHT: f32 = 38.;
+/// Every row of the thread (the question, the answer, the composer) pads its top and bottom by
+/// this, so any two rows are 2 × TURN_Y apart, whoever speaks (as in Delta).
+pub const TURN_Y: f32 = 14.;
+
+/// Who speaks, in the chat's left gutter: the person a dark disc with a figure, the agent the
+/// accent's tint with a bot — told apart at a glance. The composer wears the person's: the next
+/// message is the next turn.
+pub fn avatar(agent: bool, theme: &gpui_kit::component::Theme) -> Div {
+    div()
+        .flex_none()
+        .size(px(AVATAR))
+        .mt(px(1.))
+        .rounded_full()
+        .flex()
+        .items_center()
+        .justify_center()
+        .map(|d| {
+            if agent {
+                // Both discs solid: a pale one reads smaller than a dark one of the same size.
+                d.bg(theme.primary)
+                    .text_color(theme.primary_foreground)
+                    .child(crate::icons::Ico::Bot.icon().xsmall())
+            } else {
+                d.bg(theme.foreground.opacity(0.78))
+                    .text_color(theme.background)
+                    .child(crate::icons::Ico::UserRound.icon().xsmall())
+            }
+        })
+}
 
 /// "1 action", "3 actions" (the `few` form is kept for call-site symmetry).
 pub fn plural(n: usize, one: &str, _few: &str, many: &str) -> String {
@@ -227,7 +320,7 @@ pub fn clip(s: &str, n: usize) -> String {
 }
 
 impl HermesApp {
-    /// "app · hermes/fix-login": the chat's project and branch, with the git actions.
+    /// "app · fix-login": the chat's project and branch, with the git actions.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         use gpui_kit::component::button::{Button, ButtonVariants as _};
         use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -242,7 +335,7 @@ impl HermesApp {
         Some(
             Button::new("project-chip")
                 .ghost()
-                .xsmall()
+                .small()
                 .icon(crate::icons::Ico::GitBranch.icon())
                 .label(label)
                 .dropdown_menu(move |menu, _, _| {
@@ -308,6 +401,9 @@ impl HermesApp {
                 .as_ref()
                 .and_then(|id| self.sessions.iter().find(|s| &s.id == id))
                 .map(|s| s.title.clone())
+                .filter(|t| !t.is_empty())
+                // A thread about a task list is named after it until it has a title of its own.
+                .or_else(|| self.subject_title())
                 .unwrap_or_else(|| "New session".into())
                 .into();
             return bar
@@ -333,12 +429,10 @@ impl HermesApp {
             ("tab-mcp", "MCP", Panel::Mcp),
             ("tab-skills", "Skills", Panel::Skills),
             ("tab-prompts", "Prompts", Panel::Prompts),
-            ("tab-config", "Config", Panel::Config),
             ("tab-providers", "Providers", Panel::Providers),
             ("tab-messages", "Messages", Panel::Messages),
             ("tab-cron", "Cron", Panel::Cron),
-            ("tab-gw", "Gateways", Panel::Gateways),
-            ("tab-profiles", "Profiles", Panel::Profiles),
+            ("tab-profiles", "Agents", Panel::Profiles),
             ("tab-settings", "Settings", Panel::Settings),
         ]
         .map(|(id, label, panel)| {
@@ -349,6 +443,7 @@ impl HermesApp {
                 .px_4()
                 .flex()
                 .items_center()
+                // The bars' one size: the sidebar's group names, the header's title, the status bar.
                 .text_sm()
                 .cursor_pointer()
                 .border_r_1()
@@ -391,26 +486,25 @@ impl Render for HermesApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // The open chat's unsent text in the composer (app.rs, drafts).
         self.sync_draft(window, cx);
+        // A new chat is a code editor's empty file: the caret alone (no avatars yet), focused.
+        // The composer never has a placeholder: it is the thread's next text, not a form field.
+        let fresh = self.turns.is_empty() && self.session.is_none();
+        if fresh != self.composer_fresh {
+            self.composer_fresh = fresh;
+            if fresh && self.panel == Panel::Chat {
+                self.composer.update(cx, |s, cx| s.focus(window, cx));
+            }
+        }
+        // The server browser's stream follows what is on screen (no frames for a hidden thread).
+        #[cfg(not(target_family = "wasm"))]
+        self.update_browser_stream();
         let theme = cx.theme().clone();
-        let ssh = self.ssh.on && self.panel == Panel::Chat;
+        // The server form (new or edited server) takes the chat area while open.
+        let ssh = (self.ssh.on || self.ssh.form.is_some()) && self.panel == Panel::Chat;
         let body = match self.panel {
             Panel::Chat if self.tasks.on => self.render_tasks_body(cx),
             Panel::Chat if self.tools.on => self.render_tools_body(cx),
             Panel::Chat if ssh => self.render_ssh_body(window, cx),
-            // A setup in a terminal (installing Hermes, a Claude login) has the chat area.
-            Panel::Chat if self.setup.is_some() && self.setup_tab().is_some() => self
-                .render_setup(window, cx)
-                .unwrap_or_else(|| div().into_any_element()),
-            Panel::Chat if self.hermes_missing => v_flex()
-                .size_full()
-                .child(
-                    div()
-                        .flex_1()
-                        .min_h_0()
-                        .child(self.render_hermes_missing(cx)),
-                )
-                .child(self.render_composer(window, cx))
-                .into_any_element(),
             // Files dropped anywhere on the chat or the input are attached.
             Panel::Chat => v_flex()
                 .id("chat-drop")
@@ -419,26 +513,60 @@ impl Render for HermesApp {
                 .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
                     this.add_attachments(paths.paths().to_vec(), cx)
                 }))
-                .child(div().flex_1().min_h_0().child(self.render_chat(cx)))
+                .child(div().flex_1().min_h_0().child(self.render_chat(window, cx)))
                 .children(self.render_plan(cx))
-                .child(self.render_composer(window, cx))
                 .into_any_element(),
             Panel::Skills => self.render_skills(cx).into_any_element(),
             Panel::Mcp => self.render_mcp(cx).into_any_element(),
-            Panel::Config => self.render_config(cx).into_any_element(),
             Panel::Providers => self.render_providers(cx),
             Panel::Messages => self.render_messages(cx),
             Panel::Cron => self.render_cron(cx).into_any_element(),
             Panel::Settings => self.render_settings(cx).into_any_element(),
             Panel::Profiles => self.render_profiles(cx).into_any_element(),
-            Panel::Gateways => self.render_gateways(cx).into_any_element(),
             Panel::Prompts => self.render_prompts(cx).into_any_element(),
         };
 
+        // The sidebar folded away: its corner joins the header — room for the window's buttons
+        // and the toggle that brings it back.
+        let header = self.render_header(cx);
+        let header = if self.sidebar_hidden {
+            let theme = cx.theme().clone();
+            h_flex()
+                .flex_none()
+                .child(
+                    h_flex()
+                        .h(px(36.))
+                        .flex_none()
+                        .pl(px(78.))
+                        .pr_1()
+                        .items_center()
+                        .bg(theme.title_bar)
+                        .border_b_1()
+                        .border_color(theme.border)
+                        .child(
+                            div()
+                                .id("sidebar-show")
+                                .p_1()
+                                .cursor_pointer()
+                                .text_color(theme.muted_foreground)
+                                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                                .child(crate::icons::Ico::PanelLeft.icon().small())
+                                .tooltip(|window, cx| {
+                                    gpui_kit::component::tooltip::Tooltip::new("Show sidebar  ⌘\\")
+                                        .build(window, cx)
+                                })
+                                .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
+                        ),
+                )
+                .child(div().flex_1().min_w_0().child(header))
+                .into_any_element()
+        } else {
+            header
+        };
         let main = v_flex()
             .size_full()
             .min_w_0()
-            .child(self.render_header(cx))
+            .child(header)
             .child(div().flex_1().min_h_0().child(body));
 
         // The IDE maximized (⌘⇧B) has the whole window; the rest keeps running, hidden.
@@ -472,7 +600,12 @@ impl HermesApp {
         // One left column, one IDE width: when the set of panels changes (maximized or not,
         // IDE on the right or not) the group starts from a fresh state laid out at the widths
         // remembered here — gpui-kit would otherwise squeeze the old sizes to fit a new panel.
-        let shape = (expanded, self.right.is_some() && self.panel == Panel::Chat);
+        let hidden = self.sidebar_hidden && !expanded;
+        let shape = (
+            expanded,
+            self.right.is_some() && self.panel == Panel::Chat,
+            hidden,
+        );
         if self.layout_synced != Some(shape) {
             self.layout_synced = Some(shape);
             if expanded {
@@ -494,11 +627,17 @@ impl HermesApp {
                              cx: &mut App| {
             let sizes = state.read(cx).sizes().clone();
             view.update(cx, |this, _| {
-                if let Some(w) = sizes.first() {
-                    this.sidebar_w = *w;
-                }
+                // Without the sidebar the columns are main | IDE.
+                let ide_at = if this.sidebar_hidden && !this.ide.expanded {
+                    1
+                } else {
+                    if let Some(w) = sizes.first() {
+                        this.sidebar_w = *w;
+                    }
+                    2
+                };
                 // Normal layout with the IDE on the right: sidebar | main | IDE.
-                if let (Some(w), false) = (sizes.get(2), this.ide.expanded) {
+                if let (Some(w), false) = (sizes.get(ide_at), this.ide.expanded) {
                     this.ide_w = *w;
                 }
             });
@@ -511,6 +650,7 @@ impl HermesApp {
         if expanded {
             return h_resizable("layout-ide")
                 .with_state(&state)
+                .with_handle_appearance(quiet_divider())
                 .on_resize(remember)
                 .child(left.child(self.render_ide_sidebar(cx)))
                 .child(resizable_panel().child(self.render_ide_main(cx)))
@@ -518,8 +658,9 @@ impl HermesApp {
         }
         h_resizable("layout")
             .with_state(&state)
+            .with_handle_appearance(quiet_divider())
             .on_resize(remember)
-            .child(left.child(self.render_sidebar(cx)))
+            .when(!hidden, |d| d.child(left.child(self.render_sidebar(cx))))
             .child(resizable_panel().child(main))
             .when(
                 self.right.is_some()

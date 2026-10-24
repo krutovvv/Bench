@@ -1,14 +1,14 @@
 //! Prefill and generation speed, measured from the event stream.
 //!
-//! Hermes reports token counts per API call (each `session.usage` frame follows one call) but
+//! The agent reports token counts per API call (each `session.usage` frame follows one call) but
 //! only a blended `avg_tps`. Timing each call ourselves splits it:
 //! prefill = new input tokens / time to the first streamed token;
 //! generation = output tokens / time from the first token to the end of the call.
 //! A call that cannot be timed cleanly (nothing streamed, too few tokens) leaves the last value.
 //!
 //! Live speed: while text streams, once a second the characters of that second are turned into
-//! tokens with a characters-per-token ratio calibrated on each finished call (Hermes reports the
-//! exact token count only per call). The per-second samples of the current answer feed a chart.
+//! tokens with a characters-per-token ratio calibrated on each finished call (the agent reports
+//! the exact token count only per call). The per-second samples of the current answer feed a chart.
 
 use std::time::Duration;
 

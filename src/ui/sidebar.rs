@@ -12,6 +12,9 @@ use crate::app::{HermesApp, Panel};
 use crate::icons::Ico;
 use crate::model::source_label;
 
+/// A session title: the sidebar's 14px.
+pub(super) const SESSION_TITLE: f32 = 14.;
+
 impl HermesApp {
     pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         if self.tasks.on {
@@ -27,12 +30,16 @@ impl HermesApp {
         let muted = theme.muted_foreground;
 
         // Group visible sessions: by git project when they work in one, else by where they live
-        // (Hermes UI/CLI, Telegram, cron…). Plain Hermes chats first, then projects, then the rest.
+        // (Bench, Telegram, cron…). Plain Bench chats first, then projects, then the rest.
         let mut groups: Vec<(String, Vec<usize>)> = vec![];
         let mut rank: Vec<(String, u8)> = vec![];
         // A project/folder group's place on disk and whether it is a git repo (for its "+").
         let mut homes: Vec<(String, String, bool)> = vec![];
         for i in self.visible_sessions() {
+            // A thread with a subject is reached through its subject's row (a task list…).
+            if !self.sessions[i].subject.is_empty() {
+                continue;
+            }
             let id = &self.sessions[i].id;
             let folder = self
                 .folder_of(id)
@@ -56,7 +63,7 @@ impl HermesApp {
                 }
                 (None, None) => {
                     let l = source_label(&self.sessions[i].source);
-                    let r = if l == "Hermes" { 1 } else { 3 };
+                    let r = if l == "Bench" { 1 } else { 3 };
                     (l, r)
                 }
             };
@@ -82,6 +89,19 @@ impl HermesApp {
 
         let mut list: Vec<AnyElement> = vec![];
         let searching = !self.search_query.is_empty();
+        if !searching {
+            if crate::bench::TASKS {
+                list.extend(self.render_task_lists(cx));
+            }
+            if crate::bench::SSH {
+                list.extend(self.render_server_group(cx));
+            }
+            list.extend(self.render_files_group(cx));
+            list.extend(self.render_sites_group(cx));
+            if crate::bench::TOOLS {
+                list.extend(self.render_tool_group(cx));
+            }
+        }
         if searching {
             match &self.search_hits {
                 None => list.push(self.sidebar_note("Searching…", cx)),
@@ -116,7 +136,8 @@ impl HermesApp {
                 };
                 let key = format!("s:{label}");
                 let collapsed = self.ssh.collapsed.contains(&key);
-                let top = rems(if g > 0 { 0.75 } else { 0.5 });
+                // Tasks, Servers… stand above: every group head keeps one step.
+                let top = rems(0.75);
                 list.push(
                     h_flex()
                         .id(("ghead", g))
@@ -131,7 +152,7 @@ impl HermesApp {
                         .gap_1p5()
                         .items_center()
                         .text_sm()
-                        .child(icon.icon().small().text_color(muted))
+                        .child(super::head_icon(icon, cx))
                         .child(
                             div()
                                 .min_w_0()
@@ -146,8 +167,9 @@ impl HermesApp {
                         .child(super::group_chevron(collapsed, group.clone(), cx))
                         // "+", always shown (icon, name, "+": a balanced row): a new chat in
                         // the project/folder (a project's in a branch of its own), or a plain
-                        // Hermes chat. Telegram, cron and pinned groups can't start one here.
-                        .when(home.is_some() || label == "Hermes", |d| {
+                        // Bench chat. Telegram, cron and pinned groups can't start one here.
+                        .when(!(home.is_some() || label == "Bench"), |d| d.child(super::head_plus_slot()))
+                        .when(home.is_some() || label == "Bench", |d| {
                             let tip = match &home {
                                 Some((_, _, true)) => "New chat in this project",
                                 Some((_, path, _)) if path.contains("/Research/") => {
@@ -158,9 +180,8 @@ impl HermesApp {
                             };
                             let home = home.clone();
                             d.child(
-                                div()
+                                super::head_plus_slot()
                                     .id(("group-new", g))
-                                    .p_0p5()
                                     .cursor_pointer()
                                     .text_color(muted)
                                     .hover(|s| {
@@ -197,43 +218,11 @@ impl HermesApp {
             }
         }
 
-        // No Hermes on this Mac: the main button installs it.
-        let missing = self.hermes_missing;
-        let new_session = h_flex()
-            .id("new-session")
-            .h(rems(super::BAR_CONTROL_REMS))
-            .px_3()
-            .gap_2()
-            .items_center()
-            .justify_center()
-            .text_sm()
-            .font_weight(FontWeight::MEDIUM)
-            .bg(theme.primary)
-            .text_color(theme.primary_foreground)
-            .cursor_pointer()
-            .hover(|s| s.bg(theme.primary_hover))
-            .child(
-                if missing { Ico::Download } else { Ico::Plus }
-                    .icon()
-                    .small(),
-            )
-            .child(if missing {
-                "Install Hermes Agent"
-            } else {
-                "New session"
-            })
-            .on_click(cx.listener(move |this, _, window, cx| {
-                if missing {
-                    this.start_setup(crate::app::install::SetupKind::Hermes, window, cx)
-                } else {
-                    this.new_session(cx)
-                }
-            }));
-
         v_flex()
             .size_full()
             .bg(theme.sidebar)
-            // Under the window buttons: the search as a band, the button at the bottom as one.
+            // Under the window buttons: the search as a band, then the groups as an IDE's tree
+            // (a new chat: "+" on a group, or in the top strip).
             .child(self.render_sidebar_top(cx))
             .child(super::search_band(&self.search, cx))
             .child(
@@ -254,14 +243,6 @@ impl HermesApp {
                                 .child("Connecting…"),
                         )
                     }),
-            )
-            .child(
-                // As tall as the composer with its 1px top rule, so the button's top edge
-                // lines up with that rule across the window.
-                h_flex()
-                    .flex_none()
-                    .h(super::bar_h(cx) + px(1.))
-                    .child(new_session.flex_1().h_full()),
             )
             .into_any_element()
     }
@@ -307,7 +288,7 @@ impl HermesApp {
             })
             .when(selected, |d| d.bg(theme.sidebar_accent))
             .hover(|s| s.bg(theme.sidebar_accent))
-            .child(div().text_sm().truncate().child(title))
+            .child(div().text_size(px(SESSION_TITLE)).truncate().child(title))
             .child(
                 div()
                     .text_xs()
@@ -459,7 +440,7 @@ impl HermesApp {
             })
             .when_some(guide, |d, last| d.child(super::nest_guide(cx, last)))
             .pr_3()
-            .map(|d| if compact { d.py_1() } else { d.py_2() })
+            .map(|d| if compact { d.py_1p5() } else { d.py(px(5.)) })
             .cursor_pointer()
             .border_l_2()
             // A chosen color wins over the accent; it also tints the row lightly.
@@ -474,9 +455,10 @@ impl HermesApp {
                     ..c
                 })
             })
+            // The open chat in the accent's own tint, not one more grey.
             .when(selected && stripe.is_none(), |d| {
-                d.bg(theme.sidebar_accent)
-                    .text_color(theme.sidebar_accent_foreground)
+                d.bg(theme.primary.opacity(0.12))
+                    .text_color(theme.foreground)
             })
             // Hover keeps a chosen color, half a step denser; plain rows get the usual grey.
             .hover(move |h| match stripe {
@@ -491,7 +473,7 @@ impl HermesApp {
                     .flex_1()
                     .min_w_0()
                     // A working session's title carries a moving highlight, to find it at a glance.
-                    .child(div().text_sm().truncate().map(|d| {
+                    .child(div().text_size(px(SESSION_TITLE)).truncate().map(|d| {
                         if working {
                             d.child(ShimmerText::new(s.title.clone()))
                         } else {
@@ -548,4 +530,298 @@ fn color_row(view: &Entity<HermesApp>, id: &str, current: Option<usize>, cx: &Ap
         .children((0..crate::app::marks::SESSION_COLORS.len()).map(|c| swatch(Some(c))))
         .child(swatch(None))
         .into_any_element()
+}
+
+impl HermesApp {
+    /// The Tasks group: a folder of the task lists, each opening its thread (the list live on
+    /// top, the conversation under it).
+    fn render_task_lists(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let key = "s:Tasks".to_string();
+        let collapsed = self.ssh.collapsed.contains(&key);
+        let current = self.current_subject();
+        let compact = self.appearance.compact_sidebar;
+        let mut out = vec![h_flex()
+            .id("tasks-head")
+            .group("tasks-head")
+            .cursor_pointer()
+            .px_4()
+            .pt(rems(0.5))
+            .pb_1()
+            .gap_1p5()
+            .items_center()
+            .text_sm()
+            .child(super::head_icon(Ico::ListTodo, cx))
+            .child(
+                div()
+                    .min_w_0()
+                    .truncate()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(muted)
+                    .child("Tasks"),
+            )
+            .child(div().flex_1())
+            .child(super::group_chevron(collapsed, "tasks-head".into(), cx))
+            .child(super::head_plus_slot())
+            .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
+            .into_any_element()];
+        if collapsed {
+            return out;
+        }
+        let n = crate::tasks::LISTS.len();
+        for (k, list) in crate::tasks::LISTS.iter().enumerate() {
+            let selected =
+                self.panel == Panel::Chat && current == HermesApp::tasks_subject(list);
+            let count = match list {
+                crate::tasks::List::Today
+                | crate::tasks::List::Upcoming
+                | crate::tasks::List::Anytime => self.tasks.count(list),
+                _ => 0,
+            };
+            let l = list.clone();
+            out.push(
+                h_flex()
+                    .id(("task-list", k))
+                    .relative()
+                    .gap_1()
+                    .pl(super::nest_pl(cx))
+                    .child(super::nest_guide(cx, k + 1 == n))
+                    .pr_3()
+                    .map(|d| if compact { d.py_1p5() } else { d.py(px(5.)) })
+                    .cursor_pointer()
+                    .border_l_2()
+                    .border_color(if selected { theme.primary } else { theme.transparent })
+                    .when(selected, |d| d.bg(theme.primary.opacity(0.12)))
+                    .hover(|h| h.bg(theme.sidebar_accent))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .truncate()
+                            .text_size(px(SESSION_TITLE))
+                            .child(list.name()),
+                    )
+                    .when(count > 0, |d| {
+                        d.child(div().text_sm().text_color(muted).child(count.to_string()))
+                    })
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_task_list(l.clone(), window, cx)
+                    }))
+                    .into_any_element(),
+            );
+        }
+        out
+    }
+
+    /// A subject group's header: an icon (in its square), the name, the chevron that folds it,
+    /// then the "+" (`plus`) or the room of one — the same columns as the project groups'.
+    fn subject_head(
+        &mut self,
+        id: &'static str,
+        icon: Ico,
+        name: &'static str,
+        plus: Option<Box<dyn Fn(&mut Self, &mut Window, &mut Context<Self>) + 'static>>,
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, bool) {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let key = format!("s:{name}");
+        let collapsed = self.ssh.collapsed.contains(&key);
+        let plus_el = match plus {
+            Some(f) => super::head_plus_slot()
+                .id(SharedString::from(format!("{id}-plus")))
+                .cursor_pointer()
+                .text_color(muted)
+                .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
+                .child(Ico::Plus.icon().xsmall())
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    cx.stop_propagation();
+                    f(this, window, cx)
+                }))
+                .into_any_element(),
+            None => super::head_plus_slot().into_any_element(),
+        };
+        let head = h_flex()
+            .id(id)
+            .group(id)
+            .cursor_pointer()
+            .px_4()
+            .pt(rems(0.75))
+            .pb_1()
+            .gap_1p5()
+            .items_center()
+            .text_sm()
+            .child(super::head_icon(icon, cx))
+            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child(name))
+            .child(div().flex_1())
+            .child(super::group_chevron(collapsed, id.into(), cx))
+            .child(plus_el)
+            .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
+            .into_any_element();
+        (head, collapsed)
+    }
+
+    /// A row under a subject group: the name, a quiet note, the open thread tinted.
+    fn subject_row(
+        &self,
+        id: SharedString,
+        name: String,
+        note: String,
+        selected: bool,
+        last: bool,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let theme = cx.theme().clone();
+        let compact = self.appearance.compact_sidebar;
+        h_flex()
+            .id(id)
+            .relative()
+            .gap_2()
+            .pl(super::nest_pl(cx))
+            .child(super::nest_guide(cx, last))
+            .pr_3()
+            .map(|d| if compact { d.py_1p5() } else { d.py(px(5.)) })
+            .cursor_pointer()
+            .border_l_2()
+            .border_color(if selected { theme.primary } else { theme.transparent })
+            .when(selected, |d| d.bg(theme.primary.opacity(0.12)))
+            .hover(|h| h.bg(theme.sidebar_accent))
+            .child(div().flex_none().text_size(px(SESSION_TITLE)).child(name))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .text_sm()
+                    .text_color(theme.muted_foreground)
+                    .child(note),
+            )
+    }
+
+    /// The Servers group: every host of ~/.ssh/config; a click opens its thread, the terminal on top.
+    fn render_server_group(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let (head, collapsed) = self.subject_head(
+            "servers-head",
+            Ico::Server,
+            "Servers",
+            // "+": a new server (its form takes the chat area).
+            Some(Box::new(|this: &mut Self, window, cx| {
+                this.panel = Panel::Chat;
+                this.edit_server(None, None, window, cx)
+            })),
+            cx,
+        );
+        let mut out = vec![head];
+        if collapsed {
+            return out;
+        }
+        let current = self.current_subject();
+        let servers = self.ssh.servers.clone();
+        let n = servers.len() + 1;
+        let mut rows: Vec<(String, String)> = vec![(crate::term::LOCAL.to_string(), "this Mac".into())];
+        rows.extend(servers.iter().map(|s| {
+            let at = if s.user.is_empty() { s.hostname.clone() } else { format!("{}@{}", s.user, s.hostname) };
+            (s.alias.clone(), at)
+        }));
+        for (k, (alias, note)) in rows.into_iter().enumerate() {
+            let selected = self.panel == Panel::Chat && current == format!("ssh:{alias}");
+            let name = if alias == crate::term::LOCAL { "Terminal".to_string() } else { alias.clone() };
+            let a = alias.clone();
+            out.push(
+                self.subject_row(format!("srv-{k}").into(), name, note, selected, k + 1 == n, cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_server_thread(a.clone(), window, cx)
+                    }))
+                    .into_any_element(),
+            );
+        }
+        out
+    }
+
+    /// Tools: a folder of them, each tool a thread (the tool on top); folded by the chevron.
+    fn render_tool_group(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let (head, collapsed) = self.subject_head("tools-head", Ico::Wrench, "Tools", None, cx);
+        let mut out = vec![head];
+        if collapsed {
+            return out;
+        }
+        let current = self.current_subject();
+        let tools: Vec<(crate::devtools::Tool, &'static str)> = crate::devtools::GROUPS
+            .iter()
+            .flat_map(|g| g.tools.iter().map(move |t| (*t, g.name)))
+            .collect();
+        let n = tools.len();
+        for (k, (tool, group)) in tools.into_iter().enumerate() {
+            let key = format!("tool:{}", crate::app::subjects::tool_key(tool));
+            let selected = self.panel == Panel::Chat && current == key;
+            out.push(
+                self.subject_row(format!("tool-{k}").into(), tool.name().to_string(), group.to_string(), selected, k + 1 == n, cx)
+                    .on_click(cx.listener(move |this, _, window, cx| this.open_tool_thread(tool, window, cx)))
+                    .into_any_element(),
+            );
+        }
+        out
+    }
+
+    /// The Files group: FTP, FTPS and SFTP hosts (from Transmit and the agent's store); a click
+    /// opens the host's thread, its files on top. Folded at first: there are many.
+    fn render_files_group(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        if self.files_remote.hosts.is_empty() {
+            return vec![];
+        }
+        let (head, collapsed) = self.subject_head("files-head", Ico::FolderOpen, "Files", None, cx);
+        let mut out = vec![head];
+        if collapsed {
+            return out;
+        }
+        let current = self.current_subject();
+        let hosts = self.files_remote.hosts.clone();
+        let n = hosts.len();
+        for (k, h) in hosts.into_iter().enumerate() {
+            let selected = self.panel == Panel::Chat && current == format!("files:{}", h.id);
+            let note = if h.user.is_empty() { h.host.clone() } else { format!("{}@{}", h.user, h.host) };
+            let id = h.id.clone();
+            out.push(
+                self.subject_row(format!("fh-{k}").into(), h.name, note, selected, k + 1 == n, cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_files_thread(id.clone(), window, cx)
+                    }))
+                    .into_any_element(),
+            );
+        }
+        out
+    }
+
+    /// Browser: sessions that work in the server's browser, step by step; "+" starts one.
+    fn render_sites_group(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let (head, collapsed) = self.subject_head(
+            "browser-head",
+            Ico::Globe,
+            "Browser",
+            Some(Box::new(|this: &mut Self, _, cx| this.new_browser_thread(cx))),
+            cx,
+        );
+        let mut out = vec![head];
+        if collapsed {
+            return out;
+        }
+        let rows: Vec<(String, String, u64)> = self
+            .sessions
+            .iter()
+            .filter(|s| s.subject.starts_with("browser:"))
+            .map(|s| (s.id.clone(), if s.title.is_empty() { "Browser session".into() } else { s.title.clone() }, s.messages))
+            .collect();
+        let n = rows.len();
+        for (k, (id, title, messages)) in rows.into_iter().enumerate() {
+            let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(&id);
+            let note = format!("{messages} messages");
+            out.push(
+                self.subject_row(format!("browser-{k}").into(), title, note, selected, k + 1 == n, cx)
+                    .on_click(cx.listener(move |this, _, _, cx| this.open_browser_thread(id.clone(), cx)))
+                    .into_any_element(),
+            );
+        }
+        out
+    }
 }

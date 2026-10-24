@@ -1,5 +1,5 @@
 //! SSH mode views: the mode switch beside the window buttons, the server list (folders from
-//! `~/.ssh/config`), the header with the server's Hermes state, the server form.
+//! `~/.ssh/config`), the header with the server's agent state, the server form.
 
 use std::sync::atomic::Ordering;
 
@@ -18,15 +18,15 @@ use crate::icons::Ico;
 const DEFAULT_FOLDER: &str = "Servers";
 
 impl HermesApp {
-    /// The gateway menu in the status bar: This Mac + the servers of `~/.ssh/config` that run
-    /// Hermes. Opening it re-reads the file and asks the servers again (for the next look).
+    /// The gateway menu in the status bar: This Mac + the servers of `~/.ssh/config` that can
+    /// run the agent. Opening it re-reads the file and asks the servers again (for the next look).
     pub(super) fn render_target_picker(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let muted = cx.theme().muted_foreground;
         let view = cx.entity();
         h_flex().h_full().items_center().pl_1().child(
             Button::new("target")
                 .ghost()
-                .xsmall()
+                .small()
                 .icon(Ico::Server.icon())
                 .label(self.target.label())
                 .text_color(muted)
@@ -93,24 +93,6 @@ impl HermesApp {
                 d.child(
                     toggle("open-files", Ico::PanelRight, false, "Open files  ⌘B")
                         .on_click(cx.listener(|this, _, window, cx| this.toggle_ide(window, cx))),
-                )
-            })
-            // The mode switch comes last: it changes the whole window.
-            .when(crate::bench::SSH, |d| {
-                d.child(
-                    toggle(
-                        "mode-ssh",
-                        Ico::Terminal,
-                        ssh,
-                        if ssh {
-                            "Back to sessions  ⌘1"
-                        } else {
-                            "SSH servers  ⌘2"
-                        },
-                    )
-                    .on_click(
-                        cx.listener(move |this, _, window, cx| this.set_ssh_mode(!ssh, window, cx)),
-                    ),
                 )
             })
     }
@@ -232,7 +214,8 @@ impl HermesApp {
                                     h_flex()
                                         .min_w_0()
                                         .gap_2()
-                                        .text_sm()
+                                        // A server's name as large as a session's title.
+                                        .text_size(px(super::sidebar::SESSION_TITLE))
                                         .child(
                                             div()
                                                 .flex_none()
@@ -387,23 +370,6 @@ impl HermesApp {
             );
         }
 
-        let new_server = h_flex()
-            .id("new-server")
-            .h(rems(super::BAR_CONTROL_REMS))
-            .px_3()
-            .gap_2()
-            .items_center()
-            .justify_center()
-            .text_sm()
-            .font_weight(FontWeight::MEDIUM)
-            .bg(theme.primary)
-            .text_color(theme.primary_foreground)
-            .cursor_pointer()
-            .hover(|s| s.bg(theme.primary_hover))
-            .child(Ico::Plus.icon().small())
-            .child("New server")
-            .on_click(cx.listener(|this, _, window, cx| this.edit_server(None, None, window, cx)));
-
         v_flex()
             .size_full()
             .bg(theme.sidebar)
@@ -418,13 +384,6 @@ impl HermesApp {
                     .py_1()
                     .children(list)
                     .child(div().h_2().flex_none()),
-            )
-            .child(
-                // Same height as the composer, so the rules line up across the window.
-                h_flex()
-                    .flex_none()
-                    .h(super::bar_h(cx) + px(1.))
-                    .child(new_server.flex_1().h_full()),
             )
             .into_any_element()
     }

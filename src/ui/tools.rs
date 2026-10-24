@@ -47,7 +47,7 @@ impl HermesApp {
                     .pb_1()
                     .gap_1p5()
                     .items_center()
-                    .text_sm()
+                    .text_base()
                     .text_color(muted)
                     .child(group_icon(group.name).icon().small())
                     .child(div().font_weight(FontWeight::MEDIUM).child(group.name))
@@ -73,7 +73,7 @@ impl HermesApp {
                         .when(selected, |d| d.bg(theme.sidebar_accent))
                         .hover(|s| s.bg(theme.sidebar_accent))
                         .cursor_pointer()
-                        .child(div().text_sm().truncate().child(tool.name()))
+                        .child(div().text_base().truncate().child(tool.name()))
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.select_tool(tool, window, cx)
                         }))
@@ -98,6 +98,39 @@ impl HermesApp {
             .into_any_element()
     }
 
+    /// A tool as a thread's live block: its name, hint and modes, then the tool at a fixed height.
+    pub(super) fn render_tool_block(&mut self, height: f32, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let current = self.tools.tool;
+        let modes = current.modes();
+        let mode = self.tools.mode(current);
+        // The sidebar lists the tools (each a thread): the block is the tool alone.
+        v_flex()
+            .w_full()
+            .gap_4()
+            .child(
+                h_flex()
+                    .gap_3()
+                    .items_center()
+                    .child(div().flex_none().text_lg().font_weight(FontWeight::SEMIBOLD).child(current.name()))
+                    .child(div().flex_1().min_w_0().truncate().text_sm().text_color(muted).child(current.hint()))
+                    .when(!modes.is_empty(), |d| {
+                        d.child(segmented("tool-mode", modes, mode, cx, |this, k, window, cx| {
+                            this.set_tool_mode(k, window, cx)
+                        }))
+                    }),
+            )
+            .child(
+                div()
+                    .h(px(height))
+                    .border_1()
+                    .border_color(theme.border)
+                    .child(self.render_tools_body(cx)),
+            )
+            .into_any_element()
+    }
+
     pub(super) fn render_tools_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let tool = self.tools.tool;
@@ -117,7 +150,7 @@ impl HermesApp {
             .child(
                 div()
                     .flex_none()
-                    .text_sm()
+                    .text_base()
                     .font_weight(FontWeight::MEDIUM)
                     .child(tool.name()),
             )
@@ -126,7 +159,7 @@ impl HermesApp {
                     .flex_1()
                     .min_w_0()
                     .truncate()
-                    .text_xs()
+                    .text_sm()
                     .text_color(theme.muted_foreground)
                     .child(tool.hint()),
             )
@@ -171,11 +204,10 @@ impl HermesApp {
         } else if self.tools.preview.trim().is_empty() {
             div()
                 .flex_1()
-                .flex()
-                .items_center()
-                .justify_center()
-                .px_6()
-                .text_sm()
+                .px_4()
+                .py_3()
+                .text_base()
+                .whitespace_normal()
                 .text_color(theme.muted_foreground)
                 .child("Copy part of a web page, a Word document or a note, then press ⌘V")
                 .into_any_element()
@@ -187,7 +219,7 @@ impl HermesApp {
                 .overflow_y_scroll()
                 .px_4()
                 .py_3()
-                .text_sm()
+                .text_base()
                 .child(
                     TextView::html("tool-html-view-body", self.tools.preview.clone())
                         .selectable(true),
@@ -280,7 +312,7 @@ impl HermesApp {
                             .overflow_y_scroll()
                             .px_4()
                             .py_3()
-                            .text_sm()
+                            .text_base()
                             .child(super::media::markdown(
                                 "tool-md",
                                 self.tools.preview.clone(),
@@ -303,7 +335,7 @@ impl HermesApp {
                     None,
                     vec![
                         div()
-                            .text_xs()
+                            .text_sm()
                             .text_color(theme.muted_foreground)
                             .child(if tool == Tool::Lorem {
                                 "How many"
@@ -345,7 +377,7 @@ impl HermesApp {
                         .id(("regex-flag", k))
                         .px_1p5()
                         .py_0p5()
-                        .text_xs()
+                        .text_sm()
                         .font_family(crate::theme::MONO)
                         .border_1()
                         .border_color(theme.border)
@@ -450,7 +482,7 @@ impl HermesApp {
                                     img(path).size_full().object_fit(ObjectFit::Contain),
                                 ),
                                 None => d
-                                    .text_sm()
+                                    .text_base()
                                     .text_color(theme.muted_foreground)
                                     .child("Paste Base64 or load an image"),
                             }),
@@ -478,7 +510,7 @@ pub(super) fn pane_bar(
         .items_center()
         .border_b_1()
         .border_color(theme.border)
-        .text_xs()
+        .text_sm()
         .child(div().flex_1().min_w_0().truncate().map(|d| {
             match &error {
                 Some(e) => d.text_color(theme.danger).child(e.clone()),
@@ -504,7 +536,7 @@ pub(super) fn small_button(
         .flex_none()
         .px_2()
         .py_0p5()
-        .text_xs()
+        .text_sm()
         .border_1()
         .border_color(theme.border)
         .cursor_pointer()
@@ -549,7 +581,7 @@ pub(super) fn segmented_owned(
                 .id((id, k))
                 .px_2()
                 .py_0p5()
-                .text_xs()
+                .text_sm()
                 .cursor_pointer()
                 .when(k > 0, |d| d.border_l_1().border_color(theme.border))
                 .when(k == chosen, |d| {

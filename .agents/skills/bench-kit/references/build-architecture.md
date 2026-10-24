@@ -38,25 +38,30 @@ The gpui-kit sources are the documentation: `~/.cargo/registry/src/*/gpui-compon
 
 ```
 src/main.rs          window factory, --probe headless mode, app entry
-src/theme.rs         palettes, fonts, accents, Appearance prefs (templates/app/src/theme.rs)
-src/icons.rs         Lucide icons embedded with a macro (templates/app/src/icons.rs)
+src/theme.rs         palettes, fonts, accents, Appearance prefs (palettes: assets/themes/)
+src/icons.rs         Lucide icons embedded with a macro (assets/icons/*.svg)
 src/model.rs         plain data: rows, turns, steps, usage, prompts…
-src/connection.rs    how to reach the backend (local process / SSH tunnel), state_dir(), git/ssh helpers
+src/connection.rs    how to reach the agent (local / SSH tunnel), state_dir(), git/ssh helpers
+src/pi_agent.rs      installs and starts the agent (agent/) on this Mac and over SSH
 src/gateway.rs       worker thread: WebSocket JSON-RPC, Cmd in / Evt out, pending-call table
 src/rest.rs          blocking REST calls, one fn per endpoint
-src/app.rs           HermesApp: all state + event handling + actions (the "controller")
+src/app.rs           HermesApp (the name is older than the agent): all state + event handling + actions (the "controller")
 src/app/*.rs         feature slices as `impl HermesApp` in child modules (can use private items):
-                     projects.rs (git), cron.rs, prompts.rs, profiles.rs, slash.rs, marks.rs, gateways.rs
+                     projects.rs (git), cron.rs, prompts.rs, profiles.rs, slash.rs, marks.rs,
+                     subjects.rs (a thread's subject: Tasks, a server, files, the browser, a tool)
+src/task_store.rs    tasks: the agent's bench.sqlite via its REST `/api/tasks` (its `tasks` tool sees the same list)
 src/ui/mod.rs        Render for HermesApp: layout skeleton, header, shared helpers (bar_h, plural…)
 src/ui/*.rs          one file per area: sidebar, chat, composer, statusbar, files, panels (settings)
---- Bench additions (SSH mode + mini IDE) ---
+--- Bench additions (servers + mini IDE) ---
 src/sshconfig.rs     servers = ~/.ssh/config Host blocks (+ `# folder:`/`# path:`), safe writes
 src/ssh.rs           the shared ssh connection (ControlMaster in ~/.ssh/cm) for terminal/files/agent
 src/term.rs          PTY (portable-pty) + alacritty_terminal grid; keys, mouse reports, links
 src/remote.rs        server files as local cache copies; mtime-checked upload (conflicts)
 src/lang.rs          highlighter by file name / `#!`
-src/app/servers.rs, ui/servers.rs, ui/terminal.rs   SSH mode
-src/app/ide*.rs, ui/files.rs   mini IDE: tree, tabs, ⌘P, file ops, maximize as a layout mode
+src/app/servers.rs, ui/servers.rs, ui/terminal.rs   servers: a server's thread, its terminal on top
+src/app/ide*.rs, ui/files.rs   mini IDE: tree, tabs, ⌘P, file ops, maximize as a layout mode;
+                     ide_find.rs ⌃G / ⌘⇧F / agent edits followed; ui/editor_status.rs the line under it
+src/app/snippets.rs  editor selections as chips in the message (file + lines), back to the file
 src/app/keys.rs      window-wide shortcuts (root capture_key_down)
 scripts/bundle-macos.sh, assets/icons/*.svg, assets/themes/*.json, assets/logo.svg
 ```
@@ -129,7 +134,8 @@ parameters in a `static NEXT_WINDOW: Mutex<Option<…>>` and let `new()` take it
 
 ## Persistence
 
-Small JSON files in `~/Library/Application Support/<app>/` (`state_dir()`): appearance, last
+Small JSON files in `state_dir()` (Bench: `~/.bench/ui`, beside the agent's home; a template
+app: `~/Library/Application Support/<app>/`): appearance, last
 place (backend + profile + session per backend), session colors/pins, per-backend caches, logs.
 Merge with what is on disk before writing (another window may have written too). User content
 that belongs to the backend (prompts, skills) goes to the backend's files, as Markdown, not here.

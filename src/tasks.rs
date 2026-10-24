@@ -63,13 +63,14 @@ impl Task {
         match list {
             List::Today => !self.done() && self.day.is_some_and(|d| d <= day),
             List::Upcoming => !self.done() && self.day.is_some_and(|d| d > day),
-            List::Anytime => !self.done() && !self.someday && self.day.is_none_or(|d| d <= day),
-            List::Someday => !self.done() && self.someday && self.day.is_none(),
+            // "Someday" is not a list of its own (the person found it superfluous): those tasks are here.
+            List::Anytime => !self.done() && self.day.is_none_or(|d| d <= day),
             List::Logbook => self.done(),
         }
     }
 
     /// The notes as stored: the person's text, then Bench's lines.
+    #[cfg(test)]
     pub fn stored_notes(&self) -> String {
         let mut lines: Vec<String> = vec![];
         if !self.tags.is_empty() {
@@ -144,12 +145,14 @@ impl Task {
 }
 
 /// The lists of the sidebar.
+/// The lists in their order (the sidebar's Tasks group).
+pub const LISTS: [List; 4] = [List::Today, List::Upcoming, List::Anytime, List::Logbook];
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum List {
     Today,
     Upcoming,
     Anytime,
-    Someday,
     Logbook,
 }
 
@@ -159,7 +162,6 @@ impl List {
             List::Today => "Today".into(),
             List::Upcoming => "Upcoming".into(),
             List::Anytime => "Anytime".into(),
-            List::Someday => "Someday".into(),
             List::Logbook => "Logbook".into(),
         }
     }
@@ -169,7 +171,6 @@ impl List {
         match self {
             List::Today => task.day = Some(day),
             List::Upcoming => task.day = Some(day + Duration::days(1)),
-            List::Someday => task.someday = true,
             List::Anytime | List::Logbook => {}
         }
     }
@@ -370,8 +371,8 @@ mod tests {
         assert!(t.in_list(&List::Upcoming, day) && !t.in_list(&List::Today, day));
         t.day = None;
         t.someday = true;
-        assert!(t.in_list(&List::Someday, day) && !t.in_list(&List::Anytime, day));
+        assert!(t.in_list(&List::Anytime, day));
         t.completed = Some(day);
-        assert!(t.in_list(&List::Logbook, day) && !t.in_list(&List::Someday, day));
+        assert!(t.in_list(&List::Logbook, day) && !t.in_list(&List::Anytime, day));
     }
 }

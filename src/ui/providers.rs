@@ -8,8 +8,6 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::HermesApp;
-use crate::app::install::SetupKind;
-use crate::app::providers::CLAUDE_MODELS;
 
 type Act = Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)>;
 
@@ -18,7 +16,7 @@ impl HermesApp {
         div()
             .pt_6()
             .pb_1()
-            .text_xs()
+            .text_sm()
             .text_color(cx.theme().muted_foreground)
             .child(text.into())
     }
@@ -43,10 +41,10 @@ impl HermesApp {
                     .w(px(220.))
                     .flex_none()
                     .gap_0p5()
-                    .child(div().text_sm().child(title.into()))
+                    .child(div().text_base().child(title.into()))
                     .child(
                         div()
-                            .text_xs()
+                            .text_sm()
                             .text_color(theme.muted_foreground)
                             .child(hint.into()),
                     ),
@@ -75,7 +73,7 @@ impl HermesApp {
             .px_3()
             .flex()
             .items_center()
-            .text_sm()
+            .text_base()
             .cursor_pointer()
             .when(primary, |d| {
                 d.bg(theme.primary)
@@ -101,7 +99,7 @@ impl HermesApp {
                 .flex()
                 .items_center()
                 .justify_center()
-                .text_sm()
+                .text_base()
                 .text_color(muted)
                 .child("Loading…")
                 .into_any_element();
@@ -180,11 +178,11 @@ impl HermesApp {
                             .gap_2()
                             .pb_1()
                             .items_center()
-                            .child(div().text_sm().font_weight(FontWeight::MEDIUM).child(title))
+                            .child(div().text_base().font_weight(FontWeight::MEDIUM).child(title))
                             .when(current, |d| {
                                 d.child(
                                     div()
-                                        .text_xs()
+                                        .text_sm()
                                         .text_color(theme.primary)
                                         .child("main model"),
                                 )
@@ -210,7 +208,7 @@ impl HermesApp {
                             .py_2()
                             .gap_2()
                             .items_center()
-                            .child(div().flex_1().min_w_0().truncate().text_xs().map(|d| {
+                            .child(div().flex_1().min_w_0().truncate().text_sm().map(|d| {
                                 match check {
                                     Some((ok, msg)) => d
                                         .text_color(if ok { muted } else { theme.danger })
@@ -227,7 +225,7 @@ impl HermesApp {
             div()
                 .id("ep-add")
                 .py_2()
-                .text_sm()
+                .text_base()
                 .text_color(muted)
                 .cursor_pointer()
                 .hover(|s| s.text_color(theme.foreground))
@@ -275,7 +273,7 @@ impl HermesApp {
                     .py_0p5()
                     .border_1()
                     .border_color(theme.border)
-                    .text_xs()
+                    .text_sm()
                     .cursor_pointer()
                     .hover(|s| s.bg(theme.list_hover))
                     .child(m.clone())
@@ -305,13 +303,13 @@ impl HermesApp {
                         .px_2()
                         .py_1()
                         .gap_2()
-                        .text_sm()
+                        .text_base()
                         .cursor_pointer()
                         .hover(|s| s.bg(theme.list_hover))
                         .child(div().flex_1().min_w_0().truncate().child(id.clone()))
                         .child(
                             div()
-                                .text_xs()
+                                .text_sm()
                                 .text_color(if on { theme.primary } else { muted })
                                 .child(if on { "in the list" } else { "add" }),
                         )
@@ -335,7 +333,7 @@ impl HermesApp {
                         |d| {
                             d.child(
                                 div()
-                                    .text_xs()
+                                    .text_sm()
                                     .text_color(muted)
                                     .child("None yet: search and add"),
                             )
@@ -355,7 +353,7 @@ impl HermesApp {
                     .when(!query.is_empty() && (loading || empty_catalog), |d| {
                         d.child(
                             div()
-                                .text_xs()
+                                .text_sm()
                                 .text_color(muted)
                                 .child("Loading OpenRouter's models…"),
                         )
@@ -372,105 +370,6 @@ impl HermesApp {
                 cx,
             )
             .into_any_element(),
-        );
-
-        // ---- Claude ----
-        page.push(
-            self.pv_heading("CLAUDE · SUBSCRIPTION", cx)
-                .into_any_element(),
-        );
-        let busy = self.pv.claude_busy.clone();
-        let status = self.pv.claude.clone().unwrap_or_default();
-        let cli_line: SharedString = match &status.cli {
-            Some(v) => format!("Claude Code {v}").into(),
-            None if busy.is_some() => "Checking…".into(),
-            None => "Not installed · npm install -g @anthropic-ai/claude-code".into(),
-        };
-        page.push(
-            self.pv_row(
-                "Claude Code",
-                "The official CLI does the work",
-                div().text_sm().child(cli_line).into_any_element(),
-                cx,
-            )
-            .into_any_element(),
-        );
-        if status.cli.is_some() {
-            let login: AnyElement = if status.logged_in {
-                div()
-                    .text_sm()
-                    .child(match status.account.as_deref() {
-                        Some("claude.ai") => "Logged in with the subscription".to_string(),
-                        Some(m) => format!("Logged in ({m})"),
-                        None => "Logged in".to_string(),
-                    })
-                    .into_any_element()
-            } else {
-                h_flex()
-                    .gap_2()
-                    .items_center()
-                    .child(
-                        div()
-                            .text_sm()
-                            .text_color(theme.danger)
-                            .child("Not logged in"),
-                    )
-                    .child(self.pv_button(
-                        "claude-login",
-                        "Log in…",
-                        false,
-                        cx,
-                        Box::new(|this, w, cx| this.start_setup(SetupKind::ClaudeLogin, w, cx)),
-                    ))
-                    .into_any_element()
-            };
-            page.push(
-                self.pv_row("Account", "Your Claude Pro / Max login", login, cx)
-                    .into_any_element(),
-            );
-        }
-        let plugin: AnyElement = if status.plugin {
-            div()
-                .text_sm()
-                .child(format!("Installed · models: {}", CLAUDE_MODELS.join(", ")))
-                .into_any_element()
-        } else if let Some(b) = &busy {
-            div()
-                .text_sm()
-                .text_color(muted)
-                .child(b.clone())
-                .into_any_element()
-        } else {
-            h_flex()
-                .child(self.pv_button(
-                    "claude-plugin",
-                    "Install the plugin",
-                    false,
-                    cx,
-                    Box::new(|this, w, cx| this.install_claude_plugin(w, cx)),
-                ))
-                .into_any_element()
-        };
-        page.push(
-            self.pv_row(
-                "Hermes plugin",
-                "NousResearch's official claude-subscription",
-                plugin,
-                cx,
-            )
-            .into_any_element(),
-        );
-        page.push(
-            div()
-                .py_2()
-                .text_xs()
-                .text_color(muted)
-                .child(
-                    "Hermes runs Claude through the unmodified Claude Code CLI on your login, which Anthropic \
-                     allows for your own use. Turns count against your plan's limits; keep extra usage off \
-                     in your Claude account if you don't want overage billing.",
-                )
-                .into_any_element(),
         );
 
         // ---- fallback ----
@@ -698,7 +597,7 @@ impl HermesApp {
                     .gap_2()
                     .items_center()
                     .child(
-                        div().flex_1().text_xs().text_color(muted).child(
+                        div().flex_1().text_sm().text_color(muted).child(
                             "The gateway reads these when it starts: restart it after saving.",
                         ),
                     )
@@ -722,7 +621,7 @@ impl HermesApp {
             page.push(
                 div()
                     .py_2()
-                    .text_sm()
+                    .text_base()
                     .text_color(muted)
                     .child("Loading…")
                     .into_any_element(),

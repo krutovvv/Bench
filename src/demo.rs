@@ -1,8 +1,10 @@
-//! A made-up session for screenshots: `BENCH_DEMO=1 ./target/release/bench` (the end of the
-//! answer), `BENCH_DEMO=top` (its beginning, with the agent's steps unfolded).
+//! A made-up session for screenshots and the web demo: `BENCH_DEMO=1 ./target/release/bench`
+//! opens the browser thread (the centrepiece); `BENCH_DEMO=tasks|server|tool` another subject's
+//! thread; `BENCH_DEMO=landing` the landing-page chat at the end of its answer, `BENCH_DEMO=top`
+//! at its beginning with the agent's steps unfolded.
 //!
 //! No gateway, no Reminders, nothing of the person's: invented chats in the sidebar and one
-//! open session that shows what the Hermes client can do — steps and a subagent, an answer with
+//! open session that shows what the agent's client can do — steps and a subagent, an answer with
 //! a code block, a chart, a diagram, a formula, a video and a voice reply, its sources, the
 //! files it changed, a process still running. The media live in `assets/demo/`.
 
@@ -23,6 +25,7 @@ fn session(id: &str, title: &str, messages: u64, running: bool, source: &str) ->
         model: "Qwen3.8-Next-Flash".into(),
         running,
         source: source.into(),
+        subject: String::new(),
     }
 }
 
@@ -114,20 +117,19 @@ fn other_modes(app: &mut HermesApp) {
     done.spent = 25 * 60;
     let mut flagged = task("t-tax", "Send the quarterly report", &["finance"], Some(0));
     flagged.important = true;
-    let mut evening = task(
+    let evening = task(
         "t-read",
         "Read the RFC on rate limits",
         &["reading"],
-        Some(0),
+        Some(1),
     );
-    evening.evening = true;
     let mut timed = task(
         "t-api",
         "Rate limiting for the public API",
         &["storefront"],
         Some(0),
     );
-    timed.spent = 95 * 60;
+    timed.spent = 135 * 60;
     timed.notes = "Token bucket per API key; 429 with Retry-After.".into();
     app.tasks.items = vec![
         flagged,
@@ -158,13 +160,147 @@ fn other_modes(app: &mut HermesApp) {
     app.tasks.loaded = true;
 }
 
+/// The demo server's terminal: its last screen (no shell runs in the demo).
+pub fn terminal(alias: &str) -> String {
+    format!(
+        "deploy@{alias}:~$ uptime\n \
+10:41:07 up 37 days,  2:14,  1 user,  load average: 3.91, 3.62, 2.10\n\
+deploy@{alias}:~$ docker stats --no-stream\n\
+NAME             CPU %     MEM USAGE / LIMIT\n\
+search-indexer   188.42%   1.21GiB / 3.84GiB\n\
+storefront       6.10%     412MiB / 3.84GiB\n\
+nginx            0.31%     18MiB / 3.84GiB\n\
+deploy@{alias}:~$ "
+    )
+}
+
+/// A thread about something (`tasks:today`, `ssh:web-1`…): one turn, done.
+fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn) {
+    let mut row = session(id, title, 2, false, "desktop");
+    row.subject = subject.into();
+    app.sessions.push(row);
+    app.demo_threads.insert(id.into(), vec![turn]);
+}
+
+/// One thread per subject, so every sidebar group opens to something.
+fn subject_threads(app: &mut HermesApp, now: f64) {
+    let done = |user: &str, steps: Vec<Step>, answer: &str, secs: f64| Turn {
+        user: user.into(),
+        steps,
+        answer: answer.into(),
+        started: Some(now - 600.0),
+        finished: Some(now - 600.0 + secs),
+        ..Default::default()
+    };
+    thread(
+        app,
+        "d-today",
+        "What's left for today",
+        "tasks:today",
+        done(
+            "What's left for today? Move the RFC to tomorrow and log 40 minutes on the API task.",
+            vec![
+                tool("tasks", "list today"),
+                tool("tasks", "update: Read the RFC on rate limits → tomorrow"),
+                tool("tasks", "update: Rate limiting for the public API, +40 min"),
+            ],
+            "Three left for today:\n\n\
+- **Send the quarterly report** (flagged)\n\
+- **Rate limiting for the public API** — 2 h 15 min logged now\n\
+- **Review the landing page copy**\n\n\
+The RFC moved to tomorrow.",
+            9.0,
+        ),
+    );
+    thread(
+        app,
+        "d-web1",
+        "Why is the site slow",
+        "ssh:web-1",
+        done(
+            "The site got slow this morning. What's going on?",
+            vec![
+                tool("ssh_run", "uptime"),
+                tool("ssh_run", "docker stats --no-stream"),
+                tool("ssh_run", "journalctl -u nginx --since 09:00 | tail -50"),
+            ],
+            "The `search-indexer` container has been at **188% CPU** since 09:12: last night's reindex \
+started late and is still running. Nginx is fine — no errors, cached pages answer in 140 ms.\n\n\
+To cap it at one core and restart it:\n\n\
+```bash\ndocker update --cpus 1 search-indexer && docker restart search-indexer\n```\n\n\
+Say so and I'll run it here.",
+            21.0,
+        ),
+    );
+    thread(
+        app,
+        "d-site",
+        "Publish the release notes",
+        "browser:d1",
+        done(
+            "Open the blog's admin, make a draft from release-notes.md and stop before publishing.",
+            vec![
+                tool("browser_tabs", "new"),
+                tool("browser_navigate", "https://blog.example.com/admin/posts/new"),
+                tool("browser_fill_form", "title, body, tags"),
+                tool("browser_snapshot", ""),
+            ],
+            "The draft **Release 2.4: faster search** is in the editor with the text from \
+`release-notes.md`, the tags *releases* and *search*, and a cover. It is saved as a draft; nothing \
+is published.\n\nThe page is right here — click and type in it if something needs a touch. Say \
+*publish* and I'll press the button.",
+            48.0,
+        ),
+    );
+    app.sites.steps.insert(
+        "d-site".into(),
+        vec![crate::app::sites::Step {
+            tab: "demo-tab".into(),
+            turn: 0,
+            url: "https://blog.example.com/admin/posts/new".into(),
+        }],
+    );
+    if let Some(img) = crate::remote_browser::image_of(include_bytes!("../assets/demo/site.jpg")) {
+        app.sites.saved.insert("demo-tab".into(), img);
+    }
+    thread(
+        app,
+        "d-tool",
+        "Cron for work hours",
+        "tool:cron-parser",
+        done(
+            "Is this right for every 15 minutes during work hours on weekdays?",
+            vec![],
+            "Yes: `*/15 9-18 * * 1-5` fires at :00, :15, :30 and :45 from 09:00 to 18:45, Monday to \
+Friday — the next runs are listed above. If 18:45 is too late, make the hours `9-17`.",
+            4.0,
+        ),
+    );
+    app.tools
+        .inputs
+        .insert(crate::devtools::Tool::Cron, "*/15 9-18 * * 1-5".into());
+}
+
+/// The landing page thread's dev server, still running.
+pub fn processes(now: f64) -> Vec<BgProcess> {
+    vec![BgProcess {
+        id: "p-1".into(),
+        command: "npm run dev -- --port 5173".into(),
+        running: true,
+        exit_code: None,
+        started: Some(now - 250.0),
+        exited: None,
+        reason: None,
+        tail: "VITE v6.2  ready in 412 ms\n  ➜  Local:   http://localhost:5173/".into(),
+    }]
+}
+
 /// Fill the window with the demo instead of connecting.
 pub fn load(app: &mut HermesApp, cx: &mut Context<HermesApp>) {
     let now = crate::app::now_secs();
     app.demo = true;
     app.target = Target::Local;
     app.connecting = false;
-    app.hermes_missing = false;
     app.profiles = vec![Profile {
         name: "default".into(),
         label: "default".into(),
@@ -258,7 +394,7 @@ pub fn load(app: &mut HermesApp, cx: &mut Context<HermesApp>) {
     }
 
     let (chart, flow, clips) = media();
-    let top = std::env::var("BENCH_DEMO").as_deref() == Ok("top");
+    let top = std::env::var("BENCH_DEMO").as_deref() != Ok("landing");
     let answer = format!(
         "The new landing page is **live**, and the numbers so far look good.\n\n\
 ## What changed\n\n\
@@ -280,16 +416,16 @@ fewer form fields. Then check what it did to signups and give me a short summary
             .into(),
         steps: vec![
             Step::Thought("Plan: edit the page, run the dev server, compare signups.".into()),
-            tool("read_file", "src/pages/landing.tsx"),
-            tool("patch", "src/pages/landing.tsx"),
-            tool("patch", "src/components/SignupForm.tsx"),
-            tool("terminal", "npm run dev -- --port 5173"),
+            tool("read", "src/pages/landing.tsx"),
+            tool("edit", "src/pages/landing.tsx"),
+            tool("edit", "src/components/SignupForm.tsx"),
+            tool("bash", "npm run dev -- --port 5173"),
             tool("browser_navigate", "http://localhost:5173"),
             Step::Subagent {
                 id: "sub-1".into(),
                 goal: "Pull six weeks of signups from analytics".into(),
                 status: "completed".into(),
-                lines: vec!["web_search  analytics export API".into(), "terminal  export.csv".into()],
+                lines: vec!["web_search  analytics export API".into(), "bash  export.csv".into()],
                 summary: "6 weeks exported".into(),
             },
             tool("execute_code", "chart of weekly signups"),
@@ -314,7 +450,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         ],
         started: Some(now - 312.0),
         finished: Some(now - 60.0),
-        expanded: top,
+        expanded: std::env::var("BENCH_DEMO").as_deref() == Ok("top"),
         ..Default::default()
     }];
     // The beginning of the answer: once the first frames have laid the chat out (and media
@@ -332,18 +468,26 @@ fewer form fields. Then check what it did to signups and give me a short summary
         })
         .detach();
     }
+    app.demo_threads.insert("d-landing".into(), app.turns.clone());
     app.session = Some("d-landing".into());
     other_modes(app);
-    app.processes = vec![BgProcess {
-        id: "p-1".into(),
-        command: "npm run dev -- --port 5173".into(),
-        running: true,
-        exit_code: None,
-        started: Some(now - 250.0),
-        exited: None,
-        reason: None,
-        tail: "VITE v6.2  ready in 412 ms\n  ➜  Local:   http://localhost:5173/".into(),
-    }];
+    subject_threads(app, now);
+    // `BENCH_DEMO=tasks|server|browser|tool`: that thread open instead.
+    let open = match std::env::var("BENCH_DEMO").as_deref() {
+        Ok("tasks") => Some("d-today"),
+        Ok("server") => Some("d-web1"),
+        Ok("tool") => Some("d-tool"),
+        Ok("landing") | Ok("top") => None,
+        _ => Some("d-site"),
+    };
+    if let Some(id) = open {
+        app.session = Some(id.into());
+        app.turns = app.demo_threads.get(id).cloned().unwrap_or_default();
+    }
+    app.processes = processes(now);
+    if open.is_some() {
+        app.processes.clear();
+    }
     app.usage = Some(Usage {
         model: "Qwen3.8-Next-Flash".into(),
         context_used: 38_400,

@@ -39,6 +39,10 @@ mkdir -p dist
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp target/release/bench "$APP/Contents/MacOS/bench"
+# bench-agent's sources (the Pi backend); Bench installs them into ~/.bench-agent/app and runs
+# `npm ci` there, so node_modules stays out of every build.
+mkdir -p "$APP/Contents/Resources/agent"
+cp -R agent/src agent/scripts agent/package.json agent/package-lock.json "$APP/Contents/Resources/agent/"
 
 # Icon: render the SVG mark, then build an .icns with every size macOS asks for.
 WORK=$(mktemp -d)
@@ -73,8 +77,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>BenchCommit</key><string>$HASH</string>
   <key>LSMinimumSystemVersion</key><string>13.0</string>
   <key>NSHighResolutionCapable</key><true/>
-  <key>NSMicrophoneUsageDescription</key><string>Dictating messages to Hermes</string>
-  <key>NSLocalNetworkUsageDescription</key><string>Connecting to Hermes gateways on your local network over SSH</string>
+  <key>NSMicrophoneUsageDescription</key><string>Dictating messages to the agent</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Connecting to the agent on machines on your local network over SSH</string>
   <key>NSRemindersUsageDescription</key><string>Your tasks live in Reminders: Bench shows and edits them</string>
   <key>NSRemindersFullAccessUsageDescription</key><string>Your tasks live in Reminders: Bench shows and edits them</string>
 </dict>

@@ -1,0 +1,65 @@
+# The server browser for Bench's browser threads. Settings in .env (see .env.example).
+#   docker compose up -d --build
+name: bench-browser
+services:
+  browser:
+    build: .
+    image: bench-browser:latest
+    restart: unless-stopped
+    shm_size: 256m
+    # A hard ceiling: when the browser swells, the OOM killer takes a tab's renderer (that tab
+    # crashes; the browser and its sign-ins live on), never the rest of the server. No swap: with
+    # it the browser isn't killed but swaps for hours (CPU at 200%, the disk busy, the MCP timing out).
+    mem_limit: 1g
+    memswap_limit: 1g
+    environment:
+      - SCREEN_W=1440
+      - SCREEN_H=900
+      - RENDERER_LIMIT=4
+      - BROWSER_LANG=${BROWSER_LANG:-en-US}
+      # The guard closes tabs with no activity for TAB_IDLE_MIN minutes, and for
+      # TAB_IDLE_PRESSURE_MIN when anon memory is above MEM_PRESSURE of the limit.
+      - TAB_IDLE_MIN=120
+      - TAB_IDLE_PRESSURE_MIN=15
+      - MEM_PRESSURE=0.75
+      # The live view keeps at most LIVE_TABS tabs awake (others sleep: a screenshot and the
+      # address); past LIVE_HARD_TABS tabs in use, opening one more answers "busy".
+      - LIVE_TABS=3
+      - LIVE_HARD_TABS=5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    volumes:
+      - browser_data:/data
+    networks:
+      - proxy
+    # Traefik with a certificate resolver named "le" and an entrypoint "websecure". Another proxy
+    # works too: send https://$BROWSER_HOST/ to :8931 behind basic auth, and /live (WebSocket) to
+    # :8932 without it — the live view checks its own personal keys.
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${PROXY_NETWORK:-proxy}
+      # The agent's MCP, behind basic auth.
+      - traefik.http.routers.bench-browser.rule=Host(`${BROWSER_HOST}`)
+      - traefik.http.routers.bench-browser.entrypoints=websecure
+      - traefik.http.routers.bench-browser.tls=true
+      - traefik.http.routers.bench-browser.tls.certresolver=le
+      - traefik.http.routers.bench-browser.middlewares=bench-browser-auth
+      # From `htpasswd -nb <user> <password>`; in .env write each $ as $$.
+      - traefik.http.middlewares.bench-browser-auth.basicauth.users=${MCP_BASIC_AUTH}
+      - traefik.http.routers.bench-browser.service=bench-browser
+      - traefik.http.services.bench-browser.loadbalancer.server.port=8931
+      # The live view for Bench: the same host, path /live, its own keys.
+      - traefik.http.routers.bench-browser-live.rule=Host(`${BROWSER_HOST}`) && PathPrefix(`/live`)
+      - traefik.http.routers.bench-browser-live.priority=100
+      - traefik.http.routers.bench-browser-live.entrypoints=websecure
+      - traefik.http.routers.bench-browser-live.tls=true
+      - traefik.http.routers.bench-browser-live.tls.certresolver=le
+      - traefik.http.routers.bench-browser-live.service=bench-browser-live
+      - traefik.http.services.bench-browser-live.loadbalancer.server.port=8932
+volumes:
+  browser_data:
+networks:
+  proxy:
+    name: ${PROXY_NETWORK:-proxy}
+    external: true

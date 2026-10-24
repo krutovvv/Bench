@@ -6,13 +6,13 @@ All snippets use `use gpui_kit::*; use gpui_kit::component::{ActiveTheme as _, S
 
 ```
 ┌ sidebar 280 ─────┬ header 36 ────────────────────────────┬ right panel 640 (optional) ┐
-│ (lights)   🔧 ☰  │ title …          [chip] [▢] [±] [⊞]   │ tabs 36                    │
+│ (lights) ▯ 🔧 ☰  │ title …          [chip] [▢] [±] [⊞]   │ tabs 36                    │
 │ search band 36   ├───────────────────────────────────────┤ viewer | list (resizable)  │
 │──────────────────│ content (chat / settings page)        │                            │
 │ GROUP · n        │                                       │                            │
 │ rows…            │                                       │                            │
 │──────────────────├───────────────────────────────────────┤                            │
-│ [+ New session]  │ composer (36)                         │                            │
+│ GROUP + / rows…  │ ◉ composer (in the thread)            │                            │
 ├──────────────────┴───────────────────────────────────────┴────────────────────────────┤
 │ status bar 28: target · profile ……… speed · context · approvals · effort · model · ⟳ ⚙ │
 └───────────────────────────────────────────────────────────────────────────────────────┘
@@ -31,7 +31,7 @@ v_flex().size_full().child(
 ```
 
 The title bar is transparent (`appears_transparent: true`): the sidebar starts with a 35px
-strip beside the traffic lights (the mode toggles on its right); the main header (36px) sits at
+strip beside the traffic lights (its icon buttons on the right: Open folder, +, Hide sidebar); the main header (36px) sits at
 the top of the main column.
 
 ## Facing bars (the alignment users notice)
@@ -44,17 +44,25 @@ pub fn bar_h(cx: &App) -> Pixels { cx.theme().font_size * 2.5 }
 All bars are the header's height, and every rule crossing the window is one line:
 - Sidebar top strip `h(px(35.))` + the search band's top rule = the header's 36 → the band's
   top rule *is* the header's bottom rule, on one pixel row.
-- Search band: `h(bar_h + 1)`, rules above and below, background color, no frame.
-- Sidebar footer: `h(bar_h + 1)` with the primary button `.flex_1().h_full()`, no rule of its
-  own. Composer: `border_t_1` + a row `min_h(bar_h)` → its top rule lies exactly on the
-  button's top edge. (A footer of `bar_h` against a composer of `bar_h + rule` was a visible
-  1px step; the user spotted it.)
+- Search band: **always there**, `h(bar_h)`, transparent on the sidebar's color, no rules, no
+  frame (`ui/mod.rs` `search_band`); ⌘F focuses it (`app/keys.rs` `open_search`, which also
+  brings a hidden sidebar back). No magnifier toggle — the user had it removed (2026-10-24).
+- **Hiding the sidebar**: the last icon in its top strip (PanelLeft, "Hide sidebar ⌘\\",
+  after Open folder and +). Hidden, `render_layout` leaves the left panel out (the flag is part of the
+  `layout_synced` shape key, and the IDE's width is read from column 1 instead of 2), and the
+  header gets a 36px corner on its left: `title_bar` bg, `border_b`, `pl(78)` for the window
+  buttons, the same PanelLeft to show it again. The IDE's expanded mode ignores the flag.
+- **No "New session" button at the bottom**: the sidebar is an IDE's tree (groups as folders,
+  sessions inside); a new chat is the "+" on a group, or the "+" first in the top strip (⌘N).
 - A strip under the header that faces the search band (Tasks' tag strip): `min_h(bar_h)`, so
   its bottom rule meets the band's.
 - Any "+ New item" row at the bottom of a list: `h(bar_h + 1)`.
 Measure it (`build-verification.md`): the rules' pixel rows must be equal, not "about".
 
 ## Sidebar rows and groups
+
+Session titles 14px (`SESSION_TITLE` in `sidebar.rs`; 15 was "too big"), rows `py(9)` (compact `py_1p5`). The open chat is tinted with the accent
+(`primary 12%`), not one more grey — the user found the all-grey sidebar dull.
 
 ```rust
 h_flex().id(("row", i)).group(group_name)          // unique group name per row!
@@ -100,11 +108,11 @@ so opening the menu does not also open the row.
 `h_flex().h(px(36.)).bg(theme.title_bar).border_b_1().pl_4().pr_2().gap_1()`: title
 (`flex_1 min_w_0 text_sm font_weight(MEDIUM) truncate`), then context chips (e.g. project ·
 branch as a ghost xsmall Button with a dropdown), then 24px icon toggles (`p_1`, muted, active =
-accent + `list_active` bg, tooltip with the shortcut, e.g. "New window  ⌘⇧N"). Window-level
-toggles sit at the right end: "Open files" (shown while the chat or server has files to open)
-then **the SSH mode switch last** (it changes the whole window: a pressed/unpressed terminal
-icon). New window lives in the status bar before Settings; Tools and Tasks over the sidebar.
-Item-specific actions (open in Zed, files) go to the item's "⋯" menu, not the header. In settings mode the same strip holds tabs: each tab
+accent + `list_active` bg, tooltip with the shortcut, e.g. "New window  ⌘⇧N"). At the right
+end: "Open files ⌘B" (shown while the chat or server thread has files to open; `render_header_tail`,
+`ui/servers.rs`). New window lives in the status bar before Settings. Tasks, Servers and Tools
+are not switches anywhere: they are sidebar groups, each opening a thread (`build-subject.md`).
+Item-specific actions (open in Zed, files) go to the item's "⋯" menu, not the header. In settings the same strip holds tabs: each tab
 `h_full px_4 text_sm border_r_1`, active = content bg + foreground, others muted.
 
 ## Status bar
@@ -129,47 +137,44 @@ Delete).
 
 ## Composer
 
-```rust
-v_flex().id("composer").relative().w_full()
-    .bg(theme.background).border_t_1().border_color(theme.border)    // the row inside: min_h(bar_h)
-    .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {   // ↑ ↓ Tab Esc for the popup
-        if !ev.keystroke.modifiers.modified() && this.popup_key(ev.keystroke.key.as_str(), window, cx) {
-            cx.stop_propagation();
-        }
-    }))
-    .children(popup)                                       // absolute, see below
-    .child(h_flex().w_full().min_h(bar_h(cx)).items_center()
-        // No vertical padding: the textarea's own keeps one line inside the 35 (more lines grow it).
-        .child(div().flex_1().min_w_0().pl(px(11.))   // + the textarea's own ~13 → text at the chat's 24
-            .child(Textarea::new(&self.composer).appearance(false)))
-        .child(h_flex().flex_none().gap_2().pl_2().pr_4().items_center()
-            .child(clip).child(mic).child(send)))
-```
+The composer is **part of the thread**, as in Zed's Delta — not a field docked to the window,
+not a textarea: it is the thread's last row (`render_chat`), after the turns and cards, and it is
+there from the start — under "Loading history…" while a session opens (you can type at once),
+under the welcome block in a new chat. It scrolls away with the thread; "Jump to latest" brings
+it back. No rule above it.
 
-The buttons are **26px circles** with 13px bold-cut icons (`rounded_full`) — the only round
-things in the UI, since they float inside the field: quiet one = 1px border + muted icon (hover
-`list_hover`), filled one = accent bg + `primary_foreground` icon (Send when there is text; Stop
-turn = foreground, ⌘.; Stop recording = danger with a 9px ■, Esc cancels; while recording,
-Send stays and means "stop, transcribe, send"). While recording, the text area is
-replaced by a waveform 26 high (bars `flex_1`, 2px gap, height `2 + level × 20`, accent with
-opacity) with equal gaps: `pl_6` (24) from the divider and `pr_4` + the button column's `pl_2` =
-24 to the button. Everything inside is sized to the bar, never the bar to its contents.
+The row as a turn's: `pl(CHAT_LEFT) pr(CHAT_RIGHT) py(TURN_Y) gap(14) items_start` — the person's
+avatar (`ui::avatar(false, ..)` at `mt(AVATAR_TOP)`, centered on the first line, measured), then
+the text at `CHAT_TEXT` (the textarea pulled back `ml(-10)` by its own padding; chips over it).
+**The text, placeholder included, is the messages' size** (`Textarea::large()` = `text_base`;
+the default Medium is `text_sm`, which the user called too small). It **grows with what is typed
+and never scrolls itself** (`auto_grow(1, 100_000)`): pasted code reads like a message, the
+thread scrolls. **No buttons** — the user found clip, mic and Send noise: ⌘Enter sends, ⌘⇧D
+dictates (the mic button is in the status bar, by New window), files are dropped or pasted. Only
+while the agent works a quiet Stop (`chat::icon_button`, ⌘. too). While recording the waveform is
+drawn over the field (`absolute().inset_0()`), so nothing moves. **No placeholder** — it is the
+thread's next text, not a form field (Delta has none). **A new chat is a code editor's empty
+file**: no welcome block, no avatar (`invisible()`, its room kept so nothing moves when the
+thread starts), only the focused caret; avatars appear with the first message. The caret is 2px
+(`vendor/gpui-base`, `CURSOR_WIDTH`; 1px upstream was easy to lose). A folder for the new chat:
+the group's "+", or "New session in a folder…" (folder icon) in the sidebar's top strip.
 
-Popup list attached to the composer (slash commands, `@` prompts):
+**Scroll past the end**: the thread's column has `pb(SCROLL_PAST_END)` (240) below the composer,
+as a code editor scrolls past its last line, and `pt(CHAT_LEFT)` above the first turn (the top
+room is at least the sides').
 
-```rust
-div().absolute().bottom_full().left_0().right_0().px_4()          // chat width, 16px sides
-    .child(div().bg(theme.popover).border_t_1().border_l_1().border_r_1().border_color(theme.border)
-        .child(v_flex().id("list").max_h(px(28. * 8.)).overflow_y_scroll().track_scroll(&scroll).children(rows)))
-```
+Keys as in Delta: **Enter is a new line, ⌘Enter sends** (`submit_on_enter(false)`, send on
+`InputEvent::PressEnter { secondary: true, .. }`). Enter in the slash list
+picks the command (`slash_key` takes "enter" in the composer's `capture_key_down`). Code:
+`src/ui/composer.rs`.
 
-No bottom border (the composer's top rule is it), no gap. Rows 28px: name in Menlo xs, one-line
-description muted, category right-aligned faint. Show only while the input is a bare `/word` (or
-the last word is `@word`); a `/` elsewhere or an unknown word (a path) is plain text.
+The slash / prompt list still floats over the composer's top edge (`absolute().bottom_full()`).
+
+**The thread's width**: the window's whole width from its left edge, as an editor's text — no cap and no centering (the user: centering is not what an IDE does; `THREAD_MAX` is gone).
 
 ## Lists + editor pages (settings tabs)
 
-Settings tab order the user wants: MCP, Skills, Prompts, Config, Cron, Gateways, Profiles,
+Settings tab order the user wants: MCP, Skills, Prompts, Providers, Messages, Cron, Profiles,
 Settings (Appearance + misc as one scrolling page).
 
 List-detail tab: left `v_flex().w(px(300.)).border_r_1()` with a scrolling list (`py_2`) and
@@ -180,10 +185,18 @@ Delete that arms into danger "Confirm delete", primary Save) over a full-height 
 
 ## Chat column
 
-Turn (`text_sm`) = the person's message as a **band from edge to edge** (`bg secondary`,
-`border_t_1` except the first turn, `border_b_1`, `px_6 py_4`; text through `plain_text` so it
-can be selected and copied) — the session reads as strips, one per question — then the agent's
-side in `v_flex().px_6().py_6().gap_3()` — 24px all round. One inset, 24px, for the question,
+Turn (`text_base`), as in Zed's Delta: **who speaks is an avatar in a left gutter**, no band,
+no rules. Two rows, each `h_flex().pl(CHAT_LEFT).pr(CHAT_RIGHT).gap(14).items_start()`: a 24px
+round avatar (the person: a dark disc `foreground 78%` with UserRound in `background`; the
+agent: a solid `primary` disc with Bot in `primary_foreground` — both solid, because a pale
+disc reads smaller than a dark one of the same size; the user noticed), then the text column `flex_1 min_w_0`. Every row (question, answer, composer) pads `py(TURN_Y)` = 14 (centers of a question and its answer 52 apart, as in Delta), so any
+two rows are 28 apart whoever speaks — the user compared it with Delta, where they are equal.
+The question's text goes through `plain_text` (selectable); the agent's column `gap_3` (summary, steps,
+answer, sources, cards). Constants in `ui/mod.rs`: `CHAT_LEFT 24`, `AVATAR 24`,
+`CHAT_TEXT = 62`, `CHAT_RIGHT 48`. Everything that lines up with the text uses `CHAT_TEXT` /
+`CHAT_RIGHT`: the composer's text (`pl(CHAT_TEXT - 10)`, the textarea's own ~10), its chips, the
+waveform, the approval / question cards, the plan strip — measure with `textx.py` that they
+start within 0.5pt. One inset, 24px, for the question,
 the answer, the composer's text, its chips and the recording waveform (cards like Changed files
 end where text does); measure that the three text starts share one x. (It went 16 → 20 → 24 in
 small steps on the user's word "a little more air"; Claude Desktop's much larger insets were
@@ -198,8 +211,8 @@ Column `pb_1` and a real 12px spacer element after trailing cards.
 
 Code blocks in an answer get a header of their own: the language on the left, **Copy** on the
 right, the highlighted code under it, one 1px frame around both, **no fill anywhere** (like the
-audio, video and Changed files cards). The header is as tall as Changed files' line (`py_1`,
-`text_xs`). Recipe: `ui-content.md`, "Code blocks with a header".
+audio, video and Changed files cards). The header is a muted line (`py_1`, `text_base`, the thread's one
+size; `render_code`, `ui/media.rs`). Recipe: `ui-content.md`, "Code blocks with a header".
 
 Turn rail instead of a scrollbar: absolutely positioned in the 16px right gutter, vertically
 centered, one 8×2px tick per turn (pitch 3–8px), current tick accent, others muted 35%; hover

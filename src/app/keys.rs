@@ -19,6 +19,21 @@ impl HermesApp {
         if ks.key == "escape" && !m.modified() {
             return self.escape(cx);
         }
+        // The mini IDE's editor, as in Zed: ⌃G go to line, ⌃Tab / ⌃⇧Tab the tabs, ⌥Z wrap.
+        let in_editor = self.file.is_some() && self.file_editor.focus_handle(cx).is_focused(window);
+        if in_editor && m.control && !m.platform && !m.alt {
+            match (ks.key.as_str(), m.shift) {
+                ("g", false) => self.open_go_line(window, cx),
+                ("tab", false) => self.cycle_tab(1, window, cx),
+                ("tab", true) => self.cycle_tab(-1, window, cx),
+                _ => return false,
+            }
+            return true;
+        }
+        if in_editor && m.alt && !m.platform && !m.control && ks.key == "z" {
+            self.toggle_soft_wrap(window, cx);
+            return true;
+        }
         if !m.platform || m.control || m.alt {
             return false;
         }
@@ -42,15 +57,36 @@ impl HermesApp {
             }
             ("n", true) => self.open_new_window(cx),
             ("1", false) => self.set_ssh_mode(false, window, cx),
-            ("2", false) if crate::bench::SSH => self.set_ssh_mode(true, window, cx),
-            ("3", false) if crate::bench::TOOLS => self.toggle_tools(window, cx),
-            ("4", false) if crate::bench::TASKS => self.toggle_tasks(window, cx),
+            ("2", false) if crate::bench::SSH => {
+                self.open_server_thread(crate::term::LOCAL.to_string(), window, cx)
+            }
+            ("3", false) if crate::bench::TOOLS => {
+                let tool = self.tools.tool;
+                self.open_tool_thread(tool, window, cx)
+            }
+            ("4", false) if crate::bench::TASKS => {
+                self.open_task_list(crate::tasks::List::Today, window, cx)
+            }
             ("b", false) if crate::bench::IDE => self.toggle_ide(window, cx),
             ("b", true) if self.ide_open() => {
                 self.ide.expanded = !self.ide.expanded;
                 cx.notify();
             }
             ("p", false) if crate::bench::IDE => self.open_quick_open(window, cx),
+            ("\\", false) => self.toggle_sidebar(cx),
+            // Dictation without its button: start, and again to stop and transcribe.
+            ("d", true) => self.toggle_mic(window, cx),
+            ("f", true) if crate::bench::IDE => self.open_find(window, cx),
+            // In the editor ⌘F is its own find & replace bar.
+            ("f", false) if in_editor => return false,
+            ("w", false) if in_editor => self.close_active_tab(window, cx),
+            // The editor copies; where the text came from is remembered for a paste in the chat.
+            ("c", false) if in_editor => {
+                self.note_copy(cx);
+                return false;
+            }
+            // ⌘⇧.: the selection (or the line) to the message, as in Zed.
+            ("." | ">", true) if self.file.is_some() => self.add_selection_to_chat(window, cx),
             // Rich Text to Markdown shows the paste rendered (no editor has focus): ⌘V pastes
             // the clipboard's formatting there.
             ("v", false)
@@ -65,16 +101,7 @@ impl HermesApp {
             ("d", false) if self.file_editor.focus_handle(cx).is_focused(window) => {
                 self.select_next_occurrence(cx)
             }
-            ("f", false) => {
-                let search = if self.tasks.on {
-                    self.tasks.search.clone()
-                } else if self.ssh.on {
-                    self.ssh.search.clone()
-                } else {
-                    self.search.clone()
-                };
-                search.update(cx, |s, cx| s.focus(window, cx));
-            }
+            ("f", false) => self.open_search(window, cx),
             (",", false) => {
                 let panel = if self.panel.is_settings() {
                     Panel::Chat
@@ -99,6 +126,10 @@ impl HermesApp {
             self.send_after_transcribe = false;
         } else if self.ide.quick.is_some() {
             self.ide.quick = None;
+        } else if self.ide.goto.is_some() {
+            self.ide.goto = None;
+        } else if self.ide.root_edit.is_some() {
+            self.ide.root_edit = None;
         } else if self.ide.edit.is_some() {
             self.ide.edit = None;
         } else if self.ssh.on && self.ssh.form.is_some() {
@@ -110,6 +141,29 @@ impl HermesApp {
         }
         cx.notify();
         true
+    }
+
+    /// ⌘F or the sidebar's magnifier: show the mode's search band and focus it.
+    pub(crate) fn open_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let search = if self.tasks.on {
+            self.tasks.search.clone()
+        } else if self.tools.on {
+            self.tools.search.clone()
+        } else if self.ssh.on {
+            self.ssh.search.clone()
+        } else {
+            self.search.clone()
+        };
+        // A hidden sidebar comes back to show its search.
+        self.sidebar_hidden = false;
+        search.update(cx, |s, cx| s.focus(window, cx));
+        cx.notify();
+    }
+
+    /// ⌘\ or the toggle in the sidebar's top strip (the header's, while it is hidden).
+    pub(crate) fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
+        self.sidebar_hidden = !self.sidebar_hidden;
+        cx.notify();
     }
 
     /// ⌘B: hide the mini IDE, or open it on what the window shows (the server's terminal, else

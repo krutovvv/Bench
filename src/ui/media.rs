@@ -186,7 +186,7 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
                 .justify_between()
                 .border_b_1()
                 .border_color(theme.border)
-                .text_xs()
+                .text_base()
                 .text_color(muted)
                 .child(if lang.is_empty() {
                     "code".to_string()
@@ -218,8 +218,17 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
 
 impl HermesApp {
     pub(super) fn render_answer(&mut self, i: usize, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        media::segments(&self.turns[i].answer)
+        // Blank lines around a segment (models often start with "\n\n") would show as empty
+        // paragraphs: an answer is as tall as its text.
+        media::segments(self.turns[i].answer.trim())
             .into_iter()
+            .filter_map(|s| match s {
+                Segment::Text(t) => {
+                    let t = t.trim().to_string();
+                    (!t.is_empty()).then_some(Segment::Text(t))
+                }
+                other => Some(other),
+            })
             .enumerate()
             .map(|(k, s)| match s {
                 Segment::Text(text) => markdown(format!("answer-{i}-{k}"), text).into_any_element(),
@@ -389,7 +398,7 @@ impl HermesApp {
                 .items_center()
                 .border_1()
                 .border_color(theme.border)
-                .text_sm()
+                .text_base()
                 .child(icon.icon().xsmall().text_color(theme.muted_foreground))
                 .child(div().flex_none().child(name.clone()))
                 .child(
@@ -397,7 +406,7 @@ impl HermesApp {
                         .flex_1()
                         .min_w_0()
                         .truncate()
-                        .text_xs()
+                        .text_base()
                         .text_color(theme.muted_foreground)
                         .when_some(note, |d, (text, color)| d.text_color(color).child(text)),
                 )
@@ -645,7 +654,7 @@ impl HermesApp {
                             .px_2()
                             .py_1()
                             .items_center()
-                            .text_sm()
+                            .text_base()
                             .bg(theme.secondary)
                             .border_b_1()
                             .border_color(theme.border)
@@ -661,7 +670,7 @@ impl HermesApp {
                                     .flex_1()
                                     .min_w_0()
                                     .truncate()
-                                    .text_xs()
+                                    .text_base()
                                     .text_color(theme.muted_foreground)
                                     .child(where_),
                             )
@@ -680,7 +689,7 @@ impl HermesApp {
                                 .id(id("more"))
                                 .px_3()
                                 .py_1()
-                                .text_xs()
+                                .text_base()
                                 .text_color(theme.muted_foreground)
                                 .border_t_1()
                                 .border_color(theme.border)
@@ -780,7 +789,7 @@ impl HermesApp {
             .border_1()
             .border_color(theme.border)
             .bg(theme.background)
-            .text_xs()
+            .text_base()
             .map(|d| {
                 if here && media::kind(path) == Kind::Image {
                     d.child(
@@ -826,6 +835,74 @@ impl HermesApp {
                     .hover(|s| s.bg(theme.list_hover))
                     .on_click(move |_, _, cx| cx.open_with_system(&open)),
                 None => d,
+            })
+            .into_any_element()
+    }
+
+    /// Lines of a file going with a message: "main.rs:12–20". `remove`: its index in the
+    /// composer (shows ×); otherwise a click opens the file at those lines in the IDE.
+    pub(super) fn snippet_chip(
+        &self,
+        id: SharedString,
+        path: &str,
+        start: usize,
+        end: usize,
+        remove: Option<usize>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let tip: SharedString = format!("{path}, lines {start}–{end}").into();
+        let p = path.to_string();
+        h_flex()
+            .id(id.clone())
+            .max_w(px(260.))
+            .h(px(32.))
+            .pl_1()
+            .pr_2()
+            .gap_1p5()
+            .items_center()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.background)
+            .text_base()
+            .child(
+                div()
+                    .size(px(24.))
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .text_color(theme.muted_foreground)
+                    .child(Ico::FileCode.icon().xsmall()),
+            )
+            .child(
+                div()
+                    .min_w_0()
+                    .truncate()
+                    .font_family("Menlo")
+                    .child(crate::app::snippets::label(path, start, end)),
+            )
+            .tooltip(move |window, cx| {
+                gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(window, cx)
+            })
+            .map(|d| match remove {
+                Some(k) => d.child(
+                    div()
+                        .id(SharedString::from(format!("{id}-x")))
+                        .flex_none()
+                        .p_0p5()
+                        .cursor_pointer()
+                        .text_color(theme.muted_foreground)
+                        .hover(|s| s.text_color(theme.foreground))
+                        .child(Ico::X.icon().xsmall())
+                        .on_click(cx.listener(move |this, _, _, cx| this.remove_snippet(k, cx))),
+                ),
+                None => d
+                    .cursor_pointer()
+                    .hover(|s| s.bg(theme.list_hover))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_snippet(p.clone(), start, window, cx)
+                    })),
             })
             .into_any_element()
     }
