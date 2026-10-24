@@ -4,7 +4,7 @@
 
 <h1 align="center">Bench</h1>
 
-<p align="center"><b>Besides programs, what about kits? UI pieces and skills, from which AI builds what a person needs.</b></p>
+<p align="center"><b>A personal workbench, and an experiment: what if an app came with the kit it's built from?</b></p>
 
 <p align="center">
   <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a> ·
@@ -19,54 +19,53 @@ click through the chat, Tasks, Tools and SSH.</sub>
 
 ## The idea
 
-If [ArtCraft](https://github.com/storytold) could rebuild Photoshop with AI
-([PhotoCraft](https://github.com/storytold/photocraft)), maybe there is room for something else
-next to rebuilding programs. For some cases a kit might be handier than a program: UI pieces and skills,
-from which AI builds what a person needs for their own workflow — including the pieces the kit
-doesn't have, written from the examples in it.
+Most apps are made for most people, and that's fair: plenty of people are happy with what's
+there. But some would like it their own way — something gets in the way, something is missing,
+something works differently from how they work. Usually the choice is to live with it or to
+rewrite it from scratch.
 
-A tool like that only one person needs, so nobody would make it, and keeping it up used to be
-the real cost. Maybe that changes when the same agent that builds it also maintains it.
+What if an app came with the kit it's built from — the same UI, its pieces, examples, and skills
+for an AI agent — so it could be rebuilt around how you work? The parts the kit doesn't have, the
+agent could write from its examples, in the same look.
 
-This repository is an experiment along those lines, far from complete: a kit, and one app built
-with it (the [demo](https://krutovvv.github.io/bench/) is that app).
+An agent can build something without a kit too, but usually something ordinary. My guess is that
+the richer the kit, and the more experience goes into it, the more useful the result.
+
+This repository is one such attempt by one developer, far from complete: a kit, and the app I
+built with it for myself. It's called Bench, as in workbench.
 
 ## How it started
 
-I'm a developer, and my day was spread over a dozen apps: an AI chat (none of the clients I
-tried fit — [BoltAI](https://boltai.com), DeepSeek Harness, Hermes' own UI, Hermes One,
-[TypingMind](https://www.typingmind.com), [Open WebUI](https://openwebui.com)), SSH servers in
-[Warp](https://www.warp.dev) (with ideas from Zap, its open-source fork), small files in yet
-another editor, tasks in [Things](https://culturedcode.com/things/), and
+I'm a developer, and my day was spread over a dozen apps: an AI chat client
+([BoltAI](https://boltai.com), DeepSeek Harness, Hermes' own UI, Hermes One,
+[TypingMind](https://www.typingmind.com), [Open WebUI](https://openwebui.com) — none fit quite
+right), SSH servers in [Warp](https://www.warp.dev) (with ideas from Zap, its open-source fork),
+small files in yet another editor, tasks in [Things](https://culturedcode.com/things/), and
 [DevUtils](https://devutils.com) for Base64, regex, JSON and the like. Each of them is good.
-Together they meant switching windows all day.
+Together they meant switching windows all day, and each did a few things not the way I work.
 
-The push came from ArtCraft: with AI they rebuilt in pure Rust a whole collection of the heaviest
-programs there are — Photoshop, Premiere, Illustrator, Word, Excel, Figma, AutoCAD, Pro Tools.
-If that could be done, maybe the much simpler programs one person uses every day could be
+What made me try was [ArtCraft](https://github.com/storytold): with AI they rebuilt in pure Rust
+a whole collection of heavy programs — Photoshop
+([PhotoCraft](https://github.com/storytold/photocraft)), Premiere, Illustrator, Word, Excel,
+Figma, AutoCAD. If that could be done, maybe the much simpler programs I use every day could be
 brought together into one.
 
-So I tried. **Today I use one app instead of fifteen, and I spend much less time getting
-things done.** Nothing was cloned: the goal was to take the idea of each piece I actually use
-and give it one shape. Mostly we worked from screenshots and descriptions; here and there we
-looked deeper with [REA](https://github.com/morluto/rea) (Reverse Engineer Anything), an MCP for
-taking apart binaries and applications, to see how a program does something before rebuilding
-just that part. The same route works for any program, and any workflow, you'd like to fold in.
+So I tried, starting with the chat client, and now I work in one window. Nothing was cloned: the
+goal was to take the idea of each piece I actually use and shape it the way I work. Mostly we
+worked from screenshots and descriptions; here and there we looked deeper with
+[REA](https://github.com/morluto/rea) (Reverse Engineer Anything), an MCP for taking apart
+binaries and applications, to see how a program does something before rebuilding just that part.
 
-Ideas came from anywhere, not only from the apps I replaced. Zed's
-[Delta](https://zed.dev/blog/introducing-deltadb) treats the agent's conversation, not the
-commit, as the unit of work: every change stays linked to the thread that produced it, so you
-can always see *why* the code is the way it is. I didn't build that, but I took the part I
-could use: in Bench a chat can work in a git branch of its own and be merged back when it's
-done, so each piece of work is one conversation. That's the way of working I'd like to share:
-you see a good idea somewhere, you add it to your bench in a few minutes, and you go back to
-your actual work. No extra programmer needed.
+Ideas came from other places too. Zed's [Delta](https://zed.dev/blog/introducing-deltadb) treats
+the agent's conversation, not the commit, as the unit of work: every change stays linked to the
+thread that produced it. I didn't build that, but took the part I could use — in Bench a chat can
+work in a git branch of its own and be merged back when it's done. Seeing an idea somewhere and
+having it in the bench a few minutes later turned out to be the nicest part of all this.
 
-The interesting part turned out to be not my app but the way to make one: written down as
-agent skills, it works for anyone's set of tools. Even if you never use the kit, that's the
-thought worth taking away: your own mix of tools can be one fast app, made for you.
+Along the way the agent wrote down what worked as skills, so that another agent could build a
+different app from them. That is the kit.
 
-## The kit is the point
+## The kit
 
 [`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md) is a set of agent skills. It
 doesn't describe my tools; it describes *how to make anyone's*:
@@ -84,15 +83,12 @@ a short skill that makes an agent code like a lazy senior developer (does it nee
 it already there? is there a ready piece?). The kit's engineering rules follow it — a few
 lines of text with a visible effect.
 
-Think of a 3D printer and its test boat, the "benchy": one model, printed in different sizes and
-colors for different purposes, always recognisably the same. The kit is the printer.
-
-## What every Bench keeps
+## What stays the same in every Bench
 
 1. **One look, and the look is the method.** Flat, square, precise: a sidebar, a header, a status
    bar, exact spacing, one accent color. A job placed into "a list on the left, a strip of small
    controls, a few panes, a status line" splits into the right pieces by itself. The agent
-   doesn't design, it assembles, which is why even a mid-level model can build one well.
+   doesn't design, it assembles, which helps even a mid-level model build one well.
 2. **Native and light.** Rust with [GPUI](https://www.gpui.rs) (the UI framework behind the Zed
    editor) through [gpui-kit](https://crates.io/crates/gpui-kit): GPU-drawn, no Electron, no
    bundled browser. This whole Bench — chat, terminals, editor, tools, tasks, every icon, font
@@ -129,7 +125,7 @@ SSH, the mini IDE, Tools and Tasks can each be switched off with one flag in
 the kit's [`bench-modes-remove.md`](.agents/skills/bench-kit/references/bench-modes-remove.md)
 explains what goes with each.
 
-## A Bench that builds itself
+## Developed from inside itself
 
 This Bench is developed from inside itself: I talk to the agent in Bench, the agent changes
 Bench's code, and every commit becomes its own app next to the one I'm running. I try the new
@@ -166,4 +162,4 @@ how Bench looks and is put together.
 ## License
 
 [MIT](LICENSE): use it, change it, build your own Bench from it. Nothing here is for sale; it's
-shared to show that this can be done.
+shared as an experiment.
