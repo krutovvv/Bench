@@ -31,7 +31,7 @@ I'm a developer, and my day was spread over a dozen apps. I talk to my AI agent
 [TypingMind](https://www.typingmind.com), [Open WebUI](https://openwebui.com). My servers
 lived in [Warp](https://www.warp.dev), with ideas taken from Zap, its open-source fork that
 adds a few things of its own; small files opened in yet another editor; I tracked my
-tasks in [Things](https://culturedcode.com/things/), and reach for
+tasks in [Things](https://culturedcode.com/things/) and reached for
 [DevUtils](https://devutils.com) for Base64, regex, JSON, Unix time and the like. Each of them is
 good. Together they meant switching windows all day, copying things from one into the next,
 and using a small part of each.
