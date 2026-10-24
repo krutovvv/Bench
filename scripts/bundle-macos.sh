@@ -10,7 +10,7 @@
 #
 # Commit first: a build is one commit, so uncommitted changes stop it. For a quick experiment,
 # BENCH_DIRTY=1 scripts/bundle-macos.sh builds "Bench.<commit>-dirty.app" anyway.
-# All versions share the bundle id local.hermes-gpui (macOS grants — Reminders, notifications,
+# All versions share the bundle id local.bench (macOS grants — Reminders, notifications,
 # microphone, local network — and the state folder belong to it) and the binary's name.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -38,7 +38,7 @@ cargo build --release
 mkdir -p dist
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp target/release/hermes-gpui "$APP/Contents/MacOS/hermes-gpui"
+cp target/release/bench "$APP/Contents/MacOS/bench"
 
 # Icon: render the SVG mark, then build an .icns with every size macOS asks for.
 WORK=$(mktemp -d)
@@ -64,8 +64,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <dict>
   <key>CFBundleName</key><string>Bench</string>
   <key>CFBundleDisplayName</key><string>Bench</string>
-  <key>CFBundleIdentifier</key><string>local.hermes-gpui</string>
-  <key>CFBundleExecutable</key><string>hermes-gpui</string>
+  <key>CFBundleIdentifier</key><string>local.bench</string>
+  <key>CFBundleExecutable</key><string>bench</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.$COUNT</string>
@@ -83,7 +83,7 @@ PLIST
 
 # A stable identity, so macOS privacy grants (microphone, local network) belong to the app
 # rather than to one particular build.
-codesign --force --sign - --identifier local.hermes-gpui "$APP"
+codesign --force --sign - --identifier local.bench "$APP"
 
 # Keep the newest KEEP builds (by date); skip any that is running, never touch "Bench.app".
 OLD_BUILDS=$(ls -dt dist/Bench.*.app 2>/dev/null | tail -n +$((KEEP + 1)))

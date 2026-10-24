@@ -113,7 +113,7 @@ builds stay for rolling back.
 Needs macOS, Rust and, for the chat, [Hermes Agent](https://hermes-agent.nousresearch.com).
 
 ```bash
-cargo build --release && ./target/release/hermes-gpui     # run it
+cargo build --release && ./target/release/bench           # run it
 scripts/bundle-macos.sh                                    # dist/Bench.<commit>.app (commit first)
 ```
 

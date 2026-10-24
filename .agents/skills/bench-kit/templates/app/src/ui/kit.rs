@@ -1,4 +1,4 @@
-//! House-style building blocks, the same as Bench's (`~/Projects/hermes-gpui`). Copy this file
+//! House-style building blocks, the same as Bench's (`~/Projects/bench-kit`). Copy this file
 //! into `src/ui/kit.rs` of an app made by `scripts/new-app.sh`, add `pub mod kit;` to `src/ui/mod.rs`,
 //! and build views from these functions instead of styling elements yourself.
 //!

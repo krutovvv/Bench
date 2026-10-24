@@ -669,7 +669,7 @@ impl HermesApp {
                          (HostName, User, IdentityFile, Port), the folder and the default folder as \
                          # comments in the server's Host block (ssh ignores them), so there is one \
                          place for all of it. ssh, scp, Zed and other tools \
-                         see the same server; the previous file is kept as config.bak-hermes-gpui. \
+                         see the same server; the previous file is kept as config.bak-bench. \
                          No passwords are stored: ssh signs in with your keys and ssh-agent.",
                     ))
                     .child(

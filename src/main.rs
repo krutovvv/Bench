@@ -1,6 +1,7 @@
 //! Bench — one window for a local Hermes agent, its sessions, the user's servers (terminal over
-//! SSH) and their files (a mini IDE). Formerly "Hermes GPUI": the crate, the binary, the bundle
-//! id (local.hermes-gpui) and the state folder keep that name.
+//! SSH), their files (a mini IDE), everyday tools and tasks. Crate, binary, bundle id
+//! (local.bench) and state folder are all "bench" (formerly hermes-gpui: its state is copied
+//! over on the first start, `connection::migrate_state`).
 
 mod app;
 mod attach;
@@ -30,7 +31,7 @@ mod video;
 
 use gpui_kit::*;
 
-/// `hermes-gpui --probe [local|<ssh-host>]`: connect without a window and print what the gateway has.
+/// `bench --probe [local|<ssh-host>]`: connect without a window and print what the gateway has.
 fn probe(target: &str) -> anyhow::Result<()> {
     let target = if target == "local" {
         model::Target::Local
@@ -216,6 +217,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
 }
 
 fn main() {
+    connection::migrate_state();
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("--probe-git") {
         if let Err(e) = probe_git(&args[2]) {

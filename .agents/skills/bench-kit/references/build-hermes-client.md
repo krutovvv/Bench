@@ -49,7 +49,7 @@ Scope rules that bit us (`native_http.py::_check_profile_scope`):
   chats and coming back keeps the time running ("время хода не должно сбрасываться").
 - Fenced mutations (model, reasoning, rewind, delete) send `expected_revision` and
   `expected_generation` (`Rpc::mutate`).
-- Errors of fire-and-forget calls go to `~/Library/Application Support/hermes-gpui/gateway-errors.log`
+- Errors of fire-and-forget calls go to `~/Library/Application Support/bench/gateway-errors.log`
   — read it first when a button "does nothing".
 
 ## Questions and plans
@@ -158,12 +158,12 @@ say so, don't uninstall theirs.
 
 ## Bench: SSH mode and the mini IDE
 
-The reference app is **Bench** (`dist/Bench.app`, bundle id `local.hermes-gpui`; a Bench made by
+The reference app is **Bench** (`dist/Bench.<commit>.app`, bundle id `local.bench`; a Bench made by
 `new-bench.sh` has `local.<crate>` — use that in the commands below). Besides
 sessions it has an SSH mode (servers = `~/.ssh/config`, a terminal per server, no agent
 installed on servers; gateways list = This Mac + config hosts where Hermes answers) and a mini
 IDE (gateway files, or a server's files as synced cache copies under
-`~/Library/Caches/hermes-gpui/remote/` — "Add to chat" hands the agent that path; uploads check
+`~/Library/Caches/bench/remote/` — "Add to chat" hands the agent that path; uploads check
 the server's mtime and stop on a conflict). Local agents reach servers through the separate
 `~/Projects/ssh-mcp` MCP server (same `~/.ssh/config`, same `~/.ssh/cm` socket).
 

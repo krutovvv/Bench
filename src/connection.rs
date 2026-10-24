@@ -286,7 +286,18 @@ impl Connection {
 }
 
 pub fn state_dir() -> PathBuf {
-    home().join("Library/Application Support/hermes-gpui")
+    home().join("Library/Application Support/bench")
+}
+
+/// The app was called hermes-gpui before: its state folder (last place, drafts, marks, settings)
+/// is copied over the first time, not moved — an older build may still run from it.
+pub fn migrate_state() {
+    let new = state_dir();
+    let old = home().join("Library/Application Support/hermes-gpui");
+    if new.exists() || !old.is_dir() {
+        return;
+    }
+    let _ = std::process::Command::new("cp").arg("-R").arg(&old).arg(&new).status();
 }
 
 fn write_private(path: &PathBuf, text: &str) -> Result<()> {

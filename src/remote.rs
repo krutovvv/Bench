@@ -46,7 +46,7 @@ pub fn list_dir(alias: &str, dir: &str) -> Result<Vec<(String, String, bool)>> {
 /// Where a server's file is kept while open on this Mac.
 pub fn cache_path(alias: &str, remote: &str) -> PathBuf {
     crate::ssh::home()
-        .join("Library/Caches/hermes-gpui/remote")
+        .join("Library/Caches/bench/remote")
         .join(alias.replace('/', "_"))
         .join(remote.trim_start_matches('/'))
 }

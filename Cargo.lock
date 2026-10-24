@@ -599,6 +599,49 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
+name = "bench"
+version = "0.1.0"
+dependencies = [
+ "alacritty_terminal",
+ "anyhow",
+ "async-channel",
+ "base64 0.22.1",
+ "block2 0.6.2",
+ "chrono",
+ "chrono-tz",
+ "cpal",
+ "croner",
+ "gpui-kit",
+ "heck 0.5.0",
+ "hound",
+ "htmd",
+ "image",
+ "imagesize 0.13.0",
+ "md-5",
+ "mermaid-rs-renderer",
+ "objc2 0.6.5",
+ "objc2-event-kit",
+ "objc2-foundation 0.3.2",
+ "objc2-user-notifications",
+ "percent-encoding",
+ "portable-pty",
+ "rand 0.8.8",
+ "regex",
+ "rodio",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha1 0.10.7",
+ "sha2 0.10.9",
+ "similar",
+ "tungstenite",
+ "unicodeit",
+ "ureq",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "bindgen"
 version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3065,49 +3108,6 @@ name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
-
-[[package]]
-name = "hermes-gpui"
-version = "0.1.0"
-dependencies = [
- "alacritty_terminal",
- "anyhow",
- "async-channel",
- "base64 0.22.1",
- "block2 0.6.2",
- "chrono",
- "chrono-tz",
- "cpal",
- "croner",
- "gpui-kit",
- "heck 0.5.0",
- "hound",
- "htmd",
- "image",
- "imagesize 0.13.0",
- "md-5",
- "mermaid-rs-renderer",
- "objc2 0.6.5",
- "objc2-event-kit",
- "objc2-foundation 0.3.2",
- "objc2-user-notifications",
- "percent-encoding",
- "portable-pty",
- "rand 0.8.8",
- "regex",
- "rodio",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha1 0.10.7",
- "sha2 0.10.9",
- "similar",
- "tungstenite",
- "unicodeit",
- "ureq",
- "url",
- "uuid",
-]
 
 [[package]]
 name = "hermit-abi"

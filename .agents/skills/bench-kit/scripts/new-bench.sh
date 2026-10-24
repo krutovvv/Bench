@@ -23,8 +23,16 @@ mkdir -p "$DEST"
 git -C "$BENCH" ls-files -z | (cd "$BENCH" && xargs -0 tar -cf -) | tar -xf - -C "$DEST"
 rm -f "$DEST/dist/.build-number"
 # The reference's own name → this Bench's crate name (Cargo, bundle id, data and cache folders).
-grep -rl "hermes-gpui" "$DEST" --include='*.rs' --include='*.toml' --include='*.sh' --include='*.lock' |
-    while read -r f; do sed -i '' "s/hermes-gpui/$CRATE/g" "$f"; done
+# The reference's own identity → this Bench's crate name. Only the exact identifiers ("bench" is
+# also a word in names and comments): the crate, the binary, the bundle id, the state folders.
+grep -rlE 'name = "bench"|local\.bench|(Support|Caches)/bench|release/bench|MacOS/bench|<string>bench</string>|bak-bench|config\.bench' \
+    "$DEST" --include='*.rs' --include='*.toml' --include='*.sh' --include='*.lock' --include='*.md' |
+    while read -r f; do
+        sed -i '' -E -e "s/name = \"bench\"/name = \"$CRATE\"/" -e "s/local\.bench/local.$CRATE/g" \
+            -e "s#(Support|Caches)/bench#\1/$CRATE#g" -e "s#release/bench#release/$CRATE#g" \
+            -e "s#MacOS/bench#MacOS/$CRATE#g" -e "s#<string>bench</string>#<string>$CRATE</string>#g" \
+            -e "s/bak-bench/bak-$CRATE/g" -e "s/config\.bench\./config.$CRATE./g" "$f"
+    done
 chmod +x "$DEST"/scripts/*.sh
 
 # One shared build folder for all such apps: gpui compiles once.
