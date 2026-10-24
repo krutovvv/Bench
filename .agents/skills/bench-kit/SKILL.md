@@ -16,9 +16,10 @@ metadata:
 
 Bench is a client for an AI agent built on Pi Durable, written from scratch in Rust and GPUI and
 shaped like Zed's Delta: one chat app where **the thread with the agent is the unit of work**.
-What it adds is the person's own tools, each **a kind of thread**: the sidebar lists what they
-work on (task lists, servers, file hosts, browser sessions, utilities), and a thread about one
-has it live at the top and the conversation under it; the agent knows the subject, sees what the
+What it adds is the person's own tools, each **a kind of thread**: the sidebar holds only their
+**projects** (each with its environment: soul, MCP, skills, tasks, accesses, crons; a folder on
+disk optional) and the projects' threads; a tool is attached in a thread with `/` and stays live
+at its top, the conversation under it; the agent knows the subject, sees what the
 block shows, and has a tool to act on it. The user's Bench has five such tools — Tasks, Servers,
 Files, Browser, Tools. **This kit grows Bench**: it adds the next tool someone needs (their
 clients, their orders, their builds) the same way, in the same look. It is not for building a
@@ -40,9 +41,11 @@ often the person talks to you **through Bench itself** while you change Bench. S
 
 ## The five things that never change
 
-1. **Everything is a thread.** No modes, no separate windows or panels for a job. A tool is a
-   subject: a sidebar group, a live block at the thread's top, the conversation under it, the
-   agent acting on it (`references/build-subject.md`). Something the agent produces during a turn
+1. **Projects, and everything in them is a thread.** No modes, no profiles, no separate windows
+   or panels for a job. The sidebar lists projects; a project's environment (soul, MCP, skills,
+   tasks, accesses, crons) is what its threads get. A tool is a subject attached in a thread with
+   `/`: a live block at the thread's top, the conversation under it, the agent acting on it
+   (`references/build-subject.md`). Something the agent produces during a turn
    shows in that turn's answer (a browser step, a card, a chart).
 2. **One look, and the look is the method.** Zed-like, flat, square, precisely spaced, one
    accent; in the thread one font size, the messages'. **Never invent a look or a control** — place
@@ -71,7 +74,7 @@ often the person talks to you **through Bench itself** while you change Bench. S
    (`cargo build && ./target/debug/<crate>`). Groups they don't need are hidden by the flags in
    `src/bench.rs`.
 3. **Add a tool = a new kind of thread** (`references/build-subject.md`): key → opening → block →
-   sidebar group → the agent's tool, prompt section and block state → a demo thread. Copy the
+   its `/` command → the agent's tool, prompt section and block state → a demo thread. Copy the
    nearest of the five.
 4. **Build every view from the catalog** (`references/ui-catalog.md` → `ui-*.md`). Never style
    buttons, rows or bars yourself; never write your own text editor, renderer or highlighter.

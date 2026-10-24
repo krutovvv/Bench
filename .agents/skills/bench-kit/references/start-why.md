@@ -6,9 +6,11 @@ Bench is a native desktop client for an AI agent built on [Pi Durable](https://g
 written from scratch in Rust with GPUI. Its shape is taken from Zed's Delta: **the thread with
 the agent is the unit of work**. One chat app, no modes, no separate windows for separate jobs.
 
-What it adds to that is the person's own tools, **each as a kind of thread**. The sidebar lists
-what the person works on — task lists, servers, file hosts, browser sessions, small utilities —
-and each opens a thread about it: the thing itself live at the top (the task list, the server's
+What it adds to that is the person's own tools, **each as a kind of thread**. The sidebar holds
+only the person's **projects** (a client, a site, a codebase, a kind of work; each with its own
+environment — soul, MCP servers, skills, tasks, accesses, crons — a folder on disk optional) and
+their threads. In a thread a tool is attached with `/` — a task list, a server, a file host, the
+browser, a small utility — and stays there: the thing itself live at the top (the task list, the server's
 terminal, the folder on the FTP host, the page in the browser, the tool's input and output), the
 conversation with the agent under it. The agent knows what the thread is about, sees what the
 block shows with every message, and has a tool to act on it. The person can do the work by hand

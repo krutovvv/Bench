@@ -9,7 +9,8 @@ programmers). Don't propose anything until you have the picture.
 - What is your job? What does a normal day look like, from start to end?
 - What do you produce (code, texts, posts, reports, deals…)? For whom?
 
-**What you work on** — the things that would become the sidebar's groups:
+**What you work on** — the things that would become projects (a client, a site, a codebase, a
+kind of work), and in them the tools a thread attaches:
 - What do you keep coming back to all day: a list of tasks, servers, sites you sign in to,
   folders on a host, clients, orders, tickets, documents?
 - For each: where does it live now (an app, a website, a server, a file)? What exactly do you do

@@ -30,10 +30,15 @@ around it. You see what it did, and you can click and type in that page yourself
 tick a box, sign in. Then ask for the next step. Earlier steps keep the last picture of their
 page, so the thread reads like a record of the work.
 
-The same idea covers my other everyday tools: **each one is a kind of thread**. The sidebar lists
-what I work on. A thread about one has it live at the top and the conversation underneath. The
-agent knows what the thread is about, sees what the block shows with every message, and has a
-tool to act on it.
+The same idea covers my other everyday tools: **each one is a kind of thread**. The sidebar holds
+only **projects** — a client, a site, a codebase, a kind of work — and their threads. In a thread
+you attach a tool with `/` (`/ssh web-1`, `/ftp`, `/browser`, `/tasks`, `/tool`): it stays live at
+the top, the conversation underneath. The agent knows what the thread is about, sees what the
+block shows with every message, and has a tool to act on it.
+
+A project carries its own environment, as in Claude Code: a soul (what it is, how to work in it),
+its MCP servers, its skills, its tasks, its server and FTP accesses, its scheduled jobs. A folder
+on disk is optional. There are no agent profiles to pick: you open the project and work.
 
 | Thread | What's live | What the agent does there |
 |---|---|---|
@@ -102,7 +107,7 @@ for **adding such a tool to Bench**: one more kind of thread, made the same way 
 above, in the same look:
 
 - **the recipe** ([`build-subject.md`](.agents/skills/bench-kit/references/build-subject.md)):
-  the subject's key, the live block, the sidebar group, the agent's tool, its prompt section
+  the subject's key, the live block, its `/` command, the agent's tool, its prompt section
   and the block's state, with the browser thread as the main worked example and the other four after it and a checklist of
   every file a new one touches;
 - **how to ask** a person about their work and turn the answers into threads;
