@@ -19,6 +19,38 @@ exactly that, if it knows *how* to build it well.
 agent from your own description.** A writer's Bench, a sysadmin's Bench, an accountant's Bench
 do different jobs. They all have the same shape.
 
+## How it started
+
+I'm a developer, and my day was spread over a dozen apps. I talk to my AI agent
+([Hermes](https://hermes-agent.nousresearch.com)), and none of the clients I tried fit:
+[BoltAI](https://boltai.com), DeepSeek Harness, Hermes' own UI, Hermes One,
+[TypingMind](https://www.typingmind.com), [Open WebUI](https://openwebui.com). I keep servers
+in one SSH client and terminals in another, open small files in yet another editor, track my
+tasks in [Things](https://culturedcode.com/things/), and reach for
+[DevUtils](https://devutils.com) for Base64, regex, JSON, Unix time and the like. Each of them is
+good. Together they meant switching windows all day, copying things from one into the next,
+and using a small part of each.
+
+The push came from [ArtCraft](https://thedieline.com/artcraft-launches-an-open-source-ai-powered-alternative-to-adobes-creative-cloud/):
+a developer used Claude to write open-source Rust look-alikes of Adobe's apps — PhotoCraft
+after Photoshop, FilmCraft after Premiere, and more
+([Phoronix](https://www.phoronix.com/news/Photocraft-Filmcraft-AI)). If an AI can get that
+far with programs of that size, then the much simpler programs one person uses every day can
+certainly be brought together into one.
+
+So this is that experiment. **Bench now holds, in one fast native window, the parts I used of
+all of the above**: the chat with my agent, my SSH servers with their terminals, a mini IDE for
+the files the agent touches, a tools mode in place of DevUtils, and my tasks (moved from Things
+into the system's Reminders, which the agents read and write too). Nothing had to be copied
+exactly: the goal was never to clone a program, only to take the idea of each piece I actually
+use and give it one shape. We worked from screenshots and descriptions. A disassembler MCP such
+as [ReVa](https://github.com/cyberkaida/reverse-engineering-assistant) (Ghidra) could take
+this further — studying how a program does something before rebuilding just that part — but
+the simple tools here never needed it.
+
+The interesting part turned out to be not the app but the way to make it: written down as
+agent skills, it works for anyone's set of programs.
+
 ## The kit is the point
 
 This repository holds a Bench, but what matters is the set of agent skills next to it:
