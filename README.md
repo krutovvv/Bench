@@ -6,20 +6,36 @@
 
 <p align="center"><b>A personal workbench, and the kit an AI agent uses to build one for anyone.</b></p>
 
+<p align="center">
+  <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a> ·
+  <a href="https://github.com/krutovvv/bench/releases">Download for macOS, Linux, Windows</a>
+</p>
+
 ![A Bench at work: the agent's steps, then its answer](docs/chat-steps.png)
 
-<sub>A made-up session (demo mode, `BENCH_DEMO=top`): nothing in these screenshots is real data.</sub>
+<sub>A made-up session (demo mode): nothing in these screenshots is real data. The
+[browser demo](https://krutovvv.github.io/bench/) is the same app compiled to WebAssembly —
+click through the chat, Tasks, Tools and SSH.</sub>
 
 ## The idea
 
-Professional tools are built for everyone. Each of us uses a small, specific part of a dozen of
-them — the part our own work needs — and pays for the rest with clutter, with switching
-windows, with copying things from one app into the next.
+Some people do their whole job in one big program — a video editor in Premiere, a designer in
+Figma. Many don't. Their work runs through a dozen small tools, and they use a little of each:
+a bit of a task manager, a few converters, an AI chat or two, an editor for quick fixes, an
+SSH client. Not because they don't know those tools, but because their workflow is built from
+many of them. Switching between them, and remembering what lives where, costs time every day.
 
-Nobody makes software for one person: nobody else knows their process well enough, and it would
-never pay off. An AI agent can, if it knows *how* to build it well. **A Bench is one window
-holding exactly the parts of your work you use, built by an agent from your own description.**
-Everyone's tools are different, so everyone's Bench is different. They all have the same shape.
+The one tool that would hold exactly *their* pieces will never be made: the demand for it is
+one person. Nobody builds software for that. You could write it yourself — I'm a developer,
+and I have written such things — but writing was never the hard part. **Maintaining it was**:
+after the first version come fixes, changes, new needs, and there's a day job. Hiring someone
+for months, and then for every change, doesn't pay off either.
+
+An AI agent changes both halves. It builds the tool from your description, and it maintains
+it: you ask for a change, and it's there. **That makes personal software possible — software
+for one specialist's way of working.** A Bench is that: one window with exactly the parts of
+your work you use, built and kept up by an agent. Everyone's tools are different, so
+everyone's Bench is different. They all have the same shape.
 
 ## How it started
 
@@ -45,7 +61,8 @@ taking apart binaries and applications, to see how a program does something befo
 just that part. The same route works for any program, and any workflow, you'd like to fold in.
 
 The interesting part turned out to be not my app but the way to make one: written down as
-agent skills, it works for anyone's set of tools.
+agent skills, it works for anyone's set of tools. Even if you never use the kit, that's the
+thought worth taking away: your own mix of tools can be one fast app, made for you.
 
 ## The kit is the point
 
@@ -59,6 +76,11 @@ doesn't describe my tools; it describes *how to make anyone's*:
 - **how to change it safely**: a fixed loop of measuring, editing, building and measuring again,
   with scripts that check the result to the pixel, so a modest model can do it without guessing;
 - proven libraries, ready recipes, and the mistakes already paid for.
+
+One small thing I found worth borrowing: [ponytail](https://github.com/DietrichGebert/ponytail),
+a short skill that makes an agent code like a lazy senior developer (does it need to exist? is
+it already there? is there a ready piece?). The kit's engineering rules follow it — a few
+lines of text with a visible effect.
 
 Think of a 3D printer and its test boat, the "benchy": one model, printed in different sizes and
 colors for different purposes, always recognisably the same. The kit is the printer.
@@ -118,10 +140,14 @@ cargo build --release && ./target/release/bench    # run it
 BENCH_DEMO=1 ./target/release/bench                # the made-up session from the screenshots
 ```
 
-GPUI runs on macOS, Linux and Windows (and has a web backend). This Bench is built and used on
-macOS, and a few of its pieces talk to macOS directly (the Reminders tasks, notifications,
-`scripts/bundle-macos.sh` for an `.app`); on another system those are the parts to replace or
-switch off — the rest is plain Rust.
+```bash
+scripts/build-web.sh                               # the browser demo, into web/dist
+```
+
+GPUI runs on macOS, Linux and Windows, and in the browser; GitHub builds all of them on every
+push (`.github/workflows/build.yml`). I use Bench on macOS; the Reminders tasks and
+notifications talk to macOS directly, so elsewhere they say they're unavailable — the rest is
+the same Rust everywhere.
 
 ## Use the kit
 
@@ -129,14 +155,13 @@ Open this folder as the working folder of an agent session (in Bench, or in Herm
 once with `hermes skills trust <path-to-this-repo>`), describe your work, and ask for your
 Bench. The agent starts from [`SKILL.md`](.agents/skills/bench-kit/SKILL.md).
 
+## About me
+
+Before this I built [iSite.app](https://isite.app), a platform for making websites and online
+stores, its visual editor included. That's where my feel for interfaces comes from, and much of
+how Bench looks and is put together.
+
 ## License
 
 [MIT](LICENSE): use it, change it, build your own Bench from it. Nothing here is for sale; it's
 shared to show that this can be done.
-
----
-
-<sub>About the design: before this I built [iSite.app](https://isite.app), a platform where web
-studios make websites and online stores for their clients without programmers — its visual
-editor and interface included. Much of how Bench looks and is put together comes from that
-work.</sub>
