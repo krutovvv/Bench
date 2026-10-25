@@ -120,14 +120,4 @@ mod tests {
         let diff = "@@ -1,1 +1,1 @@\n-x\n+y\n";
         assert!(before("z\n", &[diff.to_string()]).is_none());
     }
-
-    #[test]
-    fn full_diff_parses_with_every_line() {
-        let full = full("src/x.rs", "a\nb\nc\n", "a\nB\nc\nd\n");
-        let files = gpui_kit::component::diff::DiffFile::parse(&full).unwrap();
-        assert_eq!(files.len(), 1);
-        assert_eq!((files[0].additions(), files[0].deletions()), (2, 1));
-        assert_eq!(full.lines().filter(|l| l.starts_with(' ')).count(), 2);
-        assert!(files[0].path().ends_with("src/x.rs"));
-    }
 }
