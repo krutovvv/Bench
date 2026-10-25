@@ -123,7 +123,22 @@ impl BenchApp {
             None
         } else if !self.turns.is_empty() {
             None
-        } else if self.session.is_some() {
+        } else if let (Some(id), Some(why)) = (self.session.clone(), self.history_error.clone()) {
+            // The history did not come: why, and another try.
+            Some(
+                h_flex()
+                    .w_full()
+                    .pl(px(super::CHAT_TEXT))
+                    .pr(px(super::CHAT_RIGHT))
+                    .py(px(super::TURN_Y))
+                    .gap_3()
+                    .items_center()
+                    .child(div().flex_1().min_w_0().text_base().text_color(theme.danger).child(format!("Could not open the thread: {why}")))
+                    .child(super::form_action("history-retry", "Retry", false, cx).on_click(cx.listener(move |this, _, _, cx| this.open_session(id.clone(), cx))))
+                    .into_any_element(),
+            )
+        } else if self.session.is_some() && self.runtime.is_none() {
+            // Opening: until its history comes (an empty thread has none to wait for).
             Some(
                 h_flex()
                     .w_full()

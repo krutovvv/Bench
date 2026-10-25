@@ -137,7 +137,7 @@ pub struct BenchApp {
     /// Stored id of the open session (what the session list shows).
     pub session: Option<String>,
     /// The id the gateway uses for prompts and events of the open session.
-    runtime: Option<String>,
+    pub runtime: Option<String>,
     pub confirm_delete: Option<String>,
     /// Stored id -> runtime id for sessions this client has opened (to close before delete).
     opened: HashMap<String, String>,
@@ -156,6 +156,8 @@ pub struct BenchApp {
     pub settle_stable: u8,
     /// The opening thread has content to lay out (cached or its history arrived).
     pub settle_ready: bool,
+    /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
+    pub history_error: Option<String>,
     pub live: Option<Live>,
     queued: Option<String>,
     /// Send was pressed while dictating: send once the speech is recognized.
@@ -626,6 +628,7 @@ impl BenchApp {
             settle: 0,
             settle_stable: 0,
             settle_ready: false,
+            history_error: None,
             live: None,
             queued: None,
             attachments: vec![],
@@ -972,6 +975,12 @@ impl BenchApp {
                 self.refresh_sessions();
             }
             Evt::Inserts(sid, list) => self.on_inserts(sid, list, cx),
+            Evt::ResumeFailed(sid, why) => {
+                if self.session.as_deref() == Some(sid.as_str()) {
+                    self.history_error = Some(why);
+                    self.settle = 0;
+                }
+            }
             Evt::Queue(sid, items) if self.is_current(&sid) => {
                 self.queue = items;
                 cx.notify();
@@ -1284,6 +1293,7 @@ impl BenchApp {
         self.effort_other = None;
         self.effort = self.profile_effort;
         self.turns.clear();
+        self.history_error = None;
         self.live = None;
         self.queued = None;
         self.usage = None;

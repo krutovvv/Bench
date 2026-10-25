@@ -190,6 +190,8 @@ pub enum Evt {
     Inserts(String, Vec<crate::model::Insert>),
     /// The agent refused an insert's change: the thread's list is read again.
     InsertFailed(String, String),
+    /// A thread's history could not be read (session id, why): it stops "loading".
+    ResumeFailed(String, String),
     /// The gateway says the session list changed (new session, generated title, …).
     SessionsChanged,
     Deleted,
@@ -548,6 +550,7 @@ fn run(
                 match kind {
                     Pending::Delete => emit(Evt::DeleteFailed(text)),
                     Pending::Inserts(session) => emit(Evt::InsertFailed(session, text)),
+                    Pending::Resume(session, _) => emit(Evt::ResumeFailed(session, text)),
                     // A poll every few seconds: logged above, never a toast.
                     Pending::Processes(_) => {}
                     // Older gateways may lack the projection: show the turns without extras.
