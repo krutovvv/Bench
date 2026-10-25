@@ -54,7 +54,7 @@ thread tomorrow and its inserts are where you left them, in the same state.
 | **`/terminal`**, **`/ssh`** | a terminal on this Mac or a `~/.ssh/config` server, as tall as its text | runs commands there and reads the screen |
 | **`/files`** | the project's own folder; a file opens under it in an editor | reads and edits the files with you |
 | **`/ftp`** | an FTP, FTPS or SFTP host: its folders and the open file | lists, reads, edits, renames |
-| **`/tasks`** | Today, Upcoming, Anytime, Logbook, a click apart | adds, moves, completes, sums the hours ("how long did I work for this client in October?") |
+| **`/tasks`** | Today, Upcoming, Anytime, Logbook, a click apart; one list for everything, a project is a tag (in a project it opens filtered by it) | adds, moves, completes, sums the hours ("how long did I work for this client in October?") |
 | **`/tools`** | Base64, regex, cron, JSON, a web page as Markdown… with input and output | explains, fixes, works with what's in it |
 
 When something needs a form (a new server, a new task, an MCP server's settings), the form
@@ -77,9 +77,8 @@ Each project carries its **environment**, the way Claude Code reads a repository
 - its schedule (jobs that run a prompt in a new thread on their own).
 
 You edit it in the thread too: each part is a block in the project's environment thread, and a
-change opens as a card under that block. **Host-Mac** is this computer's own project, for
-installing, building and looking after it. A server added as a project (**Host-Dev**,
-**Host-RPi**) works entirely there: its agent, threads, terminal, files, skills, MCP servers and
+change opens as a card under that block. **Host** is this computer's own project, always at the top,, for
+installing, building and looking after it. A server added as a project (**Dev**, **RPi**) works entirely there: its agent, threads, terminal, files, skills, MCP servers and
 schedule all live and run on that server.
 
 The only classic settings are behind the gear: model providers and the look.

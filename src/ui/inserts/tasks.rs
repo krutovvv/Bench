@@ -1,5 +1,5 @@
 //! `/tasks`: the task lists in the thread, every list a click away (Today, Upcoming, Anytime,
-//! Logbook…). In a project's thread the project is the tag: its tasks only. Its state: {list}.
+//! Logbook…). In a project's thread the list opens filtered by the project's tag. Its state: {list}.
 
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
@@ -32,9 +32,7 @@ impl InsertKind for Tasks {
 
     fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let now = list_of(ins);
-        if app.tasks.project != app.thread_project {
-            app.tasks.project = app.thread_project.clone();
-        }
+        app.sync_task_project();
         // Only the lists that have something (and the one shown): an empty one needs no button.
         let lists: Vec<List> = LISTS.iter().filter(|l| **l == now || !app.tasks.shown(l).is_empty()).cloned().collect();
         let chosen = lists.iter().position(|l| *l == now).unwrap_or(0);
@@ -71,9 +69,7 @@ impl InsertKind for Tasks {
         if app.tasks.list != list {
             app.select_task_list(list, window, cx);
         }
-        if app.tasks.project != app.thread_project {
-            app.tasks.project = app.thread_project.clone();
-        }
+        app.sync_task_project();
         Some(app.render_tasks_block(cx))
     }
 

@@ -41,8 +41,8 @@ person: there are projects.
   - schedule (cron).
 
   It is edited in its environment thread, one agent message per section, with the card under the
-  section being edited. **Host-Mac** is this machine's own project (installing, building,
-  looking after the machine). A server project (`host` set, e.g. Host-Dev) runs entirely on its
+  section being edited. **Host** is this machine's own project (always first in the sidebar) (installing, building,
+  looking after the machine). A server project (`host` set, e.g. Dev) runs entirely on its
   server: its agent there keeps the threads, skills, MCP, schedule; `/terminal` (`ssh:local`) is
   the thread's machine (`thread_machine()`), so it opens on that server.
 - **The gear** holds the only classic settings: providers and the look.
@@ -79,7 +79,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | What the agent knows of inserts | the `inserts` prompt section, read with `input.read.snapshot(Inserts, conversationId)`, one line per kind (`prompt.ts` `inserted()`), plus `<block-state>` with each message |
 | Prompt | Pi sections (soul, environment, inserts, project, skills, notes), resent only when changed |
 | Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Pi 1.4 leaves an aborted item in the inbox, so `dropFromInbox` removes it in a commit |
-| `/tasks` | tool `tasks` (`builtin/tasks.ts`), data in `bench.sqlite` |
+| `/tasks` | tool `tasks` (`builtin/tasks.ts`), data in `bench.sqlite`; one list for all projects, a project is a tag (`slug` of its name), the default filter in its threads |
 | `/terminal`, `/ssh` | tool `ssh_run` (`builtin/ssh.ts`); without a host it takes the thread's terminal insert |
 | `/ftp` | tools `remote_files`, `hosts` (`builtin/remote.ts`, `hosts.ts`); without a host it takes the thread's insert |
 | `/files` | Pi's coding tools (`read`, `write`, `edit`, `bash`) in the project's folder; Bench reads the folder through `/api/fs/…` |

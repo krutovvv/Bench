@@ -8,6 +8,7 @@ import { defineTool } from "@earendil-works/pi-durable";
 import { randomBytes } from "node:crypto";
 import { db } from "../config.ts";
 import { sessionOf } from "../host.ts";
+import { projects } from "./projects.ts";
 
 export interface Task {
 	id: string;
@@ -109,10 +110,22 @@ const MAX_LIST = 50;
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
 const view = (t: Task) => ({ id: t.id, title: t.title, ...(t.notes ? { notes: t.notes } : {}), ...(t.tags.length ? { tags: t.tags } : {}), day: t.day, ...(t.evening ? { evening: true } : {}), ...(t.someday ? { someday: true } : {}), ...(t.important ? { important: true } : {}), completed: t.completed, ...(t.spent ? { spent_minutes: Math.round(t.spent / 60) } : {}) });
 
+const CYR: Record<string, string> = { а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y", к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya" };
+
+/** A project's tag: its name in Latin letters, lower case, words joined by "-" ("Ассистент ТГ" →
+ * "assistent-tg"), as a slug. Bench's `tasks::slug` is the same. */
+export function slug(name: string): string {
+	return [...name.toLowerCase()]
+		.map((c) => CYR[c] ?? c)
+		.join("")
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+}
+
 export const tasksTool = defineTool({
 	name: "tasks",
 	description:
-		"The person's task list (Bench's Tasks; the only place tasks live). list: status open (default), completed or all; completed ones by done_since / done_until (YYYY-MM-DD, inclusive); filter by tag; the result has count and spent_minutes_total. " +
+		"The person's task list (Bench's Tasks; the only place tasks live; one list for every project). A project is a tag: its name as a slug. In a project's thread, list shows that project's tag unless `all` or another `tag` is given, and add tags the task with it. list: status open (default), completed or all; completed ones by done_since / done_until (YYYY-MM-DD, inclusive); filter by tag; the result has count and spent_minutes_total. " +
 		"add / update: title, notes, tags, day (YYYY-MM-DD, puts it in Today from then; \"\" clears it), evening, someday, important, spent_minutes, completed (YYYY-MM-DD: done on that day). complete (today, or `completed`) / reopen / remove by id; complete and remove take several ids in `ids`.",
 	parameters: Type.Object({
 		action: Type.Union([Type.Literal("list"), Type.Literal("add"), Type.Literal("update"), Type.Literal("complete"), Type.Literal("reopen"), Type.Literal("remove")]),
@@ -128,25 +141,27 @@ export const tasksTool = defineTool({
 		completed: Type.Optional(Type.String({ description: "YYYY-MM-DD it was done" })),
 		ids: Type.Optional(Type.Array(Type.String(), { description: "complete / remove: several at once" })),
 		tag: Type.Optional(Type.String({ description: "list: only tasks with this tag" })),
+		all: Type.Optional(Type.Boolean({ description: "list: every task, not just this project's tag" })),
 		status: Type.Optional(Type.Union([Type.Literal("open"), Type.Literal("completed"), Type.Literal("all")])),
 		done_since: Type.Optional(Type.String({ description: "list: tasks done on or after this day (with status completed / all)" })),
 		done_until: Type.Optional(Type.String({ description: "list: tasks done on or before this day" })),
 	}),
 	execute: async (args, api) => {
-		// In a project's thread: that project's tasks only, and new ones go into it.
-		let project = "";
+		// In a project's thread its tag is the default filter, and new tasks get it.
+		let projectTag = "";
 		try {
-			project = sessionOf(api.conversationId).project ?? "";
+			const id = sessionOf(api.conversationId).project ?? "";
+			const name = id ? projects.get(id)?.name : undefined;
+			if (name) projectTag = slug(name);
 		} catch {}
-		const mine = (t: Task) => !project || t.project === project;
+		const tag = args.tag ?? (args.all ? undefined : projectTag || undefined);
 		if (args.action === "list") {
 			const status = args.status ?? (args.done_since ? "all" : "open");
 			const all = tasks
 				.list(status === "open" ? undefined : (args.done_since ?? "0000"))
-				.filter(mine)
 				.filter((t) => (status === "open" ? !t.completed : status === "completed" ? !!t.completed : true))
 				.filter((t) => !t.completed || !args.done_until || t.completed <= args.done_until)
-				.filter((t) => !args.tag || t.tags.some((g) => g.toLowerCase() === args.tag!.toLowerCase()));
+				.filter((t) => !tag || t.tags.some((g) => g.toLowerCase() === tag.toLowerCase()));
 			// The total answers "how much time on X in October" in one call; a list too long for
 			// the context says how to narrow it instead of being cut off.
 			const spent = Math.round(all.reduce((n, t) => n + t.spent, 0) / 60);
@@ -160,7 +175,9 @@ export const tasksTool = defineTool({
 		}
 		if (args.action === "add") {
 			if (!args.title?.trim()) throw new Error("title is required");
-			return text({ success: true, task: view(tasks.save({ project, title: args.title.trim(), notes: args.notes, tags: args.tags, day: args.day || null, evening: args.evening, someday: args.someday, important: args.important, completed: args.completed || null, spent: args.spent_minutes !== undefined ? Math.round(args.spent_minutes * 60) : 0 })) });
+			const tags = [...(args.tags ?? [])];
+			if (projectTag && !tags.some((g) => g.toLowerCase() === projectTag)) tags.push(projectTag);
+			return text({ success: true, task: view(tasks.save({ title: args.title.trim(), notes: args.notes, tags, day: args.day || null, evening: args.evening, someday: args.someday, important: args.important, completed: args.completed || null, spent: args.spent_minutes !== undefined ? Math.round(args.spent_minutes * 60) : 0 })) });
 		}
 		if ((args.action === "complete" || args.action === "remove") && args.ids?.length) {
 			const done: string[] = [];

@@ -25,8 +25,8 @@ pub const RANGES: [(&str, i64); 5] = [
 pub struct TasksMode {
     pub on: bool,
     pub list: List,
-    /// The open thread's project: the block shows its tasks only, new ones go into it ("": the
-    /// tasks of no project).
+    /// The open thread's project ("": Host). Its tag (`tasks::slug` of its name) is the list's
+    /// filter when the thread opens, one click to drop; new tasks get the filter's tag.
     pub project: String,
     pub items: Vec<Task>,
     pub loaded: bool,
@@ -150,8 +150,6 @@ impl TasksMode {
         let mut out: Vec<Task> = self
             .items
             .iter()
-            // A project's tasks in its threads; outside projects, the tasks of no project.
-            .filter(|t| t.project == self.project)
             .filter(|t| {
                 if q.is_empty() {
                     t.in_list(list, day)
@@ -173,6 +171,22 @@ impl TasksMode {
             _ => out.sort_by_key(|t| (t.done(), t.created)),
         }
         out
+    }
+
+    /// The tags of a list's tasks, the most used first (the strip over the list).
+    pub fn tags_in(&self, list: &List) -> Vec<String> {
+        let day = today();
+        let mut counts: Vec<(String, usize)> = vec![];
+        for t in self.items.iter().filter(|t| t.in_list(list, day)) {
+            for g in &t.tags {
+                match counts.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(g)) {
+                    Some((_, c)) => *c += 1,
+                    None => counts.push((g.clone(), 1)),
+                }
+            }
+        }
+        counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+        counts.into_iter().map(|(n, _)| n).collect()
     }
 
     fn send(&self, cmd: Cmd) {
@@ -472,6 +486,39 @@ impl BenchApp {
     }
 
     /// A new task in the open list, its card open with the title field focused.
+    /// A project's tag (`tasks::slug` of its name); None for Host.
+    pub fn project_tag(&self, project: &str) -> Option<String> {
+        self.projects.iter().find(|p| p.id == project).map(|p| tasks::slug(&p.name)).filter(|s| !s.is_empty())
+    }
+
+    /// The tasks follow the open thread: in a project its tag filters the list (dropped with a
+    /// click on "All"); in Host every task shows.
+    pub fn sync_task_project(&mut self) {
+        if self.tasks.project != self.thread_project {
+            self.tasks.project = self.thread_project.clone();
+            self.tasks.tag_filter = self.project_tag(&self.thread_project);
+        }
+    }
+
+    pub fn set_task_tag_filter(&mut self, tag: Option<String>, cx: &mut Context<Self>) {
+        self.tasks.tag_filter = tag;
+        cx.notify();
+    }
+
+    /// The card's project chips: the project's tag on the open task, or off it again.
+    pub fn toggle_task_tag(&mut self, tag: String, window: &mut Window, cx: &mut Context<Self>) {
+        let mut tags = tasks::parse_tags(&self.tasks.tags.read(cx).value());
+        match tags.iter().position(|g| g.eq_ignore_ascii_case(&tag)) {
+            Some(i) => {
+                tags.remove(i);
+            }
+            None => tags.push(tag),
+        }
+        self.tasks.tags.update(cx, |s, cx| s.set_value(tags.join(", "), window, cx));
+        self.task_fields_changed(cx);
+        cx.notify();
+    }
+
     pub fn new_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.flush_task(cx);
         let token = self.tasks.next_token;
@@ -479,7 +526,6 @@ impl BenchApp {
         let mut t = Task {
             id: format!("new:{token}"),
             created: tasks::now(),
-            project: self.tasks.project.clone(),
             ..Default::default()
         };
         let list = if self.tasks.list == List::Logbook {

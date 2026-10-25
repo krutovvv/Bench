@@ -43,6 +43,26 @@ pub struct Task {
     pub project: String,
 }
 
+/// A project's tag: its name in Latin letters, lower case, words joined by "-" ("Ассистент ТГ"
+/// → "assistent-tg"), as a slug. The agent's `slug` (builtin/tasks.ts) is the same.
+pub fn slug(name: &str) -> String {
+    let latin: String = name
+        .to_lowercase()
+        .chars()
+        .map(|c| match c {
+            'а' => "a", 'б' => "b", 'в' => "v", 'г' => "g", 'д' => "d", 'е' | 'ё' => "e", 'ж' => "zh",
+            'з' => "z", 'и' => "i", 'й' => "y", 'к' => "k", 'л' => "l", 'м' => "m", 'н' => "n",
+            'о' => "o", 'п' => "p", 'р' => "r", 'с' => "s", 'т' => "t", 'у' => "u", 'ф' => "f",
+            'х' => "h", 'ц' => "ts", 'ч' => "ch", 'ш' => "sh", 'щ' => "sch", 'ъ' | 'ь' => "",
+            'ы' => "y", 'э' => "e", 'ю' => "yu", 'я' => "ya",
+            c if c.is_ascii_alphanumeric() => return c.to_string(),
+            _ => "-",
+        }
+        .to_string())
+        .collect();
+    latin.split('-').filter(|w| !w.is_empty()).collect::<Vec<_>>().join("-")
+}
+
 pub fn now() -> i64 {
     chrono::Utc::now().timestamp()
 }
@@ -295,6 +315,14 @@ pub fn parse_tags(s: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn slugs() {
+        assert_eq!(slug("Ассистент ТГ"), "assistent-tg");
+        assert_eq!(slug("Skorozvon"), "skorozvon");
+        assert_eq!(slug("  Deep Research! "), "deep-research");
+        assert_eq!(slug("Щука и ёж"), "schuka-i-ezh");
+    }
 
     fn d(s: &str) -> NaiveDate {
         NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()

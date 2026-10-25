@@ -94,6 +94,7 @@ icons! {
     Terminal => "square-terminal",
     Trash => "trash",
     FilePlus => "file-plus",
+    Tag => "tag",
     FolderPlus => "folder-plus",
     UserRound => "user-round",
     Volume => "volume-2",

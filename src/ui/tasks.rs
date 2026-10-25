@@ -263,8 +263,53 @@ impl BenchApp {
         } else {
             None
         };
-        // No tags: a project's thread shows that project's tasks, which is what tags were for.
-        let strip: Option<AnyElement> = None;
+        // The list's tags, the most used first: "All · skorozvon · client-b…". A project's thread
+        // opens on its project's tag (`sync_task_project`); "All" drops it.
+        let mut tags = if self.tasks.query.is_empty() { self.tasks.tags_in(&list) } else { vec![] };
+        let picked = self.tasks.tag_filter.clone();
+        if let Some(p) = &picked {
+            if !tags.iter().any(|g| g.eq_ignore_ascii_case(p)) {
+                tags.insert(0, p.clone());
+            }
+        }
+        let strip = (!tags.is_empty()).then(|| {
+            let chip = |id: SharedString, label: String, on: bool, tag: Option<String>, cx: &mut Context<Self>| {
+                div()
+                    .id(id)
+                    .flex_none()
+                    .px_2()
+                    .py_0p5()
+                    .rounded_md()
+                    .text_sm()
+                    .cursor_pointer()
+                    .when(on, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
+                    .when(!on, |d| d.text_color(muted).hover(|s| s.text_color(theme.foreground)))
+                    .child(label)
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.click_claimed = true;
+                        this.set_task_tag_filter(tag.clone(), cx)
+                    }))
+                    .into_any_element()
+            };
+            let mut chips = vec![chip("task-tag-all".into(), "All".into(), picked.is_none(), None, cx)];
+            for (k, tag) in tags.into_iter().enumerate() {
+                let on = picked.as_deref().is_some_and(|p| p.eq_ignore_ascii_case(&tag));
+                chips.push(chip(SharedString::from(format!("task-tag-{k}")), tag.clone(), on, Some(tag), cx));
+            }
+            h_flex()
+                .id("task-tags")
+                .flex_none()
+                .px_6()
+                .py_1()
+                .gap_1()
+                .flex_wrap()
+                .items_center()
+                .border_b_1()
+                .border_color(theme.border)
+                .child(Ico::Tag.icon().xsmall().text_color(muted).mr_1())
+                .children(chips)
+                .into_any_element()
+        });
         if inline {
             // In an insert: its head switches the lists (no heading here); the rows' own px_6
             // pulled back to the insert's edges.
@@ -384,6 +429,18 @@ impl BenchApp {
             .when(!t.notes.trim().is_empty(), |d| {
                 d.child(Ico::FileText.icon().xsmall().text_color(muted))
             })
+            // Its tags (a project's is one of them), where the list is not filtered by it.
+            .children(t.tags.iter().filter(|g| self.tasks.tag_filter.as_deref().is_none_or(|f| !f.eq_ignore_ascii_case(g))).take(3).map(|g| {
+                div()
+                    .flex_none()
+                    .px_1p5()
+                    .text_sm()
+                    .text_color(muted)
+                    .border_1()
+                    .rounded_md()
+                    .border_color(theme.border)
+                    .child(g.clone())
+            }))
             .when(t.important, |d| {
                 d.child(Ico::Flag.icon().xsmall().text_color(theme.danger))
             })
@@ -500,6 +557,43 @@ impl BenchApp {
                 "Day",
                 Input::new(&self.tasks.day).into_any_element(),
             ))
+            // The projects as tags: a click puts the project's tag on the task (or takes it off).
+            .child(field("Project", {
+                let on: Vec<String> = t.tags.iter().map(|g| g.to_lowercase()).collect();
+                let chips: Vec<AnyElement> = self
+                    .projects
+                    .iter()
+                    .map(|p| tasks::slug(&p.name))
+                    .filter(|s| !s.is_empty())
+                    .enumerate()
+                    .map(|(k, tag)| {
+                        let chosen = on.contains(&tag);
+                        div()
+                            .id(("task-project", k))
+                            .flex_none()
+                            .h(px(super::FIELD_H))
+                            .px_2()
+                            .flex()
+                            .items_center()
+                            .rounded_md()
+                            .border_1()
+                            .cursor_pointer()
+                            .when(chosen, |d| d.bg(theme.primary).border_color(theme.primary).text_color(theme.primary_foreground))
+                            .when(!chosen, |d| d.border_color(theme.border).hover(|s| s.bg(theme.list_hover)))
+                            .child(tag.clone())
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                this.toggle_task_tag(tag.clone(), window, cx)
+                            }))
+                            .into_any_element()
+                    })
+                    .collect();
+                h_flex().flex_wrap().gap_1().children(chips).into_any_element()
+            }))
+            .child(field(
+                "Tags",
+                Input::new(&self.tasks.tags).into_any_element(),
+            ))
             .child(field(
                 "Time",
                 h_flex()
@@ -550,7 +644,7 @@ impl BenchApp {
             .when(t.done(), |d| {
                 d.child(field(
                     "Done on",
-                    Input::new(&self.tasks.completed).small().into_any_element(),
+                    Input::new(&self.tasks.completed).into_any_element(),
                 ))
             })
             .when_some(self.tasks.field_error.clone(), |d, e| {

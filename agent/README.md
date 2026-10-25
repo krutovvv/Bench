@@ -79,7 +79,7 @@ commit.
 A project is a row in `bench.sqlite` (name, an optional folder, an optional server, a Telegram
 bot). Its environment is laid out like Pi's agent directory, in `~/.bench/projects/<id>/`:
 `SYSTEM.md` (its soul), `mcp.json`, `skills/`, `prompts/`. Its threads share the machine's own
-agent, `~/.bench/agents/default/` (the "Host-Mac" project in Bench): model, memory, standing instructions.
+agent, `~/.bench/agents/default/` (the "Host" project in Bench): model, memory, standing instructions.
 MCP servers that need OAuth sign in through `src/mcp-oauth.ts` (callback on `localhost:47823`,
 credentials in `~/.bench/mcp-oauth/`).
 

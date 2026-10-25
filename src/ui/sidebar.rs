@@ -34,6 +34,17 @@ impl BenchApp {
         } else {
             // Projects, each with its threads: the sidebar's only unit.
             let visible = self.visible_sessions();
+            // Host first, always: this machine's own project (looking after it), with the threads
+            // of no project, Telegram's and cron's.
+            let loose: Vec<usize> = visible
+                .iter()
+                .copied()
+                .filter(|&i| {
+                    let s = &self.sessions[i];
+                    s.host.is_empty() && (s.project.is_empty() || !self.projects.iter().any(|p| p.id == s.project))
+                })
+                .collect();
+            list.extend(self.render_loose(loose, cx));
             // Pinned projects first, each project's pinned threads first.
             let mut projects = self.projects.clone();
             projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
@@ -51,19 +62,7 @@ impl BenchApp {
                     })
                     .collect();
                 rows.sort_by_key(|&i| !self.mark_of(&self.sessions[i].id).pinned);
-                list.extend(self.render_project(g, &p, rows, cx));
-            }
-            // Threads from before projects, Telegram's and cron's: together at the end, folded.
-            let loose: Vec<usize> = visible
-                .iter()
-                .copied()
-                .filter(|&i| {
-                    let s = &self.sessions[i];
-                    s.host.is_empty() && (s.project.is_empty() || !self.projects.iter().any(|p| p.id == s.project))
-                })
-                .collect();
-            if !loose.is_empty() {
-                list.extend(self.render_loose(loose, cx));
+                list.extend(self.render_project(g + 1, &p, rows, cx));
             }
             if self.projects.is_empty() && !self.connecting {
                 list.push(self.sidebar_note("No projects yet. “+” above starts one.", cx));
@@ -195,7 +194,7 @@ impl BenchApp {
     }
 
     /// Host: the machine's own agent and environment, for looking after the machine itself (what every project's threads get too) and
-    /// the threads of no project; folded at the end until opened.
+    /// the threads of no project; first in the sidebar, folded until opened.
     fn render_loose(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
         let key = "open:loose".to_string();
@@ -206,7 +205,7 @@ impl BenchApp {
             .group(group.clone())
             .cursor_pointer()
             .px_4()
-            .pt(rems(0.75))
+            .pt(rems(0.5))
             .pb_1()
             .gap_1p5()
             .items_center()
