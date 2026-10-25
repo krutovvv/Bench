@@ -272,6 +272,10 @@ impl BenchApp {
                 .gap_1()
                 .flex_wrap()
                 .items_center()
+                // A rule from edge to edge parts the tags from the tasks.
+                .border_b_1()
+                .border_color(theme.border)
+                .mb_1()
                 .child(Ico::Tag.icon().xsmall().text_color(muted).mr_1())
                 .children(chips)
                 .into_any_element()
