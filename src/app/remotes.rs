@@ -81,6 +81,12 @@ impl BenchApp {
     }
 
     /// The server whose agent keeps the open thread (or will keep the new one): "" = this Mac.
+    /// Where the open thread's shell runs: its project's server, or this Mac (`term::LOCAL`).
+    pub fn thread_machine(&self) -> String {
+        let host = self.thread_host();
+        if host.is_empty() { crate::term::LOCAL.to_string() } else { host }
+    }
+
     pub fn thread_host(&self) -> String {
         match &self.session {
             Some(id) => self.host_of_session(id),

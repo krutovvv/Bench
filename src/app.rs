@@ -47,6 +47,10 @@ use crate::rest;
 
 pub type Choice = SelectState<Vec<SharedString>>;
 
+/// This machine's own project (the agent's general environment): installing, building, looking
+/// after the machine. A server's is a project named after it ("Host-Dev").
+pub const LOCAL_HOST: &str = "Host-Mac";
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum Panel {
     Chat,

@@ -16,10 +16,11 @@ const MAX_H: f32 = 280.;
 
 pub struct Terminal;
 
-/// The terminal's alias ("" this Mac's), None until one is picked.
-fn alias_of(key: &str) -> Option<String> {
+/// The terminal's alias, None until one is picked. "ssh:local" is the machine the thread's
+/// project runs on: this Mac's shell, or its server's (a remote project works there).
+fn alias_of(app: &BenchApp, key: &str) -> Option<String> {
     match key.strip_prefix("ssh:")? {
-        "local" | "" => Some(crate::term::LOCAL.to_string()),
+        "local" | "" => Some(app.thread_machine()),
         a => Some(a.to_string()),
     }
 }
@@ -46,7 +47,7 @@ impl InsertKind for Terminal {
     }
 
     fn title(&self, app: &BenchApp, ins: &Insert) -> String {
-        match alias_of(&ins.key) {
+        match alias_of(app, &ins.key) {
             None => "SSH".into(),
             Some(a) => {
                 let name = if a.is_empty() { "Terminal".to_string() } else { a.clone() };
@@ -59,9 +60,9 @@ impl InsertKind for Terminal {
     }
 
     fn switches(&self, app: &BenchApp, ins: &Insert) -> Vec<Switch> {
-        let now = alias_of(&ins.key);
-        // This Mac's terminal is /terminal; /ssh is for servers.
-        if now.as_deref() == Some(crate::term::LOCAL) {
+        let now = alias_of(app, &ins.key);
+        // The project's own machine is /terminal; /ssh is for servers.
+        if ins.key == "ssh:local" {
             return vec![];
         }
         let mut v = vec![];
@@ -76,7 +77,7 @@ impl InsertKind for Terminal {
     }
 
     fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
-        let Some(alias) = alias_of(&ins.key) else {
+        let Some(alias) = alias_of(app, &ins.key) else {
             return vec![];
         };
         let _ = alias;
@@ -122,7 +123,7 @@ impl InsertKind for Terminal {
     }
 
     fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-        let Some(alias) = alias_of(&ins.key) else {
+        let Some(alias) = alias_of(app, &ins.key) else {
             // Which one: this Mac, a server, or a new one.
             let id = ins.id.clone();
             let mut rows = vec![];
@@ -130,7 +131,7 @@ impl InsertKind for Terminal {
                 let id = id.clone();
                 move |this: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>| {
                     this.patch_insert(&id, json!({ "key": key }), cx);
-                    if let Some(a) = alias_of(&key) {
+                    if let Some(a) = alias_of(this, &key) {
                         this.insert_terminal(&id, &a, window, cx);
                     }
                 }
@@ -173,7 +174,7 @@ impl InsertKind for Terminal {
     }
 
     fn context(&self, app: &BenchApp, ins: &Insert, _cx: &App) -> String {
-        let Some(alias) = alias_of(&ins.key) else {
+        let Some(alias) = alias_of(app, &ins.key) else {
             return String::new();
         };
         let name = if alias.is_empty() { "this Mac".to_string() } else { alias.clone() };
@@ -184,7 +185,7 @@ impl InsertKind for Terminal {
     }
 
     fn opened(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
-        if let Some(a) = alias_of(&ins.key) {
+        if let Some(a) = alias_of(app, &ins.key) {
             if let Some(t) = app.insert_terminal(&ins.id, &a, window, cx) {
                 app.ssh.tabs[t].background = false;
                 app.ssh.tabs[t].focus.focus(window, cx);

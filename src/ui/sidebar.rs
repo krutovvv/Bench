@@ -212,7 +212,7 @@ impl BenchApp {
             .items_center()
             .text_sm()
             .child(super::head_icon(Ico::Chat, cx))
-            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child("Host"))
+            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child(crate::app::LOCAL_HOST))
             .child(div().flex_1())
             // The pencil: the general environment (soul, MCP, skills, prompts every thread gets).
             .child(

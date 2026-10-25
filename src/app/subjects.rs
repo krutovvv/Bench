@@ -66,7 +66,11 @@ impl BenchApp {
             key,
         };
         let mut rows: Vec<crate::model::SlashCommand> = match word.to_lowercase().as_str() {
-            "terminal" => vec![row("/terminal".into(), "this Mac's terminal".into(), "ssh:local".into())],
+            "terminal" => {
+                let host = self.thread_host();
+                let desc = if host.is_empty() { "this Mac's terminal".to_string() } else { format!("the terminal on {host}, where this project runs") };
+                vec![row("/terminal".into(), desc, "ssh:local".into())]
+            }
             "ssh" => {
                 let mut v = vec![];
                 v.extend(
@@ -163,7 +167,7 @@ impl BenchApp {
     pub fn subject_title(&self) -> Option<String> {
         let s = self.current_subject();
         let id = s.strip_prefix("env:")?;
-        let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| "Host".into());
+        let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| crate::app::LOCAL_HOST.into());
         Some(format!("{name}: environment"))
     }
 
@@ -187,7 +191,7 @@ impl BenchApp {
             }
         };
         let alias = match &ins.key[4..] {
-            "local" | "" => crate::term::LOCAL.to_string(),
+            "local" | "" => self.thread_machine(),
             a => a.to_string(),
         };
         if let Some(t) = self.insert_terminal(&ins.id, &alias, window, cx) {
