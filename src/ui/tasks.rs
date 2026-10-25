@@ -245,8 +245,10 @@ impl BenchApp {
                 div()
                     .id(id)
                     .flex_none()
+                    .h(px(22.))
                     .px_2()
-                    .py_0p5()
+                    .flex()
+                    .items_center()
                     .rounded_md()
                     .text_sm()
                     .cursor_pointer()
@@ -267,17 +269,16 @@ impl BenchApp {
             h_flex()
                 .id("task-tags")
                 .flex_none()
-                .px_6()
-                .py_1()
-                .gap_1()
+                // On the rows' grid: the icon in the checkboxes' column (22 + the 2 of the
+                // selection stripe, as wide as a checkbox), "All"'s text where the titles start,
+                // as tall as a row. No rule: the grid parts it from the tasks.
+                .pl(px(24.))
+                .pr_6()
+                .py_1p5()
                 .flex_wrap()
                 .items_center()
-                // A rule from edge to edge parts the tags from the tasks.
-                .border_b_1()
-                .border_color(theme.border)
-                .mb_1()
-                .child(Ico::Tag.icon().xsmall().text_color(muted).mr_1())
-                .children(chips)
+                .child(div().w(px(14.)).flex_none().flex().justify_center().child(Ico::Tag.icon().xsmall().text_color(muted)))
+                .child(h_flex().flex_wrap().gap_1().children(chips))
                 .into_any_element()
         });
         if inline {
