@@ -266,7 +266,8 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	]).catch(() => {});
 	const me = await bot.api.getMe();
 	console.log(`[telegram] @${me.username}${project ? ` (project ${project})` : ""}`);
-	void bot.start({ allowed_updates: ["message", "callback_query"] });
+	// Stopping a bot (its settings changed) rejects its start: that is not a crash of the server.
+	bot.start({ allowed_updates: ["message", "callback_query"] }).catch((e) => console.error(`[telegram] @${me.username} stopped: ${(e as Error)?.message ?? e}`));
 	running.set(project, {
 		config: JSON.stringify(cfg),
 		stop: () => {
