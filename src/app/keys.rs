@@ -16,6 +16,14 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> bool {
         let m = &ks.modifiers;
+        if !m.modified() && self.composer_focus(window, cx) && self.slash_key(ks.key.as_str(), window, cx) {
+            // The command list answers ↑ ↓ Tab Enter Esc before the text field under it does.
+            // Taken here, at the root, because this is the one place every key is seen: the
+            // composer's own handler sits under the text area's, and does not always get the key
+            // first. Only while the list's own field has the focus, so ↑ ↓ keep working in a
+            // terminal or another field with a "/word" left in the composer.
+            return true;
+        }
         if ks.key == "escape" && !m.modified() {
             return self.escape(cx);
         }

@@ -139,13 +139,10 @@ impl BenchApp {
             .w_full()
             .flex_none()
             .bg(theme.background)
-            // The command list takes ↑ ↓ Tab Esc before the text field does; ⌘V of a
-            // screenshot or of Finder files attaches them.
-            .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+            // ⌘V of a screenshot or of Finder files attaches them. The command list's ↑ ↓ Tab
+            // Esc are answered at the root (app/keys.rs), where every key is seen first.
+            .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, _window, cx| {
                 let k = &ev.keystroke;
-                if !k.modifiers.modified() && this.slash_key(k.key.as_str(), window, cx) {
-                    cx.stop_propagation();
-                }
                 let m = &k.modifiers;
                 if k.key == "v"
                     && m.platform

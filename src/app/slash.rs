@@ -134,6 +134,12 @@ impl BenchApp {
         true
     }
 
+    /// The composer's own field has the focus: the list answers keys only then, so ↑ ↓ keep
+    /// their meaning in a terminal or another field while a "/word" sits in the composer.
+    pub fn composer_focus(&self, window: &mut Window, cx: &App) -> bool {
+        self.composer.read(cx).focus_handle(cx).is_focused(window)
+    }
+
     /// ↑ ↓ Tab Esc while the list is open; returns whether the key was used.
     pub fn slash_key(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
         let n = self.slash_matches(cx).len();
