@@ -92,6 +92,9 @@ pub struct BenchApp {
     pub inserts: HashMap<String, Vec<crate::model::Insert>>,
     /// A new chat's session is being made (an insert came before any message).
     pub creating: bool,
+    /// Inserts put while a message still waited in the composer: they belong after that message,
+    /// whose place in the thread is not there yet. Their ids; `send` fixes the place as it sends.
+    pub insert_draft: Vec<String>,
     /// The insert a form was opened from (a new server, a new host): it shows under it.
     pub form_after: Option<String>,
     /// Of the inserts whose state is app-wide (tasks, tools, files), the live one per kind.
@@ -597,6 +600,7 @@ impl BenchApp {
             new_subject: String::new(),
             inserts: HashMap::new(),
             creating: false,
+            insert_draft: Vec::new(),
             queue: Vec::new(),
             insert_live: HashMap::new(),
             form_after: None,
@@ -1661,6 +1665,9 @@ impl BenchApp {
                 text,
                 context,
             });
+            // It becomes the thread's next turn: the inserts that waited with it go after it.
+            let after = self.turns.len() + 1;
+            self.anchor_draft_inserts(after, cx);
             cx.notify();
             return;
         }
@@ -1686,6 +1693,9 @@ impl BenchApp {
             started: Some(now_secs()),
             ..Default::default()
         });
+        // Inserts put while this message was in the composer sit after it, not before.
+        let after = self.turns.len();
+        self.anchor_draft_inserts(after, cx);
         self.follow = true;
         self.speed.begin_answer();
         self.speed.request();

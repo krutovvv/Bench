@@ -28,9 +28,11 @@ test("inserts sit after the messages they were put after", () => {
 	];
 	const doc = {
 		items: {
+			// i1 sits where its entry says; i2 was moved down the thread (a message that went
+			// after it); i3's "after" is nonsense, so its entry decides.
 			i1: { key: "tasks", state: { list: "upcoming" }, folded: true, removed: false },
-			i2: { key: "ssh:db", state: {}, folded: false, removed: false },
-			i3: { key: "files", state: {}, folded: false, removed: true },
+			i2: { key: "ssh:db", state: {}, folded: false, removed: false, after: 4 },
+			i3: { key: "files", state: {}, folded: false, removed: true, after: -2 },
 		},
 	};
 	const got = insertsOf(entries, doc as any);
@@ -38,13 +40,15 @@ test("inserts sit after the messages they were put after", () => {
 		got.map((i) => [i.id, i.key, i.after, i.folded]),
 		[
 			["i1", "tasks", 0, true],
-			["i2", "ssh:db", 1, false],
+			["i2", "ssh:db", 4, false],
 		],
 	);
 	assert.deepEqual(got[0].state, { list: "upcoming" });
 	assert.equal(patchInsert(doc as any, "nope", { folded: true }), false);
-	assert.equal(patchInsert(doc as any, "i2", { state: [1], key: 5, removed: false }), true);
-	assert.deepEqual(doc.items.i2, { key: "ssh:db", state: {}, folded: false, removed: false }, "bad fields change nothing");
+	assert.equal(patchInsert(doc as any, "i2", { state: [1], key: 5, removed: false, after: "3" }), true);
+	assert.deepEqual(doc.items.i2, { key: "ssh:db", state: {}, folded: false, removed: false, after: 4 }, "bad fields change nothing");
+	assert.equal(patchInsert(doc as any, "i1", { after: 1 }), true);
+	assert.equal(doc.items.i1.after, 1);
 });
 
 test("a thread's inserts: put, changed, removed, kept across a restart", async () => {
@@ -59,6 +63,8 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 	await rt.patchInsert(id, "ib", { state: { host: "h1", path: "/www/blog" } });
 	await rt.patchInsert(id, "ia", { removed: true });
 	await rt.insert(id, "ic", "tasks", { list: "today" });
+	// It was put while a message waited in the composer: it sits after that message.
+	await rt.patchInsert(id, "ic", { after: 3 });
 	await assert.rejects(rt.insert(id, "bad id!", "tasks"));
 	await assert.rejects(rt.patchInsert(id, "missing", { folded: true }));
 	const check = (list: any[]) => {
@@ -66,7 +72,7 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 			list.map((i) => [i.id, i.key, i.after]),
 			[
 				["ib", "files", 0],
-				["ic", "tasks", 0],
+				["ic", "tasks", 3],
 			],
 		);
 		assert.deepEqual(list[0].state, { host: "h1", path: "/www/blog" });

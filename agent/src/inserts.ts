@@ -21,6 +21,12 @@ export interface InsertState {
 	state: JsonObject;
 	folded: boolean;
 	removed: boolean;
+	/**
+	 * Where it sits, when that is not where its entry was written: an insert put while a message
+	 * still waited in the composer belongs after that message, and Pi's transcript cannot move an
+	 * entry. The document remembers the place; without it the entry's own place decides.
+	 */
+	after?: number;
 }
 
 export const InsertEntry = defineEntry<{ id: string; key: string }>("bench.insert");
@@ -52,19 +58,28 @@ export function insertsOf(entries: readonly any[], doc: { items: Record<string, 
 		const data = e.data as { id: string; key: string };
 		const s = doc?.items?.[data.id];
 		if (s?.removed) continue;
-		out.push({ id: data.id, key: s?.key ?? data.key, state: s?.state ?? {}, folded: s?.folded ?? false, removed: false, after: users });
+		const moved = typeof s?.after === "number" && Number.isInteger(s.after) && s.after >= 0;
+		out.push({
+			id: data.id,
+			key: s?.key ?? data.key,
+			state: s?.state ?? {},
+			folded: s?.folded ?? false,
+			removed: false,
+			after: moved ? (s as any).after : users,
+		});
 	}
 	return out;
 }
 
 /** A partial change of one insert's state, as Bench sends it. Unknown fields are ignored. */
-export function patchInsert(doc: { items: Record<string, InsertState> }, id: string, patch: { key?: unknown; state?: unknown; folded?: unknown; removed?: unknown }): boolean {
+export function patchInsert(doc: { items: Record<string, InsertState> }, id: string, patch: { key?: unknown; state?: unknown; folded?: unknown; removed?: unknown; after?: unknown }): boolean {
 	const cur = doc.items[id];
 	if (!cur) return false;
 	if (typeof patch.key === "string" && patch.key) cur.key = patch.key;
 	if (patch.state && typeof patch.state === "object" && !Array.isArray(patch.state)) cur.state = patch.state as JsonObject;
 	if (typeof patch.folded === "boolean") cur.folded = patch.folded;
 	if (patch.removed === true) cur.removed = true;
+	if (typeof patch.after === "number" && Number.isInteger(patch.after) && patch.after >= 0) cur.after = patch.after;
 	return true;
 }
 

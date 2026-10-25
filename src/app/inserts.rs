@@ -58,13 +58,19 @@ impl BenchApp {
             return;
         };
         let thread = self.thread_key();
+        // A message may be waiting in the composer: then the insert belongs after it, and only
+        // `send` knows that message's place. Until then it shows at the thread's end.
+        let draft = !self.composer.read(cx).value().trim().is_empty();
         let ins = Insert {
             id: format!("i{}", &uuid::Uuid::new_v4().simple().to_string()[..10]),
             key,
             state,
             folded: false,
-            after: self.turns.len(),
+            after: self.turns.len() + usize::from(draft),
         };
+        if draft {
+            self.insert_draft.push(ins.id.clone());
+        }
         self.inserts
             .entry(thread.clone())
             .or_default()
@@ -81,6 +87,14 @@ impl BenchApp {
         // The insert is where the person looks now.
         self.follow = true;
         cx.notify();
+    }
+
+    /// The inserts that waited with a message in the composer now sit after it: the thread's
+    /// document remembers the place, since Pi's entry stays where it was written.
+    pub fn anchor_draft_inserts(&mut self, after: usize, cx: &mut Context<Self>) {
+        for id in std::mem::take(&mut self.insert_draft) {
+            self.patch_insert(&id, json!({ "after": after }), cx);
+        }
     }
 
     fn send_insert(&self, session: &str, ins: &Insert) {
@@ -132,6 +146,9 @@ impl BenchApp {
                 }
                 if let Some(f) = patch["folded"].as_bool() {
                     ins.folded = f;
+                }
+                if let Some(a) = patch["after"].as_u64() {
+                    ins.after = a as usize;
                 }
             }
         }
