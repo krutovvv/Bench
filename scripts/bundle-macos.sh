@@ -41,7 +41,7 @@ dev)
     NAME="Bench Dev"
     ID=local.bench.dev
     APP="$PWD/dist/Bench Dev.app"
-    if pgrep -f "$APP/Contents/MacOS/" >/dev/null; then
+    if pgrep -f "/dist/Bench Dev.app/Contents/MacOS/" >/dev/null; then
         echo "Bench Dev is running — quit it first (ship.sh does)" >&2
         exit 1
     fi

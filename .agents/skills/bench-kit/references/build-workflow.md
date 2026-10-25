@@ -7,7 +7,7 @@ The loop for every single change, with the commands: `build-change-loop.md`.
 Most requests about a Bench's look or behaviour ("the border is 1px off", "move the icon",
 "more air", "the card closes by itself") were already solved once in the reference Bench. Before
 writing code:
-1. Find the same piece in the reference Bench, `~/Projects/bench-kit/src`:
+1. Find the same piece in the reference Bench, `~/Projects/bench/src`:
    `grep -rn` the visible label ("Search sessions", "Hide sidebar", "Copy") or the helper the
    catalog names.
 2. Compare the person's code with it. Different → bring theirs to the reference (that is the

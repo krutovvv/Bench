@@ -3,7 +3,7 @@
 Pure Rust, no UI: 19 everyday utilities (Rich Text → Markdown, Markdown preview, passwords, UUID,
 Lorem Ipsum, hashes, Base64 text and images, URL, HTML entities, backslash escapes, Unix time with
 time zones, JSON ⇄ YAML, string cases, sort & dedupe, cURL → JS/Python/PHP, regex tester, URL
-parser, cron parser). Taken from Bench (`~/Projects/bench-kit/src/devtools/`), tested there.
+parser, cron parser). Taken from Bench (`~/Projects/bench/src/devtools/`), tested there.
 
 ## Use it in an app
 

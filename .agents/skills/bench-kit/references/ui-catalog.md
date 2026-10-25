@@ -10,7 +10,7 @@ Where the code lives:
   app): copy the piece you need into your `src/ui/`. Bench has the same pieces in its own files
   (`src/ui/mod.rs` `block_head`, `search_band`, `render_sidebar_top`; `src/ui/tools.rs` `pane_bar`, `small_button`, `segmented`).
 - **gpui-kit components** — `gpui_kit::component::…` (editor, inputs, menus, Markdown…).
-- **Bench** — `~/Projects/bench-kit/src`, the reference app, for bigger pieces to copy.
+- **Bench** — `~/Projects/bench/src`, the reference app, for bigger pieces to copy.
 
 The whole frame in one picture: `assets/gallery.png` (its code: `templates/examples/gallery.rs`,
 compiled and checked). A real block built from these pieces: `assets/ui/tools-mode.png` (the Tools block's two panes).

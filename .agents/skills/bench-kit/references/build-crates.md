@@ -1,6 +1,6 @@
 # Crates: what to use for which job
 
-All of these compile together with gpui-kit 0.8 in Bench (`~/Projects/bench-kit/Cargo.toml`) —
+All of these compile together with gpui-kit 0.8 in Bench (`~/Projects/bench/Cargo.toml`) —
 take these versions. Many are already in gpui-kit's dependency tree, so adding them costs no extra
 build time: check with `grep -A1 '^name = "<crate>"' Cargo.lock` first.
 

@@ -13,7 +13,7 @@ edition = "2024"
 gpui-kit = { version = "0.8.0", features = ["tree-sitter", "tree-sitter-rust", "tree-sitter-python",
   "tree-sitter-javascript", "tree-sitter-typescript", "tree-sitter-tsx", "tree-sitter-html",
   "tree-sitter-css", "tree-sitter-bash", "tree-sitter-go", "tree-sitter-toml", "tree-sitter-yaml",
-  "tree-sitter-markdown", "tree-sitter-lua"] }   # full list: ~/Projects/bench-kit/Cargo.toml
+  "tree-sitter-markdown", "tree-sitter-lua"] }   # full list: ~/Projects/bench/Cargo.toml
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"        # YAML 1.2: `off` stays a string

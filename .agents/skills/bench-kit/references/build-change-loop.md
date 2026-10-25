@@ -2,14 +2,14 @@
 
 Every change to a Bench goes through these steps, in this order. Doing them every time is what
 makes the person's "1px off" complaints stop; skipping one is how a change ships unchecked.
-Paths: the project is `~/Projects/bench-kit` (crate `bench`; anywhere else works the same);
-the kit's scripts are `~/Projects/bench-kit/.agents/skills/bench-kit/scripts/` (`K=`
+Paths: the project is `~/Projects/bench` (crate `bench`; anywhere else works the same);
+the kit's scripts are `~/Projects/bench/.agents/skills/bench-kit/scripts/` (`K=`
 below). Run every command from the project folder. Units: the scripts that end in `.py` take
 **points** (as in the code), except `measure.py`, which takes **pixels** (pt × 2).
 
 ```bash
-K=~/Projects/bench-kit/.agents/skills/bench-kit/scripts
-cd ~/Projects/bench-kit
+K=~/Projects/bench/.agents/skills/bench-kit/scripts
+cd ~/Projects/bench
 ```
 
 ## 1. Turn the request into a target you can measure
@@ -28,7 +28,7 @@ Which area and which procedure: `ui-areas.md` (put / move / fit).
 
 - Grep a unique visible string: a label, a tooltip, a placeholder:
   `grep -rn '"Search sessions' src/`, `grep -rn 'Hide sidebar  ⌘' src/`.
-- Find the same piece in the reference Bench, `~/Projects/bench-kit/src` (same paths). If the
+- Find the same piece in the reference Bench, `~/Projects/bench/src` (same paths). If the
   person's code differs from the reference, the reference is usually the fix
   (`build-workflow.md`).
 - Read the whole function before editing. The value you need often has a comment saying why
@@ -125,7 +125,7 @@ cargo build --release 2>&1 | grep -E '^(warning|error)' -A7 | head -40
 - The first build of a new project takes minutes. Run it in the background or with a long
   timeout; later builds take 20–30 s.
 - An error you don't understand: read the whole message (the `-A7` lines). Then look up the
-  API in the reference Bench (`grep -rn 'fn_name' ~/Projects/bench-kit/src`) or the gpui-kit
+  API in the reference Bench (`grep -rn 'fn_name' ~/Projects/bench/src`) or the gpui-kit
   pages (`gpui-kit-usage.md`). Don't guess method names: `ui-gotchas.md` lists those that
   already went wrong.
 

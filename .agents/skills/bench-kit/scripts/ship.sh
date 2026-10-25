@@ -21,14 +21,15 @@ for a in "$@"; do
 done
 
 if [[ "$KIND" == dev ]]; then
-    DEV="$PWD/dist/Bench Dev.app"
-    if pgrep -f "$DEV/Contents/MacOS/" >/dev/null; then
+    # By the end of its path: Bench Dev may have been started through a link or an older path.
+    RUNNING="/dist/Bench Dev.app/Contents/MacOS/"
+    if pgrep -f "$RUNNING" >/dev/null; then
         osascript -e 'tell application id "local.bench.dev" to quit' >/dev/null 2>&1 || true
         for _ in $(seq 20); do
-            pgrep -f "$DEV/Contents/MacOS/" >/dev/null || break
+            pgrep -f "$RUNNING" >/dev/null || break
             sleep 0.5
         done
-        if pgrep -f "$DEV/Contents/MacOS/" >/dev/null; then
+        if pgrep -f "$RUNNING" >/dev/null; then
             echo "Bench Dev didn't quit — ask the person to quit it, then ship again" >&2
             exit 1
         fi
