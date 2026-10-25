@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- The main server: a raven's head in profile, the keeper of what is known; its eye a small lit square, a machine's. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <g transform="translate(256 256) scale(1.115) translate(-233.0 -272.0)">
+  <g transform="translate(256 256) scale(0.950) translate(-288.0 -272.0)">
     <polygon points="236.0,250.0 330.0,250.0 366.0,420.0 220.0,420.0" fill="#1F2329"/>
     <circle cx="284" cy="220" r="96" fill="#1F2329"/>
     <polygon points="206.0,186.0 86.0,236.0 214.0,262.0" fill="#1F2329"/>
