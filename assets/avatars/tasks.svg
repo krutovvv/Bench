@@ -1,28 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The task assistant: a face, half a pale mask with a sleeping eye, half a machine with a red lens. -->
+  <!-- The task assistant: half a dark mask with a sleeping eye, half a blue machine with a red lens. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <circle cx="256" cy="256" r="246" fill="#F1EADC"/>
-  <circle cx="256" cy="256" r="236" fill="#1F2329"/>
-  <circle cx="256" cy="256" r="224" fill="#F1EADC"/>
-  <circle cx="256" cy="256" r="220" fill="#1F2329"/>
-  <polygon points="60.0,247.0 67.0,256.0 60.0,265.0 53.0,256.0" fill="#F2B43C"/>
-  <polygon points="452.0,247.0 459.0,256.0 452.0,265.0 445.0,256.0" fill="#F2B43C"/>
-  <g transform="translate(256 252) scale(0.96) translate(-256 -256)">
-    <path d="M256 136 a72 100 0 0 0 0 200z" fill="#F1EADC"/>
+  <g transform="translate(256 256) scale(1.320) translate(-256.0 -261.0)">
+    <path d="M256 136 a72 100 0 0 0 0 200z" fill="#1F2329"/>
     <path d="M256 136 a72 100 0 0 1 0 200z" fill="#5C78E2"/>
-    <path d="M206 226 q22 14 40 0 q-20 6 -40 0z" fill="#1F2329"/>
+    <path d="M206 226 q22 14 40 0 q-20 6 -40 0z" fill="#FFFFFF"/>
     <rect x="270" y="212" width="34" height="26" fill="#1F2329"/>
     <circle cx="287" cy="225" r="8" fill="#E8603C"/>
-    <rect x="222" y="290" width="30" height="5" fill="#1F2329"/>
+    <rect x="222" y="290" width="30" height="5" fill="#FFFFFF"/>
     <rect x="266" y="284" width="7" height="7" fill="#1F2329"/>
     <rect x="266" y="296" width="7" height="7" fill="#1F2329"/>
     <rect x="278" y="284" width="7" height="7" fill="#1F2329"/>
     <rect x="278" y="296" width="7" height="7" fill="#1F2329"/>
     <rect x="290" y="284" width="7" height="7" fill="#1F2329"/>
     <rect x="290" y="296" width="7" height="7" fill="#1F2329"/>
-    <rect x="253" y="136" width="6" height="200" fill="#1F2329"/>
-    <rect x="232" y="344" width="48" height="10" fill="#AFC0F5"/>
-    <rect x="240" y="360" width="32" height="10" fill="#AFC0F5"/>
-    <rect x="248" y="376" width="16" height="10" fill="#AFC0F5"/>
+    <rect x="254" y="136" width="4" height="200" fill="#DEE1E6"/>
+    <rect x="232" y="344" width="48" height="10" fill="#1F2329"/>
+    <rect x="240" y="360" width="32" height="10" fill="#1F2329"/>
+    <rect x="248" y="376" width="16" height="10" fill="#1F2329"/>
   </g>
 </svg>
