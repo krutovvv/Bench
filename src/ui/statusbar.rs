@@ -14,7 +14,6 @@ use crate::icons::Ico;
 use crate::model::Step;
 
 impl BenchApp {
-
     pub(super) fn render_statusbar(
         &mut self,
         _window: &mut Window,
@@ -266,7 +265,9 @@ impl BenchApp {
                 d.child(
                     // A filled chip, not another flat icon: this is the one control of the bar
                     // that undoes work in progress, and it shows only while there is some.
-                    h_flex().h_full().items_center().pl_2().child(
+                    // A touch more room on its right than on its left: a filled chip reads
+                    // crowded beside a flat icon at the plain gap.
+                    h_flex().h_full().items_center().pl_2().pr_1().child(
                         div()
                             .id("stop")
                             .h(px(20.))
@@ -310,7 +311,12 @@ impl BenchApp {
                         )
                         .tooltip(|window, cx| Tooltip::new("Transcribing…").build(window, cx))
                 } else if recording {
-                    let level = self.recorder.as_ref().map(|r| r.level()).unwrap_or(0.).min(1.);
+                    let level = self
+                        .recorder
+                        .as_ref()
+                        .map(|r| r.level())
+                        .unwrap_or(0.)
+                        .min(1.);
                     item("mic")
                         .text_color(theme.danger)
                         .child(
