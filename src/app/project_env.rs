@@ -2,7 +2,7 @@
 //! skills and accesses, edited in place (a Save appears once something changed) or through the
 //! agent in the conversation under it.
 
-use gpui_kit::component::input::{EditorState, InputEvent, InputState, TextareaState};
+use gpui_kit::component::input::{EditorState, InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::{Value, json};
@@ -15,7 +15,7 @@ pub struct ProjectEnv {
     /// Where it lives (`~/.bench/projects/<id>`).
     pub dir: String,
     /// Its soul (SYSTEM.md): a row, opened to edit.
-    pub soul: Entity<TextareaState>,
+    pub soul: Entity<EditorState>,
     pub soul_open: bool,
     pub soul_dirty: bool,
     /// Its own Telegram bot: (@name, allowed user ids, has a token); a row, opened to edit.
@@ -34,7 +34,7 @@ pub struct ProjectEnv {
     pub skills: Vec<(String, String)>,
     /// The skill opened under its row, and its SKILL.md being edited.
     pub skill_open: Option<String>,
-    pub skill_text: Entity<TextareaState>,
+    pub skill_text: Entity<EditorState>,
     pub skill_dirty: bool,
     /// Its accesses: (id, name, kind, address).
     pub hosts: Vec<(String, String, String, String)>,
@@ -59,14 +59,18 @@ impl HermesApp {
     }
 
     fn new_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) -> ProjectEnv {
-        // Prose like the composer's, growing with the text (the thread scrolls, not the field).
-        let prose = |window: &mut Window, cx: &mut Context<Self>| cx.new(|cx| TextareaState::new(window, cx).auto_grow(1, 100_000).submit_on_enter(false));
-        let soul = prose(window, cx);
-        let skill_text = prose(window, cx);
-        let mcp_json = cx.new(|cx| EditorState::new(window, cx).scroll_beyond_last_line(Some(0)).soft_wrap(true));
+        // One editor for all three: the code editor, highlighted (Markdown, JSON), wrapped, no
+        // line numbers, no room under the last line; its height follows the text.
+        let editor = |language: &'static str, window: &mut Window, cx: &mut Context<Self>| {
+            let e = cx.new(|cx| EditorState::new(window, cx).line_number(false).folding(false).soft_wrap(true).scroll_beyond_last_line(Some(0)));
+            e.update(cx, |s, cx| s.set_highlighter(language, cx));
+            e
+        };
+        let soul = editor("markdown", window, cx);
+        let skill_text = editor("markdown", window, cx);
+        let mcp_json = editor("json", window, cx);
         let tg_token = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Bot token from @BotFather (kept as is when empty)"));
         let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
-        mcp_json.update(cx, |s, cx| s.set_highlighter("json", cx));
         // A part typed in: its Save shows.
         fn dirty(this: &mut HermesApp, which: &str, ev: &InputEvent, cx: &mut Context<HermesApp>) {
             if let (InputEvent::Change, Some(e)) = (ev, this.project_env.as_mut()) {

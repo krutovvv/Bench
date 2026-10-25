@@ -1,7 +1,7 @@
 //! The new project's form (the sidebar's "+"): a name and, if it has one, a folder on disk.
 
 use gpui_kit::component::input::Input;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -234,7 +234,14 @@ impl HermesApp {
                 cx.notify();
             }
         };
-        let field = |content: AnyElement| div().ml(px(-12.)).my(px(-10.)).child(content);
+        // An opened text: the editor as tall as its wrapped text (the thread scrolls, not it).
+        let text_editor = |state: &Entity<gpui_kit::component::input::EditorState>, cx: &App| {
+            let text = state.read(cx).value().to_string();
+            // Wrapped lines, roughly: a line per ~110 characters of the column.
+            let lines: usize = text.lines().map(|l| l.chars().count() / 110 + 1).sum::<usize>().max(2);
+            // The editor's own 12 inset pulled back: its text starts where the Save under it does.
+            div().ml(px(-12.)).h(px(lines as f32 * 21. + 12.)).child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full()).into_any_element()
+        };
         let mut out = v_flex().w_full();
 
         // The soul: a row with its first line; opened, the text to edit.
@@ -246,7 +253,7 @@ impl HermesApp {
                 .on_click(cx.listener(toggle("soul"))),
         );
         if e.soul_open {
-            let body = field(gpui_kit::component::input::Textarea::new(&e.soul).appearance(false).large().into_any_element()).into_any_element();
+            let body = text_editor(&e.soul, cx);
             out = out.child(opened(body, footer("soul", "soul", e.soul_dirty, cx).into_any_element()));
         }
 
@@ -287,8 +294,7 @@ impl HermesApp {
                 .on_click(cx.listener(toggle("mcp"))),
         );
         if e.mcp_open {
-            let lines = e.mcp_json.read(cx).value().lines().count().max(3) as f32;
-            let body = div().h(px((lines + 1.) * 20.)).child(gpui_kit::component::input::Editor::new(&e.mcp_json).appearance(false).h_full()).into_any_element();
+            let body = text_editor(&e.mcp_json, cx);
             out = out.child(opened(body, footer("mcp", "mcp", e.mcp_dirty, cx).into_any_element()));
         }
 
@@ -311,7 +317,7 @@ impl HermesApp {
                     .child(remove(id, "skill", name, cx)),
             );
             if open {
-                let body = field(gpui_kit::component::input::Textarea::new(&e.skill_text).appearance(false).large().into_any_element()).into_any_element();
+                let body = text_editor(&e.skill_text, cx);
                 out = out.child(opened(body, footer("skill", "skill", e.skill_dirty, cx).into_any_element()));
             }
         }
