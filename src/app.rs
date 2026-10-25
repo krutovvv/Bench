@@ -1191,7 +1191,13 @@ impl BenchApp {
                 }
             }
             Evt::Todos(sid, todos) if self.is_current(&sid) => {
-                self.todos = todos;
+                // The plan strip shows work still ahead: once no step is pending or in progress
+                // (the agent finished the plan, or dropped it as wrong), the block goes by itself
+                // — a plan that is over tells nothing the thread does not already say.
+                let live = todos
+                    .iter()
+                    .any(|t| t.status == "pending" || t.status == "in_progress");
+                self.todos = if live { todos } else { vec![] };
             }
             Evt::Subagent {
                 session,
