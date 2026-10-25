@@ -1,15 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The main server: the Tower, built of slabs; a red crack of light runs down through it. -->
+  <!-- The main server: a rack that is also a beast; ears, sleeping eyes, legs, a cable curled like a tail. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <g transform="translate(256 256) scale(1.051) translate(-256.0 -235.0)">
-    <rect x="196" y="112" width="120" height="44" fill="#1F2329"/>
-    <rect x="184" y="164" width="144" height="44" fill="#5C78E2"/>
-    <rect x="172" y="216" width="168" height="44" fill="#1F2329"/>
-    <rect x="160" y="268" width="192" height="44" fill="#5C78E2"/>
-    <rect x="160" y="320" width="192" height="64" fill="#1F2329"/>
-    <polygon points="262.0,104.0 250.0,170.0 268.0,214.0 246.0,280.0 266.0,330.0 256.0,392.0 250.0,392.0 258.0,330.0 238.0,280.0 258.0,214.0 242.0,170.0 254.0,104.0" fill="#E8603C"/>
-    <circle cx="300" cy="134" r="5" fill="#2FA38A"/>
-    <circle cx="320" cy="290" r="5" fill="#F2B43C"/>
-    <polygon points="256.0,78.0 262.0,92.0 256.0,98.0 250.0,92.0" fill="#F2B43C"/>
+  <g transform="translate(256 256) scale(0.943) translate(-295.0 -259.0)">
+    <polygon points="128.0,196.0 160.0,128.0 196.0,196.0" fill="#1F2329"/>
+    <polygon points="316.0,196.0 352.0,128.0 384.0,196.0" fill="#1F2329"/>
+    <polygon points="150.0,190.0 160.0,160.0 176.0,190.0" fill="#5C78E2"/>
+    <polygon points="336.0,190.0 352.0,160.0 362.0,190.0" fill="#5C78E2"/>
+    <rect x="120" y="190" width="272" height="178" fill="#1F2329"/>
+    <path d="M180 250 q20 16 40 0 q-20 8 -40 0z" fill="#FFFFFF"/>
+    <path d="M292 250 q20 16 40 0 q-20 8 -40 0z" fill="#FFFFFF"/>
+    <rect x="148" y="296" width="216" height="16" fill="#5C78E2"/>
+    <rect x="148" y="326" width="216" height="16" fill="#5C78E2"/>
+    <circle cx="344" cy="304" r="4" fill="#2FA38A"/>
+    <circle cx="344" cy="334" r="4" fill="#F2B43C"/>
+    <rect x="140" y="368" width="22" height="22" fill="#1F2329"/>
+    <rect x="350" y="368" width="22" height="22" fill="#1F2329"/>
+    <rect x="392" y="340" width="22" height="14" fill="#1F2329"/>
+    <path d="M414.0 354.0 A54 54 0 0 1 414.0 246.0 L414.0 260.0 A40 40 0 0 0 414.0 340.0z" fill="#1F2329"/>
+    <path d="M414.0 246.0 A54 54 0 0 1 468.0 300.0 L454.0 300.0 A40 40 0 0 0 414.0 260.0z" fill="#1F2329"/>
+    <rect x="454" y="282" width="14" height="18" fill="#1F2329"/>
+    <rect x="452" y="266" width="18" height="18" fill="#E8603C"/>
+    <rect x="456" y="254" width="3" height="12" fill="#E8603C"/>
+    <rect x="463" y="254" width="3" height="12" fill="#E8603C"/>
   </g>
 </svg>
