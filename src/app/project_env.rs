@@ -57,8 +57,16 @@ pub struct ProjectEnv {
     pub cron_dirty: bool,
     /// A new MCP server's or prompt's name (a new skill names itself in its front matter).
     pub new_name: Entity<InputState>,
+    /// How the project's threads run: its model (and its provider), how hard it thinks, what it
+    /// may run without asking; and the models to choose from (its provider's list, the machine's
+    /// endpoints). Chosen here once, not per chat.
+    pub model: String,
+    pub provider: String,
+    pub effort: String,
+    pub approvals: String,
+    pub models: Vec<rest::ModelChoice>,
     /// What is open under the block, as the agent's answer: (kind, name) — "name", "soul",
-    /// "telegram", "mcp", "skill", "prompt", "cron" ("new" for a new job), "host".
+    /// "telegram", "mcp", "skill", "prompt", "cron" ("new" for a new job), "host", "model".
     pub card: Option<(&'static str, String)>,
     /// Its blocks shut by a click on their head (by title).
     pub folded: std::collections::HashSet<&'static str>,
@@ -82,6 +90,17 @@ pub struct CronJob {
     pub last_run: Option<String>,
     pub last_status: Option<String>,
     pub last_output: String,
+}
+
+/// The agent a project's threads run with: its own (`project:<id>`), or this machine's for the
+/// Host project. Its model, reasoning level and approvals live in that agent's folder, so a
+/// project thinks and asks as it was set to, not as the machine was.
+pub(super) fn env_agent(id: &str) -> String {
+    if id == "general" {
+        "default".into()
+    } else {
+        format!("project:{id}")
+    }
 }
 
 /// A path segment for the agent's REST routes.
@@ -207,6 +226,11 @@ impl BenchApp {
             cron_schedule,
             cron_prompt,
             cron_dirty: false,
+            model: String::new(),
+            provider: String::new(),
+            effort: String::new(),
+            approvals: String::new(),
+            models: vec![],
             folded: Default::default(),
             card: None,
             new_name,
@@ -233,6 +257,34 @@ impl BenchApp {
         let profile = self.current_profile();
         let path = format!("/api/projects/{eid}/env");
         let asked = id.to_string();
+        // How it runs, read from the same agent its threads run with.
+        let conn2 = conn.clone();
+        let agent = env_agent(&eid);
+        let asked2 = asked.clone();
+        self.background(
+            window,
+            cx,
+            move || rest::profile_defaults(&conn2, &agent),
+            move |this, r, _window, cx| {
+                let Ok((effort, model, models, approvals, _)) = r else { return };
+                let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked2) else {
+                    return;
+                };
+                // The model's provider is the one it is listed under ("main" is the model itself).
+                let chosen = model.as_deref().unwrap_or_default();
+                let provider = models
+                    .iter()
+                    .find(|c| c.model == chosen)
+                    .map(|c| c.provider.clone())
+                    .unwrap_or_default();
+                e.model = chosen.to_string();
+                e.provider = provider;
+                e.effort = effort.unwrap_or_default();
+                e.approvals = approvals;
+                e.models = models;
+                cx.notify();
+            },
+        );
         self.background(
             window,
             cx,
@@ -249,6 +301,49 @@ impl BenchApp {
                     Err(err) => e.error = Some(format!("{err:#}")),
                 }
                 cx.notify();
+            },
+        );
+    }
+
+    /// One of the three running choices — its model, its reasoning level, its approvals — set for
+    /// the project. A click applies it at once (a choice has no draft); the project's next
+    /// threads start on it, a thread already begun keeps what it started with.
+    pub fn env_set_run(
+        &mut self,
+        what: &'static str,
+        value: String,
+        provider: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(e) = self.project_env.as_ref() else {
+            return;
+        };
+        let id = e.id.clone();
+        let Some((conn, eid)) = self.env_target(&id) else {
+            return;
+        };
+        let agent = env_agent(&eid);
+        let body = match what {
+            "model" => json!({"config": {"model": {"provider": provider, "default": value}}}),
+            "reasoning" => json!({"config": {"agent": {"reasoning_effort": value}}}),
+            _ => json!({"config": {"approvals": {"mode": value}}}),
+        };
+        let asked = id.clone();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json(&conn, "PUT", "/api/config", &agent, body),
+            move |this, r, window, cx| {
+                match r {
+                    Ok(_) => this.load_env(&asked, window, cx),
+                    Err(err) => {
+                        if let Some(e) = this.project_env.as_mut() {
+                            e.error = Some(format!("{err:#}"));
+                        }
+                        cx.notify();
+                    }
+                }
             },
         );
     }

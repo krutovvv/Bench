@@ -397,6 +397,48 @@ impl BenchApp {
             section(if general { "Host" } else { "Project" }, None, rows, cx),
         ));
 
+        // How it runs: the model, how hard it thinks, what it may run without asking. Once for
+        // the project, not per chat — its threads start on these.
+        {
+            let approval = match e.approvals.as_str() {
+                "off" => "off — it asks for nothing",
+                "manual" => "manual — it asks for everything",
+                "" => "—",
+                m => m,
+            };
+            let dash = |v: &str| if v.is_empty() { "—".to_string() } else { v.to_string() };
+            let rows = vec![
+                row(
+                    "model",
+                    "model".into(),
+                    "Model".into(),
+                    dash(&e.model),
+                    false,
+                    true,
+                    cx,
+                ),
+                row(
+                    "model",
+                    "reasoning".into(),
+                    "Reasoning".into(),
+                    dash(&e.effort),
+                    false,
+                    false,
+                    cx,
+                ),
+                row(
+                    "model",
+                    "approvals".into(),
+                    "Approvals".into(),
+                    approval.to_string(),
+                    false,
+                    false,
+                    cx,
+                ),
+            ];
+            blocks.push(("Model", section("Model", None, rows, cx)));
+        }
+
         // MCP servers.
         let mut rows = vec![];
         if e.mcp.is_empty() {
@@ -540,6 +582,7 @@ impl BenchApp {
                     "Project"
                 }
             }
+            "model" => "Model",
             "mcp" => "MCP servers",
             "skill" => "Skills",
             "prompt" => "Prompts",
@@ -821,6 +864,112 @@ impl BenchApp {
                 (
                     format!("Access · {hname}"),
                     pad(v_flex().child(div().text_color(muted).child(format!("{hkind} · {at}")))),
+                )
+            }
+            // A choice, not a text: what it can be, the current one marked; a click sets it for
+            // the project at once (a choice has no draft to save).
+            "model" => {
+                let kind: &'static str = match name.as_str() {
+                    "reasoning" => "reasoning",
+                    "approvals" => "approvals",
+                    _ => "model",
+                };
+                let cur = match kind {
+                    "reasoning" => e.effort.clone(),
+                    "approvals" => e.approvals.clone(),
+                    _ => e.model.clone(),
+                };
+                // (value, label, its provider); the models are listed under their provider.
+                let opts: Vec<(String, String, String)> = match kind {
+                    "reasoning" => crate::model::EFFORTS
+                        .iter()
+                        .map(|s| (s.to_string(), s.to_string(), String::new()))
+                        .collect(),
+                    "approvals" => crate::model::APPROVAL_MODES
+                        .iter()
+                        .map(|m| (m.to_string(), m.to_string(), String::new()))
+                        .collect(),
+                    _ => e
+                        .models
+                        .iter()
+                        .map(|c| {
+                            let label = if c.tag.is_empty() {
+                                c.model.clone()
+                            } else {
+                                format!("{} · {}", c.model, c.tag)
+                            };
+                            (c.model.clone(), label, c.provider.clone())
+                        })
+                        .collect(),
+                };
+                let mut items: Vec<AnyElement> = vec![];
+                let mut shown = String::new();
+                for (value, label, provider) in opts.into_iter() {
+                    if !provider.is_empty() && provider != shown {
+                        shown = provider.clone();
+                        items.push(
+                            div()
+                                .px_3()
+                                .pt_2()
+                                .pb_1()
+                                .text_xs()
+                                .text_color(muted)
+                                .child(shown.clone())
+                                .into_any_element(),
+                        );
+                    }
+                    let on = value == cur && (kind != "model" || provider == e.provider);
+                    let (id, value, label, provider) = (
+                        SharedString::from(format!("env-run-{name}-{value}")),
+                        value.clone(),
+                        label,
+                        provider,
+                    );
+                    items.push(
+                        h_flex()
+                            .id(id)
+                            .px_3()
+                            .py_1p5()
+                            .gap_2()
+                            .cursor_pointer()
+                            .hover(|s| s.bg(theme.list_hover))
+                            .child(div().flex_1().min_w_0().truncate().child(label))
+                            .when(on, |d| {
+                                d.child(
+                                    crate::icons::Ico::Check
+                                        .icon()
+                                        .xsmall()
+                                        .text_color(theme.foreground),
+                                )
+                            })
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                cx.stop_propagation();
+                                this.env_set_run(kind, value.clone(), provider.clone(), window, cx)
+                            }))
+                            .into_any_element(),
+                    );
+                }
+                let (title, note) = match kind {
+                    "reasoning" => ("Reasoning", "How hard it thinks. A new thread of the project starts on it."),
+                    "approvals" => ("Approvals", "What it may run without asking: off — nothing, smart — what is safe, manual — everything."),
+                    _ => ("Model", "The model the project's threads start on. A thread already begun keeps its own."),
+                };
+                (
+                    title.to_string(),
+                    v_flex()
+                        .w_full()
+                        .py_1()
+                        .children(items)
+                        .child(
+                            div()
+                                .px_3()
+                                .pt_2()
+                                .text_sm()
+                                .text_color(muted)
+                                .child(note),
+                        )
+                        .into_any_element(),
                 )
             }
             _ => return None,
