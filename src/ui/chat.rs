@@ -89,7 +89,8 @@ impl HermesApp {
             // Until the agent's first step: what this thread is for.
             match &self.sites_error {
                 Some(e) => Some(div().text_base().text_color(cx.theme().danger).child(e.clone()).into_any_element()),
-                None if self.turns.is_empty() => Some(
+                // Until the thread's first browser step.
+                None if !self.sites.steps.get(&self.thread_key()).is_some_and(|v| !v.is_empty()) => Some(
                     div()
                         .text_base()
                         .text_color(cx.theme().muted_foreground)
@@ -113,6 +114,9 @@ impl HermesApp {
         };
         // The block comes from the agent: its row, its avatar, like an answer.
         let theme = cx.theme().clone();
+        // A tool attached with / sits where the work goes on: under the conversation, over the
+        // composer. A project's environment is the thread's document: at the top.
+        let block_on_top = subject.starts_with("env:");
         let subject_block = block.map(|content| {
             h_flex()
                 .w_full()
@@ -137,6 +141,7 @@ impl HermesApp {
                 )
                 .into_any_element()
         });
+        let mut subject_block = subject_block;
         let placeholder: Option<AnyElement> = if subject_block.is_some() {
             None
         } else if !self.turns.is_empty() {
@@ -255,12 +260,13 @@ impl HermesApp {
                     .child(
                         v_flex()
                             .w_full()
-                            .children(subject_block)
+                            .when(block_on_top, |d| d.children(subject_block.take()))
                             .children(placeholder)
                             .children(rows)
                             .children(approval)
                             .children(clarify)
                             .children(thread_term)
+                            .children(subject_block)
                             // The next message is the thread's last row, as in Delta: it scrolls
                             // away with the thread, "Jump to latest" brings it back.
                             .child(composer),
