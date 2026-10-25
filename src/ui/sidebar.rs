@@ -193,7 +193,7 @@ impl BenchApp {
         out
     }
 
-    /// General: this Mac's agent's own environment (what every project's threads get too) and
+    /// Host: the machine's own agent and environment, for looking after the machine itself (what every project's threads get too) and
     /// the threads of no project; folded at the end until opened.
     fn render_loose(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
@@ -211,7 +211,7 @@ impl BenchApp {
             .items_center()
             .text_sm()
             .child(super::head_icon(Ico::Chat, cx))
-            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child("General"))
+            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child("Host"))
             .child(div().flex_1())
             // The pencil: the general environment (soul, MCP, skills, prompts every thread gets).
             .child(

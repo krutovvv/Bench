@@ -50,7 +50,7 @@ test("the server starts and answers /api/projects", async () => {
 		assert.deepEqual(listed, []);
 		// A remote project shows the server agent's general environment.
 		const general = await call("GET", "/api/projects/general/env");
-		assert.equal(general.project.name, "General");
+		assert.equal(general.project.name, "Host");
 		assert.ok(Array.isArray(general.skills) && Array.isArray(general.hosts));
 	} finally {
 		child.kill();

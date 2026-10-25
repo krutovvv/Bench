@@ -163,7 +163,7 @@ impl BenchApp {
     pub fn subject_title(&self) -> Option<String> {
         let s = self.current_subject();
         let id = s.strip_prefix("env:")?;
-        let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| "General".into());
+        let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| "Host".into());
         Some(format!("{name}: environment"))
     }
 

@@ -186,7 +186,7 @@ impl BenchApp {
             _ => "no bot of its own".into(),
         };
         rows.push(row("telegram", String::new(), "Telegram".into(), tg_note, false, false, cx));
-        blocks.push((if general { "General" } else { "Project" }, section(if general { "General" } else { "Project" }, None, rows, cx)));
+        blocks.push((if general { "Host" } else { "Project" }, section(if general { "Host" } else { "Project" }, None, rows, cx)));
 
         // MCP servers.
         let mut rows = vec![];
@@ -276,7 +276,7 @@ impl BenchApp {
         Some(match e.card.as_ref()?.0 {
             "name" | "soul" | "telegram" => {
                 if general {
-                    "General"
+                    "Host"
                 } else {
                     "Project"
                 }

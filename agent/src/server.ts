@@ -61,7 +61,7 @@ await rt.open();
 function envOf(id: string): { agent: string; dir: string; project: { id: string; name: string; telegram?: { token: string; allowed_users: string[]; username?: string } | null } } {
 	if (id === "general") {
 		const tg = getSetting("telegram");
-		return { agent: "default", dir: agentDir("default"), project: { id, name: "General", telegram: tg?.token ? { token: tg.token, allowed_users: (tg.allowed_users ?? []).map(String) } : null } };
+		return { agent: "default", dir: agentDir("default"), project: { id, name: "Host", telegram: tg?.token ? { token: tg.token, allowed_users: (tg.allowed_users ?? []).map(String) } : null } };
 	}
 	const p = projects.get(id);
 	if (!p) throw new HttpError(404, "no such project");
