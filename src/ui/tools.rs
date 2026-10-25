@@ -524,6 +524,9 @@ pub(super) fn segmented_tall_owned(
                 .flex()
                 .items_center()
                 .px_3()
+                // The fields beside it draw their text at `text_sm` (gpui-kit's default input):
+                // the cells match, so nothing in the row changes size.
+                .text_sm()
                 .cursor_pointer()
                 .when(k > 0, |d| d.border_l_1().border_color(theme.border))
                 .when(k == chosen, |d| {

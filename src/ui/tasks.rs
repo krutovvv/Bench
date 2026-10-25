@@ -585,6 +585,8 @@ impl BenchApp {
                             .px_2()
                             .flex()
                             .items_center()
+                            // As the fields' text: the chips are buttons in the same form.
+                            .text_sm()
                             .rounded_md()
                             .border_1()
                             .cursor_pointer()
