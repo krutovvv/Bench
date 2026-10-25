@@ -499,8 +499,8 @@ fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App
     };
     h_flex()
         .flex_1()
-        .justify_between()
-        .gap_1()
+        .justify_center()
+        .gap_2()
         .py_1()
         .children((0..crate::app::marks::SESSION_COLORS.len()).map(|c| swatch(Some(c))))
         .child(swatch(None))
