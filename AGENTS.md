@@ -94,15 +94,20 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 
 ## How to work here
 
-- **Bench develops itself.** The person usually talks to you through the running Bench
-  (`/Applications/Bench.app`). Never quit, kill, restart or replace it (`pkill`,
-  `osascript … quit`, deleting its `.app`).
-- **One change, one commit, one Dev build.** Commit, then run
-  `.agents/skills/bench-kit/scripts/ship.sh`. It quits Bench Dev (`dist/Bench Dev.app`), the
-  test copy, rebuilds it in place and opens it. Uncommitted changes stop it. When the person says
-  Dev is good, `ship.sh --release` rebuilds Bench itself; the running one goes on until they
-  reopen it. Both apps keep one path and are signed with the Apple Development certificate, so
-  macOS asks for each permission once.
+- **Bench develops itself, in one app.** The person works in `/Applications/Bench.app` and talks
+  to you through it. It is only a client: threads, the queue and the agent live in the agent
+  process and in `~/.bench`, so rebuilding and reopening it costs a few seconds and loses
+  nothing — an unfinished run goes on in the agent and the window comes back to it.
+- **One change, one commit, one build.** Commit, then run
+  `.agents/skills/bench-kit/scripts/ship.sh`: it quits Bench the honest way (`osascript … quit`,
+  never a kill), rebuilds `/Applications/Bench.app` in place and opens it again. Uncommitted
+  changes stop it. The way back from a bad change is an earlier commit, rebuilt — there is no
+  second app parked beside it. `ship.sh --dev` builds `dist/Bench Dev.app` only when two states
+  of the interface must be compared; it shares `~/.bench` with Bench and isolates nothing but a
+  window. Both are signed with the Apple Development certificate, so macOS asks for each
+  permission once.
+- **Never kill Bench or quit it outside `ship.sh`** (`pkill`, deleting its `.app`, an ad-hoc
+  quit): it is the window the person works in.
 - **Don't push without asking.** The repository is public: no private names, tokens or the
   person's data in commits.
 - **Back up before deleting data** (`~/.bench/backups/`).

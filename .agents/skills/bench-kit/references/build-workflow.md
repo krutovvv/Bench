@@ -32,13 +32,14 @@ writing code:
    `ship.sh` (`build-change-loop.md`, step 9). The user tests the bundle, not `target/debug` —
    "I see no changes" happened when only the dev build was rebuilt.
    **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
-   **Bench** (`/Applications/Bench.app`, `local.bench.app`) and tries every commit in **Bench Dev**
-   (`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
-   rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
-   window the person works in and talks to you through. When Dev is good and the person asks,
-   `ship.sh --release` rebuilds Bench: the running one goes on from `Bench.prev.app` (kept for
-   rolling back) and the new one starts on the next open. Both are signed with the Apple Development
-   certificate, so macOS grants are given once per app. Uncommitted changes stop the build
-   (`BENCH_DIRTY=1` for a throwaway Dev one).
+   **Bench** (`/Applications/Bench.app`, `local.bench.app`). `ship.sh` quits it with
+   `osascript … quit`, rebuilds it in place and opens it again.
+(`dist/Bench Dev.app`, `local.bench.dev`) only to compare two states of the interface. Bench is
+a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
+and reopening it costs the person a few seconds and an unfinished run comes back with the window.
+Never kill it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit —
+nothing is parked beside `/Applications/Bench.app`. Signed with the Apple Development
+certificate, so macOS grants are given once per app. Uncommitted changes stop the build
+(`BENCH_DIRTY=1` for a throwaway one).
 6. **Report honestly** what was verified and what was only built (anything that needs a click).
 

@@ -156,18 +156,17 @@ Hooks: none left. Warnings: none. Tests: all pass. Delete the test files you mad
 
 ```bash
 git add -A && git commit -m "<what changed, in the person's words>"   # a build is one commit
-$K/ship.sh            # rebuilds dist/Bench Dev.app and opens it (--release: Bench itself)
+$K/ship.sh            # quits Bench, rebuilds /Applications/Bench.app, opens it (--dev: the side copy)
 ```
-**Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
-**Bench** (`/Applications/Bench.app`, `local.bench.app`) and tries every commit in **Bench Dev**
-(`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
-rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
-window the person works in and talks to you through. When Dev is good and the person asks,
-`ship.sh --release` rebuilds Bench in place (no `Bench.prev.app` beside it: rolling back means
-rebuilding an earlier commit); the running one goes on from its old copy and the new one starts
-on the next open. Both are signed with the Apple Development
+**One app** (Bench is developed from inside Bench): the person works in
+**Bench** (`/Applications/Bench.app`, `local.bench.app`), and `ship.sh` rebuilds it in place.
+(`dist/Bench Dev.app`, `local.bench.dev`) only to compare two states of the interface. Bench is
+a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
+and reopening it costs the person a few seconds and an unfinished run comes back with the window.
+Never kill it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit —
+nothing is parked beside `/Applications/Bench.app`. Signed with the Apple Development
 certificate, so macOS grants are given once per app. Uncommitted changes stop the build
-(`BENCH_DIRTY=1` for a throwaway Dev one).
+(`BENCH_DIRTY=1` for a throwaway one).
 
 **A grant that is on but doesn't work** (local network above all: the toggle is on in Privacy &
 Security, macOS never asks, and every request to a local service fails, while Bench Dev works).

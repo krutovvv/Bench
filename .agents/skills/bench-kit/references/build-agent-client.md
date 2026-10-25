@@ -135,10 +135,13 @@ reaches them with `ssh_run` and `remote_files`, Bench with the agent's REST (`/a
 
 **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
 **Bench** (`/Applications/Bench.app`, `local.bench.app`) and tries every commit in **Bench Dev**
-(`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
-rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
-window the person works in and talks to you through. When Dev is good and the person asks,
-`ship.sh --release` rebuilds Bench: the running one goes on from `Bench.prev.app` (kept for
-rolling back) and the new one starts on the next open. Both are signed with the Apple Development
-certificate, so macOS grants are given once per app. Uncommitted changes stop the build (`BENCH_DIRTY=1` for a throwaway one). Saying "done" without
+**One app, rebuilt in place**: `ship.sh` quits the running Bench with `osascript … quit`, rebuilds
+`/Applications/Bench.app` and opens it again. `--dev` builds the side copy
+(`dist/Bench Dev.app`, `local.bench.dev`) only to compare two states of the interface. Bench is
+a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
+and reopening it costs the person a few seconds and an unfinished run comes back with the window.
+Never kill it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit —
+nothing is parked beside `/Applications/Bench.app`. Signed with the Apple Development
+certificate, so macOS grants are given once per app. Uncommitted changes stop the build
+(`BENCH_DIRTY=1` for a throwaway one). Saying "done" without
 building the app got "I see no changes".

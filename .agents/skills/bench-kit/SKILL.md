@@ -31,13 +31,14 @@ insert kind, in its one look.
 
 This kit lives in Bench's own repository, `~/Projects/bench/.agents/skills/bench-kit`. Most
 often the person talks to you **through Bench itself** while you change Bench. So:
-- **Never quit, kill, restart or replace a running Bench** (`pkill`, `osascript … quit`, deleting
-  its `.app`): it is the window the person works in and talks to you through.
-- **Every commit goes to Bench Dev.** Commit, then `scripts/ship.sh`: it quits Bench Dev
-  (`dist/Bench Dev.app`, the test copy), rebuilds it in place and opens it. The person works in
-  Bench (`/Applications/Bench.app`); when Dev is good and they ask, `scripts/ship.sh --release`
-  rebuilds it (the running one goes on until reopened; `Bench.prev.app` is the rollback).
-  Uncommitted changes stop the build.
+- **One app, rebuilt in place.** Commit, then `scripts/ship.sh`: it quits Bench
+  (`/Applications/Bench.app`) with `osascript … quit`, rebuilds it and opens it again — the app is
+  a client, the work lives in the agent process and `~/.bench`, so the person loses a few seconds
+  and their unfinished run comes back with the window. Uncommitted changes stop the build; the
+  rollback is an earlier commit, rebuilt. `--dev` builds `dist/Bench Dev.app` beside it only to
+  compare two states of the interface (same `~/.bench`, same agent — it isolates only a window).
+- **Never kill Bench or quit it outside `ship.sh`** (`pkill`, deleting its `.app`, an ad-hoc
+  quit): it is the window the person works in and talks to you through.
 - Screenshots and tests only of **your own copy** (`scripts/shot.sh`), never the person's window.
   `BENCH_DEMO=1|top|tasks|server|tool|env` opens a made-up session (`src/demo.rs`) to shoot;
   `BENCH_HOME=<a copy> BENCH_SUBJECT=tasks:upcoming` runs a real agent on a copy of the data and
@@ -89,7 +90,8 @@ often the person talks to you **through Bench itself** while you change Bench. S
    calls without a running app: stop, go back to the last version that ran, say what is hard.
 7. **Every change goes through the loop** (`references/build-change-loop.md`): the target in
    numbers → the code and the reference → shot and numbers before → one exact edit → build with
-   zero warnings → shot and numbers after (`scripts/rules.py`, `textx.py`) → commit → `scripts/ship.sh` → report with before/after.
+   zero warnings → shot and numbers after (`scripts/rules.py`, `textx.py`) → commit → `scripts/ship.sh`
+   (quits Bench, rebuilds it, opens it) → report with before/after.
    "Looks fine" is not a check.
 8. **Where a thing goes, how to move it**: `references/ui-areas.md`.
 
@@ -160,7 +162,7 @@ Rules that keep it right:
 | Path | What |
 |---|---|
 | `~/Projects/bench` (this repository) | Bench itself: `src/` the app, `agent/` the agent, `src/demo.rs` the made-up session |
-| `scripts/ship.sh` | Rebuild Bench Dev from this commit and open it; `--release` rebuilds Bench itself when the person asks (never quits it) |
+| `scripts/ship.sh` | Quit Bench, rebuild `/Applications/Bench.app` from this commit and open it; `--dev` builds the side copy instead |
 | `scripts/shot.sh` | Screenshot YOUR copy (a binary, or the .app, with `KEY=VALUE` hooks), never the person's |
 | `scripts/rules.py`, `spans.py`, `textx.py`, `crop.py`, `measure.py` | Rules and edges down a column; icons and gaps along a band; where text starts in a band; an area cut out and zoomed (pt); raw pixel runs (px) |
 | `templates/app/src/ui/kit.rs` | The piece library the catalog documents (`kit::…`); `templates/examples/gallery.rs` uses every piece (`assets/gallery.png`) |

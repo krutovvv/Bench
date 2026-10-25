@@ -1,39 +1,45 @@
 #!/bin/bash
 # Hand a change to the person. Run from the project folder, after committing.
 #
-# Usage: ship.sh [--release] [--no-open]
+# Usage: ship.sh [--dev] [--no-open]
 #
-# Bench is developed from inside Bench, which has two apps (scripts/bundle-macos.sh):
-#   * Bench Dev ("dist/Bench Dev.app"): every commit is tried here. ship.sh asks a running
-#     Bench Dev to quit (a normal quit, never a kill), rebuilds it in place and opens it.
-#   * Bench ("/Applications/Bench.app"): the one the person works in and talks to you through.
-#     Only `ship.sh --release`, when the person asks for it, rebuilds it; it never quits it: the
-#     running one goes on from its old (deleted) copy and the new one starts on the next open.
-#     Nothing is parked beside it — /Applications holds Bench.app only.
+# There is one working app: Bench (`/Applications/Bench.app`) — the person works in it and talks
+# to you through it. It is only a client: the threads, the queue and the agent live in the agent
+# process and in ~/.bench, so restarting the app costs nothing and loses nothing, and the way
+# back from a bad change is an earlier commit (the tree must be clean to build), not an older
+# copy of the app. ship.sh therefore quits Bench, rebuilds it in place and opens it again.
+#
+# `--dev` builds Bench Dev (`dist/Bench Dev.app`, bundle id local.bench.dev) beside it, for the
+# rare case of comparing two states of the interface. Both apps use the same ~/.bench — the same
+# agent, the same databases — so Dev isolates nothing but a window.
 set -euo pipefail
 [[ -x scripts/bundle-macos.sh ]] || { echo "run from the project folder" >&2; exit 1; }
-KIND=dev OPEN=1
+KIND=release OPEN=1
 for a in "$@"; do
     case "$a" in
+    --dev) KIND=dev ;;
     --release) KIND=release ;;
     --no-open) OPEN=0 ;;
-    *) echo "usage: ship.sh [--release] [--no-open]" >&2; exit 1 ;;
+    *) echo "usage: ship.sh [--dev] [--no-open]" >&2; exit 1 ;;
     esac
 done
 
+# A running app is quit the honest way (never killed): its unfinished run goes on in the agent
+# and the window comes back to it.
 if [[ "$KIND" == dev ]]; then
-    # By the end of its path: Bench Dev may have been started through a link or an older path.
-    RUNNING="/dist/Bench Dev.app/Contents/MacOS/"
+    RUNNING="/dist/Bench Dev.app/Contents/MacOS/"; NAME="Bench Dev"; ID="local.bench.dev"
+else
+    RUNNING="/Applications/Bench.app/Contents/MacOS/"; NAME="Bench"; ID="local.bench.app"
+fi
+if pgrep -f "$RUNNING" >/dev/null; then
+    osascript -e "tell application id \"$ID\" to quit" >/dev/null 2>&1 || true
+    for _ in $(seq 40); do
+        pgrep -f "$RUNNING" >/dev/null || break
+        sleep 0.5
+    done
     if pgrep -f "$RUNNING" >/dev/null; then
-        osascript -e 'tell application id "local.bench.dev" to quit' >/dev/null 2>&1 || true
-        for _ in $(seq 20); do
-            pgrep -f "$RUNNING" >/dev/null || break
-            sleep 0.5
-        done
-        if pgrep -f "$RUNNING" >/dev/null; then
-            echo "Bench Dev didn't quit — ask the person to quit it, then ship again" >&2
-            exit 1
-        fi
+        echo "$NAME didn't quit — ask the person to quit it, then ship again" >&2
+        exit 1
     fi
 fi
 
@@ -42,9 +48,9 @@ printf '%s\n' "$OUT" | grep -E '^(Built|previous|no Apple)' || true
 APP=$(printf '%s\n' "$OUT" | sed -n 's/^Built: \(.*\) (.*)$/\1/p' | tail -1)
 [[ -n "$APP" && -d "$APP" ]] || { echo "no app was built" >&2; exit 1; }
 
-if [[ "$KIND" == dev && "$OPEN" == 1 ]]; then
+if [[ "$OPEN" == 1 ]]; then
     open "$APP"
-    echo "opened Bench Dev: $APP"
-elif [[ "$KIND" == release ]]; then
-    echo "released: the next time Bench is opened it is this commit (the running one goes on until then)"
+    echo "opened: $APP"
+else
+    echo "built, not opened: $APP"
 fi
