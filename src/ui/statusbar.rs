@@ -400,12 +400,30 @@ impl BenchApp {
             // controls — left of the paperclip — not hanging over the text (⌘. does the same).
             .when(self.live.is_some(), |d| {
                 d.child(
-                    button("stop", Ico::Square, "Stop  ⌘.", false)
-                        .text_color(theme.danger)
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.click_claimed = true;
-                            this.stop(cx);
-                        })),
+                    // A filled chip, not another flat icon: this is the one control of the bar
+                    // that undoes work in progress, and it shows only while there is some.
+                    h_flex().h_full().items_center().pl_2().child(
+                        div()
+                            .id("stop")
+                            .h(px(20.))
+                            .px_2()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .cursor_pointer()
+                            .rounded_md()
+                            .bg(theme.danger)
+                            .text_color(theme.danger_foreground)
+                            .text_sm()
+                            .hover(|s| s.opacity(0.85))
+                            .child(Ico::Square.icon().xsmall())
+                            .child("Stop")
+                            .tooltip(|window, cx| Tooltip::new("Stop  ⌘.").build(window, cx))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.click_claimed = true;
+                                this.stop(cx);
+                            })),
+                    ),
                 )
             })
             .child(
