@@ -275,13 +275,22 @@ function findSkill(profile: string, name: string): string | undefined {
 	return walk(dir, 0);
 }
 
-/** `PUT /api/config`: each top-level key merges into its setting; `model` goes to the profile. */
+/**
+ * `PUT /api/config`: each top-level key merges into its setting. What the raw config reads
+ * back from the agent's own folder — the model, the reasoning level, approvals — is written
+ * there too, so a project's setting is its own and not the machine's: a thread of a project
+ * runs with `project:<id>` and reads exactly these.
+ */
 function patchConfig(profile: string, patch: any): void {
 	for (const [k, v] of Object.entries(patch ?? {})) {
-		if (k === "model" && v && typeof v === "object") {
-			const m = v as any;
+		const m = v as any;
+		if (k === "model" && m && typeof m === "object") {
 			const p = readAgent(profile);
 			writeAgent(profile, { ...p, defaultProvider: m.provider ?? p.defaultProvider, defaultModel: m.default ?? m.name ?? p.defaultModel });
+		} else if (k === "agent" && m && typeof m === "object" && m.reasoning_effort) {
+			writeAgent(profile, { ...readAgent(profile), defaultThinkingLevel: String(m.reasoning_effort) });
+		} else if (k === "approvals" && m && typeof m === "object" && m.mode !== undefined) {
+			writeAgent(profile, { ...readAgent(profile), approvals: String(m.mode) });
 		} else setSetting(k, deepMerge(getSetting(k), v));
 	}
 }

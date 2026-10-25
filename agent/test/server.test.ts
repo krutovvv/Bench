@@ -48,10 +48,23 @@ test("the server starts and answers /api/projects", async () => {
 		await call("DELETE", `/api/cron/jobs/${job.id}`);
 		listed = (await call("GET", `/api/projects/${made.project.id}/env`)).cron;
 		assert.deepEqual(listed, []);
+		// A project's model, reasoning level and approvals are its own: they go into its agent's
+		// folder (a thread of the project runs with it), not into the machine's settings.
+		await call("PUT", `/api/config?profile=${encodeURIComponent(`project:${made.project.id}`)}`, {
+			config: { model: { provider: "p1", default: "m1" }, agent: { reasoning_effort: "low" }, approvals: { mode: "smart" } },
+		});
+		const own = JSON.parse(fs.readFileSync(path.join(env.dir, "settings.json"), "utf8"));
+		assert.deepEqual([own.defaultProvider, own.defaultModel, own.defaultThinkingLevel, own.approvals], ["p1", "m1", "low", "smart"]);
 		// A remote project shows the server agent's general environment.
 		const general = await call("GET", "/api/projects/general/env");
 		assert.equal(general.project.name, "Host");
 		assert.ok(Array.isArray(general.skills) && Array.isArray(general.hosts));
+		// The machine's own agent kept what it had: the project's choices did not reach it.
+		const hostOwn = fs.existsSync(path.join(general.dir, "settings.json"))
+			? JSON.parse(fs.readFileSync(path.join(general.dir, "settings.json"), "utf8"))
+			: {};
+		assert.notEqual(hostOwn.approvals, "smart");
+		assert.notEqual(hostOwn.defaultModel, "m1");
 	} finally {
 		child.kill();
 	}
