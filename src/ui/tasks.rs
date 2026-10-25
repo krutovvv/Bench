@@ -250,10 +250,11 @@ impl BenchApp {
                     .flex()
                     .items_center()
                     .rounded_md()
+                    .border_1()
                     .text_sm()
                     .cursor_pointer()
-                    .when(on, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
-                    .when(!on, |d| d.text_color(muted).hover(|s| s.text_color(theme.foreground)))
+                    .when(on, |d| d.border_color(theme.primary).text_color(theme.primary))
+                    .when(!on, |d| d.border_color(theme.border).text_color(muted).hover(|s| s.text_color(theme.foreground)))
                     .child(label)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.click_claimed = true;
@@ -269,16 +270,13 @@ impl BenchApp {
             h_flex()
                 .id("task-tags")
                 .flex_none()
-                // On the rows' grid: the icon in the checkboxes' column (22 + the 2 of the
-                // selection stripe, as wide as a checkbox), "All"'s text where the titles start,
-                // as tall as a row. No rule: the grid parts it from the tasks.
                 .pl(px(24.))
                 .pr_6()
                 .py_1p5()
                 .flex_wrap()
+                .gap_1()
                 .items_center()
-                .child(div().w(px(14.)).flex_none().flex().justify_center().child(Ico::Tag.icon().xsmall().text_color(muted)))
-                .child(h_flex().flex_wrap().gap_1().children(chips))
+                .children(chips)
                 .into_any_element()
         });
         if inline {
