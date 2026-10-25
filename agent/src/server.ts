@@ -497,14 +497,15 @@ const routes: Record<string, Route> = {
 			models: Object.keys(p.models),
 			context_length: p.context_length ?? null,
 			has_api_key: Boolean(p.api_key),
-			api_key_preview: p.api_key ? `${p.api_key.slice(0, 3)}…${p.api_key.slice(-2)}` : "",
+			// Shown whole: this is the person's own machine and keys (a masked one saved back would break it).
+			api_key_preview: p.api_key ?? "",
 			is_current: p.id === current,
 		}));
 		return { endpoints, current };
 	},
 	"GET /api/env": (req) => {
 		const env = readEnv(profileOf(req));
-		return Object.fromEntries(Object.entries(env).map(([k, v]) => [k, { is_set: Boolean(v), redacted_value: v ? `${v.slice(0, 3)}…${v.slice(-2)}` : "", description: "", category: "", channel_managed: false, custom: true }]));
+		return Object.fromEntries(Object.entries(env).map(([k, v]) => [k, { is_set: Boolean(v), redacted_value: v ?? "", description: "", category: "", channel_managed: false, custom: true }]));
 	},
 	"PUT /api/env": (req) => {
 		setEnv(String(req.body.key), String(req.body.value ?? ""));

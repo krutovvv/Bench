@@ -254,10 +254,11 @@ impl BenchApp {
                     .strip_prefix("${")
                     .and_then(|p| p.strip_suffix('}'))
                     .map(str::to_string);
-                let key_value = key_env
-                    .as_ref()
-                    .and_then(|k| shown.get(k).cloned())
-                    .unwrap_or_default();
+                // A key kept in the agent's env shows its value; one kept with the endpoint, itself.
+                let key_value = match &key_env {
+                    Some(k) => shown.get(k).cloned().unwrap_or_default(),
+                    None => preview.clone(),
+                };
                 EndpointForm {
                     id: s("id"),
                     current: e["is_current"].as_bool().unwrap_or(false),
