@@ -6,6 +6,8 @@ import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/conte
 import { createModels, createProvider, type Model } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
+import { InsertEntry, Inserts, insertsOf, patchInsert, type InsertView } from "./inserts.ts";
+import type { JsonObject } from "@earendil-works/chord";
 import { createRegistry, Harness, watchEvents, type AgentEvent, type Conversation } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
@@ -47,6 +49,20 @@ interface Live {
 	approvedForSession: Set<string>;
 	/** Arguments of the running tool calls, by call id. */
 	toolArgs: Map<string, any>;
+	/** The thread's inserts as last read from Pi (the tools' view of them). */
+	inserts: InsertView[];
+}
+
+/** An old thread's subject as an insert: "files:<id>" → files {host}, "tasks:today" → tasks {list}… */
+function legacyInsert(subject: string): { key: string; state: JsonObject } | undefined {
+	const [kind, ...rest] = subject.split(":");
+	const value = rest.join(":");
+	if (kind === "ssh") return { key: `ssh:${value || "local"}`, state: {} };
+	if (kind === "files" && value) return { key: "files", state: { host: value } };
+	if (kind === "tasks") return { key: "tasks", state: { list: value || "today" } };
+	if (kind === "tool" && value) return { key: "tools", state: { tool: value } };
+	if (kind === "browser") return { key: "browser", state: {} };
+	return undefined;
 }
 
 const BLOCK_OPEN = "<block-state>";
@@ -234,6 +250,7 @@ export class Runtime {
 			usage: { input: 0, output: 0, calls: 0, started: Date.now() },
 			approvedForSession: new Set(),
 			toolArgs: new Map(),
+			inserts: [],
 		};
 		this.live.set(row.id, live);
 		this.byConversation.set(String(conversation.id), live);
@@ -243,6 +260,7 @@ export class Runtime {
 			for (const e of events) this.onEvent(live, e);
 		});
 		live.stop = () => stream.stop();
+		await this.inserts(row.id).catch(() => {});
 		return live;
 	}
 
@@ -349,6 +367,53 @@ export class Runtime {
 
 	// ---- the tools' host ------------------------------------------------------
 
+	// ---- inserts (src/inserts.ts) ----------------------------------------------
+
+	/** The thread's inserts in order, read from its transcript and its document. */
+	async inserts(id: string): Promise<InsertView[]> {
+		const live = this.live.get(id) ?? (await this.session(id));
+		if (!live) return [];
+		const view = await live.conversation.viewState(ctx);
+		const entries = ((view.value as any).entries ?? []) as any[];
+		view.dispose();
+		const doc = (await this.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		live.inserts = insertsOf(entries, doc);
+		// A thread from before inserts: its one tool ("subject") becomes its first insert.
+		const legacy = !live.inserts.length && !doc?.items ? legacyInsert(live.row.subject ?? "") : undefined;
+		if (legacy) {
+			this.setSubject(id, "");
+			return this.insert(id, randomBytes(4).toString("hex"), legacy.key, legacy.state);
+		}
+		return live.inserts;
+	}
+
+	/** Put an insert into the thread, where the conversation is now. An id it already has changes nothing. */
+	async insert(id: string, insertId: string, key: string, state: JsonObject = {}): Promise<InsertView[]> {
+		const live = await this.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		if (!/^[\w-]{1,64}$/.test(insertId)) throw new Error("bad insert id");
+		if (!key) throw new Error("insert key missing");
+		const known = (await this.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		if (known?.items?.[insertId]) return this.inserts(id);
+		// The state first: an entry is never without its state.
+		await live.conversation.commit(async (tx) => {
+			const doc = (await tx.doc(Inserts as any, live.conversation.id)) as any;
+			doc.items[insertId] = { key, state, folded: false, removed: false };
+		}, ctx);
+		const sub = await live.conversation.submit({ type: "write", entry: { kind: InsertEntry.kind ?? "bench.insert", data: { id: insertId, key } }, requestId: randomUUID() } as any, ctx);
+		await sub.wait(ctx);
+		return this.inserts(id);
+	}
+
+	/** Change an insert: its key (another server), its state, folded, or removed. */
+	async patchInsert(id: string, insertId: string, patch: Record<string, unknown>): Promise<InsertView[]> {
+		const live = await this.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		const found = await live.conversation.commit(async (tx) => patchInsert((await tx.doc(Inserts as any, live.conversation.id)) as any, insertId, patch), ctx);
+		if (!found) throw new Error(`no insert ${insertId}`);
+		return this.inserts(id);
+	}
+
 	/** The thread's block changes (a tool attached in it): stored, and the live turn's prompt sees it. */
 	setSubject(id: string, subject: string): void {
 		this.store.update(id, { subject });
@@ -357,7 +422,7 @@ export class Runtime {
 	}
 
 	private sessionInfo(row: SessionRow): SessionInfo {
-		return { id: row.id, profile: row.profile, cwd: row.cwd, source: row.source, chat_id: row.chat_id, subject: row.subject, project: row.project ?? "" };
+		return { id: row.id, profile: row.profile, cwd: row.cwd, source: row.source, chat_id: row.chat_id, subject: row.subject, project: row.project ?? "", inserts: this.live.get(row.id)?.inserts ?? [] };
 	}
 
 	private host(): Host {

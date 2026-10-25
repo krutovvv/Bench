@@ -1,0 +1,139 @@
+//! `/ftp`: a file host in the thread, a small Transmit — the hosts to pick from (and a new one),
+//! then the host's folders and files, a file open in an editor with its highlighting. Its state:
+//! {host, path, file}; the thread shows them again when it is reopened.
+
+use gpui_kit::component::{ActiveTheme as _, v_flex};
+use gpui_kit::*;
+use serde_json::{Map, json};
+
+use super::{InsertKind, Switch, SwitchTo, clip, pick_row};
+use crate::app::HermesApp;
+use crate::icons::Ico;
+use crate::model::Insert;
+
+pub struct Files;
+
+/// The hosts a thread may open: its project's and the shared ones.
+fn hosts(app: &HermesApp) -> Vec<(String, String, String)> {
+    let proj = app.thread_project.clone();
+    app.files_remote
+        .hosts
+        .iter()
+        .filter(|h| proj.is_empty() || h.project.is_empty() || h.project == proj)
+        .map(|h| (h.id.clone(), h.name.clone(), format!("{} · {}@{}", h.kind.to_uppercase(), h.user, h.host)))
+        .collect()
+}
+
+fn new_host(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>) {
+    app.new_host_form(window, cx);
+}
+
+impl InsertKind for Files {
+    fn owns(&self, key: &str) -> bool {
+        key == "files"
+    }
+
+    fn title(&self, app: &HermesApp, ins: &Insert) -> String {
+        let host = ins.get("host");
+        app.files_remote
+            .hosts
+            .iter()
+            .find(|h| h.id == host)
+            .map(|h| format!("{} · {}", h.name, h.kind.to_uppercase()))
+            .unwrap_or_else(|| "Files".into())
+    }
+
+    fn switches(&self, app: &HermesApp, ins: &Insert) -> Vec<Switch> {
+        let now = ins.get("host");
+        let mut v: Vec<Switch> = hosts(app)
+            .into_iter()
+            .map(|(id, name, detail)| Switch {
+                chosen: id == now,
+                to: SwitchTo::Patch(json!({ "state": { "host": id, "path": "", "file": "" } })),
+                label: name,
+                detail,
+            })
+            .collect();
+        v.push(Switch { label: "New host…".into(), detail: "FTP, FTPS or SFTP".into(), chosen: false, to: SwitchTo::Run(new_host) });
+        v
+    }
+
+    fn controls(&self, app: &mut HermesApp, ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) -> Vec<AnyElement> {
+        let f = &app.files_remote;
+        if f.owner.as_deref() != Some(ins.id.as_str()) || f.path.is_empty() {
+            return vec![];
+        }
+        vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(f.path.clone()).into_any_element()]
+    }
+
+    fn body(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) -> Option<AnyElement> {
+        let host = ins.get("host");
+        if host.is_empty() {
+            let id = ins.id.clone();
+            let mut rows = vec![];
+            for (k, (hid, name, detail)) in hosts(app).into_iter().enumerate() {
+                let id = id.clone();
+                rows.push(pick_row(format!("{id}-h{k}"), Ico::Server, name, detail, cx, move |this, _, cx| {
+                    this.patch_insert(&id, json!({ "state": { "host": hid, "path": "", "file": "" } }), cx);
+                }));
+            }
+            rows.push(pick_row(format!("{id}-new"), Ico::Plus, "Add a host…".into(), "FTP, FTPS or SFTP".into(), cx, new_host));
+            return Some(v_flex().children(rows).into_any_element());
+        }
+        let theme = cx.theme().clone();
+        if app.files_remote.owner.as_deref() != Some(ins.id.as_str()) {
+            // Another insert has edits not saved: they are not thrown away by showing this one.
+            if app.files_remote.dirty {
+                let file = app.files_remote.file.clone().unwrap_or_default();
+                return Some(
+                    div()
+                        .py_1()
+                        .text_base()
+                        .text_color(theme.muted_foreground)
+                        .child(format!("{file} has edits not saved in another thread: save them there first."))
+                        .into_any_element(),
+                );
+            }
+            app.files_remote.owner = Some(ins.id.clone());
+            app.show_files_at(&host, &ins.get("path"), &ins.get("file"), window, cx);
+        } else {
+            // What it shows now is its state.
+            let f = &app.files_remote;
+            if f.host.as_deref() == Some(host.as_str()) && !f.loading && f.error.is_none() && !f.path.is_empty() {
+                let mut state = Map::new();
+                state.insert("host".into(), json!(host));
+                state.insert("path".into(), json!(f.path));
+                state.insert("file".into(), json!(f.file.clone().unwrap_or_default()));
+                app.sync_insert_state(&ins.id, state, cx);
+            }
+        }
+        Some(app.render_files_block(&host, false, window, cx))
+    }
+
+    fn context(&self, app: &HermesApp, ins: &Insert, cx: &App) -> String {
+        let f = &app.files_remote;
+        let host = ins.get("host");
+        if host.is_empty() {
+            return "The file host insert has no host chosen yet.".into();
+        }
+        if f.owner.as_deref() != Some(ins.id.as_str()) || f.host.as_deref() != Some(host.as_str()) {
+            return String::new();
+        }
+        let names: Vec<String> = f.entries.iter().take(80).map(|e| if e.dir { format!("{}/", e.name) } else { e.name.clone() }).collect();
+        let mut out = format!("The file host insert (host id {host}) is in the folder {}. It lists: {}", f.path, names.join(", "));
+        if let Some(file) = &f.file {
+            out.push_str(&format!(
+                "\nOpen in its editor: {file}{}\n```\n{}\n```",
+                if f.dirty { " (edited, not saved)" } else { "" },
+                clip(&f.editor.read(cx).value(), 6000)
+            ));
+        }
+        out
+    }
+
+    fn opened(&self, app: &mut HermesApp, _ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) {
+        if app.files_remote.hosts.is_empty() {
+            app.load_remote_hosts(window, cx);
+        }
+    }
+}

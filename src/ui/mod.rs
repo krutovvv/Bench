@@ -5,6 +5,7 @@ mod chat;
 mod composer;
 pub(crate) mod editor_status;
 mod files;
+pub(crate) mod inserts;
 mod media;
 mod panels;
 mod providers;

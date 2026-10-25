@@ -17,6 +17,7 @@ use gpui_kit::*;
 mod asks;
 mod attachments;
 pub(crate) mod ide;
+pub(crate) mod inserts;
 pub(crate) mod ide_find;
 pub(crate) mod ide_ops;
 mod ide_tabs;
@@ -117,6 +118,10 @@ pub struct HermesApp {
     pub conn: Option<Arc<Connection>>,
     /// The subject of the chat about to be created ("tasks:today"): it goes with session.create.
     pub new_subject: String,
+    /// Each thread's inserts (by session id; "draft" for a new chat): `app::inserts`.
+    pub inserts: HashMap<String, Vec<crate::model::Insert>>,
+    /// A new chat's session is being made (an insert came before any message).
+    pub creating: bool,
     /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
     /// new one (the row's "+"), `Some(Some(id))` = that thread (a row under the subject).
     pub subject_target: Option<Option<String>>,
@@ -140,13 +145,10 @@ pub struct HermesApp {
     pub sites: sites::Sites,
     pub sites_error: Option<String>,
     /// A step's tab being reopened: (thread, turn, url, the tabs before).
-    pub sites_pending: Option<(String, usize, String, Vec<String>)>,
     /// A click in the thread landed in something that types (a terminal, an editor): it keeps the focus.
     pub click_claimed: bool,
     /// Where the left button went down in the thread (a drag selects text: no focus move).
     pub click_at: Option<Point<Pixels>>,
-    /// Terminals opened in a thread with "!": thread key (session id, or "draft") -> tab alias.
-    pub thread_terms: std::collections::HashMap<String, String>,
     /// The composer shows a new chat (no placeholder) — what render last set.
     pub composer_fresh: bool,
     evt_tx: async_channel::Sender<Evt>,
@@ -632,6 +634,8 @@ impl HermesApp {
             gateway: None,
             conn: None,
             new_subject: String::new(),
+            inserts: HashMap::new(),
+            creating: false,
             subject_target: None,
             thread_project: String::new(),
             projects: vec![],
@@ -643,10 +647,8 @@ impl HermesApp {
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,
-            sites_pending: None,
             click_claimed: false,
             click_at: None,
-            thread_terms: Default::default(),
             composer_fresh: false,
             evt_tx,
             connecting: false,
@@ -974,6 +976,7 @@ impl HermesApp {
                     );
                 }
                 self.opened.insert(session.clone(), runtime.clone());
+                self.inserts_created(&session);
                 self.session = Some(session);
                 self.save_place();
                 self.runtime = Some(runtime.clone());
@@ -1001,6 +1004,14 @@ impl HermesApp {
                 }
                 // Show the new session in the list right away.
                 self.refresh_sessions();
+            }
+            Evt::Inserts(sid, list) => self.on_inserts(sid, list, cx),
+            Evt::InsertFailed(sid, e) => {
+                self.toast(NotificationType::Error, format!("The insert didn't change: {e}"), window, cx);
+                // The agent's list is the truth: read it again.
+                if self.session.as_deref() == Some(&sid) {
+                    self.open_session(sid, cx);
+                }
             }
             Evt::Started(sid) if self.is_current(&sid) => {
                 if self.live.is_none() {
@@ -1297,6 +1308,8 @@ impl HermesApp {
         self.process_open = None;
         self.session = None;
         self.runtime = None;
+        self.inserts.remove("draft");
+        self.creating = false;
         // A new chat starts on the profile's level.
         self.effort_other = None;
         self.effort = self.profile_effort;
@@ -1420,8 +1433,6 @@ impl HermesApp {
             self.reset_chat(cx);
         }
         self.sessions.retain(|s| s.id != id);
-        // Its own files (browser steps' frames) go with it.
-        sites::forget_session(&id);
         let runtime = self.opened.remove(&id);
         let rid = id.clone();
         self.rest(

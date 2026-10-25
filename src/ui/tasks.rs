@@ -332,21 +332,11 @@ impl HermesApp {
                 .children(chips)
         });
         if inline {
-            // The rows' own px_6 is pulled back so their text starts at the thread's column.
-            // In the agent's row: the rows' own px_6 pulled back, so their text starts at the
-            // row's text column.
+            // In an insert: its head switches the lists (no heading here); the rows' own px_6
+            // pulled back to the insert's edges.
             return v_flex()
                 .w_full()
-                .ml(px(-24.))
-                .mr(px(-24.))
-                .child(
-                    div()
-                        .px_6()
-                        .pb_1()
-                        .text_lg()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .child(list.name()),
-                )
+                .mx(px(-12.))
                 .children(strip)
                 .child(v_flex().pt_1().children(rows).when_some(note, |d, (text, color)| {
                     d.child(div().px_6().py_3().text_base().text_color(color).child(text))

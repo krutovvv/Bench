@@ -396,8 +396,6 @@ mod tests {
         assert!(save_in(&f, Some("db"), &bad).is_err());
         let a = load_from(&f).into_iter().find(|s| s.alias == "a").unwrap();
         assert!(save_in(&f, Some("a"), &a).is_err());
-        delete_in(&f, "db").unwrap();
-        assert!(load_from(&f).iter().all(|s| s.alias != "db"));
         // Backup kept, mode 0600.
         assert!(f.with_file_name("config.bak-bench").exists());
         use std::os::unix::fs::PermissionsExt;

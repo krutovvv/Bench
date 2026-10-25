@@ -28,10 +28,18 @@ pub enum Cmd {
         /// The project it belongs to (its id); "" = none.
         project: String,
     },
-    /// A tool attached to the thread (`/ssh web-1`): its block from now on.
-    SetSubject {
+    /// An insert put into the thread where it is now (agent/src/inserts.ts).
+    Insert {
         session: String,
-        subject: String,
+        id: String,
+        key: String,
+        state: Value,
+    },
+    /// An insert changed: {key?, state?, folded?, removed?}.
+    PatchInsert {
+        session: String,
+        id: String,
+        patch: Value,
     },
     Send {
         profile: String,
@@ -158,6 +166,10 @@ pub enum Evt {
         session: String,
         runtime: String,
     },
+    /// A thread's inserts as the agent keeps them (the whole list, in order).
+    Inserts(String, Vec<crate::model::Insert>),
+    /// The agent refused an insert's change: the thread's list is read again.
+    InsertFailed(String, String),
     /// The gateway says the session list changed (new session, generated title, …).
     SessionsChanged,
     Deleted,
@@ -203,6 +215,8 @@ enum Pending {
         replay: Vec<Value>,
     },
     Create,
+    /// An insert's answer: the session's new list.
+    Inserts(String),
     Delete,
     Catalog,
     /// `process.list` for this runtime session.
@@ -333,10 +347,15 @@ impl Rpc {
                     Pending::Ignore,
                 )?
             }
-            Cmd::SetSubject { session, subject } => self.call(
-                "session.subject",
-                json!({"session_id": session, "subject": subject}),
-                Pending::Ignore,
+            Cmd::Insert { session, id, key, state } => self.call(
+                "session.insert",
+                json!({"session_id": session, "id": id, "key": key, "state": state}),
+                Pending::Inserts(session.clone()),
+            )?,
+            Cmd::PatchInsert { session, id, patch } => self.call(
+                "session.insert.patch",
+                json!({"session_id": session, "id": id, "patch": patch}),
+                Pending::Inserts(session.clone()),
             )?,
             Cmd::SetEffort { session, effort } => self.call(
                 "config.set",
@@ -499,6 +518,7 @@ fn run(
                 log_error(&method, &err.to_string());
                 match kind {
                     Pending::Delete => emit(Evt::DeleteFailed(text)),
+                    Pending::Inserts(session) => emit(Evt::InsertFailed(session, text)),
                     // A poll every few seconds: logged above, never a toast.
                     Pending::Processes(_) => {}
                     // Older gateways may lack the projection: show the turns without extras.
@@ -553,6 +573,10 @@ fn run(
                 if r["info"].is_object() {
                     replay.push(json!({"type": "session.info", "session_id": runtime,
                                        "payload": r["info"]}));
+                }
+                if r["inserts"].is_array() {
+                    replay.push(json!({"type": "session.inserts", "session_id": runtime,
+                                       "payload": {"inserts": r["inserts"]}}));
                 }
                 if r["todo_state"]["todos"].is_array() {
                     replay.push(json!({"type": "todo.updated", "session_id": runtime,
@@ -668,6 +692,7 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                 .to_string();
             emit(Evt::Created { session, runtime })
         }
+        Pending::Inserts(session) => emit(Evt::Inserts(session, inserts(&r["inserts"]))),
         Pending::Delete => emit(Evt::Deleted),
         Pending::Catalog => emit(Evt::Catalog(catalog(r))),
         Pending::Processes(session) => emit(Evt::Processes(session, processes(r))),
@@ -692,6 +717,10 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
         }
         Pending::Ignore => {}
     }
+}
+
+fn inserts(v: &Value) -> Vec<crate::model::Insert> {
+    v.as_array().map(|a| a.iter().filter_map(crate::model::Insert::from_json).collect()).unwrap_or_default()
 }
 
 fn on_event(p: &Value, emit: &impl Fn(Evt)) {
@@ -850,6 +879,7 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             }
         }
         "sessions.changed" => emit(Evt::SessionsChanged),
+        "session.inserts" => emit(Evt::Inserts(sid, inserts(&payload["inserts"]))),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
         "message.complete" => {
             if payload["usage"].is_object() {

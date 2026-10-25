@@ -253,7 +253,9 @@ fn grid(session: Arc<Session>, focused: bool, theme: &Theme) -> impl IntoElement
                 .unwrap_or(font_size * 0.6);
             let line_h = (font_size * 1.35).round();
             let cols = ((bounds.size.width / cell_w).floor() as usize).max(2);
-            let rows = ((bounds.size.height / line_h).floor() as usize).max(1);
+            // The view may be shorter than the program's screen (a terminal in a thread): the
+            // rows under it are cut off by the view.
+            let rows = ((bounds.size.height / line_h).floor() as usize).max(1).max(session.min_rows());
             session.resize(
                 Size { cols, rows },
                 Layout {
@@ -365,6 +367,8 @@ impl HermesApp {
         div()
             .id(("terminal", tab.id))
             .size_full()
+            // Rows past the view's height (see Session::min_rows) stay hidden.
+            .overflow_hidden()
             .bg(theme.secondary)
             .px_4()
             .py_2()

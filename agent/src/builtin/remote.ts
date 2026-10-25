@@ -357,7 +357,7 @@ export function rename(h: Host, from: string, to: string): Promise<{ from: strin
 // ---- the tool ------------------------------------------------------------------
 
 /** A host by id or name (case-insensitive), or the one the thread is about. */
-export function hostFor(name: string | undefined, subject: string | undefined): Host {
+export function hostFor(name: string | undefined, subject: string | undefined, inserts: { key: string; state: Record<string, unknown> }[] = []): Host {
 	if (name) {
 		const all = hosts.list();
 		const h = hosts.get(name) ?? all.find((x) => x.name.toLowerCase() === name.toLowerCase());
@@ -367,6 +367,13 @@ export function hostFor(name: string | undefined, subject: string | undefined): 
 	if (subject?.startsWith("files:")) {
 		const h = hosts.get(subject.slice(6));
 		if (!h) throw new Error("the host of this thread no longer exists");
+		return h;
+	}
+	// The file host inserted in the thread (the last one).
+	const files = [...inserts].reverse().find((i) => i.key === "files" && i.state.host);
+	if (files) {
+		const h = hosts.get(String(files.state.host));
+		if (!h) throw new Error("the host inserted in this thread no longer exists");
 		return h;
 	}
 	if (subject?.startsWith("ssh:") && subject !== "ssh:local") {
@@ -395,7 +402,7 @@ export const remoteFiles = defineTool({
 		host: Type.Optional(Type.String({ description: "Another host by name or id, only when the person names one" })),
 	}),
 	execute: async (args, api) => {
-		const h = hostFor(args.host, sessionOf(api.conversationId).subject);
+		const h = hostFor(args.host, sessionOf(api.conversationId).subject, sessionOf(api.conversationId).inserts);
 		try {
 			if (args.action === "ls") {
 				const r = await ls(h, args.path);

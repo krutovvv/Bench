@@ -1,6 +1,6 @@
-//! A step of a site thread: the page itself (no browser UI), as wide as the thread's text and
-//! as tall as the page's frame. The latest step is live — clicks, scrolls and typing go to the
-//! server's tab; an earlier one shows its last frame and reopens its page on a click.
+//! A thread's tab in the server's browser: the page itself (no browser UI), as wide as the
+//! thread's text and as tall as the page's frame, live — clicks, scrolls and typing go to the
+//! tab. Paused (nobody at work), it shows its last frame; a click resumes it.
 
 use std::sync::Arc;
 
@@ -15,35 +15,19 @@ use crate::app::HermesApp;
 const MAX_H: f32 = 620.;
 
 impl HermesApp {
-    pub(super) fn render_site_step(&mut self, tab: String, turn: usize, url: String, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_tab(&mut self, tab: String, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let Some((frame, w, h, live)) = self.step_frame(&tab) else {
-            // Still coming (the tab is there, its first frame is not), or gone with no picture
-            // left (the server's browser restarted): then say so, and offer the page again.
-            let open = self.sites.browser.as_ref().is_some_and(|b| b.is_open(&tab));
-            if open || url.is_empty() {
-                return div()
-                    .py_2()
-                    .child(ShimmerText::new("Opening the page…").text_base().text_color(muted))
-                    .into_any_element();
-            }
-            let thread = self.thread_key();
-            let label = url_label(&url);
+        let Some((frame, w, h, live)) = self.tab_frame(&tab) else {
             return div()
-                .id(SharedString::from(format!("site-gone-{tab}")))
-                .px_3()
+                .id(SharedString::from(format!("site-wait-{tab}")))
                 .py_2()
-                .border_1()
-                .border_color(theme.border)
-                .text_base()
-                .text_color(muted)
                 .cursor_pointer()
-                .hover(|s| s.text_color(theme.foreground))
-                .child(format!("{label}  ·  the page is closed — click to open it again"))
-                .on_click(cx.listener(move |this, _, _, cx| {
+                .child(ShimmerText::new("Opening the page…").text_base().text_color(muted))
+                .on_click(cx.listener(|this, _, _, cx| {
                     this.click_claimed = true;
-                    this.reopen_step(thread.clone(), turn, url.clone(), cx)
+                    this.touch_browser();
+                    cx.notify();
                 }))
                 .into_any_element();
         };
@@ -69,7 +53,6 @@ impl HermesApp {
             }
         };
         let (tp_down, tp_up, tp_move, tp_wheel) = (to_page.clone(), to_page.clone(), to_page.clone(), to_page);
-        let thread = self.thread_key();
         let paused = self.sites.browser.as_ref().is_some_and(|b| b.is_paused());
         v_flex()
             .w_full()
@@ -121,7 +104,7 @@ impl HermesApp {
                                     b.mouse("mousePressed", x, y, "left", ev.click_count as u32);
                                 }
                             } else {
-                                this.reopen_step(thread.clone(), turn, url.clone(), cx);
+                                focus.focus(window, cx);
                             }
                         }),
                     )
@@ -163,34 +146,10 @@ impl HermesApp {
                     .text_base()
                     .text_color(muted)
                     .truncate()
-                    .child(if self.demo {
-                        url_label(&self.step_url(&tab))
-                    } else if !live {
-                        format!("{}  ·  click to open it again", url_label(&self.step_url(&tab)))
-                    } else if paused {
-                        format!("{}  ·  paused — click to watch live", url_label(&self.step_url(&tab)))
-                    } else {
-                        url_label(&self.step_url(&tab))
-                    }),
+                    .when(paused && !self.demo, |d| d.child("Paused — click the page to watch it live")),
             )
             .into_any_element()
     }
-
-    fn step_url(&self, tab: &str) -> String {
-        self.sites
-            .steps
-            .values()
-            .flatten()
-            .find(|s| s.tab == tab)
-            .map(|s| s.url.clone())
-            .unwrap_or_default()
-    }
-}
-
-/// A page's address as read: no scheme, no query (a search's long encoded query is noise).
-fn url_label(url: &str) -> String {
-    let u = url.trim_start_matches("https://").trim_start_matches("http://");
-    u.split(['?', '#']).next().unwrap_or(u).trim_end_matches('/').to_string()
 }
 
 /// A key to the page: text as typed, the special keys by name, ⌘V pastes. Whether it was sent.

@@ -16,7 +16,8 @@ import { sshRun } from "../builtin/ssh.ts";
 import { hostsTool } from "../builtin/hosts.ts";
 import { tasksTool } from "../builtin/tasks.ts";
 import { host } from "../host.ts";
-import { environment, notes, projectContext, skills, soul, subject } from "../prompt.ts";
+import { environment, inserted, notes, projectContext, skills, soul, subject } from "../prompt.ts";
+import { Inserts } from "../inserts.ts";
 
 const of = (input: any) => host().session(input.conversationId);
 const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined) => (input: any) => {
@@ -44,6 +45,15 @@ export const assistant = defineExtension({
 		section("soul", s(soul), { tag: false }),
 		section("environment", s(environment)),
 		section("subject", s(subject), { tag: false }),
+		// Read from the thread's own document: what the person inserted.
+		section(
+			"inserts",
+			async (input: any, context: any) => {
+				const doc = (await input.read.snapshot(Inserts as any, input.conversationId, context).catch(() => undefined)) as any;
+				return inserted(Object.values<any>(doc?.items ?? {}).filter((i) => !i.removed));
+			},
+			{ tag: false },
+		),
 		section("project", s(projectContext), { tag: false }),
 		section("skills", s(skills), { tag: false }),
 		section("notes", s(notes), { tag: false }),

@@ -180,7 +180,23 @@ deploy@{alias}:~$ "
 /// A thread about something (`tasks:today`, `ssh:web-1`…): one turn, done.
 fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn) {
     let mut row = session(id, title, 2, false, "desktop");
-    row.subject = subject.into();
+    // An environment is the thread's top; a tool, an insert before the first message.
+    if subject.starts_with("env:") {
+        row.subject = subject.into();
+    } else if !subject.is_empty() {
+        let spec = match subject.split_once(':') {
+            Some(("tool", t)) => format!("tools:{t}"),
+            Some(("browser", _)) => "browser".into(),
+            Some(("ssh", "")) => "ssh:local".into(),
+            _ => subject.to_string(),
+        };
+        let (key, mut state) = HermesApp::insert_spec(&spec);
+        if key == "browser" {
+            state.insert("tab".into(), serde_json::json!("demo-tab"));
+            state.insert("url".into(), serde_json::json!("https://blog.example.com/admin/posts/new"));
+        }
+        app.inserts.insert(id.into(), vec![crate::model::Insert { id: format!("i-{id}"), key, state, folded: false, after: 0 }]);
+    }
     app.sessions.push(row);
     app.demo_threads.insert(id.into(), vec![turn]);
 }
@@ -296,17 +312,7 @@ is published.\n\nThe page is right here — click and type in it if something ne
             48.0,
         ),
     );
-    app.sites.steps.insert(
-        "d-site".into(),
-        vec![crate::app::sites::Step {
-            tab: "demo-tab".into(),
-            turn: 0,
-            url: "https://blog.example.com/admin/posts/new".into(),
-        }],
-    );
-    if let Some(img) = crate::remote_browser::image_of(include_bytes!("../assets/demo/site.jpg")) {
-        app.sites.saved.insert("demo-tab".into(), img);
-    }
+    app.sites.demo_frame = crate::remote_browser::image_of(include_bytes!("../assets/demo/site.jpg"));
     thread(
         app,
         "d-env",

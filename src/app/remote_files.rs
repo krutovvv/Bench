@@ -42,6 +42,8 @@ pub struct RemoteFiles {
     pub file: Option<String>,
     pub editor: Entity<EditorState>,
     pub dirty: bool,
+    /// The insert the browser shows now (its id): another one restores its own place first.
+    pub owner: Option<String>,
     /// The host's password, typed when the server refused the login.
     pub password: Entity<InputState>,
     /// The new host's form, in the chat area while open (the Files group's "+").
@@ -90,6 +92,7 @@ impl RemoteFiles {
             file: None,
             editor,
             dirty: false,
+            owner: None,
         }
     }
 }
@@ -200,18 +203,13 @@ impl HermesApp {
                     this.files_remote.form = false;
                     this.load_remote_hosts(window, cx);
                     if let Some(id) = v["host"]["id"].as_str() {
-                        this.open_files_thread(id.to_string(), window, cx);
+                        // Into the thread's file host insert (put in if there is none).
+                        this.put_insert(format!("files:{id}"), window, cx);
                     }
                 }
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
             },
         );
-    }
-
-    /// A file host in the sidebar: its thread, the files on top.
-    pub fn open_files_thread(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.ensure_remote_listing(&id, window, cx);
-        self.open_subject(format!("files:{id}"), cx);
     }
 
     /// The thread's host is shown (after a restart, or opening the thread from elsewhere).
@@ -284,6 +282,29 @@ impl HermesApp {
             self.list_remote(path, window, cx);
             return;
         }
+        self.open_remote_path(path, window, cx);
+    }
+
+    /// A host's folder and open file as an insert last showed them (its thread reopened, or
+    /// another insert showed another host meanwhile). Nothing changes while edits are unsaved.
+    pub fn show_files_at(&mut self, host: &str, path: &str, file: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.files_remote.dirty {
+            return;
+        }
+        let f = &mut self.files_remote;
+        f.host = Some(host.to_string());
+        f.path = String::new();
+        f.entries.clear();
+        f.error = None;
+        f.file = None;
+        self.list_remote(path.to_string(), window, cx);
+        if !file.is_empty() {
+            self.open_remote_path(file.to_string(), window, cx);
+        }
+    }
+
+    /// A file of the shown host, in the editor.
+    pub fn open_remote_path(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
         let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
             return;
         };
@@ -404,8 +425,4 @@ impl HermesApp {
         );
     }
 
-    /// The host a thread is about (`files:<id>`).
-    pub fn subject_files(subject: &str) -> Option<String> {
-        subject.strip_prefix("files:").map(str::to_string)
-    }
 }

@@ -41,6 +41,39 @@ pub struct SessionRow {
     pub host: String,
 }
 
+/// A piece the person put into a thread with "/" (a server's terminal, a file host, the tasks,
+/// the utilities, the browser's tab): kept by the agent as a Pi entry where it was put and a
+/// document of its state (agent/src/inserts.ts). Its look and behaviour: `crate::inserts`.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Insert {
+    pub id: String,
+    /// What it is: "ssh:<alias>" (a terminal; "ssh:local" this Mac's), "files", "tasks",
+    /// "tools", "browser".
+    pub key: String,
+    /// Its own state (the host and folder a file browser is on, the list, the tool).
+    pub state: serde_json::Map<String, Value>,
+    pub folded: bool,
+    /// After how many of the person's messages it sits.
+    pub after: usize,
+}
+
+impl Insert {
+    pub fn from_json(v: &Value) -> Option<Self> {
+        Some(Self {
+            id: v["id"].as_str()?.to_string(),
+            key: v["key"].as_str()?.to_string(),
+            state: v["state"].as_object().cloned().unwrap_or_default(),
+            folded: v["folded"].as_bool().unwrap_or(false),
+            after: v["after"].as_u64().unwrap_or(0) as usize,
+        })
+    }
+
+    /// A string field of its state.
+    pub fn get(&self, field: &str) -> String {
+        self.state.get(field).and_then(Value::as_str).unwrap_or_default().to_string()
+    }
+}
+
 /// What the person works on: the sidebar's unit. A folder on disk (a codebase) is optional.
 #[derive(Clone, Debug, Default)]
 pub struct ProjectEntry {

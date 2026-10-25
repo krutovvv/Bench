@@ -358,28 +358,9 @@ impl HermesApp {
         }
     }
 
-    /// The subject key of a task list's thread: "tasks:today".
-    pub fn tasks_subject(list: &List) -> String {
-        format!("tasks:{}", list.name().to_lowercase())
-    }
-
-    /// The list a thread is about, from its subject.
-    pub fn subject_list(subject: &str) -> Option<List> {
-        let name = subject.strip_prefix("tasks:")?;
-        crate::tasks::LISTS
-            .iter()
-            .find(|l| l.name().eq_ignore_ascii_case(name))
-            .cloned()
-    }
-
-    /// A task list in the sidebar: its thread — the list live at the top, the conversation under
-    /// it. The latest thread about that list, or a new one.
+    /// The task lists in a new thread, on `list`.
     pub fn open_task_list(&mut self, list: List, window: &mut Window, cx: &mut Context<Self>) {
-        let key = Self::tasks_subject(&list);
-        self.start_reminders(cx);
-        self.load_tasks();
-        self.select_task_list(list, window, cx);
-        self.open_subject(key, cx);
+        self.new_thread_with(format!("tasks:{}", list.name().to_lowercase()), window, cx);
     }
 
     pub fn select_task_list(&mut self, list: List, window: &mut Window, cx: &mut Context<Self>) {

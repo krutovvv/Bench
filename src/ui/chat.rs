@@ -18,8 +18,6 @@ use crate::model::{Step, Turn};
 
 /// Below the composer the thread can scroll on, as a code editor past its last line.
 const SCROLL_PAST_END: f32 = 240.;
-/// A tool's block at a thread's top.
-const SUBJECT_H: f32 = 440.;
 /// A terminal's most: under it, it fits its text.
 const TERMINAL_MAX: f32 = 280.;
 
@@ -34,122 +32,6 @@ pub(super) fn terminal_height(session: &crate::term::Session) -> f32 {
     (used * line + 16.).min(TERMINAL_MAX)
 }
 
-/// The demo's server: a terminal's last screen, as text (no shell runs in the demo), in the
-/// terminal block's look.
-fn demo_terminal(alias: &str, cx: &App) -> AnyElement {
-    let theme = cx.theme();
-    v_flex()
-        .bg(theme.secondary)
-        .border_1()
-        .border_color(theme.border)
-        .px_3()
-        .py_2()
-        .child(h_flex().gap_1().italic().text_color(theme.muted_foreground).child("ssh").child(Ico::ChevronDown.icon().xsmall()))
-        .child(
-            div()
-                .pt_1()
-                .font_family(crate::theme::MONO)
-                .text_sm()
-                .whitespace_nowrap()
-                .overflow_hidden()
-                .children(crate::demo::terminal(alias).lines().map(|l| div().h(px(20.)).child(l.to_string()))),
-        )
-        .into_any_element()
-}
-
-impl HermesApp {
-    /// A terminal as a block of the thread, as Delta draws one: on a tinted ground, its shell's
-    /// name on top (a click folds it), on the right "focus" and "to the background"; its lines
-    /// under, as many as it shows. In the background it is its head with a badge, and the status
-    /// bar lists it.
-    fn render_terminal_block(&mut self, ix: usize, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let tab = &self.ssh.tabs[ix];
-        let (collapsed, background) = (tab.collapsed, tab.background);
-        let name = tab.session.title().filter(|t| !t.trim().is_empty()).unwrap_or_else(|| if tab.alias.is_empty() || tab.alias.starts_with("thread:") { "zsh".into() } else { tab.alias.clone() });
-        let id = tab.id;
-        let h = terminal_height(&tab.session);
-        let icon = |key: &'static str, ico: Ico, tip: &'static str| {
-            div()
-                .id((key, id))
-                .p_0p5()
-                .cursor_pointer()
-                .text_color(muted)
-                .hover(|s| s.text_color(theme.foreground).bg(theme.list_hover))
-                .child(ico.icon().small())
-                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx))
-        };
-        let head = h_flex()
-            .gap_2()
-            .child(
-                h_flex()
-                    .id(("term-fold", id))
-                    .gap_1()
-                    .cursor_pointer()
-                    .italic()
-                    .text_color(muted)
-                    .hover(|s| s.text_color(theme.foreground))
-                    .child(name)
-                    .child(if collapsed || background { Ico::ChevronRight } else { Ico::ChevronDown }.icon().xsmall())
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.click_claimed = true;
-                        if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
-                            if t.background {
-                                t.background = false;
-                                t.collapsed = false;
-                            } else {
-                                t.collapsed = !t.collapsed;
-                            }
-                        }
-                        cx.notify();
-                    })),
-            )
-            .child(div().flex_1())
-            .when(background, |d| {
-                d.child(
-                    h_flex()
-                        .gap_1()
-                        .px_1p5()
-                        .border_1()
-                        .border_color(theme.border)
-                        .text_sm()
-                        .text_color(muted)
-                        .child(div().size(px(6.)).rounded_full().bg(theme.primary))
-                        .child("Background"),
-                )
-            })
-            .when(!background, |d| {
-                d.child(icon("term-focus", Ico::Terminal, "Focus the terminal").on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
-                    if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
-                        t.collapsed = false;
-                        t.focus.focus(window, cx);
-                    }
-                    cx.notify();
-                })))
-                .child(icon("term-bg", Ico::ToBackground, "Send to the background").on_click(cx.listener(move |this, _, _, cx| {
-                    this.click_claimed = true;
-                    if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
-                        t.background = true;
-                    }
-                    cx.notify();
-                })))
-            });
-        let open = !collapsed && !background;
-        v_flex()
-            .bg(theme.secondary)
-            .border_1()
-            .border_color(theme.border)
-            .px_3()
-            .py_1p5()
-            .child(head)
-            // The view's own 16 inset pulled back: its text starts where the head's does.
-            .when(open, |d| d.child(div().h(px(h)).ml(px(-16.)).mr(px(-16.)).child(self.render_terminal(ix, window, cx))))
-            .into_any_element()
-    }
-}
-
 impl HermesApp {
     /// New chat: optionally work in a git project, optionally in a branch of its own.
     pub(super) fn render_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -161,45 +43,14 @@ impl HermesApp {
             self.prompts_for = Some(self.thread_project.clone());
             self.load_prompts(window, cx);
         }
+        // A project's environment is the thread's document, at its top; everything else the
+        // person puts in is an insert (crate::ui::inserts), where it was put.
         let subject = self.current_subject();
-        let block = if let Some(list) = HermesApp::subject_list(&subject) {
-            if self.tasks.list != list {
-                self.tasks.list = list;
-            }
-            // A project's thread: that project's tasks.
-            if self.tasks.project != self.thread_project {
-                self.tasks.project = self.thread_project.clone();
-            }
-            Some(self.render_tasks_block(cx))
-        } else if let Some(alias) = HermesApp::subject_server(&subject) {
-            self.ensure_terminal(&alias, window, cx).map(|ix| self.render_terminal_block(ix, window, cx))
-            .or_else(|| self.demo.then(|| demo_terminal(&alias, cx)))
-        } else if let Some(id) = HermesApp::subject_files(&subject) {
-            Some(self.render_files_block(&id, window, cx))
-        } else if HermesApp::subject_browser(&subject).is_some() {
-            // Until the agent's first step: what this thread is for.
-            match &self.sites_error {
-                Some(e) => Some(div().text_base().text_color(cx.theme().danger).child(e.clone()).into_any_element()),
-                // Until the thread's first browser step.
-                None if !self.sites.steps.get(&self.thread_key()).is_some_and(|v| !v.is_empty()) => Some(
-                    div()
-                        .text_base()
-                        .text_color(cx.theme().muted_foreground)
-                        .child("The server's browser. Ask for a step — “open the blog’s admin and sign in”, “publish the draft” — and each step's page shows here, live: click and type in it, or ask again.")
-                        .into_any_element(),
-                ),
-                None => None,
-            }
-        } else if let Some(id) = subject.strip_prefix("env:") {
+        let block = if let Some(id) = subject.strip_prefix("env:") {
             if self.project_env.as_ref().is_none_or(|e| e.id != id) {
                 self.load_env(id, window, cx);
             }
             Some(self.render_env_block(window, cx))
-        } else if let Some(tool) = HermesApp::subject_tool(&subject) {
-            if self.tools.tool != tool {
-                self.select_tool(tool, window, cx);
-            }
-            Some(self.render_tool_block(SUBJECT_H, cx))
         } else {
             None
         };
@@ -229,7 +80,7 @@ impl HermesApp {
         // A tool attached with / sits where the work goes on: under the conversation, over the
         // composer. A project's environment is the thread's document: at the top.
         let block_on_top = block_on_top_form.unwrap_or_else(|| subject.starts_with("env:"));
-        let block_is_terminal = block_on_top_form.is_none() && subject.starts_with("ssh:");
+        let block_is_terminal = false;
         let subject_block = block.map(|content| {
             h_flex()
                 .w_full()
@@ -256,7 +107,7 @@ impl HermesApp {
                 .into_any_element()
         });
         let mut subject_block = subject_block;
-        let placeholder: Option<AnyElement> = if subject_block.is_some() {
+        let placeholder: Option<AnyElement> = if subject_block.is_some() || !self.thread_inserts().is_empty() {
             None
         } else if !self.turns.is_empty() {
             None
@@ -310,31 +161,16 @@ impl HermesApp {
         }
         self.last_max = max;
 
-        let rows: Vec<AnyElement> = (0..self.turns.len())
-            .map(|i| self.render_turn(i, cx))
-            .collect();
+        // The turns, and after each the inserts the person put there.
+        let n = self.turns.len();
+        let mut rows: Vec<AnyElement> = self.render_inserts_at(0, n == 0, window, cx);
+        for i in 0..n {
+            rows.push(self.render_turn(i, cx));
+            rows.extend(self.render_inserts_at(i + 1, i + 1 == n, window, cx));
+        }
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
-        // A terminal "!" opened in this thread: under the conversation, as tall as its text.
-        let thread_term = self.thread_terminal().map(|ix| {
-            let theme = cx.theme().clone();
-            let h = terminal_height(&self.ssh.tabs[ix].session);
-            div()
-                .w_full()
-                .pl(px(super::CHAT_TEXT - 16.))
-                .pr(px(super::CHAT_RIGHT))
-                .py(px(super::TURN_Y))
-                .child(
-                    div()
-                        .h(px(h))
-                        .border_1()
-                        .border_color(theme.border)
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| this.click_claimed = true))
-                        .child(self.render_terminal(ix, window, cx)),
-                )
-                .into_any_element()
-        });
         let composer = self.render_composer(cx);
 
         div()
@@ -379,7 +215,6 @@ impl HermesApp {
                             .children(rows)
                             .children(approval)
                             .children(clarify)
-                            .children(thread_term)
                             .children(subject_block)
                             // The next message is the thread's last row, as in Delta: it scrolls
                             // away with the thread, "Jump to latest" brings it back.
@@ -514,11 +349,6 @@ impl HermesApp {
         });
 
         let answer = self.render_answer(i, cx);
-        // A site thread: the tab this turn worked in (its latest), live or its last frame.
-        let site_step = self
-            .steps_of(i)
-            .pop()
-            .map(|st| self.render_site_step(st.tab, i, st.url, cx));
         let turn: &Turn = &self.turns[i];
         let has_answer = !turn.answer.trim().is_empty();
         let time = match (turn.started, turn.finished) {
@@ -688,7 +518,6 @@ impl HermesApp {
                                     .children(answer)
                                     // What came with the answer, right under its text (the agent's side).
                                     .children(sources)
-                                    .children(site_step)
                                     .children(processes)
                                     .children(files)
                                     .when(!reviews.is_empty(), |d| {

@@ -15,6 +15,8 @@ export interface SessionInfo {
 	subject?: string;
 	/** The project the thread belongs to; "" = none. */
 	project?: string;
+	/** What the person inserted into the thread, in order (src/inserts.ts). */
+	inserts?: { id: string; key: string; state: Record<string, unknown> }[];
 }
 
 export interface Host {

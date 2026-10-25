@@ -135,6 +135,9 @@ pub struct Session {
     /// The shell (or ssh) process, to read a local shell's folder.
     pid: Option<u32>,
     local: bool,
+    /// The fewest rows the program gets, whatever the view's height: a terminal in a thread is as
+    /// tall as its text, but its program sees a whole screen (`ls` doesn't shrink it to a line).
+    min_rows: std::sync::atomic::AtomicUsize,
 }
 
 /// What ⌘-click found in a terminal line.
@@ -222,6 +225,7 @@ impl Session {
             hover: Mutex::new(None),
             pid,
             local,
+            min_rows: std::sync::atomic::AtomicUsize::new(0),
         });
 
         let this = session.clone();
@@ -280,6 +284,15 @@ impl Session {
     }
 
     /// Called while painting: the grid follows the view's size.
+    /// See `min_rows`.
+    pub fn set_min_rows(&self, rows: usize) {
+        self.min_rows.store(rows, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    pub fn min_rows(&self) -> usize {
+        self.min_rows.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
     pub fn resize(&self, size: Size, layout: Layout) {
         *self.listener.layout.lock().unwrap() = (layout, size);
         let mut cur = self.size.lock().unwrap();

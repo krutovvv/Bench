@@ -94,6 +94,18 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 		broadcast(session_id, "sessions.changed", {});
 		return { ok: true };
 	},
+	// The person's inserts (src/inserts.ts): put one where the thread is now, or change one. Every
+	// window showing the thread hears the new list.
+	"session.insert": async ({ session_id, id, key, state }) => {
+		const inserts = await rt.insert(String(session_id), String(id ?? ""), String(key ?? ""), state && typeof state === "object" ? state : {});
+		broadcast(session_id, "session.inserts", { inserts });
+		return { inserts };
+	},
+	"session.insert.patch": async ({ session_id, id, patch }) => {
+		const inserts = await rt.patchInsert(String(session_id), String(id ?? ""), patch && typeof patch === "object" ? patch : {});
+		broadcast(session_id, "session.inserts", { inserts });
+		return { inserts };
+	},
 	"session.resume": async ({ session_id }) => {
 		const live = await rt.session(session_id);
 		if (!live) throw new Error(`session not found: ${session_id}`);
@@ -105,6 +117,7 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 			execution_generation: live.generation,
 			running: live.busy,
 			messages: await rt.history(session_id),
+			inserts: await rt.inserts(session_id),
 			prompts: rt.pendingPrompts(session_id),
 			info: { reasoning_effort: row.effort, model: row.model, cwd: row.cwd, revision: 0, execution_generation: live.generation },
 			todo_state: { todos: row.todos },

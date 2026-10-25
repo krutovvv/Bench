@@ -50,6 +50,8 @@ impl Session {
         String::new()
     }
 
+    pub fn set_min_rows(&self, _rows: usize) {}
+
     pub fn used_rows(&self) -> usize {
         0
     }

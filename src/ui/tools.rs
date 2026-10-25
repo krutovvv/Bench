@@ -14,39 +14,6 @@ use crate::devtools::{Kind, Tool};
 
 impl HermesApp {
 
-    /// A tool as a thread's live block: its name, hint and modes, then the tool at a fixed height.
-    pub(super) fn render_tool_block(&mut self, height: f32, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let current = self.tools.tool;
-        let modes = current.modes();
-        let mode = self.tools.mode(current);
-        // The sidebar lists the tools (each a thread): the block is the tool alone.
-        v_flex()
-            .w_full()
-            .gap_4()
-            .child(
-                h_flex()
-                    .gap_3()
-                    .items_center()
-                    .child(div().flex_none().text_lg().font_weight(FontWeight::SEMIBOLD).child(current.name()))
-                    .child(div().flex_1().min_w_0().truncate().text_sm().text_color(muted).child(current.hint()))
-                    .when(!modes.is_empty(), |d| {
-                        d.child(segmented("tool-mode", modes, mode, cx, |this, k, window, cx| {
-                            this.set_tool_mode(k, window, cx)
-                        }))
-                    }),
-            )
-            .child(
-                div()
-                    .h(px(height))
-                    .border_1()
-                    .border_color(theme.border)
-                    .child(self.render_tools_body(cx)),
-            )
-            .into_any_element()
-    }
-
     pub(super) fn render_tools_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let tool = self.tools.tool;

@@ -34,6 +34,7 @@ pub struct Page {
 #[derive(Clone, Default)]
 pub struct Shot {
     pub frame: Option<Arc<RenderImage>>,
+    #[allow(dead_code)]
     pub jpeg: Vec<u8>,
     pub w: f32,
     pub h: f32,
@@ -233,6 +234,7 @@ impl Browser {
         self.op(json!({"op": "open", "url": url}));
     }
 
+    #[allow(dead_code)]
     pub fn close(&self, id: &str) {
         self.op(json!({"op": "close", "tab": id}));
     }

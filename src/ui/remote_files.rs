@@ -23,7 +23,7 @@ fn size_label(n: u64) -> String {
 }
 
 impl HermesApp {
-    pub(super) fn render_files_block(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_files_block(&mut self, id: &str, titled: bool, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         self.ensure_remote_listing(id, window, cx);
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
@@ -88,13 +88,15 @@ impl HermesApp {
         v_flex()
             .w_full()
             .gap_2()
-            .child(
-                h_flex()
-                    .gap_3()
-                    .items_baseline()
-                    .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(title))
-                    .child(div().flex_1().min_w_0().truncate().text_base().text_color(muted).child(f.path.clone())),
-            )
+            .when(titled, |d| {
+                d.child(
+                    h_flex()
+                        .gap_3()
+                        .items_baseline()
+                        .child(div().text_lg().font_weight(FontWeight::SEMIBOLD).child(title))
+                        .child(div().flex_1().min_w_0().truncate().text_base().text_color(muted).child(f.path.clone())),
+                )
+            })
             .child(
                 v_flex()
                     .id("remote-list")

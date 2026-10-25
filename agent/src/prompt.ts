@@ -116,3 +116,35 @@ export function subject(s: SessionInfo): string | undefined {
 		return `# This thread\nIt is about the folder ${value}, shown above the conversation. Work in it with read, write, edit and bash.`;
 	return undefined;
 }
+
+/**
+ * What the person inserted into the thread with "/" (src/inserts.ts), each as live as a window
+ * next to the conversation. Built from the thread's `bench.inserts` document, so it changes only
+ * when an insert comes, goes or switches (another server, another host): the prompt cache keeps.
+ */
+export function inserted(items: { key: string; state: Record<string, unknown> }[]): string | undefined {
+	if (!items.length) return undefined;
+	const lines = items.map(({ key, state }) => {
+		const [kind, ...rest] = key.split(":");
+		const value = rest.join(":");
+		if (kind === "ssh")
+			return value === "local" || !value
+				? "- This machine's terminal. Run commands on it with ssh_run (host \"local\")."
+				: `- The terminal of the server "${value}" (a ~/.ssh/config host). Run commands there with ssh_run (host "${value}").`;
+		if (kind === "files") {
+			const h = hosts.get(String(state.host ?? ""));
+			return `- A file host's browser, now on ${h ? `${h.name} (${h.kind}, id ${h.id})` : "no host"}${state.path ? `, in ${state.path}` : ""}${state.file ? `, with ${state.file} open in its editor` : ""}. Work with its files with remote_files (host "${h?.id ?? ""}").`;
+		}
+		if (kind === "tasks")
+			return `- The person's tasks, the "${state.list ?? "today"}" list. Read and change them with the tasks tool — the only place they live; the list updates by itself, so don't repeat it back unless asked. Time spent: list status "completed" with done_since / done_until and a tag; the result sums it.`;
+		if (kind === "tools") return `- The everyday utilities, now on "${state.tool ?? ""}" (its input and output come with each message). Do what is asked with its content yourself (read, bash) and give the result in your answer.`;
+		if (kind === "browser")
+			return "- This thread's own tab in the server's shared browser, live: the person watches it, can click and type in it, then says \"continue\". Drive it with the mcp__browser__* tools only (find them with tool_search \"browser\" if not loaded). Work only in this thread's tab — the others are other threads'; <block-state> says its address: at the start of a turn, browser_tabs list and select it; if it is gone, browser_tabs new and go on there (it becomes this thread's tab). The browser keeps the sign-ins. The person already sees the page: read it with snapshots, never take screenshots to show it. End each turn with what is on the page now and what the next step would be.";
+		return `- ${key}`;
+	});
+	return [
+		"# Inserted in this thread",
+		"The person put these into the conversation; they are live, and \"this\", \"here\", \"it\" usually mean one of them. Each message may end with <block-state>: what they show at that moment. Use it; never quote it back.",
+		...lines,
+	].join("\n");
+}
