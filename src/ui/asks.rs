@@ -135,8 +135,11 @@ impl BenchApp {
         )
     }
 
-    /// The plan strip over the input: "Plan · 3/7 · <the step in progress>", unfolding into
-    /// the steps with their state.
+
+    /// The plan over the input: a block like an insert's — its head (`block_head`) with the
+    /// chevron, "PLAN · 3/7" and, folded, the step in progress; the steps under the head when
+    /// open. It sits over the input in the thread's text column. When no step is left to do the
+    /// app drops it altogether (`Evt::Todos`), so an ended plan never lingers.
     pub(super) fn render_plan(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.todos.is_empty() {
             return None;
@@ -174,9 +177,9 @@ impl BenchApp {
                         .gap_2()
                         .py_0p5()
                         .pl(px(16. * t.depth as f32))
-                        .items_start()
+                        .items_center()
                         .text_base()
-                        .child(icon.icon().xsmall().text_color(color).mt(px(3.)))
+                        .child(icon.icon().xsmall().text_color(color))
                         .child(
                             div()
                                 .flex_1()
@@ -194,67 +197,70 @@ impl BenchApp {
         } else {
             vec![]
         };
+        let fold = if open {
+            Ico::ChevronDown
+        } else {
+            Ico::ChevronRight
+        };
+        let head = super::block_head(&theme, open)
+            .id("plan-head")
+            .gap_1p5()
+            .cursor_pointer()
+            .hover(|s| s.text_color(theme.foreground))
+            .child(fold.icon().xsmall())
+            .child(Ico::ListChecks.icon().xsmall())
+            .child(div().flex_none().child(format!("PLAN · {done}/{total}")))
+            .when_some(current.filter(|_| !open), |d, step| {
+                d.child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_color(theme.foreground)
+                        .child(format!("· {step}")),
+                )
+            })
+            .when(!open, |d| d.child(div().flex_1()))
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.plan_open = !this.plan_open;
+                cx.notify();
+            }));
+        let frame = v_flex()
+            .id("plan-block")
+            .w_full()
+            .min_w_0()
+            .flex_none()
+            .bg(theme.background)
+            .border_1()
+            .border_color(theme.border)
+            .rounded_md()
+            .overflow_hidden()
+            .child(head)
+            .when(open, |d| {
+                d.child(
+                    v_flex()
+                        .id("plan-steps")
+                        .px_3()
+                        .py_2()
+                        .max_h(px(240.))
+                        .overflow_y_scroll()
+                        .children(steps),
+                )
+            });
         Some(
-            v_flex()
+            h_flex()
                 .w_full()
                 .flex_none()
-                .border_t_1()
-                .border_color(theme.border)
-                .bg(theme.background)
-                // The rule spans the window; the content starts at the thread's text.
+                // In the thread's text column, with the usual gap over the input.
+                .pl(px(super::CHAT_LEFT))
+                .pr(px(super::CHAT_RIGHT))
+                .pt(px(super::TURN_Y))
                 .child(
-                    v_flex()
-                        .w_full()
-                        .child(
-                            h_flex()
-                                .id("plan-head")
-                                .pl(px(super::CHAT_TEXT))
-                                .pr(px(super::CHAT_RIGHT))
-                                .py_1p5()
-                                .gap_1p5()
-                                .items_center()
-                                .text_base()
-                                .text_color(muted)
-                                .cursor_pointer()
-                                .hover(|s| s.text_color(theme.foreground))
-                                .child(
-                                    if open {
-                                        Ico::ChevronDown
-                                    } else {
-                                        Ico::ChevronRight
-                                    }
-                                    .icon()
-                                    .xsmall(),
-                                )
-                                .child(Ico::ListChecks.icon().xsmall())
-                                .child(div().flex_none().child(format!("PLAN · {done}/{total}")))
-                                .when_some(current.filter(|_| !open), |d, step| {
-                                    d.child(
-                                        div()
-                                            .flex_1()
-                                            .min_w_0()
-                                            .truncate()
-                                            .text_color(theme.foreground)
-                                            .child(format!("· {step}")),
-                                    )
-                                })
-                                .on_click(cx.listener(|this, _, _, cx| {
-                                    this.plan_open = !this.plan_open;
-                                    cx.notify();
-                                })),
-                        )
-                        .when(open, |d| {
-                            d.child(
-                                v_flex()
-                                    .id("plan-steps")
-                                    .pl(px(super::CHAT_TEXT))
-                                    .pr(px(super::CHAT_RIGHT))
-                                    .pb_2()
-                                    .max_h(px(240.))
-                                    .overflow_y_scroll()
-                                    .children(steps),
-                            )
-                        }),
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .ml(px(super::CHAT_TEXT - super::CHAT_LEFT))
+                        .child(frame),
                 )
                 .into_any_element(),
         )
