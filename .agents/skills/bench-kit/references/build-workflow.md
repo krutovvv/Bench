@@ -32,7 +32,7 @@ writing code:
    `ship.sh` (`build-change-loop.md`, step 9). The user tests the bundle, not `target/debug` —
    "I see no changes" happened when only the dev build was rebuilt.
    **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
-   **Bench** (`/Applications/Bench.app`, `local.bench`) and tries every commit in **Bench Dev**
+   **Bench** (`/Applications/Bench.app`, `local.bench.app`) and tries every commit in **Bench Dev**
    (`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
    rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
    window the person works in and talks to you through. When Dev is good and the person asks,

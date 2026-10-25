@@ -2,7 +2,7 @@
 # Build Bench as one of its two apps (release binary + icon + Info.plist), each at a fixed place:
 #
 #   scripts/bundle-macos.sh            "dist/Bench Dev.app"        bundle id local.bench.dev
-#   scripts/bundle-macos.sh release    "/Applications/Bench.app"  bundle id local.bench
+#   scripts/bundle-macos.sh release    "/Applications/Bench.app"  bundle id local.bench.app
 #
 # (/System/Applications is macOS's own read-only volume, for Apple's apps only.)
 #
@@ -13,7 +13,12 @@
 # Each app keeps one path and one bundle id, and both are signed with the Apple Development
 # certificate from the keychain: macOS then knows Bench by team and bundle id, not by the
 # build's hash, so privacy grants (microphone, local network, notifications) are given once per
-# app and survive rebuilds. Without such a certificate the build falls back to ad-hoc signing
+# app and survive rebuilds. Local network privacy also tells apps apart by the executable's
+# Mach-O UUID, and both apps are built from the same binary: each gets its own UUID (below), or
+# macOS mixes their grants up. The release id was local.bench until macOS's local network list
+# filled with dead local.bench entries (one per path of the old per-commit builds) that it
+# matched instead of asking; there is no way to remove them, so the release took a fresh id.
+# Without such a certificate the build falls back to ad-hoc signing
 # (grants are asked again after every build); BENCH_SIGN=<identity> picks another one.
 #
 # Neither build quits anything. A running Bench Dev stops the Dev build (ship.sh quits it
@@ -50,7 +55,7 @@ dev)
     ;;
 release)
     NAME="Bench"
-    ID=local.bench
+    ID=local.bench.app
     APP="/Applications/Bench.app"
     ;;
 *)
@@ -71,6 +76,23 @@ NEW="$(dirname "$APP")/.$NAME.new.app"
 rm -rf "$NEW"
 mkdir -p "$NEW/Contents/MacOS" "$NEW/Contents/Resources"
 cp target/release/bench "$NEW/Contents/MacOS/bench"
+# Its own Mach-O UUID per app (from the linker's one and the bundle id), before signing.
+python3 -I - "$NEW/Contents/MacOS/bench" "$ID" <<'PY'
+import hashlib, struct, sys
+path, ident = sys.argv[1], sys.argv[2]
+b = bytearray(open(path, "rb").read())
+assert struct.unpack_from("<I", b, 0)[0] == 0xFEEDFACF, "not a thin 64-bit Mach-O"
+off = 32
+for _ in range(struct.unpack_from("<I", b, 16)[0]):
+    cmd, size = struct.unpack_from("<II", b, off)
+    if cmd == 0x1B:  # LC_UUID
+        b[off + 8 : off + 24] = hashlib.md5(bytes(b[off + 8 : off + 24]) + ident.encode()).digest()
+        break
+    off += size
+else:
+    sys.exit("no LC_UUID")
+open(path, "wb").write(b)
+PY
 # bench-agent's sources (the Pi backend); Bench installs them into ~/.bench/app and runs
 # `npm ci` there, so node_modules stays out of every build.
 mkdir -p "$NEW/Contents/Resources/agent"
