@@ -15,7 +15,7 @@ import { Bot, InputFile, type Context as TgContext } from "grammy";
 import fs from "node:fs";
 import path from "node:path";
 import { transcribe } from "./audio.ts";
-import { BENCH_HOME, getSetting, profileEnv } from "./config.ts";
+import { approvalsMode, BENCH_HOME, getSetting, homeAgent, profileEnv, reasoningEffort, resolveModel } from "./config.ts";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { projects } from "./builtin/projects.ts";
 import type { Emit, Runtime } from "./runtime.ts";
@@ -23,6 +23,11 @@ import type { Emit, Runtime } from "./runtime.ts";
 const MAX = 4096;
 const EDIT_EVERY_MS = 1500;
 const SHOWN_STEPS = 6;
+/** Messages that come in a run (several written one after another, a forwarded batch) are one
+ * turn: it starts once the chat is quiet this long, or longer while the batch is only forwarded
+ * messages (the instruction usually follows). */
+const GATHER_MS = 1500;
+const GATHER_FORWARDED_MS = 6000;
 
 interface Config {
 	token: string;
@@ -32,6 +37,8 @@ interface Config {
 
 interface Turn {
 	chat: number;
+	/** The person's message it answers: the status and the answer are replies to it. */
+	replyTo?: number;
 	status?: number;
 	steps: string[];
 	started: number;
@@ -86,6 +93,9 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	const api = bot.api;
 
 	const turns = new Map<string, Turn>(); // session id -> its running turn
+	const replies = new Map<string, number>(); // session id -> the message its next turn answers
+	// chat -> the messages gathered for its next turn
+	const gathering = new Map<number, { parts: string[]; attachments: { path: string; mime: string }[]; last: number; onlyForwarded: boolean; timer?: NodeJS.Timeout; name: string }>();
 	const prompts = new Map<string, { session: string; promptId: string; kind: string; choices: string[] }>(); // "chat:message"
 
 	// This bot's chats only: a chat with another bot is another thread.
@@ -114,7 +124,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const text = statusText(t, done).slice(0, MAX);
 		try {
 			if (t.status) await api.editMessageText(t.chat, t.status, text);
-			else t.status = (await api.sendMessage(t.chat, text, { disable_notification: true })).message_id;
+			else t.status = (await api.sendMessage(t.chat, text, { disable_notification: true, ...replyOpts(t.replyTo) })).message_id;
 		} catch {}
 	};
 	const schedule = (t: Turn) => {
@@ -126,14 +136,14 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		}, Math.max(0, EDIT_EVERY_MS - (Date.now() - t.lastEdit)));
 	};
 
-	const sendAnswer = async (chat: number, final: string) => {
+	const sendAnswer = async (chat: number, final: string, replyTo?: number) => {
 		const { text, files } = extractMedia(final);
 		for (const chunk of split(text.trim())) {
 			if (!chunk) continue;
 			try {
-				await api.sendMessage(chat, toHtml(chunk), { parse_mode: "HTML", link_preview_options: { is_disabled: true } });
+				await api.sendMessage(chat, toHtml(chunk), { parse_mode: "HTML", link_preview_options: { is_disabled: true }, ...replyOpts(replyTo) });
 			} catch {
-				await api.sendMessage(chat, chunk).catch(() => {});
+				await api.sendMessage(chat, chunk, replyOpts(replyTo)).catch(() => {});
 			}
 		}
 		for (const f of files) await sendFile(chat, f).catch((e) => api.sendMessage(chat, `Could not send ${path.basename(f)}: ${e.message}`).catch(() => {}));
@@ -155,7 +165,9 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const chat = chatOf(sessionId);
 		if (chat === undefined) return;
 		if (type === "message.start") {
-			const t: Turn = { chat, steps: [], started: Date.now(), dirty: false, lastEdit: 0 };
+			const replyTo = replies.get(sessionId);
+			replies.delete(sessionId);
+			const t: Turn = { chat, replyTo, steps: [], started: Date.now(), dirty: false, lastEdit: 0 };
 			turns.set(sessionId, t);
 			void editStatus(t);
 			api.sendChatAction(chat, "typing").catch(() => {});
@@ -178,7 +190,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 				clearInterval(t.typing);
 				void editStatus(t, "✅ Done");
 			}
-			void sendAnswer(chat, String(payload.text ?? ""));
+			void sendAnswer(chat, String(payload.text ?? ""), t?.replyTo);
 		} else if (type === "clarify.request" || type === "approval.request") {
 			const choices: string[] = type === "approval.request" ? ["once", "session", "always", "deny"] : ((payload.choices as string[]) ?? []);
 			const text = type === "approval.request" ? `Approve this command?\n\n${payload.command}\n\n${payload.description ?? ""}` : String(payload.question ?? "");
@@ -207,8 +219,8 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const chat = ctx.chat.id;
 		const old = rt.store.list({ source: "telegram", limit: 1000 }).find((s) => s.chat_id === String(chat) && ours(s));
 		if (old) rt.store.update(old.id, { chat_id: `${chat}:${Date.now()}` } as any);
-		await sessionFor(chat, nameOf(ctx));
-		await ctx.reply("New session.");
+		const id = await sessionFor(chat, nameOf(ctx));
+		await ctx.reply(sessionCard(id), { parse_mode: "HTML", ...replyOpts(ctx.message?.message_id) });
 	});
 	bot.command("stop", async (ctx) => {
 		await rt.interrupt(await sessionFor(ctx.chat.id, nameOf(ctx)));
@@ -250,8 +262,51 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			if (mime.startsWith("image/")) attachments.push({ path: p, mime });
 			prompt = `${prompt}\n\n[attached: ${p}]`.trim();
 		}
-		if (prompt) await rt.submit(session, prompt, attachments);
+		if (!prompt) return;
+		// Forwarded messages say whose they were.
+		const origin = forwardedFrom(m);
+		const part = origin ? `[forwarded from ${origin}]\n${prompt}` : prompt;
+		const g = gathering.get(chat) ?? { parts: [], attachments: [], last: m.message_id, onlyForwarded: true, name: nameOf(ctx) };
+		g.parts.push(part);
+		g.attachments.push(...attachments);
+		g.last = m.message_id;
+		g.onlyForwarded &&= !!origin;
+		clearTimeout(g.timer);
+		g.timer = setTimeout(() => void flush(chat), g.onlyForwarded ? GATHER_FORWARDED_MS : GATHER_MS);
+		gathering.set(chat, g);
+		api.sendChatAction(chat, "typing").catch(() => {});
 	});
+
+	// The gathered messages as one: a new turn answering the last of them, or (the agent is at
+	// work) joined to the running turn after its current step.
+	const flush = async (chat: number) => {
+		const g = gathering.get(chat);
+		gathering.delete(chat);
+		if (!g?.parts.length) return;
+		const session = await sessionFor(chat, g.name);
+		if (!turns.has(session)) replies.set(session, g.last);
+		await rt.submit(session, g.parts.join("\n\n"), g.attachments).catch((e) => api.sendMessage(chat, `Could not send: ${(e as Error).message}`).catch(() => {}));
+	};
+
+	/** What a session runs with, as /new shows it. */
+	const sessionCard = (id: string): string => {
+		const row = rt.store.get(id);
+		const agent = row?.profile ?? profile;
+		const m = resolveModel(agent, { model: row?.model, provider: row?.provider });
+		const name = project ? (projects.get(project)?.name ?? project) : "Host";
+		const k = Math.round(m.contextLength / 1024);
+		return [
+			`✨ <b>New session</b> · ${esc(name)}`,
+			"",
+			`◆ Model: <code>${esc(m.model)}</code>`,
+			`◆ Provider: ${esc(m.provider)}`,
+			`◆ Context: ${k}K tokens`,
+			`◆ Thinking: ${esc(row?.effort || reasoningEffort(homeAgent(agent)))}`,
+			`◆ Approvals: ${approvalsMode(homeAgent(agent)) === "manual" ? "asks before risky commands" : "off"}`,
+			"",
+			"Messages sent in a row (or forwarded together) are read as one; what you write while I work joins the running turn. /stop stops it.",
+		].join("\n");
+	};
 
 	bot.on("callback_query:data", async (ctx) => {
 		const msg = ctx.callbackQuery.message;
@@ -283,6 +338,18 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		send: (chat, text) => sendAnswer(chat, text),
 	});
 	if (project) projects.setBotName(project, me.username ?? "");
+}
+
+/** Reply to the person's message (and still send when it is gone). */
+const replyOpts = (id?: number) => (id ? { reply_parameters: { message_id: id, allow_sending_without_reply: true } } : {});
+
+/** Whose a forwarded message was: a person, a hidden one, a chat or a channel. */
+function forwardedFrom(m: any): string | undefined {
+	const o = m.forward_origin;
+	if (!o) return undefined;
+	if (o.type === "user") return [o.sender_user?.first_name, o.sender_user?.last_name].filter(Boolean).join(" ") || o.sender_user?.username || "someone";
+	if (o.type === "hidden_user") return o.sender_user_name || "someone";
+	return o.chat?.title || o.author_signature || "a chat";
 }
 
 const nameOf = (ctx: TgContext) => [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(" ") || ctx.from?.username || String(ctx.from?.id ?? "");
