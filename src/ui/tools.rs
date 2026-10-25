@@ -489,6 +489,17 @@ pub(super) fn segmented_tall(
     cx: &mut Context<BenchApp>,
     on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
 ) -> AnyElement {
+    segmented_tall_owned(id, labels.iter().map(|s| s.to_string()).collect(), chosen, cx, on)
+}
+
+/// `segmented_tall` with labels made at run time (a form's list of servers).
+pub(super) fn segmented_tall_owned(
+    id: &'static str,
+    labels: Vec<String>,
+    chosen: usize,
+    cx: &mut Context<BenchApp>,
+    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
+) -> AnyElement {
     let theme = cx.theme().clone();
     h_flex()
         .flex_none()
@@ -497,7 +508,7 @@ pub(super) fn segmented_tall(
         .rounded_md()
         .overflow_hidden()
         .border_color(theme.border)
-        .children(labels.iter().enumerate().map(|(k, label)| {
+        .children(labels.into_iter().enumerate().map(|(k, label)| {
             let on = on.clone();
             div()
                 .id((id, k))
@@ -509,7 +520,7 @@ pub(super) fn segmented_tall(
                 .when(k > 0, |d| d.border_l_1().border_color(theme.border))
                 .when(k == chosen, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
                 .when(k != chosen, |d| d.hover(|s| s.bg(theme.list_hover)))
-                .child(label.to_string())
+                .child(label)
                 .on_click(cx.listener(move |this, _, window, cx| on(this, k, window, cx)))
         }))
         .into_any_element()

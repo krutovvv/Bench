@@ -42,7 +42,7 @@ impl BenchApp {
             let at = labels.iter().position(|a| *a == chosen).unwrap_or(labels.len());
             labels.push("New server…".into());
             let aliases = labels.clone();
-            let pick = super::tools::segmented_owned("project-server", labels, at, cx, move |this, k, _, cx| {
+            let pick = super::tools::segmented_tall_owned("project-server", labels, at, cx, move |this, k, _, cx| {
                 if let Some(f) = this.project_form.as_mut() {
                     f.host = Some(if k + 1 == aliases.len() { String::new() } else { aliases[k].clone() });
                 }

@@ -42,7 +42,6 @@ icons! {
     AppWindow => "app-window",
     Bot => "bot",
     Brain => "brain",
-    Chat => "message-square-text",
     ChevronDown => "chevron-down",
     ChevronRight => "chevron-right",
     CircleAlert => "circle-alert",

@@ -281,8 +281,9 @@ pub fn file_icon(name: &str, dir: bool, theme: &gpui_kit::component::Theme) -> (
     }
 }
 
-/// A text field's height (gpui-kit's default input): a form's other controls match it.
-pub const FIELD_H: f32 = 32.;
+/// A text field's height (gpui-kit's default input, measured: 28 pt): a form's other controls —
+/// switches, pickers, its buttons — match it, so nothing in a form changes size.
+pub const FIELD_H: f32 = 28.;
 
 /// A code editor's line (gpui-kit's editor: the mono font × 1.5): what a block as tall as its
 /// text counts in.
@@ -617,8 +618,11 @@ pub fn form_action(id: &'static str, label: &'static str, primary: bool, cx: &Ap
     let text = theme.foreground;
     div()
         .id(id)
+        .h(px(FIELD_H))
+        .flex()
+        .items_center()
         .cursor_pointer()
-        .when(primary, |d| d.px_2().rounded_md().bg(bg).text_color(fg).hover(move |s| s.bg(hover)))
+        .when(primary, |d| d.px_3().rounded_md().bg(bg).text_color(fg).hover(move |s| s.bg(hover)))
         .when(!primary, |d| d.text_color(muted).hover(move |s| s.text_color(text)))
         .child(label)
 }
