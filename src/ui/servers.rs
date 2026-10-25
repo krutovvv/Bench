@@ -57,6 +57,11 @@ impl HermesApp {
                         .on_click(cx.listener(|this, _, window, cx| this.toggle_ide(window, cx))),
                 )
             })
+            // A window of its own, in the window's top-right corner.
+            .child(
+                toggle("new-window", Ico::AppWindow, false, "New window  ⌘⇧N")
+                    .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),
+            )
     }
 
     pub(super) fn render_ssh_header(&mut self, cx: &mut Context<Self>) -> AnyElement {

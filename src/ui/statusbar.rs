@@ -294,37 +294,7 @@ impl HermesApp {
             .text_sm()
             // Nothing about where the agent runs or which one: a thread runs with its project.
             // The backend shows up only when something is wrong (its panel reconnects).
-            .children(self.render_backend(cx))
-            .child(div().flex_1())
-            .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
-            .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
-            .when_some(self.approval_mode.clone().filter(|_| ready), |d, mode| {
-                d.child(picker(
-                    "approvals",
-                    Ico::Shield,
-                    mode,
-                    // The agent keeps approvals in the profile's config, not per chat.
-                    Some("All chats of this agent"),
-                    vec![],
-                    approvals,
-                ))
-            })
-            .when(ready, |d| {
-                d.child(picker(
-                    "effort",
-                    Ico::Brain,
-                    self.effort_other
-                        .clone()
-                        .unwrap_or_else(|| EFFORTS[self.effort].to_string()),
-                    Some(if self.session.is_some() {
-                        "This chat"
-                    } else {
-                        "The new chat"
-                    }),
-                    vec![],
-                    efforts,
-                ))
-            })
+            // Left: the model, how full its context is, how hard it thinks, what it may run.
             .map(|d| {
                 if !ready {
                     d
@@ -345,6 +315,42 @@ impl HermesApp {
                     ))
                 }
             })
+            .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
+            .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
+            .when(ready, |d| {
+                d.child(picker(
+                    "effort",
+                    Ico::Brain,
+                    self.effort_other
+                        .clone()
+                        .unwrap_or_else(|| EFFORTS[self.effort].to_string()),
+                    Some(if self.session.is_some() {
+                        "This chat"
+                    } else {
+                        "The new chat"
+                    }),
+                    vec![],
+                    efforts,
+                ))
+            })
+            .when_some(self.approval_mode.clone().filter(|_| ready), |d, mode| {
+                d.child(picker(
+                    "approvals",
+                    Ico::Shield,
+                    mode,
+                    // The agent keeps approvals in the profile's config, not per chat.
+                    Some("All chats of this agent"),
+                    vec![],
+                    approvals,
+                ))
+            })
+            .children(self.render_backend(cx))
+            .child(div().flex_1())
+            // Right: icons only — attach, dictate, settings.
+            .child(
+                button("attach", Ico::Paperclip, "Attach files", false)
+                    .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),
+            )
             // Dictation: a red square while recording, a spinner while transcribing.
             .child({
                 let recording = self.recorder.is_some();
@@ -359,10 +365,6 @@ impl HermesApp {
                     .when(recording, |d| d.text_color(cx.theme().danger))
                     .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
             })
-            .child(
-                button("new-window", Ico::AppWindow, "New window  ⌘⇧N", false)
-                    .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),
-            )
             .child(
                 button(
                     "settings",
