@@ -11,16 +11,14 @@ use crate::app::BenchApp;
 use crate::icons::Ico;
 
 /// The avatar's offset from the row's top (it replaces the avatar's own): the textarea's line
-/// sits higher than a message's, so the avatar goes up to center on it (the caret, the waveform).
+/// sits higher than a message's, so the avatar goes up to center on it (the caret).
+
 const AVATAR_TOP: f32 = -2.5;
 const BUTTONS_TOP: f32 = 3.;
 
 /// Rows the command list shows before it scrolls, and their height.
 const SLASH_ROWS: f32 = 8.;
 const SLASH_ROW: f32 = 30.;
-
-/// Bars in the waveform; it scrolls right to left, newest on the right (25 ms each = 3 s).
-const WAVE_BARS: usize = 120;
 
 impl BenchApp {
     /// Commands matching a bare `/word`, in a small list right above the input.
@@ -100,34 +98,9 @@ impl BenchApp {
         )
     }
 
-    /// While recording the text field is not needed (speech is recognized at the end), so its
-    /// place shows the voice level live.
-    fn render_wave(&self, theme: &gpui_kit::component::Theme) -> impl IntoElement {
-        let levels = self
-            .recorder
-            .as_ref()
-            .map(|r| r.levels(WAVE_BARS))
-            .unwrap_or_default();
-        let bars = levels.into_iter().map(|v| {
-            div()
-                .flex_1()
-                .h(px(2. + v * 20.))
-                .bg(theme.primary.opacity(0.35 + v * 0.65))
-        });
-        // Over the text field (absolute, its box), so starting to record moves nothing.
-        h_flex()
-            .absolute()
-            .inset_0()
-            .bg(theme.background)
-            .gap(px(2.))
-            .items_center()
-            .children(bars)
-    }
-
     pub(super) fn render_composer(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let busy = self.live.is_some();
-        let recording = self.recorder.is_some();
         // No buttons: ⌘Enter sends, ⌘⇧D (or the status bar's mic) dictates, files are dropped
         // or pasted. While the agent works a quiet Stop stays, for the mouse (⌘. also stops).
         let stop = busy.then(|| {
@@ -183,7 +156,7 @@ impl BenchApp {
                 }
             }))
             // The next turn of the thread: it is the thread's last row (it
-            // scrolls with it). Avatar, the text (or the waveform over it while recording) and
+            // scrolls with it). Avatar, the text and
             // the buttons sit on one line; the text starts where messages' text does and grows
             // down. Enter is a new line, ⌘Enter sends; the buttons — an answer's own small ones —
             // show on hover (⌘⇧D dictates, files are dropped or pasted), a Stop that matters
@@ -234,7 +207,6 @@ impl BenchApp {
                                                         .large(),
                                                 ),
                                             )
-                                            .when(recording, |d| d.child(self.render_wave(&theme))),
                                     )
                                     .children(stop.map(|s| s.flex_none().mt(px(BUTTONS_TOP)))),
                             ),
