@@ -311,6 +311,11 @@ pub const FIELD_H: f32 = 28.;
 /// waits in the queue, a plan's head. One height, so these rows do not jump about each other.
 pub const CHIP_H: f32 = FIELD_H;
 
+/// A picture's square, in the composer and in a sent message: big enough to tell at a glance
+/// what is inside — the file's name says nothing — and always the same size, so a line of them
+/// reads as one line.
+pub const THUMB: f32 = 64.;
+
 /// A code editor's line (gpui-kit's editor: the mono font × 1.5): what a block as tall as its
 /// text counts in.
 pub fn editor_line(cx: &App) -> f32 {

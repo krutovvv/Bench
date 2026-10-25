@@ -467,7 +467,7 @@ impl BenchApp {
                 .pl(px(super::CHAT_TEXT))
                 .pr(px(super::CHAT_RIGHT))
                 .pt(px(super::TURN_Y))
-                .gap_2()
+                .gap(px(10.))
                 .children(rows)
                 .into_any_element(),
         )
@@ -708,8 +708,9 @@ impl BenchApp {
                                 d.child(
                                     h_flex()
                                         .flex_wrap()
-                                        .gap_1p5()
-                                        .when(has_text, |d| d.mt_2())
+                                        .gap_2()
+                                        .when(has_text, |d| d.mt(px(10.)))
+                                        .pb(px(4.))
                                         .children(attached),
                                 )
                             }),

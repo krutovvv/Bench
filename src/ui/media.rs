@@ -769,73 +769,110 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let local = std::path::PathBuf::from(path);
         let here = local.is_file();
-        let icon = match media::kind(path) {
-            Kind::Image => Ico::Image,
-            Kind::Audio => Ico::Music,
-            Kind::Video => Ico::Film,
-            Kind::Markdown => Ico::FileText,
-            Kind::Doc | Kind::File => Ico::File,
-        };
         let open = local.clone();
-        h_flex()
-            .id(id.clone())
-            .max_w(px(260.))
-            .h(px(super::CHIP_H))
-            .pl_1()
-            .pr_2()
-            .gap_1p5()
-            .items_center()
-            .border_1()
-            .rounded_md()
-            .border_color(theme.border)
-            .bg(theme.background)
-            .text_base()
-            .map(|d| {
-                if here && media::kind(path) == Kind::Image {
-                    d.child(
-                        img(local.clone())
-                            .size(px(20.))
-                            .flex_none()
-                            .object_fit(ObjectFit::Cover),
-                    )
-                } else {
-                    d.child(
-                        div()
-                            .size(px(24.))
-                            .flex_none()
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .text_color(theme.muted_foreground)
-                            .child(icon.icon().xsmall()),
-                    )
-                }
-            })
-            .child(div().min_w_0().truncate().child(
-                // A server file's local copy names the server file it stands for.
-                match crate::remote::origin(path) {
-                    Some((alias, remote)) => format!("{alias}: {remote}"),
-                    None => file_name(path),
-                },
-            ))
-            .map(|d| match remove {
-                Some(k) => d.child(
+        let name = file_name(path);
+        // The ✕ that takes a file back: a corner badge on a picture's square (the square is the
+        // label, so nothing may crowd it), an end of the row on a named chip.
+        let close = |id: SharedString, k: usize, badge: bool| {
+            let b = div()
+                .id(SharedString::from(format!("{id}-x")))
+                .flex_none()
+                .cursor_pointer()
+                .text_color(theme.muted_foreground)
+                .hover(|s| s.text_color(theme.foreground))
+                .child(Ico::X.icon().xsmall())
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.remove_attachment(k, cx);
+                }));
+            if badge {
+                b.absolute()
+                    .top(px(3.))
+                    .right(px(3.))
+                    .size(px(18.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded(px(4.))
+                    .bg(theme.background.opacity(0.92))
+                    .border_1()
+                    .border_color(theme.border)
+            } else {
+                b.p_0p5()
+            }
+        };
+        // A picture shows as a square of itself, without its name: the name tells nothing about
+        // what is inside, and every square is the same size, so a line of them reads as one.
+        if here && media::kind(path) == Kind::Image {
+            let square = div()
+                .id(id.clone())
+                .relative()
+                .size(px(super::THUMB))
+                .flex_none()
+                .overflow_hidden()
+                .border_1()
+                .border_color(theme.border)
+                .rounded_md()
+                .cursor_pointer()
+                .hover(|s| s.border_color(theme.accent))
+                .child(
+                    img(local.clone())
+                        .size(px(super::THUMB))
+                        .object_fit(ObjectFit::Cover),
+                )
+                .tooltip(move |window, cx| Tooltip::new(name.clone()).build(window, cx))
+                .on_click(move |_, _, cx| cx.open_with_system(&open));
+            match remove {
+                Some(k) => square.child(close(id, k, true)).into_any_element(),
+                None => square.into_any_element(),
+            }
+        } else {
+            let icon = match media::kind(path) {
+                Kind::Image => Ico::Image,
+                Kind::Audio => Ico::Music,
+                Kind::Video => Ico::Film,
+                Kind::Markdown => Ico::FileText,
+                Kind::Doc | Kind::File => Ico::File,
+            };
+            let pill = h_flex()
+                .id(id.clone())
+                .max_w(px(260.))
+                .h(px(super::CHIP_H))
+                .pl_1()
+                .pr_2()
+                .gap_1p5()
+                .items_center()
+                .border_1()
+                .rounded_md()
+                .border_color(theme.border)
+                .bg(theme.background)
+                .text_base()
+                .child(
                     div()
-                        .id(SharedString::from(format!("{id}-x")))
+                        .size(px(24.))
                         .flex_none()
-                        .p_0p5()
-                        .cursor_pointer()
+                        .flex()
+                        .items_center()
+                        .justify_center()
                         .text_color(theme.muted_foreground)
-                        .hover(|s| s.text_color(theme.foreground))
-                        .child(Ico::X.icon().xsmall())
-                        .on_click(cx.listener(move |this, _, _, cx| this.remove_attachment(k, cx))),
-                ),
-                None if here => d
-                    .cursor_pointer()
-                    .hover(|s| s.bg(theme.list_hover))
-                    .on_click(move |_, _, cx| cx.open_with_system(&open)),
-                None => d,
-            })
-            .into_any_element()
+                        .child(icon.icon().xsmall()),
+                )
+                .child(div().min_w_0().truncate().child(
+                    // A server file's local copy names the server file it stands for.
+                    match crate::remote::origin(path) {
+                        Some((alias, remote)) => format!("{alias}: {remote}"),
+                        None => name,
+                    },
+                ))
+                .map(|d| match remove {
+                    Some(k) => d.child(close(id.clone(), k, false)),
+                    None if here => d
+                        .cursor_pointer()
+                        .hover(|s| s.bg(theme.list_hover))
+                        .on_click(move |_, _, cx| cx.open_with_system(&open)),
+                    None => d,
+                });
+            pill.into_any_element()
+        }
     }
 }
