@@ -2,7 +2,7 @@
 
 ## Look and feel
 
-- Reference: Zed editor / Delta. Flat, square, monolithic, dense but breathing. No rounded
+- Reference: the Zed editor. Flat, square, monolithic, dense but breathing. No rounded
   corners, no shadows, no gradients, no "cards floating on a background". Slight rounding of the
   search field, primary button and message blocks was tried: "отвратительный вид", removed.
   Only controls that hang inside a field (composer Dictate / Send) are round circles.
@@ -10,7 +10,7 @@
 - Fonts: happy with 14 UI / 12 code; adjust only by small steps, never big redesigns. Chat text
   (answers and own messages) was `text_sm` like session titles ("идеально"), then on
   2026-10-24 one size up, `text_base`, with a bit more inset: the middle is what is read (Zed's
-  Delta does this). Disliked there: slight rounding, mixed fonts between blocks.
+  Zed does this). Disliked there: slight rounding, mixed fonts between blocks.
 - Syntax: One Light (One Dark in dark mode), the same in every editor and diff.
 - Icons: Lucide, monochrome, small. Liked them a lot.
 - Spacing is the most frequent complaint. Wants one rhythm ("like a step / golden ratio"):
@@ -26,7 +26,7 @@
 - Q&A reads as strips: the user's message a band from edge to edge, the agent's side under it,
   both at one inset (now 2rem on every side — it was 16/32 "forum thread" once, then 24; see
   "Insets in small steps"). Then (2026-10-24) the band went: avatars in a left gutter, as in
-  Delta; the sidebar's right rule went too ("олдскульно") and the chrome got darker.
+  Zed; the sidebar's right rule went too ("олдскульно") and the chrome got darker.
 - The user's own messages are selectable/copyable like the answers.
 - Media in the chat itself — images, video playing in place, audio, Markdown, diagrams,
   formulas; anything else opens in its default app on a click. All with the lightest possible

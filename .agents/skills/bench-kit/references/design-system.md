@@ -1,6 +1,6 @@
-# Design system (Zed / Delta style)
+# Design system (Zed style)
 
-Reference: the Zed editor and its "Delta" look — flat, square, dense, quiet chrome, content first.
+Reference: the Zed editor's look — flat, square, dense, quiet chrome, content first.
 Working copy of everything below: Bench's `src/theme.rs`, `assets/themes/one-light.json`,
 `assets/themes/one-dark.json`.
 

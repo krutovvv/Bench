@@ -1,6 +1,6 @@
 //! Inserts as the thread draws them (the model: `crate::app::inserts`). Every kind is one
 //! `InsertKind` in `KINDS`: what it shows, what its title switches between, its controls, and
-//! what it tells the agent. The frame is the same for all, as Delta draws a terminal: a tinted
+//! what it tells the agent. The frame is the same for all,: a tinted
 //! ground, the title on top (a menu when there is something to switch to), the kind's controls
 //! and "remove" on the right, a click on the chevron folds it. It sits in the person's row (their
 //! avatar): it is part of what they say.

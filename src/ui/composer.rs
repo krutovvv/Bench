@@ -1,4 +1,4 @@
-//! The input: the thread's next message, as in Zed's Delta — the person's avatar and the text,
+//! The input: the thread's next message — the person's avatar and the text,
 //! at the messages' size, growing with what is typed. No buttons (⌘Enter sends, ⌘⇧D dictates,
 //! files are dropped); a quiet Stop while the agent works.
 
@@ -67,7 +67,7 @@ impl BenchApp {
                 .on_click(cx.listener(move |this, _, window, cx| this.pick_slash(i, window, cx)))
         });
         Some(
-            // Under the line being typed, from where the text starts, as in Delta: the composer
+            // Under the line being typed, from where the text starts: the composer
             // is the thread's last row, and the thread scrolls on past it, so there is room below.
             div()
                 .absolute()
@@ -163,7 +163,7 @@ impl BenchApp {
                     cx.stop_propagation();
                 }
             }))
-            // The next turn of the thread, as in Zed's Delta: it is the thread's last row (it
+            // The next turn of the thread: it is the thread's last row (it
             // scrolls with it). Avatar, the text (or the waveform over it while recording) and
             // the buttons sit on one line; the text starts where messages' text does and grows
             // down. Enter is a new line, ⌘Enter sends; the buttons — an answer's own small ones —
@@ -181,7 +181,7 @@ impl BenchApp {
                     .items_start()
                     .text_base()
                     // The person's avatar even in a new chat: an empty sheet with no sign of whose
-                    // turn it is was not clear (the user, after trying Delta's bare caret).
+                    // turn it is was not clear (the user, after trying a bare caret).
                     .child(super::avatar(false, &theme).mt(px(AVATAR_TOP)))
                     .child(
                         v_flex()

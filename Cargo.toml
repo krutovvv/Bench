@@ -82,5 +82,5 @@ getrandom04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 [patch.crates-io]
 gpui-pre-web = { path = "vendor/gpui-pre-web" }
 gpui-pre-platform = { path = "vendor/gpui-pre-platform" }
-# The text caret 2px wide (1px upstream), as Zed and Delta draw it: one constant changed.
+# The text caret 2px wide (1px upstream), as Zed draws it: one constant changed.
 gpui-base = { path = "vendor/gpui-base" }

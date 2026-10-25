@@ -236,7 +236,7 @@ fn quiet_divider() -> gpui_kit::base::ResizeHandleRenderer {
     })
 }
 
-/// The chat as in Zed's Delta: who speaks is an avatar in a left gutter, not a colored band.
+/// The chat: who speaks is an avatar in a left gutter, not a colored band.
 /// The avatar sits `CHAT_LEFT` from the column's edge; text starts at `CHAT_TEXT`; the right
 /// side keeps `CHAT_RIGHT` (more than the left: a line ends well before the edge).
 /// The thread's side room, equal to the room above its first turn (the user asked for both alike).
@@ -245,7 +245,7 @@ pub const AVATAR: f32 = 24.;
 pub const CHAT_TEXT: f32 = CHAT_LEFT + AVATAR + 14.;
 pub const CHAT_RIGHT: f32 = 38.;
 /// Every row of the thread (the question, the answer, the composer) pads its top and bottom by
-/// this, so any two rows are 2 × TURN_Y apart, whoever speaks (as in Delta).
+/// this, so any two rows are 2 × TURN_Y apart, whoever speaks.
 pub const TURN_Y: f32 = 14.;
 
 /// The head of every block (an insert, a code block, a tool's pane, an open file): one height,

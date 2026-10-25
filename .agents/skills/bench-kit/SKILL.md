@@ -1,12 +1,12 @@
 ---
 name: bench-kit
-description: "Bench Kit: how to understand and change Bench — an open, native workbench for working with an AI agent (Rust + GPUI, gpui-kit 0.8), a thread-centric editor in the spirit of Zed's Delta, on its own agent in agent/ (Pi Durable). A thread is a document of messages and the person's inserts: live tools put in with / (/terminal, /ssh, /files, /ftp, /tasks, /tools, /browser), each kept by the agent as a Pi entry and document, with an agent tool that acts on it and its state sent with every message. The kit: the concepts, the insert recipe with the six kinds as worked examples, a UI catalog of every piece with pictures and code, the look's rules and the user's preferences, the agent's side in Pi's terms, crates, the change loop with pixel checks, shipping, and the gpui-kit/GPUI reference. Use for any change to Bench (~/Projects/bench-kit), for adding an insert kind, and when asked how Bench should look or be built."
+description: "Bench Kit: how to understand and change Bench — an open, native workbench for working with an AI agent (Rust + GPUI, gpui-kit 0.8), a thread-centric app, on its own agent in agent/ (Pi Durable). A thread is a document of messages and the person's inserts: live tools put in with / (/terminal, /ssh, /files, /ftp, /tasks, /tools, /browser), each kept by the agent as a Pi entry and document, with an agent tool that acts on it and its state sent with every message. The kit: the concepts, the insert recipe with the six kinds as worked examples, a UI catalog of every piece with pictures and code, the look's rules and the user's preferences, the agent's side in Pi's terms, crates, the change loop with pixel checks, shipping, and the gpui-kit/GPUI reference. Use for any change to Bench (~/Projects/bench-kit), for adding an insert kind, and when asked how Bench should look or be built."
 version: 4.0.0
 author: The user and their agents (from building Bench, ~/Projects/bench-kit)
 license: MIT
 platforms: [macos]
 metadata:
-  tags: [Rust, GPUI, gpui-kit, Desktop, Bench, Pi, Agent-Client, Delta, Zed, macOS]
+  tags: [Rust, GPUI, gpui-kit, Desktop, Bench, Pi, Agent-Client, Zed, macOS]
   category: desktop-dev
 ---
 
@@ -15,7 +15,7 @@ metadata:
 ## What this is, in one paragraph
 
 Bench is a native desktop **workbench for working with an AI agent**: an open, thread-centric
-editor in the spirit of Zed's Delta, written from scratch in Rust and GPUI, on its own agent
+app, written from scratch in Rust and GPUI, on its own agent
 (`agent/`, Pi Durable). **The thread with the agent is the unit of work.** A thread is a
 document: messages and the person's **inserts**, small live tools put in with `/` where the
 conversation is (`/terminal`, `/ssh`, `/files`, `/ftp`, `/tasks`, `/tools`, `/browser`; several per

@@ -12,7 +12,7 @@
 4. **Fonts:** UI 14px (it is also the rem, so spacing scales with it), code/mono 12px.
    Size presets S/M/L = 13/14/15 UI and 11/12/13 mono. System font for UI, Menlo for code.
    The conversation (answers and the user's messages) is `text_base` — a size up from the
-   sidebar's `text_sm` lists, so the eye goes to the middle (2026-10-24, after Zed's Delta; it was
+   sidebar's `text_sm` lists, so the eye goes to the middle (2026-10-24; it was
    `text_sm` before). Turns are told apart by avatars in a gutter, not by a colored band.
    The chrome (sidebar `#EAEAEC`, header / status bar `#E4E4E6`) is half a step darker than it
    was, and the sidebar meets the chat with **no rule**: the window's column dividers are

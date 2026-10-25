@@ -4,7 +4,7 @@
 
 <h1 align="center">Bench</h1>
 
-<p align="center"><b>A workbench for working with an AI agent: an open, native, thread-centric editor in the spirit of Zed's Delta, where the tools you need are put right into the conversation.</b></p>
+<p align="center"><b>A workbench for working with an AI agent: an open, native, thread-centric app where the tools you need are put right into the conversation.</b></p>
 
 <p align="center">
   <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a> ·
@@ -19,12 +19,16 @@ click through the threads in the sidebar.</sub>
 
 ## What it is
 
-Bench is a desktop app for one thing: doing your work together with an AI agent. Zed's
-[Delta](https://zed.dev/blog/introducing-deltadb) showed the shape: the conversation with the
-agent is the unit of work, not a side panel of an editor. Delta is closed and commercial. Bench
-is my open take on that shape. It is written from scratch in Rust and
-[GPUI](https://www.gpui.rs) (Zed's UI framework), and runs on an agent built on
-[Pi Durable](https://github.com/earendil-works/pi).
+Bench is a desktop app for one thing: doing your work together with an AI agent. The
+conversation with the agent is the unit of work, not a side panel of an editor.
+
+**Built with:**
+- [GPUI](https://www.gpui.rs) (Zed's open-source UI framework, through gpui-kit) and Rust, written
+  from scratch: native and fast, on macOS, Linux, Windows and in the browser (WebAssembly);
+- [Pi Durable](https://github.com/earendil-works/pi) for the agent (`agent/`, Node.js): durable
+  conversations, tools, extensions, scheduled tasks, MCP;
+- Playwright and Chrome for the shared server browser (`browser-server/`, Docker);
+- grammY for Telegram.
 
 A workbench, not a chat window: you bring the tools you need for this job to the conversation,
 and the agent works with them alongside you.

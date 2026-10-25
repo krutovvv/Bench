@@ -134,7 +134,7 @@ Delete).
 
 ## Composer
 
-The composer is **part of the thread**, as in Zed's Delta — not a field docked to the window,
+The composer is **part of the thread** — not a field docked to the window,
 not a textarea: it is the thread's last row (`render_chat`), after the turns and cards, and it is
 there from the start — under "Loading history…" while a session opens (you can type at once),
 under the welcome block in a new chat. It scrolls away with the thread; "Jump to latest" brings
@@ -150,7 +150,7 @@ thread scrolls. **No buttons** — the user found clip, mic and Send noise: ⌘E
 dictates (the mic button is in the status bar, by New window), files are dropped or pasted. Only
 while the agent works a quiet Stop (`chat::icon_button`, ⌘. too). While recording the waveform is
 drawn over the field (`absolute().inset_0()`), so nothing moves. **No placeholder** — it is the
-thread's next text, not a form field (Delta has none). **A new chat is a code editor's empty
+thread's next text, not a form field . **A new chat is a code editor's empty
 file**: no welcome block, no avatar (`invisible()`, its room kept so nothing moves when the
 thread starts), only the focused caret; avatars appear with the first message. The caret is 2px
 (`vendor/gpui-base`, `CURSOR_WIDTH`; 1px upstream was easy to lose). A folder for the new chat:
@@ -160,7 +160,7 @@ the project's (its "+"); a project without a folder works in one Bench keeps for
 as a code editor scrolls past its last line, and `pt(CHAT_LEFT)` above the first turn (the top
 room is at least the sides').
 
-Keys as in Delta: **Enter is a new line, ⌘Enter sends** (`submit_on_enter(false)`, send on
+Keys: **Enter is a new line, ⌘Enter sends** (`submit_on_enter(false)`, send on
 `InputEvent::PressEnter { secondary: true, .. }`). Enter in the slash list
 picks the command (`slash_key` takes "enter" in the composer's `capture_key_down`). Code:
 `src/ui/composer.rs`.
@@ -183,12 +183,12 @@ Delete that arms into danger "Confirm delete", primary Save) over a full-height 
 
 ## Chat column
 
-Turn (`text_base`), as in Zed's Delta: **who speaks is an avatar in a left gutter**, no band,
+Turn (`text_base`): **who speaks is an avatar in a left gutter**, no band,
 no rules. Two rows, each `h_flex().pl(CHAT_LEFT).pr(CHAT_RIGHT).gap(14).items_start()`: a 24px
 round avatar (the person: a dark disc `foreground 78%` with UserRound in `background`; the
 agent: a solid `primary` disc with Bot in `primary_foreground` — both solid, because a pale
-disc reads smaller than a dark one of the same size; the user noticed), then the text column `flex_1 min_w_0`. Every row (question, answer, composer) pads `py(TURN_Y)` = 14 (centers of a question and its answer 52 apart, as in Delta), so any
-two rows are 28 apart whoever speaks — the user compared it with Delta, where they are equal.
+disc reads smaller than a dark one of the same size; the user noticed), then the text column `flex_1 min_w_0`. Every row (question, answer, composer) pads `py(TURN_Y)` = 14 (centers of a question and its answer 52 apart), so any
+two rows are 28 apart whoever speaks — the user wants them equal.
 The question's text goes through `plain_text` (selectable); the agent's column `gap_3` (summary, steps,
 answer, sources, cards). Constants in `ui/mod.rs`: `CHAT_LEFT 24`, `AVATAR 24`,
 `CHAT_TEXT = 62`, `CHAT_RIGHT 48`. Everything that lines up with the text uses `CHAT_TEXT` /

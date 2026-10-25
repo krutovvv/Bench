@@ -151,7 +151,7 @@ impl BenchApp {
                     .into_any_element(),
             )
         } else {
-            // A new chat is a clean sheet, as in Delta: only the composer. Its folder is the
+            // A new chat is a clean sheet: only the composer. Its folder is the
             // group's "+" or the sidebar's "Open folder…".
             None
         };
@@ -245,7 +245,7 @@ impl BenchApp {
                             .children(subject_block)
                             // What waits for the agent, over the next message.
                             .children(queue)
-                            // The next message is the thread's last row, as in Delta: it scrolls
+                            // The next message is the thread's last row: it scrolls
                             // away with the thread, "Jump to latest" brings it back.
                             .child(composer),
                     ),
@@ -530,7 +530,7 @@ impl BenchApp {
                 })
         });
 
-        // As in Zed's Delta: who speaks is an avatar in the left gutter, no band, no rules. The
+        // Who speaks is an avatar in the left gutter, no band, no rules. The
         // question's text and the agent's side start at one x (CHAT_TEXT); the composer's text,
         // its chips and the cards start there too.
         use super::{AVATAR, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT};

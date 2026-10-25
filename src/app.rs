@@ -382,7 +382,7 @@ impl BenchApp {
             ),
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
                 match ev {
-                    // Enter is a new line; ⌘Enter sends (as in Delta).
+                    // Enter is a new line; ⌘Enter sends.
                     InputEvent::PressEnter {
                         secondary: true, ..
                     } => this.send(window, cx),
@@ -1567,7 +1567,7 @@ impl BenchApp {
         if files.is_empty() && self.complete_slash(window, cx) {
             return;
         }
-        // "!command": run it in this thread's terminal (opened under the thread), as in Delta.
+        // "!command": run it in this thread's terminal (opened under the thread).
         if let Some(command) = typed.strip_prefix('!') {
             let command = command.trim().to_string();
             self.composer.update(cx, |s, cx| s.set_value("", window, cx));

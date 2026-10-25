@@ -5,7 +5,7 @@ Read this first. Read the skill `.agents/skills/bench-kit/SKILL.md` before any U
 ## What Bench is
 
 Bench is a native desktop **workbench for working with an AI agent**. It is an open,
-thread-centric editor in the spirit of Zed's Delta, written from scratch in Rust and GPUI
+thread-centric app, written from scratch in Rust and GPUI
 (gpui-kit 0.8). It is a client of its own agent in `agent/`, a Node server on **Pi Durable**.
 
 Bench is not a kit for building other apps, and it has nothing to do with Hermes. Hermes was an
