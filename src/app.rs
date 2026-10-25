@@ -143,6 +143,15 @@ pub struct BenchApp {
     pub tg_visible: Option<HashSet<String>>,
 
     pub turns: Vec<Turn>,
+    /// Each thread opened in this run, as last shown: switching back shows it at once while
+    /// its history comes again.
+    pub thread_cache: HashMap<String, Vec<Turn>>,
+    /// Frames left to keep a thread that is opening invisible, and how many in a row its layout
+    /// stayed the same; it shows once settled (`ui::chat`), so it appears whole, not in jumps.
+    pub settle: u8,
+    pub settle_stable: u8,
+    /// The opening thread has content to lay out (cached or its history arrived).
+    pub settle_ready: bool,
     pub live: Option<Live>,
     queued: Option<String>,
     /// Send was pressed while dictating: send once the speech is recognized.
@@ -605,6 +614,10 @@ impl BenchApp {
             tg_people: vec![],
             tg_visible: None,
             turns: vec![],
+            thread_cache: HashMap::new(),
+            settle: 0,
+            settle_stable: 0,
+            settle_ready: false,
             live: None,
             queued: None,
             attachments: vec![],
@@ -866,9 +879,12 @@ impl BenchApp {
                 running,
             } => {
                 self.opened.insert(session.clone(), runtime.clone());
+                self.thread_cache.insert(session.clone(), turns.clone());
                 if self.session.as_deref() == Some(&session) {
                     self.runtime = Some(runtime);
                     self.turns = turns;
+                    self.settle_ready = true;
+                    self.settle_stable = 0;
                     self.restore_reviews();
                     // The clock runs from the user's message, not from when this chat was opened.
                     let since = live_since(self.turns.last().and_then(|t| t.started));
@@ -1336,11 +1352,23 @@ impl BenchApp {
         self.ssh.form = None;
         self.files_remote.form = false;
         self.project_form = None;
+        if let Some(prev) = self.session.clone() {
+            self.thread_cache.insert(prev, self.turns.clone());
+        }
         self.reset_chat(cx);
         self.session = Some(id.clone());
+        // Invisible until laid out at its bottom; a thread seen before shows its last state now.
+        self.settle = 30;
+        self.settle_stable = 0;
+        self.settle_ready = false;
+        if let Some(turns) = self.thread_cache.get(&id) {
+            self.turns = turns.clone();
+            self.settle_ready = true;
+        }
         self.thread_project = self.sessions.iter().find(|s| s.id == id).map(|s| s.project.clone()).unwrap_or_default();
         if self.demo {
             self.turns = self.demo_threads.get(&id).cloned().unwrap_or_default();
+            self.settle_ready = true;
             self.processes = if id == "d-landing" { crate::demo::processes(now_secs()) } else { Vec::new() };
             cx.notify();
             return;

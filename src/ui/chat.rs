@@ -170,6 +170,18 @@ impl BenchApp {
         if self.follow && !at_bottom {
             self.chat_scroll.set_offset(point(px(0.), -max));
         }
+        // An opening thread stays invisible until its content is in and its height held for a
+        // few frames (inserts placed, the offset pinned to the bottom), at most `settle` frames.
+        if self.settle > 0 {
+            if self.settle_ready && max == self.last_max {
+                self.settle_stable += 1;
+            } else {
+                self.settle_stable = 0;
+            }
+            self.settle = if self.settle_stable >= 3 { 0 } else { self.settle - 1 };
+            window.request_animation_frame();
+        }
+        let hidden = self.settle > 0;
         self.last_max = max;
 
         // The turns, and after each the inserts the person put there.
@@ -193,6 +205,7 @@ impl BenchApp {
                 v_flex()
                     .id("chat")
                     .size_full()
+                    .when(hidden, |d| d.opacity(0.))
                     // A click anywhere in the thread means "I'm about to type": the composer takes
                     // the focus, unless the click went into something that types itself, or the
                     // mouse moved (a drag selects text).
