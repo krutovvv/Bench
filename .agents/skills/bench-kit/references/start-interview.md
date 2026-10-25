@@ -33,22 +33,24 @@ specification; build exactly this.
 
 ## 3. Turn the answers into threads
 
-Bench is one chat with the agent; each thing they work on becomes a **kind of thread**: a group
-in the sidebar, a live block at the thread's top, the agent's tool for it
-(`build-subject.md`). First see whether one of the five that exist covers it:
+Bench is one chat with the agent, threads grouped by **project**; each tool they work with
+becomes a **kind of insert**: a small live app they put into a thread with `/`, with the agent's
+tool for it (`build-subject.md`). What belongs to a project (its soul, servers, hosts, bot,
+scheduled jobs) goes into the project's environment. First see whether one of the five that
+exist covers it:
 
-| They work with… | Thread | What the block shows | What the agent does |
+| They work with… | Insert | What it shows | What the agent does |
 |---|---|---|---|
-| their tasks | Tasks (`tasks:<list>`) | the list: Today, Upcoming, Anytime, Logbook | adds, moves, completes, sums the time spent |
-| servers | Servers (`ssh:<alias>`) | the server's terminal | runs commands there (`ssh_run`) |
-| files on hosts (FTP, SFTP) | Files (`files:<host id>`) | the folder and the open file | lists, reads, writes, renames (`remote_files`) |
-| websites they sign in to | Browser (`browser:<id>`) | each step's page, live; they click and type in it | drives the page through the browser MCP |
-| small utilities | Tools (`tool:<name>`) | the tool's input and output | explains, fixes, works with what's in it |
+| their tasks | `/tasks` | the lists: Today, Upcoming, Anytime, Logbook | adds, moves, completes, sums the time spent |
+| servers | `/ssh`, `/terminal` | the server's terminal | runs commands there (`ssh_run`) |
+| files on hosts (FTP, SFTP) | `/ftp` | the hosts, the folder, the open file | lists, reads, writes, renames (`remote_files`) |
+| websites they sign in to | `/browser` | the thread's own tab, live; they click and type in it | drives the page through the browser MCP |
+| small utilities | `/tools` | the tool's input and output | explains, fixes, works with what's in it |
 | a project, a question | an ordinary thread (in a folder) | — | reads, edits, runs, searches |
 
-What none of these covers becomes **a new kind of thread**, in the same shape: say what its
-sidebar lists, what its block shows, which tool the agent gets (or which MCP server already
-exists for that service), what Bench sends with each message. Examples: "my clients" (a CRM's
+What none of these covers becomes **a new kind of insert**, in the same shape: say what it shows,
+what its title switches between, which tool the agent gets (or which MCP server already exists
+for that service), what Bench sends with each message. Examples: "my clients" (a CRM's
 records, the agent through the CRM's MCP), "the shop's orders" (a list re-read from the shop's
 API), "the build queue" (a list of runs with their logs).
 
@@ -57,9 +59,9 @@ API), "the build queue" (a list of runs with their logs).
 In order, say which one each job gets:
 1. **The agent does it through an MCP server or an API** (most such jobs): the thread shows
    the result; no page needed.
-2. **The browser thread**, when there is no API or the person needs to see and touch the page
-   (sign-ins, publishing on sites without an API): the agent drives the server's browser, the
-   person watches each step live and steps in.
+2. **The browser insert**, when there is no API or the person needs to see and touch the page
+   (sign-ins, publishing on sites without an API): the agent drives the server's browser in the
+   thread's own tab, the person watches it live and steps in.
 3. **A tool in Tools** for the local step around the service (HTML → Markdown of a copied page,
    clean up pasted text).
 Never a half-copy of the website inside Bench.
@@ -67,12 +69,15 @@ Never a half-copy of the website inside Bench.
 ## 4. Example: how the user's Bench came out of their answers
 
 - "I talk to an agent all day, in projects" → ordinary threads, in folders, with git branches.
-- "I keep my tasks in a task app and log the hours" → **Tasks**: the lists as threads, the
-  agent's `tasks` tool; "how many hours this month for the client" is one question.
-- "Many servers, always in a terminal" → **Servers**: each `~/.ssh/config` host a thread with its
-  terminal; the agent runs commands in it and reads what's on screen.
-- "Sites on old hosting, FTP passwords in Transmit" → **Files**: hosts imported once, a folder and
-  an editor in the block, the agent edits through `remote_files`.
-- "We publish on sites without an API, a whole team" → **Browser**: a shared server browser,
-  each person with their own key, each step's page live in the answer.
-- "DevUtils for Base64, regex, cron; tables from sites for the AI" → **Tools**, one thread per tool.
+- "I keep my tasks in a task app and log the hours" → **`/tasks`**: the lists in any thread, a
+  project's tasks in its threads, the agent's `tasks` tool; "how many hours this month for the
+  client" is one question.
+- "Many servers, always in a terminal" → **`/ssh`**: a `~/.ssh/config` host's terminal in the
+  thread; the agent runs commands there and reads what's on screen.
+- "Sites on old hosting, FTP passwords in Transmit" → **`/ftp`**: hosts imported once (a
+  project's own), a folder and an editor in the insert, the agent edits through `remote_files`.
+- "We publish on sites without an API, a whole team" → **`/browser`**: a shared server browser,
+  each person with their own key, each thread its own tab, live.
+- "DevUtils for Base64, regex, cron; tables from sites for the AI" → **`/tools`**: every utility
+  in one insert.
+- "Reports every Monday, a check every night" → the project's **schedule** (its environment).

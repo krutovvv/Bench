@@ -1,150 +1,139 @@
-# Adding a tool to Bench: a new kind of thread
+# Adding a tool to Bench: a new kind of insert
 
-Bench has no modes. Everything is a thread with the agent, and a tool is a **subject**: what a
-thread is about, drawn live at its top, with the conversation under it (Zed's Delta, where a
-thread is the unit of work, extended with blocks). Bench has five, and each is a worked example
-of this page. **The browser is the centrepiece**: it shows the idea most clearly — the agent's
-step is a live page right in its answer, and the person clicks and types in it — so read it
-first; the others are simpler cases of the same shape.
+Bench has no modes and no tool pages. A thread is a **document**: the person's messages, the
+agent's answers, and the person's **inserts** — small live apps put into the conversation with
+`/`, part of what the person says, right where they put them (2026-10-25, the person: "this is
+the only approach in this app now; the only classic settings left are the gear"). An insert
+never switches the thread or renames it; a thread can hold several; coming back to a thread
+brings them back as they were. Bench has five kinds, and each is a worked example of this page.
+**The browser is the centrepiece** — the thread's own tab, live, instead of a screenshot — so
+read it first; the others are simpler cases of the same shape.
 
-| Subject key | Sidebar group | What's live | The agent's tool | What Bench sends with each message |
+| Key (state) | `/` word | What's live | The agent's tool | What Bench sends with each message |
 |---|---|---|---|---|
-| `browser:<id>` | Browser (+) | the server browser's tab of each step, live in that turn's answer (`render_site_step`, `src/ui/sites.rs`; state and streaming `src/app/sites.rs`, `src/remote_browser.rs`) | the browser MCP (Playwright on the server, `browser-server/`) | the live tab's address and title |
-| `tasks:<list>` | Tasks (Today, Upcoming, Anytime, Logbook) | the task list at the top (`render_tasks_block`, `src/ui/tasks.rs`) | `tasks` (`agent/src/builtin/tasks.ts`) | nothing: the agent reads the list with its tool |
-| `ssh:<alias>` (`ssh:` alone is this Mac) | Servers | the server's terminal at the top (`render_terminal`, `src/ui/terminal.rs`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
-| `files:<host id>` | Files | an FTP/SFTP folder and file editor at the top (`render_files_block`, `src/ui/remote_files.rs`) | `remote_files` (`builtin/remote.ts`) | the folder, its entries, the open file |
-| `tool:<name>` | Tools | a utility's input → output at the top (`render_tool_block`, `src/ui/tools.rs`) | none: `read`/`bash` on what it is sent | the tool's input and output |
+| `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`ui/inserts/browser.rs`; tab per thread, streaming: `app/sites.rs`, `remote_browser.rs`) | the browser MCP (Playwright on the server, `browser-server/`) | the tab's address and title, and "work only in it" |
+| `tasks` {list} | `/tasks` | every list a click apart; in a project its tasks only (`ui/inserts/tasks.rs`) | `tasks` (`agent/src/builtin/tasks.ts`) | which list is shown |
+| `ssh:<alias>` (`ssh:local` this Mac; `ssh` alone: pick one) | `/terminal`, `/ssh` | the terminal, as tall as its text (`ui/inserts/terminal.rs`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
+| `files` {host, path, file} | `/ftp` | the hosts (and a new one), the folder, the open file in an editor (`ui/inserts/files.rs`) | `remote_files` (`builtin/remote.ts`) | the folder, its entries, the open file |
+| `tools` {tool} | `/tools` | every utility in its title's menu, the tool's input → output (`ui/inserts/tools.rs`) | none: `read`/`bash` on what it is sent | the tool's input and output |
 
-**How the browser thread works**, end to end (the pattern for anything the agent makes live
-during a turn):
-1. The browser runs on a server (`browser-server/`: Chrome, the Playwright MCP the agent drives,
-   and a `/live` gateway for people: a personal key, a narrow set of operations, a log). Set-up:
-   `browser-server/README.md`.
-2. The prompt section (`subject()` in `agent/src/prompt.ts`) tells the agent to open a new tab
-   each turn and not to screenshot the page for the person.
-3. Bench watches the gateway's tab list; a tab that appears (or moves to a new page) during a turn
-   becomes that turn's **step** (`on_browser`, `steps_of`), drawn in the answer, streamed live
-   while it is the latest (≤ 2 frames a second, only while someone looks), clickable and typable
-   (`render_site_step` maps the pointer and keys to the page).
-4. Each step's last frame is saved in the session's folder, so the thread still shows what the
-   agent saw after a restart; a click reopens the page.
-5. `block_context` sends the live tab's address and title with each message.
+What belongs to a **project** rather than to a thread (its soul, MCP servers, skills, prompts,
+accesses, Telegram bot, scheduled jobs) is not an insert: it is the project's environment, the
+block a project's pencil opens (`app/project_env.rs`, `ui/project_list.rs` `render_env_block`).
 
-So a new tool for a person ("my clients", "the shop's orders", "the build queue") is the same
-five pieces. Copy the subject closest to it.
+## How it is kept: Pi's terms
 
-## The five pieces
+The agent keeps the inserts (`agent/src/inserts.ts`), so they are durable and every window sees
+the same:
+- an **entry** `bench.insert` {id, key} in the conversation's transcript, written where it was
+  put (a Pi *write*: the model doesn't see it, it is never queued, it lands at once even mid-run);
+- its state in the conversation's **document** `bench.inserts` ({items: {id: {key, state, folded,
+  removed}}}), changed in commits. A removed insert keeps its entry and is marked removed.
 
-**1. A key.** `<kind>:<value>`, stored on the session (`SessionRow.subject`, sent with
-`session.create`). Parse it in one place: `subject_<kind>(key) -> Option<…>`, like
-`subject_server` / `subject_tool` (`src/app/subjects.rs`), `subject_list` (`app/tasks.rs`),
-`subject_files` (`app/remote_files.rs`); add its branch to `open_subject_key` and
-`subject_title` in `subjects.rs`.
+RPC: `session.insert` {id, key, state}, `session.insert.patch` {id, patch}; `session.resume`
+returns `inserts` (each with `after`: how many of the person's messages come before it); every
+change is broadcast as `session.inserts`. Bench changes an insert on screen at once and sends the
+change; the agent's answer replaces Bench's list (the truth). A new chat's session is created when
+its first insert comes, not with the first message. Tests: `agent/test/inserts.test.ts`.
 
-**2. Opening it.** A subject has **many threads, one job each** (the user: "first we did one
-thing on the server, then another, then a third by hand" — each its own thread, never one
-endless thread, and never split automatically). `open_<kind>_thread(value, window, cx)`:
-prepare the block's state (connect, load, start a terminal), then `self.open_subject(key, cx)`.
-That opens the latest thread about the subject, or a new chat that will carry it
-(`new_subject`); in a project the usual way is `/` in the thread (piece 4). The block
-belongs to the subject, not the thread: every thread about `web-1` shows the same terminal. Bench's: `open_server_thread`,
-`open_tool_thread` (`subjects.rs`), `open_task_list` (`app/tasks.rs`), `open_files_thread`
-(`app/remote_files.rs`), `open_browser_thread` / `new_browser_thread` (`app/sites.rs`).
+## The pieces of a new kind
 
-**3. The block.** One branch in `render_chat` (`src/ui/chat.rs`, the `let block = …` chain)
-returning the view. The chat puts it in an agent row (the agent's avatar in the gutter), on top
-of the conversation, and its clicks are its own (set `this.click_claimed = true` in its
-handlers; a click anywhere else in the thread focuses the composer). Rules:
-- Built from the catalog's pieces (`ui-catalog.md`), the thread's text size (`text_base`; code
-  and terminals monospaced), muted color for what is secondary. No bars or frames of its own
-  beyond a 1px border where a surface needs one.
-- Its height fits what it shows, up to a cap (a terminal fits its text up to 280; a tool's block
-  is 440): the conversation must stay in view.
-- State the block needs lives in the app, not in the view: `self.<kind>` (a struct in
-  `src/app/<kind>.rs`, its field on `HermesApp`, its `new()` in `HermesApp::new`).
+**1. A key and its state.** A key names the kind (and, for terminals, which one: several can sit
+in a thread); everything that changes as the person works is `state` (a JSON object). Map the `/`
+row's key to (key, state) in `insert_spec` (`app/inserts.rs`): "files:<id>" → files {host}.
 
-**4. Attaching it in a thread.** The sidebar holds **projects only** (2026-10-25: the person's
-work is project-centric — a project has its servers, hosts, browser sessions, tasks, tools;
-`src/app/project_list.rs`, `src/ui/sidebar.rs` `render_project`). A tool is attached inside a
-thread with `/`: `/ssh`, `/ftp`, `/browser`, `/tasks`, `/tool`, then a concrete one
-(`tool_slash` lists them, `attach_tool` prepares the block and sets the thread's subject —
-`session.subject` on the agent for an existing thread, `new_subject` for a new one). A new kind
-of tool adds its word to `tool_words` and its rows to `tool_slash`; "New …" rows open its form.
+**2. An `InsertKind`** — one file in `src/ui/inserts/<kind>.rs`, a unit struct, a line in `KINDS`
+(`src/ui/inserts/mod.rs`):
+- `owns(key)`; `same(there, new)`: whether putting it again brings back the one there (default:
+  one per thread);
+- `title`; `switches` — the title's menu (another server, host, tool; "New …" runs a form);
+- `controls` — the head's own buttons; the frame adds fold and remove;
+- `body` — what it shows, under the head. Its height fits what it shows, up to a cap; the
+  conversation must stay in view. While it renders, it restores its state (the files insert shows
+  its host and folder again) and syncs what changed back with `sync_insert_state`;
+- `context` — what it shows now, as text for the agent (cut long text at 6000 characters);
+- `opened` (put in, or brought back: start a terminal, load the hosts), `removed`.
+The frame is the same for every kind (`render_insert`): the person's avatar, a light ground, a
+thin border, round corners, `block_head` on top (one height and look for every block's head).
+State the kind needs while it lives stays in the app (`self.<kind>`, a struct in
+`src/app/<kind>.rs`); its clicks set `this.click_claimed = true`.
 
-**5. The agent's side.** Three parts, in `agent/`:
-- **A tool** that does the subject's work with the thread's value: `defineTool` in
-  `agent/src/builtin/<kind>.ts`, added to the assistant's `tools` (`agent/src/extensions/assistant.ts`).
-  It reads the thread's subject from `sessionOf(api.conversationId).subject` (see `ssh.ts`), so
-  the agent never has to name the server or list.
-  Watch the first message of a new thread: the thread is created first and the sessions list
-  arrives later, so the new row goes into `sessions` at once with its subject (`Evt::Created`),
-  or `block_context` finds no subject and the block's state is lost. When an MCP server already does the job, use
-  it instead and write no tool (the browser).
-- **A prompt section** for the subject: a case in `subject()` (`agent/src/prompt.ts`): what the
-  block is, which tool works on it, what "this" and "here" mean, what not to do (tasks: "never look
-  for them in files"; browser: "don't take screenshots to show the page"). Two or three sentences.
-- **The block's state**: `block_context` (`subjects.rs`) returns what the block shows right now
-  as text; Bench sends it as `context` with `prompt.submit`, the agent appends it to the message
+**3. Its `/` word.** A line in `words()` (`ui/inserts/mod.rs`); rows for `/word <query>` in
+`tool_slash` (`app/subjects.rs`) when picking straight away helps (`/ssh web-1`).
+
+**4. The agent's side**, in `agent/`:
+- **A tool** for its work: `defineTool` in `agent/src/builtin/<kind>.ts`, in the assistant's
+  `tools` (`agent/src/extensions/assistant.ts`). It finds what the thread has inserted in
+  `sessionOf(api.conversationId).inserts` (see `ssh.ts`, `remote.ts` `hostFor`), so the agent never
+  has to name the server or host. When an MCP server already does the job, use it (the browser).
+- **A prompt line**: its case in `inserted()` (`agent/src/prompt.ts`): what it is, which tool works
+  on it, what not to do ("never look for the tasks in files"; "don't take screenshots to show the
+  page"). The `inserts` section is built from the document, so it changes only when an insert
+  comes, goes or switches, and the prompt cache keeps.
+- **Its live state**: Bench sends every insert's `context` with each message; the agent appends it
   inside `<block-state>` for the model and strips it from the history (`runtime.ts` `submit`,
-  `stripBlock`). Send what the person sees and the model cannot get with a tool; nothing when
-  the tool reads it anyway. Cut long text (6000 characters).
+  `stripBlock`).
 
-Then: `cargo build`; open the thread; ask the agent something about "this" and watch which tool
-it calls; screenshot (`build-verification.md`). Add a demo thread for it in `src/demo.rs`
-(`subject_threads`), so the web demo and the README show it.
+Then: `cargo build`; put it into a thread; ask the agent something about "this" and watch which
+tool it calls; screenshot (`build-verification.md`). Add a demo thread with it in `src/demo.rs`
+(`thread(…, "<subject>", …)` makes the insert), so the web demo and the README show it.
+
+## How the browser insert works, end to end
+
+The pattern for anything live from elsewhere:
+1. The browser runs on a server (`browser-server/`: Chrome, the Playwright MCP the agent drives,
+   and a `/live` gateway for people: a personal key, a narrow set of operations, a log).
+2. Each thread has its own tab (2026-10-25, the person: "one thread works with one site, another
+   with another; if the tab falls off, the thread opens a new one through MCP"). The insert's
+   state keeps {tab, url}. The tab the agent opens or moves while it answers in the open thread
+   becomes that thread's (`on_browser`, `app/sites.rs`); a tab woken under a new id keeps its
+   thread; a closed one is opened again at its address ("Open again", `reopen_thread_tab`).
+3. The insert streams that tab (≤ 2 frames a second, only while the thread is open and someone
+   looks; paused, it keeps the last frame) and maps the pointer and keys to the page
+   (`render_tab`, `ui/sites.rs`).
+4. `context` tells the agent the tab's address and to work only in it (select it with
+   `browser_tabs`, or open a new one when it is gone); the prompt line says the same.
 
 ## Where the data lives
 
 The tool's records live where the agent can reach them with Bench closed: in `~/.bench`
-(`bench.sqlite`, through the agent's REST API: Bench's Tasks and hosts, `/api/tasks`,
-`/api/hosts`) or where they already live (`~/.ssh/config`, a server's files, a website behind
-the browser). Never only in Bench's memory. `build-native-data.md`.
+(`bench.sqlite`, through the agent's REST API: tasks and hosts, `/api/tasks`, `/api/hosts`) or
+where they already live (`~/.ssh/config`, a server's files, a website behind the browser). A
+project's accesses are its own (`project` on the row). Never only in Bench's memory.
+`build-native-data.md`.
 
-## Patterns for a block
+## Patterns for a body
 
-- **Input → output** (a tool): two panes side by side, `h_flex().size_full().items_stretch()`
-  (without `items_stretch` the panes shrink to their content); a 36px strip over each pane with
-  its title and small square buttons; `Editor::new(&state).appearance(false)` in a
-  `div().flex_1().min_h_0()`. Bench `src/ui/tools.rs`.
-- **A list re-read from its source** (tasks, a folder): the agent and other devices change it
-  too, so re-read it now and then (Tasks: every 4 s while the thread is open) and replace the
-  list, with three rules, each from a real bug:
-  - keep what exists only here (a new item not yet saved has a temporary id `new:<token>`;
-    carry it over the re-read, or its card closes "by itself");
-  - don't overwrite a card being typed into: keep the dirty copy, save 700 ms after the last key,
-    then re-read;
-  - every row in a scrolling list gets `.flex_none()`, or GPUI squeezes the rows to fit.
-  Bench `src/app/tasks.rs` (`tick_tasks`, `drop_blank_new`), `src/ui/tasks.rs`.
+- **Input → output** (a tool): two panes side by side, `h_flex().size_full().items_stretch()`;
+  `block_head` over each pane with its title and small buttons (copying is an icon);
+  `Editor::new(&state).appearance(false)` in a `div().flex_1().min_h_0()`. `src/ui/tools.rs`.
+- **A list re-read from its source** (tasks, a folder): re-read it now and then and replace the
+  list, with three rules, each from a real bug: keep what exists only here (a new item's
+  temporary id `new:<token>`); don't overwrite a card being typed into (save 700 ms after the last
+  key, then re-read); every row in a scrolling list gets `.flex_none()`. `src/app/tasks.rs`.
+- **A terminal**: as tall as its text, while its program sees a whole screen
+  (`Session::set_min_rows`, `term.rs`): `ls` must not shrink it to one line.
 - **Something live from elsewhere** (a terminal, a browser tab): a worker thread owns the
-  connection, sends events over an `async_channel` that a `cx.spawn` loop drains into
-  `cx.notify()`. Keep it light: stream only while the thread is open and someone looks (the
-  browser pauses after 60 s idle and frames are capped at 2 a second), and keep the last picture
-  when the source goes away (`sites.rs` saves each step's frame in the session's folder).
-- **Something the agent made during a turn belongs to that turn**: the browser gives each tab
-  opened during a turn to that turn and shows it in the answer, not at the top
-  (`on_browser`, `steps_of`).
+  connection and sends events over an `async_channel` that a `cx.spawn` loop drains into
+  `cx.notify()`; stream only while someone looks.
 - **Work that takes time**: `cx.spawn_in(window, async move |this, cx| { let r =
   cx.background_spawn(async move { … }).await; this.update_in(cx, |this, window, cx| …) })`.
-  Clipboard: `cx.read_from_clipboard()`, `cx.write_to_clipboard(ClipboardItem::new_string(…))`.
-- **"!" from any thread**: `!command` runs in a terminal opened under that thread (a server
-  thread types it into its own terminal): `run_bang`, `subjects.rs`.
+- **"!" from any thread**: `!command` types into the thread's terminal insert, or puts this Mac's
+  in (in the thread's folder): `run_bang`, `subjects.rs`.
 
-## Checklist: every file a new tool touches
+## Checklist: every file a new kind touches
 
-From adding Files (FTP/SFTP), in order, `cargo build` after each line:
+In order, `cargo build` after each line:
 1. `src/<logic>.rs` — the data type and its pure functions, tested; `mod` in `main.rs`.
-2. `agent/src/builtin/<kind>.ts` — the agent's tool (or an MCP server in the agent's `mcp.json`),
-   and the REST routes Bench uses to read the same data (`agent/src/server.ts`).
-3. `src/app/<kind>.rs` — state + `open_<kind>_thread` and the actions; `pub(crate) mod` in
+2. `agent/src/builtin/<kind>.ts` — the agent's tool (or an MCP server in the project's
+   `mcp.json`), and the REST routes Bench uses to read the same data (`agent/src/server.ts`).
+3. `src/app/<kind>.rs` — the state it needs while it lives and its actions; `pub(crate) mod` in
    `src/app.rs`, the field on `HermesApp`.
-4. `src/ui/<kind>.rs` — `render_<kind>_block`; `mod` in `src/ui/mod.rs`.
-5. `src/app/subjects.rs` — `open_subject_key`, `subject_title`, `block_context` (and
-   `subject_<kind>`, here or in `app/<kind>.rs`).
-6. `src/ui/chat.rs` — the block's branch in `render_chat`.
-7. `src/app/subjects.rs` — its `/` word (`tool_words`) and rows (`tool_slash`), its preparation in
-   `attach_tool`.
-8. `agent/src/prompt.ts` — the subject's case in `subject()`.
-9. Icons: SVGs in `assets/icons/`, lines in `src/icons.rs` (`design-icons.md`).
-10. `src/demo.rs` — a demo thread; the web build still compiles
-    (`cargo check --target wasm32-unknown-unknown`: desktop-only crates go under
-    `[target.'cfg(not(target_family = "wasm"))'.dependencies]`, with a stub for the browser build).
+4. `src/ui/inserts/<kind>.rs` — its `InsertKind`; `mod` and a line in `KINDS` (`ui/inserts/mod.rs`).
+5. `src/ui/inserts/mod.rs` `words()` — its `/` word; `app/inserts.rs` `insert_spec` when a row
+   carries state; `app/subjects.rs` `tool_slash` for its rows.
+6. `agent/src/prompt.ts` — its line in `inserted()`.
+7. Icons: SVGs in `assets/icons/`, lines in `src/icons.rs` (`design-icons.md`).
+8. `src/demo.rs` — a demo thread with it; the web build still compiles
+   (`cargo check --release --target wasm32-unknown-unknown`: desktop-only crates go under
+   `[target.'cfg(not(target_family = "wasm"))'.dependencies]`, with a stub for the browser build).
