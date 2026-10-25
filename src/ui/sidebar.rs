@@ -121,6 +121,7 @@ impl BenchApp {
         });
         let (new_id, del_id, env_id) = (p.id.clone(), p.id.clone(), p.id.clone());
         let pinned = self.mark_of(&format!("p:{}", p.id)).pinned;
+        let zed = p.folder.clone().filter(|f| !f.is_empty()).map(|f| (f, p.host.clone()));
         let mut out = vec![h_flex()
             .id(("phead", g))
             .group(group.clone())
@@ -141,7 +142,7 @@ impl BenchApp {
                     .opacity(0.)
                     .group_hover(group.clone(), |s| s.opacity(1.))
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(Button::new(("pmore", g)).ghost().xsmall().icon(Ico::Ellipsis.icon()).dropdown_menu(project_menu(cx.entity(), env_id.clone(), pinned))),
+                    .child(Button::new(("pmore", g)).ghost().xsmall().icon(Ico::Ellipsis.icon()).dropdown_menu(project_menu(cx.entity(), env_id.clone(), pinned, zed.clone()))),
             )
             .child(
                 super::head_plus_slot()
@@ -168,7 +169,7 @@ impl BenchApp {
                     .child(if collapsed { Ico::ChevronRight } else { Ico::ChevronDown }.icon().xsmall()),
             )
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
-            .context_menu(project_menu(cx.entity(), del_id.clone(), pinned))
+            .context_menu(project_menu(cx.entity(), del_id.clone(), pinned, zed.clone()))
             .into_any_element()];
         if collapsed {
             return out;
@@ -539,7 +540,7 @@ fn session_menu(view: Entity<BenchApp>, id: String, pinned: bool) -> impl Fn(gpu
 }
 
 /// A project's menu (its "⋯" and a right click): its environment, pin, remove.
-fn project_menu(view: Entity<BenchApp>, id: String, pinned: bool) -> impl Fn(gpui_kit::component::menu::PopupMenu, &mut Window, &mut Context<gpui_kit::component::menu::PopupMenu>) -> gpui_kit::component::menu::PopupMenu + 'static {
+fn project_menu(view: Entity<BenchApp>, id: String, pinned: bool, zed: Option<(String, Option<String>)>) -> impl Fn(gpui_kit::component::menu::PopupMenu, &mut Window, &mut Context<gpui_kit::component::menu::PopupMenu>) -> gpui_kit::component::menu::PopupMenu + 'static {
     move |menu, _, _| {
         let act = |f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>| {
             let view = view.clone();
@@ -552,6 +553,10 @@ fn project_menu(view: Entity<BenchApp>, id: String, pinned: bool) -> impl Fn(gpu
                     .icon(Ico::Pin.icon())
                     .on_click(act(Box::new(move |this, _, cx| this.toggle_pin(pin_id.clone(), cx)))),
             )
+            // A project with a folder opens in Zed (a server's over SSH).
+            .when_some(zed.clone(), |menu, (folder, host)| {
+                menu.item(PopupMenuItem::new("Open in Zed").icon(Ico::Zed.icon()).on_click(act(Box::new(move |this, _, cx| this.open_in_zed(&folder, None, host.as_deref(), cx)))))
+            })
             .separator()
             .item(PopupMenuItem::new("Remove project").icon(Ico::Trash.icon()).on_click(act(Box::new(move |this, window, cx| this.delete_project(del.clone(), window, cx)))))
     }

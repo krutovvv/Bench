@@ -78,7 +78,7 @@ icons! {
     ListChecks => "list-checks",
     Loader => "loader-circle",
     MemoryStick => "memory-stick",
-    MicFill => "mic-fill",
+    Mic => "mic",
     PanelLeft => "panel-left",
     Paperclip => "paperclip",
     Pencil => "pencil",

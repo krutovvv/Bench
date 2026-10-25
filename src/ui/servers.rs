@@ -35,23 +35,11 @@ impl BenchApp {
                 .child(icon.icon().small())
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
         };
-        // The thread's project has a folder: it opens in Zed (a server's over SSH).
-        let zed = self
-            .projects
-            .iter()
-            .find(|p| p.id == self.thread_project)
-            .and_then(|p| p.folder.clone().filter(|f| !f.is_empty()).map(|f| (f, p.host.clone())));
         let _ = ssh;
         h_flex()
             .flex_none()
             .gap_1()
             .items_center()
-            .when_some(zed, |d, (folder, host)| {
-                d.child(
-                    toggle("open-in-zed", Ico::Zed, false, "Open the project in Zed")
-                        .on_click(cx.listener(move |this, _, _, cx| this.open_in_zed(&folder, None, host.as_deref(), cx))),
-                )
-            })
             // A window of its own, in the window's top-right corner.
             .child(
                 toggle("new-window", Ico::AppWindow, false, "New window  ⌘⇧N")

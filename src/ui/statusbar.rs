@@ -395,7 +395,7 @@ impl BenchApp {
                 } else if recording {
                     (Ico::Square, "Stop and transcribe  ⌘⇧D")
                 } else {
-                    (Ico::MicFill, "Dictate  ⌘⇧D")
+                    (Ico::Mic, "Dictate  ⌘⇧D")
                 };
                 button("mic", icon, tip, false)
                     .when(recording, |d| d.text_color(cx.theme().danger))
