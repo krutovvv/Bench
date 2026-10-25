@@ -81,3 +81,20 @@ test("tasks: add, list by tag, complete, import without doubles", async () => {
 	assert.equal(tasks.import([{ title: "From Reminders", source_id: "r1" }]), 1);
 	assert.equal(tasks.import([{ title: "From Reminders", source_id: "r1" }]), 0);
 });
+
+test("telegram: a batch keeps the order the messages came in and waits for voice", async () => {
+	const { Batch } = await import("../src/telegram.ts");
+	const b = new Batch("me");
+	const voice = b.reserve(1, false);
+	const link = b.reserve(2, false);
+	b.fill(link, "https://example.com/schedule");
+	assert.equal(b.ready, false);
+	b.fill(voice, "make a table from this schedule");
+	assert.equal(b.ready, true);
+	assert.equal(b.text(), "make a table from this schedule\n\nhttps://example.com/schedule");
+	assert.equal(b.last, 2);
+	const f = new Batch("me");
+	f.fill(f.reserve(3, true), undefined);
+	assert.equal(f.onlyForwarded, true);
+	assert.equal(f.text(), "");
+});

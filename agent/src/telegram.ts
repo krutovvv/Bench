@@ -25,10 +25,43 @@ const MAX = 4096;
 const EDIT_EVERY_MS = 1500;
 const SHOWN_STEPS = 6;
 /** Messages that come in a run (several written one after another, a forwarded batch) are one
- * turn: it starts once the chat is quiet this long, or longer while the batch is only forwarded
- * messages (the instruction usually follows). */
-const GATHER_MS = 1500;
+ * turn: it starts once the chat is quiet this long after the last of them is ready (a voice
+ * message once it is transcribed), or longer while the batch is only forwarded messages (the
+ * instruction usually follows). A new message always takes over: the running turn is stopped
+ * at once, and the next one gets everything sent since. */
+const GATHER_MS = 2000;
 const GATHER_FORWARDED_MS = 6000;
+
+/** The messages for a chat's next turn, in the order they came: a voice message or a file holds
+ * its place while it is transcribed or downloaded. */
+export class Batch {
+	parts: (string | undefined)[] = [];
+	attachments: { path: string; mime: string }[] = [];
+	pending = 0;
+	last = 0;
+	onlyForwarded = true;
+	timer?: NodeJS.Timeout;
+	name: string;
+	constructor(name: string) {
+		this.name = name;
+	}
+	reserve(message: number, forwarded: boolean): number {
+		this.pending++;
+		this.last = message;
+		this.onlyForwarded &&= forwarded;
+		return this.parts.push(undefined) - 1;
+	}
+	fill(slot: number, part: string | undefined): void {
+		this.parts[slot] = part;
+		this.pending--;
+	}
+	get ready(): boolean {
+		return this.pending === 0;
+	}
+	text(): string {
+		return this.parts.filter((p): p is string => !!p).join("\n\n");
+	}
+}
 
 interface Config {
 	token: string;
@@ -45,6 +78,8 @@ interface Turn {
 	started: number;
 	dirty: boolean;
 	lastEdit: number;
+	/** Stopped by a newer message: its answer is not sent. */
+	superseded?: boolean;
 	timer?: NodeJS.Timeout;
 	typing?: NodeJS.Timeout;
 }
@@ -95,8 +130,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 
 	const turns = new Map<string, Turn>(); // session id -> its running turn
 	const replies = new Map<string, number>(); // session id -> the message its next turn answers
-	// chat -> the messages gathered for its next turn
-	const gathering = new Map<number, { parts: string[]; attachments: { path: string; mime: string }[]; last: number; onlyForwarded: boolean; timer?: NodeJS.Timeout; name: string }>();
+	const gathering = new Map<number, Batch>(); // chat -> the messages gathered for its next turn
 	const prompts = new Map<string, { session: string; promptId: string; kind: string; choices: string[] }>(); // "chat:message"
 
 	// This bot's chats only: a chat with another bot is another thread.
@@ -189,9 +223,9 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			if (t) {
 				clearTimeout(t.timer);
 				clearInterval(t.typing);
-				void editStatus(t, "✅ Done");
+				void editStatus(t, t.superseded ? "⏹ Stopped for your new message" : "✅ Done");
 			}
-			void sendAnswer(chat, String(payload.text ?? ""), t?.replyTo);
+			if (!t?.superseded) void sendAnswer(chat, String(payload.text ?? ""), t?.replyTo);
 		} else if (type === "clarify.request" || type === "approval.request") {
 			const choices: string[] = type === "approval.request" ? ["once", "session", "always", "deny"] : ((payload.choices as string[]) ?? []);
 			const text = type === "approval.request" ? `Approve this command?\n\n${payload.command}\n\n${payload.description ?? ""}` : String(payload.question ?? "");
@@ -238,28 +272,62 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		await ctx.reply("Stopped.");
 	});
 
+	// A message is taken in at once (grammY handles updates one by one, so a voice message being
+	// transcribed would hold up the ones after it): it stops the running turn, takes its place in
+	// the chat's batch, and is filled in when its voice or file is ready.
 	bot.on("message", async (ctx) => {
 		const m = ctx.message;
 		const chat = ctx.chat.id;
 		const session = await sessionFor(chat, nameOf(ctx));
-		let prompt = m.text ?? m.caption ?? "";
+		const typed = m.text ?? m.caption ?? "";
 		// A typed answer to a pending question.
 		const pending = [...prompts.entries()].find(([k, p]) => k.startsWith(`${chat}:`) && p.session === session && p.kind === "clarify.request");
-		if (pending && prompt) {
+		if (pending && typed) {
 			prompts.delete(pending[0]);
-			rt.respond(session, pending[1].promptId, prompt);
+			rt.respond(session, pending[1].promptId, typed);
 			return;
 		}
-		const attachments: { path: string; mime: string }[] = [];
+		const origin = forwardedFrom(m);
+		const g = gathering.get(chat) ?? new Batch(nameOf(ctx));
+		gathering.set(chat, g);
+		clearTimeout(g.timer);
+		const slot = g.reserve(m.message_id, !!origin);
+		api.sendChatAction(chat, "typing").catch(() => {});
+		// What was sent last matters more than what the agent is doing: stop it now.
+		if (rt.isBusy(session)) {
+			const t = turns.get(session);
+			if (t) t.superseded = true;
+			void rt.interrupt(session).catch(() => {});
+		}
+		void (async () => {
+			let part: string | undefined;
+			try {
+				part = await partOf(m, typed, g);
+				// Forwarded messages say whose they were.
+				if (part && origin) part = `[forwarded from ${origin}]\n${part}`;
+			} catch (e) {
+				await ctx.reply(String((e as Error).message), replyOpts(m.message_id)).catch(() => {});
+			}
+			g.fill(slot, part);
+			if (gathering.get(chat) === g && g.ready) {
+				clearTimeout(g.timer);
+				g.timer = setTimeout(() => void flush(chat), g.onlyForwarded ? GATHER_FORWARDED_MS : GATHER_MS);
+			}
+		})();
+	});
+
+	/** A message as text for the agent: typed, transcribed, or a file saved and named. */
+	const partOf = async (m: any, typed: string, g: Batch): Promise<string | undefined> => {
+		let text = typed;
 		const voice = m.voice ?? m.audio;
 		if (voice) {
 			const { data, name } = await download(voice.file_id);
 			try {
-				prompt = await transcribe(profile, data, voice.mime_type ?? "audio/ogg", name.replace(/\.oga$/, ".ogg"));
+				text = await transcribe(profile, data, voice.mime_type ?? "audio/ogg", name.replace(/\.oga$/, ".ogg"));
 			} catch (e) {
-				return void ctx.reply(`Could not transcribe: ${(e as Error).message}`);
+				throw new Error(`Could not transcribe: ${(e as Error).message}`);
 			}
-			if (!prompt) return void ctx.reply("(nothing recognized)");
+			if (!text) throw new Error("(nothing recognized)");
 		}
 		const photo = m.photo?.at(-1);
 		const doc = m.document;
@@ -270,33 +338,24 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			const p = path.join(dir, `${Date.now()}-${doc?.file_name ?? name}`);
 			fs.writeFileSync(p, data);
 			const mime = photo ? "image/jpeg" : (doc?.mime_type ?? "application/octet-stream");
-			if (mime.startsWith("image/")) attachments.push({ path: p, mime });
-			prompt = `${prompt}\n\n[attached: ${p}]`.trim();
+			if (mime.startsWith("image/")) g.attachments.push({ path: p, mime });
+			text = `${text}\n\n[attached: ${p}]`.trim();
 		}
-		if (!prompt) return;
-		// Forwarded messages say whose they were.
-		const origin = forwardedFrom(m);
-		const part = origin ? `[forwarded from ${origin}]\n${prompt}` : prompt;
-		const g = gathering.get(chat) ?? { parts: [], attachments: [], last: m.message_id, onlyForwarded: true, name: nameOf(ctx) };
-		g.parts.push(part);
-		g.attachments.push(...attachments);
-		g.last = m.message_id;
-		g.onlyForwarded &&= !!origin;
-		clearTimeout(g.timer);
-		g.timer = setTimeout(() => void flush(chat), g.onlyForwarded ? GATHER_FORWARDED_MS : GATHER_MS);
-		gathering.set(chat, g);
-		api.sendChatAction(chat, "typing").catch(() => {});
-	});
+		return text || undefined;
+	};
 
-	// The gathered messages as one: a new turn answering the last of them, or (the agent is at
-	// work) joined to the running turn after its current step.
+	// The gathered messages as one new turn, answering the last of them. A turn stopped for them
+	// is let finish its stop first, so they start a turn of their own rather than join it.
 	const flush = async (chat: number) => {
 		const g = gathering.get(chat);
+		if (!g?.ready) return;
 		gathering.delete(chat);
-		if (!g?.parts.length) return;
+		const text = g.text();
+		if (!text) return;
 		const session = await sessionFor(chat, g.name);
-		if (!turns.has(session)) replies.set(session, g.last);
-		await rt.submit(session, g.parts.join("\n\n"), g.attachments).catch((e) => api.sendMessage(chat, `Could not send: ${(e as Error).message}`).catch(() => {}));
+		for (let i = 0; i < 100 && rt.isBusy(session); i++) await new Promise((r) => setTimeout(r, 100));
+		replies.set(session, g.last);
+		await rt.submit(session, text, g.attachments).catch((e) => api.sendMessage(chat, `Could not send: ${(e as Error).message}`).catch(() => {}));
 	};
 
 	/** What a session runs with, as /new shows it. */
@@ -315,7 +374,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			`◆ Thinking: ${esc(row?.effort || reasoningEffort(homeAgent(agent)))}`,
 			`◆ Approvals: ${approvalsMode(homeAgent(agent)) === "manual" ? "asks before risky commands" : "off"}`,
 			"",
-			"Messages sent in a row (or forwarded together) are read as one; what you write while I work joins the running turn. /stop stops it.",
+			"Messages sent in a row (or forwarded together) are read as one. A new message stops what I'm doing, and I start over with everything you sent. /stop just stops.",
 		].join("\n");
 	};
 
