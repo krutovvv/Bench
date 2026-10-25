@@ -1,8 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The task assistant: an eclipse; in the black sun a check mark burns. Round, unlike the others. -->
+  <!-- The task assistant: a pale hand rises from a black hole, holding up a glowing orb. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <circle cx="268" cy="248" r="150" fill="#F2B43C"/>
-  <circle cx="252" cy="262" r="140" fill="#1F2329"/>
-  <polygon points="176,262 202,236 238,272 316,194 342,220 238,324" fill="#E8603C"/>
-  <circle cx="392" cy="402" r="14" fill="#2FA38A"/>
+  <circle cx="256" cy="112" r="40" fill="#F2B43C"/>
+  <circle cx="256" cy="112" r="16" fill="#E8603C"/>
+  <ellipse cx="256" cy="410" rx="130" ry="34" fill="#1F2329"/>
+  <rect x="236" y="250" width="40" height="160" fill="#FFFFFF"/>
+  <rect x="218" y="206" width="76" height="52" fill="#FFFFFF"/>
+  <rect x="218" y="160" width="14" height="48" fill="#FFFFFF"/>
+  <rect x="239" y="150" width="14" height="58" fill="#FFFFFF"/>
+  <rect x="260" y="150" width="14" height="58" fill="#FFFFFF"/>
+  <rect x="281" y="162" width="13" height="46" fill="#FFFFFF"/>
+  <polygon points="218,232 186,198 196,188 226,212" fill="#FFFFFF"/>
+  <ellipse cx="256" cy="424" rx="90" ry="14" fill="#2B313A"/>
 </svg>
