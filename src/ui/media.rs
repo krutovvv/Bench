@@ -780,7 +780,7 @@ impl BenchApp {
         h_flex()
             .id(id.clone())
             .max_w(px(260.))
-            .h(px(32.))
+            .h(px(super::CHIP_H))
             .pl_1()
             .pr_2()
             .gap_1p5()
@@ -794,7 +794,7 @@ impl BenchApp {
                 if here && media::kind(path) == Kind::Image {
                     d.child(
                         img(local.clone())
-                            .size(px(24.))
+                            .size(px(20.))
                             .flex_none()
                             .object_fit(ObjectFit::Cover),
                     )

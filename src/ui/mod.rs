@@ -307,6 +307,10 @@ pub fn file_icon(
 /// switches, pickers, its buttons — match it, so nothing in a form changes size.
 pub const FIELD_H: f32 = 28.;
 
+/// The height of every small row and chip in the thread: an attachment's chip, a message that
+/// waits in the queue, a plan's head. One height, so these rows do not jump about each other.
+pub const CHIP_H: f32 = FIELD_H;
+
 /// A code editor's line (gpui-kit's editor: the mono font × 1.5): what a block as tall as its
 /// text counts in.
 pub fn editor_line(cx: &App) -> f32 {

@@ -203,6 +203,8 @@ impl BenchApp {
         };
         let head = super::block_head(&theme, open)
             .id("plan-head")
+            // As short as the thread's other small rows, not as tall as a block's head.
+            .h(px(super::CHIP_H))
             .gap_1p5()
             .cursor_pointer()
             .hover(|s| s.text_color(theme.foreground))
