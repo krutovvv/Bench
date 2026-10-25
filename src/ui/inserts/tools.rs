@@ -66,7 +66,6 @@ impl InsertKind for Tools {
         if app.tools.tool != tool {
             app.select_tool(tool, window, cx);
         }
-        let theme = cx.theme().clone();
         Some(div().h(px(H)).mx(px(-12.)).my(px(-8.)).child(app.render_tools_body(cx)).into_any_element())
     }
 
