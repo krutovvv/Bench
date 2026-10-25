@@ -165,81 +165,34 @@ impl HermesApp {
 }
 
 impl HermesApp {
-    /// A new file host (the Files group's "+"), in the chat area like the server form.
+    /// A new file host, inside the thread: into the agent's store (this project's), then attached.
     pub(super) fn render_host_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
         let f = &self.files_remote;
-        let label = |title: &'static str, hint: &'static str| {
-            v_flex()
-                .w(px(220.))
-                .flex_none()
-                .gap_0p5()
-                .child(div().text_sm().child(title))
-                .child(div().text_xs().text_color(muted).child(hint))
-        };
-        let row = |title: &'static str, hint: &'static str, field: AnyElement| {
-            h_flex()
-                .gap_4()
-                .py_3()
-                .items_center()
-                .border_b_1()
-                .border_color(theme.border)
-                .child(label(title, hint))
-                .child(div().flex_1().child(field))
-        };
-        let button = |id: &'static str, text: &'static str, primary: bool| {
-            div()
-                .id(id)
-                .h(rems(super::BAR_CONTROL_REMS))
-                .px_4()
-                .flex()
-                .items_center()
-                .text_sm()
-                .cursor_pointer()
-                .when(primary, |d| {
-                    d.bg(theme.primary)
-                        .text_color(theme.primary_foreground)
-                        .hover(|s| s.bg(theme.primary_hover))
-                })
-                .when(!primary, |d| d.border_1().border_color(theme.border).hover(|s| s.bg(theme.list_hover)))
-                .child(text)
-        };
         let kind = super::tools::segmented("host-kind", &["FTP", "FTPS", "SFTP"], f.f_kind, cx, |this, k, _, cx| {
             this.files_remote.f_kind = k;
             cx.notify();
         });
-        v_flex()
-            .id("host-form")
-            .size_full()
-            .overflow_y_scroll()
-            .px_4()
-            .pb_6()
-            .child(div().pt_4().pb_1().text_xs().text_color(muted).child("FILE HOST · FTP, FTPS, SFTP"))
-            .child(
-                v_flex()
-                    .max_w(px(720.))
-                    .child(row("Name", "How the list shows it. Empty = the address.", Input::new(&f.f_name).into_any_element()))
-                    .child(row("Protocol", "FTPS is FTP over TLS.", kind))
-                    .child(row("Host", "Address or domain.", Input::new(&f.f_host).into_any_element()))
-                    .child(row("Port", "Empty = 21 (FTP, FTPS) or 22 (SFTP).", Input::new(&f.f_port).into_any_element()))
-                    .child(row("User", "The login.", Input::new(&f.f_user).into_any_element()))
-                    .child(row("Password", "Kept in the agent's store, ~/.bench/bench.sqlite.", Input::new(&f.f_password).into_any_element()))
-                    .child(row("Folder", "Where the files open. Empty = the login's home.", Input::new(&f.f_path).into_any_element()))
-                    .child(div().py_3().text_xs().text_color(muted).child(
-                        "The host goes into the agent's store, so the agent reaches its files with \
-                         remote_files in this host's threads, also with Bench closed.",
-                    ))
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .child(button("host-save", "Add and open", true).on_click(cx.listener(|this, _, window, cx| this.save_host(window, cx))))
-                            .child(button("host-cancel", "Cancel", false).on_click(cx.listener(|this, _, _, cx| {
-                                this.files_remote.form = false;
-                                cx.notify();
-                            }))),
-                    ),
-            )
-            .into_any_element()
+        let field = |e: &Entity<gpui_kit::component::input::InputState>| Input::new(e).into_any_element();
+        let rows = vec![
+            ("Name", field(&f.f_name)),
+            ("Protocol", kind),
+            ("Host", field(&f.f_host)),
+            ("Port", field(&f.f_port)),
+            ("User", field(&f.f_user)),
+            ("Password", field(&f.f_password)),
+            ("Folder", field(&f.f_path)),
+        ];
+        let actions = vec![
+            super::form_action("host-save", "Add and open", true, cx)
+                .on_click(cx.listener(|this, _, window, cx| this.save_host(window, cx)))
+                .into_any_element(),
+            super::form_action("host-cancel", "Cancel", false, cx)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.files_remote.form = false;
+                    cx.notify();
+                }))
+                .into_any_element(),
+        ];
+        super::inline_form("New file host", rows, Some("Empty name = the address; empty port = 21 (FTP, FTPS) or 22 (SFTP). The password is kept in the agent's store.".into()), actions, cx)
     }
 }

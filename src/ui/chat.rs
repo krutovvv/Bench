@@ -114,9 +114,30 @@ impl HermesApp {
         };
         // The block comes from the agent: its row, its avatar, like an answer.
         let theme = cx.theme().clone();
+        // `BENCH_DEMO=new-project`: the new project's form, once (for screenshots).
+        if self.demo && !self.subject_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
+            self.subject_opened = true;
+            self.new_project_form(window, cx);
+        }
+        // A form (a new project; a new server or file host) is a block of the thread too: the new
+        // project's at the top of its empty thread, the others with the tools, under the
+        // conversation.
+        let form: Option<(AnyElement, bool)> = if self.project_form.is_some() {
+            Some((self.render_project_form(cx), true))
+        } else if self.files_remote.form {
+            Some((self.render_host_form(cx), false))
+        } else if self.ssh.form.is_some() {
+            Some((self.render_server_form(cx), false))
+        } else {
+            None
+        };
+        let (block, block_on_top_form) = match form {
+            Some((f, top)) => (Some(f), Some(top)),
+            None => (block, None),
+        };
         // A tool attached with / sits where the work goes on: under the conversation, over the
         // composer. A project's environment is the thread's document: at the top.
-        let block_on_top = subject.starts_with("env:");
+        let block_on_top = block_on_top_form.unwrap_or_else(|| subject.starts_with("env:"));
         let subject_block = block.map(|content| {
             h_flex()
                 .w_full()

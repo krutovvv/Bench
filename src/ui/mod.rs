@@ -450,12 +450,10 @@ impl Render for HermesApp {
         self.update_browser_stream();
         let theme = cx.theme().clone();
         // The server form (new or edited server) takes the chat area while open.
-        let ssh = (self.ssh.on || self.ssh.form.is_some()) && self.panel == Panel::Chat;
+        let ssh = self.ssh.on && self.panel == Panel::Chat;
         let body = match self.panel {
             Panel::Chat if self.tasks.on => self.render_tasks_body(cx),
             Panel::Chat if self.tools.on => self.render_tools_body(cx),
-            Panel::Chat if self.project_form.is_some() => self.render_project_form(cx),
-            Panel::Chat if self.files_remote.form => self.render_host_form(cx),
             Panel::Chat if ssh => self.render_ssh_body(window, cx),
             // Files dropped anywhere on the chat or the input are attached.
             Panel::Chat => v_flex()
@@ -625,3 +623,37 @@ impl HermesApp {
             .into_any_element()
     }
 }
+
+/// A form inside the thread, as the environment block's rows: a muted label, the field; a short
+/// note; then its actions (the primary one filled). No page of its own, no hints column.
+pub fn inline_form(title: &'static str, rows: Vec<(&'static str, AnyElement)>, note: Option<SharedString>, actions: Vec<AnyElement>, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    v_flex()
+        .w_full()
+        .gap_1()
+        .child(div().pb_1().font_weight(FontWeight::MEDIUM).child(title))
+        .children(rows.into_iter().map(|(label, field)| {
+            h_flex()
+                .gap_3()
+                .items_center()
+                .child(div().w(px(110.)).flex_none().text_color(theme.muted_foreground).child(label))
+                .child(div().flex_1().max_w(px(560.)).child(field))
+        }))
+        .children(note.map(|n| div().pt_1().text_color(theme.muted_foreground).child(n)))
+        .child(h_flex().pt_2().gap_3().children(actions))
+        .into_any_element()
+}
+
+/// A form's action: the primary one filled, the others quiet text.
+pub fn form_action(id: &'static str, label: &'static str, primary: bool, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme();
+    let (fg, bg, hover, muted) = (theme.primary_foreground, theme.primary, theme.primary_hover, theme.muted_foreground);
+    let text = theme.foreground;
+    div()
+        .id(id)
+        .cursor_pointer()
+        .when(primary, |d| d.px_2().bg(bg).text_color(fg).hover(move |s| s.bg(hover)))
+        .when(!primary, |d| d.text_color(muted).hover(move |s| s.text_color(text)))
+        .child(label)
+}
+

@@ -5,7 +5,7 @@ use std::sync::atomic::Ordering;
 
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -192,146 +192,38 @@ impl HermesApp {
         }
     }
 
-    fn render_server_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
+    /// A new (or edited) server, inside the thread: saved in ~/.ssh/config, then attached to it.
+    pub(super) fn render_server_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let editing = self.ssh.form.clone().flatten();
-        let row = |title: &'static str, hint: &'static str, field: &Entity<InputState>| {
-            h_flex()
-                .gap_4()
-                .py_3()
-                .items_center()
-                .border_b_1()
-                .border_color(theme.border)
-                .child(
-                    v_flex()
-                        .w(px(220.))
-                        .flex_none()
-                        .gap_0p5()
-                        .child(div().text_sm().child(title))
-                        .child(div().text_xs().text_color(muted).child(hint)),
-                )
-                .child(div().flex_1().child(Input::new(field)))
-        };
-        let button = |id: &'static str, label: &'static str, primary: bool| {
-            div()
-                .id(id)
-                .h(rems(super::BAR_CONTROL_REMS))
-                .px_4()
-                .flex()
-                .items_center()
-                .text_sm()
-                .cursor_pointer()
-                .when(primary, |d| {
-                    d.bg(theme.primary)
-                        .text_color(theme.primary_foreground)
-                        .hover(|s| s.bg(theme.primary_hover))
-                })
-                .when(!primary, |d| {
-                    d.border_1()
-                        .border_color(theme.border)
-                        .hover(|s| s.bg(theme.list_hover))
-                })
-                .child(label)
-        };
-        v_flex()
-            .id("server-form")
-            .size_full()
-            .overflow_y_scroll()
-            .px_4()
-            .pb_6()
-            .child(
-                div()
-                    .pt_4()
-                    .pb_1()
-                    .text_xs()
-                    .text_color(muted)
-                    .child("SERVER · ~/.ssh/config"),
-            )
-            .child(
-                v_flex()
-                    .max_w(px(720.))
-                    .child(row(
-                        "Name",
-                        "The Host alias: ssh <name>.",
-                        &self.ssh.f_alias,
-                    ))
-                    .child(row(
-                        "Host",
-                        "Address or domain (HostName).",
-                        &self.ssh.f_host,
-                    ))
-                    .child(row("User", "Empty = your Mac user.", &self.ssh.f_user))
-                    // The key: a path (IdentityFile), never a password.
-                    .child(
-                        h_flex()
-                            .gap_4()
-                            .py_3()
-                            .items_center()
-                            .border_b_1()
-                            .border_color(theme.border)
-                            .child(
-                                v_flex()
-                                    .w(px(220.))
-                                    .flex_none()
-                                    .gap_0p5()
-                                    .child(div().text_sm().child("Key file"))
-                                    .child(
-                                        div()
-                                            .text_xs()
-                                            .text_color(muted)
-                                            .child("Private key. Empty = ssh-agent."),
-                                    ),
-                            )
-                            .child(div().flex_1().child(Input::new(&self.ssh.f_key)))
-                            .child(button("srv-key", "Choose…", false).on_click(cx.listener(
-                                |this, _, window, cx| this.pick_key_file(window, cx),
-                            ))),
-                    )
-                    .child(row("Port", "Empty = 22.", &self.ssh.f_port))
-                    .child(row(
-                        "Folder",
-                        "Groups servers in the list.",
-                        &self.ssh.f_folder,
-                    ))
-                    .child(row(
-                        "Default folder",
-                        "Files and Zed open here. Empty = home.",
-                        &self.ssh.f_path,
-                    ))
-                    .child(div().py_3().text_xs().text_color(muted).child(
-                        "Saved in ~/.ssh/config: the connection and the key as ssh options \
-                         (HostName, User, IdentityFile, Port), the folder and the default folder as \
-                         # comments in the server's Host block (ssh ignores them), so there is one \
-                         place for all of it. ssh, scp, Zed and other tools \
-                         see the same server; the previous file is kept as config.bak-bench. \
-                         No passwords are stored: ssh signs in with your keys and ssh-agent.",
-                    ))
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .child(
-                                button(
-                                    "srv-save",
-                                    if editing.is_some() {
-                                        "Save and connect"
-                                    } else {
-                                        "Add and connect"
-                                    },
-                                    true,
-                                )
-                                .on_click(
-                                    cx.listener(|this, _, window, cx| this.save_server(window, cx)),
-                                ),
-                            )
-                            .child(button("srv-cancel", "Cancel", false).on_click(cx.listener(
-                                |this, _, _, cx| {
-                                    this.ssh.form = None;
-                                    cx.notify();
-                                },
-                            ))),
-                    ),
-            )
-            .into_any_element()
+        let f = |e: &Entity<InputState>| Input::new(e).into_any_element();
+        let rows = vec![
+            ("Name", f(&self.ssh.f_alias)),
+            ("Host", f(&self.ssh.f_host)),
+            ("User", f(&self.ssh.f_user)),
+            ("Port", f(&self.ssh.f_port)),
+            ("Key file", f(&self.ssh.f_key)),
+            ("Folder", f(&self.ssh.f_path)),
+        ];
+        let actions = vec![
+            super::form_action("srv-save", if editing.is_some() { "Save and connect" } else { "Add and connect" }, true, cx)
+                .on_click(cx.listener(|this, _, window, cx| this.save_server(window, cx)))
+                .into_any_element(),
+            super::form_action("srv-key", "Choose a key…", false, cx)
+                .on_click(cx.listener(|this, _, window, cx| this.pick_key_file(window, cx)))
+                .into_any_element(),
+            super::form_action("srv-cancel", "Cancel", false, cx)
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.ssh.form = None;
+                    cx.notify();
+                }))
+                .into_any_element(),
+        ];
+        super::inline_form(
+            if editing.is_some() { "Server" } else { "New server" },
+            rows,
+            Some("Saved in ~/.ssh/config (ssh signs in with your keys; no passwords are kept). Empty port = 22, empty folder = home.".into()),
+            actions,
+            cx,
+        )
     }
 }

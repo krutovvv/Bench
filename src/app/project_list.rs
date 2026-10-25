@@ -17,8 +17,13 @@ pub struct ProjectForm {
     pub name: Entity<InputState>,
     /// A codebase on disk, if it has one.
     pub folder: Option<String>,
-    /// A server whose agent the project is (an ~/.ssh/config host); None = this Mac.
+    /// A server whose agent the project is (an ~/.ssh/config host); None = this Mac, Some("") =
+    /// another server, typed in below (it goes into ~/.ssh/config too).
     pub host: Option<String>,
+    pub new_host: Entity<InputState>,
+    pub new_user: Entity<InputState>,
+    pub new_port: Entity<InputState>,
+    pub new_key: Entity<InputState>,
 }
 
 impl HermesApp {
@@ -54,12 +59,23 @@ impl HermesApp {
 
     /// The sidebar's "+": the new project's form takes the chat area.
     pub fn new_project_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Its own empty thread: the form is that thread's first block.
+        self.new_session(cx);
+        self.thread_project = String::new();
         self.panel = super::Panel::Chat;
         self.ssh.form = None;
         self.files_remote.form = false;
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
         name.update(cx, |s, cx| s.focus(window, cx));
-        self.project_form = Some(ProjectForm { name, folder: None, host: None });
+        let field = |hint: &str, window: &mut Window, cx: &mut Context<Self>| {
+            let hint = hint.to_string();
+            cx.new(|cx| InputState::new(window, cx).placeholder(hint))
+        };
+        let new_host = field("Address or domain", window, cx);
+        let new_user = field("Login", window, cx);
+        let new_port = field("22", window, cx);
+        let new_key = field("Private key file (empty = ssh-agent)", window, cx);
+        self.project_form = Some(ProjectForm { name, folder: None, host: None, new_host, new_user, new_port, new_key });
         cx.notify();
     }
 
@@ -104,7 +120,32 @@ impl HermesApp {
             self.toast(NotificationType::Error, "The project needs a name".to_string(), window, cx);
             return;
         }
-        let body = json!({"name": name, "folder": form.folder, "host": form.host});
+        // Another server: into ~/.ssh/config first, named after the project.
+        let mut host = form.host.clone();
+        if host.as_deref() == Some("") {
+            let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
+            let address = v(&form.new_host);
+            if address.is_empty() {
+                self.toast(NotificationType::Error, "The server's address is empty".to_string(), window, cx);
+                return;
+            }
+            let alias: String = name
+                .to_lowercase()
+                .chars()
+                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+                .collect::<String>()
+                .trim_matches('-')
+                .to_string();
+            let alias = if alias.is_empty() { address.clone() } else { alias };
+            let server = crate::sshconfig::Server { alias: alias.clone(), hostname: address, user: v(&form.new_user), port: v(&form.new_port), identity: v(&form.new_key), ..Default::default() };
+            if let Err(e) = crate::sshconfig::save(None, &server) {
+                self.toast(NotificationType::Error, format!("~/.ssh/config: {e:#}"), window, cx);
+                return;
+            }
+            host = Some(alias);
+        }
+        let body = json!({"name": name, "folder": form.folder, "host": host});
+        self.reload_servers(cx);
         let profile = self.current_profile();
         self.background(
             window,
