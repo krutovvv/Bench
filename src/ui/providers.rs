@@ -516,42 +516,7 @@ impl BenchApp {
             );
         }
 
-        // ---- keys ----
-        page.push(
-            self.pv_heading("SERVICE KEYS · .env", cx)
-                .into_any_element(),
-        );
-        for k in 0..self.pv.keys.len() {
-            let f = &self.pv.keys[k];
-            let (key, input) = (f.key.clone(), f.input.clone());
-            let k1 = key.clone();
-            let controls = h_flex()
-                .gap_2()
-                .child(div().flex_1().child(self.pv_input(&input)))
-                .child(self.pv_button(
-                    ("key-save", k),
-                    "Save",
-                    false,
-                    cx,
-                    Box::new(move |this, w, cx| this.save_key(k1.clone(), w, cx)),
-                ));
-            let hint = if f.value.is_empty() {
-                "Not set · "
-            } else {
-                ""
-            };
-            page.push(
-                self.pv_row(
-                    key,
-                    format!("{hint}{}", crate::ui::clip(&f.hint, 70)),
-                    controls.into_any_element(),
-                    cx,
-                )
-                .into_any_element(),
-            );
-        }
-
-        // The rest of the settings on the same page: one page, no tabs.
+        // No list of keys here: each key is set on the card or MCP server that reads it.
         page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
         page.push(self.render_appearance(cx).into_any_element());
         v_flex()

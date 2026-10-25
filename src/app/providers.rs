@@ -1,7 +1,7 @@
 //! Settings → Providers and Messages, for the current machine and profile, through the agent's
 //! API: custom (OpenAI-compatible) endpoints, OpenRouter with the models picked for the model
-//! list, the fallback model, voice (speech to text, text to speech), service keys from `.env`,
-//! and Telegram.
+//! list, the fallback model, voice (speech to text, text to speech) and Telegram. A key is set
+//! on the card that uses it, never in a list of names.
 
 use std::collections::HashMap;
 
@@ -14,17 +14,10 @@ use super::BenchApp;
 use crate::connection;
 use crate::rest::{self, ModelChoice};
 
-/// Service keys shown even when not set: the ones the agent's tools use most.
-const COMMON_KEYS: [&str; 5] = [
-    "TAVILY_API_KEY",
-    "BRAVE_SEARCH_API_KEY",
-    "GITHUB_TOKEN",
-    "FIRECRAWL_API_KEY",
-    "ELEVENLABS_API_KEY",
-];
-
 /// One `.env` value with its field: what it is and the value as the agent shows it (redacted:
 /// it says the key is set). Saving an unchanged field does nothing; an emptied one removes the key.
+/// Only the cards that own a key use it (an endpoint's, OpenRouter's): the settings page has no
+/// list of keys, since a key with no MCP server or card reading it is dead weight.
 pub struct KeyField {
     pub key: String,
     pub hint: String,
@@ -73,7 +66,6 @@ pub struct PickerPrefs {
 pub struct Providers {
     pub loaded: bool,
     pub endpoints: Vec<EndpointForm>,
-    pub keys: Vec<KeyField>,
     pub openrouter_key: Option<KeyField>,
     pub voice: Option<Voice>,
     pub fallback: Option<(String, String)>,
@@ -286,40 +278,9 @@ impl BenchApp {
                 value,
             }
         };
-        // Set keys first, then the common ones not set yet. Not here: model provider keys
-        // (their cards have them), Telegram (Messages tab), anything a channel page owns.
-        let endpoint_keys: Vec<String> = yaml["providers"]
-            .as_object()
-            .into_iter()
-            .flatten()
-            .filter_map(|(_, e)| e["key_env"].as_str().map(str::to_string))
-            .collect();
-        let mut names: Vec<String> = env
-            .as_object()
-            .into_iter()
-            .flatten()
-            .filter(|(k, v)| {
-                v["is_set"].as_bool() == Some(true)
-                    && v["channel_managed"].as_bool() != Some(true)
-                    && !k.starts_with("TELEGRAM_")
-                    && *k != "OPENROUTER_API_KEY"
-                    && !endpoint_keys.contains(k)
-                    && v["category"].as_str() != Some("provider")
-                    // Keys and tokens only: .env also holds plain settings (timeouts, flags).
-                    && ["_KEY", "_TOKEN", "_SECRET"].iter().any(|e| k.ends_with(e))
-                    // Model endpoints' keys belong to their cards; the API server's is the agent's own.
-                    && !k.contains("CUSTOM_")
-                    && *k != "API_SERVER_KEY"
-            })
-            .map(|(k, _)| k.clone())
-            .collect();
-        names.sort();
-        for k in COMMON_KEYS {
-            if !names.iter().any(|n| n == k) {
-                names.push(k.to_string());
-            }
-        }
-        self.pv.keys = names.iter().map(|k| key_field(k, window, cx)).collect();
+        // Keys are set where they are used: in a card (an endpoint's, OpenRouter's), or in an
+        // MCP server's own config. The old list of every `.env` key is gone; the agent still
+        // fills `${NAME}` from them, and they stay in its store.
         self.pv.openrouter_key = Some(key_field("OPENROUTER_API_KEY", window, cx));
 
         let f = &yaml["fallback_providers"][0];
@@ -502,14 +463,14 @@ impl BenchApp {
         );
     }
 
-    /// Save a key as its field shows it: a changed value is written, an emptied field removes
-    /// the key, an unchanged one does nothing.
+    /// Save a key as its field shows it (OpenRouter's, the one key the agent keeps in its env
+    /// rather than on a card): a changed value is written, an emptied field removes the key,
+    /// an unchanged one does nothing.
     pub fn save_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
         let field = self
             .pv
-            .keys
+            .openrouter_key
             .iter()
-            .chain(self.pv.openrouter_key.iter())
             .find(|f| f.key == key);
         let Some(f) = field else { return };
         let value = text(&f.input, cx);
