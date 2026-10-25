@@ -41,6 +41,22 @@ pub enum Cmd {
         id: String,
         patch: Value,
     },
+    /// A message sent while the agent works: it waits in the conversation's queue (Pi's inbox)
+    /// until the agent answers.
+    Queue {
+        session: String,
+        text: String,
+        context: String,
+    },
+    /// A waiting message taken back, or sent now (into the running work).
+    QueueWithdraw {
+        session: String,
+        id: String,
+    },
+    QueueSend {
+        session: String,
+        id: String,
+    },
     Send {
         profile: String,
         session: String,
@@ -166,6 +182,10 @@ pub enum Evt {
         session: String,
         runtime: String,
     },
+    /// A thread's waiting messages: (id, "followUp"/"steer", text).
+    Queue(String, Vec<(String, String, String)>),
+    /// A waiting message the agent took up: it is the thread's next turn.
+    UserPlaced(String, String),
     /// A thread's inserts as the agent keeps them (the whole list, in order).
     Inserts(String, Vec<crate::model::Insert>),
     /// The agent refused an insert's change: the thread's list is read again.
@@ -347,6 +367,15 @@ impl Rpc {
                     Pending::Ignore,
                 )?
             }
+            Cmd::Queue { session, text, context } => {
+                let mut params = json!({"session_id": session, "text": text, "mode": "queue"});
+                if !context.is_empty() {
+                    params["context"] = json!(context);
+                }
+                self.call("prompt.submit", params, Pending::Ignore)?
+            }
+            Cmd::QueueWithdraw { session, id } => self.call("session.queue.withdraw", json!({"session_id": session, "id": id}), Pending::Ignore)?,
+            Cmd::QueueSend { session, id } => self.call("session.queue.send", json!({"session_id": session, "id": id}), Pending::Ignore)?,
             Cmd::Insert { session, id, key, state } => self.call(
                 "session.insert",
                 json!({"session_id": session, "id": id, "key": key, "state": state}),
@@ -573,6 +602,10 @@ fn run(
                 if r["info"].is_object() {
                     replay.push(json!({"type": "session.info", "session_id": runtime,
                                        "payload": r["info"]}));
+                }
+                if r["queue"].is_array() {
+                    replay.push(json!({"type": "session.queue", "session_id": runtime,
+                                       "payload": {"items": r["queue"]}}));
                 }
                 if r["inserts"].is_array() {
                     replay.push(json!({"type": "session.inserts", "session_id": runtime,
@@ -880,6 +913,21 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         }
         "sessions.changed" => emit(Evt::SessionsChanged),
         "session.inserts" => emit(Evt::Inserts(sid, inserts(&payload["inserts"]))),
+        "session.queue" => emit(Evt::Queue(
+            sid,
+            payload["items"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .map(|i| {
+                            let s = |k: &str| i[k].as_str().unwrap_or_default().to_string();
+                            (s("id"), s("mode"), s("text"))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
+        )),
+        "message.user" => emit(Evt::UserPlaced(sid, text())),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
         "message.complete" => {
             if payload["usage"].is_object() {

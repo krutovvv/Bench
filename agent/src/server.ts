@@ -118,6 +118,7 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 			running: live.busy,
 			messages: await rt.history(session_id),
 			inserts: await rt.inserts(session_id),
+			queue: await rt.queue(session_id),
 			prompts: rt.pendingPrompts(session_id),
 			info: { reasoning_effort: row.effort, model: row.model, cwd: row.cwd, revision: 0, execution_generation: live.generation },
 			todo_state: { todos: row.todos },
@@ -133,8 +134,15 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 		broadcast(session_id, "sessions.changed", {});
 		return { ok: true };
 	},
-	"prompt.submit": async ({ session_id, text, attachments, context }) => {
-		await rt.submit(session_id, String(text ?? ""), attachments ?? [], String(context ?? ""));
+	"prompt.submit": async ({ session_id, text, attachments, context, mode }) => {
+		await rt.submit(session_id, String(text ?? ""), attachments ?? [], String(context ?? ""), mode === "queue" ? "queue" : "steer");
+		return { ok: true };
+	},
+	// The messages waiting while the agent works (Pi's inbox): take one back, or send it now.
+	"session.queue": async ({ session_id }) => ({ items: await rt.queue(String(session_id)) }),
+	"session.queue.withdraw": async ({ session_id, id }) => ({ result: await rt.withdraw(String(session_id), String(id)) }),
+	"session.queue.send": async ({ session_id, id }) => {
+		await rt.sendNow(String(session_id), String(id));
 		return { ok: true };
 	},
 	"session.interrupt": async ({ session_id }) => {

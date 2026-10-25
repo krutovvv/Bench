@@ -122,6 +122,8 @@ pub struct HermesApp {
     pub inserts: HashMap<String, Vec<crate::model::Insert>>,
     /// A new chat's session is being made (an insert came before any message).
     pub creating: bool,
+    /// The open thread's messages waiting for the agent: (id, mode, text).
+    pub queue: Vec<(String, String, String)>,
     /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
     /// new one (the row's "+"), `Some(Some(id))` = that thread (a row under the subject).
     pub subject_target: Option<Option<String>>,
@@ -636,6 +638,7 @@ impl HermesApp {
             new_subject: String::new(),
             inserts: HashMap::new(),
             creating: false,
+            queue: Vec::new(),
             subject_target: None,
             thread_project: String::new(),
             projects: vec![],
@@ -819,6 +822,15 @@ impl HermesApp {
     /// To the agent the command concerns (`remotes.rs`): this Mac's, or a remote project's.
     fn cmd(&self, cmd: Cmd) {
         self.route(cmd);
+    }
+
+    /// A waiting message (the thread's queue): sent now, into the running work, or taken back.
+    pub fn queued(&mut self, id: String, send_now: bool, cx: &mut Context<Self>) {
+        let Some(session) = self.runtime.clone() else {
+            return;
+        };
+        self.cmd(if send_now { Cmd::QueueSend { session, id } } else { Cmd::QueueWithdraw { session, id } });
+        cx.notify();
     }
 
     pub fn current_profile(&self) -> String {
@@ -1006,6 +1018,20 @@ impl HermesApp {
                 self.refresh_sessions();
             }
             Evt::Inserts(sid, list) => self.on_inserts(sid, list, cx),
+            Evt::Queue(sid, items) if self.is_current(&sid) => {
+                self.queue = items;
+                cx.notify();
+            }
+            // A waiting message the agent took up: the thread's next turn.
+            Evt::UserPlaced(sid, text) if self.is_current(&sid) => {
+                self.turns.push(Turn {
+                    user: text,
+                    started: Some(now_secs()),
+                    ..Default::default()
+                });
+                self.follow = true;
+                cx.notify();
+            }
             Evt::InsertFailed(sid, e) => {
                 self.toast(NotificationType::Error, format!("The insert didn't change: {e}"), window, cx);
                 // The agent's list is the truth: read it again.
@@ -1310,6 +1336,7 @@ impl HermesApp {
         self.runtime = None;
         self.inserts.remove("draft");
         self.creating = false;
+        self.queue.clear();
         // A new chat starts on the profile's level.
         self.effort_other = None;
         self.effort = self.profile_effort;
@@ -1608,8 +1635,7 @@ impl HermesApp {
             return;
         };
         let files = self.attachments.clone();
-        if (typed.is_empty() && files.is_empty() && self.snippets.is_empty()) || self.live.is_some()
-        {
+        if typed.is_empty() && files.is_empty() && self.snippets.is_empty() {
             return;
         }
         // Enter in the command list picks the command instead of sending.
@@ -1621,6 +1647,27 @@ impl HermesApp {
             let command = command.trim().to_string();
             self.composer.update(cx, |s, cx| s.set_value("", window, cx));
             self.run_bang(command, window, cx);
+            return;
+        }
+        // While the agent works, a message waits in the thread's queue (files come after it).
+        if self.live.is_some() {
+            if !files.is_empty() {
+                self.toast(NotificationType::Info, "Files go with the next message, once the agent answers", window, cx);
+                return;
+            }
+            let Some(session) = self.runtime.clone() else {
+                return;
+            };
+            let text = std::iter::once(typed)
+                .filter(|t| !t.is_empty())
+                .chain(self.snippets.drain(..).map(|s| s.block()))
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            self.composer.update(cx, |s, cx| s.set_value("", window, cx));
+            self.note_draft(cx);
+            let context = self.block_context(cx);
+            self.cmd(Cmd::Queue { session, text, context });
+            cx.notify();
             return;
         }
         // Code from the IDE follows the words, each block naming its file and lines.

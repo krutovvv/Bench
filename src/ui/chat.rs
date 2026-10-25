@@ -171,6 +171,7 @@ impl HermesApp {
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
+        let queue = self.render_queue(cx);
         let composer = self.render_composer(cx);
 
         div()
@@ -216,6 +217,8 @@ impl HermesApp {
                             .children(approval)
                             .children(clarify)
                             .children(subject_block)
+                            // What waits for the agent, over the next message.
+                            .children(queue)
                             // The next message is the thread's last row, as in Delta: it scrolls
                             // away with the thread, "Jump to latest" brings it back.
                             .child(composer),
@@ -245,6 +248,59 @@ impl HermesApp {
                 )
             })
             .into_any_element()
+    }
+
+    /// The messages sent while the agent works, waiting in the thread's queue (Pi's inbox) until
+    /// it answers: each can go now (into the running work) or be taken back.
+    fn render_queue(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        if self.queue.is_empty() {
+            return None;
+        }
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let rows: Vec<AnyElement> = self
+            .queue
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(k, (id, mode, text))| {
+                let (send_id, rm_id) = (id.clone(), id.clone());
+                let steer = mode == "steer";
+                let first = text.lines().next().unwrap_or_default().to_string();
+                h_flex()
+                    .id(("queued", k))
+                    .gap_2()
+                    .px_3()
+                    .py_1()
+                    .items_center()
+                    .border_1()
+                    .rounded_md()
+                    .border_color(theme.border)
+                    .child(div().flex_none().text_sm().text_color(muted).child(if steer { "Next" } else { "Queued" }))
+                    .child(div().flex_1().min_w_0().truncate().child(first))
+                    .when(!steer, |d| {
+                        d.child(icon_button(("queued-send", k), Ico::Play, "Send now: into the running work", cx).on_click(cx.listener(move |this, _, _, cx| {
+                            this.click_claimed = true;
+                            this.queued(send_id.clone(), true, cx);
+                        })))
+                    })
+                    .child(icon_button(("queued-rm", k), Ico::X, "Take it back", cx).on_click(cx.listener(move |this, _, _, cx| {
+                        this.click_claimed = true;
+                        this.queued(rm_id.clone(), false, cx);
+                    })))
+                    .into_any_element()
+            })
+            .collect();
+        Some(
+            v_flex()
+                .w_full()
+                .pl(px(super::CHAT_TEXT))
+                .pr(px(super::CHAT_RIGHT))
+                .pt(px(super::TURN_Y))
+                .gap_1()
+                .children(rows)
+                .into_any_element(),
+        )
     }
 
     fn render_turn(&mut self, i: usize, cx: &mut Context<Self>) -> AnyElement {

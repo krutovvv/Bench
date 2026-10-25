@@ -8,7 +8,7 @@ import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messag
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { InsertEntry, Inserts, insertsOf, patchInsert, type InsertView } from "./inserts.ts";
 import type { JsonObject } from "@earendil-works/chord";
-import { createRegistry, Harness, watchEvents, type AgentEvent, type Conversation } from "@earendil-works/pi-durable";
+import { createRegistry, Harness, InboxDoc, watchEvents, type AgentEvent, type Conversation } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { randomBytes, randomUUID } from "node:crypto";
@@ -51,6 +51,27 @@ interface Live {
 	toolArgs: Map<string, any>;
 	/** The thread's inserts as last read from Pi (the tools' view of them). */
 	inserts: InsertView[];
+	/** The messages waiting in Pi's inbox, as last told to Bench. */
+	queue: QueuedMessage[];
+	/** Follow-ups Pi placed while the run was ending: told to Bench after its answer, so each answer stays with its message. */
+	placed: string[];
+	/** Messages this agent queued, by Pi submission id, until placed or taken back. */
+	pending: Map<string, { text: string; mode: string }>;
+	/** Queue checks, one at a time. */
+	queueLine: Promise<void>;
+}
+
+/** A message the person sent while the agent works, waiting in the conversation's inbox. */
+export interface QueuedMessage {
+	id: string;
+	/** "followUp": sent when the agent answers; "steer": joins the running work after its tools. */
+	mode: string;
+	text: string;
+}
+
+/** The text of a user message's content (a string, or blocks). */
+function contentText(c: any): string {
+	return typeof c === "string" ? c : Array.isArray(c) ? c.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("") : "";
 }
 
 /** An old thread's subject as an insert: "files:<id>" → files {host}, "tasks:today" → tasks {list}… */
@@ -251,6 +272,10 @@ export class Runtime {
 			approvedForSession: new Set(),
 			toolArgs: new Map(),
 			inserts: [],
+			queue: [],
+			placed: [],
+			pending: new Map(),
+			queueLine: Promise.resolve(),
 		};
 		this.live.set(row.id, live);
 		this.byConversation.set(String(conversation.id), live);
@@ -281,7 +306,11 @@ export class Runtime {
 
 	// ---- turns -----------------------------------------------------------
 
-	async submit(id: string, text: string, attachments: { path: string; mime: string }[] = [], context = ""): Promise<void> {
+	/**
+	 * A message from the person. While the agent works it waits in Pi's inbox (`mode` "queue",
+	 * sent when the agent answers) or joins the running work after its current tools ("steer").
+	 */
+	async submit(id: string, text: string, attachments: { path: string; mime: string }[] = [], context = "", mode: "queue" | "steer" = "steer"): Promise<void> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const row = this.store.get(id)!;
@@ -298,8 +327,14 @@ export class Runtime {
 		const content: any = images.length ? [{ type: "text", text: said }, ...images] : said;
 		this.store.addMessage(id, { role: "user", text });
 		if (live.busy) {
-			// Mid-run the message steers the work: Pi places it after the current tool round.
-			await live.conversation.submit({ type: "input", content, whenBusy: "steer", requestId: randomUUID() }, ctx);
+			// Queued: Pi keeps it in the inbox until the run answers. Steered: placed after the
+			// current tool round.
+			const sub = await live.conversation.submit({ type: "input", content, whenBusy: mode === "queue" ? "followUp" : "steer", requestId: randomUUID() }, ctx);
+			// Watched until Pi places it (its turn starts) or it is taken back.
+			if (mode === "queue") {
+				live.pending.set(String(sub.id), { text, mode: "followUp" });
+				this.queueChanged(live);
+			}
 			return;
 		}
 		live.busy = true;
@@ -323,6 +358,85 @@ export class Runtime {
 			live.prompts.delete(pid);
 		}
 		await live.conversation.abort(ctx);
+	}
+
+	// ---- the queue (Pi's inbox) ------------------------------------------------
+
+	/** The messages waiting in the thread's inbox, oldest first. */
+	async queue(id: string): Promise<QueuedMessage[]> {
+		const live = this.live.get(id) ?? (await this.session(id));
+		if (!live) return [];
+		const inbox = (await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx)) as any;
+		return ((inbox?.items ?? []) as any[])
+			.filter((i) => i.mode !== "write")
+			.map((i) => ({ id: String(i.id), mode: i.mode, text: stripBlock(contentText(i.content)) }));
+	}
+
+	/**
+	 * Something may have changed the queue (Pi's inbox events come in batches, so every chance
+	 * counts: a submit, a withdrawal, a placed entry, a run's start and end). Checks run one at a
+	 * time: Bench gets the queue when it changed, and the text of each queued message Pi placed in
+	 * the conversation, as the thread's next turn.
+	 */
+	private queueChanged(live: Live): void {
+		live.queueLine = live.queueLine.then(() => this.checkQueue(live)).catch((err) => console.error("[queue]", err));
+	}
+
+	private async checkQueue(live: Live): Promise<void> {
+		const now = await this.queue(live.row.id);
+		// Taken back (withdrawn, or dropped by Stop): no longer watched. A placed one is told by
+		// its `entry_appended`.
+		for (const sub of [...live.pending.keys()]) {
+			if (now.some((n) => n.id === sub)) continue;
+			const record = await (await this.harness.submission(sub as any, ctx))?.status(ctx).catch(() => undefined);
+			if (record && (record.status === "queued" || ("entry" in record && record.entry !== undefined))) continue;
+			live.pending.delete(sub);
+		}
+		if (JSON.stringify(now) !== JSON.stringify(live.queue)) {
+			live.queue = now;
+			this.emit(live.row.id, "session.queue", { items: now });
+		}
+	}
+
+	/** Take a waiting message back out of the queue. */
+	async withdraw(id: string, submission: string): Promise<string> {
+		const live = await this.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		const result = await this.harness.abortSubmission(submission as any, ctx, live.conversation.id);
+		if (result === "aborted") {
+			live.pending.delete(submission);
+			await this.dropFromInbox(live, submission);
+		}
+		this.queueChanged(live);
+		return result;
+	}
+
+	/**
+	 * An aborted submission's inbox item: Pi 1.4 marks the submission unanswered but leaves the item,
+	 * and the next boundary still places it. Taken out of the inbox document in a commit.
+	 */
+	private async dropFromInbox(live: Live, submission: string): Promise<void> {
+		await live.conversation.commit(async (tx) => {
+			const inbox = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
+			const at = inbox.items.findIndex((i: any) => String(i.id) === submission);
+			if (at >= 0) inbox.items.splice(at, 1);
+		}, ctx);
+	}
+
+	/** Send a waiting message now: out of the queue, into the running work (or a new run). */
+	async sendNow(id: string, submission: string): Promise<void> {
+		const live = await this.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		const inbox = (await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx)) as any;
+		const item = (inbox?.items ?? []).find((i: any) => String(i.id) === submission);
+		if (!item) return;
+		if ((await this.harness.abortSubmission(submission as any, ctx, live.conversation.id)) !== "aborted") return;
+		live.pending.delete(submission);
+		await this.dropFromInbox(live, submission);
+		// Its turn shows when Pi places it (after the current tools, or when the run answers).
+		const sub = await live.conversation.submit({ type: "input", content: item.content, ...(live.busy ? { whenBusy: "steer" } : {}), requestId: randomUUID() } as any, ctx);
+		live.pending.set(String(sub.id), { text: stripBlock(contentText(item.content)), mode: "steer" });
+		this.queueChanged(live);
 	}
 
 	/** Regenerate: drop the last exchange (a fork before the last user message) so the next prompt replaces it. */
@@ -484,6 +598,21 @@ export class Runtime {
 		const id = live.row.id;
 		if (process.env.BENCH_AGENT_TRACE) fs.appendFileSync(process.env.BENCH_AGENT_TRACE, JSON.stringify(e) + "\n");
 		switch (e.type) {
+			case "inbox_update":
+				this.queueChanged(live);
+				break;
+			case "submission": {
+				// A queued message placed in the conversation: in the event stream's own order (after
+				// the previous run's end, before the next one's start), so its turn comes between them.
+				const rec: any = e.record;
+				const item = live.pending.get(String(rec?.id));
+				if (!item || rec.status !== "placed") break;
+				live.pending.delete(String(rec.id));
+				if (live.busy) live.placed.push(item.text);
+				else this.emit(id, "message.user", { text: item.text, queued: true });
+				this.queueChanged(live);
+				break;
+			}
 			case "run_start":
 				if (!live.busy) {
 					live.busy = true;
@@ -556,6 +685,7 @@ export class Runtime {
 				break;
 			case "run_end":
 				this.finish(live);
+				this.queueChanged(live);
 				break;
 			case "task_failed":
 				console.error("[pi] task failed", e.kind, e.message);
@@ -616,6 +746,7 @@ export class Runtime {
 		this.emitUsage(live);
 		this.emit(id, "message.complete", { text });
 		this.emit(id, "sessions.changed", {});
+		for (const t of live.placed.splice(0)) this.emit(id, "message.user", { text: t, queued: true });
 	}
 
 	// ---- titles ----------------------------------------------------------
