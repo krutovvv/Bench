@@ -16,7 +16,7 @@ import { timezone } from "./config.ts";
 import { agentMcp, AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting, agentDir, agents, providers, readConfig, readEnv, readAgent, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp, migrateProfiles } from "./config.ts";
 import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
-import { usagePayload } from "./usage.ts";
+import { speedOf, usagePayload } from "./usage.ts";
 import { syncTelegram } from "./telegram.ts";
 import { arm, describe, jobs, newJob, nextRun, runJob, type Job } from "./builtin/cron.ts";
 import { authorizeServer, connectMcp, mcpStatus } from "./mcp.ts";
@@ -104,6 +104,12 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 		broadcast(session_id, "session.inserts", { inserts });
 		return { inserts };
 	},
+	// Bench measures the speed of the stream (only it sees when each token arrives) and sends it
+	// at the end of an answer; it belongs to the thread, so reopening either brings the chart back.
+	"session.speed": ({ session_id, speed }) => {
+		rt.store.update(String(session_id), { speed: speedOf(speed) });
+		return { ok: true };
+	},
 	"session.resume": async ({ session_id }) => {
 		const live = await rt.session(session_id);
 		if (!live) throw new Error(`session not found: ${session_id}`);
@@ -122,6 +128,8 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 			todo_state: { todos: row.todos, at: row.todos_at ?? 0 },
 			// The thread's numbers, so the status bar has them before the first answer here.
 			usage: usagePayload(row.model, live.usage, resolveModel(row.profile, { model: row.model, provider: row.provider }).contextLength),
+			// …and how fast the model wrote in its last answer here.
+			speed: row.speed ?? speedOf(null),
 		};
 	},
 	"session.history": async ({ session_id }) => ({ messages: rt.store.messages(session_id) }),

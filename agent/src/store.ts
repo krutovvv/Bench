@@ -3,7 +3,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import { db } from "./config.ts";
-import { totalsOf, type Totals } from "./usage.ts";
+import { speedOf, totalsOf, type SpeedStat, type Totals } from "./usage.ts";
 
 export interface Todo {
 	id: string;
@@ -38,6 +38,8 @@ export interface SessionRow {
 	/** The thread's token counters as of its last finished turn; zeroes for a thread that has
 	 *  not run yet. Kept so Bench shows them again when the thread is reopened. */
 	usage: Totals;
+	/** How fast the model wrote in the thread's last answer, as Bench measured it (src/usage.ts). */
+	speed: SpeedStat;
 }
 
 export class Store {
@@ -51,6 +53,7 @@ export class Store {
 				source TEXT DEFAULT 'local', cwd TEXT DEFAULT '', model TEXT DEFAULT '', provider TEXT DEFAULT '',
 				effort TEXT DEFAULT '', created REAL, updated REAL, message_count INTEGER DEFAULT 0,
 				todos TEXT DEFAULT '[]', todos_at REAL DEFAULT 0, usage TEXT DEFAULT '',
+				speed TEXT DEFAULT '',
 				chat_id TEXT, display_name TEXT,
 				deleted INTEGER DEFAULT 0
 			);
@@ -60,8 +63,9 @@ export class Store {
 			);
 			CREATE INDEX IF NOT EXISTS messages_session ON messages(session_id, ts);
 		`);
-		// usage: the thread's token counters, settled at every turn end (src/usage.ts).
-		for (const col of ["subject", "project", "usage"])
+		// usage: the thread's token counters, settled at every turn end (src/usage.ts);
+		// speed: how fast the model wrote, measured by Bench and sent over at the turn's end.
+		for (const col of ["subject", "project", "usage", "speed"])
 			try {
 				this.db.exec(`ALTER TABLE sessions ADD COLUMN ${col} TEXT DEFAULT ''`);
 			} catch {}
@@ -79,10 +83,18 @@ export class Store {
 		} catch {
 			usage = totalsOf(null);
 		}
-		return { ...r, todos: JSON.parse(r.todos || "[]"), todos_at: r.todos_at ?? 0, usage };
+		let speed: SpeedStat;
+		try {
+			speed = speedOf(JSON.parse(r.speed || "{}"));
+		} catch {
+			speed = speedOf(null);
+		}
+		return { ...r, todos: JSON.parse(r.todos || "[]"), todos_at: r.todos_at ?? 0, usage, speed };
 	}
 
-	create(s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "todos_at" | "title" | "usage"> & { title?: string }): SessionRow {
+	create(
+		s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "todos_at" | "title" | "usage" | "speed"> & { title?: string },
+	): SessionRow {
 		const now = Date.now() / 1000;
 		this.db
 			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, subject, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
