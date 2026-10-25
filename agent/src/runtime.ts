@@ -98,6 +98,8 @@ export function stripBlock(text: string): string {
 export class Runtime {
 	store = new Store();
 	harness!: Harness;
+	/** Pi's storage: the whole transcript for Bench (the conversation's view is what the model sees, compacted). */
+	storage!: any;
 	models = createModels();
 	live = new Map<string, Live>();
 	byConversation = new Map<string, Live>();
@@ -123,7 +125,8 @@ export class Runtime {
 		const registry = (this.registry = createRegistry());
 		setHost(this.host());
 		await loadExtensions(registry, () => this.reconfigureAll());
-		this.harness = await Harness.open(await openNodeSqliteStorage(path.join(AGENT_HOME, "pi.sqlite")), {
+		this.storage = await openNodeSqliteStorage(path.join(AGENT_HOME, "pi.sqlite"));
+		this.harness = await Harness.open(this.storage, {
 			models: this.models,
 			registry,
 			// Pi's coding tools work in the conversation's directory.
@@ -784,12 +787,19 @@ export class Runtime {
 	async history(id: string): Promise<any[]> {
 		const live = await this.session(id);
 		if (!live) return [];
-		const view = await live.conversation.viewState(ctx);
-		const entries = ((view.value as any).entries ?? []) as any[];
-		view.dispose();
+		// Every entry, not the model's view: after a compaction the view starts at the summary, and
+		// the person keeps seeing the whole thread. The summary itself is the model's, not shown.
+		const entries: any[] = [];
+		let cursor: any;
+		do {
+			const page = await this.storage.scanEntries({ conversationId: live.conversation.id, order: "ascending" }, 500, cursor, ctx);
+			entries.push(...page.items);
+			cursor = page.next;
+		} while (cursor);
 		const out: any[] = [];
 		let row = 0;
 		for (const entry of entries) {
+			if (entry.kind === "pi.compaction") continue;
 			for (const m of entry.model ?? []) {
 				row++;
 				if (m.role === "user") {
