@@ -110,9 +110,11 @@ impl BenchApp {
             )
             .into_any_element();
 
+        // The page's own width: these rows are rows of the same list, and a narrower column for
+        // them alone read as a mistake (their rules ended short of every other rule).
         v_flex().w_full().child(
             v_flex()
-                .max_w(px(640.))
+                .w_full()
                 .child(row(
                     "Theme",
                     "Light, dark, or follow macOS.",
