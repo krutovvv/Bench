@@ -399,7 +399,10 @@ impl BenchApp {
                 button("attach", Ico::Paperclip, "Attach files", false)
                     .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),
             )
-            // Dictation: a red square while recording, a spinner while transcribing.
+            // Dictation: the mic stays the mic while it records — a small bar on its edge shows
+            // the level (⌘⇧D or the same button stops). The typed text is never hidden: a
+            // thought is often dictated in pieces, with pauses and typing between them. A
+            // spinner while transcribing.
             .child({
                 let recording = self.recorder.is_some();
                 if self.transcribing {
@@ -411,14 +414,28 @@ impl BenchApp {
                                 .small(),
                         )
                         .tooltip(|window, cx| Tooltip::new("Transcribing…").build(window, cx))
+                } else if recording {
+                    let level = self.recorder.as_ref().map(|r| r.level()).unwrap_or(0.).min(1.);
+                    item("mic")
+                        .text_color(theme.danger)
+                        .child(
+                            div().relative().child(Ico::Mic.icon().small()).child(
+                                div()
+                                    .absolute()
+                                    .right(px(-2.))
+                                    .bottom(px(1.))
+                                    .w(px(2.))
+                                    .h(px(2. + level * 9.))
+                                    .rounded(px(1.))
+                                    .bg(theme.danger),
+                            ),
+                        )
+                        .tooltip(|window, cx| {
+                            Tooltip::new("Stop and transcribe  ⌘⇧D").build(window, cx)
+                        })
+                        .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
                 } else {
-                    let (icon, tip) = if recording {
-                        (Ico::Square, "Stop and transcribe  ⌘⇧D")
-                    } else {
-                        (Ico::Mic, "Dictate  ⌘⇧D")
-                    };
-                    button("mic", icon, tip, false)
-                        .when(recording, |d| d.text_color(cx.theme().danger))
+                    button("mic", Ico::Mic, "Dictate  ⌘⇧D", false)
                         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
                 }
             })

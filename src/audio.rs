@@ -83,6 +83,13 @@ impl Recorder {
         out
     }
 
+    /// The loudness now, 0..1: the mean of the last four 25 ms slices, so the mic's little bar
+    /// moves without flickering on every consonant.
+    pub fn level(&self) -> f32 {
+        let v = self.levels(4);
+        v.iter().sum::<f32>() / v.len() as f32
+    }
+
     /// Stop and return a 16-bit mono WAV.
     pub fn finish(self) -> Result<Vec<u8>> {
         drop(self.stream);
