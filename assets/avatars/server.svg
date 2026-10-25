@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The main server: a raven's head in profile, the keeper of what is known; its eye a small lit square, a machine's. -->
+  <!-- The smart home: a dark door left ajar, light along its edge, one eye in the dark of it. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <g transform="translate(256 256) scale(0.950) translate(-288.0 -272.0)">
-    <polygon points="236.0,250.0 330.0,250.0 366.0,420.0 220.0,420.0" fill="#1F2329"/>
-    <circle cx="284" cy="220" r="96" fill="#1F2329"/>
-    <polygon points="206.0,186.0 86.0,236.0 214.0,262.0" fill="#1F2329"/>
-    <polygon points="206.0,226.0 110.0,236.0 214.0,262.0" fill="#2B313A"/>
-    <polygon points="296.0,322.0 352.0,330.0 366.0,420.0 300.0,420.0" fill="#5C78E2"/>
-    <rect x="276" y="186" width="22" height="22" fill="#E8603C"/>
+  <g transform="translate(256 256) scale(1.130) translate(-256.0 -258.0)">
+    <rect x="176" y="112" width="152" height="268" fill="#1F2329"/>
+    <rect x="328" y="112" width="8" height="268" fill="#F2B43C"/>
+    <polygon points="176.0,380.0 336.0,380.0 356.0,404.0 156.0,404.0" fill="#F2B43C"/>
+    <path d="M206 208 Q252 172 298 208 Q252 244 206 208z" fill="#FFFFFF"/>
+    <circle cx="262" cy="208" r="20" fill="#E8603C"/>
+    <circle cx="265" cy="208" r="8" fill="#1F2329"/>
   </g>
 </svg>

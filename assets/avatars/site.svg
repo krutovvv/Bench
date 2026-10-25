@@ -1,21 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The site that calls: the receiver lifted off over an old dial, one hole lit red; nobody speaks. -->
-  <rect width="512" height="512" fill="#DEE1E6"/>
-  <g transform="translate(256 256) scale(0.954) translate(-256.0 -273.0)">
-    <polygon points="149.0,183.7 350.6,118.2 359.3,144.9 157.7,210.4" fill="#1F2329"/>
-    <polygon points="139.5,186.8 192.8,169.5 220.1,227.9 153.6,249.5" fill="#1F2329"/>
-    <polygon points="306.9,132.4 360.1,115.1 385.6,174.1 319.1,195.8" fill="#1F2329"/>
-    <circle cx="256" cy="350" r="96" fill="#5C78E2"/>
-    <circle cx="224.0" cy="405.4" r="12" fill="#1F2329"/>
-    <circle cx="200.6" cy="382.0" r="12" fill="#1F2329"/>
-    <circle cx="192.0" cy="350.0" r="12" fill="#1F2329"/>
-    <circle cx="200.6" cy="318.0" r="12" fill="#1F2329"/>
-    <circle cx="224.0" cy="294.6" r="12" fill="#1F2329"/>
-    <circle cx="256.0" cy="286.0" r="12" fill="#1F2329"/>
-    <circle cx="288.0" cy="294.6" r="12" fill="#E8603C"/>
-    <circle cx="311.4" cy="318.0" r="12" fill="#1F2329"/>
-    <circle cx="320.0" cy="350.0" r="12" fill="#1F2329"/>
-    <circle cx="311.4" cy="382.0" r="12" fill="#1F2329"/>
-    <circle cx="256" cy="350" r="22" fill="#FFFFFF"/>
-  </g>
+  <polygon points="256.0,190.0 410.0,420.0 102.0,420.0" fill="#1F2329"/>
+  <polygon points="256.0,80.0 300.0,150.0 212.0,150.0" fill="#F2B43C"/>
+  <polygon points="256.0,190.0 410.0,420.0 330.0,420.0" fill="#2B313A"/>
+  <circle cx="256.0" cy="300.0" r="10" fill="#E8603C"/>
 </svg>
