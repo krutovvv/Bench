@@ -77,7 +77,7 @@ impl HermesApp {
                 .child(
                     div()
                         .bg(theme.popover)
-                        .border_1()
+                        .border_1().rounded_md()
                         .border_color(theme.border)
                         .py_1()
                         .child(

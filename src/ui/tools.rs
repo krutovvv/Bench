@@ -5,7 +5,7 @@
 use gpui_kit::component::input::{Editor, Input};
 use gpui_kit::component::text::TextView;
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -136,10 +136,21 @@ impl HermesApp {
             buttons.extend(extra);
             pane_bar("Input", None, buttons, cx)
         };
+        // Copying is an icon, as on every block.
         let copy = |cx: &mut Context<Self>| {
-            small_button("tool-copy", "Copy", cx, |this, _, cx| {
-                this.copy_tool_output(cx)
-            })
+            let theme = cx.theme().clone();
+            div()
+                .id("tool-copy")
+                .flex_none()
+                .p_1()
+                .rounded_sm()
+                .cursor_pointer()
+                .text_color(theme.muted_foreground)
+                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                .tooltip(|window, cx| Tooltip::new("Copy").build(window, cx))
+                .child(crate::icons::Ico::Copy.icon().small())
+                .on_click(cx.listener(|this, _, _, cx| this.copy_tool_output(cx)))
+                .into_any_element()
         };
         let editor = |state: &Entity<gpui_kit::component::input::EditorState>| {
             div()
@@ -262,7 +273,7 @@ impl HermesApp {
                         .py_0p5()
                         .text_sm()
                         .font_family(crate::theme::MONO)
-                        .border_1()
+                        .border_1().rounded_md()
                         .border_color(theme.border)
                         .cursor_pointer()
                         .when(on, |d| {
@@ -420,7 +431,7 @@ pub(super) fn small_button(
         .px_2()
         .py_0p5()
         .text_sm()
-        .border_1()
+        .border_1().rounded_md()
         .border_color(theme.border)
         .cursor_pointer()
         .hover(|s| s.bg(theme.list_hover))
@@ -456,7 +467,8 @@ pub(super) fn segmented_owned(
     let theme = cx.theme().clone();
     h_flex()
         .flex_none()
-        .border_1()
+        .border_1().rounded_md()
+        .overflow_hidden()
         .border_color(theme.border)
         .children(labels.into_iter().enumerate().map(|(k, label)| {
             let on = on.clone();

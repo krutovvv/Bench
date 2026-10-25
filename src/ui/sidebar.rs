@@ -518,7 +518,7 @@ fn color_row(view: &Entity<HermesApp>, id: &str, current: Option<usize>, cx: &Ap
             .items_center()
             .justify_center()
             .cursor_pointer()
-            .border_1()
+            .border_1().rounded_md()
             .border_color(if on {
                 theme.foreground
             } else {

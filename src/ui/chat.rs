@@ -234,7 +234,7 @@ impl HermesApp {
                         .py_1()
                         .text_base()
                         .bg(theme.background)
-                        .border_1()
+                        .border_1().rounded_md()
                         .border_color(theme.border)
                         .text_color(theme.muted_foreground)
                         .cursor_pointer()
@@ -621,7 +621,7 @@ impl HermesApp {
                 .mt_2()
                 .p_3()
                 .gap_2()
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(theme.warning)
                 .child(
                     h_flex()
@@ -743,7 +743,7 @@ impl HermesApp {
                                 .mt_0p5()
                                 .p_2()
                                 .bg(theme.secondary)
-                                .border_1()
+                                .border_1().rounded_md()
                                 .border_color(theme.border)
                                 .font_family(crate::theme::MONO)
                                 .text_base()
@@ -796,7 +796,7 @@ impl HermesApp {
                     .gap_1()
                     .px_1p5()
                     .py_0p5()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(if active { theme.primary } else { theme.border })
                     .text_base()
                     .text_color(if active {
@@ -1001,7 +1001,7 @@ impl HermesApp {
                                 .mb_2()
                                 .p_2()
                                 .bg(theme.secondary)
-                                .border_1()
+                                .border_1().rounded_md()
                                 .border_color(theme.border)
                                 .font_family(crate::theme::MONO)
                                 .text_base()
@@ -1021,7 +1021,7 @@ impl HermesApp {
             .collect();
         Some(
             v_flex()
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(theme.border)
                 .child(
                     h_flex()
@@ -1147,7 +1147,7 @@ impl HermesApp {
             .collect();
         Some(
             v_flex()
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(theme.border)
                 // Folded by default: one line with the totals; a click lists the files.
                 .child(

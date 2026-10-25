@@ -67,7 +67,7 @@ impl HermesApp {
                     // The picture never leaves its frame (a frame of another size than the
                     // last one must not spill over the thread).
                     .overflow_hidden()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(if live { theme.primary.opacity(0.5) } else { theme.border })
                     .when(live, |d| d.track_focus(&focus).cursor(CursorStyle::Arrow))
                     .when(!live, |d| d.cursor_pointer())

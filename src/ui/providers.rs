@@ -81,7 +81,7 @@ impl HermesApp {
                     .hover(|s| s.bg(theme.primary_hover))
             })
             .when(!primary, |d| {
-                d.border_1()
+                d.border_1().rounded_md()
                     .border_color(theme.border)
                     .hover(|s| s.bg(theme.list_hover))
             })
@@ -271,7 +271,7 @@ impl HermesApp {
                     .gap_1()
                     .px_2()
                     .py_0p5()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(theme.border)
                     .text_sm()
                     .cursor_pointer()
@@ -361,7 +361,7 @@ impl HermesApp {
                     .when(!results.is_empty(), |d| {
                         d.child(
                             v_flex()
-                                .border_1()
+                                .border_1().rounded_md()
                                 .border_color(theme.border)
                                 .children(results),
                         )

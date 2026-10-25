@@ -102,7 +102,7 @@ impl HermesApp {
                     .id("remote-list")
                     .max_h(px(LIST_H))
                     .overflow_y_scroll()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(theme.border)
                     .children(rows)
                     .children(note),
@@ -110,7 +110,7 @@ impl HermesApp {
             .when_some(open, |d, path| {
                 d.child(
                     v_flex()
-                        .border_1()
+                        .border_1().rounded_md()
                         .border_color(theme.border)
                         .child(
                             h_flex()

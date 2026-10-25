@@ -238,7 +238,7 @@ impl HermesApp {
                                 .flex_none()
                                 .mx_6()
                                 .my_1()
-                                .border_1()
+                                .border_1().rounded_md()
                                 .border_color(theme.border)
                                 .child(card)
                                 .into_any_element(),
@@ -412,7 +412,7 @@ impl HermesApp {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(if done { theme.primary } else { theme.input })
                     .when(done, |d| {
                         d.bg(theme.primary)
@@ -455,7 +455,7 @@ impl HermesApp {
                     .px_1p5()
                     .text_sm()
                     .text_color(muted)
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(theme.border)
                     .child(g.clone())
             }))
@@ -600,7 +600,7 @@ impl HermesApp {
                             .flex()
                             .items_center()
                             .text_sm()
-                            .border_1()
+                            .border_1().rounded_md()
                             .border_color(if running { theme.primary } else { theme.border })
                             .text_color(if running {
                                 theme.primary
@@ -636,7 +636,7 @@ impl HermesApp {
             })
             .child(
                 div()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(theme.border)
                     .px_1()
                     .child(Textarea::new(&self.tasks.notes).appearance(false)),
@@ -651,7 +651,7 @@ impl HermesApp {
                             .px_2()
                             .py_0p5()
                             .text_sm()
-                            .border_1()
+                            .border_1().rounded_md()
                             .border_color(theme.border)
                             .cursor_pointer()
                             .hover(|s| s.bg(theme.list_hover))
@@ -671,7 +671,7 @@ impl HermesApp {
                             .px_2()
                             .py_0p5()
                             .text_sm()
-                            .border_1()
+                            .border_1().rounded_md()
                             .border_color(if armed { theme.danger } else { theme.border })
                             .text_color(if armed { theme.danger } else { muted })
                             .cursor_pointer()

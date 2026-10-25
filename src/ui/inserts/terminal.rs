@@ -95,7 +95,7 @@ impl InsertKind for Terminal {
                     .id(("term-bg-badge", id))
                     .gap_1()
                     .px_1p5()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(theme.border)
                     .text_sm()
                     .text_color(theme.muted_foreground)

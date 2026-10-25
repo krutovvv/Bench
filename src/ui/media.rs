@@ -174,7 +174,8 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
     let copy = code.trim_end_matches('\n').to_string();
     v_flex()
         .w_full()
-        .border_1()
+        .border_1().rounded_md()
+        .overflow_hidden()
         .border_color(theme.border)
         .child(
             // As tall as the changed-files card's line: small text, 4 above and below.
@@ -196,13 +197,13 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
                 .child(
                     h_flex()
                         .id(SharedString::from(format!("code-copy-{i}-{k}")))
-                        .gap_1()
-                        .px_1p5()
+                        .p_1()
+                        .rounded_sm()
                         .items_center()
                         .cursor_pointer()
                         .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                        .child(Ico::Copy.icon().xsmall())
-                        .child("Copy")
+                        .tooltip(|window, cx| gpui_kit::component::tooltip::Tooltip::new("Copy").build(window, cx))
+                        .child(Ico::Copy.icon().small())
                         .on_click(move |_, window, cx| {
                             cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
                             window.push_notification(
@@ -396,7 +397,7 @@ impl HermesApp {
                 .px_2()
                 .py_1()
                 .items_center()
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(theme.border)
                 .text_base()
                 .child(icon.icon().xsmall().text_color(theme.muted_foreground))
@@ -433,7 +434,7 @@ impl HermesApp {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(theme.border)
                     .text_color(theme.muted_foreground)
                     .child(Ico::Loader.live(true))
@@ -482,7 +483,7 @@ impl HermesApp {
                 .relative()
                 .w(w)
                 .h(h)
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(theme.border)
                 .cursor_pointer()
                 .child(img(src).size_full())
@@ -646,7 +647,7 @@ impl HermesApp {
                 let k2 = key.clone();
                 v_flex()
                     .max_w(px(MAX_W + 160.))
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(theme.border)
                     .child(
                         h_flex()
@@ -786,7 +787,7 @@ impl HermesApp {
             .pr_2()
             .gap_1p5()
             .items_center()
-            .border_1()
+            .border_1().rounded_md()
             .border_color(theme.border)
             .bg(theme.background)
             .text_base()
@@ -861,7 +862,7 @@ impl HermesApp {
             .pr_2()
             .gap_1p5()
             .items_center()
-            .border_1()
+            .border_1().rounded_md()
             .border_color(theme.border)
             .bg(theme.background)
             .text_base()

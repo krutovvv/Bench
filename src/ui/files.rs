@@ -180,7 +180,7 @@ impl HermesApp {
                 .py_0p5()
                 .text_xs()
                 .cursor_pointer()
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(if active { theme.primary } else { theme.border })
                 .text_color(if active { theme.foreground } else { muted })
                 .hover(|s| s.text_color(theme.foreground))
@@ -306,7 +306,7 @@ impl HermesApp {
                             .px_2()
                             .py_0p5()
                             .cursor_pointer()
-                            .border_1()
+                            .border_1().rounded_md()
                             .border_color(theme.border)
                             .text_color(theme.foreground)
                             .hover(|s| s.bg(theme.list_hover))
@@ -683,7 +683,7 @@ impl HermesApp {
                     .items_center()
                     .text_sm()
                     .cursor_pointer()
-                    .border_1()
+                    .border_1().rounded_md()
                     .border_color(if selected {
                         theme.primary
                     } else {

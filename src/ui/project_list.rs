@@ -129,7 +129,7 @@ impl HermesApp {
                                     this.env_save(what, window, cx)
                                 }))
                         })
-                        .when(!dirty, |d| d.border_1().border_color(theme.border).text_color(muted))
+                        .when(!dirty, |d| d.border_1().rounded_md().border_color(theme.border).text_color(muted))
                         .child("Save"),
                 )
                 .when(dirty, |d| {
@@ -146,7 +146,7 @@ impl HermesApp {
             let lines: usize = text.lines().map(|l| l.chars().count() / 100 + 1).sum::<usize>().max(1);
             div()
                 .mt_1()
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(theme.border)
                 .h(px(lines as f32 * 21. + 10.))
                 .child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full())

@@ -36,7 +36,7 @@ impl HermesApp {
                          items: Vec<(&'static str, bool, crate::theme::Appearance)>,
                          cx: &mut Context<Self>| {
             h_flex()
-                .border_1()
+                .border_1().rounded_md()
                 .border_color(theme.border)
                 .children(items.into_iter().enumerate().map(|(k, (label, on, next))| {
                     div()
@@ -91,7 +91,7 @@ impl HermesApp {
                         div()
                             .id(("accent", k))
                             .p(px(3.))
-                            .border_1()
+                            .border_1().rounded_md()
                             .border_color(if on {
                                 theme.foreground
                             } else {

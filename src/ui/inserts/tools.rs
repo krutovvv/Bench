@@ -67,7 +67,7 @@ impl InsertKind for Tools {
             app.select_tool(tool, window, cx);
         }
         let theme = cx.theme().clone();
-        Some(div().h(px(H)).border_1().border_color(theme.border).bg(theme.background).child(app.render_tools_body(cx)).into_any_element())
+        Some(div().h(px(H)).mx(px(-12.)).my(px(-8.)).child(app.render_tools_body(cx)).into_any_element())
     }
 
     fn context(&self, app: &HermesApp, ins: &Insert, cx: &App) -> String {

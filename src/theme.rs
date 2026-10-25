@@ -158,8 +158,9 @@ pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
             t.font_family = "Inter Variable".into();
             t.mono_font_family = MONO.into();
         }
-        t.radius = px(0.);
-        t.radius_lg = px(0.);
+        // Slightly round, the same everywhere (buttons, fields, menus; the blocks use rounded_md).
+        t.radius = px(4.);
+        t.radius_lg = px(6.);
         t.shadow = false;
         t.font_size = px(ui);
         t.mono_font_size = px(mono);
