@@ -161,6 +161,10 @@ fn other_modes(app: &mut BenchApp) {
         done,
     ];
     app.tasks.loaded = true;
+    // `BENCH_DEMO=tasks-open`: the task card open, as when it is being edited.
+    if std::env::var("BENCH_DEMO").as_deref() == Ok("tasks-open") {
+        app.tasks.selected = Some("t-api".into());
+    }
 }
 
 /// The demo server's terminal: its last screen (no shell runs in the demo).
