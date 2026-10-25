@@ -1,10 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- A door left ajar: dark inside, light along its edge, and one eye watching from the gap. -->
+  <!-- The smart home: a door left ajar, light along its edge, and one eye in the dark of it. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <path d="M136 416 h236 l52 44 h-340z" fill="#F2B43C"/>
-  <rect x="136" y="96" width="236" height="320" fill="#1F2329"/>
-  <rect x="372" y="96" width="10" height="320" fill="#F2B43C"/>
-  <path d="M184 220 Q244 170 304 220 Q244 270 184 220z" fill="#FFFFFF"/>
-  <circle cx="264" cy="220" r="26" fill="#E8603C"/>
-  <circle cx="268" cy="220" r="11" fill="#1F2329"/>
+  <rect x="120" y="52" width="272" height="408" fill="#F1EADC"/>
+  <rect x="132" y="64" width="248" height="384" fill="#1F2329"/>
+  <rect x="140" y="72" width="232" height="368" fill="#F1EADC"/>
+  <rect x="143" y="75" width="226" height="362" fill="#1F2329"/>
+  <rect x="158" y="90" width="12" height="12" fill="#2FA38A"/>
+  <rect x="342" y="410" width="12" height="12" fill="#2FA38A"/>
+  <rect x="176" y="112" width="152" height="268" fill="#5C78E2"/>
+  <rect x="328" y="112" width="8" height="268" fill="#F2B43C"/>
+  <polygon points="176.0,380.0 336.0,380.0 356.0,404.0 156.0,404.0" fill="#F2B43C"/>
+  <path d="M206 208 Q252 172 298 208 Q252 244 206 208z" fill="#FFFFFF"/>
+  <circle cx="262" cy="208" r="20" fill="#E8603C"/>
+  <circle cx="265" cy="208" r="8" fill="#1F2329"/>
 </svg>

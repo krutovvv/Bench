@@ -1,14 +1,26 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The task assistant: a round labyrinth, each ring open somewhere else; a light waits in the middle. -->
+  <!-- The task assistant: a face, half a pale mask with a sleeping eye, half a machine with a red lens. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <path d="M365.6 93.5 A196 196 0 1 1 276.5 61.1 L274.4 81.0 A176 176 0 1 0 354.4 110.1z" fill="#1F2329"/>
-  <path d="M299.0 406.0 A156 156 0 1 1 364.4 368.2 L350.5 353.8 A136 136 0 1 0 293.5 386.7z" fill="#1F2329"/>
-  <path d="M159.8 191.1 A116 116 0 1 1 140.6 243.9 L160.5 246.0 A96 96 0 1 0 176.4 202.3z" fill="#1F2329"/>
-  <path d="M331.8 261.3 A76 76 0 1 1 325.4 225.1 L307.2 233.2 A56 56 0 1 0 311.9 259.9z" fill="#1F2329"/>
-  <polygon points="133.3,352.4 118.0,365.3 124.4,373.0 139.7,360.1" fill="#1F2329"/>
-  <polygon points="318.3,158.0 328.3,140.7 319.7,135.7 309.7,153.0" fill="#1F2329"/>
-  <polygon points="237.9,330.0 234.4,349.7 244.3,351.4 247.7,331.7" fill="#1F2329"/>
-  <circle cx="256" cy="256" r="30" fill="#F2B43C"/>
-  <circle cx="256" cy="256" r="12" fill="#E8603C"/>
-  <circle cx="331.9" cy="47.4" r="8" fill="#E8603C"/>
+  <rect x="120" y="52" width="272" height="408" fill="#F1EADC"/>
+  <rect x="132" y="64" width="248" height="384" fill="#1F2329"/>
+  <rect x="140" y="72" width="232" height="368" fill="#F1EADC"/>
+  <rect x="143" y="75" width="226" height="362" fill="#1F2329"/>
+  <polygon points="164.0,87.0 171.0,96.0 164.0,105.0 157.0,96.0" fill="#F2B43C"/>
+  <polygon points="348.0,407.0 355.0,416.0 348.0,425.0 341.0,416.0" fill="#F2B43C"/>
+  <path d="M256 136 a72 100 0 0 0 0 200z" fill="#F1EADC"/>
+  <path d="M256 136 a72 100 0 0 1 0 200z" fill="#5C78E2"/>
+  <path d="M206 226 q22 14 40 0 q-20 6 -40 0z" fill="#1F2329"/>
+  <rect x="270" y="212" width="34" height="26" fill="#1F2329"/>
+  <circle cx="287" cy="225" r="8" fill="#E8603C"/>
+  <rect x="222" y="290" width="30" height="5" fill="#1F2329"/>
+  <rect x="266" y="284" width="7" height="7" fill="#1F2329"/>
+  <rect x="266" y="296" width="7" height="7" fill="#1F2329"/>
+  <rect x="278" y="284" width="7" height="7" fill="#1F2329"/>
+  <rect x="278" y="296" width="7" height="7" fill="#1F2329"/>
+  <rect x="290" y="284" width="7" height="7" fill="#1F2329"/>
+  <rect x="290" y="296" width="7" height="7" fill="#1F2329"/>
+  <rect x="253" y="136" width="6" height="200" fill="#1F2329"/>
+  <rect x="232" y="344" width="48" height="10" fill="#AFC0F5"/>
+  <rect x="240" y="360" width="32" height="10" fill="#AFC0F5"/>
+  <rect x="248" y="376" width="16" height="10" fill="#AFC0F5"/>
 </svg>

@@ -1,13 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Skorozvon's site: a dark window; a receiver lifted in it, and the call going out in rings. -->
+  <!-- The site that calls: a receiver hangs off the hook on its cord, swaying over an old dial. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <rect x="96" y="112" width="320" height="300" fill="#1F2329"/>
-  <rect x="96" y="112" width="320" height="34" fill="#2FA38A"/>
-  <circle cx="118" cy="129" r="7" fill="#DEE1E6"/>
-  <polygon points="144.3,332.1 303.7,240.1 317.7,264.4 158.3,356.4" fill="#FFFFFF"/>
-  <polygon points="127.0,342.1 170.3,317.1 206.5,367.8 158.0,395.8" fill="#FFFFFF"/>
-  <polygon points="277.7,255.1 321.0,230.1 352.0,283.8 303.5,311.8" fill="#FFFFFF"/>
-  <path d="M332.5 159.9 A56 56 0 0 1 372.1 199.5 L356.6 203.6 A40 40 0 0 0 328.4 175.4z" fill="#F2B43C"/>
-  <path d="M341.3 127.1 A90 90 0 0 1 404.9 190.7 L389.5 194.8 A74 74 0 0 0 337.2 142.5z" fill="#F2B43C"/>
-  <path d="M350.1 94.2 A124 124 0 0 1 437.8 181.9 L422.3 186.0 A108 108 0 0 0 346.0 109.7z" fill="#E8603C"/>
+  <rect x="120" y="52" width="272" height="408" fill="#F1EADC"/>
+  <rect x="132" y="64" width="248" height="384" fill="#1F2329"/>
+  <rect x="140" y="72" width="232" height="368" fill="#F1EADC"/>
+  <rect x="143" y="75" width="226" height="362" fill="#1F2329"/>
+  <polygon points="164.0,88.0 172.0,102.0 156.0,102.0" fill="#5C78E2"/>
+  <polygon points="348.0,408.0 356.0,422.0 340.0,422.0" fill="#5C78E2"/>
+  <rect x="253" y="76" width="6" height="92" fill="#F1EADC"/>
+  <rect x="250" y="174" width="14" height="92" fill="#F1EADC"/>
+  <path d="M264 166 h-40 a20 20 0 0 0 0 40 h40z" fill="#F1EADC"/>
+  <path d="M264 234 h-40 a20 20 0 0 0 0 40 h40z" fill="#F1EADC"/>
+  <rect x="212" y="180" width="6" height="12" fill="#1F2329"/>
+  <circle cx="256" cy="352" r="58" fill="#5C78E2"/>
+  <circle cx="235.5" cy="387.5" r="8" fill="#1F2329"/>
+  <circle cx="220.5" cy="372.5" r="8" fill="#1F2329"/>
+  <circle cx="215.0" cy="352.0" r="8" fill="#1F2329"/>
+  <circle cx="220.5" cy="331.5" r="8" fill="#1F2329"/>
+  <circle cx="235.5" cy="316.5" r="8" fill="#1F2329"/>
+  <circle cx="256.0" cy="311.0" r="8" fill="#1F2329"/>
+  <circle cx="276.5" cy="316.5" r="8" fill="#E8603C"/>
+  <circle cx="291.5" cy="331.5" r="8" fill="#1F2329"/>
+  <circle cx="297.0" cy="352.0" r="8" fill="#1F2329"/>
+  <circle cx="291.5" cy="372.5" r="8" fill="#1F2329"/>
+  <circle cx="256" cy="352" r="15" fill="#F1EADC"/>
 </svg>
