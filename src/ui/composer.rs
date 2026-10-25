@@ -12,7 +12,7 @@ use crate::icons::Ico;
 
 /// The avatar's offset from the row's top (it replaces the avatar's own): the textarea's line
 /// sits higher than a message's, so the avatar goes up to center on it (the caret, the waveform).
-const AVATAR_TOP: f32 = -1.5;
+const AVATAR_TOP: f32 = -2.5;
 const BUTTONS_TOP: f32 = 3.;
 
 /// Rows the command list shows before it scrolls, and their height.

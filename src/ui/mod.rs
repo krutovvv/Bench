@@ -317,7 +317,7 @@ pub fn avatar(agent: bool, theme: &gpui_kit::component::Theme) -> Div {
         .flex_none()
         .size(px(AVATAR))
         // Its center on the first line's (measured).
-        .mt(px(0.5))
+        .mt(px(-0.5))
         .rounded_full()
         .flex()
         .items_center()
