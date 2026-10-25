@@ -92,12 +92,12 @@ impl BenchApp {
     /// A project's environment as rows in blocks (the task list's look: a line between rows, a
     /// row lit under the pointer); a row's click opens its card under the block, as the agent's
     /// answer (`render_env_card`), where it is edited, saved or removed.
-    pub(super) fn render_env_block(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_env_sections(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Vec<(&'static str, AnyElement)> {
         let _ = window;
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(e) = self.project_env.as_ref() else {
-            return div().text_color(muted).child("Loading…").into_any_element();
+            return vec![("", div().text_color(muted).child("Loading…").into_any_element())];
         };
         let remote = self.projects.iter().any(|p| p.id == e.id && p.host.is_some());
         let general = e.id == "general";
@@ -106,11 +106,17 @@ impl BenchApp {
         let act = |id: SharedString, label: &'static str| {
             div().id(id).flex_none().cursor_pointer().text_color(muted).hover(|s| s.text_color(theme.foreground)).child(label)
         };
-        let add = |id: &'static str, ask: &'static str, cx: &mut Context<Self>| {
+        // "+ Add": a new one's card (paste it, or ask the agent from there); accesses are the
+        // agent's to add.
+        let add = |id: &'static str, kind: &'static str, ask: &'static str, cx: &mut Context<Self>| {
             act(id.into(), "+ Add").on_click(cx.listener(move |this, _, window, cx| {
                 this.click_claimed = true;
                 cx.stop_propagation();
-                this.ask_in_composer(ask, window, cx)
+                if kind.is_empty() {
+                    this.ask_in_composer(ask, window, cx)
+                } else {
+                    this.env_card(kind, "new".into(), window, cx)
+                }
             }))
         };
         // A row: its name, a one-line note; lit when its card is open.
@@ -180,7 +186,7 @@ impl BenchApp {
             _ => "no bot of its own".into(),
         };
         rows.push(row("telegram", String::new(), "Telegram".into(), tg_note, false, false, cx));
-        blocks.push(section(if general { "General" } else { "Project" }, None, rows, cx));
+        blocks.push((if general { "General" } else { "Project" }, section(if general { "General" } else { "Project" }, None, rows, cx)));
 
         // MCP servers.
         let mut rows = vec![];
@@ -196,8 +202,8 @@ impl BenchApp {
             };
             rows.push(row("mcp", name.clone(), name, note, error.is_some() && enabled, k == 0, cx));
         }
-        let extra = add("env-mcp-add", "Add an MCP server to this project: ", cx).into_any_element();
-        blocks.push(section("MCP servers", Some(extra), rows, cx));
+        let extra = add("env-mcp-add", "mcp", "", cx).into_any_element();
+        blocks.push(("MCP servers", section("MCP servers", Some(extra), rows, cx)));
 
         // Skills.
         let mut rows = vec![];
@@ -207,8 +213,8 @@ impl BenchApp {
         for (k, (name, desc)) in e.skills.clone().into_iter().enumerate() {
             rows.push(row("skill", name.clone(), name, desc, false, k == 0, cx));
         }
-        let extra = add("env-skill-add", "Write a skill for this project: ", cx).into_any_element();
-        blocks.push(section("Skills", Some(extra), rows, cx));
+        let extra = add("env-skill-add", "skill", "", cx).into_any_element();
+        blocks.push(("Skills", section("Skills", Some(extra), rows, cx)));
 
         // Prompts (@ in the composer).
         let mut rows = vec![];
@@ -218,8 +224,8 @@ impl BenchApp {
         for (k, name) in e.prompts.clone().into_iter().enumerate() {
             rows.push(row("prompt", name.clone(), name, String::new(), false, k == 0, cx));
         }
-        let extra = add("env-prompt-add", "Write a prompt for this project: ", cx).into_any_element();
-        blocks.push(section("Prompts", Some(extra), rows, cx));
+        let extra = add("env-prompt-add", "prompt", "", cx).into_any_element();
+        blocks.push(("Prompts", section("Prompts", Some(extra), rows, cx)));
 
         // Schedule: what runs on its own, each run a thread of the project.
         let mut rows = vec![];
@@ -242,7 +248,7 @@ impl BenchApp {
                 this.env_card("cron", "new".into(), window, cx)
             }))
             .into_any_element();
-        blocks.push(section("Schedule", Some(new_job), rows, cx));
+        blocks.push(("Schedule", section("Schedule", Some(new_job), rows, cx)));
 
         // Accesses (a remote project's are its server's own).
         if !remote {
@@ -253,16 +259,34 @@ impl BenchApp {
             for (k, (hid, name, kind, at)) in e.hosts.clone().into_iter().enumerate() {
                 rows.push(row("host", hid, name, format!("{kind} · {at}"), false, k == 0, cx));
             }
-            let extra = add("env-host-add", "Add to this project the access: ", cx).into_any_element();
-            blocks.push(section("Accesses", Some(extra), rows, cx));
+            let extra = add("env-host-add", "", "Add to this project the access: ", cx).into_any_element();
+            blocks.push(("Accesses", section("Accesses", Some(extra), rows, cx)));
         }
 
-        v_flex()
-            .w_full()
-            .gap_3()
-            .children(blocks)
-            .when_some(e.error.clone(), |d, err| d.child(div().text_color(theme.danger).child(err)))
-            .into_any_element()
+        if let Some(err) = e.error.clone() {
+            blocks.push(("", div().text_color(theme.danger).child(err).into_any_element()));
+        }
+        blocks
+    }
+
+    /// The environment's section a card belongs to (it shows under it).
+    pub(super) fn env_card_section(&self) -> Option<&'static str> {
+        let e = self.project_env.as_ref()?;
+        let general = e.id == "general";
+        Some(match e.card.as_ref()?.0 {
+            "name" | "soul" | "telegram" => {
+                if general {
+                    "General"
+                } else {
+                    "Project"
+                }
+            }
+            "mcp" => "MCP servers",
+            "skill" => "Skills",
+            "prompt" => "Prompts",
+            "cron" => "Schedule",
+            _ => "Accesses",
+        })
     }
 
     /// The open row's card, under the environment block as the agent's answer: its fields, and in
@@ -345,6 +369,31 @@ impl BenchApp {
                         .child(gpui_kit::component::input::Input::new(&e.tg_users))
                         .child(div().text_sm().text_color(muted).child("Its chats become this project's threads, with its soul, skills and servers."))),
                 )
+            }
+            "mcp" | "skill" | "prompt" if name == "new" => {
+                let ask = act("env-card-ask".into(), "Ask the agent instead".into(), muted)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        let text = match kind {
+                            "mcp" => "Add an MCP server to this project: ",
+                            "skill" => "Write a skill for this project: ",
+                            _ => "Write a prompt for this project: ",
+                        };
+                        this.ask_in_composer(text, window, cx)
+                    }))
+                    .into_any_element();
+                actions.push(ask);
+                actions.push(save(kind, true, cx));
+                let (title, editor, named) = match kind {
+                    "mcp" => ("New MCP server: its name, and its config (Pi's format: {\"url\", \"headers\"} or {\"command\", \"args\", \"env\"})", &e.mcp_json, true),
+                    "skill" => ("New skill: paste its SKILL.md (its front matter names it)", &e.skill_text, false),
+                    _ => ("New prompt: its name, and its text", &e.prompt_text, true),
+                };
+                let body = v_flex()
+                    .when(named, |d| d.child(div().px_3().pt_2().child(gpui_kit::component::input::Input::new(&e.new_name))))
+                    .child(code(editor, cx))
+                    .into_any_element();
+                (title.to_string(), body)
             }
             "mcp" => {
                 if !e.mcp.iter().any(|m| m.0 == name) {

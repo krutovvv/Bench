@@ -602,6 +602,17 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		return { name: skill.name, dir: skill.dir, text: fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8") };
 	}],
 	// A project's skill changed by hand (its SKILL.md as typed).
+	// A new skill of the project, pasted whole: its SKILL.md names it (front matter "name:").
+	["POST", /^\/api\/projects\/([^/]+)\/skills$/, (req, m) => {
+		const text = String(req.body?.text ?? "");
+		const name = text.match(/^---[\s\S]*?^name:\s*["']?([\w.-]+)["']?\s*$/m)?.[1];
+		if (!name) throw new HttpError(400, "the skill needs front matter with name: <name>");
+		const dir = path.join(envOf(decodeURIComponent(m[1])).dir, "skills", name);
+		if (fs.existsSync(path.join(dir, "SKILL.md"))) throw new HttpError(409, `the project already has a skill "${name}"`);
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(path.join(dir, "SKILL.md"), text);
+		return { ok: true, name };
+	}],
 	["PUT", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (req, m) => {
 		const id = decodeURIComponent(m[1]);
 		const { dir } = envOf(id);

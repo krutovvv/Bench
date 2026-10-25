@@ -46,14 +46,23 @@ impl BenchApp {
         // A project's environment is the thread's document, at its top; everything else the
         // person puts in is an insert (crate::ui::inserts), where it was put.
         let subject = self.current_subject();
-        let block = if let Some(id) = subject.strip_prefix("env:") {
+        // The environment: each part its own message, the open row's card right under its part.
+        let mut env_rows: Vec<AnyElement> = vec![];
+        if let Some(id) = subject.strip_prefix("env:") {
             if self.project_env.as_ref().is_none_or(|e| e.id != id) {
                 self.load_env(id, window, cx);
             }
-            Some(self.render_env_block(window, cx))
-        } else {
-            None
-        };
+            let under = self.env_card_section();
+            for (title, part) in self.render_env_sections(window, cx) {
+                env_rows.push(self.agent_row(part, cx));
+                if under == Some(title) && !title.is_empty() {
+                    if let Some(card) = self.render_env_card(cx) {
+                        env_rows.push(self.agent_row(card, cx));
+                    }
+                }
+            }
+        }
+        let block: Option<AnyElement> = None;
         // The block comes from the agent: its row, its avatar, like an answer.
         let theme = cx.theme().clone();
         // `BENCH_DEMO=new-project`: the new project's form, once (for screenshots).
@@ -111,7 +120,7 @@ impl BenchApp {
                 .into_any_element()
         });
         let mut subject_block = subject_block;
-        let placeholder: Option<AnyElement> = if subject_block.is_some() || !self.thread_inserts().is_empty() {
+        let placeholder: Option<AnyElement> = if subject_block.is_some() || !env_rows.is_empty() || !self.thread_inserts().is_empty() {
             None
         } else if !self.turns.is_empty() {
             None
@@ -176,11 +185,6 @@ impl BenchApp {
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
         // The environment's open row, as the agent's answer under it.
-        let env_card = if subject.starts_with("env:") {
-            self.render_env_card(cx).map(|c| self.agent_row(c, cx))
-        } else {
-            None
-        };
         let queue = self.render_queue(cx);
         let composer = self.render_composer(cx);
 
@@ -221,7 +225,8 @@ impl BenchApp {
                     .child(
                         v_flex()
                             .w_full()
-                            .when(block_on_top, |d| d.children(subject_block.take()).children(env_card))
+                            .children(env_rows)
+                            .when(block_on_top, |d| d.children(subject_block.take()))
                             .children(placeholder)
                             .children(rows)
                             .children(approval)

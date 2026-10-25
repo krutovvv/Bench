@@ -29,6 +29,11 @@ test("the server starts and answers /api/projects", async () => {
 		fs.writeFileSync(path.join(skill, "SKILL.md"), "---\nname: publish\ndescription: d\n---\nSteps.");
 		const read = await call("GET", `/api/projects/${made.project.id}/skills/publish`);
 		assert.match(read.text, /Steps\./);
+		// A skill pasted whole: its front matter names it; twice is refused.
+		const made2 = await call("POST", `/api/projects/${made.project.id}/skills`, { text: "---\nname: digest\ndescription: d\n---\nSum up." });
+		assert.equal(made2.name, "digest");
+		const again = await call("POST", `/api/projects/${made.project.id}/skills`, { text: "---\nname: digest\ndescription: d\n---\n" });
+		assert.match(String(again.detail ?? ""), /already/);
 		// The project's schedule: a job made, changed, paused, removed; a bad schedule refused.
 		const job = await call("POST", `/api/projects/${made.project.id}/cron`, { name: "Digest", prompt: "Sum up the week", schedule: "every 1d" });
 		assert.equal(job.schedule_display, "every 1d");

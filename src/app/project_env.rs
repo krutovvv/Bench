@@ -55,6 +55,8 @@ pub struct ProjectEnv {
     pub cron_schedule: Entity<InputState>,
     pub cron_prompt: Entity<EditorState>,
     pub cron_dirty: bool,
+    /// A new MCP server's or prompt's name (a new skill names itself in its front matter).
+    pub new_name: Entity<InputState>,
     /// What is open under the block, as the agent's answer: (kind, name) — "name", "soul",
     /// "telegram", "mcp", "skill", "prompt", "cron" ("new" for a new job), "host".
     pub card: Option<(&'static str, String)>,
@@ -114,6 +116,7 @@ impl BenchApp {
         let cron_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name: Weekly digest"));
         let cron_schedule = cx.new(|cx| InputState::new(window, cx).placeholder("every 1d · every 30m · 0 9 * * 1-5 · 2026-11-01T09:00"));
         let name = cx.new(|cx| InputState::new(window, cx));
+        let new_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name"));
         let tg_token = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Bot token from @BotFather (kept as is when empty)"));
         let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
         // A part typed in: its Save shows.
@@ -175,6 +178,7 @@ impl BenchApp {
             cron_dirty: false,
             folded: Default::default(),
             card: None,
+            new_name,
             mcp_auth: Default::default(),
             armed: None,
             error: None,
@@ -230,15 +234,29 @@ impl BenchApp {
         let (method, path, body) = match what {
             "soul" => ("PUT", format!("/api/projects/{eid}/soul"), json!({"text": e.soul.read(cx).value().to_string()})),
             "mcp" => {
-                let Some(name) = e.mcp_open.clone() else {
+                let Some(mut name) = e.mcp_open.clone() else {
                     return;
                 };
+                if name == "new" {
+                    name = e.new_name.read(cx).value().trim().to_string();
+                    if name.is_empty() {
+                        self.toast(NotificationType::Error, "Name it first", window, cx);
+                        return;
+                    }
+                }
                 ("PUT", format!("/api/projects/{eid}/mcp/{}/spec", enc(&name)), json!({"text": e.mcp_json.read(cx).value().to_string()}))
             }
             "prompt" => {
-                let Some(name) = e.prompt_open.clone() else {
+                let Some(mut name) = e.prompt_open.clone() else {
                     return;
                 };
+                if name == "new" {
+                    name = e.new_name.read(cx).value().trim().to_string();
+                    if name.is_empty() {
+                        self.toast(NotificationType::Error, "Name it first", window, cx);
+                        return;
+                    }
+                }
                 ("PUT", format!("/api/projects/{eid}/prompts/{}", enc(&name)), json!({"text": e.prompt_text.read(cx).value().to_string()}))
             }
             "cron" => {
@@ -271,7 +289,12 @@ impl BenchApp {
                 let Some(name) = e.skill_open.clone() else {
                     return;
                 };
-                ("PUT", format!("/api/projects/{eid}/skills/{}", enc(&name)), json!({"text": e.skill_text.read(cx).value().to_string()}))
+                let text = json!({"text": e.skill_text.read(cx).value().to_string()});
+                if name == "new" {
+                    ("POST", format!("/api/projects/{eid}/skills"), text)
+                } else {
+                    ("PUT", format!("/api/projects/{eid}/skills/{}", enc(&name)), text)
+                }
             }
         };
         let profile = self.current_profile();
@@ -282,6 +305,13 @@ impl BenchApp {
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     if let Some(e) = this.project_env.as_mut() {
+                        // A new one is made: its form closes, it is in the list.
+                        if e.card.as_ref().is_some_and(|(_, n)| n == "new") && what != "cron" {
+                            e.card = None;
+                            e.mcp_open = None;
+                            e.skill_open = None;
+                            e.prompt_open = None;
+                        }
                         match what {
                             "soul" => e.soul_dirty = false,
                             "mcp" => e.mcp_dirty = false,
@@ -504,6 +534,24 @@ impl BenchApp {
             return;
         }
         e.card = Some((kind, name.clone()));
+        // A new one: an empty form, its text pasted (or written), then Save.
+        if name == "new" && matches!(kind, "mcp" | "skill" | "prompt") {
+            let (editor, template) = match kind {
+                "mcp" => (e.mcp_json.clone(), "{\n  \"url\": \"https://\"\n}\n"),
+                "skill" => (e.skill_text.clone(), "---\nname: \ndescription: \n---\n\n"),
+                _ => (e.prompt_text.clone(), ""),
+            };
+            match kind {
+                "mcp" => e.mcp_open = Some(name),
+                "skill" => e.skill_open = Some(name),
+                _ => e.prompt_open = Some(name),
+            }
+            editor.update(cx, |s, cx| s.set_value(template, window, cx));
+            e.new_name.update(cx, |s, cx| s.set_value("", window, cx));
+            e.new_name.update(cx, |s, cx| s.focus(window, cx));
+            cx.notify();
+            return;
+        }
         match kind {
             "soul" => e.soul_open = true,
             "telegram" => e.tg_open = true,
