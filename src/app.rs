@@ -282,9 +282,6 @@ pub struct BenchApp {
     /// The composer's measured height, from the same canvas as `composer_y`: how much of the
     /// window the thread's last row has to share with it (`past_end`).
     pub composer_h: f32,
-    /// Measured height of the thread's last row: how deep the thread may scroll depends on it
-    /// (`ui::chat::past_end`).
-    pub last_h: f32,
     pub viewport_h: Pixels,
     /// Unfolded steps (turn, step) and the source host whose pages are listed (turn, host).
     pub open_steps: HashSet<(usize, usize)>,
@@ -720,7 +717,6 @@ impl BenchApp {
             last_max: px(0.),
             composer_y: px(0.),
             composer_h: 0.,
-            last_h: 0.,
             viewport_h: px(0.),
             open_steps: HashSet::new(),
             open_source: None,

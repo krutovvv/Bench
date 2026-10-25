@@ -16,15 +16,13 @@ use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
-/// How far the thread scrolls past its last row: like an editor's scroll past the end, so the
-/// last message can be pulled to the top of the window. The room is what the window has left
-/// after the status bar, the composer and a line; the last row's own height is taken off it, so
-/// the deepest scroll stops with that row whole under the top edge instead of shoving its avatar
-/// above the window. A row taller than the room leaves only the floor: the thread then scrolls as
-/// an ordinary chat, and reading that row means scrolling through it.
-fn past_end(viewport: f32, composer: f32, last_h: f32) -> f32 {
-    let room = viewport - super::STATUS_H - composer - LINE;
-    (room - last_h).clamp(LINE, room.max(LINE))
+/// The air the deepest scroll leaves under the top edge of the window. The row's own padding
+/// keeps it whole; what the room was missing was this fixed breath — measuring the last row's
+/// height turned out to be the wrong lever, since it made the depth change with every row.
+const AIR: f32 = 16.;
+
+fn past_end(viewport: f32, composer: f32) -> f32 {
+    (viewport - super::STATUS_H - composer - LINE - AIR).max(LINE)
 }
 
 /// After how many turns a row of the agent's own work sits: after the last turn that had begun
@@ -45,18 +43,17 @@ mod past_end_tests {
     #[test]
     fn the_last_row_reaches_the_top_and_never_past_it() {
         // A 900-px window, a composer of one line (48): the room is what the window has left.
-        let room = 900. - 48. - super::super::STATUS_H - LINE;
-        // A short row flies: it lifts to the top of the window and the room is what it gets.
-        assert!(past_end(900., 48., 60.) > room - 100.);
-        // A tall one gives its own height back, so its top stays under the edge, never cut.
-        assert_eq!(past_end(900., 48., 300.), room - 300.);
-        // Taller than the room: only the floor is left, an ordinary chat.
-        assert_eq!(past_end(900., 48., 5000.), LINE);
+        let big = past_end(900., 48.);
+        assert!(big > 700. && big < 900., "{big}");
         // A taller composer takes room away; a small window keeps at least a line of it.
-        assert!(past_end(900., 300., 60.) < past_end(900., 48., 60.));
-        assert_eq!(past_end(100., 400., 0.), LINE, "no room: still a line to scroll");
-        // The first frame has measured nothing yet: the room whole, as before.
-        assert_eq!(past_end(900., 48., 0.), room);
+        assert!(past_end(900., 300.) < big);
+        assert_eq!(
+            past_end(100., 400.),
+            LINE,
+            "no room: still a line to scroll"
+        );
+        // Pulled to the top, the last row stops with the fixed air under the edge, not flush on it.
+        assert_eq!(900. - past_end(900., 48.) - 48. - super::super::STATUS_H, 40.);
     }
 }
 
@@ -140,7 +137,7 @@ impl BenchApp {
         } else {
             f32::from(self.viewport_h) * 0.1 + LINE
         };
-        let past = past_end(f32::from(self.viewport_h), composer_h, self.last_h);
+        let past = past_end(f32::from(self.viewport_h), composer_h);
         // A thread with no turns yet still is a thread: "Loading history…" while it opens, then
         // the composer; a new chat is the composer alone.
         // A thread about something starts with it, live: a task list, a server's terminal, a tool.
@@ -385,49 +382,6 @@ impl BenchApp {
         let queue = self.render_queue(cx);
         let composer = self.render_composer(cx);
 
-        // The body of the thread: everything of it but the composer, which follows and is not
-        // part of the conversation. Its last row carries a measurer, because the depth the thread
-        // may scroll is the room minus that row's height (`past_end`): pulled up, it stops with
-        // its top under the edge of the window.
-        let measurer = cx.entity();
-        let mut body: Vec<AnyElement> = Vec::new();
-        body.append(&mut env_rows);
-        if block_on_top {
-            body.extend(subject_block.take());
-        }
-        body.extend(placeholder);
-        body.append(&mut rows);
-        body.extend(approval);
-        body.extend(clarify);
-        body.extend(subject_block.map(|b| b.into_any()));
-        body.extend(queue);
-        if let Some(last) = body.pop() {
-            body.push(
-                div()
-                    .w_full()
-                    .relative()
-                    .child(last)
-                    .child(
-                        canvas(
-                            move |b, _, cx| {
-                                measurer.update(cx, |this, cx| {
-                                    let h = f32::from(b.size.height);
-                                    if (this.last_h - h).abs() > 0.5 {
-                                        this.last_h = h;
-                                        // The scroll room depends on it: one more frame, settled.
-                                        cx.notify();
-                                    }
-                                });
-                            },
-                            |_, _, _, _| {},
-                        )
-                        .absolute()
-                        .size_full(),
-                    )
-                    .into_any(),
-            );
-        }
-
         div()
             .relative()
             .size_full()
@@ -467,10 +421,17 @@ impl BenchApp {
                     .child(
                         v_flex()
                             .w_full()
-                            // The queued drafts are the last rows of the body; the composer after
-                            // them is the thread's last line: it scrolls away with the thread,
-                            // "Jump to latest" brings it back.
-                            .children(body)
+                            .children(env_rows)
+                            .when(block_on_top, |d| d.children(subject_block.take()))
+                            .children(placeholder)
+                            .children(rows)
+                            .children(approval)
+                            .children(clarify)
+                            .children(subject_block)
+                            // What the person has written and has not yet gone out.
+                            .children(queue)
+                            // The next message is the thread's last row: it scrolls
+                            // away with the thread, "Jump to latest" brings it back.
                             .child(composer),
                     ),
             )
