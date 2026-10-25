@@ -1655,17 +1655,11 @@ impl BenchApp {
             self.run_bang(command, window, cx);
             return;
         }
-        // While the agent works, a message waits in the thread's queue (files come after it).
+        // While the agent works, the message waits in the thread's queue (Pi's inbox) until the
+        // answer is ready — with its files too: they are staged first (copied aside, uploaded
+        // over SSH), then the same queue. The old refusal ("files go with the next message")
+        // was ours, not Pi's: the inbox takes a follow-up with attachments like any other.
         if self.live.is_some() {
-            if !files.is_empty() {
-                self.toast(
-                    NotificationType::Info,
-                    "Files go with the next message, once the agent answers",
-                    window,
-                    cx,
-                );
-                return;
-            }
             let Some(session) = self.runtime.clone() else {
                 return;
             };
@@ -1673,16 +1667,57 @@ impl BenchApp {
             self.composer
                 .update(cx, |s, cx| s.set_value("", window, cx));
             self.note_draft(cx);
+            self.attachments.clear();
             let context = self.block_context(cx);
-            self.cmd(Cmd::Queue {
-                session,
-                text,
-                context,
-            });
             // It becomes the thread's next turn: the inserts that waited with it go after it.
             let after = self.turns.len() + 1;
-            self.anchor_draft_inserts(after, cx);
-            cx.notify();
+            if files.is_empty() {
+                self.cmd(Cmd::Queue {
+                    session,
+                    text,
+                    context,
+                });
+                self.anchor_draft_inserts(after, cx);
+                cx.notify();
+                return;
+            }
+            let Some(conn) = self.conn.clone() else {
+                return;
+            };
+            let target = self.target.clone();
+            let profile2 = profile.clone();
+            let keep = files.clone();
+            cx.spawn_in(window, async move |this, cx| {
+                let prepared = cx
+                    .background_spawn(async move {
+                        attach::prepare(&conn, &target, &profile2, &files)
+                    })
+                    .await;
+                let _ = this.update_in(cx, |this, window, cx| match prepared {
+                    Ok(prep) => {
+                        // The thread he sent from, even if another is open by now.
+                        let same = this.runtime.as_deref() == Some(session.as_str());
+                        this.cmd(Cmd::Queue {
+                            session,
+                            text: with_attachments(&text, &prep.lines),
+                            context,
+                        });
+                        if same {
+                            this.anchor_draft_inserts(after, cx);
+                        }
+                    }
+                    Err(e) => {
+                        this.attachments = keep;
+                        this.toast(
+                            NotificationType::Error,
+                            format!("Attach: {e:#}"),
+                            window,
+                            cx,
+                        );
+                    }
+                });
+            })
+            .detach();
             return;
         }
         // Code from the IDE follows the words, each block naming its file and lines.
@@ -1691,19 +1726,12 @@ impl BenchApp {
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.note_draft(cx);
         self.attachments.clear();
-        let with_files = |text: &str, lines: Vec<String>| {
-            std::iter::once(text.to_string())
-                .filter(|t| !t.is_empty())
-                .chain(lines)
-                .collect::<Vec<_>>()
-                .join("\n\n")
-        };
         let shown: Vec<String> = files
             .iter()
             .map(|f| format!("{}{}]", attach::PREFIX, f.display()))
             .collect();
         self.turns.push(Turn {
-            user: with_files(&text, shown),
+            user: with_attachments(&text, &shown),
             started: Some(now_secs()),
             ..Default::default()
         });
@@ -1730,6 +1758,7 @@ impl BenchApp {
             return;
         };
         let target = self.target.clone();
+        let keep = files.clone();
         cx.spawn_in(window, async move |this, cx| {
             let p = profile.clone();
             let prepared = cx
@@ -1740,11 +1769,13 @@ impl BenchApp {
                     if let Some(live) = this.live.as_mut() {
                         live.label = "Sending…".into();
                     }
-                    let full = with_files(&text, prep.lines);
+                    let full = with_attachments(&text, &prep.lines);
                     this.submit(profile, full, window, cx);
                 }
                 Err(e) => {
                     this.live = None;
+                    // His files come back: the message stays his to send again.
+                    this.attachments = keep;
                     this.toast(
                         NotificationType::Error,
                         format!("Attach: {e:#}"),
@@ -2345,7 +2376,16 @@ pub fn last_line(text: &str) -> String {
         .collect()
 }
 
-/// A step's label: the tool's name in words ("session search"; an MCP tool
+/// The message's text with the files' `[attached: …]` lines under it.
+fn with_attachments(text: &str, lines: &[String]) -> String {
+    std::iter::once(text.to_string())
+        .filter(|t| !t.is_empty())
+        .chain(lines.iter().cloned())
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+///  ("session search"; an MCP tool
 /// `mcp__<server>__<tool>` as "<server> · <tool>"), then what it worked on.
 pub fn tool_label(name: &str, detail: &str) -> String {
     let name = match name.strip_prefix("mcp__").and_then(|n| n.split_once("__")) {

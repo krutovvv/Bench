@@ -358,7 +358,9 @@ impl BenchApp {
             .map(|(k, (id, mode, text))| {
                 let (send_id, rm_id) = (id.clone(), id.clone());
                 let steer = mode == "steer";
-                let first = text.lines().next().unwrap_or_default().to_string();
+                // The files it carries show as the chips they are, not as `[attached: …]`.
+                let (said, paths) = crate::attach::split(&text);
+                let first = said.lines().next().unwrap_or_default().to_string();
                 h_flex()
                     .id(("queued", k))
                     .gap_2()
@@ -376,6 +378,16 @@ impl BenchApp {
                             .child(if steer { "Next" } else { "Queued" }),
                     )
                     .child(div().flex_1().min_w_0().truncate().child(first))
+                    .when(!paths.is_empty(), |d| {
+                        d.children(paths.iter().enumerate().map(|(j, p)| {
+                            self.attachment_chip(
+                                format!("queued-chip-{k}-{j}").into(),
+                                p,
+                                None,
+                                cx,
+                            )
+                        }))
+                    })
                     .when(!steer, |d| {
                         d.child(
                             icon_button(
