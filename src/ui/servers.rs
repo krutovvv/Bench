@@ -35,26 +35,21 @@ impl BenchApp {
                 .child(icon.icon().small())
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
         };
-        // Files of what the window shows (the open chat, the server's terminal) one click
-        // away, as ⌘B and "Open files" in the "⋯" menu; gone while the IDE is open (its own
-        // close button stands there).
-        let files = crate::bench::IDE
-            && !self.ide_open()
-            && !self.tools.on
-            && !self.tasks.on
-            && if ssh {
-                self.ssh.active_tab().is_some()
-            } else {
-                self.session.is_some()
-            };
+        // The thread's project has a folder: it opens in Zed (a server's over SSH).
+        let zed = self
+            .projects
+            .iter()
+            .find(|p| p.id == self.thread_project)
+            .and_then(|p| p.folder.clone().filter(|f| !f.is_empty()).map(|f| (f, p.host.clone())));
+        let _ = ssh;
         h_flex()
             .flex_none()
             .gap_1()
             .items_center()
-            .when(files, |d| {
+            .when_some(zed, |d, (folder, host)| {
                 d.child(
-                    toggle("open-files", Ico::PanelRight, false, "Open files  ⌘B")
-                        .on_click(cx.listener(|this, _, window, cx| this.toggle_ide(window, cx))),
+                    toggle("open-in-zed", Ico::Zed, false, "Open the project in Zed")
+                        .on_click(cx.listener(move |this, _, _, cx| this.open_in_zed(&folder, None, host.as_deref(), cx))),
                 )
             })
             // A window of its own, in the window's top-right corner.

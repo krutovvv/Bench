@@ -125,7 +125,7 @@ impl BenchApp {
                     .unwrap_or_default();
                 Ok((top, branch))
             },
-            move |this, r: anyhow::Result<(String, String)>, window, cx| {
+            move |this, r: anyhow::Result<(String, String)>, _window, cx| {
                 if this.session.as_deref() != Some(&session) {
                     return;
                 }
@@ -140,10 +140,6 @@ impl BenchApp {
                             );
                         }
                         this.project = Some(Project::from_top(&top, &branch));
-                        // The Files tab follows the chat's project.
-                        if this.right == Some(super::RightTab::Files) && this.tree_root.is_none() {
-                            this.load_tree_root(window, cx);
-                        }
                     }
                     // The folder is gone or not a repo: keep what the agent recorded, if anything.
                     Err(_) => {}
@@ -299,4 +295,17 @@ pub(crate) fn merge(target: &Target, p: &Project, title: &str) -> anyhow::Result
         anyhow::bail!("Merge into {main_branch} failed, nothing changed: {e:#}");
     }
     Ok(format!("Merged {} into {main_branch}", p.branch))
+}
+
+impl BenchApp {
+    /// A file or folder in Zed (the code editor beside Bench): `zed://file/<path>:<line>`, or
+    /// over SSH `zed://ssh/<alias>/<path>` for a server's.
+    pub fn open_in_zed(&mut self, path: &str, line: Option<usize>, host: Option<&str>, cx: &mut Context<Self>) {
+        let at = line.map(|l| format!(":{l}")).unwrap_or_default();
+        let url = match host.filter(|h| !h.is_empty() && *h != crate::term::LOCAL) {
+            Some(h) => format!("zed://ssh/{h}{path}{at}"),
+            None => format!("zed://file{path}{at}"),
+        };
+        cx.open_url(&url);
+    }
 }

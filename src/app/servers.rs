@@ -385,21 +385,7 @@ impl BenchApp {
                 Ok(String::from_utf8_lossy(&out).trim().to_string())
             },
             move |this, r, window, cx| match r.as_deref().ok().and_then(|o| o.split_once(' ')) {
-                Some(("d", dir)) => {
-                    this.open_ide_server_at(alias.clone(), Some(dir.to_string()), window, cx);
-                }
-                Some(("f", file)) => {
-                    let file = file.to_string();
-                    let same_tree = this.ide_open()
-                        && this.ide.server.as_deref() == Some(alias.as_str())
-                        && this.tree_root.as_ref().is_some_and(|r| file.starts_with(r.as_str()));
-                    if !same_tree {
-                        let dir =
-                            file.rsplit_once('/').map_or("/".to_string(), |(d, _)| d.to_string());
-                        this.open_ide_server_at(alias.clone(), Some(dir), window, cx);
-                    }
-                    this.open_file_at(file, line, window, cx);
-                }
+                Some((_, found)) => this.open_in_zed(found, line, Some(&alias), cx),
                 _ => this.toast(
                     NotificationType::Info,
                     format!("{alias}: no file or folder at {path}"),
@@ -410,23 +396,7 @@ impl BenchApp {
         );
     }
 
-    /// Open a file in the IDE, at `line` once it has loaded.
-    fn open_file_at(
-        &mut self,
-        file: String,
-        line: Option<usize>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        if let Some(line) = line {
-            self.ide.pending_line = Some((file.clone(), line));
-        }
-        self.open_file(file, window, cx);
-        self.apply_pending_line(window, cx);
-    }
-
-    /// ⌘-click on a path in this machine's terminal: a folder opens as the IDE's tree, a file in
-    /// its editor (with its folder as the tree).
+    /// ⌘-click on a path in this machine's terminal: it opens in Zed.
     fn open_local_link(
         &mut self,
         link: &str,
@@ -441,22 +411,8 @@ impl BenchApp {
             None => link.to_string(),
         };
         let p = std::path::Path::new(&path);
-        if p.is_dir() {
-            self.open_ide(Some(path), window, cx);
-        } else if p.is_file() {
-            let same_tree = self.ide_open()
-                && self.ide.server.is_none()
-                && self
-                    .tree_root
-                    .as_ref()
-                    .is_some_and(|r| path.starts_with(r.as_str()));
-            if !same_tree {
-                let dir = p
-                    .parent()
-                    .map_or("/".into(), |d| d.to_string_lossy().to_string());
-                self.open_ide(Some(dir), window, cx);
-            }
-            self.open_file_at(path, line, window, cx);
+        if p.exists() {
+            self.open_in_zed(&path, line, None, cx);
         } else {
             self.toast(
                 NotificationType::Info,

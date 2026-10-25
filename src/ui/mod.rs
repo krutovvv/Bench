@@ -3,8 +3,6 @@
 mod asks;
 mod chat;
 mod composer;
-pub(crate) mod editor_status;
-mod files;
 pub(crate) mod inserts;
 mod media;
 mod panels;
@@ -537,9 +535,7 @@ impl Render for BenchApp {
             .child(header)
             .child(div().flex_1().min_h_0().child(body));
 
-        // The IDE maximized (⌘⇧B) has the whole window; the rest keeps running, hidden.
-        let expanded = self.ide.expanded && self.right.is_some() && self.panel == Panel::Chat;
-        let content = self.render_layout(main, expanded, window, cx);
+        let content = self.render_layout(main, window, cx);
         v_flex()
             .size_full()
             .bg(theme.background)
@@ -556,95 +552,35 @@ impl Render for BenchApp {
 }
 
 impl BenchApp {
-    /// Sidebar | main | IDE (when open), resizable. Maximized, the IDE takes both places: its
-    /// tree where the sidebar is (same width), its editor where the chat/terminal is.
-    fn render_layout(
-        &mut self,
-        main: Div,
-        expanded: bool,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        // One left column, one IDE width: when the set of panels changes (maximized or not,
-        // IDE on the right or not) the group starts from a fresh state laid out at the widths
-        // remembered here — gpui-kit would otherwise squeeze the old sizes to fit a new panel.
-        let hidden = self.sidebar_hidden && !expanded;
-        let shape = (
-            expanded,
-            self.right.is_some() && self.panel == Panel::Chat,
-            hidden,
-        );
+    /// Sidebar | main, the sidebar resizable (its width kept). Code opens in Zed: no panel of
+    /// files here.
+    fn render_layout(&mut self, main: Div, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let hidden = self.sidebar_hidden;
+        let shape = (false, false, hidden);
         if self.layout_synced != Some(shape) {
             self.layout_synced = Some(shape);
-            if expanded {
-                self.layout_ide_state = cx.new(|_| Default::default());
-            } else {
-                self.layout_state = cx.new(|_| Default::default());
-            }
+            self.layout_state = cx.new(|_| Default::default());
         }
-        let state = if expanded {
-            self.layout_ide_state.clone()
-        } else {
-            self.layout_state.clone()
-        };
+        let state = self.layout_state.clone();
         let _ = window;
-        // Every drag of a divider is that column's width from now on.
+        // Every drag of the divider is the sidebar's width from now on.
         let view = cx.entity();
-        let remember = move |state: &Entity<gpui_kit::component::resizable::ResizableState>,
-                             _: &mut Window,
-                             cx: &mut App| {
+        let remember = move |state: &Entity<gpui_kit::component::resizable::ResizableState>, _: &mut Window, cx: &mut App| {
             let sizes = state.read(cx).sizes().clone();
             view.update(cx, |this, _| {
-                // Without the sidebar the columns are main | IDE.
-                let ide_at = if this.sidebar_hidden && !this.ide.expanded {
-                    1
-                } else {
-                    if let Some(w) = sizes.first() {
-                        this.sidebar_w = *w;
-                    }
-                    2
-                };
-                // Normal layout with the IDE on the right: sidebar | main | IDE.
-                if let (Some(w), false) = (sizes.get(ide_at), this.ide.expanded) {
-                    this.ide_w = *w;
+                if let (Some(w), false) = (sizes.first(), this.sidebar_hidden) {
+                    this.sidebar_w = *w;
                 }
             });
         };
-        // Fixed: a window resize goes to the middle; the columns keep their widths.
-        let left = resizable_panel()
-            .size(self.sidebar_w)
-            .size_range(px(200.)..px(480.))
-            .fixed();
-        if expanded {
-            return h_resizable("layout-ide")
-                .with_state(&state)
-                .with_handle_appearance(quiet_divider())
-                .on_resize(remember)
-                .child(left.child(self.render_ide_sidebar(cx)))
-                .child(resizable_panel().child(self.render_ide_main(cx)))
-                .into_any_element();
-        }
+        // Fixed: a window resize goes to the thread; the sidebar keeps its width.
+        let left = resizable_panel().size(self.sidebar_w).size_range(px(200.)..px(480.)).fixed();
         h_resizable("layout")
             .with_state(&state)
             .with_handle_appearance(quiet_divider())
             .on_resize(remember)
             .when(!hidden, |d| d.child(left.child(self.render_sidebar(cx))))
             .child(resizable_panel().child(main))
-            .when(
-                self.right.is_some()
-                    && self.panel == Panel::Chat
-                    && !self.tools.on
-                    && !self.tasks.on,
-                |d| {
-                    d.child(
-                        resizable_panel()
-                            .size(self.ide_w)
-                            .size_range(px(360.)..px(1000.))
-                            .fixed()
-                            .child(self.render_right(cx)),
-                    )
-                },
-            )
             .into_any_element()
     }
 }

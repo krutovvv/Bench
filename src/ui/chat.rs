@@ -412,16 +412,9 @@ impl BenchApp {
             _ => String::new(),
         };
         let when = turn.finished.or(turn.started).unwrap_or_default();
-        let (rest, snippet_refs) = crate::app::snippets::split(&turn.user);
-        let (user, attached_paths) = crate::attach::split(&rest);
+        let (user, attached_paths) = crate::attach::split(&turn.user);
         let has_text = !user.is_empty();
-        let mut attached: Vec<AnyElement> = snippet_refs
-            .iter()
-            .enumerate()
-            .map(|(k, (p, a, b))| {
-                self.snippet_chip(format!("sent-snip-{i}-{k}").into(), p, *a, *b, None, cx)
-            })
-            .collect();
+        let mut attached: Vec<AnyElement> = vec![];
         attached.extend(
             attached_paths
                 .iter()
@@ -1143,7 +1136,7 @@ impl BenchApp {
                     .parent()
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_default();
-                let selected = self.file.as_ref().is_some_and(|f| f.path == path);
+                let selected = false;
                 let open = path.clone();
                 h_flex()
                     .id(("file", k))
@@ -1195,8 +1188,10 @@ impl BenchApp {
                                 .child("written"),
                         )
                     })
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.open_file(open.clone(), window, cx)
+                    // In Zed, the code editor beside Bench.
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        let host = this.thread_host();
+                        this.open_in_zed(&open, None, Some(host.as_str()), cx)
                     }))
                     .into_any_element()
             })

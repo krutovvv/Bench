@@ -97,21 +97,7 @@ pub fn before(current: &str, diffs: &[String]) -> Option<String> {
     Some(text)
 }
 
-/// The whole file as one unified diff (every unchanged line kept as context), so a viewer
-/// can show the full text with the changes highlighted in place.
-pub fn full(path: &str, before: &str, after: &str) -> String {
-    similar::TextDiff::from_lines(before, after)
-        .unified_diff()
-        .context_radius(usize::MAX / 4)
-        .header(&format!("a/{path}"), &format!("b/{path}"))
-        .to_string()
-}
 
-/// A combined unified diff between two texts' hunks is not needed: the session diff is
-/// simply the tool diffs in order.
-pub fn joined(diffs: &[String]) -> String {
-    diffs.join("\n")
-}
 
 #[cfg(test)]
 mod tests {

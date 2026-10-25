@@ -416,10 +416,13 @@ impl BenchApp {
                             }))
                             .separator()
                             .item(
-                                PopupMenuItem::new("Open files")
-                                    .icon(Ico::FolderTree.icon())
-                                    .on_click(act(Box::new(move |this, window, cx| {
-                                        this.open_ide_for_session(files_id.clone(), window, cx)
+                                PopupMenuItem::new("Open in Zed")
+                                    .icon(Ico::Zed.icon())
+                                    .on_click(act(Box::new(move |this, _, cx| {
+                                        if let Some(dir) = this.folder_of(&files_id) {
+                                            let host = this.host_of_session(&files_id);
+                                            this.open_in_zed(&dir, None, Some(host.as_str()), cx);
+                                        }
                                     }))),
                             )
                             .separator()

@@ -19,27 +19,10 @@ impl BenchApp {
         if ks.key == "escape" && !m.modified() {
             return self.escape(cx);
         }
-        // The mini IDE's editor, as in Zed: ⌃G go to line, ⌃Tab / ⌃⇧Tab the tabs, ⌥Z wrap.
-        let in_editor = self.file.is_some() && self.file_editor.focus_handle(cx).is_focused(window);
-        if in_editor && m.control && !m.platform && !m.alt {
-            match (ks.key.as_str(), m.shift) {
-                ("g", false) => self.open_go_line(window, cx),
-                ("tab", false) => self.cycle_tab(1, window, cx),
-                ("tab", true) => self.cycle_tab(-1, window, cx),
-                _ => return false,
-            }
-            return true;
-        }
-        if in_editor && m.alt && !m.platform && !m.control && ks.key == "z" {
-            self.toggle_soft_wrap(window, cx);
-            return true;
-        }
         if !m.platform || m.control || m.alt {
             return false;
         }
         match (ks.key.as_str(), m.shift) {
-            // Save the file open in the mini IDE.
-            ("s", false) if self.file.is_some() => self.save_file(window, cx),
             // New chat / new server, as the mode's bottom button.
             ("n", false) if self.tasks.on => self.new_task(window, cx),
             // Done / not done for the open task.
@@ -67,26 +50,9 @@ impl BenchApp {
             ("4", false) if crate::bench::TASKS => {
                 self.open_task_list(crate::tasks::List::Today, window, cx)
             }
-            ("b", false) if crate::bench::IDE => self.toggle_ide(window, cx),
-            ("b", true) if self.ide_open() => {
-                self.ide.expanded = !self.ide.expanded;
-                cx.notify();
-            }
-            ("p", false) if crate::bench::IDE => self.open_quick_open(window, cx),
             ("\\", false) => self.toggle_sidebar(cx),
             // Dictation without its button: start, and again to stop and transcribe.
             ("d", true) => self.toggle_mic(window, cx),
-            ("f", true) if crate::bench::IDE => self.open_find(window, cx),
-            // In the editor ⌘F is its own find & replace bar.
-            ("f", false) if in_editor => return false,
-            ("w", false) if in_editor => self.close_active_tab(window, cx),
-            // The editor copies; where the text came from is remembered for a paste in the chat.
-            ("c", false) if in_editor => {
-                self.note_copy(cx);
-                return false;
-            }
-            // ⌘⇧.: the selection (or the line) to the message, as in Zed.
-            ("." | ">", true) if self.file.is_some() => self.add_selection_to_chat(window, cx),
             // Rich Text to Markdown shows the paste rendered (no editor has focus): ⌘V pastes
             // the clipboard's formatting there.
             ("v", false)
@@ -96,10 +62,6 @@ impl BenchApp {
                     && !self.tools.search.focus_handle(cx).is_focused(window) =>
             {
                 self.paste_tool_input(window, cx)
-            }
-            // In the mini IDE's editor: the next occurrence gets a cursor too.
-            ("d", false) if self.file_editor.focus_handle(cx).is_focused(window) => {
-                self.select_next_occurrence(cx)
             }
             ("f", false) => self.open_search(window, cx),
             (",", false) => {
@@ -124,14 +86,6 @@ impl BenchApp {
         if self.recorder.take().is_some() {
             self.wave_ticker = None;
             self.send_after_transcribe = false;
-        } else if self.ide.quick.is_some() {
-            self.ide.quick = None;
-        } else if self.ide.goto.is_some() {
-            self.ide.goto = None;
-        } else if self.ide.root_edit.is_some() {
-            self.ide.root_edit = None;
-        } else if self.ide.edit.is_some() {
-            self.ide.edit = None;
         } else if self.ssh.on && self.ssh.form.is_some() {
             self.ssh.form = None;
         } else if self.panel.is_settings() {
@@ -164,28 +118,6 @@ impl BenchApp {
     pub(crate) fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
         self.sidebar_hidden = !self.sidebar_hidden;
         cx.notify();
-    }
-
-    /// ⌘B: hide the mini IDE, or open it on what the window shows (the server's terminal, else
-    /// the open chat).
-    pub(crate) fn toggle_ide(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.ide_open() {
-            self.close_ide(cx);
-        } else if self.ssh.on {
-            match self.ssh.active_tab().map(|t| t.alias.clone()) {
-                // This machine's terminal: its files, from the home folder.
-                Some(alias) if alias == crate::term::LOCAL => {
-                    self.open_ide(std::env::var("HOME").ok(), window, cx)
-                }
-                Some(alias) => self.open_ide_server(alias, window, cx),
-                None => {}
-            }
-        } else {
-            match self.session.clone() {
-                Some(id) => self.open_ide_for_session(id, window, cx),
-                None => self.open_ide(None, window, cx),
-            }
-        }
     }
 
     /// ⌘+ / ⌘−: the Appearance size, one step.

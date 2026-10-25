@@ -8,19 +8,14 @@ use web_time::Instant;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::diff::{DiffFile, DiffState};
-use gpui_kit::component::input::{EditorState, InputEvent, InputState, TextareaState};
+use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::{SelectEvent, SelectState};
 use gpui_kit::*;
 
 mod asks;
 mod attachments;
-pub(crate) mod ide;
 pub(crate) mod inserts;
-pub(crate) mod ide_find;
-pub(crate) mod ide_ops;
-mod ide_tabs;
 mod keys;
 pub mod marks;
 mod processes;
@@ -34,7 +29,6 @@ mod prompts;
 pub(crate) mod providers;
 pub(crate) mod servers;
 mod slash;
-pub(crate) mod snippets;
 pub(crate) mod remote_files;
 pub(crate) mod sites;
 pub(crate) mod subjects;
@@ -64,36 +58,6 @@ impl Panel {
     pub fn is_settings(self) -> bool {
         self != Panel::Chat
     }
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum RightTab {
-    Changes,
-    Files,
-    /// ⌘⇧F: text in every file under the tree's root.
-    Search,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum FileMode {
-    Diff,
-    Before,
-    After,
-}
-
-/// The file open in the right panel. `diffs` are this session's tool diffs for it, in order.
-pub struct FileView {
-    pub path: String,
-    pub mode: FileMode,
-    pub diffs: Vec<String>,
-    pub loaded: bool,
-    pub truncated: bool,
-    /// The file is gone from disk (an old session): only the recorded edits can be shown.
-    pub missing: bool,
-    /// Diff view: the whole file with the changes in place, else just the tool diffs.
-    pub diff_view: Option<Entity<DiffState>>,
-    /// The original text, when it could be reconstructed from the edits.
-    pub before_view: Option<Entity<DiffState>>,
 }
 
 /// The instant a turn began, from its Unix start time (now when unknown or in the future).
@@ -190,8 +154,6 @@ pub struct BenchApp {
     pub attachments: Vec<std::path::PathBuf>,
     /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
     pub sidebar_hidden: bool,
-    /// Code from the IDE going with the next message (`snippets.rs`).
-    pub snippets: Vec<snippets::Snippet>,
     pub usage: Option<Usage>,
     pub effort: usize,
     /// The open session's effort when it is none of EFFORTS (set elsewhere, e.g. `high`; "" is the
@@ -291,15 +253,6 @@ pub struct BenchApp {
     /// Unfolded steps (turn, step) and the source host whose pages are listed (turn, host).
     pub open_steps: HashSet<(usize, usize)>,
     pub open_source: Option<(usize, String)>,
-    /// Right panel: changed files / file tree, and the file being viewed.
-    pub right: Option<RightTab>,
-    pub file: Option<FileView>,
-    pub file_editor: Entity<EditorState>,
-    /// The line under the IDE editor (cursor, selection, language), repainted on its own.
-    pub editor_status: Entity<crate::ui::editor_status::EditorStatus>,
-    pub tree_root: Option<String>,
-    pub tree: HashMap<String, Vec<(String, String, bool)>>,
-    pub tree_open: HashSet<String>,
     pub recorder: Option<Recorder>,
     /// Repaints the waveform while recording.
     wave_ticker: Option<Task<()>>,
@@ -327,15 +280,10 @@ pub struct BenchApp {
     pub tasks: tasks::TasksMode,
     /// The files of an FTP / SFTP host, shown in its thread.
     pub files_remote: remote_files::RemoteFiles,
-    /// The mini IDE's source and the server file it keeps in sync.
-    pub ide: ide::Ide,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
     /// width, kept by the app across the two layouts that show it (`ui/mod.rs`).
     pub sidebar_w: Pixels,
-    /// The IDE's width when it sits on the right.
-    pub ide_w: Pixels,
     pub layout_state: Entity<gpui_kit::component::resizable::ResizableState>,
-    pub layout_ide_state: Entity<gpui_kit::component::resizable::ResizableState>,
     /// The layout shape (maximized IDE, IDE on the right) the left width was last applied to;
     /// a new shape gets it again.
     pub layout_synced: Option<(bool, bool, bool)>,
@@ -394,24 +342,7 @@ impl BenchApp {
                 cx,
             )
         });
-        // The IDE panel is narrow: long lines scroll sideways instead of wrapping into a mess.
-        let file_editor = cx.new(|cx| {
-            EditorState::new(window, cx)
-                .line_number(true)
-                .soft_wrap(false)
-                .folding(true)
-        });
-        let app = cx.entity().downgrade();
-        let editor_status =
-            cx.new(|cx| crate::ui::editor_status::EditorStatus::new(file_editor.clone(), app, cx));
-
         let subs = vec![
-            // The IDE's editor: unsaved edits show as a dot on the tab.
-            cx.subscribe_in(&file_editor, window, |this, _, ev: &InputEvent, _, cx| {
-                if let InputEvent::Change = ev {
-                    this.on_editor_change(cx);
-                }
-            }),
             // "System" follows macOS light/dark as it changes.
             cx.observe_window_appearance(window, |this, window, cx| {
                 if this.appearance.mode == crate::theme::Mode::System {
@@ -626,11 +557,8 @@ impl BenchApp {
             tools,
             files_remote,
             tasks: tasks_mode,
-            ide: Default::default(),
             sidebar_w: px(280.),
-            ide_w: px(640.),
             layout_state: cx.new(|_| Default::default()),
-            layout_ide_state: cx.new(|_| Default::default()),
             layout_synced: None,
             targets,
             target: initial.clone(),
@@ -674,7 +602,6 @@ impl BenchApp {
             queued: None,
             attachments: vec![],
             sidebar_hidden: false,
-            snippets: vec![],
             files_open: false,
             processes: vec![],
             processes_open: false,
@@ -736,13 +663,6 @@ impl BenchApp {
             last_max: px(0.),
             open_steps: HashSet::new(),
             open_source: None,
-            right: None,
-            file: None,
-            file_editor,
-            editor_status,
-            tree_root: None,
-            tree: HashMap::new(),
-            tree_open: HashSet::new(),
             wave_ticker: None,
             recorder: None,
             transcribing: false,
@@ -1123,7 +1043,6 @@ impl BenchApp {
                 } else if let Some(id) = subject.strip_prefix("env:") {
                     self.load_env(id, window, cx);
                 }
-                let mut changed = None;
                 if let Some(turn) = self.turns.last_mut() {
                     let step = turn.steps.iter_mut().rev().find(|s| match s {
                         Step::Tool { call_id: id, .. } => call_id.is_empty() || *id == call_id,
@@ -1139,16 +1058,11 @@ impl BenchApp {
                         *o = output;
                     }
                     if let Some(edit) = edit {
-                        changed = Some(edit.path.clone());
                         turn.files.push(edit);
                         if self.project.is_none() {
                             self.resolve_project(window, cx);
                         }
                     }
-                }
-                // The agent wrote the file open in the IDE: it follows.
-                if let Some(path) = changed {
-                    self.file_changed_outside(&path, window, cx);
                 }
                 cx.notify();
             }
@@ -1328,11 +1242,6 @@ impl BenchApp {
     // ---- chat ------------------------------------------------------------
 
     fn reset_chat(&mut self, cx: &mut Context<Self>) {
-        // An open IDE stays as it is (it was opened on purpose); a closed one re-roots next time.
-        if !self.ide_open() {
-            self.tree_root = None;
-            self.tree.clear();
-        }
         self.processes.clear();
         self.process_open = None;
         self.session = None;
@@ -1638,11 +1547,11 @@ impl BenchApp {
             return;
         };
         let files = self.attachments.clone();
-        if typed.is_empty() && files.is_empty() && self.snippets.is_empty() {
+        if typed.is_empty() && files.is_empty() {
             return;
         }
         // Enter in the command list picks the command instead of sending.
-        if files.is_empty() && self.snippets.is_empty() && self.complete_slash(window, cx) {
+        if files.is_empty() && self.complete_slash(window, cx) {
             return;
         }
         // "!command": run it in this thread's terminal (opened under the thread), as in Delta.
@@ -1661,11 +1570,7 @@ impl BenchApp {
             let Some(session) = self.runtime.clone() else {
                 return;
             };
-            let text = std::iter::once(typed)
-                .filter(|t| !t.is_empty())
-                .chain(self.snippets.drain(..).map(|s| s.block()))
-                .collect::<Vec<_>>()
-                .join("\n\n");
+            let text = typed;
             self.composer.update(cx, |s, cx| s.set_value("", window, cx));
             self.note_draft(cx);
             let context = self.block_context(cx);
@@ -1674,11 +1579,7 @@ impl BenchApp {
             return;
         }
         // Code from the IDE follows the words, each block naming its file and lines.
-        let text = std::iter::once(typed)
-            .filter(|t| !t.is_empty())
-            .chain(self.snippets.drain(..).map(|s| s.block()))
-            .collect::<Vec<_>>()
-            .join("\n\n");
+        let text = typed;
         self.composer
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.note_draft(cx);
@@ -2322,18 +2223,6 @@ impl BenchApp {
     }
 }
 
-/// The deepest folder containing every path.
-pub(super) fn common_dir(paths: &[String]) -> Option<String> {
-    let first = std::path::Path::new(paths.first()?).parent()?.to_path_buf();
-    let mut root = first;
-    for p in &paths[1..] {
-        while !std::path::Path::new(p).starts_with(&root) {
-            root = root.parent()?.to_path_buf();
-        }
-    }
-    Some(root.to_string_lossy().to_string())
-}
-
 pub fn now_secs() -> f64 {
     web_time::SystemTime::now()
         .duration_since(web_time::UNIX_EPOCH)
@@ -2364,11 +2253,6 @@ pub fn tool_label(name: &str, detail: &str) -> String {
     } else {
         format!("{name}: {detail}")
     }
-}
-
-/// A diff view state: three lines of context around each change, the rest folded (expandable).
-pub(super) fn diff_state(files: Vec<DiffFile>, cx: &mut App) -> Entity<DiffState> {
-    cx.new(|cx| DiffState::new(files, cx).with_context_lines(Some(3)))
 }
 
 /// One line of at most 160 characters.

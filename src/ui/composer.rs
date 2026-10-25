@@ -129,22 +129,7 @@ impl BenchApp {
                 .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
         });
         let slash = self.render_slash(cx);
-        let mut chips: Vec<AnyElement> = self
-            .snippets
-            .clone()
-            .iter()
-            .enumerate()
-            .map(|(k, s)| {
-                self.snippet_chip(
-                    format!("snip-{k}").into(),
-                    &s.path,
-                    s.start,
-                    s.end,
-                    Some(k),
-                    cx,
-                )
-            })
-            .collect();
+        let mut chips: Vec<AnyElement> = vec![];
         chips.extend(self.attachments.clone().iter().enumerate().map(|(k, p)| {
             self.attachment_chip(
                 format!("attach-{k}").into(),
@@ -173,7 +158,7 @@ impl BenchApp {
                     && !m.shift
                     && !m.alt
                     && !m.control
-                    && (this.paste_snippet(cx) || this.paste_attachments(cx))
+                    && this.paste_attachments(cx)
                 {
                     cx.stop_propagation();
                 }

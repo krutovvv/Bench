@@ -4,8 +4,6 @@
 
 /// Servers: `~/.ssh/config` hosts and this Mac's terminal as threads (⌘2).
 pub const SSH: bool = true;
-/// The mini IDE beside a thread: file tree, editor, tabs (⌘B, ⌘P, "Open files").
-pub const IDE: bool = true;
 /// Tools: everyday utilities, one thread per tool (⌘3).
 pub const TOOLS: bool = true;
 /// Tasks: the task lists as threads, kept in `~/.bench/bench.sqlite` (⌘4).
