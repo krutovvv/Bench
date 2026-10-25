@@ -13,6 +13,7 @@
 
 import { Bot, InputFile, type Context as TgContext } from "grammy";
 import fs from "node:fs";
+import https from "node:https";
 import path from "node:path";
 import { transcribe } from "./audio.ts";
 import { approvalsMode, BENCH_HOME, getSetting, homeAgent, profileEnv, reasoningEffort, resolveModel } from "./config.ts";
@@ -202,11 +203,21 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	};
 	rt.listeners.add(listener);
 
+	// Files (photos, voice) come the way the bot's messages do: through the proxy where Telegram
+	// is reached only that way.
 	const download = async (fileId: string): Promise<{ data: Buffer; name: string }> => {
 		const f = await api.getFile(fileId);
-		const r = await fetch(`https://api.telegram.org/file/bot${cfg.token}/${f.file_path}`);
-		if (!r.ok) throw new Error(`download: HTTP ${r.status}`);
-		return { data: Buffer.from(await r.arrayBuffer()), name: path.basename(f.file_path ?? "file") };
+		const data = await new Promise<Buffer>((resolve, reject) => {
+			https
+				.get(`https://api.telegram.org/file/bot${cfg.token}/${f.file_path}`, proxy ? { agent: new HttpsProxyAgent(proxy) } : {}, (r) => {
+					if (r.statusCode !== 200) return reject(new Error(`download: HTTP ${r.statusCode}`));
+					const chunks: Buffer[] = [];
+					r.on("data", (c) => chunks.push(c));
+					r.on("end", () => resolve(Buffer.concat(chunks)));
+				})
+				.on("error", reject);
+		});
+		return { data, name: path.basename(f.file_path ?? "file") };
 	};
 
 	bot.use(async (ctx, next) => {
@@ -320,7 +331,11 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		await ctx.editMessageText(`${(msg as any).text ?? ""}\n\n→ ${choice.replace(/\s*\(Recommended\)$/, "")}`).catch(() => {});
 	});
 
-	bot.catch((e) => console.error("[telegram]", e.message));
+	// A failure handling a message is said in the chat, not only in the log.
+	bot.catch((e) => {
+		console.error("[telegram]", e.message);
+		(e as any).ctx?.reply(`Could not handle that: ${String((e as any).error?.message ?? e.message)}`).catch(() => {});
+	});
 	await bot.api.setMyCommands([
 		{ command: "new", description: "Start a new session" },
 		{ command: "stop", description: "Stop the running turn" },
