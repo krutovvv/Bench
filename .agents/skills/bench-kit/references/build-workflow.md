@@ -31,11 +31,14 @@ writing code:
 5. **Commit, then build the commit's app** after every change the user will look at:
    `ship.sh` (`build-change-loop.md`, step 9). The user tests the bundle, not `target/debug` —
    "I see no changes" happened when only the dev build was rebuilt.
-   **Builds are a carousel, one app per commit** (Bench is developed from inside Bench): commit,
-   then `scripts/bundle-macos.sh` makes `dist/Bench.<commit>.app` (7 characters of the hash) as a
-   NEW app next to the others, and `ship.sh` opens it beside the running one. **Never quit, kill or
-   replace the app the person runs** — it is the window they work in and talk to you through. They
-   try the new build and move the Dock icon to it when it's good; the newest 6 builds stay for
-   rolling back. Uncommitted changes stop the build (`BENCH_DIRTY=1` for a throwaway one).
+   **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
+   **Bench** (`~/Applications/Bench.app`, `local.bench`) and tries every commit in **Bench Dev**
+   (`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
+   rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
+   window the person works in and talks to you through. When Dev is good and the person asks,
+   `ship.sh --release` rebuilds Bench: the running one goes on from `Bench.prev.app` (kept for
+   rolling back) and the new one starts on the next open. Both are signed with the Apple Development
+   certificate, so macOS grants are given once per app. Uncommitted changes stop the build
+   (`BENCH_DIRTY=1` for a throwaway Dev one).
 6. **Report honestly** what was verified and what was only built (anything that needs a click).
 

@@ -33,10 +33,11 @@ This kit lives in Bench's own repository, `~/Projects/bench-kit/.agents/skills/b
 often the person talks to you **through Bench itself** while you change Bench. So:
 - **Never quit, kill, restart or replace a running Bench** (`pkill`, `osascript … quit`, deleting
   its `.app`): it is the window the person works in and talks to you through.
-- **A build is a commit's app.** Commit, then `scripts/ship.sh`: it builds
-  `dist/Bench.<commit>.app` **next to** the running one and opens it. The person tries it and
-  moves the Dock icon over themselves; the newest 6 builds stay for rolling back. Uncommitted
-  changes stop the build.
+- **Every commit goes to Bench Dev.** Commit, then `scripts/ship.sh`: it quits Bench Dev
+  (`dist/Bench Dev.app`, the test copy), rebuilds it in place and opens it. The person works in
+  Bench (`~/Applications/Bench.app`); when Dev is good and they ask, `scripts/ship.sh --release`
+  rebuilds it (the running one goes on until reopened; `Bench.prev.app` is the rollback).
+  Uncommitted changes stop the build.
 - Screenshots and tests only of **your own copy** (`scripts/shot.sh`), never the person's window.
   `BENCH_DEMO=1|top|tasks|server|tool|env` opens a made-up session (`src/demo.rs`) to shoot;
   `BENCH_HOME=<a copy> BENCH_SUBJECT=tasks:upcoming` runs a real agent on a copy of the data and
@@ -159,7 +160,7 @@ Rules that keep it right:
 | Path | What |
 |---|---|
 | `~/Projects/bench-kit` (this repository) | Bench itself: `src/` the app, `agent/` the agent, `src/demo.rs` the made-up session |
-| `scripts/ship.sh` | Build this commit's `dist/Bench.<commit>.app` and open it next to the running one (never quits anything) |
+| `scripts/ship.sh` | Rebuild Bench Dev from this commit and open it; `--release` rebuilds Bench itself when the person asks (never quits it) |
 | `scripts/shot.sh` | Screenshot YOUR copy (a binary, or the .app, with `KEY=VALUE` hooks), never the person's |
 | `scripts/rules.py`, `spans.py`, `textx.py`, `crop.py`, `measure.py` | Rules and edges down a column; icons and gaps along a band; where text starts in a band; an area cut out and zoomed (pt); raw pixel runs (px) |
 | `templates/app/src/ui/kit.rs` | The piece library the catalog documents (`kit::…`); `templates/examples/gallery.rs` uses every piece (`assets/gallery.png`) |

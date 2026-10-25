@@ -95,11 +95,15 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 
 ## How to work here
 
-- **Bench develops itself.** The person usually talks to you through the running Bench. Never
-  quit, kill, restart or replace it (`pkill`, `osascript … quit`, deleting its `.app`).
-- **One change, one commit, one app.** Commit, then run
-  `.agents/skills/bench-kit/scripts/ship.sh`. It builds `dist/Bench.<commit>.app` next to the
-  running one and opens it. Uncommitted changes stop it.
+- **Bench develops itself.** The person usually talks to you through the running Bench
+  (`~/Applications/Bench.app`). Never quit, kill, restart or replace it (`pkill`,
+  `osascript … quit`, deleting its `.app`).
+- **One change, one commit, one Dev build.** Commit, then run
+  `.agents/skills/bench-kit/scripts/ship.sh`. It quits Bench Dev (`dist/Bench Dev.app`), the
+  test copy, rebuilds it in place and opens it. Uncommitted changes stop it. When the person says
+  Dev is good, `ship.sh --release` rebuilds Bench itself; the running one goes on until they
+  reopen it. Both apps keep one path and are signed with the Apple Development certificate, so
+  macOS asks for each permission once.
 - **Don't push without asking.** The repository is public: no private names, tokens or the
   person's data in commits.
 - **Back up before deleting data** (`~/.bench/backups/`).

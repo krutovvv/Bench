@@ -124,7 +124,7 @@ notification replaces the older one for the same chat.
 
 ## Bench: servers and files
 
-The reference app is **Bench** (`dist/Bench.<commit>.app`, bundle id `local.bench`). Gateways are
+The reference app is **Bench** (`~/Applications/Bench.app`, bundle id `local.bench`; Bench Dev is `local.bench.dev`). Gateways are
 This Mac plus `~/.ssh/config` hosts with Node 22.18+, where Bench installs the agent on connect;
 a project with a remote host runs on that host's agent. Servers, file hosts and the project's
 folder come into a thread as inserts (`/ssh`, `/ftp`, `/files`, `build-insert.md`); the agent
@@ -133,10 +133,12 @@ reaches them with `ssh_run` and `remote_files`, Bench with the agent's REST (`/a
 
 ## Shipping changes to the user
 
-The user runs a build from `dist/` (pinned in the Dock). **Builds are a carousel, one app per commit** (Bench is developed from inside Bench): commit,
-then `scripts/bundle-macos.sh` makes `dist/Bench.<commit>.app` (7 characters of the hash) as a
-NEW app next to the others, and `ship.sh` opens it beside the running one. **Never quit, kill or
-replace the app the person runs** — it is the window they work in and talk to you through. They
-try the new build and move the Dock icon to it when it's good; the newest 6 builds stay for
-rolling back. Uncommitted changes stop the build (`BENCH_DIRTY=1` for a throwaway one). Saying "done" without
+**Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
+**Bench** (`~/Applications/Bench.app`, `local.bench`) and tries every commit in **Bench Dev**
+(`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
+rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
+window the person works in and talks to you through. When Dev is good and the person asks,
+`ship.sh --release` rebuilds Bench: the running one goes on from `Bench.prev.app` (kept for
+rolling back) and the new one starts on the next open. Both are signed with the Apple Development
+certificate, so macOS grants are given once per app. Uncommitted changes stop the build (`BENCH_DIRTY=1` for a throwaway one). Saying "done" without
 building the app got "I see no changes".

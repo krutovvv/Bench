@@ -116,9 +116,10 @@
 - "Don't hack": prefer supported APIs; if something isn't supported (e.g. downgrading the
   backend), say so and offer the safe alternative instead of a fragile workaround.
 - Commit freely once the user is happy ("делай смело коммит"); keep the repo clean of junk files.
-- Always build the commit's app before saying a change is ready — a new `dist/Bench.<commit>.app`
-  next to the running one (never quit theirs: they develop Bench from inside Bench). They switch
-  the Dock icon themselves and keep the older builds for a while to roll back.
+- Always build the commit into Bench Dev before saying a change is ready (`ship.sh`); never quit
+  their Bench (they develop Bench from inside Bench). They ask for a release when Dev is good.
+- One app per commit (`Bench.<hash>.app`) filled System Settings → Privacy with dead entries;
+  hence two apps on fixed paths, signed with the Apple Development certificate.
 - When an approach turns out heavier than expected (a browser engine, a big runtime), stop and
   say so before shipping it; the user prefers dropping a feature to carrying weight.
 - **The composer is part of the thread** (2026-10-24): the messages' font size, no buttons

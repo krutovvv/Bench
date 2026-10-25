@@ -1,48 +1,78 @@
 #!/bin/bash
-# Build the current commit as its own app: "dist/Bench.<commit>.app" (release binary + icon +
-# Info.plist), <commit> = the first 7 characters of the commit's hash, as in `git log --oneline`.
+# Build Bench as one of its two apps (release binary + icon + Info.plist), each at a fixed place:
 #
-# Bench is developed from inside Bench, so a build never replaces or quits the app that runs:
-# every commit gets a new app next to the others; the person tries it (open
-# "dist/Bench.<commit>.app") and moves the Dock icon over when it's good. The last KEEP builds
-# stay for rolling back; older ones are removed, but never one that is running, and never
-# "Bench.app".
+#   scripts/bundle-macos.sh            "dist/Bench Dev.app"        bundle id local.bench.dev
+#   scripts/bundle-macos.sh release    "~/Applications/Bench.app"  bundle id local.bench
+#
+# Bench is developed from inside Bench: the person works in the release app (and talks to the
+# agent through it); every commit is tried in Bench Dev, which is rebuilt in place. When Dev is
+# good, the person asks for a release. Both share ~/.bench, so the threads are the same.
+#
+# Each app keeps one path and one bundle id, and both are signed with the Apple Development
+# certificate from the keychain: macOS then knows Bench by team and bundle id, not by the
+# build's hash, so privacy grants (microphone, local network, notifications) are given once per
+# app and survive rebuilds. Without such a certificate the build falls back to ad-hoc signing
+# (grants are asked again after every build); BENCH_SIGN=<identity> picks another one.
+#
+# Neither build quits anything. A running Bench Dev stops the Dev build (ship.sh quits it
+# first). A running release app is moved aside to "Bench.prev.app" and keeps running from
+# there; the new one starts the next time the person opens Bench. The previous release stays
+# as Bench.prev.app for rolling back.
 #
 # Commit first: a build is one commit, so uncommitted changes stop it. For a quick experiment,
-# BENCH_DIRTY=1 scripts/bundle-macos.sh builds "Bench.<commit>-dirty.app" anyway.
-# All versions share the bundle id local.bench (macOS grants — Reminders, notifications,
-# microphone, local network — and the state folder belong to it) and the binary's name.
+# BENCH_DIRTY=1 builds Dev anyway (a release is always a clean commit).
 set -euo pipefail
 cd "$(dirname "$0")/.."
-KEEP=6
+KIND=${1:-dev}
 
 HASH=$(git rev-parse --short=7 HEAD)
 if [[ -n "$(git status --porcelain --untracked-files=normal -- . ':!dist')" ]]; then
-    if [[ "${BENCH_DIRTY:-}" == 1 ]]; then
+    if [[ "${BENCH_DIRTY:-}" == 1 && "$KIND" == dev ]]; then
         HASH="$HASH-dirty"
     else
-        echo "Uncommitted changes — commit them first (a build is one commit's), or BENCH_DIRTY=1:" >&2
+        echo "Uncommitted changes — commit them first (a build is one commit's):" >&2
         git status --short -- . ':!dist' | head -20 >&2
         exit 1
     fi
 fi
-APP="dist/Bench.$HASH.app"
-if pgrep -f "$PWD/$APP/Contents/MacOS/" >/dev/null; then
-    echo "$APP is running — it is this commit's build already; quit it to rebuild it" >&2
+
+case "$KIND" in
+dev)
+    NAME="Bench Dev"
+    ID=local.bench.dev
+    APP="$PWD/dist/Bench Dev.app"
+    if pgrep -f "$APP/Contents/MacOS/" >/dev/null; then
+        echo "Bench Dev is running — quit it first (ship.sh does)" >&2
+        exit 1
+    fi
+    ;;
+release)
+    NAME="Bench"
+    ID=local.bench
+    APP="$HOME/Applications/Bench.app"
+    ;;
+*)
+    echo "usage: $0 [dev|release]" >&2
     exit 1
-fi
+    ;;
+esac
 COUNT=$(git rev-list --count HEAD)
+
+SIGN=${BENCH_SIGN:-$(security find-identity -v -p codesigning |
+    awk -F'"' '/"Apple Development:/ { split($1, a, " "); print a[2]; exit }')}
 
 cargo build --release
 
-mkdir -p dist
-rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp target/release/bench "$APP/Contents/MacOS/bench"
-# bench-agent's sources (the Pi backend); Bench installs them into ~/.bench-agent/app and runs
+# Assembled next to the target, then moved into place in one step.
+mkdir -p "$(dirname "$APP")"
+NEW="$(dirname "$APP")/.$NAME.new.app"
+rm -rf "$NEW"
+mkdir -p "$NEW/Contents/MacOS" "$NEW/Contents/Resources"
+cp target/release/bench "$NEW/Contents/MacOS/bench"
+# bench-agent's sources (the Pi backend); Bench installs them into ~/.bench/app and runs
 # `npm ci` there, so node_modules stays out of every build.
-mkdir -p "$APP/Contents/Resources/agent"
-cp -R agent/src agent/scripts agent/package.json agent/package-lock.json "$APP/Contents/Resources/agent/"
+mkdir -p "$NEW/Contents/Resources/agent"
+cp -R agent/src agent/scripts agent/package.json agent/package-lock.json "$NEW/Contents/Resources/agent/"
 
 # Icon: render the SVG mark, then build an .icns with every size macOS asks for.
 WORK=$(mktemp -d)
@@ -58,17 +88,17 @@ for s in 16 32 128 256 512; do
   sips -z $s $s "$SRC" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null
   sips -z $((s*2)) $((s*2)) "$SRC" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null
 done
-iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+iconutil -c icns "$ICONSET" -o "$NEW/Contents/Resources/AppIcon.icns"
 rm -rf "$WORK"
 
-cat > "$APP/Contents/Info.plist" <<PLIST
+cat > "$NEW/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleName</key><string>Bench</string>
-  <key>CFBundleDisplayName</key><string>Bench</string>
-  <key>CFBundleIdentifier</key><string>local.bench</string>
+  <key>CFBundleName</key><string>$NAME</string>
+  <key>CFBundleDisplayName</key><string>$NAME</string>
+  <key>CFBundleIdentifier</key><string>$ID</string>
   <key>CFBundleExecutable</key><string>bench</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
@@ -85,20 +115,26 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# A stable identity, so macOS privacy grants (microphone, local network) belong to the app
-# rather than to one particular build.
-codesign --force --sign - --identifier local.bench "$APP"
+if [[ -n "$SIGN" ]]; then
+    codesign --force --sign "$SIGN" --identifier "$ID" "$NEW"
+else
+    echo "no Apple Development certificate: signing ad-hoc (privacy grants won't survive rebuilds)" >&2
+    codesign --force --sign - --identifier "$ID" "$NEW"
+fi
 
-# Keep the newest KEEP builds (by date); skip any that is running, never touch "Bench.app".
-OLD_BUILDS=$(ls -dt dist/Bench.*.app 2>/dev/null | tail -n +$((KEEP + 1)))
-printf '%s\n' "$OLD_BUILDS" | while read -r old; do
-    [[ -z "$old" ]] && continue
-    if pgrep -f "$PWD/$old/Contents/MacOS/" >/dev/null; then
-        echo "kept (running): $old"
-    else
-        rm -rf "$old" && echo "removed old build: $old"
+if [[ "$KIND" == release && -d "$APP" ]]; then
+    PREV="$(dirname "$APP")/Bench.prev.app"
+    if pgrep -f "$PREV/Contents/MacOS/" >/dev/null; then
+        echo "Bench.prev.app is still running — quit it, then release again" >&2
+        rm -rf "$NEW"
+        exit 1
     fi
-done
+    rm -rf "$PREV"
+    mv "$APP" "$PREV"
+    echo "previous release: $PREV"
+else
+    rm -rf "$APP"
+fi
+mv "$NEW" "$APP"
 
-echo "Built: $APP"
-echo "Try it next to the running one: open \"$APP\""
+echo "Built: $APP ($HASH)"
