@@ -35,7 +35,7 @@ often the person talks to you **through Bench itself** while you change Bench. S
   its `.app`): it is the window the person works in and talks to you through.
 - **Every commit goes to Bench Dev.** Commit, then `scripts/ship.sh`: it quits Bench Dev
   (`dist/Bench Dev.app`, the test copy), rebuilds it in place and opens it. The person works in
-  Bench (`~/Applications/Bench.app`); when Dev is good and they ask, `scripts/ship.sh --release`
+  Bench (`/Applications/Bench.app`); when Dev is good and they ask, `scripts/ship.sh --release`
   rebuilds it (the running one goes on until reopened; `Bench.prev.app` is the rollback).
   Uncommitted changes stop the build.
 - Screenshots and tests only of **your own copy** (`scripts/shot.sh`), never the person's window.

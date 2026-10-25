@@ -6,7 +6,7 @@
 # Bench is developed from inside Bench, which has two apps (scripts/bundle-macos.sh):
 #   * Bench Dev ("dist/Bench Dev.app"): every commit is tried here. ship.sh asks a running
 #     Bench Dev to quit (a normal quit, never a kill), rebuilds it in place and opens it.
-#   * Bench ("~/Applications/Bench.app"): the one the person works in and talks to you through.
+#   * Bench ("/Applications/Bench.app"): the one the person works in and talks to you through.
 #     Only `ship.sh --release`, when the person asks for it, rebuilds it; it never quits it: the
 #     running one keeps going from Bench.prev.app and the new one starts on the next open.
 set -euo pipefail

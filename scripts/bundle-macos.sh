@@ -2,7 +2,9 @@
 # Build Bench as one of its two apps (release binary + icon + Info.plist), each at a fixed place:
 #
 #   scripts/bundle-macos.sh            "dist/Bench Dev.app"        bundle id local.bench.dev
-#   scripts/bundle-macos.sh release    "~/Applications/Bench.app"  bundle id local.bench
+#   scripts/bundle-macos.sh release    "/Applications/Bench.app"  bundle id local.bench
+#
+# (/System/Applications is macOS's own read-only volume, for Apple's apps only.)
 #
 # Bench is developed from inside Bench: the person works in the release app (and talks to the
 # agent through it); every commit is tried in Bench Dev, which is rebuilt in place. When Dev is
@@ -49,7 +51,7 @@ dev)
 release)
     NAME="Bench"
     ID=local.bench
-    APP="$HOME/Applications/Bench.app"
+    APP="/Applications/Bench.app"
     ;;
 *)
     echo "usage: $0 [dev|release]" >&2

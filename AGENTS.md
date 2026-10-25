@@ -96,7 +96,7 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 ## How to work here
 
 - **Bench develops itself.** The person usually talks to you through the running Bench
-  (`~/Applications/Bench.app`). Never quit, kill, restart or replace it (`pkill`,
+  (`/Applications/Bench.app`). Never quit, kill, restart or replace it (`pkill`,
   `osascript … quit`, deleting its `.app`).
 - **One change, one commit, one Dev build.** Commit, then run
   `.agents/skills/bench-kit/scripts/ship.sh`. It quits Bench Dev (`dist/Bench Dev.app`), the

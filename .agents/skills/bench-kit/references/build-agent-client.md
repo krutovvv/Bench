@@ -124,7 +124,7 @@ notification replaces the older one for the same chat.
 
 ## Bench: servers and files
 
-The reference app is **Bench** (`~/Applications/Bench.app`, bundle id `local.bench`; Bench Dev is `local.bench.dev`). Gateways are
+The reference app is **Bench** (`/Applications/Bench.app`, bundle id `local.bench`; Bench Dev is `local.bench.dev`). Gateways are
 This Mac plus `~/.ssh/config` hosts with Node 22.18+, where Bench installs the agent on connect;
 a project with a remote host runs on that host's agent. Servers, file hosts and the project's
 folder come into a thread as inserts (`/ssh`, `/ftp`, `/files`, `build-insert.md`); the agent
@@ -134,7 +134,7 @@ reaches them with `ssh_run` and `remote_files`, Bench with the agent's REST (`/a
 ## Shipping changes to the user
 
 **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
-**Bench** (`~/Applications/Bench.app`, `local.bench`) and tries every commit in **Bench Dev**
+**Bench** (`/Applications/Bench.app`, `local.bench`) and tries every commit in **Bench Dev**
 (`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
 rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
 window the person works in and talks to you through. When Dev is good and the person asks,

@@ -159,7 +159,7 @@ git add -A && git commit -m "<what changed, in the person's words>"   # a build 
 $K/ship.sh            # rebuilds dist/Bench Dev.app and opens it (--release: Bench itself)
 ```
 **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
-**Bench** (`~/Applications/Bench.app`, `local.bench`) and tries every commit in **Bench Dev**
+**Bench** (`/Applications/Bench.app`, `local.bench`) and tries every commit in **Bench Dev**
 (`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
 rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
 window the person works in and talks to you through. When Dev is good and the person asks,
