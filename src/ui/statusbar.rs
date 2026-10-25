@@ -396,6 +396,18 @@ impl BenchApp {
                     background_terms,
                 ))
             })
+            // Stop: while the agent works, the way to halt it belongs with the bar's other
+            // controls — left of the paperclip — not hanging over the text (⌘. does the same).
+            .when(self.live.is_some(), |d| {
+                d.child(
+                    button("stop", Ico::Square, "Stop  ⌘.", false)
+                        .text_color(theme.danger)
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.click_claimed = true;
+                            this.stop(cx);
+                        })),
+                )
+            })
             .child(
                 button("attach", Ico::Paperclip, "Attach files", false)
                     .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),

@@ -1,6 +1,6 @@
 //! The input: the thread's next message — the person's avatar and the text,
 //! at the messages' size, growing with what is typed. No buttons (⌘Enter sends, ⌘⇧D dictates,
-//! files are dropped); a quiet Stop while the agent works.
+//! files are dropped); stopping the agent is the status bar's control.
 
 use gpui_kit::component::input::Textarea;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -8,13 +8,11 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::icons::Ico;
 
 /// The avatar's offset from the row's top (it replaces the avatar's own): the textarea's line
 /// sits higher than a message's, so the avatar goes up to center on it (the caret).
 
 const AVATAR_TOP: f32 = -2.5;
-const BUTTONS_TOP: f32 = 3.;
 
 /// Rows the command list shows before it scrolls, and their height.
 const SLASH_ROWS: f32 = 8.;
@@ -100,14 +98,8 @@ impl BenchApp {
 
     pub(super) fn render_composer(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        let busy = self.live.is_some();
-        // No buttons: ⌘Enter sends, ⌘⇧D (or the status bar's mic) dictates, files are dropped
-        // or pasted. While the agent works a quiet Stop stays, for the mouse (⌘. also stops).
-        let stop = busy.then(|| {
-            super::chat::icon_button("stop", Ico::Square, "Stop  ⌘.", cx)
-                .text_color(theme.foreground)
-                .on_click(cx.listener(|this, _, _, cx| this.stop(cx)))
-        });
+        // No buttons here: ⌘Enter sends, ⌘⇧D (or the status bar's mic) dictates, files are
+        // dropped or pasted. Stopping the agent is the status bar's control, by the paperclip.
         let slash = self.render_slash(cx);
         let mut chips: Vec<AnyElement> = vec![];
         chips.extend(self.attachments.clone().iter().enumerate().map(|(k, p)| {
@@ -187,30 +179,17 @@ impl BenchApp {
                                 d.child(h_flex().flex_wrap().gap_1p5().pt_1().children(chips))
                             })
                             .child(
-                                h_flex()
-                                    .w_full()
-                                    .gap_2()
-                                    .items_start()
-                                    .child(
-                                        div()
-                                            .relative()
-                                            .flex_1()
-                                            .min_w_0()
-                                            .child(
-                                                // A Large textarea pads its text 12 left and
-                                                // 10 above and below (gpui-component's
-                                                // input_px/py): pulled back by exactly that, so
-                                                // its first line sits where a message's does.
-                                                // Large = the messages' size; it grows with the
-                                                // text (no scroll of its own: the thread scrolls).
-                                                div().ml(px(-12.)).my(px(-10.)).child(
-                                                    Textarea::new(&self.composer)
-                                                        .appearance(false)
-                                                        .large(),
-                                                ),
-                                            )
-                                    )
-                                    .children(stop.map(|s| s.flex_none().mt(px(BUTTONS_TOP)))),
+                                div().w_full().relative().child(
+                                    // A Large textarea pads its text 12 left and 10 above
+                                    // and below (gpui-component's input_px/py): pulled back
+                                    // by exactly that, so its first line sits where a
+                                    // message's does. Large = the messages' size; it grows
+                                    // with the text (no scroll of its own: the thread
+                                    // scrolls).
+                                    div().ml(px(-12.)).my(px(-10.)).child(
+                                        Textarea::new(&self.composer).appearance(false).large(),
+                                    ),
+                                ),
                             ),
                     ),
             )
