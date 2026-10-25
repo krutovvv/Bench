@@ -282,11 +282,11 @@ impl BenchApp {
                 .into_any_element()
         });
         if inline {
-            // In an insert: its head switches the lists (no heading here); the rows' own px_6
-            // pulled back to the insert's edges.
-            // No w_full: stretched, the negative margins widen it to the insert's edges.
+            // In an insert: its head switches the lists (no heading here); the rows are pulled
+            // close to the insert's edges but keep a small gutter (4 + 12 wrapper = 16 px).
+            // No w_full: stretched, the negative margins widen it toward the insert's edges.
             return v_flex()
-                .mx(px(-12.))
+                .mx(px(-4.))
                 .children(strip)
                 .child(v_flex().children(rows).when_some(note, |d, (text, color)| {
                     // One line, as an empty terminal is.
