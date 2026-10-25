@@ -266,7 +266,9 @@ impl BenchApp {
             cx,
             move || rest::profile_defaults(&conn2, &agent),
             move |this, r, _window, cx| {
-                let Ok((effort, model, models, approvals, _)) = r else { return };
+                let Ok((effort, model, models, approvals, _)) = r else {
+                    return;
+                };
                 let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked2) else {
                     return;
                 };
@@ -334,15 +336,13 @@ impl BenchApp {
             window,
             cx,
             move || rest::send_json(&conn, "PUT", "/api/config", &agent, body),
-            move |this, r, window, cx| {
-                match r {
-                    Ok(_) => this.load_env(&asked, window, cx),
-                    Err(err) => {
-                        if let Some(e) = this.project_env.as_mut() {
-                            e.error = Some(format!("{err:#}"));
-                        }
-                        cx.notify();
+            move |this, r, window, cx| match r {
+                Ok(_) => this.load_env(&asked, window, cx),
+                Err(err) => {
+                    if let Some(e) = this.project_env.as_mut() {
+                        e.error = Some(format!("{err:#}"));
                     }
+                    cx.notify();
                 }
             },
         );

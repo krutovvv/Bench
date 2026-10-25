@@ -21,7 +21,16 @@ use objc2_user_notifications::{
 pub static AUTH: AtomicU8 = AtomicU8::new(0);
 
 fn remember(granted: bool, asked: bool) {
-    AUTH.store(if asked { 0 } else if granted { 1 } else { 2 }, Ordering::Relaxed);
+    AUTH.store(
+        if asked {
+            0
+        } else if granted {
+            1
+        } else {
+            2
+        },
+        Ordering::Relaxed,
+    );
 }
 
 /// Refresh `AUTH` from what macOS says now (the person may have changed their mind in System

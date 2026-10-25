@@ -462,11 +462,7 @@ impl BenchApp {
     /// rather than on a card): a changed value is written, an emptied field removes the key,
     /// an unchanged one does nothing.
     pub fn save_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        let field = self
-            .pv
-            .openrouter_key
-            .iter()
-            .find(|f| f.key == key);
+        let field = self.pv.openrouter_key.iter().find(|f| f.key == key);
         let Some(f) = field else { return };
         let value = text(&f.input, cx);
         if value == f.value {

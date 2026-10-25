@@ -406,7 +406,13 @@ impl BenchApp {
                 "" => "—",
                 m => m,
             };
-            let dash = |v: &str| if v.is_empty() { "—".to_string() } else { v.to_string() };
+            let dash = |v: &str| {
+                if v.is_empty() {
+                    "—".to_string()
+                } else {
+                    v.to_string()
+                }
+            };
             let rows = vec![
                 row(
                     "model",
@@ -951,9 +957,18 @@ impl BenchApp {
                     );
                 }
                 let (title, note) = match kind {
-                    "reasoning" => ("Reasoning", "How hard it thinks. A new thread of the project starts on it."),
-                    "approvals" => ("Approvals", "What it may run without asking: off — nothing, smart — what is safe, manual — everything."),
-                    _ => ("Model", "The model the project's threads start on. A thread already begun keeps its own."),
+                    "reasoning" => (
+                        "Reasoning",
+                        "How hard it thinks. A new thread of the project starts on it.",
+                    ),
+                    "approvals" => (
+                        "Approvals",
+                        "What it may run without asking: off — nothing, smart — what is safe, manual — everything.",
+                    ),
+                    _ => (
+                        "Model",
+                        "The model the project's threads start on. A thread already begun keeps its own.",
+                    ),
                 };
                 (
                     title.to_string(),
@@ -961,14 +976,7 @@ impl BenchApp {
                         .w_full()
                         .py_1()
                         .children(items)
-                        .child(
-                            div()
-                                .px_3()
-                                .pt_2()
-                                .text_sm()
-                                .text_color(muted)
-                                .child(note),
-                        )
+                        .child(div().px_3().pt_2().text_sm().text_color(muted).child(note))
                         .into_any_element(),
                 )
             }
