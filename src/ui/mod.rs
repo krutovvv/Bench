@@ -329,56 +329,22 @@ pub fn clip(s: &str, n: usize) -> String {
 }
 
 impl BenchApp {
-    /// "app · fix-login": the chat's project and branch, with the git actions.
+    /// "app · main": the thread works in a git repository (its folder's name and branch). Git
+    /// itself is the agent's: ask it to commit, or to undo.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        use gpui_kit::component::button::{Button, ButtonVariants as _};
-        use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
         let p = self.project.clone()?;
-        let label = if p.branch.is_empty() {
-            p.name()
-        } else {
-            format!("{} · {}", p.name(), p.branch)
-        };
-        let view = cx.entity();
-        let armed = self.git_armed == Some(crate::app::GitArm::Delete);
+        let label = if p.branch.is_empty() { p.name() } else { format!("{} · {}", p.name(), p.branch) };
+        let theme = cx.theme();
         Some(
-            Button::new("project-chip")
-                .ghost()
-                .small()
-                .icon(crate::icons::Ico::GitBranch.icon())
-                .label(label)
-                .dropdown_menu(move |menu, _, _| {
-                    let act = |f: fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)| {
-                        let view = view.clone();
-                        move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
-                            view.update(cx, |this, cx| f(this, window, cx))
-                        }
-                    };
-                    let mut menu =
-                        menu.item(PopupMenuItem::new("New chat in a new branch").on_click(act(
-                            |this, _, cx| {
-                                let root = this.project.as_ref().map(|p| p.root.clone());
-                                this.new_chat_in(root, true, cx)
-                            },
-                        )));
-                    if p.in_branch_folder() {
-                        menu = menu
-                            .item(
-                                PopupMenuItem::new("Merge into main checkout").on_click(act(
-                                    |this, window, cx| this.merge_branch(window, cx),
-                                )),
-                            )
-                            .item(
-                                PopupMenuItem::new(if armed {
-                                    "Delete branch — confirm"
-                                } else {
-                                    "Delete branch"
-                                })
-                                .on_click(act(|this, window, cx| this.delete_branch(window, cx))),
-                            );
-                    }
-                    menu
-                })
+            h_flex()
+                .flex_none()
+                .gap_1()
+                .px_1()
+                .items_center()
+                .text_sm()
+                .text_color(theme.muted_foreground)
+                .child(crate::icons::Ico::GitBranch.icon().small())
+                .child(label)
                 .into_any_element(),
         )
     }

@@ -281,13 +281,6 @@ fn probe(target: &str) -> anyhow::Result<()> {
 fn main() {
     connection::migrate_state();
     let args: Vec<String> = std::env::args().collect();
-    if args.get(1).map(String::as_str) == Some("--probe-git") {
-        if let Err(e) = probe_git(&args[2]) {
-            eprintln!("probe-git failed: {e:#}");
-            std::process::exit(1);
-        }
-        return;
-    }
     // Run inside the .app (`open -n dist/Bench.app --args --probe-reminders`): macOS asks for
     // Reminders access on behalf of the bundle. The result goes to a log file.
     if args.get(1).map(String::as_str) == Some("--probe-reminders") {
@@ -376,41 +369,3 @@ pub fn open_main_window(cx: &mut App) {
     }
 }
 
-/// End-to-end check of the branch flow on a scratch repo, through the local gateway.
-#[cfg(not(target_family = "wasm"))]
-fn probe_git(repo: &str) -> anyhow::Result<()> {
-    use model::{Project, Target};
-    let conn = connection::Connection::open(&Target::Local)?;
-    let profile = std::env::var("PROBE_PROFILE").unwrap_or_else(|_| "default".into());
-    connection::exclude_worktrees(&Target::Local, repo)?;
-    let (dir, branch) = rest::worktree_add(&conn, &profile, repo, "probe idea")?;
-    println!(
-        "main status with a branch folder: {:?}",
-        connection::git(&Target::Local, repo, &["status", "--short"])?
-    );
-    println!("worktree: {dir} on {branch}");
-    std::fs::write(format!("{dir}/idea.txt"), "from the branch\n")?;
-    let top = connection::git(&Target::Local, &dir, &["rev-parse", "--show-toplevel"])?;
-    let p = Project::from_top(&top, &branch);
-    println!(
-        "project root={} dir={} in_branch={}",
-        p.root,
-        p.dir,
-        p.in_branch_folder()
-    );
-    println!(
-        "{}",
-        app::projects::merge(&Target::Local, &p, "Probe idea")?
-    );
-    println!(
-        "main log: {}",
-        connection::git(&Target::Local, repo, &["log", "--oneline", "-3"])?
-    );
-    rest::worktree_remove(&conn, &profile, &p.root, &p.dir)?;
-    connection::git(&Target::Local, &p.root, &["branch", "-D", &p.branch])?;
-    println!(
-        "branches after delete: {}",
-        connection::git(&Target::Local, repo, &["branch"])?
-    );
-    Ok(())
-}

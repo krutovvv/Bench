@@ -16,6 +16,7 @@ use gpui_kit::*;
 mod asks;
 mod attachments;
 pub(crate) mod inserts;
+pub(crate) mod local_files;
 mod keys;
 pub mod marks;
 mod processes;
@@ -34,7 +35,6 @@ pub(crate) mod sites;
 pub(crate) mod subjects;
 pub(crate) mod tasks;
 pub(crate) mod tools;
-pub use projects::GitArm;
 
 use crate::attach;
 use crate::audio::{Playback, Recorder};
@@ -209,9 +209,8 @@ pub struct BenchApp {
     pub default_cwd: Option<String>,
     /// Reopen this session once the list arrives (where the app was last closed).
     resume_session: Option<String>,
-    /// For the next new chat: work in this repo, and in a branch of its own.
+    /// For the next new chat: work in this folder.
     pub new_project: Option<String>,
-    pub new_branch: bool,
     /// The chosen folder is a git repo (so "in a new branch" applies).
     pub new_project_repo: bool,
     /// Typing a folder path (SSH hosts have no native folder dialog here).
@@ -219,7 +218,6 @@ pub struct BenchApp {
     pub project_path: Entity<InputState>,
     /// New chat: a group to put it in (`~/Research/<name>`) when it has no project.
     pub group_name: Entity<InputState>,
-    pub git_armed: Option<GitArm>,
     pub appearance: crate::theme::Appearance,
     pub speed: crate::speed::Meter,
     /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
@@ -280,6 +278,8 @@ pub struct BenchApp {
     pub tasks: tasks::TasksMode,
     /// The files of an FTP / SFTP host, shown in its thread.
     pub files_remote: remote_files::RemoteFiles,
+    /// The project's own folder in a thread (`/files`).
+    pub local_files: local_files::LocalFiles,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
     /// width, kept by the app across the two layouts that show it (`ui/mod.rs`).
     pub sidebar_w: Pixels,
@@ -539,6 +539,7 @@ impl BenchApp {
         let tools = tools::Tools::new(window, cx);
         let tasks_mode = tasks::TasksMode::new(window, cx);
         let files_remote = remote_files::RemoteFiles::new(window, cx);
+        let local_files = local_files::LocalFiles::new(window, cx);
         for host in targets.iter().filter_map(|t| match t {
             Target::Ssh(h) => Some(h.clone()),
             Target::Local => None,
@@ -556,6 +557,7 @@ impl BenchApp {
             ssh,
             tools,
             files_remote,
+            local_files,
             tasks: tasks_mode,
             sidebar_w: px(280.),
             layout_state: cx.new(|_| Default::default()),
@@ -634,12 +636,10 @@ impl BenchApp {
             default_cwd: None,
             resume_session: None,
             new_project: None,
-            new_branch: false,
             new_project_repo: true,
             path_entry: false,
             project_path,
             group_name,
-            git_armed: None,
             appearance: crate::theme::Appearance::load(),
             speed: crate::speed::Meter::fresh(),
             search,
@@ -1268,8 +1268,6 @@ impl BenchApp {
         self.speed.restart();
         self.project = None;
         self.new_project = None;
-        self.new_branch = false;
-        self.git_armed = None;
         self.reset_scroller(cx);
     }
 
@@ -1407,39 +1405,6 @@ impl BenchApp {
         cx.notify();
     }
 
-    fn rest_branch(
-        &mut self,
-        conn: Arc<Connection>,
-        profile: String,
-        root: String,
-        name: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let p = profile.clone();
-        let target = self.target.clone();
-        self.background(
-            window,
-            cx,
-            move || {
-                let _ = connection::exclude_worktrees(&target, &root);
-                rest::worktree_add(&conn, &p, &root, &name)
-            },
-            move |this, r, window, cx| match r {
-                Ok((folder, _branch)) => this.cmd(this.create_cmd(profile, Some(folder))),
-                Err(e) => {
-                    this.live = None;
-                    this.queued = None;
-                    this.toast(
-                        NotificationType::Error,
-                        format!("New branch: {e:#}"),
-                        window,
-                        cx,
-                    );
-                }
-            },
-        );
-    }
 
     /// Pick the model for a new session (primary or a fallback); applied once it is created.
     pub fn set_model(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -1705,17 +1670,7 @@ impl BenchApp {
                     cx.notify();
                     return;
                 }
-                match (self.new_project.clone(), self.new_branch) {
-                    (Some(root), true) => {
-                        // Its own branch: a fresh folder named after the request.
-                        let Some(conn) = self.conn.clone() else {
-                            return;
-                        };
-                        let name = branch_name(&text);
-                        self.rest_branch(conn, profile, root, name, window, cx);
-                    }
-                    (root, _) => self.cmd(self.create_cmd(profile, root)),
-                }
+                self.cmd(self.create_cmd(profile, self.new_project.clone()));
             }
         }
         cx.notify();
@@ -2269,25 +2224,6 @@ fn clip_line(s: &str) -> String {
     }
 }
 
-/// A branch/folder name from the request: its first Latin words ("fix login bug"), else a short
-/// unique "chat-1a2b" (the slug keeps only ASCII).
-fn branch_name(text: &str) -> String {
-    let words: Vec<String> = text
-        .split_whitespace()
-        .map(|w| {
-            w.chars()
-                .filter(|c| c.is_ascii_alphanumeric())
-                .collect::<String>()
-        })
-        .filter(|w| w.len() > 1)
-        .take(5)
-        .collect();
-    if words.is_empty() {
-        format!("chat-{}", &uuid::Uuid::new_v4().simple().to_string()[..4])
-    } else {
-        words.join(" ").to_lowercase()
-    }
-}
 
 impl BenchApp {
     /// The composer's text is the open chat's draft (called on every change).

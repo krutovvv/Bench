@@ -9,6 +9,7 @@
 //! word in `words()`, and a line in the agent's `inserted()` prompt (agent/src/prompt.ts).
 
 mod browser;
+mod dir;
 mod files;
 mod tasks;
 mod terminal;
@@ -71,7 +72,7 @@ pub trait InsertKind: Sync {
     fn removed(&self, _app: &mut BenchApp, _ins: &Insert, _cx: &mut Context<BenchApp>) {}
 }
 
-static KINDS: &[&dyn InsertKind] = &[&terminal::Terminal, &files::Files, &tasks::Tasks, &tools::Tools, &browser::Browser];
+static KINDS: &[&dyn InsertKind] = &[&terminal::Terminal, &dir::Dir, &files::Files, &tasks::Tasks, &tools::Tools, &browser::Browser];
 
 pub fn kind_of(key: &str) -> Option<&'static dyn InsertKind> {
     KINDS.iter().copied().find(|k| k.owns(key))
@@ -83,6 +84,7 @@ pub fn words() -> Vec<SlashCommand> {
     [
         ("/terminal", "This Mac's terminal", "ssh:local"),
         ("/ssh", "A server's terminal", "ssh"),
+        ("/files", "The project's folder: open, edit, save", "dir"),
         ("/ftp", "A file host: folders and files, edit them", "files"),
         ("/tasks", "The task lists", "tasks"),
         ("/tools", "Everyday utilities: Base64, JSON, regex, cron…", "tools"),

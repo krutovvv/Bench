@@ -207,46 +207,6 @@ fn write_private(path: &PathBuf, text: &str) -> Result<()> {
     Ok(())
 }
 
-/// Keep branch folders (`.worktrees/`) out of the main checkout's status: a local-only exclude
-/// in `.git/info/exclude`, never committed.
-pub fn exclude_worktrees(target: &Target, repo: &str) -> Result<()> {
-    let path = git(
-        target,
-        repo,
-        &[
-            "rev-parse",
-            "--path-format=absolute",
-            "--git-path",
-            "info/exclude",
-        ],
-    )?;
-    let line = ".worktrees/";
-    match target {
-        Target::Local => {
-            let text = std::fs::read_to_string(&path).unwrap_or_default();
-            if !text.lines().any(|l| l.trim() == line) {
-                if let Some(dir) = std::path::Path::new(&path).parent() {
-                    std::fs::create_dir_all(dir)?;
-                }
-                let sep = if text.is_empty() || text.ends_with('\n') {
-                    ""
-                } else {
-                    "\n"
-                };
-                std::fs::write(&path, format!("{text}{sep}{line}\n"))?;
-            }
-        }
-        Target::Ssh(host) => {
-            let p = shell_quote(&path);
-            let script = format!("grep -qxF '{line}' {p} 2>/dev/null || echo '{line}' >> {p}");
-            Command::new("ssh")
-                .args(["-o", "BatchMode=yes", host, &script])
-                .stdin(Stdio::null())
-                .output()?;
-        }
-    }
-    Ok(())
-}
 
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))

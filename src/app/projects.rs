@@ -6,19 +6,12 @@
 
 use std::collections::HashMap;
 
-use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use super::BenchApp;
 use crate::connection;
-use crate::model::{Project, Target};
+use crate::model::Project;
 use crate::rest;
-
-/// A git action that needs a second click.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GitArm {
-    Delete,
-}
 
 impl BenchApp {
     fn projects_path(&self) -> std::path::PathBuf {
@@ -164,14 +157,6 @@ impl BenchApp {
         .detach();
     }
 
-    /// Start a new chat in `root`, optionally in a fresh branch of its own.
-    pub fn new_chat_in(&mut self, root: Option<String>, branch: bool, cx: &mut Context<Self>) {
-        self.new_session(cx);
-        self.new_project = root;
-        self.new_branch = branch && self.new_project.is_some();
-        cx.notify();
-    }
-
     /// Use `path` for the next new chat: its repo when it is in one, else the folder itself.
     pub fn set_new_project(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
         let target = self.target.clone();
@@ -189,83 +174,9 @@ impl BenchApp {
                     Err(_) => {
                         this.new_project = Some(path);
                         this.new_project_repo = false;
-                        this.new_branch = false;
                     }
                 }
                 cx.notify();
-            },
-        );
-    }
-
-    /// Merge this chat's branch into the default branch of the main checkout. Uncommitted work
-    /// in the branch folder is committed first (titled after the chat).
-    pub fn merge_branch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(p) = self.project.clone().filter(|p| p.in_branch_folder()) else {
-            return;
-        };
-        let target = self.target.clone();
-        let title = self.current_title();
-        self.toast(
-            NotificationType::Info,
-            format!("Merging {}…", p.branch),
-            window,
-            cx,
-        );
-        self.background(
-            window,
-            cx,
-            move || merge(&target, &p, &title),
-            |this, r, window, cx| match r {
-                Ok(msg) => this.toast(NotificationType::Success, msg, window, cx),
-                Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
-            },
-        );
-    }
-
-    /// Delete this chat's branch and its folder (second click confirms).
-    pub fn delete_branch(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(p) = self.project.clone().filter(|p| p.in_branch_folder()) else {
-            return;
-        };
-        if self.git_armed != Some(GitArm::Delete) {
-            self.git_armed = Some(GitArm::Delete);
-            self.toast(
-                NotificationType::Warning,
-                format!(
-                    "Choose “Delete branch” again to delete {} and its folder",
-                    p.branch
-                ),
-                window,
-                cx,
-            );
-            cx.notify();
-            return;
-        }
-        self.git_armed = None;
-        let target = self.target.clone();
-        let Some(conn) = self.conn.clone() else {
-            return;
-        };
-        let profile = self.current_profile();
-        self.background(
-            window,
-            cx,
-            move || {
-                rest::worktree_remove(&conn, &profile, &p.root, &p.dir)?;
-                connection::git(&target, &p.root, &["branch", "-D", &p.branch])?;
-                Ok(p.branch)
-            },
-            |this, r, window, cx| match r {
-                Ok(branch) => {
-                    this.toast(
-                        NotificationType::Success,
-                        format!("Deleted {branch}"),
-                        window,
-                        cx,
-                    );
-                    this.resolve_project(window, cx);
-                }
-                Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
             },
         );
     }
@@ -278,23 +189,6 @@ impl BenchApp {
             .filter(|t| !t.is_empty())
             .unwrap_or_else(|| "Bench changes".into())
     }
-}
-
-pub(crate) fn merge(target: &Target, p: &Project, title: &str) -> anyhow::Result<String> {
-    let git = |dir: &str, args: &[&str]| connection::git(target, dir, args);
-    if !git(&p.dir, &["status", "--porcelain"])?.is_empty() {
-        git(&p.dir, &["add", "-A"])?;
-        git(&p.dir, &["commit", "-m", title])?;
-    }
-    let main_branch = git(&p.root, &["rev-parse", "--abbrev-ref", "HEAD"])?;
-    if main_branch == p.branch {
-        anyhow::bail!("the main folder is on {main_branch} itself");
-    }
-    if let Err(e) = git(&p.root, &["merge", "--no-ff", "--no-edit", &p.branch]) {
-        let _ = git(&p.root, &["merge", "--abort"]);
-        anyhow::bail!("Merge into {main_branch} failed, nothing changed: {e:#}");
-    }
-    Ok(format!("Merged {} into {main_branch}", p.branch))
 }
 
 impl BenchApp {

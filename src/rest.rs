@@ -533,41 +533,7 @@ pub fn session_places(
         .collect())
 }
 
-/// A new branch in its own folder (`<repo>/.worktrees/<name>`): (folder, branch).
-pub fn worktree_add(
-    conn: &Connection,
-    profile: &str,
-    repo: &str,
-    name: &str,
-) -> Result<(String, String)> {
-    let v = send(
-        conn,
-        "POST",
-        "/api/git/worktree/add",
-        profile,
-        json!({"path": repo, "name": name}),
-        60,
-    )?;
-    Ok((
-        v["path"]
-            .as_str()
-            .ok_or_else(|| anyhow!("no worktree path"))?
-            .to_string(),
-        v["branch"].as_str().unwrap_or_default().to_string(),
-    ))
-}
 
-pub fn worktree_remove(conn: &Connection, profile: &str, repo: &str, folder: &str) -> Result<()> {
-    send(
-        conn,
-        "POST",
-        "/api/git/worktree/remove",
-        profile,
-        json!({"path": repo, "worktreePath": folder, "force": true}),
-        60,
-    )?;
-    Ok(())
-}
 
 /// The profile's folder in the agent's home on its machine: `~/.bench/profiles/<name>`
 /// (`default` for the default profile).
