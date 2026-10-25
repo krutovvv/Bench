@@ -10,9 +10,9 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::icons::Ico;
 
-/// The avatar's and the buttons' offsets from the row's top: 0, as in a message (the text's own
-/// padding is pulled back, so the first line starts at the row's top).
-const AVATAR_TOP: f32 = 0.;
+/// The avatar's offset from the row's top (it replaces the avatar's own): the textarea's line
+/// sits higher than a message's, so the avatar goes up to center on it (the caret, the waveform).
+const AVATAR_TOP: f32 = -1.5;
 const BUTTONS_TOP: f32 = 3.;
 
 /// Rows the command list shows before it scrolls, and their height.

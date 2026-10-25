@@ -64,6 +64,13 @@ impl BenchApp {
             }
         }
         let block: Option<AnyElement> = None;
+        // `BENCH_DEMO_DRAFT=text`: the composer filled once (for screenshots of a typed line).
+        if self.demo && self.composer.read(cx).value().is_empty() {
+            if let Some(text) = std::env::var("BENCH_DEMO_DRAFT").ok().filter(|_| !self.demo_draft_done) {
+                self.demo_draft_done = true;
+                self.composer.update(cx, |s, cx| s.set_value(text, window, cx));
+            }
+        }
         // `BENCH_DEMO=new-project`: the new project's page, once (for screenshots).
         if self.demo && !self.subject_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
             self.subject_opened = true;

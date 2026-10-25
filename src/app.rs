@@ -158,6 +158,8 @@ pub struct BenchApp {
     pub settle_ready: bool,
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
     pub history_error: Option<String>,
+    /// `BENCH_DEMO_DRAFT` was put into the composer.
+    pub demo_draft_done: bool,
     pub live: Option<Live>,
     queued: Option<String>,
     /// Send was pressed while dictating: send once the speech is recognized.
@@ -629,6 +631,7 @@ impl BenchApp {
             settle_stable: 0,
             settle_ready: false,
             history_error: None,
+            demo_draft_done: false,
             live: None,
             queued: None,
             attachments: vec![],
