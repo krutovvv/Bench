@@ -116,8 +116,15 @@ impl BenchApp {
     /// A row picked from the `/` list: a form (a new server or host), or an insert.
     pub fn attach_tool(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
         match key.as_str() {
-            "new:ssh" => return self.edit_server(None, None, window, cx),
-            "new:ftp" => return self.new_host_form(window, cx),
+            // From the composer: the form shows at the thread's end.
+            "new:ssh" => {
+                self.form_after = None;
+                return self.edit_server(None, None, window, cx);
+            }
+            "new:ftp" => {
+                self.form_after = None;
+                return self.new_host_form(window, cx);
+            }
             _ => {}
         }
         // Everything else is an insert, put where the conversation is now.

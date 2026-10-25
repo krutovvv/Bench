@@ -124,6 +124,19 @@ impl BenchApp {
                         out.push(self.agent_row(f, cx));
                     }
                 }
+                // A form it opened (a new server, a new host), as the agent's answer under it.
+                if self.form_after.as_deref() == Some(ins.id.as_str()) {
+                    let form = if self.files_remote.form {
+                        Some(self.render_host_form(cx))
+                    } else if self.ssh.form.is_some() {
+                        Some(self.render_server_form(cx))
+                    } else {
+                        None
+                    };
+                    if let Some(f) = form {
+                        out.push(self.agent_row(f, cx));
+                    }
+                }
                 out
             })
             .collect()
@@ -227,7 +240,10 @@ impl BenchApp {
                                         }
                                     }
                                 }
-                                SwitchTo::Run(f) => f(this, window, cx),
+                                SwitchTo::Run(f) => {
+                                    this.form_after = Some(ins_id.clone());
+                                    f(this, window, cx)
+                                }
                             })
                         }));
                     }

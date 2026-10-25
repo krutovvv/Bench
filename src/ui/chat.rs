@@ -64,8 +64,12 @@ impl BenchApp {
         // A form (a new project; a new server or file host) is a block of the thread too: the new
         // project's at the top of its empty thread, the others with the tools, under the
         // conversation.
+        // A form opened from an insert shows under that insert (`render_inserts_at`).
+        let under_insert = self.form_after.as_ref().is_some_and(|id| self.thread_inserts().iter().any(|i| &i.id == id));
         let form: Option<(AnyElement, bool)> = if self.project_form.is_some() {
             Some((self.render_project_form(cx), true))
+        } else if under_insert {
+            None
         } else if self.files_remote.form {
             Some((self.render_host_form(cx), false))
         } else if self.ssh.form.is_some() {

@@ -86,6 +86,8 @@ pub struct BenchApp {
     pub inserts: HashMap<String, Vec<crate::model::Insert>>,
     /// A new chat's session is being made (an insert came before any message).
     pub creating: bool,
+    /// The insert a form was opened from (a new server, a new host): it shows under it.
+    pub form_after: Option<String>,
     /// Of the inserts whose state is app-wide (tasks, tools, files), the live one per kind.
     pub insert_live: HashMap<String, String>,
     /// The open thread's messages waiting for the agent: (id, mode, text).
@@ -572,6 +574,7 @@ impl BenchApp {
             creating: false,
             queue: Vec::new(),
             insert_live: HashMap::new(),
+            form_after: None,
             subject_target: None,
             thread_project: String::new(),
             projects: vec![],

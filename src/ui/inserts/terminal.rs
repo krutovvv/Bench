@@ -138,7 +138,11 @@ impl InsertKind for Terminal {
             for (k, (alias, host)) in servers(app).into_iter().enumerate() {
                 rows.push(pick_row(format!("{id}-s{k}"), Ico::Server, alias.clone(), host, cx, pick(format!("ssh:{alias}"))));
             }
-            rows.push(pick_row(format!("{id}-new"), Ico::Plus, "New server…".into(), "add one to ~/.ssh/config".into(), cx, new_server));
+            let from = id.clone();
+            rows.push(pick_row(format!("{id}-new"), Ico::Plus, "New server…".into(), "add one to ~/.ssh/config".into(), cx, move |this, window, cx| {
+                this.form_after = Some(from.clone());
+                new_server(this, window, cx)
+            }));
             return Some(v_flex().children(rows).into_any_element());
         };
         if app.demo {

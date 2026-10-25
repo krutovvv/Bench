@@ -82,7 +82,11 @@ impl InsertKind for Files {
                     this.patch_insert(&id, json!({ "state": { "host": hid, "path": "", "file": "" } }), cx);
                 }));
             }
-            rows.push(pick_row(format!("{id}-new"), Ico::Plus, "Add a host…".into(), "FTP, FTPS or SFTP".into(), cx, new_host));
+            let from = id.clone();
+            rows.push(pick_row(format!("{id}-new"), Ico::Plus, "Add a host…".into(), "FTP, FTPS or SFTP".into(), cx, move |this, window, cx| {
+                this.form_after = Some(from.clone());
+                new_host(this, window, cx)
+            }));
             return Some(v_flex().children(rows).into_any_element());
         }
         let theme = cx.theme().clone();
