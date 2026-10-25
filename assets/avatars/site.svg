@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Skorozvon's site: a dark window; a receiver lifted in it, and the call going out in rings. -->
+  <rect width="512" height="512" fill="#DEE1E6"/>
+  <rect x="96" y="112" width="320" height="300" fill="#1F2329"/>
+  <rect x="96" y="112" width="320" height="34" fill="#2FA38A"/>
+  <circle cx="118" cy="129" r="7" fill="#DEE1E6"/>
+  <polygon points="144.3,332.1 303.7,240.1 317.7,264.4 158.3,356.4" fill="#FFFFFF"/>
+  <polygon points="127.0,342.1 170.3,317.1 206.5,367.8 158.0,395.8" fill="#FFFFFF"/>
+  <polygon points="277.7,255.1 321.0,230.1 352.0,283.8 303.5,311.8" fill="#FFFFFF"/>
+  <path d="M332.5 159.9 A56 56 0 0 1 372.1 199.5 L356.6 203.6 A40 40 0 0 0 328.4 175.4z" fill="#F2B43C"/>
+  <path d="M341.3 127.1 A90 90 0 0 1 404.9 190.7 L389.5 194.8 A74 74 0 0 0 337.2 142.5z" fill="#F2B43C"/>
+  <path d="M350.1 94.2 A124 124 0 0 1 437.8 181.9 L422.3 186.0 A108 108 0 0 0 346.0 109.7z" fill="#E8603C"/>
+</svg>

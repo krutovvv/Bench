@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- A monolith on the horizon, split by a thin glowing slit, under a pale moon. -->
-  <rect width="512" height="512" fill="#DEE1E6"/>
-  <circle cx="136" cy="156" r="44" fill="#AFC0F5"/>
-  <circle cx="118" cy="144" r="40" fill="#DEE1E6"/>
-  <rect x="80" y="372" width="352" height="60" fill="#5C78E2"/>
-  <rect x="196" y="112" width="120" height="292" fill="#1F2329"/>
-  <rect x="252" y="150" width="8" height="200" fill="#E8603C"/>
-</svg>
