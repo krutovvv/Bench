@@ -133,21 +133,16 @@ impl BenchApp {
                     }
                 }
                 List::Upcoming => {
-                    // The next seven days, empty or not, then by month.
+                    // The next seven days that have something ("Tomorrow · 26 Oct"), then by month.
                     for k in 1..=7 {
                         let d = day + chrono::Duration::days(k);
-                        let label = format!(
-                            "{}\u{0}{}",
-                            d.format("%-d"),
-                            if k == 1 {
-                                "Tomorrow".to_string()
-                            } else {
-                                d.format("%A").to_string()
-                            }
-                        );
+                        let name = if k == 1 { "Tomorrow".to_string() } else { d.format("%A").to_string() };
+                        let label = format!("{name} · {}", d.format("%-d %b"));
                         let on: Vec<Task> =
                             shown.iter().filter(|t| t.day == Some(d)).cloned().collect();
-                        sections.push((Some(label), None, on));
+                        if !on.is_empty() {
+                            sections.push((Some(label), None, on));
+                        }
                     }
                     for t in shown
                         .into_iter()
@@ -176,54 +171,27 @@ impl BenchApp {
                 _ => sections.push((None, None, shown)),
             }
         }
-        let empty = sections.iter().all(|(_, _, v)| v.is_empty()) && list != List::Upcoming;
+        let empty = sections.iter().all(|(_, _, v)| v.is_empty());
         let mut rows: Vec<AnyElement> = vec![];
         let mut n = 0;
         for (title, icon, list_tasks) in sections {
-            let has_header = title.is_some();
-            // An Upcoming day: "24  Tomorrow" over a rule, like Things' plan.
-            if let Some((num, name)) = title.as_deref().and_then(|t| t.split_once('\u{0}')) {
+            // A section's name: one quiet line over its tasks, no rule (the first one closer).
+            if let Some(title) = title {
                 rows.push(
                     h_flex()
                         .flex_none()
                         .px_6()
-                        .pt_4()
-                        .pb_1()
-                        .gap_2()
-                        .items_baseline()
-                        .border_b_1()
-                        .border_color(theme.border)
-                        .child(
-                            div()
-                                .text_lg()
-                                .font_weight(FontWeight::SEMIBOLD)
-                                .child(num.to_string()),
-                        )
-                        .child(div().text_base().text_color(muted).child(name.to_string()))
-                        .into_any_element(),
-                );
-            } else if let Some(title) = title {
-                rows.push(
-                    h_flex()
-                        .flex_none()
-                        .px_6()
-                        .pt_4()
+                        .pt(px(if rows.is_empty() { 4. } else { 14. }))
                         .pb_1()
                         .gap_1p5()
                         .items_center()
                         .text_sm()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(muted)
-                        .border_b_1()
-                        .border_color(theme.border)
                         .when_some(icon, |d, i| d.child(i.icon().xsmall()))
                         .child(title)
                         .into_any_element(),
                 );
-            }
-            // Some air between a section's rule and its first task (the rule belongs to the header).
-            if has_header && !list_tasks.is_empty() {
-                rows.push(div().h_1().flex_none().into_any_element());
             }
             for t in list_tasks {
                 rows.push(self.render_task_row(n, &t, cx));
@@ -304,8 +272,6 @@ impl BenchApp {
                 .gap_1()
                 .flex_wrap()
                 .items_center()
-                .border_b_1()
-                .border_color(theme.border)
                 .child(Ico::Tag.icon().xsmall().text_color(muted).mr_1())
                 .children(chips)
                 .into_any_element()
@@ -313,8 +279,8 @@ impl BenchApp {
         if inline {
             // In an insert: its head switches the lists (no heading here); the rows' own px_6
             // pulled back to the insert's edges.
+            // No w_full: stretched, the negative margins widen it to the insert's edges.
             return v_flex()
-                .w_full()
                 .mx(px(-12.))
                 .children(strip)
                 .child(v_flex().children(rows).when_some(note, |d, (text, color)| {
@@ -429,8 +395,8 @@ impl BenchApp {
             .when(!t.notes.trim().is_empty(), |d| {
                 d.child(Ico::FileText.icon().xsmall().text_color(muted))
             })
-            // Its tags (a project's is one of them), where the list is not filtered by it.
-            .children(t.tags.iter().filter(|g| self.tasks.tag_filter.as_deref().is_none_or(|f| !f.eq_ignore_ascii_case(g))).take(3).map(|g| {
+            // Its tags (a project's is one of them).
+            .children(t.tags.iter().take(3).map(|g| {
                 div()
                     .flex_none()
                     .px_1p5()
