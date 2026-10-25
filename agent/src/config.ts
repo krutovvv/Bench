@@ -5,9 +5,8 @@
 //   agents/<name>/        an agent, laid out like Pi's agent directory (see below)
 //   cron/, attachments/, cache/, server.json, server.log, app/ (the installed server)
 //
-// Hermes is not needed: `import-hermes.ts` copies what is worth keeping from ~/.hermes once.
-// `readConfig()` still answers in the shape of Hermes' config.yaml, assembled from the settings
-// and the profile, for the tool ports that read it.
+// `readConfig()` answers in one config object assembled from the settings and the agent, for the
+// tools that read it.
 
 import fs from "node:fs";
 import os from "node:os";
@@ -17,8 +16,6 @@ import { DatabaseSync } from "node:sqlite";
 export const BENCH_HOME = process.env.BENCH_HOME ?? path.join(os.homedir(), ".bench");
 /** Kept as a name for the server's own files; it is the same folder. */
 export const AGENT_HOME = BENCH_HOME;
-/** Only the importer reads it. */
-export const HERMES_ROOT = process.env.HERMES_HOME ?? path.join(os.homedir(), ".hermes");
 
 let database: DatabaseSync | undefined;
 
@@ -204,7 +201,7 @@ export function migrateProfiles(): string[] {
 
 // ---- the config view the tool ports read --------------------------------------
 
-/** Hermes' config.yaml shape, assembled from the settings and the profile. */
+/** One config object, assembled from the settings and the agent. */
 export function readConfig(profile: string): any {
 	const s = allSettings();
 	const p = readAgent(profile);

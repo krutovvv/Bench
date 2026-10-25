@@ -1,8 +1,7 @@
 # Bench ↔ its agent: the protocol
 
-Bench talks only to its own agent (`agent/`, `references/build-pi-backend.md`), which speaks
-the protocol it inherited from the former agent (its "**token mode**"; names like
-`X-Hermes-Session-Token` keep that origin). The source of truth for each
+Bench talks only to its own agent (`agent/`, `references/build-pi-backend.md`): JSON-RPC over a
+WebSocket plus REST, with a session token. The source of truth for each
 method and route is the agent's `agent/src/server.ts`. Answer protocol questions with the app's
 `--probe` mode or `node agent/scripts/probe.ts`, not by clicking.
 
@@ -10,9 +9,10 @@ method and route is the agent's `agent/src/server.ts`. Answer protocol questions
 
 `connection.rs`: `pi_agent::ensure()` (this Mac) or `pi_agent::ensure_remote(host)` (over an
 `ssh -L` tunnel) gives a port and a session token. The WebSocket opens
-`ws://127.0.0.1:<port>/api/ws?token=<token>`; every REST call sends `X-Hermes-Session-Token`
-(`Connection::rest_auth`). There are no tickets, profiles or purposes in the auth: the profile
-is a call's `profile` argument (`?profile=`, `rest::url` adds it). A host's port and token are
+`ws://127.0.0.1:<port>/api/ws?token=<token>`; every REST call sends the token header that
+`Connection::rest_auth` returns. There are no tickets or purposes in the auth. Which agent dir a
+call is about (the Host's `default`, or a project's environment `project:<id>`) is its `profile`
+argument (`?profile=`, `rest::url` adds it) — a wire name only; the UI has no profiles. A host's port and token are
 saved in `state_dir()/ssh-<host>.json` to reattach next launch.
 
 ## Sessions over JSON-RPC (`gateway.rs`)
@@ -73,7 +73,7 @@ Bench `src/app/processes.rs`, `gateway.rs` `processes()`, `ui/chat.rs` `render_p
   feeds the waveform; Stop → WAV bytes → `POST /api/audio/transcribe` `{data_url:
   "data:audio/wav;base64,…", mime_type: "audio/wav"}` (180 s timeout) → `{transcript}`, appended
   to the composer (`rest.rs` `transcribe`). The STT engine is the agent's (`stt.openai.base_url /
-  model / language` in the profile's config — editable in Bench's Providers).
+  model / language` in the agent's settings — editable in Bench's Providers).
 - **Send while recording** = stop + transcribe + send in one press: `send()` sets
   `send_after_transcribe = true` and stops the mic; the transcription's callback sends. Esc
   cancels a recording.
@@ -110,29 +110,26 @@ notification replaces the older one for the same chat.
 
 - Every file (images too) is named in the text as `[attached: <path on the gateway's
   machine>]`: a local file in place; a temporary one (`/var/folders`, `/tmp`, pasted) copied to
-  `<profile home>/attachments/`; over SSH uploaded there with `POST /api/files/upload
+  `~/.bench/attachments/`; over SSH uploaded there with `POST /api/files/upload
   {path, data_url}` (after `/api/files/mkdir`). The UI turns those lines back into chips
   (`attach::split`).
 - Verified headless: staging and copies, without submitting a turn. Clean up probe files.
 
-## Profiles in the UI
+## Agent defaults in the status bar
 
-- Status bar profile = the one chats run in and new profiles are cloned from.
-- Settings → Profiles may open and edit ANY profile's SOUL.md; the call names that profile.
-- The status bar shows approvals / reasoning / model only after `profile_defaults` arrived
-  (`profile_ready`), never placeholder defaults.
+- The status bar shows approvals / reasoning / model only after the agent's defaults arrived
+  (`rest::profile_defaults`, the `profile_ready` flag), never placeholder defaults.
+- A project's soul (SYSTEM.md), MCP servers, skills, prompts, accesses, Telegram bot and schedule
+  are its environment, edited in the block a project's pencil opens (`app/project_env.rs`).
 
-## Bench: servers and the mini IDE
+## Bench: servers and files
 
-The reference app is **Bench** (`dist/Bench.<commit>.app`, bundle id `local.bench`; a Bench made by
-`new-bench.sh` has `local.<crate>` — use that in the commands below). Besides
-plain chats it has server threads (servers = `~/.ssh/config`, a server's terminal on top of its
-thread; gateways
-list = This Mac + config hosts with Node 22.18+, where Bench installs the agent on connect) and a mini
-IDE (gateway files, or a server's files as synced cache copies under
-`~/Library/Caches/bench/remote/` — "Add to chat" hands the agent that path; uploads check
-the server's mtime and stop on a conflict). Local agents reach servers through the separate
-`~/Projects/ssh-mcp` MCP server (same `~/.ssh/config`, same `~/.ssh/cm` socket).
+The reference app is **Bench** (`dist/Bench.<commit>.app`, bundle id `local.bench`). Gateways are
+This Mac plus `~/.ssh/config` hosts with Node 22.18+, where Bench installs the agent on connect;
+a project with a remote host runs on that host's agent. Servers, file hosts and the project's
+folder come into a thread as inserts (`/ssh`, `/ftp`, `/files`, `build-insert.md`); the agent
+reaches them with `ssh_run` and `remote_files`, Bench with the agent's REST (`/api/hosts`,
+`/api/fs/…`). A whole project opens in Zed from its ⋯ menu.
 
 ## Shipping changes to the user
 

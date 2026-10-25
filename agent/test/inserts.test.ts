@@ -9,7 +9,6 @@ import { after, test } from "node:test";
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-inserts-"));
 process.env.BENCH_HOME = home;
-process.env.HERMES_HOME = path.join(home, "no-hermes");
 process.env.BENCH_AGENT_NO_MCP = "1";
 after(() => fs.rmSync(home, { recursive: true, force: true }));
 

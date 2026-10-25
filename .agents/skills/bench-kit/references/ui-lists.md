@@ -1,7 +1,7 @@
 # Lists: group headers, rows, tabs
 
-The sidebar lists the subjects and the threads (Tasks, servers, files, tools, project chats…). It looks
-like a file explorer: groups with an icon of their kind, rows hanging on a thin guide line, the
+The sidebar lists only projects (Host first) and their threads; tools are inserts inside a thread
+(`build-insert.md`). It looks like a file explorer: projects with an icon, rows hanging on a thin guide line, the
 selected row with an accent stripe on the left.
 
 ![](../assets/ui/sidebar-groups.png) ![](../assets/ui/bench-sidebar-tools.png)
@@ -51,7 +51,7 @@ Order of groups: pinned first, then plain items, then folders/projects alphabeti
 other sources. A single plain group shows no header.
 
 What the meta line says: the facts that tell rows apart at a glance — Bench servers show
-`user@address`, chats show `branch · 6 messages`. One line, truncated.
+`user@address`, chats show `6 messages` (with the git branch when the thread works in one). One line, truncated.
 
 Filtering: the sidebar's search filters rows (case-insensitive substring on the title and the
 meta); a group whose rows all fail disappears. No results → a muted "Nothing found" line.
@@ -80,7 +80,7 @@ kit::tab_strip("tabs", tabs, cx,
     Rc::new(move |k, _, cx| view.update(cx, |this, cx| this.close_tab(k, cx))))
 ```
 
-Settings pages use the same strip as page tabs (Appearance, Profiles, …).
+Settings (the gear: providers, look) use the same strip as page tabs.
 
 ## A long or live list in the body
 

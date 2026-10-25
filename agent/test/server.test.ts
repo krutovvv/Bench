@@ -9,7 +9,7 @@ import path from "node:path";
 
 test("the server starts and answers /api/projects", async () => {
 	const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-server-"));
-	const child = spawn(process.execPath, ["--no-warnings", "src/server.ts"], { env: { ...process.env, BENCH_HOME: home, HERMES_HOME: path.join(home, "no-hermes"), BENCH_AGENT_NO_MCP: "1" }, stdio: ["ignore", "ignore", "pipe"] });
+	const child = spawn(process.execPath, ["--no-warnings", "src/server.ts"], { env: { ...process.env, BENCH_HOME: home, BENCH_AGENT_NO_MCP: "1" }, stdio: ["ignore", "ignore", "pipe"] });
 	let err = "";
 	child.stderr.on("data", (d) => (err += d));
 	try {

@@ -16,8 +16,7 @@
    `text_sm` before). Turns are told apart by avatars in a gutter, not by a colored band.
    The chrome (sidebar `#EAEAEC`, header / status bar `#E4E4E6`) is half a step darker than it
    was, and the sidebar meets the chat with **no rule**: the window's column dividers are
-   transparent at rest and an accent line on hover (`ui/mod.rs` `quiet_divider`); the IDE panel
-   draws its own left rule. The whole thread uses one size, the messages' `text_base`: steps, meta lines, cards' headers too; secondary things are muted, never smaller. One family everywhere in the chat: no
+   transparent at rest and an accent line on hover (`ui/mod.rs` `quiet_divider`). The whole thread uses one size, the messages' `text_base`: steps, meta lines, cards' headers too; secondary things are muted, never smaller. One family everywhere in the chat: no
    monospace or bigger fonts jumping between blocks except real code.
 5. **One inset per area:** 16px in the sidebar and in headers; 24px around reading content in
    the main area (the chat's question band and answer, the composer's text, task rows and the
@@ -35,7 +34,7 @@
    answer, "+" on a group header); no scrollbars — a thin rail of ticks instead; popups attach
    to the thing they belong to (command list rests on the input, no gap, no double border).
 9. **No dialogs for simple choices.** Arm-then-confirm buttons ("Delete" → "Confirm delete"),
-   inline fields, sensible defaults (e.g. new profile = clone of the current one).
+   inline fields, sensible defaults (e.g. a new project's environment starts from the Host's).
 10. **English UI**, short labels, tooltips for icons, and nothing added to the status bar
     without the user's agreement.
 11. **Nothing jumps.** Lay content out at its final size in the first frame (sizes of local

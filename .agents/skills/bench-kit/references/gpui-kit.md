@@ -2,8 +2,8 @@
 
 ## Local resources (prefer these over the network)
 
-- Upstream checkout (docs md, `examples/` runnable apps incl. `ai_recipes`):
-  `~/.hermes/refrepos/gpui-kit` — refresh with `git -C ~/.hermes/refrepos/gpui-kit pull`.
+- Upstream repository (docs md, `examples/` runnable apps incl. `ai_recipes`): clone it when you
+  need the examples (its address is on gpui-kit.com); there is no local checkout by default.
 - Pinned crate source — the ground truth for the version user projects build against
   (`gpui-kit = "0.8.0"`): `~/.cargo/registry/src/index.crates.io-*/gpui-{base,component}-0.8.0/src`.
   The checkout tracks upstream `main` and may run ahead of 0.8.0: when a symbol
@@ -16,7 +16,7 @@
   repo (`skills/gpui-kit`); code under Apache-2.0, prose CC BY 4.0, credit GPUI Kit.
 - User conventions win over generic examples: for the look, spacing, fonts, icons,
   macOS packaging and UI verification of THIS user's apps see `SKILL.md` and the `ui-*` / `design-*` pages
-  (flat, square, dense, One Light) and `references/build-new-app.md` (scaffold); media/file
+  (dense, One Light, rounded blocks); media/file
   handling: `references/build-media.md`. They change presentation, never API facts.
 
 Applications depend on one crate, `gpui-kit`. GPUI is `use gpui_kit::*;`, and

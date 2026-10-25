@@ -19,7 +19,7 @@ y ┌─────────────────────────
 35│━━━━━━━━━━━━━━━━━━━━━━━━━━│━━━━━━━━━━━━━━━━━━━━━━━━━ (one line across) ━━━━━━━━━━━━━│ 35 rule
   │ 🔍 SEARCH BAND           │ [STRIP under the header: tags / tabs, if the view has one]│ 36–70
 70│━━━━━━━━━━━━━━━━━━━━━━━━━━│━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│ 70 rule
-  │ GROUP HEADER        ˅ +  │ BODY: the thread — its subject's block on top, then chat│
+  │ PROJECT HEADER      ˅ +  │ BODY: the thread — messages, the person's inserts in it │
   │ │ row                    │   chat: question band ─ answer ─ cards under the answer │
   │ │ row          (hover …) │   lists, two panes, an editor, a card on the right      │
   │                          │                                                         │
@@ -31,17 +31,16 @@ y ┌─────────────────────────
 
 | Area | Height | Inside | Inset | Code (Bench) |
 |---|---|---|---|---|
-| Top strip (over the sidebar) | 35 | icon buttons, right-aligned: Open folder, + (New session ⌘N), Hide sidebar | right 16 (`pr 12` + the toggle's `p_1`) | `render_sidebar_top`, `ui/mod.rs` |
+| Top strip (over the sidebar) | 35 | icon buttons, right-aligned: + (New project), Hide sidebar | right 16 (`pr 12` + the toggle's `p_1`) | `render_sidebar_top`, `ui/mod.rs` |
 | Search band | 36 incl. 2 rules (`bar_h + 1`) | the search input, no frame | magnifier over the group icons (`pl 3.5`, measured) | `search_band`, `ui/mod.rs` |
-| Sidebar list | rest | group headers, rows | 16; nested rows `nest_pl` | `ui/sidebar.rs`, `ui/servers.rs`, `ui/tools.rs`, `ui/tasks.rs` |
+| Sidebar list | rest | projects (Host first) and their threads | 16; nested rows `nest_pl` | `ui/sidebar.rs` (`render_project`, `render_session_row`) |
 | Bottom bar | 36 (`bar_h + 1`) | the one primary button, filling it (Bench's chat list has none: "+" instead) | — | `kit::bottom_bar`; Bench settings `ui/panels.rs` |
 | Header | 36 incl. its rule | title, a muted hint, choices (segmented), icon toggles on the right | left 16 (`pl_4`), right 8 (`pr_2`) | `render_header`, `ui/mod.rs`; its right end `render_header_tail`, `ui/servers.rs` |
 | Strip under the header | 35 (`min_h(bar_h)`), its rule meets the search band's | tag pills, tabs | 24 (`px_6`) in content, 16 for tabs | `ui/tasks.rs` (tags) |
-| Body | rest | the thread: the subject's block, then the conversation | 24 (`px_6`) around reading content | `render_chat`, `ui/chat.rs` (the `let block = …` chain) |
+| Body | rest | the thread: a project's environment block (when opened), the conversation, inserts in the person's rows | 24 (`px_6`) around reading content | `render_chat`, `ui/chat.rs`; inserts `render_inserts_at`, `ui/inserts/mod.rs` |
 | Cards under an answer | — | Changed files, processes, code, audio, video | the answer's 24 | `ui/chat.rs`, `ui/media.rs` |
 | Composer | 36 (rule + `min_h(bar_h)`) | text, then 26pt round buttons | text at 24, buttons 24 from the edge | `ui/composer.rs` |
 | Status bar | 28 incl. its top rule | left: facts; right: pickers, New window, Settings | items `px_2` | `ui/statusbar.rs` |
-| Right panel (IDE, files) | full height, 640 (360–1400) | tabs 36, viewer, a file list | 16 | `ui/files.rs`, `ui/mod.rs` |
 
 `bar_h` = `font_size × 2.5` (35). Every bar is the header's 36 with its rule; every rule that
 crosses the window is one pixel row. The status bar is the only shorter bar (28).
@@ -50,7 +49,8 @@ crosses the window is one pixel row. The status bar is the only shorter bar (28)
 
 | The thing | Area | Never |
 |---|---|---|
-| A new kind of thread (Tasks, a server, a tool) | a sidebar group (`subject_head`, `subject_row`, `ui/sidebar.rs`) | a switch anywhere |
+| A new tool (Tasks, a server, files, a utility) | an insert put in with `/` (`build-insert.md`) | a sidebar group, a mode, a side panel |
+| A form a tool needs (a new server, a new host) | an agent-message card under the insert that asked for it | a dialog, a settings page |
 | The sidebar's own buttons (new, open folder, hide) | top strip, right; the same strip on every sidebar variant | the status bar |
 | Window-level buttons (New window, Settings) | status bar, right end, Settings last | the header |
 | Facts (where, who, Ln/Col, counts) | status bar, left; text, not buttons | — |
@@ -72,16 +72,15 @@ then make sure the area's other rules still hold (same strip on every sidebar va
 
 ## Moving a control from one area to another
 
-The real case (before modes became subjects): "Put the Tools icon in the sidebar's top strip,
+The real case (when Bench still had modes): "Put the Tools icon in the sidebar's top strip,
 Tools before Tasks; the bottom right corner keeps only New window and Settings." The strip now
-holds Open folder, + and Hide sidebar; the steps are the same for any icon.
+holds + (New project) and Hide sidebar; the steps are the same for any icon.
 
 1. **Find where it is now.** `grep -rn '"Hide sidebar  ⌘' src/`: the tooltip is the most unique
    string. Note the handler it calls (`toggle_sidebar`) and any flag around it
    (`.when(crate::bench::TOOLS, …)`).
 2. **Find the target area's builder.** It's in the map above (`render_sidebar_top`). Check that
-   **every variant of the area** uses it: here, every sidebar (the chat list, the IDE's tree)
-   starts with `.child(self.render_sidebar_top(cx))` (`grep -rn render_sidebar_top src/ui`). If
+   **every variant of the area** uses it: here, every sidebar starts with `.child(self.render_sidebar_top(cx))` (`grep -rn render_sidebar_top src/ui`). If
    one draws its own top, the icon will jump between them. Make that sidebar use the builder too.
 3. **Rebuild the control as the target area's piece, not as a copy of the old one.** A status
    bar button (full bar height, `xsmall` icon) becomes a strip toggle (24pt square, `small`
@@ -101,7 +100,7 @@ holds Open folder, + and Hide sidebar; the steps are the same for any icon.
 7. **Measure** (`build-change-loop.md`): a shot of your own instance before and after;
    `spans.py shot.png 8 28 0 280` lists the strip's icons with their positions and the gap to
    the sidebar's edge (the last gap must stay 16, the icons that were there must not move);
-   `spans.py` on the old area shows it's gone. Crop both areas and look at them. Open another sidebar variant (the IDE) with a hook and shoot it: the icons must not move.
+   `spans.py` on the old area shows it's gone. Crop both areas and look at them.
 
 Other moves done the same way:
 - **New window** from the header to the status bar, before Settings.
@@ -161,5 +160,5 @@ The real case: "The code block's header must be as tall as the Changed files lin
   there was a gap after it; 118 fits.
 - **A list that grows past the window**: every child needs `.flex_none()`, or the rows get
   squeezed and the steps between them turn uneven.
-- After any change, shoot **other subjects' threads** too: shared pieces (the top strip, the
-  bars) are in every one.
+- After any change, shoot **threads with other inserts** too: shared pieces (the top strip, the
+  bars, `block_head`) are in every one.

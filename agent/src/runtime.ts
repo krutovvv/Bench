@@ -24,7 +24,7 @@ import { Store, type SessionRow, type Todo } from "./store.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
-/** One event for Bench, as Hermes sends it: `{ session_id, type, payload }`. */
+/** One event for Bench: `{ session_id, type, payload }`. */
 export type Emit = (sessionId: string, type: string, payload: Record<string, unknown>) => void;
 
 interface Pending {
@@ -774,7 +774,7 @@ export class Runtime {
 
 	// ---- history (session.resume) -------------------------------------------
 
-	/** The transcript in Hermes' `messages[]` shape. */
+	/** The transcript as Bench reads it: `messages[]`. */
 	async history(id: string): Promise<any[]> {
 		const live = await this.session(id);
 		if (!live) return [];
@@ -869,7 +869,7 @@ export function defaultCwd(profile: string): string {
 	return process.env.HOME ?? "/";
 }
 
-/** The one-line detail Bench shows on a tool step (Hermes' `context`). */
+/** The one-line detail Bench shows on a tool step (its `context`). */
 export function preview(name: string, args: any): string {
 	if (!args || typeof args !== "object") return "";
 	const pick = args.command ?? args.path ?? args.query ?? args.url ?? args.urls?.[0] ?? args.name ?? args.goal ?? args.pattern ?? args.action;

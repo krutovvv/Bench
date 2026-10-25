@@ -1,4 +1,4 @@
-// Speech in and out through Hermes' `stt:` / `tts:` config (OpenAI-compatible servers): Bench's
+// Speech in and out through the `stt` / `tts` settings (OpenAI-compatible servers): Bench's
 // dictation and read-aloud, and Telegram's voice messages.
 
 import { readConfig, readEnv } from "./config.ts";

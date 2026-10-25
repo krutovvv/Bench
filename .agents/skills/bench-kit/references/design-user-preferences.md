@@ -31,19 +31,14 @@
 - Media in the chat itself — images, video playing in place, audio, Markdown, diagrams,
   formulas; anything else opens in its default app on a click. All with the lightest possible
   implementation (no browsers), see `references/build-media.md`.
-- New desktop apps: the same stack and the same look as Bench, only the icon differs
-  (`references/build-new-app.md`).
 - Color labels: thin stripe + light tint of the row background, for quick scanning.
 - Working items (a session whose agent runs) show a moving highlight over their title
   (`ShimmerText`, follows the text color) besides the "working…" meta, so they are found at a glance.
 
-- Sidebar groups as a file explorer: kind icon + name + chevron/"+" on the right, rows on an
+- Sidebar projects as a file explorer: icon + name + chevron/"+" on the right, rows on an
   indent guide; no counts, no horizontal rules (see layout-recipes → Sidebar).
 - Tabs and lists that can overflow scroll sideways rather than squeeze; code editors don't
   soft-wrap in narrow panels (horizontal scroll).
-- "Maximize" is a layout mode, not an overlay: the maximized panel takes the places of the
-  sidebar (same width) and the main area, toggled back with the same button/shortcut. An
-  immersive view needs no labels saying where it is.
 
 - **Every bar the header's height, every crossing rule one line.** The user spots a 1px step
   between the composer and "New session" and calls it "бесит". All bars 36; the composer's
@@ -54,8 +49,9 @@
   list, task card). A big app's generous padding (Claude Desktop) is the direction, not the target.
 - **Mode toggles over the sidebar**, in the strip beside the window buttons (Tools, then Tasks);
   the status bar's right corner holds only New window and Settings. *Superseded 2026-10-24:*
-  there are no modes; Tasks, Servers, Tools are sidebar groups, each opening a thread
-  (`build-insert.md`); the strip holds Open folder, + and Hide sidebar. The status bar rule stands.
+  there are no modes. *Then 2026-10-25:* the sidebar holds only projects and their threads; Tasks,
+  servers, files, tools and the browser are inserts put into a thread with `/` (`build-insert.md`).
+  The status bar rule stands.
 - **Cards are frames, not fills**: code blocks, audio, video, Changed files — a 1px frame, no
   background; header lines all the same height. A darker code background read as "тёмный вид".
 - **Code in answers has a header**: language left, Copy right, like every AI chat.
@@ -74,13 +70,14 @@
   (agents run for hours while the user is elsewhere).
 - Live numbers that matter most: generation speed (tokens/s, live, per second, with min/avg/max),
   prefill speed, context used/limit (from config), compactions, cache hit. Estimates marked `~`.
-- Remembers state: last backend, profile and open session per backend; panel toggles; prefs.
+- Remembers state: last backend and open session per backend; panel toggles; prefs.
 - Things that belong to the backend live there as files the user can edit elsewhere (prompts as
-  `prompts/*.md` in the profile, skills, SOUL.md) — not in app-private storage.
+  `prompts/*.md` in the agent dir or the project's environment, skills, SYSTEM.md) — not in
+  app-private storage.
 - Multi-window rather than tabs: one window = one independent context.
-- Git when needed, never forced: project detected automatically from the session's folder or
-  edited files; a chat can get its own branch (worktree); merge/delete from a chip. Chats with no
-  files show nothing git-related.
+- Git when needed, never forced: the repo and branch are detected from the thread's folder or
+  edited files and shown as a label; no git actions of Bench's own (branches per thread were
+  dropped). Chats with no files show nothing git-related.
 - Dictation: show a live waveform in place of the text field while recording, with equal gaps
   to the left edge and to the button; the mic button turns into a filled round Stop (■) — not an
   animated "waveform" icon; spinner while transcribing.
@@ -96,11 +93,10 @@
   `~/.ssh/config` (app fields as `# folder:` / `# path:` comments), keys as `IdentityFile`,
   never passwords.
 - Nothing installed on servers, no personal data or tokens left there; agents stay local.
-- Lightweight first, the heavy tool one click away: open in the built-in mini IDE first, Zed
-  from inside it.
+- Lightweight first, the heavy tool one click away: a file opens in the thread (the `/files`
+  insert); the whole project opens in Zed from the project's ⋯ menu (only where it has a folder).
 
-- **The Bench aggregates; data stays native** (servers in `~/.ssh/config`; tasks were in Apple
-  Reminders and sessions in the former agent, Hermes). The user rejected a JSON store, then SQLite, then a
+- **The Bench aggregates; data stays native** (servers in `~/.ssh/config`). The user rejected a JSON store, then SQLite, then a
   third-party app (Things) as the store, then an MCP built into the Bench: the agents' MCP lives
   in the agent, the Bench only shows and edits (`build-native-data.md`). *Updated 2026-10-24:*
   tasks and sessions now live in `~/.bench/bench.sqlite`, owned by the agent (`agent/`), which
@@ -128,14 +124,14 @@
 - **The composer is part of the thread** (2026-10-24): the messages' font size, no buttons
   (⌘Enter, ⌘⇧D, drag-and-drop), no scroll of its own, there while history loads; the thread
   scrolls past its end like a code editor. The mic lives in the status bar.
-- **The sidebar is an IDE's tree**: no big "New session" button; "+" on a group or in the top strip.
+- **The sidebar is a tree** (projects and their threads, nothing else): no big "New session" button; "+" on a project or in the top strip.
 - **Fold strips (Background, Changed files) are as tall as a source chip.**
 - **One size in the thread** (2026-10-24): the thread is one document in one font size — the
   messages' (`text_base`). Step summaries ("Sending… · 17s", "Done · N actions"), step rows,
   site labels, file and fold strips, source chips, plan and asks: all `text_base`, set apart by
   color (muted) only. Code stays monospaced. "это единый документ. Он одним шрифтом идет."
-- **One size in the bars**: header title, settings tabs, the branch chip, every status bar item
+- **One size in the bars**: header title, settings tabs, every status bar item
   are the sidebar's group-name size (`text_sm`, buttons `.small()`, icons `.small()`).
-- **No centering, no max width** for the thread: full width from the left, like an IDE.
+- **No centering, no max width** for the thread: full width from the left, like an editor.
 - **Primary buttons in the accent** (`button_primary = primary` in `theme.rs`), never the kit's black.
 

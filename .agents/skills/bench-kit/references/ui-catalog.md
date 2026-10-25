@@ -7,9 +7,8 @@ and ask the person before inventing a new kind of control.
 
 Where the code lives:
 - **`kit::…`** — `templates/app/src/ui/kit.rs`, the piece library (not a way to start an
-  app): copy the piece you need into your `src/ui/`. A Bench made by `scripts/new-bench.sh`
-  has the same pieces in Bench's own files (`src/ui/mod.rs`
-  `search_band`, `render_sidebar_top`; `src/ui/tools.rs` `pane_bar`, `small_button`, `segmented`).
+  app): copy the piece you need into your `src/ui/`. Bench has the same pieces in its own files
+  (`src/ui/mod.rs` `block_head`, `search_band`, `render_sidebar_top`; `src/ui/tools.rs` `pane_bar`, `small_button`, `segmented`).
 - **gpui-kit components** — `gpui_kit::component::…` (editor, inputs, menus, Markdown…).
 - **Bench** — `~/Projects/bench-kit/src`, the reference app, for bigger pieces to copy.
 
@@ -25,7 +24,7 @@ Where each piece goes in the window, and how to move or fit one: `ui-areas.md`.
 | Window frame: sidebar, header, body, status bar | `assets/gallery.png` | Bench `src/ui/mod.rs` | `ui-frame.md` |
 | Header bar (36px, title + icon buttons) | `assets/ui/header-bar.png` | `kit::header_bar` | `ui-frame.md` |
 | Status bar (28px, facts left, pickers right) | `assets/ui/status-bar.png`, `assets/ui/bench-status-bar.png` | `kit::status_text`, `kit::status_button` | `ui-frame.md` |
-| Top strip over the sidebar (Open folder, +, Hide sidebar) | — | `kit::sidebar_top`, `kit::mode_toggle` (its icon button; Bench `render_sidebar_top`) | `ui-frame.md`, `ui-buttons.md` |
+| Top strip over the sidebar (+, Hide sidebar) | — | `kit::sidebar_top`, `kit::mode_toggle` (its icon button; Bench `render_sidebar_top`) | `ui-frame.md`, `ui-buttons.md` |
 | Search band (36, rules above and below) | `assets/ui/search.png` | `kit::search_band` | `ui-frame.md` |
 | Bottom button filling its bar | `assets/ui/primary-button.png` | `kit::bottom_bar(kit::primary_button(..))` | `ui-frame.md` |
 | Primary button (the one filled button) | `assets/ui/primary-button.png` | `kit::primary_button` | `ui-buttons.md` |

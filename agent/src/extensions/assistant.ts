@@ -1,7 +1,8 @@
 // The assistant: Bench's default extension. Pi's own coding tools (read, write, edit, bash) and
 // tool search, plus the person-facing tools (clarify, todo, memory, skills, cron, delegate,
-// session_search). Its prompt is a few short sections (src/prompt.ts). A profile can select
-// other extensions next to it or instead of it (profile.json "extensions").
+// session_search) and the inserts' tools (tasks, ssh_run, remote_files, hosts). Its prompt is a
+// few short sections (src/prompt.ts). An agent can select other extensions next to it or instead
+// of it (its settings.json "extensions").
 
 import { defineExtension, hook, section, ToolTask } from "@earendil-works/pi-durable";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
@@ -25,7 +26,7 @@ const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined
 	return info ? render(info) : undefined;
 };
 
-/** Commands that ask first when approvals are on (profile.json "approvals": "manual"). */
+/** Commands that ask first when approvals are on (the agent's settings.json "approvals": "manual"). */
 const DANGEROUS: [RegExp, string][] = [
 	[/\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b/i, "recursive delete"],
 	[/\bsudo\b/, "runs as root"],

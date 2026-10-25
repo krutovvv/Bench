@@ -45,7 +45,7 @@ export function environment(s: SessionInfo): string {
 	return [
 		`Today is ${day} (${timezone()}). For the exact time, run date.`,
 		`Machine: ${os.type() === "Darwin" ? "macOS" : os.type()}, home ${os.homedir()}. Working directory: ${s.cwd}.`,
-		"Bench's own data (tasks, hosts, sessions, settings) is reached through your tools, not files; ~/.hermes is a former agent's folder, not used.",
+		"Bench's own data (tasks, hosts, sessions, settings) is reached through your tools, not files.",
 		PLATFORM[s.source] ?? PLATFORM.local,
 	].join("\n");
 }

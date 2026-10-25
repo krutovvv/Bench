@@ -92,7 +92,7 @@ rem; at 14px rem they are ~12% smaller — that is fine, keep using the scale co
 | Composer buttons | 26px circles, 13px bold-cut icons, `gap_2`; quiet = 1px border, filled = accent (Send with text) / foreground (Stop turn) / danger (Stop recording) |
 | Cards under an answer (Changed files, code block, audio, video) | 1px frame, no fill; header line `px_2 py_1 text_xs` muted (code: `pl_4`, language left, Copy right) |
 | Settings list column | 300px wide, right border |
-| Sidebar | 280px (resizable 200–480); right panel 640px (360–1400) |
+| Sidebar | 280px (resizable 200–480); no right panel |
 | Popover panels | 260–300px wide, rows `px_3 py_0p5 text_xs`, key muted left / value right |
 
 ## Color usage rules

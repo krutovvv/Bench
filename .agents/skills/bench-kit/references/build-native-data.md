@@ -32,10 +32,11 @@ list re-read from its source": keep unsaved new items, don't overwrite a card be
   shape in Rust: `src/tasks.rs` (lists: Today, Upcoming, Anytime, Logbook — someday tasks show in Anytime; pure
   functions, tested).
 - **Bench's side**: `src/task_store.rs` — a worker thread that sends `Cmd::Load / Save / Delete`
-  as REST calls and returns `Evt::Loaded / Created / Error` over an `async_channel`; the thread
-  `tasks:<list>` shows them (`src/app/tasks.rs`, `src/ui/tasks.rs`).
+  as REST calls and returns `Evt::Loaded / Created / Error` over an `async_channel`; the `/tasks`
+  insert shows them (`src/ui/inserts/tasks.rs`, `src/app/tasks.rs`, `src/ui/tasks.rs`).
 - **The agent's side**: the `tasks` tool (list with status, tag, `done_since` / `done_until`,
-  sums `spent_minutes_total`; add; update; complete; delete). The subject's prompt section says
+  sums `spent_minutes_total`; add; update; complete; delete). Its line in the `inserts` prompt
+  section says
   "the only place they live, never look for them in files".
 - **How they got there**: years in Things, then Apple Reminders (1318 tasks), then
   `bench.sqlite` (2026-10-24): Bench read every reminder once over EventKit
@@ -62,9 +63,9 @@ Evening → evening; Someday → someday; a deadline → the flag (that person u
 it); completed → completed with its original date. Projects, areas and checklists were not used —
 ask before dropping them for someone who uses them.
 
-## Groups of chats without a project
+## Projects without a folder
 
-A thread works in a folder; the sidebar groups threads by folder. "Name a group" in a new chat
-makes `~/Research/<name>` (on the machine the agent runs on) and starts the thread there; the
-sidebar then shows the group (a layers icon for folders under `~/Research/`), and its "+" starts
-the next one there. `connection::group_dir`, the `group_name` field in `src/app.rs`.
+The sidebar holds only projects. A project's folder (a codebase) is optional: without one its
+threads work in a folder Bench keeps for it (`src/app/project_list.rs`). An "audit" or a
+"research" of a few deep threads is such a project. (`connection::group_dir`, which makes
+`~/Research/<name>` from "Name a group", is the older way and still in the code.)

@@ -7,7 +7,7 @@ Five kinds, each with one job. Don't style a button yourself and don't add a six
 | Primary (filled, accent) | the one main action: bottom of the sidebar | `kit::primary_button` |
 | Icon button (small square) | header, inside rows, toggles | `kit::icon_button` |
 | Status button | status bar: New window, Settings | `kit::status_button` |
-| Strip toggle | the sidebar's top strip: Open folder, +, Hide sidebar | `kit::mode_toggle` |
+| Strip toggle | the sidebar's top strip: + (New project), Hide sidebar | `kit::mode_toggle` |
 | Small text button | a pane's strip: Paste, Copy, Clear, Generate | `kit::small_button` |
 | Arm-then-delete | deleting a row, without a dialog | `kit::arm_delete_button` |
 
@@ -102,7 +102,6 @@ the filled one in the accent. 26 so the composer stays the header's 36 (at 30 it
 `kit::mode_toggle(id, icon, "Hide sidebar  ⌘\\", on, cx, on_click)` in `kit::sidebar_top(vec![…])`
 (Bench: the `toggle` closure in `render_sidebar_top`, `src/ui/mod.rs`): a 24px square icon
 button, muted; while `on` it is accent on `list_active` and its tooltip reads "Back" + the
-shortcut. Bench's strip, left to right: Open folder ("New session in a folder…"), + ("New
-session  ⌘N"), Hide sidebar; all open or hide something, so `on` is always false. It is not a
-mode switch: there are no modes, a tool is a subject (`build-insert.md`). The same strip is on
+shortcut. Bench's strip, left to right: + ("New project"), Hide sidebar; all open or hide something, so `on` is always false. It is not a
+mode switch: there are no modes, a tool is an insert (`build-insert.md`). The same strip is on
 top of every sidebar variant, so its icons stay put.

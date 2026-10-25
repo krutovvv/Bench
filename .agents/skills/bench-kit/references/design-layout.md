@@ -5,17 +5,17 @@ All snippets use `use gpui_kit::*; use gpui_kit::component::{ActiveTheme as _, S
 ## Window skeleton
 
 ```
-┌ sidebar 280 ─────┬ header 36 ────────────────────────────┬ right panel 640 (optional) ┐
-│ (lights) ▯ 🔧 ☰  │ title …          [chip] [▢] [±] [⊞]   │ tabs 36                    │
-│ search band 36   ├───────────────────────────────────────┤ viewer | list (resizable)  │
-│──────────────────│ content (chat / settings page)        │                            │
-│ GROUP · n        │                                       │                            │
-│ rows…            │                                       │                            │
-│──────────────────├───────────────────────────────────────┤                            │
-│ GROUP + / rows…  │ ◉ composer (in the thread)            │                            │
-├──────────────────┴───────────────────────────────────────┴────────────────────────────┤
-│ status bar 28: target · profile ……… speed · context · approvals · effort · model · ⟳ ⚙ │
-└───────────────────────────────────────────────────────────────────────────────────────┘
+┌ sidebar 280 ─────┬ header 36 ────────────────────────────┐
+│ (lights) 📂 + ◧  │ title …                  [chip] [▢]   │
+│ search band 36   ├───────────────────────────────────────┤
+│──────────────────│ the thread: messages, inserts in the  │
+│ HOST             │ person's rows / settings page         │
+│ │ threads…       │                                       │
+│ PROJECT  ⋯ +     │                                       │
+│ │ threads…       │ ◉ composer (in the thread)            │
+├──────────────────┴───────────────────────────────────────┤
+│ status bar 28: target ……… speed · context · approvals · effort · model · ⟳ ⚙ │
+└──────────────────────────────────────────────────────────┘
 ```
 
 ```rust
@@ -23,15 +23,14 @@ v_flex().size_full().child(
     div().flex_1().min_h_0().child(
         h_resizable("layout")
             .child(resizable_panel().size(px(280.)).size_range(px(200.)..px(480.)).child(sidebar))
-            .child(resizable_panel().child(main))
-            .when(show_right, |d| d.child(
-                resizable_panel().size(px(640.)).size_range(px(360.)..px(1400.)).child(right))),
+            .child(resizable_panel().child(main)),
     ),
 ).child(statusbar)
 ```
 
-The title bar is transparent (`appears_transparent: true`): the sidebar starts with a 35px
-strip beside the traffic lights (its icon buttons on the right: Open folder, +, Hide sidebar); the main header (36px) sits at
+There is no right panel (the mini IDE is gone): files open in a thread's insert, a whole project
+in Zed from its ⋯ menu. The title bar is transparent (`appears_transparent: true`): the sidebar starts with a 35px
+strip beside the traffic lights (its icon buttons on the right: + New project, Hide sidebar); the main header (36px) sits at
 the top of the main column.
 
 ## Facing bars (the alignment users notice)
@@ -48,12 +47,12 @@ All bars are the header's height, and every rule crossing the window is one line
   frame (`ui/mod.rs` `search_band`); ⌘F focuses it (`app/keys.rs` `open_search`, which also
   brings a hidden sidebar back). No magnifier toggle — the user had it removed (2026-10-24).
 - **Hiding the sidebar**: the last icon in its top strip (PanelLeft, "Hide sidebar ⌘\\",
-  after Open folder and +). Hidden, `render_layout` leaves the left panel out (the flag is part of the
-  `layout_synced` shape key, and the IDE's width is read from column 1 instead of 2), and the
+  after +). Hidden, `render_layout` leaves the left panel out (the flag is part of the
+  `layout_synced` shape key), and the
   header gets a 36px corner on its left: `title_bar` bg, `border_b`, `pl(78)` for the window
-  buttons, the same PanelLeft to show it again. The IDE's expanded mode ignores the flag.
-- **No "New session" button at the bottom**: the sidebar is an IDE's tree (groups as folders,
-  sessions inside); a new chat is the "+" on a group, or the "+" first in the top strip (⌘N).
+  buttons, the same PanelLeft to show it again.
+- **No "New session" button at the bottom**: the sidebar is a tree (projects as folders,
+  threads inside); a new thread is the "+" on a project (⌘N); the "+" in the top strip is a new project.
 - A strip under the header that faces the search band (Tasks' tag strip): `min_h(bar_h)`, so
   its bottom rule meets the band's.
 - Any "+ New item" row at the bottom of a list: `h(bar_h + 1)`.
@@ -106,18 +105,17 @@ so opening the menu does not also open the row.
 ## Header strip
 
 `h_flex().h(px(36.)).bg(theme.title_bar).border_b_1().pl_4().pr_2().gap_1()`: title
-(`flex_1 min_w_0 text_sm font_weight(MEDIUM) truncate`), then context chips (e.g. project ·
-branch as a ghost xsmall Button with a dropdown), then 24px icon toggles (`p_1`, muted, active =
-accent + `list_active` bg, tooltip with the shortcut, e.g. "New window  ⌘⇧N"). At the right
-end: "Open files ⌘B" (shown while the chat or server thread has files to open; `render_header_tail`,
-`ui/servers.rs`). New window lives in the status bar before Settings. Tasks, Servers and Tools
-are not switches anywhere: they are sidebar groups, each opening a thread (`build-insert.md`).
-Item-specific actions (open in Zed, files) go to the item's "⋯" menu, not the header. In settings the same strip holds tabs: each tab
-`h_full px_4 text_sm border_r_1`, active = content bg + foreground, others muted.
+(`flex_1 min_w_0 text_sm font_weight(MEDIUM) truncate`), then the project chip (repo · branch
+when the thread works in git, `render_project_chip`), then 24px icon toggles (`p_1`, muted, active =
+accent + `list_active` bg, tooltip with the shortcut, e.g. "New window  ⌘⇧N"; `render_header_tail`,
+`ui/servers.rs`). Tasks, servers, files and tools are not switches anywhere: they are inserts
+put into a thread with `/` (`build-insert.md`). Item-specific actions (Open in Zed) go to the
+item's "⋯" menu, not the header. Settings (the gear) is one page with a plain "Settings" title
+and a close ×.
 
 ## Status bar
 
-28px, `bg(status_bar) border_t_1 text_xs`. Left: where (target), who (profile). Right: live
+28px, `bg(status_bar) border_t_1 text_xs`. Left: where (target). Right: live
 readouts and pickers. A picker is a ghost xsmall Button **with the icon inside it** (so hover
 highlights both) and a `dropdown_menu` of checked items:
 
@@ -129,8 +127,7 @@ Button::new(id).ghost().xsmall().icon(Ico::Cpu.icon()).label(label).dropdown_men
 
 Readouts with more detail open a `Popover` on click (stats table, speed chart) — see
 `references/ui-gotchas.md`. Hide a picker until its data is loaded (no empty dropdowns, no
-default values pretending to be real: keep a `ready` flag, reset it on reconnect / profile
-switch). All picker buttons `.text_color(muted)` so the bar is one tone.
+default values pretending to be real: keep a `ready` flag, reset it on reconnect). All picker buttons `.text_color(muted)` so the bar is one tone.
 
 Row menus: separate unrelated groups with `.separator()` (Pin | colors | Open in new window |
 Delete).
@@ -157,7 +154,7 @@ thread's next text, not a form field (Delta has none). **A new chat is a code ed
 file**: no welcome block, no avatar (`invisible()`, its room kept so nothing moves when the
 thread starts), only the focused caret; avatars appear with the first message. The caret is 2px
 (`vendor/gpui-base`, `CURSOR_WIDTH`; 1px upstream was easy to lose). A folder for the new chat:
-the group's "+", or "New session in a folder…" (folder icon) in the sidebar's top strip.
+the project's (its "+"); a project without a folder works in one Bench keeps for it.
 
 **Scroll past the end**: the thread's column has `pb(SCROLL_PAST_END)` (240) below the composer,
 as a code editor scrolls past its last line, and `pt(CHAT_LEFT)` above the first turn (the top
@@ -170,14 +167,15 @@ picks the command (`slash_key` takes "enter" in the composer's `capture_key_down
 
 The slash / prompt list still floats over the composer's top edge (`absolute().bottom_full()`).
 
-**The thread's width**: the window's whole width from its left edge, as an editor's text — no cap and no centering (the user: centering is not what an IDE does; `THREAD_MAX` is gone).
+**The thread's width**: the window's whole width from its left edge, as an editor's text — no cap and no centering (the user: centering is not what an editor does; `THREAD_MAX` is gone).
 
-## Lists + editor pages (settings tabs)
+## Lists + editor pages
 
-Settings tab order the user wants: MCP, Skills, Prompts, Providers, Messages, Cron, Profiles,
-Settings (Appearance + misc as one scrolling page).
+The only classic settings are the gear's page (providers, look). MCP servers, skills, prompts,
+accesses, the Telegram bot and the schedule are a project's environment, edited in its block
+(`ui/project_list.rs` `render_env_sections`), not settings tabs.
 
-List-detail tab: left `v_flex().w(px(300.)).border_r_1()` with a scrolling list (`py_2`) and
+A list-detail page, where one is needed: left `v_flex().w(px(300.)).border_r_1()` with a scrolling list (`py_2`) and
 optional bottom "+ New …" row (`h(bar_h)`, `border_t_1`, muted → foreground on hover); right an
 "editor page": 36px toolbar (`pl_4 pr_2 border_b_1`, name/fields left, actions right: ghost
 Delete that arms into danger "Confirm delete", primary Save) over a full-height code editor
@@ -218,10 +216,3 @@ Turn rail instead of a scrollbar: absolutely positioned in the 16px right gutter
 centered, one 8×2px tick per turn (pitch 3–8px), current tick accent, others muted 35%; hover
 changes color only (never the size) and shows the question as a tooltip; click scrolls to that
 turn (`scroll_to_top_of_item`). Shown only with ≥ 2 turns.
-
-## Right panel (files)
-
-Tabs (Changes / Files) 36px; body = `h_resizable` of viewer and a 240px file list (160–600),
-list hidden by default and remembered. Viewer toolbar: file name (tooltip = path), Diff /
-Before / After toggles (1px bordered chips, active = accent border), Save, Open in Zed. Diff
-uses gpui-kit `Diff` with the whole file as context (collapsed to 3 lines, expandable).

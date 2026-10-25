@@ -1,6 +1,6 @@
-// bench-agent's server: the protocol Bench speaks to Hermes in token mode — JSON-RPC 2.0 over a
-// WebSocket at /api/ws?token=, REST under /api/ with X-Hermes-Session-Token — so Bench drives it
-// as it drives `hermes serve`. Started by Bench (or `node src/server.ts`); writes its port and
+// bench-agent's server: Bench's protocol — JSON-RPC 2.0 over a WebSocket at /api/ws?token=, REST
+// under /api/ with the token in X-Hermes-Session-Token (a header name kept from an earlier agent,
+// so older agents on servers keep answering). Started by Bench (or `node src/server.ts`); writes its port and
 // token to ~/.bench-agent/server.json.
 
 import { execFileSync } from "node:child_process";
@@ -14,7 +14,6 @@ import YAML from "yaml";
 import pkg from "../package.json" with { type: "json" };
 import { timezone } from "./config.ts";
 import { agentMcp, AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting, agentDir, agents, providers, readConfig, readEnv, readAgent, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp, migrateProfiles } from "./config.ts";
-import { importHermes, migrateCronFile } from "./import-hermes.ts";
 import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
 import { syncTelegram } from "./telegram.ts";
@@ -46,8 +45,6 @@ function broadcast(sessionId: string, type: string, payload: Record<string, unkn
 	for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(frame);
 }
 
-for (const line of importHermes()) console.log(`[import] ${line}`);
-migrateCronFile();
 for (const name of migrateProfiles()) console.log(`[migrate] profile ${name} → agents/${name}`);
 const rt = new Runtime(broadcast);
 await rt.open();
@@ -247,7 +244,7 @@ async function slash({ session_id, profile, command }: { session_id: string; pro
 			return { type: "info", output: "Compacting the context." };
 		}
 		default: {
-			// A skill: its body becomes the turn, as Hermes' /skill-name does.
+			// A skill: its body becomes the turn (/skill-name).
 			const skill = findSkill(profile || row?.profile || "default", name.slice(1));
 			if (skill) {
 				const body = fs.readFileSync(skill, "utf8");
@@ -336,7 +333,7 @@ const routes: Record<string, Route> = {
 		return { sessions: rows.map((s) => ({ id: s.id, title: s.title, cwd: s.cwd, source: s.source, git_repo_root: gitRoot(s.cwd), git_branch: null, chat_id: s.chat_id, user_id: s.chat_id, display_name: s.display_name })) };
 	},
 	"GET /api/sessions/search": (req) => ({ results: rt.store.search(req.query.get("q") ?? "", Number(req.query.get("limit") ?? 30)).map((r) => ({ session_id: r.session_id, snippet: r.snippet })) }),
-	// What Bench still reads from Hermes' config.yaml, built from Bench's own settings (read-only).
+	// The config Bench reads, built from Bench's own settings (read-only).
 	"GET /api/config/raw": (req) => ({ yaml: YAML.stringify(readConfig(profileOf(req))) }),
 	"PUT /api/config": (req) => {
 		patchConfig(profileOf(req), req.body?.config ?? {});
@@ -438,7 +435,7 @@ const routes: Record<string, Route> = {
 	"POST /api/hosts/import": () => ({ ssh_config: importSshConfig(), transmit: importTransmit() }),
 	/** Bench's one-time move from Apple Reminders: items carry source_id (the reminder's id). */
 	"POST /api/tasks/import": (req) => ({ imported: tasks.import(req.body?.tasks ?? []) }),
-	// Dictation and read-aloud through Hermes' stt / tts config (OpenAI-compatible servers).
+	// Dictation and read-aloud through the stt / tts settings (OpenAI-compatible servers).
 	"POST /api/audio/transcribe": async (req) => {
 		try {
 			return { transcript: await transcribe(profileOf(req), dataUrl(req.body?.data_url), String(req.body?.mime_type ?? "audio/wav")) };

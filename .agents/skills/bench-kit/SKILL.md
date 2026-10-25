@@ -1,7 +1,7 @@
 ---
 name: bench-kit
-description: "Bench Kit: grow Bench — a native desktop client (Rust + GPUI, gpui-kit 0.8) for an AI agent on Pi Durable, shaped like Zed's Delta (the thread with the agent is the unit of work, no modes) and extended with a person's own tools, each as a kind of insert: a small live app the person puts into a thread with / (a task list, a server's terminal, an FTP host, the thread's own browser tab, the utilities), kept by the agent as a Pi entry and document, with an agent tool that acts on it and its state sent with every message. The kit adds such a tool (a new insert kind) for someone's needs, in Bench's one look: the recipe with the five existing tools as worked examples, the interview, a UI catalog of every piece with pictures and code, the look's rules and the user's preferences, the agent's side (Pi extensions, tools, prompt sections), crates, the change loop with pixel checks, packaging, and the gpui-kit/GPUI reference. Use for any change to Bench (~/Projects/bench-kit), for adding a tool or a thread kind to it, for a copy of Bench for another person, and when asked how Bench should look or be built."
-version: 3.0.0
+description: "Bench Kit: how to understand and change Bench — an open, native workbench for working with an AI agent (Rust + GPUI, gpui-kit 0.8), a thread-centric editor in the spirit of Zed's Delta, on its own agent in agent/ (Pi Durable). A thread is a document of messages and the person's inserts: live tools put in with / (/terminal, /ssh, /files, /ftp, /tasks, /tools, /browser), each kept by the agent as a Pi entry and document, with an agent tool that acts on it and its state sent with every message. The kit: the concepts, the insert recipe with the six kinds as worked examples, a UI catalog of every piece with pictures and code, the look's rules and the user's preferences, the agent's side in Pi's terms, crates, the change loop with pixel checks, shipping, and the gpui-kit/GPUI reference. Use for any change to Bench (~/Projects/bench-kit), for adding an insert kind, and when asked how Bench should look or be built."
+version: 4.0.0
 author: The user and their agents (from building Bench, ~/Projects/bench-kit)
 license: MIT
 platforms: [macos]
@@ -14,17 +14,18 @@ metadata:
 
 ## What this is, in one paragraph
 
-Bench is a client for an AI agent built on Pi Durable, written from scratch in Rust and GPUI and
-shaped like Zed's Delta: one chat app where **the thread with the agent is the unit of work**.
-A thread is a document: messages and the person's **inserts**. The sidebar holds only their
+Bench is a native desktop **workbench for working with an AI agent**: an open, thread-centric
+editor in the spirit of Zed's Delta, written from scratch in Rust and GPUI, on its own agent
+(`agent/`, Pi Durable). **The thread with the agent is the unit of work.** A thread is a
+document: messages and the person's **inserts**, small live tools put in with `/` where the
+conversation is (`/terminal`, `/ssh`, `/files`, `/ftp`, `/tasks`, `/tools`, `/browser`; several per
+thread, every `/` a new one, never switching or renaming the thread). The agent knows what is
+inserted, sees what each shows with every message, and has a tool to act on it. Forms and
+editors come as cards in the thread, under what asked for them. The sidebar holds only
 **projects** (each with its environment: soul, MCP, skills, prompts, accesses, Telegram,
-schedule; a folder on disk optional) and the projects' threads; a tool is **put into a thread with
-`/`** where the conversation is, live, part of the person's message (several per thread, never
-switching or renaming it); the agent knows what is inserted, sees what each shows, and has a tool
-to act on it. The user's Bench has five such tools — `/tasks`, `/ssh` (and `/terminal`), `/ftp`,
-`/browser`, `/tools`. **This kit grows Bench**: it adds the next tool someone needs (their
-clients, their orders, their builds) the same way, in the same look. It is not for building a
-different app. Why, and how it came to this: `references/start-why.md`.
+schedule; a folder and a server optional) and their threads. The repository's `AGENTS.md` is the
+short version of all this; this kit is the detail: how to change Bench and how to add the next
+insert kind, in its one look.
 
 ## Working on Bench from inside Bench (read first)
 
@@ -65,23 +66,19 @@ often the person talks to you **through Bench itself** while you change Bench. S
    providers, sessions), agents in Pi's agent directories, Bench's view state in `ui/`. What
    already has a home stays there (`~/.ssh/config`, files, the browser's profile)
    (`references/build-native-data.md`).
-5. **Their subset, built exactly as asked; the person grows it.** The part they use, done simply;
-   extra ideas in one line, not built; nothing that does nothing. One module per tool on each
+5. **Built exactly as asked.** The part the person uses, done simply; extra ideas in one line,
+   not built; nothing that does nothing. One module per tool on each
    side, logic as tested pure functions, thin views — the next tool copies the last one.
 
 ## Start here (in order)
 
-1. **Understand the person** (`references/start-interview.md`): what they work on all day, what
-   they repeat, what the agent should take over. Write it back in their words; confirm it. Then
-   say which inserts it becomes — the five that exist, and any new kind (what it shows, what its
-   title switches between, the agent's tool).
-2. **Their own Bench, if it's not the user's** (`references/build-new-app.md`):
-   `scripts/new-bench.sh <crate>` copies this Bench. Build and run it untouched first
-   (`cargo build && ./target/debug/<crate>`). Groups they don't need are hidden by the flags in
-   `src/bench.rs`.
+1. **Read `AGENTS.md`** at the repository's root: the concepts, the code map, how the agent uses
+   Pi, the working rules.
+2. **Find the nearest existing piece in `src/`** and the page that describes it. Bench is its own
+   example: a new thing copies the closest one.
 3. **Add a tool = a new kind of insert** (`references/build-insert.md`): key and state → its
    `InsertKind` (one file in `src/ui/inserts/`) → its `/` word → the agent's tool, prompt line and
-   live state → a demo thread. Copy the nearest of the five.
+   live state → a demo thread. Copy the nearest of the six.
 4. **Build every view from the catalog** (`references/ui-catalog.md` → `ui-*.md`). Never style
    buttons, rows or bars yourself; never write your own text editor, renderer or highlighter.
 5. **A library? From `references/build-crates.md`** (proven together). Nothing there → ask before
@@ -110,19 +107,12 @@ Rules that keep it right:
 
 ## Map of the kit
 
-**Start** — why, and with whom
-| Page | What |
-|---|---|
-| `references/start-why.md` | What Bench is (a Pi client shaped like Delta, tools as threads), how it came to this, what the kit is for, the look as the method, the engineering rules |
-| `references/start-interview.md` | Interview questions, writing it back, turning answers into threads, the user's Bench as the example |
-
 **Build** — how Bench is put together and grown
 | Page | What |
 |---|---|
-| `references/build-insert.md` | **Adding a tool: a new kind of insert** — how inserts are kept in Pi, the `InsertKind` trait, the five existing kinds as examples, body patterns, the checklist of files |
-| `references/build-pi-backend.md` | The agent: Pi Durable server in `agent/`, installed and started by Bench (also over SSH); extensions, tools, subject sections, the server browser |
+| `references/build-insert.md` | **Adding a tool: a new kind of insert** — how inserts are kept in Pi, the `InsertKind` trait, the six existing kinds as examples, body patterns, the checklist of files |
+| `references/build-pi-backend.md` | The agent: Pi Durable server in `agent/`, installed and started by Bench (also over SSH); extensions, tools, prompt sections, how each tool uses Pi Durable, the server browser |
 | `references/build-agent-client.md` | Bench's side of the protocol: sessions, events, Stop, questions, media |
-| `references/build-new-app.md` | A copy of Bench for another person (`new-bench.sh`), the shared build folder, the flags in `src/bench.rs` |
 | `references/build-architecture.md` | Crate layout, modules, state, threads, windows; where Bench keeps each piece |
 | `references/build-native-data.md` | Where a tool's data lives (`~/.bench`, native places), moving data and the skills/cron jobs that used it |
 | `references/build-crates.md` | Which crate for which job (HTML→Markdown, dates, cron, regex, hashes, terminal…) |
@@ -169,7 +159,6 @@ Rules that keep it right:
 | Path | What |
 |---|---|
 | `~/Projects/bench-kit` (this repository) | Bench itself: `src/` the app, `agent/` the agent, `src/demo.rs` the made-up session |
-| `scripts/new-bench.sh` | A copy of Bench for another person |
 | `scripts/ship.sh` | Build this commit's `dist/Bench.<commit>.app` and open it next to the running one (never quits anything) |
 | `scripts/shot.sh` | Screenshot YOUR copy (a binary, or the .app, with `KEY=VALUE` hooks), never the person's |
 | `scripts/rules.py`, `spans.py`, `textx.py`, `crop.py`, `measure.py` | Rules and edges down a column; icons and gaps along a band; where text starts in a band; an area cut out and zoomed (pt); raw pixel runs (px) |

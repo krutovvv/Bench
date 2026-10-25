@@ -2,14 +2,14 @@
 
 Every change to a Bench goes through these steps, in this order. Doing them every time is what
 makes the person's "1px off" complaints stop; skipping one is how a change ships unchecked.
-Paths: the project is usually `~/Projects/<crate>` (made by `new-bench.sh`;
-anywhere else works the same); the kit's scripts are `~/Projects/bench-kit/.agents/skills/bench-kit/scripts/` (`K=`
+Paths: the project is `~/Projects/bench-kit` (crate `bench`; anywhere else works the same);
+the kit's scripts are `~/Projects/bench-kit/.agents/skills/bench-kit/scripts/` (`K=`
 below). Run every command from the project folder. Units: the scripts that end in `.py` take
 **points** (as in the code), except `measure.py`, which takes **pixels** (pt × 2).
 
 ```bash
 K=~/Projects/bench-kit/.agents/skills/bench-kit/scripts
-cd ~/Projects/<crate>
+cd ~/Projects/bench-kit
 ```
 
 ## 1. Turn the request into a target you can measure
@@ -41,10 +41,10 @@ app keeps running untouched.
 
 ```bash
 cargo build --release 2>&1 | grep -E '^(warning|error)|Finished'
-$K/shot.sh target/release/<crate> /tmp/before.png 8          # prints the size in px and pt
+$K/shot.sh target/release/bench /tmp/before.png 8          # prints the size in px and pt
 ```
 - The copy opens where the person left off: their last thread. To show another state
-  (a subject's thread, a list, a dialog, a new task), add a temporary hook (step 5) first.
+  (a thread with an insert, a list, a dialog, a new task), add a temporary hook (step 5) first.
 - The data sits behind a macOS permission (Calendar, Contacts, the microphone)? A bare binary
   is refused. Bundle and shoot the app instead: `scripts/bundle-macos.sh`, then
   `$K/shot.sh dist/<Title>.app /tmp/before.png 8 DEBUG_X=1`. The script starts a separate copy
@@ -111,7 +111,7 @@ if std::env::var("DEBUG_CHAT").is_ok() && self.turns.is_empty() { self.turns.pus
 vec![FileEdit { path: "/tmp/x.rs".into(), diff: None }]`; both in `src/model.rs`.)
 
 Hooks that worked:
-- open a subject's thread (`open_subject_key`) or a list;
+- open a thread with an insert in it (`open_subject_key` with the insert's key, e.g. `ssh:local`) or a list;
 - start a new session;
 - open a session by title (in the handler that receives the sessions list);
 - press New task and shoot twice, 10 s apart (for bugs that need time).
@@ -139,7 +139,7 @@ Compare with the target from step 1:
 - "Doesn't close by itself": a second shot after the wait shows the same state.
 Off? Back to step 4 with the measured difference, not a guess.
 
-Also shoot what the change could have touched: other subjects' threads (shared bars and strips), a long
+Also shoot what the change could have touched: threads with other inserts (shared heads and strips), a long
 list, the dark theme if colors changed.
 
 ## 8. Clean up

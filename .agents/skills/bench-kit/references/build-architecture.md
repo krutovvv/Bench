@@ -47,21 +47,25 @@ src/gateway.rs       worker thread: WebSocket JSON-RPC, Cmd in / Evt out, pendin
 src/rest.rs          blocking REST calls, one fn per endpoint
 src/app.rs           BenchApp (the name is older than the agent): all state + event handling + actions (the "controller")
 src/app/*.rs         feature slices as `impl BenchApp` in child modules (can use private items):
-                     projects.rs (git), cron.rs, prompts.rs, profiles.rs, slash.rs, marks.rs,
-                     subjects.rs (a thread's subject: Tasks, a server, files, the browser, a tool)
+                     project_list.rs (projects: the sidebar's only unit), project_env.rs (a project's
+                     environment block), remotes.rs (projects on a server's agent), projects.rs (git
+                     repo + branch label, Open in Zed), inserts.rs (put in / patch / sync inserts),
+                     subjects.rs (opening a thread, the `/` rows, `!command`), local_files.rs,
+                     remote_files.rs, servers.rs, sites.rs (the browser), tasks.rs, tools.rs,
+                     prompts.rs, providers.rs, slash.rs, marks.rs, asks.rs, attachments.rs, processes.rs
 src/task_store.rs    tasks: the agent's bench.sqlite via its REST `/api/tasks` (its `tasks` tool sees the same list)
-src/ui/mod.rs        Render for BenchApp: layout skeleton, header, shared helpers (bar_h, plural…)
-src/ui/*.rs          one file per area: sidebar, chat, composer, statusbar, files, panels (settings)
---- Bench additions (servers + mini IDE) ---
+src/ui/mod.rs        Render for BenchApp: layout skeleton, header, shared helpers (block_head,
+                     editor_height, BLOCK_HEAD_H / FIELD_H, bar_h, plural…)
+src/ui/*.rs          one file per area: sidebar, project_list, chat, composer, statusbar, panels (settings),
+                     providers; the bodies the inserts reuse (tasks, tools, servers, terminal, remote_files, sites)
+src/ui/inserts/      the inserts registry: `InsertKind` + `KINDS` + `words()` in mod.rs; terminal,
+                     dir (/files), files (/ftp), tasks, tools, browser (`build-insert.md`)
+--- servers and terminals ---
 src/sshconfig.rs     servers = ~/.ssh/config Host blocks (+ `# folder:`/`# path:`), safe writes
 src/ssh.rs           the shared ssh connection (ControlMaster in ~/.ssh/cm) for terminal/files/agent
 src/term.rs          PTY (portable-pty) + alacritty_terminal grid; keys, mouse reports, links
-src/remote.rs        server files as local cache copies; mtime-checked upload (conflicts)
+src/remote.rs        a server's file kept as a local cache copy: where it came from
 src/lang.rs          highlighter by file name / `#!`
-src/app/servers.rs, ui/servers.rs, ui/terminal.rs   servers: a server's thread, its terminal on top
-src/app/ide*.rs, ui/files.rs   mini IDE: tree, tabs, ⌘P, file ops, maximize as a layout mode;
-                     ide_find.rs ⌃G / ⌘⇧F / agent edits followed; ui/editor_status.rs the line under it
-src/app/snippets.rs  editor selections as chips in the message (file + lines), back to the file
 src/app/keys.rs      window-wide shortcuts (root capture_key_down)
 scripts/bundle-macos.sh, assets/icons/*.svg, assets/themes/*.json, assets/logo.svg
 ```
@@ -128,7 +132,7 @@ pub fn open_main_window(cx: &mut App) {
 }
 ```
 
-Each window is a full app state (own connection, profile, chat) — simpler than tabs and lets two
+Each window is a full app state (own connection, project, thread) — simpler than tabs and lets two
 windows point at different backends. To open "this item in a new window", put the start
 parameters in a `static NEXT_WINDOW: Mutex<Option<…>>` and let `new()` take it.
 
@@ -136,7 +140,7 @@ parameters in a `static NEXT_WINDOW: Mutex<Option<…>>` and let `new()` take it
 
 Small JSON files in `state_dir()` (Bench: `~/.bench/ui`, beside the agent's home; a template
 app: `~/Library/Application Support/<app>/`): appearance, last
-place (backend + profile + session per backend), session colors/pins, per-backend caches, logs.
+place (backend + session per backend), session colors/pins, per-backend caches, logs.
 Merge with what is on disk before writing (another window may have written too). User content
 that belongs to the backend (prompts, skills) goes to the backend's files, as Markdown, not here.
 

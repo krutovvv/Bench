@@ -4,7 +4,7 @@
 
 <h1 align="center">Bench</h1>
 
-<p align="center"><b>A client for an AI agent, shaped like Zed's Delta: the agent's work shows up live in the thread — a web page you can click, a terminal, a task list.</b></p>
+<p align="center"><b>A workbench for working with an AI agent: an open, native, thread-centric editor in the spirit of Zed's Delta, where the tools you need are put right into the conversation.</b></p>
 
 <p align="center">
   <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a> ·
@@ -17,45 +17,82 @@
 [browser demo](https://krutovvv.github.io/bench/) is the same app compiled to WebAssembly —
 click through the threads in the sidebar.</sub>
 
-## The idea
+## What it is
 
-Zed's [Delta](https://zed.dev/blog/introducing-deltadb) treats the conversation with the agent as
-the unit of work. Bench takes that shape — one chat app, no modes, everything a thread — and
-shows it best in the **browser thread**.
+Bench is a desktop app for one thing: doing your work together with an AI agent. Zed's
+[Delta](https://zed.dev/blog/introducing-deltadb) showed the shape: the conversation with the
+agent is the unit of work, not a side panel of an editor. Delta is closed and commercial. Bench
+is my open take on that shape. It is written from scratch in Rust and
+[GPUI](https://www.gpui.rs) (Zed's UI framework), and runs on an agent built on
+[Pi Durable](https://github.com/earendil-works/pi).
 
-A thread is a **document**: your messages, the agent's answers, and what you **insert** into it
-with `/`. An insert is a small live app, part of what you say, right where you put it: the
-thread never switches or changes its name for it.
+A workbench, not a chat window: you bring the tools you need for this job to the conversation,
+and the agent works with them alongside you.
 
-You type `/browser` and ask the agent to do something on a website: "open the blog's admin, make
-a draft from the release notes, stop before publishing". The agent works in a real browser on a
-server, in **this thread's own tab**, and the insert shows that tab **live**, with no browser
-chrome around it — instead of a screenshot. You watch it work, click and type in the page
-yourself (fix a word, tick a box, sign in), then say "continue". Another thread works on another
-site in its own tab.
+## The thread is a document
 
-The same goes for my other everyday tools. The sidebar holds only **projects** — a client, a
-site, a codebase, a kind of work — and their threads. In any thread, `/terminal`, `/ssh`, `/ftp`,
-`/tasks`, `/tools`, `/browser` put the tool in, live; several fit in one thread. The agent knows
-what is inserted, sees what each insert shows with every message, and has a tool to act on it.
-Coming back to a thread brings its inserts back as they were.
+A thread is not a list of chat bubbles. It is a **document** made of two kinds of things:
 
-A project carries its own environment, as in Claude Code: a soul (what it is, how to work in it),
-its MCP servers, its skills, its tasks, its server and FTP accesses, its scheduled jobs. A folder
-on disk is optional. There are no agent profiles to pick: you open the project and work.
+- **messages**: yours and the agent's, with everything the agent did in between (steps,
+  commands, changed files, subagents, pictures, sources);
+- **inserts**: small live tools you put into the thread by typing `/`, right where the
+  conversation is.
 
-| Insert | What's live | What the agent does with it |
+An insert is part of what you say. Type `/ssh dev` and the server's terminal appears in the
+thread, live. Ask "why is the site slow?" and the agent sees what that terminal shows. It runs
+commands there, and you see them run in the same terminal. A thread can hold several inserts.
+Every `/` adds a new one; the thread never switches mode or gets renamed for it. Come back to a
+thread tomorrow and its inserts are where you left them, in the same state.
+
+| Insert | What you see, live | What the agent does with it |
 |---|---|---|
-| **`/browser`** — the thread's tab in a shared server browser | the page: click and type in it | drives it (Playwright), only in this thread's tab |
-| **`/tasks`** — Today, Upcoming, Anytime, Logbook a click apart | the list (in a project: its tasks) | adds, moves, completes, sums the hours ("how much did I work for this client in October?") |
-| **`/terminal`, `/ssh`** — this Mac, or a `~/.ssh/config` host | the terminal, as tall as its text | runs commands there and reads what's on screen |
-| **`/ftp`** — FTP, FTPS and SFTP hosts | the hosts, the folder, an editor for the open file | lists, reads, edits, renames |
-| **`/tools`** — Base64, regex, cron, JSON, Markdown from a web page… | the tool's input and output | explains, fixes, works with what's in it |
+| **`/browser`** | this thread's own tab in a real browser on a server; you click and type in it | drives that tab (Playwright), only that tab; you watch, step in, say "continue" |
+| **`/terminal`**, **`/ssh`** | a terminal on this Mac or a `~/.ssh/config` server, as tall as its text | runs commands there and reads the screen |
+| **`/files`** | the project's own folder; a file opens under it in an editor | reads and edits the files with you |
+| **`/ftp`** | an FTP, FTPS or SFTP host: its folders and the open file | lists, reads, edits, renames |
+| **`/tasks`** | Today, Upcoming, Anytime, Logbook, a click apart | adds, moves, completes, sums the hours ("how long did I work for this client in October?") |
+| **`/tools`** | Base64, regex, cron, JSON, a web page as Markdown… with input and output | explains, fixes, works with what's in it |
 
-The project's own settings are in its environment (the pencil): its soul, MCP servers, skills,
-prompts, accesses, Telegram bot and **schedule** — the jobs that run a prompt in a new thread of
-the project on their own. The gear holds only the providers and the look. Ordinary threads work
-in a project folder, with a git branch of their own when needed.
+When something needs a form (a new server, a new task, an MCP server's settings), the form
+appears as a card in the thread, under the insert that asked for it, not in a settings window.
+
+## Projects
+
+The sidebar holds only **projects** and their threads. A project is whatever you work on: a
+client, a site, a codebase, a kind of work. It may have a folder on disk (then the threads work
+in it, and the project's ⋯ menu opens it in Zed), and it may live on a server (its agent runs
+there, over SSH).
+
+Each project carries its **environment**, the way Claude Code reads a repository's setup:
+
+- its soul (what the project is and how to work in it);
+- its MCP servers (with OAuth sign-in where a server needs it);
+- its skills and prompts;
+- its server and FTP accesses;
+- its Telegram bot;
+- its schedule (jobs that run a prompt in a new thread on their own).
+
+You edit it in the thread too: each part is a block in the project's environment thread, and a
+change opens as a card under that block. **Host** is the machine's own project, for installing,
+building and looking after the computer itself.
+
+The only classic settings are behind the gear: model providers and the look.
+
+## How it differs
+
+- **The conversation is the workspace.** No modes, no panels per job, no separate apps for the
+  terminal, the files, the tasks, the browser. They come to the thread.
+- **The agent sees what you see.** Each insert tells the agent what it shows with every message
+  (the terminal's last lines, the open file, the tool's input and output) and gives the agent a
+  tool to act on it.
+- **You can always take over.** The browser tab, the terminal and the editor are live and yours
+  too: fix a word, sign in, tick a box, then let the agent go on.
+- **Durable.** Pi keeps every step on disk. A turn survives a crash or a restart, scheduled jobs
+  and Telegram answers keep running with Bench closed, and inserts come back as they were.
+- **Messages queue.** Send while the agent works and your message waits in the thread's queue.
+  Above the composer each waiting message can be sent now or taken back.
+- **Open and local.** Your data lives on your machine (`~/.bench`): providers you choose,
+  including local models; MIT-licensed code.
 
 <table>
 <tr>
@@ -70,108 +107,49 @@ in a project folder, with a git branch of their own when needed.
 
 ## The agent
 
-Bench is a client. The agent is [`agent/`](agent/README.md), a small Node server on
-[Pi Durable](https://github.com/earendil-works/pi). It is used the way its authors describe it
-and extended with their packages and popular ones; about 3k lines are our own. Pi keeps every
-step on disk, so a turn survives a crash, and cron jobs and Telegram answers keep working with
-Bench closed. Bench installs and starts the agent on this Mac (`~/.bench`), or over SSH on a
-server; it needs Node.js 22.18 or newer.
+Bench is a client. The agent is [`agent/`](agent/README.md), a small Node server on Pi Durable,
+used the way Pi's authors describe it and extended with their packages and popular ones. Bench
+installs and starts it on this Mac (`~/.bench`), or over SSH on a server. It needs Node.js 22.18
+or newer.
 
-Inserts are kept the Pi way: each is an entry in the conversation's transcript, where it was put
-(the model doesn't see it), and its state — which host and folder, which list, which tab — is a
-document of the conversation, changed in commits. Bench changes them through the agent and takes
-the agent's answer as the truth. An insert kind is three small pieces on the agent's side:
-- a **tool** that acts on it (`tasks`, `ssh_run`, `remote_files`, or an MCP server);
-- a line of **prompt** saying what it is, built from the inserts document;
-- the **insert's state** that Bench sends with each message (the terminal's last lines, the open
-  file, the tool's input and output). It goes to the model and is kept out of the history.
+The agent keeps everything in Pi's own terms:
 
-A message sent while the agent works waits in the conversation's queue (Pi's inbox) and goes
-when the agent answers; above the composer each one can be sent now or taken back.
+- **an insert** is an entry in the conversation's transcript, where you put it, plus its live
+  state (which host, folder, list or tab) in a document of the conversation, changed in commits.
+  Bench changes it through the agent and takes the agent's answer as the truth;
+- **the system prompt** is Pi sections, among them a line per insert saying what it is and
+  which tool acts on it. A section is resent only when it changes, so the provider's prompt
+  cache stays warm;
+- **the queue** is Pi's inbox;
+- **a scheduled job** is a durable Pi task that sleeps until its time;
+- **subagents** are child conversations owned by the tool call that started them.
 
-The browser inserts use a shared Chrome on a server, a tab per thread, which the agent drives
-through the Playwright MCP. People watch and step in through a small gateway. All three come as one Docker
-setup in [`browser-server/`](browser-server/README.md), ready to deploy. Each person gets their own
-key, no SSH needed. It allows a narrow set of operations and keeps a log. Frames come at 2 per
-second at most, and only while someone is watching. Idle tabs sleep to keep the server within
-its memory budget.
-
-## How it got here
-
-My day used to be spread over a dozen apps: an AI chat client (none fit quite right), SSH
-servers in [Warp](https://www.warp.dev), FTP in Transmit, tasks in
-[Things](https://culturedcode.com/things/), [DevUtils](https://devutils.com) for Base64 and
-regex, a browser for the sites we publish on by hand. Each is good. Together they meant
-switching windows all day.
-
-The first plan was bigger than this: a collection of skills from which an agent would build
-*anyone* a different app from a description of their work. ArtCraft's
-[rebuilds in pure Rust](https://github.com/storytold) of whole heavy programs made that seem
-possible. Along the way it got simpler. The modes, the separate panels and the "build any app"
-went away, one at a time. What stayed is a Delta-like agent client where each tool is a thread.
-It wasn't a straight road, but that's where it landed, and it's what I now work in all day.
-
-## The kit: add your own tools as threads
-
-Your tools are not mine. One person has clients, another the shop's orders, a third a build
-queue. [`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md) is a set of agent skills
-for **adding such a tool to Bench**: one more kind of insert, made the same way as the five
-above, in the same look:
-
-- **the recipe** ([`build-insert.md`](.agents/skills/bench-kit/references/build-insert.md)):
-  the insert's key and state, its `InsertKind` (title, switcher, controls, body, what it tells
-  the agent), its `/` word, the agent's tool and prompt line, with the browser insert as the main
-  worked example and the other four after it, and a checklist of every file a new one touches;
-- **how to ask** a person about their work and turn the answers into threads;
-- **one look, written down to the pixel**: a catalog of every piece with pictures and code, the
-  rules behind them, and what I liked and rejected along the way;
-- **how to change it safely**: a fixed loop of measuring, editing, building and measuring again,
-  with scripts that check the result, so even a modest model can do it without guessing;
-- proven libraries, the agent's side on Pi, and the mistakes already paid for.
-
-Open this folder in an agent session (in Bench, or another agent that reads skills), describe
-what you work on, and ask for it. For someone else's Bench, `scripts/new-bench.sh` makes a copy
-to grow.
-
-## The code
-
-The app in `src/` is my Bench. The kit points into it everywhere, because a real, finished app
-is the best example. Take what's useful.
-
-| Piece | Files (in `src/` unless noted) |
-|---|---|
-| **Frame**: window, sidebar, header, status bar, theme, icons, shortcuts | `main.rs`, `theme.rs`, `icons.rs`, `ui/mod.rs`, `ui/sidebar.rs`, `ui/statusbar.rs`, `app/keys.rs`, `bench.rs` |
-| **Agent client**: threads, steps, subagents, media, voice, changed files, background processes, profiles, providers, prompts, skills, cron | `gateway.rs`, `rest.rs`, `connection.rs`, `pi_agent.rs`, `history.rs`, `media.rs`, `audio.rs`, `video.rs`, `app.rs`, `app/*.rs`, `ui/chat.rs`, `ui/composer.rs`, `ui/media.rs`, `ui/asks.rs`, `ui/panels.rs` |
-| **Inserts**: the model, the `/` list, one `InsertKind` per kind | `app/inserts.rs`, `ui/inserts/` (`terminal.rs`, `files.rs`, `tasks.rs`, `tools.rs`, `browser.rs`), `app/subjects.rs` · agent: `inserts.ts` |
-| Tasks | `tasks.rs`, `task_store.rs`, `app/tasks.rs`, `ui/tasks.rs` · agent: `builtin/tasks.ts` |
-| Servers | `sshconfig.rs`, `ssh.rs`, `term.rs`, `app/servers.rs`, `ui/servers.rs`, `ui/terminal.rs` · agent: `builtin/ssh.ts` |
-| Files | `app/remote_files.rs`, `ui/remote_files.rs` · agent: `builtin/remote.ts`, `builtin/hosts.ts` |
-| Browser | `remote_browser.rs`, `app/sites.rs`, `ui/sites.rs` · the server: [`browser-server/`](browser-server/README.md) |
-| Tools | `devtools/` (19 tools as tested pure functions), `app/tools.rs`, `ui/tools.rs` |
-| Mini IDE beside a thread: tree, editor, tabs, diffs | `app/ide*.rs`, `ui/files.rs`, `diff.rs`, `lang.rs` |
-| Demo: the made-up session in these screenshots | `demo.rs` (media in `assets/demo/`) |
-| The agent | [`agent/`](agent/README.md) |
+The browser inserts use a shared Chrome on a server: a tab per thread, driven through the
+Playwright MCP, and watched through a small gateway. It all comes as one Docker setup in
+[`browser-server/`](browser-server/README.md). Each person gets their own key and no SSH is
+needed. Frames arrive at 2 per second at most, and only while someone is watching.
 
 ## Developed from inside itself
 
 I talk to the agent in Bench, and the agent changes Bench's code. Every commit becomes its own
-app next to the one I'm running. I try the new one and switch to it when it's good; the
-previous builds stay for rolling back.
+app next to the one I'm running. I try it and switch over when it's good; earlier builds stay
+for rolling back. [`AGENTS.md`](AGENTS.md) is what an agent reads first. The skill in
+[`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md) holds the rest: the insert
+recipe, the UI pieces with pictures, the look's rules, and the GPUI reference.
 
 ## Build
 
 ```bash
 cargo build --release && ./target/release/bench    # run it
-BENCH_DEMO=1 ./target/release/bench                # the made-up session, on the browser insert (also: tasks, server, tool, env, landing)
+BENCH_DEMO=1 ./target/release/bench                # the made-up session (also: tasks, server, tool, env)
 scripts/build-web.sh                               # the browser demo, into web/dist
+cd agent && npm ci && node --test test/*.test.ts   # the agent's tests
 ```
 
-GPUI runs on macOS, Linux and Windows, and in the browser; GitHub builds all of them on every
-push (`.github/workflows/build.yml`). I use Bench on macOS. Notifications and the one-time
-import of tasks from Apple Reminders talk to macOS directly; the rest is the same Rust
+GPUI runs on macOS, Linux, Windows and in the browser; GitHub builds all of them on every push.
+I use Bench on macOS: notifications talk to macOS directly, the rest is the same Rust
 everywhere.
 
 ## License
 
-[MIT](LICENSE): use it, change it, grow your own. Nothing here is for sale; it's shared as an
-experiment.
+[MIT](LICENSE).

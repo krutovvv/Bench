@@ -1,5 +1,5 @@
 // `memory`: two small notebooks of the profile, memories/MEMORY.md (the agent's notes) and
-// memories/USER.md (about the person), entries separated by "\n§\n" as Hermes kept them. Both are
+// memories/USER.md (about the person), entries separated by "\n§\n". Both are
 // in the system prompt. Written only when the person asks; there is no automatic saving.
 
 import { Type } from "@earendil-works/pi-ai";

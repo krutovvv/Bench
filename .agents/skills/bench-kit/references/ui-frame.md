@@ -1,8 +1,9 @@
 # The frame: window, sidebar, header bar, status bar
 
 Every Bench has this frame and keeps it (Bench's `src/ui/mod.rs`). A new tool doesn't get a
-frame of its own: it is a subject — a sidebar group, a live block at the top of its thread, the
-conversation under it (`build-insert.md`). Never remove the sidebar, the header or the status bar.
+frame of its own: it is an insert — a small live block the person puts into a thread with `/`,
+in the conversation where they put it (`build-insert.md`). The sidebar holds only projects and
+their threads. Never remove the sidebar, the header or the status bar.
 
 Picture: `assets/gallery.png` (the piece gallery), `assets/ui/tools-mode.png` (Bench's Tools block).
 
@@ -11,10 +12,10 @@ Picture: `assets/gallery.png` (the piece gallery), `assets/ui/tools-mode.png` (B
 │ (traffic lights) 📂 + ◧ │ header_bar 36px: title ........... icon_buttons │
 │ search band (36)       │ [tab_strip 36px, if the view has tabs]          │
 │ ─────────────────────  │                                                 │
-│ group_header           │ body: a thread (its block on top) / settings    │
+│ project header         │ body: a thread (messages + inserts) / settings  │
 │ │ list_row             │       / empty_state                             │
 │ │ list_row             │                                                 │
-│ group_header           │                                                 │
+│ project header         │                                                 │
 │ ─────────────────────  │                                                 │
 │ primary_button (36)    │ composer (36)                                   │
 ├────────────────────────┴─────────────────────────────────────────────────┤
@@ -28,8 +29,8 @@ a list's tag strip: all 36 with their rule, and every rule that crosses the wind
 composer's top rule). The user checks this to the pixel.
 
 The title bar is transparent: the sidebar starts with a 35px strip beside the traffic lights
-(`kit::sidebar_top`) holding its icon buttons on the right (Bench: Open folder, "+" New session
-⌘N, Hide sidebar ⌘\\ — `render_sidebar_top`),
+(`kit::sidebar_top`) holding its icon buttons on the right (Bench: "+" New project, Hide sidebar
+⌘\\ — `render_sidebar_top`),
 the header sits at the top of the main column. Resizable split:
 `h_resizable("layout").child(resizable_panel().size(px(280.)).size_range(px(200.)..px(480.)).child(sidebar)).child(resizable_panel().child(main))`
 (wrap it in a `div().flex_1().min_h_0()` — the group itself takes no styling).
@@ -42,8 +43,8 @@ The search and the button are **bands from edge to edge**, not controls floating
 bar: the search has rules above and below and the content's background between, with no frame
 of its own (it *is* the divider), its magnifier right over the group icons; the bottom button
 fills its whole bar (no rule, no margin), its top edge level with the composer's rule (Bench has
-no bottom button: a new chat is the "+"). Every sidebar variant (the list, the IDE's tree) starts
-with the same top strip, so its icons never jump.
+no bottom button: a new chat is the "+"). Every sidebar variant starts with the same top strip, so
+its icons never jump.
 
 ```rust
 v_flex().size_full().bg(theme.sidebar)
@@ -118,9 +119,10 @@ the header (the Tasks tag strip) is `min_h(bar_h)`. Header 36px, status bar 28px
 are 26 (were 30 — they made the bar 44 and the user saw it "bulge"). Use rems next to rem-sized
 controls: fixed `px` heights drift apart at the S/L font sizes.
 
-## Subjects, not modes
+## Inserts, not modes
 
-There are no modes. Tasks, Servers, Files, Browser, Tools and the project groups are sidebar
-groups; a click opens the latest thread about that subject (or a new one), its live block on
-top (`src/app/subjects.rs`, `render_chat` in `src/ui/chat.rs`). ⌘1 chats, ⌘2 this Mac's terminal,
-⌘3 the current tool, ⌘4 Today's tasks (`src/app/keys.rs`). Recipe: `build-insert.md`.
+There are no modes and no tool pages. Tasks, a terminal, a server, files, the browser and the
+utilities are inserts put into a thread with `/` (`src/ui/inserts/`, `render_insert`); a
+project's environment is the block its pencil opens at a thread's top. ⌘1 chats, ⌘2 a thread with
+this Mac's terminal, ⌘3 with the current tool, ⌘4 with Today's tasks (`src/app/keys.rs`). The
+only classic settings are the gear (providers, look). Recipe: `build-insert.md`.

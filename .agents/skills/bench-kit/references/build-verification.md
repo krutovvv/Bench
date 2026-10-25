@@ -22,7 +22,7 @@ edges in pt down a column), `scripts/textx.py` (where text starts), `scripts/cro
 zoomed).
 
 - Wait long enough for the backend: local ~12 s, SSH targets 25–40 s.
-- The dev instance restores the user's last place (backend/profile/session). To show a specific
+- The dev instance restores the user's last place (backend/session). To show a specific
   state, use a temporary env hook instead of editing the user's state files. One line at the end
   of the app's `new()`, marked so it can't be forgotten, removed before the final build:
   ```rust
@@ -30,7 +30,7 @@ zoomed).
   ```
   or in the handler where the data arrives (`self.sessions = rows;` → open the session whose
   title contains `$DEBUG_OPEN`). Afterwards: `sed -i '' '/DEBUG-TMP/d' src/app.rs` and
-  `grep -c DEBUG_ src/app.rs` must print 0. Hooks that worked: open a subject's thread or a list, open a session
+  `grep -c DEBUG_ src/app.rs` must print 0. Hooks that worked: open a thread with an insert (`open_subject_key`) or a list, open a session
   by title, start a new session, press "New task" and screenshot twice 10 s apart (a bug that
   needs time to appear).
 - **Data behind a macOS permission** (Calendar, Contacts, the microphone): the grant

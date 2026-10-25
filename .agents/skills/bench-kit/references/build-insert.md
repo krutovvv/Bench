@@ -5,7 +5,7 @@ agent's answers, and the person's **inserts** — small live apps put into the c
 `/`, part of what the person says, right where they put them (2026-10-25, the person: "this is
 the only approach in this app now; the only classic settings left are the gear"). An insert
 never switches the thread or renames it; a thread can hold several; coming back to a thread
-brings them back as they were. Bench has five kinds, and each is a worked example of this page.
+brings them back as they were. Bench has six kinds, and each is a worked example of this page.
 **The browser is the centrepiece** — the thread's own tab, live, instead of a screenshot — so
 read it first; the others are simpler cases of the same shape.
 
@@ -14,12 +14,13 @@ read it first; the others are simpler cases of the same shape.
 | `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`ui/inserts/browser.rs`; tab per thread, streaming: `app/sites.rs`, `remote_browser.rs`) | the browser MCP (Playwright on the server, `browser-server/`) | the tab's address and title, and "work only in it" |
 | `tasks` {list} | `/tasks` | every list a click apart; in a project its tasks only (`ui/inserts/tasks.rs`) | `tasks` (`agent/src/builtin/tasks.ts`) | which list is shown |
 | `ssh:<alias>` (`ssh:local` this Mac; `ssh` alone: pick one) | `/terminal`, `/ssh` | the terminal, as tall as its text (`ui/inserts/terminal.rs`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
+| `dir` {path, file} | `/files` | the project's own folder (this Mac, or a remote project's server via `/api/fs/…`): folders open in place, a file opens under the insert, Save writes it back (`ui/inserts/dir.rs`, `app/local_files.rs`; one live browser for the app, `InsertKind::shared`) | Pi's `read`/`write`/`edit`/`bash` in the thread's folder | the folder and the open file |
 | `files` {host, path, file} | `/ftp` | the hosts (and a new one), the folder, the open file in an editor (`ui/inserts/files.rs`) | `remote_files` (`builtin/remote.ts`) | the folder, its entries, the open file |
 | `tools` {tool} | `/tools` | every utility in its title's menu, the tool's input → output (`ui/inserts/tools.rs`) | none: `read`/`bash` on what it is sent | the tool's input and output |
 
 What belongs to a **project** rather than to a thread (its soul, MCP servers, skills, prompts,
 accesses, Telegram bot, scheduled jobs) is not an insert: it is the project's environment, the
-block a project's pencil opens (`app/project_env.rs`, `ui/project_list.rs` `render_env_block`).
+block a project's pencil opens (`app/project_env.rs`, `ui/project_list.rs` `render_env_sections`).
 
 ## How it is kept: Pi's terms
 
@@ -44,13 +45,17 @@ row's key to (key, state) in `insert_spec` (`app/inserts.rs`): "files:<id>" → 
 
 **2. An `InsertKind`** — one file in `src/ui/inserts/<kind>.rs`, a unit struct, a line in `KINDS`
 (`src/ui/inserts/mod.rs`):
-- `owns(key)`; `same(there, new)`: whether putting it again brings back the one there (default:
-  one per thread);
+- `owns(key)`; `shared` — a name when its live state is one for the whole app (the task list,
+  the tool, the file browser): of several such inserts one is live (the last clicked, else the
+  newest), the others offer to show it there;
 - `title`; `switches` — the title's menu (another server, host, tool; "New …" runs a form);
 - `controls` — the head's own buttons; the frame adds fold and remove;
-- `body` — what it shows, under the head. Its height fits what it shows, up to a cap; the
-  conversation must stay in view. While it renders, it restores its state (the files insert shows
-  its host and folder again) and syncs what changed back with `sync_insert_state`;
+- `body` — what it shows, under the head (None: the head alone). Its height fits what it shows
+  (editors at `editor_height`, never scrolling inside; no scroll inside the thread's scroll except
+  the terminal). While it renders, it restores its state (the files insert shows its host and
+  folder again) and syncs what changed back with `sync_insert_state`;
+- `follow` — what it opened (the open file, the open task) as the next row of the thread, while
+  it is live and unfolded;
 - `context` — what it shows now, as text for the agent (cut long text at 6000 characters);
 - `opened` (put in, or brought back: start a terminal, load the hosts), `removed`.
 The frame is the same for every kind (`render_insert`): the person's avatar, a light ground, a
@@ -76,7 +81,7 @@ State the kind needs while it lives stays in the app (`self.<kind>`, a struct in
 
 Then: `cargo build`; put it into a thread; ask the agent something about "this" and watch which
 tool it calls; screenshot (`build-verification.md`). Add a demo thread with it in `src/demo.rs`
-(`thread(…, "<subject>", …)` makes the insert), so the web demo and the README show it.
+(`thread(…, "<key>", …)` makes the insert; an `env:<id>` key is a project's environment instead), so the web demo and the README show it.
 
 ## How the browser insert works, end to end
 
