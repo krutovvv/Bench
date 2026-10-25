@@ -12,6 +12,7 @@
 
 use std::time::Duration;
 
+use serde_json::{Value, json};
 use web_time::Instant;
 
 use crate::model::Usage;
@@ -40,6 +41,55 @@ pub struct Meter {
     pub live: Option<f64>,
     /// One-second samples of the current (or last) answer.
     pub samples: Vec<f64>,
+}
+
+/// How many of the per-second samples a thread keeps (the chart shows the last minute or so).
+pub const KEEP: usize = 180;
+
+/// What a thread keeps of the measurements: the chart of its last answer and the last speeds.
+/// Bench measures these, the agent keeps them with the thread (its store is what survives a
+/// restart), so reopening the thread or the app brings the numbers back.
+#[derive(Default, Clone, Debug)]
+pub struct Stat {
+    pub samples: Vec<f64>,
+    pub prefill: Option<f64>,
+    pub generation: Option<f64>,
+    pub ratio: Option<f64>,
+}
+
+impl Stat {
+    /// What the agent kept (`speed` of `session.resume`). Readings that are not readings — zero,
+    /// negative, a word — are dropped rather than trusted.
+    pub fn from_json(v: &Value) -> Self {
+        let num = |k: &str| v[k].as_f64().filter(|f| *f > 0.);
+        Self {
+            samples: v["samples"]
+                .as_array()
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|x| x.as_f64().filter(|f| f.is_finite() && *f > 0.))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            prefill: num("prefill"),
+            generation: num("generation"),
+            ratio: num("ratio"),
+        }
+    }
+
+    pub fn to_json(&self) -> Value {
+        json!({
+            "samples": self.samples,
+            "prefill": self.prefill,
+            "generation": self.generation,
+            "ratio": self.ratio,
+        })
+    }
+
+    /// A thread that never ran has nothing to show.
+    pub fn is_empty(&self) -> bool {
+        self.samples.is_empty() && self.prefill.is_none() && self.generation.is_none()
+    }
 }
 
 /// Mixed Russian/English prose and code averages about this many characters per token.
@@ -125,6 +175,41 @@ impl Meter {
         self.window_chars = 0;
     }
 
+    /// The thread's numbers as they stand: its chart's tail and the last measured speeds.
+    pub fn stat(&self) -> Stat {
+        Stat {
+            samples: self
+                .samples
+                .iter()
+                .copied()
+                .rev()
+                .take(KEEP)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect(),
+            prefill: self.prefill,
+            generation: self.generation,
+            ratio: (self.ratio > 0.).then_some(self.ratio),
+        }
+    }
+
+    /// What the thread kept, back in the meter: its chart always (it is the thread's own answer),
+    /// the speeds only if the thread measured them (a chat that has not run yet keeps the speeds
+    /// of the model, which describe the model and its server rather than the chat).
+    pub fn restore(&mut self, s: Stat) {
+        self.samples = s.samples;
+        if s.prefill.is_some() {
+            self.prefill = s.prefill;
+        }
+        if s.generation.is_some() {
+            self.generation = s.generation;
+        }
+        if let Some(r) = s.ratio {
+            self.ratio = r.clamp(DEFAULT_RATIO / 2., DEFAULT_RATIO * 2.);
+        }
+    }
+
     /// The model finished generating a tool call (its arguments are not streamed).
     pub fn tool_call(&mut self) {
         if self.first.is_some() && !self.closed {
@@ -161,5 +246,58 @@ impl Meter {
         if self.first.is_some() {
             self.request();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_threads_numbers_survive_the_wire() {
+        let m = || Stat {
+            samples: vec![10., 20., 30.],
+            prefill: Some(1200.5),
+            generation: Some(990.25),
+            ratio: Some(3.1),
+        };
+        assert_eq!(Stat::from_json(&m().to_json()).samples, vec![10., 20., 30.]);
+        assert_eq!(Stat::from_json(&m().to_json()).generation, Some(990.25));
+    }
+
+    #[test]
+    fn a_reading_that_is_not_a_reading_is_not_kept() {
+        let s = Stat::from_json(
+            &json!({"samples": ["x", -5, 0, 40, null], "prefill": "fast", "generation": 0}),
+        );
+        assert_eq!(s.samples, vec![40.]);
+        assert_eq!(s.prefill, None);
+        assert_eq!(s.generation, None);
+        assert_eq!(Stat::from_json(&json!({})).samples, Vec::<f64>::new());
+        assert!(Stat::default().is_empty());
+    }
+
+    #[test]
+    fn the_chart_keeps_its_tail_and_a_chat_without_one_keeps_the_speeds() {
+        let mut meter = Meter::fresh();
+        meter.samples = (0..400).map(|k| k as f64).collect();
+        meter.generation = Some(900.);
+        let st = meter.stat();
+        assert_eq!(st.samples.len(), KEEP);
+        assert_eq!(st.samples.last(), Some(&399.));
+        // A thread that never ran: no chart, but the model's speed stays.
+        meter.restore(Stat::default());
+        assert!(meter.samples.is_empty());
+        assert_eq!(meter.generation, Some(900.));
+        // A thread that ran: its own chart and its own numbers.
+        meter.restore(Stat {
+            samples: vec![5., 6.],
+            prefill: None,
+            generation: Some(120.),
+            ratio: Some(4.),
+        });
+        assert_eq!(meter.samples, vec![5., 6.]);
+        assert_eq!(meter.generation, Some(120.));
+        assert_eq!(meter.prefill, None);
     }
 }

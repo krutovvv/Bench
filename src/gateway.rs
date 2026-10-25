@@ -70,6 +70,12 @@ pub enum Cmd {
         profile: String,
         session: String,
     },
+    /// How fast the model wrote in the answer that just ended, as Bench measured it from the
+    /// stream (`crate::speed::Stat`). The agent keeps it with the thread.
+    SaveSpeed {
+        session: String,
+        speed: Value,
+    },
     /// `runtime` set when this client has the session open: it is closed first,
     /// since the gateway refuses to delete an active session.
     Delete {
@@ -144,6 +150,8 @@ pub enum Evt {
     /// The agent's plan and the moment (unix seconds) it began; 0 = the agent did not say
     /// (an older agent), so Bench keeps the block where it already had it.
     Todos(String, Vec<crate::model::Todo>, f64),
+    /// What the thread keeps of the speed of its last answer (its chart and its last speeds).
+    Speed(String, crate::speed::Stat),
     /// The background self-improvement review of the last turn: what it saved or patched.
     Review(String, String),
     /// The pending approval was answered or withdrawn.
@@ -458,6 +466,11 @@ impl Rpc {
                 self.call("prompt.submit", params, Pending::Ignore)?
             }
             // Stop names the turn it stops: the gateway refuses any other generation.
+            Cmd::SaveSpeed { session, speed } => self.call(
+                "session.speed",
+                json!({"session_id": session, "speed": speed}),
+                Pending::Ignore,
+            )?,
             Cmd::Interrupt { profile, session } => {
                 let generation = self.fences.get(&session).copied().unwrap_or(0);
                 self.call(
@@ -597,6 +610,12 @@ fn run(
                 if r["usage"].is_object() {
                     replay.push(json!({"type": "session.usage", "session_id": runtime,
                                        "payload": {"usage": r["usage"]}}));
+                }
+                // How fast the model wrote in this thread's last answer: its chart comes back
+                // with the thread, not with the app.
+                if r["speed"].is_object() {
+                    replay.push(json!({"type": "session.speed", "session_id": runtime,
+                                       "payload": {"speed": r["speed"]}}));
                 }
                 if r["queue"].is_array() {
                     replay.push(json!({"type": "session.queue", "session_id": runtime,
@@ -929,6 +948,10 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         )),
         "message.user" => emit(Evt::UserPlaced(sid, text())),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
+        "session.speed" => emit(Evt::Speed(
+            sid,
+            crate::speed::Stat::from_json(&payload["speed"]),
+        )),
         "message.complete" => {
             if payload["usage"].is_object() {
                 emit(Evt::Usage(sid.clone(), Usage::from_json(&payload["usage"])));

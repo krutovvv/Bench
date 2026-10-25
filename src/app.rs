@@ -1309,8 +1309,21 @@ impl BenchApp {
                         turn.answer = text;
                     }
                 }
+                // The answer is over: its speed is the thread's to keep (Bench measured it, the
+                // agent stores it where the thread lives).
+                let stat = self.speed.stat();
+                if !stat.is_empty() {
+                    self.cmd(Cmd::SaveSpeed {
+                        session: session.clone(),
+                        speed: stat.to_json(),
+                    });
+                }
                 self.remeasure_last(cx);
                 self.refresh_sessions();
+            }
+            Evt::Speed(session, stat) if self.is_current(&session) => {
+                // Reopening a thread (or the app) brings its numbers back.
+                self.speed.restore(stat);
             }
             _ => {}
         }
@@ -1671,9 +1684,9 @@ impl BenchApp {
             let keep = files.clone();
             cx.spawn_in(window, async move |this, cx| {
                 let prepared = cx
-                    .background_spawn(async move {
-                        attach::prepare(&conn, &target, &profile2, &files)
-                    })
+                    .background_spawn(
+                        async move { attach::prepare(&conn, &target, &profile2, &files) },
+                    )
                     .await;
                 let _ = this.update_in(cx, |this, window, cx| match prepared {
                     Ok(prep) => {
@@ -1878,7 +1891,11 @@ impl BenchApp {
     /// send one — the way to see for oneself that Bench can say it is done from the background.
     pub fn notif(&mut self, test: bool, cx: &mut Context<Self>) {
         if test {
-            crate::notify::post("bench.test", "Bench", "This is a test: Bench says it is done.");
+            crate::notify::post(
+                "bench.test",
+                "Bench",
+                "This is a test: Bench says it is done.",
+            );
         }
         crate::notify::check();
         cx.notify();
@@ -2508,8 +2525,15 @@ mod proc_moment_tests {
     #[test]
     fn the_row_follows_the_newest_process() {
         assert_eq!(newest_start(&[]), None, "no processes: no row");
-        assert_eq!(newest_start(&[proc(None)]), None, "a start the agent never gave");
-        assert_eq!(newest_start(&[proc(Some(100.)), proc(Some(300.))]), Some(300.));
+        assert_eq!(
+            newest_start(&[proc(None)]),
+            None,
+            "a start the agent never gave"
+        );
+        assert_eq!(
+            newest_start(&[proc(Some(100.)), proc(Some(300.))]),
+            Some(300.)
+        );
         assert_eq!(
             newest_start(&[proc(Some(300.)), proc(Some(100.))]),
             Some(300.),
