@@ -1,19 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- The main server: the Tower, built of slabs; a red crack of light runs down through it. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <rect x="120" y="52" width="272" height="408" fill="#F1EADC"/>
-  <rect x="132" y="64" width="248" height="384" fill="#1F2329"/>
-  <rect x="140" y="72" width="232" height="368" fill="#F1EADC"/>
-  <rect x="143" y="75" width="226" height="362" fill="#1F2329"/>
-  <circle cx="164" cy="96" r="7" fill="#E8603C"/>
-  <circle cx="348" cy="416" r="7" fill="#E8603C"/>
-  <rect x="196" y="112" width="120" height="44" fill="#F1EADC"/>
-  <rect x="184" y="164" width="144" height="44" fill="#5C78E2"/>
-  <rect x="172" y="216" width="168" height="44" fill="#F1EADC"/>
-  <rect x="160" y="268" width="192" height="44" fill="#5C78E2"/>
-  <rect x="160" y="320" width="192" height="64" fill="#F1EADC"/>
-  <polygon points="262.0,104.0 250.0,170.0 268.0,214.0 246.0,280.0 266.0,330.0 256.0,392.0 250.0,392.0 258.0,330.0 238.0,280.0 258.0,214.0 242.0,170.0 254.0,104.0" fill="#E8603C"/>
-  <circle cx="300" cy="134" r="5" fill="#2FA38A"/>
-  <circle cx="320" cy="290" r="5" fill="#F2B43C"/>
-  <polygon points="256.0,78.0 262.0,92.0 256.0,98.0 250.0,92.0" fill="#F2B43C"/>
+  <circle cx="256" cy="256" r="246" fill="#F1EADC"/>
+  <circle cx="256" cy="256" r="236" fill="#1F2329"/>
+  <circle cx="256" cy="256" r="224" fill="#F1EADC"/>
+  <circle cx="256" cy="256" r="220" fill="#1F2329"/>
+  <circle cx="60" cy="256" r="7" fill="#E8603C"/>
+  <circle cx="452" cy="256" r="7" fill="#E8603C"/>
+  <g transform="translate(256 252) scale(0.96) translate(-256 -256)">
+    <rect x="196" y="112" width="120" height="44" fill="#F1EADC"/>
+    <rect x="184" y="164" width="144" height="44" fill="#5C78E2"/>
+    <rect x="172" y="216" width="168" height="44" fill="#F1EADC"/>
+    <rect x="160" y="268" width="192" height="44" fill="#5C78E2"/>
+    <rect x="160" y="320" width="192" height="64" fill="#F1EADC"/>
+    <polygon points="262.0,104.0 250.0,170.0 268.0,214.0 246.0,280.0 266.0,330.0 256.0,392.0 250.0,392.0 258.0,330.0 238.0,280.0 258.0,214.0 242.0,170.0 254.0,104.0" fill="#E8603C"/>
+    <circle cx="300" cy="134" r="5" fill="#2FA38A"/>
+    <circle cx="320" cy="290" r="5" fill="#F2B43C"/>
+    <polygon points="256.0,78.0 262.0,92.0 256.0,98.0 250.0,92.0" fill="#F2B43C"/>
+  </g>
 </svg>

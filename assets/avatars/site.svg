@@ -1,27 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <!-- The site that calls: a receiver hangs off the hook on its cord, swaying over an old dial. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <rect x="120" y="52" width="272" height="408" fill="#F1EADC"/>
-  <rect x="132" y="64" width="248" height="384" fill="#1F2329"/>
-  <rect x="140" y="72" width="232" height="368" fill="#F1EADC"/>
-  <rect x="143" y="75" width="226" height="362" fill="#1F2329"/>
-  <polygon points="164.0,88.0 172.0,102.0 156.0,102.0" fill="#5C78E2"/>
-  <polygon points="348.0,408.0 356.0,422.0 340.0,422.0" fill="#5C78E2"/>
-  <rect x="253" y="76" width="6" height="92" fill="#F1EADC"/>
-  <rect x="250" y="174" width="14" height="92" fill="#F1EADC"/>
-  <path d="M264 166 h-40 a20 20 0 0 0 0 40 h40z" fill="#F1EADC"/>
-  <path d="M264 234 h-40 a20 20 0 0 0 0 40 h40z" fill="#F1EADC"/>
-  <rect x="212" y="180" width="6" height="12" fill="#1F2329"/>
-  <circle cx="256" cy="352" r="58" fill="#5C78E2"/>
-  <circle cx="235.5" cy="387.5" r="8" fill="#1F2329"/>
-  <circle cx="220.5" cy="372.5" r="8" fill="#1F2329"/>
-  <circle cx="215.0" cy="352.0" r="8" fill="#1F2329"/>
-  <circle cx="220.5" cy="331.5" r="8" fill="#1F2329"/>
-  <circle cx="235.5" cy="316.5" r="8" fill="#1F2329"/>
-  <circle cx="256.0" cy="311.0" r="8" fill="#1F2329"/>
-  <circle cx="276.5" cy="316.5" r="8" fill="#E8603C"/>
-  <circle cx="291.5" cy="331.5" r="8" fill="#1F2329"/>
-  <circle cx="297.0" cy="352.0" r="8" fill="#1F2329"/>
-  <circle cx="291.5" cy="372.5" r="8" fill="#1F2329"/>
-  <circle cx="256" cy="352" r="15" fill="#F1EADC"/>
+  <circle cx="256" cy="256" r="246" fill="#F1EADC"/>
+  <circle cx="256" cy="256" r="236" fill="#1F2329"/>
+  <circle cx="256" cy="256" r="224" fill="#F1EADC"/>
+  <circle cx="256" cy="256" r="220" fill="#1F2329"/>
+  <polygon points="60.0,248.0 68.0,262.0 52.0,262.0" fill="#5C78E2"/>
+  <polygon points="452.0,248.0 460.0,262.0 444.0,262.0" fill="#5C78E2"/>
+  <g transform="translate(256 252) scale(0.96) translate(-256 -256)">
+    <rect x="253" y="76" width="6" height="92" fill="#F1EADC"/>
+    <rect x="250" y="174" width="14" height="92" fill="#F1EADC"/>
+    <path d="M264 166 h-40 a20 20 0 0 0 0 40 h40z" fill="#F1EADC"/>
+    <path d="M264 234 h-40 a20 20 0 0 0 0 40 h40z" fill="#F1EADC"/>
+    <rect x="212" y="180" width="6" height="12" fill="#1F2329"/>
+    <circle cx="256" cy="352" r="58" fill="#5C78E2"/>
+    <circle cx="235.5" cy="387.5" r="8" fill="#1F2329"/>
+    <circle cx="220.5" cy="372.5" r="8" fill="#1F2329"/>
+    <circle cx="215.0" cy="352.0" r="8" fill="#1F2329"/>
+    <circle cx="220.5" cy="331.5" r="8" fill="#1F2329"/>
+    <circle cx="235.5" cy="316.5" r="8" fill="#1F2329"/>
+    <circle cx="256.0" cy="311.0" r="8" fill="#1F2329"/>
+    <circle cx="276.5" cy="316.5" r="8" fill="#E8603C"/>
+    <circle cx="291.5" cy="331.5" r="8" fill="#1F2329"/>
+    <circle cx="297.0" cy="352.0" r="8" fill="#1F2329"/>
+    <circle cx="291.5" cy="372.5" r="8" fill="#1F2329"/>
+    <circle cx="256" cy="352" r="15" fill="#F1EADC"/>
+  </g>
 </svg>
