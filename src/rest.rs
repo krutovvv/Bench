@@ -307,22 +307,7 @@ pub fn transcribe(conn: &Connection, profile: &str, wav: &[u8]) -> Result<String
 /// Delete a stored session: read its mutation snapshot, then DELETE fenced on that revision;
 /// a gateway without the snapshot route (the agent) takes a plain DELETE.
 pub fn delete_session(conn: &Connection, profile: &str, id: &str) -> Result<()> {
-    let path = format!("/api/sessions/{id}");
-    let fence = match get(conn, &format!("{path}/mutation-snapshot"), profile) {
-        Ok(snap) => format!(
-            "request_id={}&expected_revision={}&expected_generation={}",
-            uuid::Uuid::new_v4(),
-            snap["runtime_revision"].as_i64().unwrap_or(0),
-            snap["runtime_generation"].as_i64().unwrap_or(0)
-        ),
-        Err(e) if e.to_string().contains("404") || e.to_string().contains("405") => String::new(),
-        Err(e) => return Err(e),
-    };
-    let mut target = url(conn, &path, profile);
-    if !fence.is_empty() {
-        target.push(if target.contains('?') { '&' } else { '?' });
-        target.push_str(&fence);
-    }
+    let target = url(conn, &format!("/api/sessions/{id}"), profile);
     let (h, v) = conn.rest_auth(profile, "native-http")?;
     match ureq::request("DELETE", &target)
         .set(h, &v)

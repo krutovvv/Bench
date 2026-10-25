@@ -1375,6 +1375,17 @@ impl BenchApp {
         self.sessions.retain(|s| s.id != id);
         let runtime = self.opened.remove(&id);
         let rid = id.clone();
+        // A remote project's thread is its server agent's to delete.
+        let host = self.host_of_session(&id);
+        let remote = (!host.is_empty()).then(|| self.remotes.get(&host).and_then(|r| r.conn.clone())).flatten();
+        if let Some(conn) = remote {
+            let p = profile.clone();
+            self.background(window, cx, move || rest::delete_session(&conn, &p, &rid), move |this, r, window, cx| match r {
+                Ok(()) => this.refresh_sessions(),
+                Err(e) => this.toast(NotificationType::Error, format!("Could not delete: {e:#}"), window, cx),
+            });
+            return;
+        }
         self.rest(
             window,
             cx,
