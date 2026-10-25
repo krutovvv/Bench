@@ -38,13 +38,15 @@ impl InsertKind for Dir {
         format!("Files · {name}")
     }
 
-    fn controls(&self, app: &mut BenchApp, _ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
         let path = app.local_files.path.clone();
         if path.is_empty() {
             return vec![];
         }
-        vec![div().min_w_0().truncate().text_sm().text_color(theme.muted_foreground).child(path).into_any_element()]
+        let mut v = vec![div().min_w_0().truncate().text_sm().text_color(theme.muted_foreground).child(path).into_any_element()];
+        v.extend(super::file_buttons(&ins.id, false, cx));
+        v
     }
 
     fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
@@ -77,14 +79,19 @@ impl InsertKind for Dir {
         // As long as the folder is: the thread scrolls, not the list.
         // ".." first, as in a file manager: up a folder.
         let up = (f.path != "/").then(|| (String::from(".."), parent(&f.path), true));
+        let has_up = up.is_some();
         let rows: Vec<AnyElement> = up
             .into_iter()
             .chain(f.entries.clone())
             .enumerate()
             .map(|(k, (name, path, is_dir))| {
                 let chosen = open.as_deref() == Some(path.as_str());
+                let group = SharedString::from(format!("{}-g{k}", ins.id));
+                // Every entry but ".." can be removed.
+                let trash = (!(has_up && k == 0)).then(|| super::row_trash(app, format!("{}-rm{k}", ins.id).into(), group.clone(), false, path.clone(), cx));
                 h_flex()
                     .id((SharedString::from(format!("{}-row", ins.id)), k))
+                    .group(group)
                     .px_3()
                     .py_1()
                     .gap_2()
@@ -99,6 +106,7 @@ impl InsertKind for Dir {
                         ico.icon().small().text_color(color)
                     })
                     .child(div().flex_1().min_w_0().truncate().child(name))
+                    .children(trash)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
                         this.open_local_entry(path.clone(), is_dir, window, cx)
@@ -111,10 +119,40 @@ impl InsertKind for Dir {
 
     /// The open file, as the next row of the thread.
     fn follow(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-        let f = &app.local_files;
-        if f.owner.as_deref() != Some(ins.id.as_str()) {
+        if app.local_files.owner.as_deref() != Some(ins.id.as_str()) {
             return None;
         }
+        // A new file or folder being named, then the open file.
+        let form = super::file_form(app, &ins.id, cx);
+        let file = self.open_file(app, ins, cx);
+        match (form, file) {
+            (None, None) => None,
+            (a, b) => Some(v_flex().w_full().gap_4().children(a).children(b).into_any_element()),
+        }
+    }
+
+    fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {
+        let f = &app.local_files;
+        if f.owner.as_deref() != Some(ins.id.as_str()) {
+            return String::new();
+        }
+        let names: Vec<String> = f.entries.iter().take(80).map(|e| if e.2 { format!("{}/", e.0) } else { e.0.clone() }).collect();
+        let mut out = format!("The files insert is in the folder {}. It lists: {}", f.path, names.join(", "));
+        if let Some(file) = &f.file {
+            out.push_str(&format!(
+                "\nOpen under it: {file}{}\n```\n{}\n```",
+                if f.dirty(cx) { " (edited, not saved)" } else { "" },
+                clip(&f.editor.read(cx).value(), 6000)
+            ));
+        }
+        out
+    }
+}
+
+impl Dir {
+    /// The open file, at its full height: its path, Save, Zed and Close on top.
+    fn open_file(&self, app: &BenchApp, ins: &Insert, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+        let f = &app.local_files;
         let path = f.file.clone()?;
         let theme = cx.theme().clone();
         let dirty = f.dirty(cx);
@@ -150,22 +188,5 @@ impl InsertKind for Dir {
             .child(gpui_kit::component::input::Editor::new(&app.local_files.editor).appearance(false).h_full())
             .into_any_element();
         Some(super::card(head, body, &theme))
-    }
-
-    fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {
-        let f = &app.local_files;
-        if f.owner.as_deref() != Some(ins.id.as_str()) {
-            return String::new();
-        }
-        let names: Vec<String> = f.entries.iter().take(80).map(|e| if e.2 { format!("{}/", e.0) } else { e.0.clone() }).collect();
-        let mut out = format!("The files insert is in the folder {}. It lists: {}", f.path, names.join(", "));
-        if let Some(file) = &f.file {
-            out.push_str(&format!(
-                "\nOpen under it: {file}{}\n```\n{}\n```",
-                if f.dirty(cx) { " (edited, not saved)" } else { "" },
-                clip(&f.editor.read(cx).value(), 6000)
-            ));
-        }
-        out
     }
 }

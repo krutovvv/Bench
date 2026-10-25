@@ -109,7 +109,7 @@ fn host_of(v: &Value) -> RemoteHost {
     }
 }
 
-fn enc(s: &str) -> String {
+pub(super) fn enc(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
@@ -122,6 +122,31 @@ fn enc(s: &str) -> String {
 
 impl BenchApp {
     /// The file hosts (FTP, FTPS, SFTP) from the agent's store, once per connection.
+    /// A file host's trash in a picker: the first click arms it, the second removes the host
+    /// (and its password) from the agent's store.
+    pub fn remove_file_host(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
+        let key = format!("host:{id}");
+        if self.confirm_delete.as_deref() != Some(key.as_str()) {
+            self.confirm_delete = Some(key);
+            cx.notify();
+            return;
+        }
+        self.confirm_delete = None;
+        let Some(conn) = self.conn.clone() else {
+            return;
+        };
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json(&conn, "DELETE", &format!("/api/hosts/{}", enc(&id)), &profile, Value::Null),
+            |this, r, window, cx| match r {
+                Ok(_) => this.load_remote_hosts(window, cx),
+                Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+            },
+        );
+    }
+
     pub fn load_remote_hosts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(conn) = self.conn.clone() else {
             return;

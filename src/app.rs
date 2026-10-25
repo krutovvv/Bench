@@ -265,6 +265,10 @@ pub struct BenchApp {
     /// Keep the view pinned to the newest content until the user scrolls up.
     pub follow: bool,
     pub last_max: Pixels,
+    /// Where the composer is in the window, and the window's height (last frame): the `/` list
+    /// opens above the line when there is no room under it.
+    pub composer_y: Pixels,
+    pub viewport_h: Pixels,
     /// Unfolded steps (turn, step) and the source host whose pages are listed (turn, host).
     pub open_steps: HashSet<(usize, usize)>,
     pub open_source: Option<(usize, String)>,
@@ -683,6 +687,8 @@ impl BenchApp {
             chat_scroll: ScrollHandle::new(),
             follow: true,
             last_max: px(0.),
+            composer_y: px(0.),
+            viewport_h: px(0.),
             open_steps: HashSet::new(),
             open_source: None,
             wave_ticker: None,

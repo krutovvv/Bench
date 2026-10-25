@@ -384,6 +384,17 @@ const routes: Record<string, Route> = {
 		fs.writeFileSync(p, String(req.body.content ?? ""));
 		return { ok: true };
 	},
+	// /files: a new folder, and removing an entry (a folder with what is in it; Bench asks first).
+	"POST /api/fs/mkdir": (req) => {
+		fs.mkdirSync(expand(required(req.body?.path, "path")), { recursive: true });
+		return { ok: true };
+	},
+	"POST /api/fs/delete": (req) => {
+		const p = expand(required(req.body?.path, "path"));
+		if (p === "/" || p === os.homedir()) throw new HttpError(400, "not removing the root or the home folder");
+		fs.rmSync(p, { recursive: true });
+		return { ok: true };
+	},
 	"GET /api/fs/list": (req) => {
 		const p = expand(req.query.get("path") ?? os.homedir());
 		try {

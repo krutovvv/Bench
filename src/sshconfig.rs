@@ -222,6 +222,38 @@ pub fn save(old: Option<&str>, s: &Server) -> Result<()> {
     save_in(&path(), old, s)
 }
 
+/// Take a server's Host block out of ~/.ssh/config (the file as it was is kept as config.bak).
+pub fn remove(alias: &str) -> Result<()> {
+    let file = path();
+    let text = std::fs::read_to_string(&file).unwrap_or_default();
+    std::fs::write(file.with_extension("bak"), &text)?;
+    std::fs::write(&file, remove_from(&text, alias)?)?;
+    Ok(())
+}
+
+fn remove_from(text: &str, alias: &str) -> Result<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let bl = blocks(&lines);
+    let Some((start, end, names)) = bl.iter().find(|b| b.2.iter().any(|n| n == alias)) else {
+        bail!("“{alias}” is not in ~/.ssh/config");
+    };
+    if names.len() > 1 {
+        bail!("this Host line names several hosts; edit ~/.ssh/config by hand");
+    }
+    // The block, and the blank line after it.
+    let mut end = *end;
+    if lines.get(end).is_some_and(|l| l.trim().is_empty()) {
+        end += 1;
+    }
+    let mut out: Vec<&str> = lines[..*start].to_vec();
+    out.extend(&lines[end..]);
+    let mut s = out.join("\n");
+    if !s.is_empty() {
+        s.push('\n');
+    }
+    Ok(s)
+}
+
 fn save_in(file: &std::path::Path, old: Option<&str>, s: &Server) -> Result<()> {
     check(s)?;
     let before = old.and_then(|o| load_from(file).into_iter().find(|x| x.alias == o));
@@ -334,6 +366,14 @@ mod tests {
     }
 
     const SAMPLE: &str = "Include ~/.orbstack/ssh/config\n\nHost web\n  HostName 10.0.0.5\n  User deploy\n  IdentityFile ~/.ssh/web\n  IdentityFile ~/.ssh/web-old\n  # folder: Prod\n  # path: /srv/www\n\nHost a b\n  User x\n";
+
+    #[test]
+    fn removes_one_block() {
+        let text = "Host a\n  HostName 1.1.1.1\n\nHost b\n  HostName 2.2.2.2\n  # folder: X\n\nHost c\n  User u\n";
+        assert_eq!(remove_from(text, "b").unwrap(), "Host a\n  HostName 1.1.1.1\n\nHost c\n  User u\n");
+        assert_eq!(remove_from(text, "c").unwrap(), "Host a\n  HostName 1.1.1.1\n\nHost b\n  HostName 2.2.2.2\n  # folder: X\n\n");
+        assert!(remove_from(text, "zz").is_err());
+    }
 
     #[test]
     fn reads_fields_and_comments() {

@@ -31,6 +31,12 @@ impl BenchApp {
         }
         let theme = cx.theme().clone();
         let sel = self.slash_sel.min(matches.len() - 1);
+        // Under the line, or above it when the window has no room below (the status bar is
+        // there): the list's own height decides.
+        let list_h = (matches.len() as f32).min(SLASH_ROWS) * SLASH_ROW + 10.;
+        let below = f32::from(self.composer_y) + super::TURN_Y + 30.;
+        let room = f32::from(self.viewport_h) - 36. - below;
+        let top = if room < list_h && f32::from(self.composer_y) > list_h + 48. { super::TURN_Y - list_h - 6. } else { super::TURN_Y + 30. };
         let rows = matches.into_iter().enumerate().map(|(i, c)| {
             let on = i == sel;
             h_flex()
@@ -71,7 +77,7 @@ impl BenchApp {
             // is the thread's last row, and the thread scrolls on past it, so there is room below.
             div()
                 .absolute()
-                .top(px(super::TURN_Y + 30.))
+                .top(px(top))
                 .left(px(super::CHAT_TEXT - 4.))
                 .w(px(560.))
                 .child(
@@ -139,9 +145,19 @@ impl BenchApp {
             )
         }));
 
+        let view = cx.entity();
         v_flex()
             .id("composer")
             .relative()
+            // Where it is in the window, for the `/` list (above or under the line).
+            .child(
+                canvas(
+                    move |bounds, _, cx| view.update(cx, |this, _| this.composer_y = bounds.origin.y),
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_full(),
+            )
             .w_full()
             .flex_none()
             .bg(theme.background)

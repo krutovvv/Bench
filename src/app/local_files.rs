@@ -5,13 +5,14 @@
 
 use std::sync::Arc;
 
-use gpui_kit::component::input::EditorState;
+use gpui_kit::component::input::{EditorState, InputState, TextareaState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use super::BenchApp;
 use crate::connection::Connection;
 use crate::rest;
+use serde_json::{Value, json};
 
 pub struct LocalFiles {
     /// The insert it shows now (its id): another one restores its own place first.
@@ -27,12 +28,25 @@ pub struct LocalFiles {
     /// Too big to show whole: shown, never saved back.
     pub truncated: bool,
     pub editor: Entity<EditorState>,
+    /// A new file or folder being named, in a card under its insert.
+    pub form: Option<FileForm>,
+}
+
+/// A new file or folder, asked for under the `/files` or `/ftp` insert that wants it: a name,
+/// and for a file what it holds.
+pub struct FileForm {
+    pub insert: String,
+    /// On the `/ftp` insert's host (else in `/files`'s folder).
+    pub remote: bool,
+    pub folder: bool,
+    pub name: Entity<InputState>,
+    pub content: Entity<TextareaState>,
 }
 
 impl LocalFiles {
     pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let editor = cx.new(|cx| EditorState::new(window, cx).scroll_beyond_last_line(Some(0)).line_number(true).soft_wrap(false));
-        Self { owner: None, path: String::new(), entries: vec![], loading: false, error: None, file: None, saved: String::new(), truncated: false, editor }
+        Self { owner: None, path: String::new(), entries: vec![], loading: false, error: None, file: None, saved: String::new(), truncated: false, editor, form: None }
     }
 
     /// The open file was edited since it was opened or saved.
@@ -153,5 +167,132 @@ impl BenchApp {
                 cx.notify();
             },
         );
+    }
+
+    /// "New file" / "New folder" on an insert's head: the card that names it.
+    pub fn open_file_form(&mut self, insert: String, remote: bool, folder: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let name = cx.new(|cx| InputState::new(window, cx).placeholder(if folder { "Folder name" } else { "File name, e.g. notes.md" }));
+        name.update(cx, |s, cx| s.focus(window, cx));
+        let content = cx.new(|cx| TextareaState::new(window, cx).auto_grow(6, 100_000).placeholder("What it holds (may stay empty)"));
+        self.local_files.form = Some(FileForm { insert, remote, folder, name, content });
+        cx.notify();
+    }
+
+    /// Create what the card names, in the folder the insert shows, then show the folder again.
+    pub fn create_from_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(f) = self.local_files.form.as_ref() else {
+            return;
+        };
+        let name = f.name.read(cx).value().trim().to_string();
+        if name.is_empty() || name.contains('/') {
+            self.toast(NotificationType::Error, "A name, without /", window, cx);
+            return;
+        }
+        let text = f.content.read(cx).value().to_string();
+        let (folder, remote) = (f.folder, f.remote);
+        let profile = self.current_profile();
+        if remote {
+            let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
+                return;
+            };
+            let path = format!("{}/{name}", self.files_remote.path.trim_end_matches('/'));
+            self.background(
+                window,
+                cx,
+                move || {
+                    if folder {
+                        rest::send_json(&conn, "POST", &format!("/api/hosts/{id}/mkdir"), &profile, json!({"path": path}))
+                    } else {
+                        rest::send_json(&conn, "PUT", &format!("/api/hosts/{id}/file"), &profile, json!({"path": path, "text": text}))
+                    }
+                },
+                |this, r, window, cx| match r {
+                    Ok(_) => {
+                        this.local_files.form = None;
+                        let p = this.files_remote.path.clone();
+                        this.list_remote(p, window, cx);
+                    }
+                    Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+                },
+            );
+        } else {
+            let Some((conn, profile)) = self.files_conn() else {
+                return;
+            };
+            let path = format!("{}/{name}", self.local_files.path.trim_end_matches('/'));
+            self.background(
+                window,
+                cx,
+                move || {
+                    if folder {
+                        rest::send_json(&conn, "POST", "/api/fs/mkdir", &profile, json!({"path": path})).map(|_| ())
+                    } else {
+                        rest::write_text(&conn, &profile, &path, &text)
+                    }
+                },
+                |this, r, window, cx| match r {
+                    Ok(()) => {
+                        this.local_files.form = None;
+                        let p = this.local_files.path.clone();
+                        this.show_dir(p, String::new(), window, cx);
+                    }
+                    Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+                },
+            );
+        }
+    }
+
+    /// A row's trash: the first click arms it, the second removes the file or folder (a local
+    /// folder with what is in it; a host's folder only when empty).
+    pub fn delete_entry(&mut self, remote: bool, path: String, window: &mut Window, cx: &mut Context<Self>) {
+        let key = format!("entry:{path}");
+        if self.confirm_delete.as_deref() != Some(key.as_str()) {
+            self.confirm_delete = Some(key);
+            cx.notify();
+            return;
+        }
+        self.confirm_delete = None;
+        let profile = self.current_profile();
+        if remote {
+            let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
+                return;
+            };
+            let q = path.clone();
+            self.background(
+                window,
+                cx,
+                move || rest::send_json(&conn, "DELETE", &format!("/api/hosts/{id}/file?path={}", super::remote_files::enc(&q)), &profile, Value::Null),
+                move |this, r, window, cx| match r {
+                    Ok(_) => {
+                        if this.files_remote.file.as_deref() == Some(path.as_str()) {
+                            this.files_remote.file = None;
+                        }
+                        let p = this.files_remote.path.clone();
+                        this.list_remote(p, window, cx);
+                    }
+                    Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+                },
+            );
+        } else {
+            let Some((conn, profile)) = self.files_conn() else {
+                return;
+            };
+            let q = path.clone();
+            self.background(
+                window,
+                cx,
+                move || rest::send_json(&conn, "POST", "/api/fs/delete", &profile, json!({"path": q})),
+                move |this, r, window, cx| match r {
+                    Ok(_) => {
+                        if this.local_files.file.as_deref() == Some(path.as_str()) {
+                            this.local_files.file = None;
+                        }
+                        let p = this.local_files.path.clone();
+                        this.show_dir(p, String::new(), window, cx);
+                    }
+                    Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+                },
+            );
+        }
     }
 }

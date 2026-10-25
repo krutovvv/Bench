@@ -93,6 +93,8 @@ icons! {
     Square => "square",
     Terminal => "square-terminal",
     Trash => "trash",
+    FilePlus => "file-plus",
+    FolderPlus => "folder-plus",
     UserRound => "user-round",
     Volume => "volume-2",
     Search => "search",

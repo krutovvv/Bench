@@ -68,7 +68,9 @@ impl InsertKind for Files {
         if f.owner.as_deref() != Some(ins.id.as_str()) || f.path.is_empty() {
             return vec![];
         }
-        vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(f.path.clone()).into_any_element()]
+        let mut v = vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(f.path.clone()).into_any_element()];
+        v.extend(super::file_buttons(&ins.id, true, cx));
+        v
     }
 
     fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
@@ -78,9 +80,11 @@ impl InsertKind for Files {
             let mut rows = vec![];
             for (k, (hid, name, detail)) in hosts(app).into_iter().enumerate() {
                 let id = id.clone();
-                rows.push(pick_row(format!("{id}-h{k}"), Ico::Server, name, detail, cx, move |this, _, cx| {
+                let armed = app.confirm_delete.as_deref() == Some(format!("host:{hid}").as_str());
+                let gone = hid.clone();
+                rows.push(super::pick_row_removable(format!("{id}-h{k}"), Ico::Server, name, detail, armed, cx, move |this, _, cx| {
                     this.patch_insert(&id, json!({ "state": { "host": hid, "path": "", "file": "" } }), cx);
-                }));
+                }, move |this, window, cx| this.remove_file_host(gone.clone(), window, cx)));
             }
             let from = id.clone();
             rows.push(pick_row(format!("{id}-new"), Ico::Plus, "Add a host…".into(), "FTP, FTPS or SFTP".into(), cx, move |this, window, cx| {
@@ -124,7 +128,13 @@ impl InsertKind for Files {
         if app.files_remote.owner.as_deref() != Some(ins.id.as_str()) {
             return None;
         }
-        app.render_open_file(format!("{}-file-close", ins.id), cx)
+        // A new file or folder being named, then the open file.
+        let form = super::file_form(app, &ins.id, cx);
+        let file = app.render_open_file(format!("{}-file-close", ins.id), cx);
+        match (form, file) {
+            (None, None) => None,
+            (a, b) => Some(gpui_kit::component::v_flex().w_full().gap_4().children(a).children(b).into_any_element()),
+        }
     }
 
     fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {

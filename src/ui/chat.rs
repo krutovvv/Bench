@@ -35,6 +35,7 @@ pub(super) fn terminal_height(session: &crate::term::Session) -> f32 {
 impl BenchApp {
     /// New chat: optionally work in a git project, optionally in a branch of its own.
     pub(super) fn render_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        self.viewport_h = window.viewport_size().height;
         // A thread with no turns yet still is a thread: "Loading history…" while it opens, then
         // the composer; a new chat is the composer alone.
         // A thread about something starts with it, live: a task list, a server's terminal, a tool.

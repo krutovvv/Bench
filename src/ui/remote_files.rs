@@ -165,8 +165,14 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let n = name.clone();
+        let group = SharedString::from(format!("remote-g{k}"));
+        let trash = (name != "..").then(|| {
+            let path = format!("{}/{name}", self.files_remote.path.trim_end_matches('/'));
+            super::inserts::row_trash(self, format!("remote-rm{k}").into(), group.clone(), true, path, cx)
+        });
         h_flex()
             .id(("remote-row", k))
+            .group(group)
             .px_3()
             .py_1()
             .gap_2()
@@ -181,6 +187,7 @@ impl BenchApp {
             .child(div().flex_1().min_w_0().truncate().child(name))
             .child(div().flex_none().text_base().text_color(muted).child(size))
             .child(div().flex_none().w(px(130.)).text_base().text_color(muted).child(modified))
+            .children(trash)
             .on_click(cx.listener(move |this, _, window, cx| this.open_remote_entry(n.clone(), dir, window, cx)))
             .into_any_element()
     }

@@ -18,6 +18,7 @@ mod tools;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use serde_json::Value;
@@ -338,6 +339,54 @@ pub(super) fn pick_row(
         .into_any_element()
 }
 
+/// `pick_row` with a trash on hover: the first click arms it ("Delete?"), the second removes
+/// the server or host (`remove`).
+pub(super) fn pick_row_removable(
+    id: String,
+    ico: Ico,
+    label: String,
+    detail: String,
+    armed: bool,
+    cx: &mut Context<BenchApp>,
+    on: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
+    remove: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
+) -> AnyElement {
+    let theme = cx.theme().clone();
+    let group = SharedString::from(format!("{id}-g"));
+    h_flex()
+        .id(SharedString::from(id.clone()))
+        .group(group.clone())
+        .px_2()
+        .py_1()
+        .gap_2()
+        .items_center()
+        .text_base()
+        .cursor_pointer()
+        .hover(|s| s.bg(theme.list_hover))
+        .child(ico.icon().small().text_color(theme.muted_foreground))
+        .child(div().flex_none().child(label))
+        .child(div().flex_1().min_w_0().truncate().text_sm().text_color(theme.muted_foreground).child(detail))
+        .child(
+            div()
+                .id(SharedString::from(format!("{id}-rm")))
+                .flex_none()
+                .px_1()
+                .text_sm()
+                .when(!armed, |d| d.opacity(0.).group_hover(group, |s| s.opacity(1.)).text_color(theme.muted_foreground).hover(|s| s.text_color(theme.danger)).child(Ico::Trash.icon().small()))
+                .when(armed, |d| d.text_color(theme.danger).child("Delete?"))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    cx.stop_propagation();
+                    remove(this, window, cx)
+                })),
+        )
+        .on_click(cx.listener(move |this, _, window, cx| {
+            this.click_claimed = true;
+            on(this, window, cx)
+        }))
+        .into_any_element()
+}
+
 /// Shorten text for the agent.
 pub(super) fn clip(s: &str, n: usize) -> String {
     if s.chars().count() <= n {
@@ -360,5 +409,69 @@ pub(super) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::The
         .bg(theme.background)
         .child(head)
         .child(body)
+        .into_any_element()
+}
+
+/// "New file" and "New folder" on the head of a files insert (`/files`, `/ftp`): a card under it
+/// names the new one.
+pub(super) fn file_buttons(ins_id: &str, remote: bool, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    let theme = cx.theme().clone();
+    [(false, Ico::FilePlus, "New file"), (true, Ico::FolderPlus, "New folder")]
+        .into_iter()
+        .map(|(folder, ico, tip)| {
+            let id = ins_id.to_string();
+            icon_button(&format!("{ins_id}-new-{folder}"), ico, tip, &theme)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    this.open_file_form(id.clone(), remote, folder, window, cx)
+                }))
+                .into_any_element()
+        })
+        .collect()
+}
+
+/// The card naming a new file or folder, under the insert that asked for it.
+pub(super) fn file_form(app: &BenchApp, ins_id: &str, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    let f = app.local_files.form.as_ref().filter(|f| f.insert == ins_id)?;
+    let mut rows = vec![("Name", gpui_kit::component::input::Input::new(&f.name).into_any_element())];
+    if !f.folder {
+        rows.push(("Content", gpui_kit::component::input::Textarea::new(&f.content).into_any_element()));
+    }
+    let actions = vec![
+        super::form_action("file-form-create", "Create", true, cx)
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.click_claimed = true;
+                this.create_from_form(window, cx)
+            }))
+            .into_any_element(),
+        super::form_action("file-form-cancel", "Cancel", false, cx)
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.click_claimed = true;
+                this.local_files.form = None;
+                cx.notify();
+            }))
+            .into_any_element(),
+    ];
+    Some(super::inline_form(if f.folder { "New folder" } else { "New file" }, rows, None, actions, cx))
+}
+
+/// A file row's trash, on the row's hover; the first click arms it ("Delete?" stays shown), the
+/// second removes the file or folder.
+pub(in crate::ui) fn row_trash(app: &BenchApp, id: SharedString, group: SharedString, remote: bool, path: String, cx: &mut Context<BenchApp>) -> AnyElement {
+    let theme = cx.theme().clone();
+    let armed = app.confirm_delete.as_deref() == Some(format!("entry:{path}").as_str());
+    div()
+        .id(id)
+        .flex_none()
+        .px_1()
+        .cursor_pointer()
+        .text_sm()
+        .when(!armed, |d| d.opacity(0.).group_hover(group, |s| s.opacity(1.)).text_color(theme.muted_foreground).hover(|s| s.text_color(theme.danger)).child(Ico::Trash.icon().small()))
+        .when(armed, |d| d.text_color(theme.danger).child("Delete?"))
+        .on_click(cx.listener(move |this, _, window, cx| {
+            this.click_claimed = true;
+            cx.stop_propagation();
+            this.delete_entry(remote, path.clone(), window, cx)
+        }))
         .into_any_element()
 }

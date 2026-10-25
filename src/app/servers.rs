@@ -195,6 +195,22 @@ impl BenchApp {
         }
     }
 
+    /// A server's trash in a picker: the first click arms it, the second takes its Host block
+    /// out of ~/.ssh/config (kept as config.bak).
+    pub fn remove_server(&mut self, alias: String, window: &mut Window, cx: &mut Context<Self>) {
+        let key = format!("server:{alias}");
+        if self.confirm_delete.as_deref() != Some(key.as_str()) {
+            self.confirm_delete = Some(key);
+            cx.notify();
+            return;
+        }
+        self.confirm_delete = None;
+        match sshconfig::remove(&alias) {
+            Ok(()) => self.reload_servers(cx),
+            Err(e) => self.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+        }
+    }
+
     /// Re-read `~/.ssh/config` (edited elsewhere too) and resolve the targets.
     pub fn reload_servers(&mut self, cx: &mut Context<Self>) {
         // The demo shows made-up servers, never the person's ~/.ssh/config.
