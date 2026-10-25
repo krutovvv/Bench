@@ -171,6 +171,12 @@ impl BenchApp {
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
+        // The environment's open row, as the agent's answer under it.
+        let env_card = if subject.starts_with("env:") {
+            self.render_env_card(cx).map(|c| self.agent_row(c, cx))
+        } else {
+            None
+        };
         let queue = self.render_queue(cx);
         let composer = self.render_composer(cx);
 
@@ -211,7 +217,7 @@ impl BenchApp {
                     .child(
                         v_flex()
                             .w_full()
-                            .when(block_on_top, |d| d.children(subject_block.take()))
+                            .when(block_on_top, |d| d.children(subject_block.take()).children(env_card))
                             .children(placeholder)
                             .children(rows)
                             .children(approval)

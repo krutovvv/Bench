@@ -89,6 +89,9 @@ impl BenchApp {
     /// Telegram bot, MCP servers, skills, prompts and accesses. A row opens in place as a code
     /// block (line numbers, highlighting) with Save / Revert under it, and closes again; "+ Add"
     /// starts the request for the agent in the composer.
+    /// A project's environment as rows in blocks (the task list's look: a line between rows, a
+    /// row lit under the pointer); a row's click opens its card under the block, as the agent's
+    /// answer (`render_env_card`), where it is edited, saved or removed.
     pub(super) fn render_env_block(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let _ = window;
         let theme = cx.theme().clone();
@@ -97,118 +100,50 @@ impl BenchApp {
             return div().text_color(muted).child("Loading…").into_any_element();
         };
         let remote = self.projects.iter().any(|p| p.id == e.id && p.host.is_some());
-        // The general environment has no name to change and is not removed.
         let general = e.id == "general";
-        // A quiet text action: muted, the foreground on hover; red for removing.
-        let act = |id: SharedString, label: String, danger: bool| {
-            div()
-                .id(id)
-                .flex_none()
-                .cursor_pointer()
-                .text_color(if danger { theme.danger } else { muted })
-                .hover(|s| s.text_color(if danger { theme.danger } else { theme.foreground }))
-                .child(label)
-        };
-        // Under an opened block: Save (live once something changed) and Revert.
-        let footer = |id: &'static str, what: &'static str, dirty: bool, cx: &mut Context<Self>| {
-            h_flex()
-                .pt_1()
-                .pb_2()
-                .gap_3()
-                .child(
-                    div()
-                        .id(SharedString::from(format!("{id}-save")))
-                        .px_2()
-                        .when(dirty, |d| {
-                            d.cursor_pointer()
-                                .bg(theme.primary)
-                                .text_color(theme.primary_foreground)
-                                .hover(|s| s.bg(theme.primary_hover))
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    this.click_claimed = true;
-                                    this.env_save(what, window, cx)
-                                }))
-                        })
-                        .when(!dirty, |d| d.border_1().rounded_md().border_color(theme.border).text_color(muted))
-                        .child("Save"),
-                )
-                .when(dirty, |d| {
-                    d.child(act(format!("{id}-revert").into(), "Revert".into(), false).on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        this.env_revert(what, window, cx)
-                    })))
-                })
-                .into_any_element()
-        };
-        // An opened text: a code block, as tall as its wrapped text (the thread scrolls, not it).
-        let code = |state: &Entity<gpui_kit::component::input::EditorState>, cx: &App| {
-            let text = state.read(cx).value().to_string();
-            let lines: usize = text.lines().map(|l| l.chars().count() / 100 + 1).sum::<usize>().max(1);
-            div()
-                .mt_1()
-                .border_1().rounded_md()
-                .border_color(theme.border)
-                .h(px(lines as f32 * super::editor_line(cx) + 10.))
-                .child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full())
-                .into_any_element()
-        };
-        let armed = e.armed.clone();
-        let is_armed = |k: String| armed.as_deref() == Some(&k);
-        let remove = |id: String, what: &'static str, name: String, cx: &mut Context<Self>| {
-            let on = is_armed(format!("{what}:{name}"));
-            div()
-                .flex_none()
-                .when(!on, |d| d.opacity(0.).group_hover(SharedString::from(id.clone()), |s| s.opacity(1.)))
-                .child(act(format!("{id}-rm").into(), if on { "Remove?".into() } else { "Remove".into() }, true).on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
-                    cx.stop_propagation();
-                    this.env_remove(what, name.clone(), window, cx)
-                })))
+        let card = e.card.clone();
+        // A quiet text action in a head: muted, the foreground on hover.
+        let act = |id: SharedString, label: &'static str| {
+            div().id(id).flex_none().cursor_pointer().text_color(muted).hover(|s| s.text_color(theme.foreground)).child(label)
         };
         let add = |id: &'static str, ask: &'static str, cx: &mut Context<Self>| {
-            act(id.into(), "+ Add".into(), false).on_click(cx.listener(move |this, _, window, cx| {
+            act(id.into(), "+ Add").on_click(cx.listener(move |this, _, window, cx| {
                 this.click_claimed = true;
                 cx.stop_propagation();
                 this.ask_in_composer(ask, window, cx)
             }))
         };
-        let row = |id: String, name: String, note: String, bad: bool| {
-            // One line whatever the text: a description's line breaks become spaces.
+        // A row: its name, a one-line note; lit when its card is open.
+        let row = |kind: &'static str, name: String, label: String, note: String, bad: bool, first: bool, cx: &mut Context<Self>| {
             let note = note.split_whitespace().collect::<Vec<_>>().join(" ");
+            let on = card.as_ref().is_some_and(|(k, n)| *k == kind && *n == name);
             h_flex()
-                .id(SharedString::from(id.clone()))
-                .group(SharedString::from(id))
+                .id(SharedString::from(format!("env-{kind}-{name}")))
+                .px_3()
+                .py_1p5()
                 .gap_2()
-                .py_0p5()
-                .child(div().flex_none().child(name))
+                .cursor_pointer()
+                .when(!first, |d| d.border_t_1().border_color(theme.border.opacity(0.5)))
+                .when(on, |d| d.bg(theme.list_active))
+                .hover(|s| s.bg(theme.list_hover))
+                .child(div().flex_none().child(label))
                 .child(div().flex_1().min_w_0().truncate().text_color(if bad { theme.danger } else { muted }).child(note))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    this.env_card(kind, name.clone(), window, cx)
+                }))
+                .into_any_element()
         };
-        let toggle = |which: &'static str| {
-            move |this: &mut Self, _: &ClickEvent, _: &mut Window, cx: &mut Context<Self>| {
-                this.click_claimed = true;
-                if let Some(e) = this.project_env.as_mut() {
-                    match which {
-                        "soul" => e.soul_open = !e.soul_open,
-                        _ => e.tg_open = !e.tg_open,
-                    }
-                }
-                cx.notify();
-            }
-        };
-        // Each part of the environment is a block, as everything in a thread: `block_head` with its
-        // title, a fold and "+ Add", its rows under it. `section` closes the block being built.
+        let empty = |text: &'static str| div().px_3().py_2().text_color(muted).child(text).into_any_element();
         let folded = e.folded.clone();
-        let mut blocks: Vec<AnyElement> = vec![];
-        let mut cur: (&'static str, Option<AnyElement>) = (if general { "General" } else { "Project" }, None);
-        let mut section = |blocks: &mut Vec<AnyElement>, body: Div, next: (&'static str, Option<AnyElement>), cx: &mut Context<Self>| {
-            let (title, add) = std::mem::replace(&mut cur, next);
+        let section = |title: &'static str, extra: Option<AnyElement>, rows: Vec<AnyElement>, cx: &mut Context<Self>| {
             let shut = folded.contains(title);
             let head = super::block_head(&theme, !shut)
                 .id(SharedString::from(format!("env-sec-{title}")))
                 .cursor_pointer()
                 .child(if shut { crate::icons::Ico::ChevronRight } else { crate::icons::Ico::ChevronDown }.icon().xsmall())
                 .child(div().text_color(theme.foreground).child(title))
-                .children(add)
+                .children(extra)
                 .child(div().flex_1())
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.click_claimed = true;
@@ -219,238 +154,295 @@ impl BenchApp {
                     }
                     cx.notify();
                 }));
-            blocks.push(
-                v_flex()
-                    .w_full()
-                    .border_1()
-                    .rounded_md()
-                    .border_color(theme.border)
-                    .overflow_hidden()
-                    .bg(theme.background)
-                    .child(head)
-                    .when(!shut, |d| d.child(div().px_3().py_2().child(body)))
-                    .into_any_element(),
-            );
+            v_flex()
+                .w_full()
+                .border_1()
+                .rounded_md()
+                .border_color(theme.border)
+                .overflow_hidden()
+                .bg(theme.background)
+                .child(head)
+                .when(!shut, |d| d.children(rows))
+                .into_any_element()
         };
-        let mut out = v_flex().w_full();
+        let mut blocks = vec![];
 
-        // Its name (a remote project's is its server's agent: named here, on this Mac, too).
-        out = out.when(!general, |d| d.child(
-            h_flex()
-                .gap_3()
-                .child(div().flex_none().text_color(muted).child("Name"))
-                .child(div().w(px(320.)).child(gpui_kit::component::input::Input::new(&e.name).appearance(false)))
-                .when(e.name_dirty, |d| d.child(footer("name", "name", true, cx))),
-        ));
-
-        // The soul.
+        // The project: its name, soul, Telegram bot.
+        let mut rows = vec![];
+        if !general {
+            rows.push(row("name", String::new(), "Name".into(), e.name.read(cx).value().to_string(), false, true, cx));
+        }
         let soul_text = e.soul.read(cx).value().to_string();
         let first = soul_text.lines().map(|l| l.trim_start_matches('#').trim()).find(|l| !l.is_empty()).unwrap_or("not described yet").to_string();
-        out = out.child(
-            row("env-soul".into(), "Soul".into(), if e.soul_open { "what the project is, how to work in it".into() } else { first }, false)
-                .cursor_pointer()
-                .on_click(cx.listener(toggle("soul"))),
-        );
-        if e.soul_open {
-            out = out.child(code(&e.soul, cx)).child(footer("soul", "soul", e.soul_dirty, cx));
-        }
-
-        // Its Telegram bot.
+        rows.push(row("soul", String::new(), "Soul".into(), first, false, general, cx));
         let tg_note = match &e.telegram {
             Some((name, users, true)) => format!("{} · {} may write", if name.is_empty() { "a bot".to_string() } else { format!("@{name}") }, users.len()),
-            _ => "no bot of its own: open to set one".into(),
+            _ => "no bot of its own".into(),
         };
-        out = out.child(row("env-tg".into(), "Telegram".into(), tg_note, false).cursor_pointer().on_click(cx.listener(toggle("telegram"))));
-        if e.tg_open {
-            out = out
-                .child(
-                    v_flex()
-                        .mt_1()
-                        .gap_2()
-                        .child(gpui_kit::component::input::Input::new(&e.tg_token))
-                        .child(gpui_kit::component::input::Input::new(&e.tg_users))
-                        .child(div().text_color(muted).child("Its chats become this project's threads, with its soul, skills and servers.")),
-                )
-                .child(footer("tg", "telegram", e.tg_dirty, cx));
-        }
+        rows.push(row("telegram", String::new(), "Telegram".into(), tg_note, false, false, cx));
+        blocks.push(section(if general { "General" } else { "Project" }, None, rows, cx));
 
-        // MCP servers: each opens to its own config.
-        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("MCP servers", Some(add("env-mcp-add", "Add an MCP server to this project: ", cx).into_any_element())), cx);
+        // MCP servers.
+        let mut rows = vec![];
         if e.mcp.is_empty() {
-            out = out.child(div().text_color(muted).child("None of its own: the general ones work here too."));
+            rows.push(empty("None of its own: the general ones work here too."));
         }
-        for (name, kind, enabled, connected, tools, error, _) in e.mcp.clone() {
+        for (k, (name, kind, enabled, connected, tools, error, _)) in e.mcp.clone().into_iter().enumerate() {
             let note = match (enabled, &error, connected) {
-                (false, _, _) => format!("{kind} · off (\"enabled\": false)"),
+                (false, _, _) => format!("{kind} · off"),
                 (_, Some(err), _) => format!("{kind} · {err}"),
                 (_, _, true) => format!("{kind} · {tools} tools"),
                 _ => format!("{kind} · connects with the project's first thread"),
             };
-            let id = format!("env-mcp-{name}");
-            let n = name.clone();
-            out = out.child(
-                row(id.clone(), name.clone(), note, error.is_some() && enabled)
-                    .cursor_pointer()
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        this.env_open("mcp", n.clone(), window, cx)
-                    }))
-                    .when(e.mcp_auth.contains(&name), |d| {
-                        let n = name.clone();
-                        d.child(act(format!("{id}-auth").into(), "Authorize".into(), false).text_color(theme.primary).on_click(cx.listener(move |this, _, window, cx| {
-                            this.click_claimed = true;
-                            cx.stop_propagation();
-                            this.env_authorize(n.clone(), window, cx)
-                        })))
-                    })
-                    .child(remove(id, "mcp", name.clone(), cx)),
-            );
-            if e.mcp_open.as_deref() == Some(&name) {
-                out = out.child(code(&e.mcp_json, cx)).child(footer("mcp", "mcp", e.mcp_dirty, cx));
-            }
+            rows.push(row("mcp", name.clone(), name, note, error.is_some() && enabled, k == 0, cx));
         }
+        let extra = add("env-mcp-add", "Add an MCP server to this project: ", cx).into_any_element();
+        blocks.push(section("MCP servers", Some(extra), rows, cx));
 
         // Skills.
-        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Skills", Some(add("env-skill-add", "Write a skill for this project: ", cx).into_any_element())), cx);
+        let mut rows = vec![];
         if e.skills.is_empty() {
-            out = out.child(div().text_color(muted).child("None of its own: the general ones work here too."));
+            rows.push(empty("None of its own: the general ones work here too."));
         }
-        for (name, desc) in e.skills.clone() {
-            let id = format!("env-skill-{name}");
-            let n = name.clone();
-            out = out.child(
-                row(id.clone(), name.clone(), desc, false)
-                    .cursor_pointer()
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        this.env_open_skill(n.clone(), window, cx)
-                    }))
-                    .child(remove(id, "skill", name.clone(), cx)),
-            );
-            if e.skill_open.as_deref() == Some(&name) {
-                out = out.child(code(&e.skill_text, cx)).child(footer("skill", "skill", e.skill_dirty, cx));
-            }
+        for (k, (name, desc)) in e.skills.clone().into_iter().enumerate() {
+            rows.push(row("skill", name.clone(), name, desc, false, k == 0, cx));
         }
+        let extra = add("env-skill-add", "Write a skill for this project: ", cx).into_any_element();
+        blocks.push(section("Skills", Some(extra), rows, cx));
 
         // Prompts (@ in the composer).
-        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Prompts", Some(add("env-prompt-add", "Write a prompt for this project: ", cx).into_any_element())), cx);
+        let mut rows = vec![];
         if e.prompts.is_empty() {
-            out = out.child(div().text_color(muted).child("None of its own: @ in the composer offers the general ones."));
+            rows.push(empty("None of its own: @ in the composer offers the general ones."));
         }
-        for name in e.prompts.clone() {
-            let id = format!("env-prompt-{name}");
-            let n = name.clone();
-            out = out.child(
-                row(id.clone(), name.clone(), String::new(), false)
-                    .cursor_pointer()
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        this.env_open("prompt", n.clone(), window, cx)
-                    }))
-                    .child(remove(id, "prompt", name.clone(), cx)),
-            );
-            if e.prompt_open.as_deref() == Some(&name) {
-                out = out.child(code(&e.prompt_text, cx)).child(footer("prompt", "prompt", e.prompt_dirty, cx));
-            }
+        for (k, name) in e.prompts.clone().into_iter().enumerate() {
+            rows.push(row("prompt", name.clone(), name, String::new(), false, k == 0, cx));
         }
+        let extra = add("env-prompt-add", "Write a prompt for this project: ", cx).into_any_element();
+        blocks.push(section("Prompts", Some(extra), rows, cx));
 
         // Schedule: what runs on its own, each run a thread of the project.
-        let new_job = act("env-cron-add".into(), "+ New job".into(), false).on_click(cx.listener(|this, _, window, cx| {
-            this.click_claimed = true;
-            cx.stop_propagation();
-            this.env_open_cron("new".into(), window, cx)
-        }));
-        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Schedule", Some(new_job.into_any_element())), cx);
-        if e.cron.is_empty() && e.cron_open.as_deref() != Some("new") {
-            out = out.child(div().text_color(muted).child("Nothing runs on its own yet: a job runs its prompt in a new thread of the project, on a schedule."));
+        let mut rows = vec![];
+        if e.cron.is_empty() {
+            rows.push(empty("Nothing runs on its own yet: a job runs its prompt in a new thread of the project, on a schedule."));
         }
-        let cron_form = |e: &crate::app::ProjectEnv, cx: &mut Context<Self>| {
-            v_flex()
-                .mt_1()
-                .gap_2()
-                .child(gpui_kit::component::input::Input::new(&e.cron_name))
-                .child(gpui_kit::component::input::Input::new(&e.cron_schedule))
-                .child(code(&e.cron_prompt, cx))
-                .child(footer("cron", "cron", e.cron_dirty, cx))
-                .into_any_element()
-        };
-        if e.cron_open.as_deref() == Some("new") {
-            out = out.child(cron_form(e, cx));
-        }
-        for j in e.cron.clone() {
-            let id = format!("env-cron-{}", j.id);
+        for (k, j) in e.cron.clone().into_iter().enumerate() {
             let next = j.next_run.as_deref().map(when).unwrap_or_else(|| "no next run".into());
             let mut note = if j.enabled { format!("{} · next {next}", j.display) } else { format!("{} · paused", j.display) };
             if let Some(st) = &j.last_status {
                 note.push_str(&format!(" · last: {st}"));
             }
             let failed = j.last_status.as_deref().is_some_and(|s| s != "ok");
-            let (open_id, pause_id, run_id) = (j.id.clone(), j.id.clone(), j.id.clone());
-            let enabled = j.enabled;
-            let hover = SharedString::from(id.clone());
-            out = out.child(
-                row(id.clone(), j.name.clone(), note, failed)
-                    .cursor_pointer()
+            rows.push(row("cron", j.id.clone(), j.name.clone(), note, failed, k == 0, cx));
+        }
+        let new_job = act("env-cron-add".into(), "+ New job")
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.click_claimed = true;
+                cx.stop_propagation();
+                this.env_card("cron", "new".into(), window, cx)
+            }))
+            .into_any_element();
+        blocks.push(section("Schedule", Some(new_job), rows, cx));
+
+        // Accesses (a remote project's are its server's own).
+        if !remote {
+            let mut rows = vec![];
+            if e.hosts.is_empty() {
+                rows.push(empty("No servers or file hosts yet: /ssh and /ftp in its threads offer only these."));
+            }
+            for (k, (hid, name, kind, at)) in e.hosts.clone().into_iter().enumerate() {
+                rows.push(row("host", hid, name, format!("{kind} · {at}"), false, k == 0, cx));
+            }
+            let extra = add("env-host-add", "Add to this project the access: ", cx).into_any_element();
+            blocks.push(section("Accesses", Some(extra), rows, cx));
+        }
+
+        v_flex()
+            .w_full()
+            .gap_3()
+            .children(blocks)
+            .when_some(e.error.clone(), |d, err| d.child(div().text_color(theme.danger).child(err)))
+            .into_any_element()
+    }
+
+    /// The open row's card, under the environment block as the agent's answer: its fields, and in
+    /// its head Save (live once something changed), Revert, its own actions, Remove (twice) and
+    /// Close.
+    pub(super) fn render_env_card(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let e = self.project_env.as_ref()?;
+        let (kind, name) = e.card.clone()?;
+        let act = |id: String, label: String, color: Hsla| {
+            div().id(SharedString::from(id)).flex_none().cursor_pointer().text_color(color).hover(|s| s.opacity(0.8)).child(label)
+        };
+        let save = |what: &'static str, dirty: bool, cx: &mut Context<Self>| {
+            div()
+                .id(SharedString::from(format!("env-card-save-{what}")))
+                .flex_none()
+                .px_2()
+                .rounded_sm()
+                .when(dirty, |d| {
+                    d.cursor_pointer().bg(theme.primary).text_color(theme.primary_foreground).on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.env_save(what, window, cx)
+                    }))
+                })
+                .when(!dirty, |d| d.text_color(muted))
+                .child("Save")
+                .into_any_element()
+        };
+        let revert = |what: &'static str, dirty: bool, cx: &mut Context<Self>| {
+            dirty.then(|| {
+                act(format!("env-card-revert-{what}"), "Revert".into(), muted)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
-                        this.env_open_cron(open_id.clone(), window, cx)
+                        this.env_revert(what, window, cx)
                     }))
-                    .child(
-                        h_flex()
-                            .flex_none()
-                            .gap_3()
-                            .opacity(0.)
-                            .group_hover(hover, |s| s.opacity(1.))
-                            .child(act(format!("{id}-run").into(), "Run now".into(), false).on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                cx.stop_propagation();
-                                this.env_cron(run_id.clone(), "trigger", window, cx)
-                            })))
-                            .child(act(format!("{id}-pause").into(), if enabled { "Pause".into() } else { "Resume".into() }, false).on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                cx.stop_propagation();
-                                this.env_cron(pause_id.clone(), if enabled { "pause" } else { "resume" }, window, cx)
-                            }))),
-                    )
-                    .child(remove(id, "cron", j.id.clone(), cx)),
-            );
-            if e.cron_open.as_deref() == Some(j.id.as_str()) {
-                out = out.child(cron_form(e, cx));
-                if !j.last_output.trim().is_empty() {
-                    let last = j.last_run.as_deref().map(when).unwrap_or_default();
-                    out = out.child(div().pb_2().text_sm().text_color(muted).child(format!("Last run {last}: {}", j.last_output.trim())));
+                    .into_any_element()
+            })
+        };
+        let armed = e.armed.clone();
+        let remove = |what: &'static str, target: String, label: &'static str, cx: &mut Context<Self>| {
+            let on = armed.as_deref() == Some(format!("{what}:{target}").as_str());
+            act(format!("env-card-rm-{what}"), if on { format!("{label}?") } else { label.to_string() }, theme.danger)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    this.env_remove(what, target.clone(), window, cx)
+                }))
+                .into_any_element()
+        };
+        // A text: a code editor as tall as its wrapped text (the thread scrolls, not it).
+        let code = |state: &Entity<gpui_kit::component::input::EditorState>, cx: &App| {
+            let text = state.read(cx).value().to_string();
+            let lines: usize = text.lines().map(|l| l.chars().count() / 100 + 1).sum::<usize>().max(1);
+            div()
+                .h(px(lines as f32 * super::editor_line(cx) + 12.))
+                .child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full())
+                .into_any_element()
+        };
+        let pad = |d: Div| d.px_3().py_2().gap_2().into_any_element();
+        let mut actions: Vec<AnyElement> = vec![];
+        let (title, body): (String, AnyElement) = match kind {
+            "name" => {
+                actions.push(save("name", e.name_dirty, cx));
+                actions.extend(revert("name", e.name_dirty, cx));
+                actions.push(remove("project", String::new(), "Remove the project", cx));
+                ("Name".into(), pad(v_flex().child(gpui_kit::component::input::Input::new(&e.name)).child(div().text_sm().text_color(muted).child("Removing the project keeps its threads."))))
+            }
+            "soul" => {
+                actions.push(save("soul", e.soul_dirty, cx));
+                actions.extend(revert("soul", e.soul_dirty, cx));
+                ("Soul: what the project is, how to work in it".into(), code(&e.soul, cx))
+            }
+            "telegram" => {
+                actions.push(save("telegram", e.tg_dirty, cx));
+                actions.extend(revert("telegram", e.tg_dirty, cx));
+                (
+                    "Telegram".into(),
+                    pad(v_flex()
+                        .child(gpui_kit::component::input::Input::new(&e.tg_token))
+                        .child(gpui_kit::component::input::Input::new(&e.tg_users))
+                        .child(div().text_sm().text_color(muted).child("Its chats become this project's threads, with its soul, skills and servers."))),
+                )
+            }
+            "mcp" => {
+                if !e.mcp.iter().any(|m| m.0 == name) {
+                    return None;
                 }
+                if e.mcp_auth.contains(&name) {
+                    let n = name.clone();
+                    actions.push(
+                        act("env-card-auth".into(), "Authorize".into(), theme.primary)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                this.env_authorize(n.clone(), window, cx)
+                            }))
+                            .into_any_element(),
+                    );
+                }
+                actions.push(save("mcp", e.mcp_dirty, cx));
+                actions.extend(revert("mcp", e.mcp_dirty, cx));
+                actions.push(remove("mcp", name.clone(), "Remove", cx));
+                (format!("MCP server · {name}"), code(&e.mcp_json, cx))
             }
-        }
-
-        // Accesses.
-        if !remote {
-            section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Accesses", Some(add("env-host-add", "Add to this project the access: ", cx).into_any_element())), cx);
-            if e.hosts.is_empty() {
-                out = out.child(div().text_color(muted).child("No servers or file hosts yet: /ssh and /ftp in its threads offer only these."));
+            "skill" => {
+                if !e.skills.iter().any(|k| k.0 == name) {
+                    return None;
+                }
+                actions.push(save("skill", e.skill_dirty, cx));
+                actions.extend(revert("skill", e.skill_dirty, cx));
+                actions.push(remove("skill", name.clone(), "Remove", cx));
+                (format!("Skill · {name}"), code(&e.skill_text, cx))
             }
-            for (hid, name, kind, at) in e.hosts.clone() {
-                let id = format!("env-host-{hid}");
-                out = out.child(row(id.clone(), name, format!("{kind} · {at}"), false).child(remove(id, "host", hid, cx)));
+            "prompt" => {
+                if !e.prompts.contains(&name) {
+                    return None;
+                }
+                actions.push(save("prompt", e.prompt_dirty, cx));
+                actions.extend(revert("prompt", e.prompt_dirty, cx));
+                actions.push(remove("prompt", name.clone(), "Remove", cx));
+                (format!("Prompt · {name}"), code(&e.prompt_text, cx))
             }
-        }
-
-        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("", None), cx);
-
-        // The project's removal, in red.
-        let project_armed = is_armed("project:".into());
-        out = v_flex().w_full().gap_3().children(blocks)
-            .when_some(e.error.clone(), |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
-            .when(!general, |d| d.child(
-                h_flex().pt_4().child(div().flex_1()).child(
-                    act("env-remove-project".into(), if project_armed { "Remove the project? Its threads stay".into() } else { "Remove project".into() }, true)
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.click_claimed = true;
-                            this.env_remove("project", String::new(), window, cx)
-                        })),
-                ),
-            ));
-        out.into_any_element()
+            "cron" => {
+                let job = e.cron.iter().find(|j| j.id == name).cloned();
+                if name != "new" && job.is_none() {
+                    return None;
+                }
+                if let Some(j) = &job {
+                    let (run, pause, enabled) = (j.id.clone(), j.id.clone(), j.enabled);
+                    actions.push(
+                        act("env-card-run".into(), "Run now".into(), muted)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                this.env_cron(run.clone(), "trigger", window, cx)
+                            }))
+                            .into_any_element(),
+                    );
+                    actions.push(
+                        act("env-card-pause".into(), if enabled { "Pause".into() } else { "Resume".into() }, muted)
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                this.env_cron(pause.clone(), if enabled { "pause" } else { "resume" }, window, cx)
+                            }))
+                            .into_any_element(),
+                    );
+                }
+                actions.push(save("cron", e.cron_dirty, cx));
+                actions.extend(revert("cron", e.cron_dirty, cx));
+                if job.is_some() {
+                    actions.push(remove("cron", name.clone(), "Remove", cx));
+                }
+                let last = job.as_ref().filter(|j| !j.last_output.trim().is_empty()).map(|j| {
+                    let at = j.last_run.as_deref().map(when).unwrap_or_default();
+                    div().text_sm().text_color(muted).child(format!("Last run {at}: {}", j.last_output.trim()))
+                });
+                (
+                    job.as_ref().map(|j| format!("Job · {}", j.name)).unwrap_or_else(|| "New job".into()),
+                    pad(v_flex()
+                        .child(gpui_kit::component::input::Input::new(&e.cron_name))
+                        .child(gpui_kit::component::input::Input::new(&e.cron_schedule))
+                        .child(div().border_1().rounded_md().border_color(theme.border).child(code(&e.cron_prompt, cx)))
+                        .children(last)),
+                )
+            }
+            "host" => {
+                let (hid, hname, hkind, at) = e.hosts.iter().find(|h| h.0 == name).cloned()?;
+                actions.push(remove("host", hid, "Remove from the project", cx));
+                (format!("Access · {hname}"), pad(v_flex().child(div().text_color(muted).child(format!("{hkind} · {at}")))))
+            }
+            _ => return None,
+        };
+        let close = super::inserts::icon_button("env-card-close", crate::icons::Ico::X, "Close", &theme).on_click(cx.listener(move |this, _, window, cx| {
+            this.click_claimed = true;
+            this.env_card(kind, name.clone(), window, cx)
+        }));
+        let head = super::block_head(&theme, true)
+            .gap_3()
+            .child(div().flex_1().min_w_0().truncate().text_color(theme.foreground).child(title))
+            .children(actions)
+            .child(close);
+        Some(super::inserts::card(head, body, &theme))
     }
 }
 

@@ -55,6 +55,9 @@ pub struct ProjectEnv {
     pub cron_schedule: Entity<InputState>,
     pub cron_prompt: Entity<EditorState>,
     pub cron_dirty: bool,
+    /// What is open under the block, as the agent's answer: (kind, name) — "name", "soul",
+    /// "telegram", "mcp", "skill", "prompt", "cron" ("new" for a new job), "host".
+    pub card: Option<(&'static str, String)>,
     /// Its blocks shut by a click on their head (by title).
     pub folded: std::collections::HashSet<&'static str>,
     /// A row's remove asked once ("mcp:<name>", "skill:<name>", "host:<id>", "project"): the
@@ -171,6 +174,7 @@ impl BenchApp {
             cron_prompt,
             cron_dirty: false,
             folded: Default::default(),
+            card: None,
             mcp_auth: Default::default(),
             armed: None,
             error: None,
@@ -292,6 +296,7 @@ impl BenchApp {
                                 // A new job: its form closes, the job is in the list.
                                 if e.cron_open.as_deref() == Some("new") {
                                     e.cron_open = None;
+                                    e.card = None;
                                 }
                             }
                             _ => e.skill_dirty = false,
@@ -386,6 +391,10 @@ impl BenchApp {
             move || rest::send_json(&conn, "DELETE", &path, &profile, Value::Null),
             move |this, r, window, cx| match r {
                 Ok(_) => {
+                    // What was removed had its card open.
+                    if let Some(e) = this.project_env.as_mut() {
+                        e.card = None;
+                    }
                     this.load_env(&id, window, cx);
                     this.load_remote_hosts(window, cx);
                 }
@@ -474,6 +483,36 @@ impl BenchApp {
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
             },
         );
+    }
+
+    /// A row's click: its card opens under the block (again: it closes); one card at a time.
+    pub fn env_card(&mut self, kind: &'static str, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        let again = e.card.as_ref().is_some_and(|(k, n)| *k == kind && *n == name);
+        e.soul_open = false;
+        e.tg_open = false;
+        e.mcp_open = None;
+        e.skill_open = None;
+        e.prompt_open = None;
+        e.cron_open = None;
+        e.armed = None;
+        if again {
+            e.card = None;
+            cx.notify();
+            return;
+        }
+        e.card = Some((kind, name.clone()));
+        match kind {
+            "soul" => e.soul_open = true,
+            "telegram" => e.tg_open = true,
+            "mcp" | "prompt" => self.env_open(kind, name, window, cx),
+            "skill" => self.env_open_skill(name, window, cx),
+            "cron" => self.env_open_cron(name, window, cx),
+            _ => {}
+        }
+        cx.notify();
     }
 
     /// A job's row: its name, schedule and prompt open under it to edit (again: closes); "new":

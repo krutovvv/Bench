@@ -227,10 +227,12 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
         ]
     });
     crate::app::project_env::apply(e, &v, window, cx);
-    // `BENCH_DEMO=env-open`: the soul and a skill opened, as when they are being edited.
-    if std::env::var("BENCH_DEMO").as_deref() == Ok("env-open") && e.skill_open.is_none() {
-        e.soul_open = true;
-        app.env_open_skill("release-notes".into(), window, cx);
+    // `BENCH_DEMO=env-open`: a skill's card open, as when it is being edited.
+    if std::env::var("BENCH_DEMO").as_deref() == Ok("env-open") && e.card.is_none() {
+        app.env_card("skill", "release-notes".into(), window, cx);
+        if let Some(e) = app.project_env.as_mut() {
+            e.folded.extend(["Project", "MCP servers", "Prompts", "Schedule", "Accesses"]);
+        }
     }
 }
 

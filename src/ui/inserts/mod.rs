@@ -130,7 +130,7 @@ impl BenchApp {
     }
 
     /// A block in the agent's row (its avatar), at the thread's column: what an insert opened.
-    fn agent_row(&mut self, content: AnyElement, cx: &mut Context<Self>) -> AnyElement {
+    pub(in crate::ui) fn agent_row(&mut self, content: AnyElement, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         h_flex()
             .w_full()
