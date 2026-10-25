@@ -65,7 +65,7 @@ impl BenchApp {
         self.inserts.entry(thread.clone()).or_default().push(ins.clone());
         match self.session.clone() {
             Some(session) => self.send_insert(&session, &ins),
-            None => self.create_thread_now(window, cx),
+            None => self.create_thread_now(),
         }
         // The newest of a shared kind is the live one.
         if let Some(name) = kind.shared() {
@@ -86,15 +86,15 @@ impl BenchApp {
         });
     }
 
-    /// A new chat's session, made before any message (an insert was put into it).
-    fn create_thread_now(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// A new chat's session, made before any message (an insert was put into it, or a
+    /// project's "+": the thread shows in the sidebar at once).
+    pub(crate) fn create_thread_now(&mut self) {
         if self.creating || self.runtime.is_some() {
             return;
         }
         let Some(profile) = self.profile.clone() else {
             return;
         };
-        let _ = (window, cx);
         self.creating = true;
         self.cmd(self.create_cmd(profile, self.new_project.clone()));
     }

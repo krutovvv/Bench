@@ -902,7 +902,7 @@ impl BenchApp {
                         0,
                         crate::model::SessionRow {
                             id: session.clone(),
-                            title: String::new(),
+                            title: "Untitled".into(),
                             messages: 0,
                             model: String::new(),
                             running: true,
