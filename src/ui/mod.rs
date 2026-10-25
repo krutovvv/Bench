@@ -251,6 +251,36 @@ pub const TURN_Y: f32 = 14.;
 /// The head of every block (an insert, a code block, a tool's pane, an open file): one height,
 /// one faint ground, small muted text. `over_body`: a line under it, when something follows.
 pub const BLOCK_HEAD_H: f32 = 32.;
+/// A file's icon and its color, by what it is, as an editor's file tree shows them: folders in
+/// blue, code in its own colors, config, data, pictures, media, archives each told apart.
+pub fn file_icon(name: &str, dir: bool, theme: &gpui_kit::component::Theme) -> (crate::icons::Ico, Hsla) {
+    use crate::icons::Ico;
+    if dir {
+        return (Ico::Folder, theme.blue);
+    }
+    let lower = name.to_lowercase();
+    let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
+    match ext {
+        "rs" | "go" | "c" | "h" | "cpp" | "hpp" | "swift" | "kt" | "java" | "cs" | "zig" | "scala" => (Ico::FileCode, theme.red),
+        "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "vue" | "svelte" | "astro" => (Ico::FileCode, theme.yellow),
+        "py" | "rb" | "php" | "lua" | "pl" | "ex" | "exs" => (Ico::FileCode, theme.blue),
+        "html" | "htm" | "css" | "scss" | "sass" | "less" | "xml" | "svg" => (Ico::FileCode, theme.magenta),
+        "json" | "jsonc" | "json5" => (Ico::FileJson, theme.yellow),
+        "yml" | "yaml" | "toml" | "ini" | "conf" | "cfg" | "env" | "properties" | "plist" => (Ico::FileCog, theme.cyan),
+        "md" | "mdx" | "txt" | "rst" | "org" | "csv" | "log" => (Ico::FileText, theme.muted_foreground),
+        "sh" | "bash" | "zsh" | "fish" | "ps1" => (Ico::FileTerminal, theme.green),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" | "bmp" | "tiff" | "heic" => (Ico::FileImage, theme.magenta),
+        "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" => (Ico::FileAudio, theme.cyan),
+        "mp4" | "mov" | "mkv" | "webm" | "avi" => (Ico::FileVideo, theme.cyan),
+        "zip" | "gz" | "tgz" | "bz2" | "xz" | "7z" | "rar" | "tar" | "zst" => (Ico::FileArchive, theme.yellow),
+        "lock" | "pem" | "key" | "crt" => (Ico::FileLock, theme.muted_foreground),
+        _ if matches!(lower.as_str(), "dockerfile" | "makefile") => (Ico::FileCog, theme.cyan),
+        // A dotfile is a program's settings (.zshrc, .gitconfig, .npmrc).
+        _ if lower.starts_with('.') && !lower[1..].contains('.') => (Ico::FileCog, theme.cyan),
+        _ => (Ico::File, theme.muted_foreground),
+    }
+}
+
 /// A text field's height (gpui-kit's default input): a form's other controls match it.
 pub const FIELD_H: f32 = 32.;
 

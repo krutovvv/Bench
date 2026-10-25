@@ -174,12 +174,10 @@ impl BenchApp {
             .text_base()
             .cursor_pointer()
             .hover(|s| s.bg(theme.list_hover))
-            .child(
-                if dir { Ico::Folder } else { Ico::File }
-                    .icon()
-                    .small()
-                    .text_color(muted),
-            )
+            .child({
+                let (ico, color) = super::file_icon(&name, dir, &theme);
+                ico.icon().small().text_color(color)
+            })
             .child(div().flex_1().min_w_0().truncate().child(name))
             .child(div().flex_none().text_base().text_color(muted).child(size))
             .child(div().flex_none().w(px(130.)).text_base().text_color(muted).child(modified))

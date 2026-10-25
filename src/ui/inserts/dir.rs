@@ -94,7 +94,10 @@ impl InsertKind for Dir {
                     .when(k > 0, |d| d.border_t_1().border_color(theme.border.opacity(0.5)))
                     .when(chosen, |d| d.bg(theme.list_active))
                     .hover(|s| s.bg(theme.list_hover))
-                    .child(if is_dir { Ico::Folder } else { Ico::File }.icon().small().text_color(muted))
+                    .child({
+                        let (ico, color) = super::super::file_icon(&name, is_dir, &theme);
+                        ico.icon().small().text_color(color)
+                    })
                     .child(div().flex_1().min_w_0().truncate().child(name))
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
