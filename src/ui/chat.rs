@@ -252,6 +252,8 @@ impl BenchApp {
             rows.push(self.render_turn(i, cx));
             rows.extend(self.render_inserts_at(i + 1, i + 1 == n, window, cx));
         }
+        // The agent's plan, as its row under the work it describes.
+        let plan = self.render_plan(cx);
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
@@ -302,6 +304,7 @@ impl BenchApp {
                             .when(block_on_top, |d| d.children(subject_block.take()))
                             .children(placeholder)
                             .children(rows)
+                            .children(plan)
                             .children(approval)
                             .children(clarify)
                             .children(subject_block)

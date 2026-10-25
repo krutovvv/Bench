@@ -135,11 +135,10 @@ impl BenchApp {
         )
     }
 
-
-    /// The plan over the input: a block like an insert's — its head (`block_head`) with the
-    /// chevron, "PLAN · 3/7" and, folded, the step in progress; the steps under the head when
-    /// open. It sits over the input in the thread's text column. When no step is left to do the
-    /// app drops it altogether (`Evt::Todos`), so an ended plan never lingers.
+    /// The plan as a row of the thread, the agent's: a block like an insert's (its avatar, its
+    /// `block_head`) with the chevron, "PLAN · 3/7" and, folded, the step in progress; the steps
+    /// under the head when open. It goes when no step is left to do (`Evt::Todos`), so an ended
+    /// plan never lingers.
     pub(super) fn render_plan(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.todos.is_empty() {
             return None;
@@ -222,6 +221,8 @@ impl BenchApp {
             })
             .when(!open, |d| d.child(div().flex_1()))
             .on_click(cx.listener(|this, _, _, cx| {
+                // Folding is the thread's own click: it must not pull the focus to the composer.
+                this.click_claimed = true;
                 this.plan_open = !this.plan_open;
                 cx.notify();
             }));
@@ -242,26 +243,23 @@ impl BenchApp {
                         .id("plan-steps")
                         .px_3()
                         .py_2()
-                        .max_h(px(240.))
-                        .overflow_y_scroll()
+                        .gap_0p5()
                         .children(steps),
                 )
             });
+        // The agent's row, as an insert's or an answer's: its avatar, the block in the text column.
         Some(
             h_flex()
                 .w_full()
                 .flex_none()
-                // In the thread's text column, with the usual gap over the input.
+                .id("plan-row")
                 .pl(px(super::CHAT_LEFT))
                 .pr(px(super::CHAT_RIGHT))
-                .pt(px(super::TURN_Y))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .ml(px(super::CHAT_TEXT - super::CHAT_LEFT))
-                        .child(frame),
-                )
+                .py(px(super::TURN_Y))
+                .gap(px(super::CHAT_TEXT - super::CHAT_LEFT - super::AVATAR))
+                .items_start()
+                .child(super::avatar(true, &theme))
+                .child(div().flex_1().min_w_0().child(frame))
                 .into_any_element(),
         )
     }

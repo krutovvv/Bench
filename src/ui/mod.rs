@@ -529,7 +529,6 @@ impl Render for BenchApp {
                     this.add_attachments(paths.paths().to_vec(), cx)
                 }))
                 .child(div().flex_1().min_h_0().child(self.render_chat(window, cx)))
-                .children(self.render_plan(cx))
                 .into_any_element(),
             Panel::Providers => self.render_providers(cx),
             Panel::NewProject => self.render_project_form(cx),
