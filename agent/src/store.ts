@@ -26,6 +26,9 @@ export interface SessionRow {
 	updated: number;
 	message_count: number;
 	todos: Todo[];
+	/** When the plan in `todos` started (unix seconds): where Bench puts its block in the
+	 *  thread. 0 = no plan of note. */
+	todos_at: number;
 	chat_id?: string;
 	display_name?: string;
 	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:<host id>", "folder:<path>"; "" = a plain chat. */
@@ -47,7 +50,8 @@ export class Store {
 				id TEXT PRIMARY KEY, conversation TEXT NOT NULL, profile TEXT NOT NULL, title TEXT DEFAULT '',
 				source TEXT DEFAULT 'local', cwd TEXT DEFAULT '', model TEXT DEFAULT '', provider TEXT DEFAULT '',
 				effort TEXT DEFAULT '', created REAL, updated REAL, message_count INTEGER DEFAULT 0,
-				todos TEXT DEFAULT '[]', usage TEXT DEFAULT '', chat_id TEXT, display_name TEXT,
+				todos TEXT DEFAULT '[]', todos_at REAL DEFAULT 0, usage TEXT DEFAULT '',
+				chat_id TEXT, display_name TEXT,
 				deleted INTEGER DEFAULT 0
 			);
 			CREATE TABLE IF NOT EXISTS messages (
@@ -61,6 +65,9 @@ export class Store {
 			try {
 				this.db.exec(`ALTER TABLE sessions ADD COLUMN ${col} TEXT DEFAULT ''`);
 			} catch {}
+		try {
+			this.db.exec("ALTER TABLE sessions ADD COLUMN todos_at REAL DEFAULT 0");
+		} catch {}
 		// Pi's conversation ids are integers; early rows kept them as "125.0".
 		this.db.exec("UPDATE sessions SET conversation = CAST(CAST(conversation AS REAL) AS INTEGER) WHERE conversation LIKE '%.%'");
 	}
@@ -72,10 +79,10 @@ export class Store {
 		} catch {
 			usage = totalsOf(null);
 		}
-		return { ...r, todos: JSON.parse(r.todos || "[]"), usage };
+		return { ...r, todos: JSON.parse(r.todos || "[]"), todos_at: r.todos_at ?? 0, usage };
 	}
 
-	create(s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "title" | "usage"> & { title?: string }): SessionRow {
+	create(s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "todos_at" | "title" | "usage"> & { title?: string }): SessionRow {
 		const now = Date.now() / 1000;
 		this.db
 			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, subject, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")

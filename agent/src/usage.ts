@@ -48,3 +48,10 @@ export function usagePayload(model: string, u: Totals, max: number): Record<stri
 		avg_tps: u.tps ?? 0,
 	};
 }
+/** Does `next` begin a plan of its own, against the plan `prev` the thread had? Steps carry
+ *  stable ids, so a plan with no id in common is a new one; the same ids are the same plan
+ *  changing status, which stays where it was first put. */
+export function planFresh(prev: unknown, next: unknown): boolean {
+	const ids = new Set((Array.isArray(prev) ? prev : []).map((t: any) => t?.id).filter(Boolean));
+	return !(Array.isArray(next) ? next : []).some((t: any) => ids.has(t?.id));
+}

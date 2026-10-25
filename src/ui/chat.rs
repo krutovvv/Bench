@@ -16,6 +16,42 @@ use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
+/// After how many turns the plan's row sits: after the last turn that had begun when the plan
+/// did. Without a moment of its own (a thread planned before this was kept) it stays at the end,
+/// as it was then.
+fn plan_pos(turns: &[Turn], at: Option<f64>) -> usize {
+    let Some(at) = at else { return turns.len() };
+    turns
+        .iter()
+        .position(|t| t.started.is_some_and(|s| s > at))
+        .unwrap_or(turns.len())
+}
+
+#[cfg(test)]
+mod plan_tests {
+    use super::plan_pos;
+    use crate::model::Turn;
+
+    fn turn(started: Option<f64>) -> Turn {
+        Turn {
+            started,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn the_plan_sits_where_it_was_made() {
+        let turns = [turn(Some(100.)), turn(Some(200.)), turn(Some(300.))];
+        assert_eq!(plan_pos(&turns, Some(150.)), 1, "made during the first turn");
+        assert_eq!(plan_pos(&turns, Some(250.)), 2);
+        assert_eq!(plan_pos(&turns, Some(500.)), 3, "the newest work");
+        assert_eq!(plan_pos(&turns, Some(50.)), 0, "older than the thread: at its top");
+        assert_eq!(plan_pos(&turns, None), 3, "no moment of its own: at the end");
+        assert_eq!(plan_pos(&[turn(None)], Some(10.)), 1, "an undated turn keeps it after");
+        assert_eq!(plan_pos(&[], Some(10.)), 0, "no turns yet");
+    }
+}
+
 /// Below the composer the thread can scroll on, as a code editor past its last line.
 const SCROLL_PAST_END: f32 = 240.;
 /// A terminal's most: under it, it fits its text.
@@ -247,13 +283,22 @@ impl BenchApp {
 
         // The turns, and after each the inserts the person put there.
         let n = self.turns.len();
+        // The agent's plan, as its row under the work it describes — there, and not after the
+        // newest message: a plan made earlier stays where it was made.
+        let plan_after = plan_pos(&self.turns, self.plan_at);
+        let mut plan = self.render_plan(cx);
+
         let mut rows: Vec<AnyElement> = self.render_inserts_at(0, n == 0, window, cx);
         for i in 0..n {
             rows.push(self.render_turn(i, cx));
             rows.extend(self.render_inserts_at(i + 1, i + 1 == n, window, cx));
+            if plan_after == i + 1 {
+                rows.extend(plan.take());
+            }
         }
-        // The agent's plan, as its row under the work it describes.
-        let plan = self.render_plan(cx);
+        if n == 0 && plan_after == 0 {
+            rows.extend(plan.take());
+        }
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
@@ -304,7 +349,6 @@ impl BenchApp {
                             .when(block_on_top, |d| d.children(subject_block.take()))
                             .children(placeholder)
                             .children(rows)
-                            .children(plan)
                             .children(approval)
                             .children(clarify)
                             .children(subject_block)

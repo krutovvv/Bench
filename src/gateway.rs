@@ -152,7 +152,9 @@ pub enum Evt {
     /// The pending question was answered, timed out or withdrawn.
     ClarifyDone(String),
     /// The session's plan, whole: (runtime session, steps).
-    Todos(String, Vec<crate::model::Todo>),
+    /// The agent's plan and the moment (unix seconds) it began; 0 = the agent did not say
+    /// (an older agent), so Bench keeps the block where it already had it.
+    Todos(String, Vec<crate::model::Todo>, f64),
     /// The background self-improvement review of the last turn: what it saved or patched.
     Review(String, String),
     /// The pending approval was answered or withdrawn.
@@ -822,7 +824,7 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             session: sid,
         }),
         "tool.complete" if payload["todos"].is_array() => {
-            emit(Evt::Todos(sid.clone(), todos(payload)));
+            emit(Evt::Todos(sid.clone(), todos(payload), todo_at(payload)));
             emit(Evt::ToolDone {
                 failed: history::failed(&payload["result"]),
                 call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
@@ -897,7 +899,7 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             }))
         }
         "clarify.settled" | "clarify.cancelled" => emit(Evt::ClarifyDone(sid)),
-        "todo.updated" => emit(Evt::Todos(sid, todos(payload))),
+        "todo.updated" => emit(Evt::Todos(sid, todos(payload), todo_at(payload))),
         kind @ ("subagent.start" | "subagent.tool" | "subagent.text" | "subagent.complete") => {
             let s = |k: &str| payload[k].as_str().unwrap_or_default().to_string();
             let id = payload["subagent_id"]
@@ -1026,6 +1028,11 @@ fn log_error(method: &str, err: &str) {
 }
 
 /// The plan steps of a `todo.updated` / todo `tool.complete` payload, sub-steps indented.
+/// When this plan began, as the agent dated it.
+fn todo_at(payload: &Value) -> f64 {
+    payload["at"].as_f64().unwrap_or(0.)
+}
+
 fn todos(payload: &Value) -> Vec<crate::model::Todo> {
     let items = payload["todos"].as_array().cloned().unwrap_or_default();
     let parent_of = |id: &str| {

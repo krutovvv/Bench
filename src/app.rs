@@ -209,6 +209,9 @@ pub struct BenchApp {
     pub clarify_input: Entity<InputState>,
     /// The agent's plan for this chat, and whether its list is unfolded.
     pub todos: Vec<crate::model::Todo>,
+    /// When the plan above began (unix seconds): the thread's row of the plan sits there
+    /// instead of trailing the newest message. None = no plan shown.
+    pub plan_at: Option<f64>,
     pub plan_open: bool,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
@@ -677,6 +680,7 @@ impl BenchApp {
             clarify_picked: vec![],
             clarify_input,
             todos: vec![],
+            plan_at: None,
             plan_open: false,
             approval_mode: None,
             profile_context: 0,
@@ -1208,14 +1212,28 @@ impl BenchApp {
                     self.clarify = None;
                 }
             }
-            Evt::Todos(sid, todos) if self.is_current(&sid) => {
-                // The plan strip shows work still ahead: once no step is pending or in progress
+            Evt::Todos(sid, todos, at) if self.is_current(&sid) => {
+                // The plan block shows work still ahead: once no step is pending or in progress
                 // (the agent finished the plan, or dropped it as wrong), the block goes by itself
                 // — a plan that is over tells nothing the thread does not already say.
                 let live = todos
                     .iter()
                     .any(|t| t.status == "pending" || t.status == "in_progress");
-                self.todos = if live { todos } else { vec![] };
+                if live {
+                    // It stays where the plan began, not at the newest message: the same steps
+                    // keep the moment they were first seen with, a new plan gets a new one.
+                    self.plan_at = Some(if at > 0. {
+                        at
+                    } else if self.todos.is_empty() {
+                        now_secs()
+                    } else {
+                        self.plan_at.unwrap_or_else(now_secs)
+                    });
+                    self.todos = todos;
+                } else {
+                    self.todos.clear();
+                    self.plan_at = None;
+                }
             }
             Evt::Subagent {
                 session,
@@ -1347,6 +1365,7 @@ impl BenchApp {
         self.approval = None;
         self.clarify = None;
         self.todos.clear();
+        self.plan_at = None;
         self.model_pick = None;
         self.model_pending = false;
         // Speeds describe the model and server, not the chat: keep them, restart the counters.

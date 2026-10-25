@@ -16,7 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
 import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort, resolveModel, setSetting, type ModelChoice } from "./config.ts";
-import { EMPTY_TOTALS, totalsOf, usagePayload } from "./usage.ts";
+import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { setHost, type Host, type SessionInfo } from "./host.ts";
@@ -571,10 +571,17 @@ export class Runtime {
 				return choice || "deny";
 			},
 			setTodos: (sessionId, todos: Todo[]) => {
-				this.store.update(sessionId, { todos });
+				// A plan with new steps is a new plan: it gets its own moment, and Bench keeps its
+				// block there instead of trailing it after the thread. Steps of the same plan
+				// (same ids) only change their status and stay where they were put.
+				const prev = this.store.get(sessionId)?.todos ?? [];
+				const fresh = planFresh(prev, todos);
+				const now = Date.now() / 1000;
+				this.store.update(sessionId, fresh ? { todos, todos_at: now } : { todos });
+				const at = fresh ? now : this.store.get(sessionId)?.todos_at ?? 0;
 				const live = this.live.get(sessionId);
 				if (live) live.row.todos = todos;
-				this.emit(sessionId, "todo.updated", { todos });
+				this.emit(sessionId, "todo.updated", { todos, at });
 			},
 			todos: (sessionId) => this.store.get(sessionId)?.todos ?? [],
 			emit: (sessionId, type, payload) => this.emit(sessionId, type, payload),

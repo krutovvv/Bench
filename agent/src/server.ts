@@ -119,7 +119,7 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 			queue: await rt.queue(session_id),
 			prompts: rt.pendingPrompts(session_id),
 			info: { reasoning_effort: row.effort, model: row.model, cwd: row.cwd, revision: 0, execution_generation: live.generation },
-			todo_state: { todos: row.todos },
+			todo_state: { todos: row.todos, at: row.todos_at ?? 0 },
 			// The thread's numbers, so the status bar has them before the first answer here.
 			usage: usagePayload(row.model, live.usage, resolveModel(row.profile, { model: row.model, provider: row.provider }).contextLength),
 		};
