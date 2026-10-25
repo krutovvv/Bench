@@ -250,6 +250,22 @@ pub const CHAT_RIGHT: f32 = 38.;
 /// this, so any two rows are 2 × TURN_Y apart, whoever speaks (as in Delta).
 pub const TURN_Y: f32 = 14.;
 
+/// The head of every block (an insert, a code block, a tool's pane, an open file): one height,
+/// one faint ground, small muted text. `over_body`: a line under it, when something follows.
+pub const BLOCK_HEAD_H: f32 = 32.;
+pub fn block_head(theme: &gpui_kit::component::Theme, over_body: bool) -> Div {
+    h_flex()
+        .flex_none()
+        .h(px(BLOCK_HEAD_H))
+        .px_3()
+        .gap_2()
+        .items_center()
+        .bg(theme.muted.opacity(0.35))
+        .when(over_body, |d| d.border_b_1().border_color(theme.border))
+        .text_sm()
+        .text_color(theme.muted_foreground)
+}
+
 /// Who speaks, in the chat's left gutter: the person a dark disc with a figure, the agent the
 /// accent's tint with a bot — told apart at a glance. The composer wears the person's: the next
 /// message is the next turn.

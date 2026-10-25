@@ -396,15 +396,7 @@ pub(super) fn pane_bar(
     cx: &mut Context<HermesApp>,
 ) -> AnyElement {
     let theme = cx.theme();
-    h_flex()
-        .flex_none()
-        .h(px(36.))
-        .px_3()
-        .gap_2()
-        .items_center()
-        .border_b_1()
-        .border_color(theme.border)
-        .text_sm()
+    super::block_head(theme, true)
         .child(div().flex_1().min_w_0().truncate().map(|d| {
             match &error {
                 Some(e) => d.text_color(theme.danger).child(e.clone()),

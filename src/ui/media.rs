@@ -153,7 +153,6 @@ pub(super) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
 /// a copy button on the right, the highlighted code under it (one frame around both).
 fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyElement {
     let theme = cx.theme();
-    let muted = theme.muted_foreground;
     let fence = if code.contains("```") { "~~~~" } else { "```" };
     let body = TextView::markdown(
         ElementId::Name(format!("code-{i}-{k}").into()),
@@ -179,16 +178,8 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
         .border_color(theme.border)
         .child(
             // As tall as the changed-files card's line: small text, 4 above and below.
-            h_flex()
-                .py_1()
-                .pl_4()
-                .pr_2()
-                .items_center()
+            super::block_head(&theme, true)
                 .justify_between()
-                .border_b_1()
-                .border_color(theme.border)
-                .text_base()
-                .text_color(muted)
                 .child(if lang.is_empty() {
                     "code".to_string()
                 } else {

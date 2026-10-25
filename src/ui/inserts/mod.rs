@@ -18,7 +18,6 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::Value;
 
@@ -124,7 +123,7 @@ impl HermesApp {
                 this.patch_insert(&fold_id, serde_json::json!({ "folded": !folded }), cx);
             }));
         let title_el: AnyElement = if switches.is_empty() {
-            div().px_1().text_sm().italic().text_color(muted).child(title).into_any_element()
+            div().px_1().italic().child(title).into_any_element()
         } else {
             let view = cx.entity();
             let ins_id = ins.id.clone();
@@ -158,13 +157,8 @@ impl HermesApp {
                 })
                 .into_any_element()
         };
-        let head = h_flex()
-            .px_3()
-            .py_1()
+        let head = super::block_head(&theme, body.is_some())
             .gap_1()
-            .items_center()
-            .bg(theme.muted.opacity(0.35))
-            .when(body.is_some(), |d| d.border_b_1().border_color(theme.border))
             .child(fold)
             .child(title_el)
             .child(div().flex_1())
