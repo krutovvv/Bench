@@ -27,6 +27,11 @@ pub struct Tab {
     pub alias: String,
     pub session: Arc<Session>,
     pub focus: FocusHandle,
+    /// Its block in the thread shows only its head.
+    pub collapsed: bool,
+    /// Sent to the background: it keeps running, its block is a head with a badge, the status
+    /// bar lists it.
+    pub background: bool,
     _wake: Task<()>,
 }
 
@@ -276,6 +281,8 @@ impl HermesApp {
                     alias: alias.to_string(),
                     session,
                     focus: cx.focus_handle(),
+                    collapsed: false,
+                    background: false,
                     _wake: wake,
                 });
                 Some(self.ssh.tabs.len() - 1)

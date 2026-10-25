@@ -56,7 +56,8 @@ pub fn palette(theme: &Theme) -> Palette {
     Palette {
         ansi: table.map(hex),
         fg: to_rgb(theme.foreground),
-        bg: to_rgb(theme.background),
+        // A terminal is a block of the thread, on its tinted ground.
+        bg: to_rgb(theme.secondary),
         cursor: to_rgb(theme.primary),
     }
 }
@@ -364,7 +365,7 @@ impl HermesApp {
         div()
             .id(("terminal", tab.id))
             .size_full()
-            .bg(theme.background)
+            .bg(theme.secondary)
             .px_4()
             .py_2()
             .track_focus(&focus)

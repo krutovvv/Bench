@@ -23,31 +23,131 @@ const SUBJECT_H: f32 = 440.;
 /// A terminal's most: under it, it fits its text.
 const TERMINAL_MAX: f32 = 280.;
 
-/// A terminal as tall as what it shows, one free line under the cursor, up to SUBJECT_H.
+/// A terminal as tall as the lines it shows (the cursor's included), up to TERMINAL_MAX.
 pub(super) fn terminal_height(session: &crate::term::Session) -> f32 {
     let line = match session.layout().line_h {
         h if h > 1. => h,
         _ => 20.,
     };
-    let used = session.used_rows().min(1000) as f32;
-    // The view's own padding (py_2) and the border.
-    ((used + 1.).max(3.) * line + 18.).min(TERMINAL_MAX)
+    let used = session.used_rows().min(1000).max(1) as f32;
+    // The view's own padding (py_2).
+    (used * line + 16.).min(TERMINAL_MAX)
 }
 
-/// The demo's server: a terminal's last screen, as text (no shell runs in the demo).
+/// The demo's server: a terminal's last screen, as text (no shell runs in the demo), in the
+/// terminal block's look.
 fn demo_terminal(alias: &str, cx: &App) -> AnyElement {
     let theme = cx.theme();
-    div()
+    v_flex()
+        .bg(theme.secondary)
         .border_1()
         .border_color(theme.border)
         .px_3()
         .py_2()
-        .font_family(crate::theme::MONO)
-        .text_sm()
-        .whitespace_nowrap()
-        .overflow_hidden()
-        .children(crate::demo::terminal(alias).lines().map(|l| div().h(px(20.)).child(l.to_string())))
+        .child(h_flex().gap_1().italic().text_color(theme.muted_foreground).child("ssh").child(Ico::ChevronDown.icon().xsmall()))
+        .child(
+            div()
+                .pt_1()
+                .font_family(crate::theme::MONO)
+                .text_sm()
+                .whitespace_nowrap()
+                .overflow_hidden()
+                .children(crate::demo::terminal(alias).lines().map(|l| div().h(px(20.)).child(l.to_string()))),
+        )
         .into_any_element()
+}
+
+impl HermesApp {
+    /// A terminal as a block of the thread, as Delta draws one: on a tinted ground, its shell's
+    /// name on top (a click folds it), on the right "focus" and "to the background"; its lines
+    /// under, as many as it shows. In the background it is its head with a badge, and the status
+    /// bar lists it.
+    fn render_terminal_block(&mut self, ix: usize, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let tab = &self.ssh.tabs[ix];
+        let (collapsed, background) = (tab.collapsed, tab.background);
+        let name = tab.session.title().filter(|t| !t.trim().is_empty()).unwrap_or_else(|| if tab.alias.is_empty() || tab.alias.starts_with("thread:") { "zsh".into() } else { tab.alias.clone() });
+        let id = tab.id;
+        let h = terminal_height(&tab.session);
+        let icon = |key: &'static str, ico: Ico, tip: &'static str| {
+            div()
+                .id((key, id))
+                .p_0p5()
+                .cursor_pointer()
+                .text_color(muted)
+                .hover(|s| s.text_color(theme.foreground).bg(theme.list_hover))
+                .child(ico.icon().small())
+                .tooltip(move |window, cx| gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx))
+        };
+        let head = h_flex()
+            .gap_2()
+            .child(
+                h_flex()
+                    .id(("term-fold", id))
+                    .gap_1()
+                    .cursor_pointer()
+                    .italic()
+                    .text_color(muted)
+                    .hover(|s| s.text_color(theme.foreground))
+                    .child(name)
+                    .child(if collapsed || background { Ico::ChevronRight } else { Ico::ChevronDown }.icon().xsmall())
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.click_claimed = true;
+                        if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                            if t.background {
+                                t.background = false;
+                                t.collapsed = false;
+                            } else {
+                                t.collapsed = !t.collapsed;
+                            }
+                        }
+                        cx.notify();
+                    })),
+            )
+            .child(div().flex_1())
+            .when(background, |d| {
+                d.child(
+                    h_flex()
+                        .gap_1()
+                        .px_1p5()
+                        .border_1()
+                        .border_color(theme.border)
+                        .text_sm()
+                        .text_color(muted)
+                        .child(div().size(px(6.)).rounded_full().bg(theme.primary))
+                        .child("Background"),
+                )
+            })
+            .when(!background, |d| {
+                d.child(icon("term-focus", Ico::Terminal, "Focus the terminal").on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                        t.collapsed = false;
+                        t.focus.focus(window, cx);
+                    }
+                    cx.notify();
+                })))
+                .child(icon("term-bg", Ico::ToBackground, "Send to the background").on_click(cx.listener(move |this, _, _, cx| {
+                    this.click_claimed = true;
+                    if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                        t.background = true;
+                    }
+                    cx.notify();
+                })))
+            });
+        let open = !collapsed && !background;
+        v_flex()
+            .bg(theme.secondary)
+            .border_1()
+            .border_color(theme.border)
+            .px_3()
+            .py_1p5()
+            .child(head)
+            // The view's own 16 inset pulled back: its text starts where the head's does.
+            .when(open, |d| d.child(div().h(px(h)).ml(px(-16.)).mr(px(-16.)).child(self.render_terminal(ix, window, cx))))
+            .into_any_element()
+    }
 }
 
 impl HermesApp {
@@ -72,16 +172,7 @@ impl HermesApp {
             }
             Some(self.render_tasks_block(cx))
         } else if let Some(alias) = HermesApp::subject_server(&subject) {
-            self.ensure_terminal(&alias, window, cx).map(|ix| {
-                let theme = cx.theme().clone();
-                let h = terminal_height(&self.ssh.tabs[ix].session);
-                div()
-                    .h(px(h))
-                    .border_1()
-                    .border_color(theme.border)
-                    .child(self.render_terminal(ix, window, cx))
-                    .into_any_element()
-            })
+            self.ensure_terminal(&alias, window, cx).map(|ix| self.render_terminal_block(ix, window, cx))
             .or_else(|| self.demo.then(|| demo_terminal(&alias, cx)))
         } else if let Some(id) = HermesApp::subject_files(&subject) {
             Some(self.render_files_block(&id, window, cx))
@@ -138,6 +229,7 @@ impl HermesApp {
         // A tool attached with / sits where the work goes on: under the conversation, over the
         // composer. A project's environment is the thread's document: at the top.
         let block_on_top = block_on_top_form.unwrap_or_else(|| subject.starts_with("env:"));
+        let block_is_terminal = block_on_top_form.is_none() && subject.starts_with("ssh:");
         let subject_block = block.map(|content| {
             h_flex()
                 .w_full()
@@ -146,7 +238,8 @@ impl HermesApp {
                 .py(px(super::TURN_Y))
                 .gap(px(super::CHAT_TEXT - super::CHAT_LEFT - super::AVATAR))
                 .items_start()
-                .child(super::avatar(true, &theme))
+                // A terminal is the person's (they opened it); the rest the agent's.
+                .child(super::avatar(!block_is_terminal, &theme))
                 // Typing in a block keeps the focus there (see the thread's click below).
                 .child(
                     div()

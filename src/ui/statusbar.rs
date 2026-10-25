@@ -284,6 +284,38 @@ impl HermesApp {
                 .content(move |_, _, cx| speed_panel(&samples, prefill, generation, cx))
         });
 
+        // Terminals sent to the background: each brings it back into its thread; Stop all ends them.
+        let mut background_terms: Vec<(String, bool, Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)>)> = self
+            .ssh
+            .tabs
+            .iter()
+            .filter(|t| t.background)
+            .enumerate()
+            .map(|(k, t)| {
+                let id = t.id;
+                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> = Box::new(move |this, _, cx| {
+                    if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                        t.background = false;
+                        t.collapsed = false;
+                    }
+                    cx.notify();
+                });
+                (format!("Terminal {}", k + 1), false, f)
+            })
+            .collect();
+        if !background_terms.is_empty() {
+            background_terms.push((
+                "Stop all".into(),
+                false,
+                Box::new(|this, _, cx| {
+                    for t in this.ssh.tabs.iter().filter(|t| t.background) {
+                        t.session.kill();
+                    }
+                    this.ssh.tabs.retain(|t| !t.background);
+                    cx.notify();
+                }),
+            ));
+        }
         h_flex()
             .h(px(28.))
             .flex_none()
@@ -346,7 +378,11 @@ impl HermesApp {
             })
             .children(self.render_backend(cx))
             .child(div().flex_1())
-            // Right: icons only — attach, dictate, settings.
+            // Right: icons only — the terminals in the background (if any), attach, dictate,
+            // settings.
+            .when(!background_terms.is_empty(), |d| {
+                d.child(picker("bg-terminals", Ico::Terminal, String::new(), Some("Running terminals"), vec![], background_terms))
+            })
             .child(
                 button("attach", Ico::Paperclip, "Attach files", false)
                     .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),
