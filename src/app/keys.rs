@@ -65,7 +65,7 @@ impl BenchApp {
             }
             ("f", false) => self.open_search(window, cx),
             (",", false) => {
-                let panel = if self.panel.is_settings() {
+                let panel = if self.panel == Panel::Providers {
                     Panel::Chat
                 } else {
                     Panel::Providers

@@ -52,6 +52,8 @@ pub enum Panel {
     Chat,
     /// Model providers, fallback, voice, service keys.
     Providers,
+    /// A new project: a page of its own, not a thread (a project is not a conversation).
+    NewProject,
 }
 
 impl Panel {
@@ -2071,6 +2073,7 @@ impl BenchApp {
         match panel {
             Panel::Chat => {}
             Panel::Providers => self.load_providers(window, cx),
+            Panel::NewProject => {}
         }
         cx.notify();
     }

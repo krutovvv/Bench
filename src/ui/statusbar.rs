@@ -407,10 +407,10 @@ impl BenchApp {
                     "settings",
                     Ico::Settings,
                     "Settings",
-                    self.panel.is_settings(),
+                    self.panel == Panel::Providers,
                 )
                 .on_click(cx.listener(|this, _, window, cx| {
-                    if this.panel.is_settings() {
+                    if this.panel == Panel::Providers {
                         this.panel = Panel::Chat;
                         cx.notify();
                     } else {

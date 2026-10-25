@@ -12,7 +12,7 @@ use crate::app::BenchApp;
 type Act = Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>;
 
 impl BenchApp {
-    fn pv_heading(&self, text: impl Into<SharedString>, cx: &App) -> Div {
+    pub(super) fn pv_heading(&self, text: impl Into<SharedString>, cx: &App) -> Div {
         div()
             .pt_6()
             .pb_1()
@@ -22,7 +22,7 @@ impl BenchApp {
     }
 
     /// Title and hint on the left, the control on the right, a rule below.
-    fn pv_row(
+    pub(super) fn pv_row(
         &self,
         title: impl Into<SharedString>,
         hint: impl Into<SharedString>,
@@ -52,12 +52,12 @@ impl BenchApp {
             .child(div().flex_1().min_w_0().child(control))
     }
 
-    fn pv_input(&self, input: &Entity<InputState>) -> AnyElement {
+    pub(super) fn pv_input(&self, input: &Entity<InputState>) -> AnyElement {
         Input::new(input).into_any_element()
     }
 
     /// A bordered text button; `primary` fills it with the accent.
-    fn pv_button(
+    pub(super) fn pv_button(
         &self,
         id: impl Into<ElementId>,
         label: impl Into<SharedString>,

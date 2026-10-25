@@ -1,6 +1,5 @@
-//! The new project's form (the sidebar's "+"): a name and, if it has one, a folder on disk.
+//! The new project's page (the sidebar's "+"), and a project's environment as rows in its thread.
 
-use gpui_kit::component::input::Input;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -8,79 +7,100 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 
 impl BenchApp {
-    /// A new project, inside the thread: its name, where its agent runs (this Mac, a server from
-    /// ~/.ssh/config, or another one typed in), a folder on disk if it has one.
+    /// The new project's page (the sidebar's "+"), laid out like Settings: what it is called,
+    /// where its agent runs (this Mac or a server), and on this Mac a folder if it has one.
     pub(super) fn render_project_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
         let Some(form) = self.project_form.as_ref() else {
             return div().into_any_element();
         };
-        let host = form.host.clone();
-        let folder = form.folder.clone();
-        let mut places: Vec<(Option<String>, String)> = vec![(None, "This Mac".into())];
-        places.extend(self.ssh.servers.iter().map(|s| (Some(s.alias.clone()), s.alias.clone())));
-        places.push((Some(String::new()), "Another server…".into()));
-        let where_row = h_flex()
-            .flex_wrap()
-            .gap_1()
-            .children(places.into_iter().enumerate().map(|(k, (h, label))| {
-                let on = h == host;
+        let (name, host, folder) = (form.name.clone(), form.host.clone(), form.folder.clone());
+        let (new_host, new_user, new_port, new_key) = (form.new_host.clone(), form.new_user.clone(), form.new_port.clone(), form.new_key.clone());
+        let mut page: Vec<AnyElement> = vec![
+            div()
+                .pt_6()
+                .text_base()
+                .text_color(muted)
+                .child("A project is what you work on: a client, a site, a codebase. Its threads share its environment (soul, MCP servers, skills, prompts, Telegram, schedule); you set that up in its environment thread once it exists.")
+                .into_any_element(),
+            self.pv_heading("PROJECT", cx).into_any_element(),
+            self.pv_row("Name", "How it shows in the sidebar", self.pv_input(&name), cx).into_any_element(),
+        ];
+        // Where it runs: this Mac, or a server (its agent there keeps the threads, skills, MCP).
+        let on_server = host.is_some();
+        let place = super::tools::segmented_tall("project-place", &["This Mac", "A server"], on_server as usize, cx, |this, k, _, cx| {
+            if let Some(f) = this.project_form.as_mut() {
+                f.host = if k == 0 { None } else { Some(this.ssh.servers.first().map(|s| s.alias.clone()).unwrap_or_default()) };
+            }
+            cx.notify();
+        });
+        page.push(self.pv_row("Runs on", "Where its agent works and keeps its threads", h_flex().child(place).into_any_element(), cx).into_any_element());
+        if let Some(chosen) = host.clone() {
+            // The servers from ~/.ssh/config, and a new one typed in.
+            let mut labels: Vec<String> = self.ssh.servers.iter().map(|s| s.alias.clone()).collect();
+            let at = labels.iter().position(|a| *a == chosen).unwrap_or(labels.len());
+            labels.push("New server…".into());
+            let aliases = labels.clone();
+            let pick = super::tools::segmented_owned("project-server", labels, at, cx, move |this, k, _, cx| {
+                if let Some(f) = this.project_form.as_mut() {
+                    f.host = Some(if k + 1 == aliases.len() { String::new() } else { aliases[k].clone() });
+                }
+                cx.notify();
+            });
+            page.push(self.pv_row("Server", "A host from ~/.ssh/config, or a new one", h_flex().flex_wrap().child(pick).into_any_element(), cx).into_any_element());
+            if chosen.is_empty() {
+                page.push(self.pv_row("Address", "Its IP or domain", self.pv_input(&new_host), cx).into_any_element());
+                page.push(self.pv_row("Login", "The user on it", self.pv_input(&new_user), cx).into_any_element());
+                page.push(self.pv_row("Port", "Empty: 22", self.pv_input(&new_port), cx).into_any_element());
+                page.push(self.pv_row("Key file", "Empty: ssh-agent", self.pv_input(&new_key), cx).into_any_element());
+            }
+            page.push(
                 div()
-                    .id(("project-where", k))
-                    .px_2()
-                    .cursor_pointer()
-                    .when(on, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
-                    .when(!on, |d| d.text_color(theme.muted_foreground).hover(|s| s.text_color(theme.foreground)))
-                    .child(label)
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.click_claimed = true;
+                    .pt_2()
+                    .text_sm()
+                    .text_color(muted)
+                    .child("Bench installs and starts the agent there over SSH (it needs Node.js 22.18+). The project's threads, skills and MCP servers live on that server.")
+                    .into_any_element(),
+            );
+        } else {
+            let has = folder.is_some();
+            let control = h_flex()
+                .gap_2()
+                .items_center()
+                .child(div().min_w_0().truncate().text_base().text_color(if has { theme.foreground } else { muted }).child(folder.clone().unwrap_or_else(|| "None".into())))
+                .child(super::form_action("project-folder", if has { "Change…" } else { "Choose…" }, false, cx).on_click(cx.listener(|this, _, window, cx| this.pick_project_codebase(window, cx))))
+                .when(has, |d| {
+                    d.child(super::form_action("project-folder-clear", "Clear", false, cx).on_click(cx.listener(|this, _, _, cx| {
                         if let Some(f) = this.project_form.as_mut() {
-                            f.host = h.clone();
+                            f.folder = None;
                         }
                         cx.notify();
-                    }))
-            }))
-            .into_any_element();
-        let mut rows = vec![("Name", Input::new(&form.name).into_any_element()), ("Where", where_row)];
-        if host.as_deref() == Some("") {
-            rows.push(("Address", Input::new(&form.new_host).into_any_element()));
-            rows.push(("User", Input::new(&form.new_user).into_any_element()));
-            rows.push(("Port", Input::new(&form.new_port).into_any_element()));
-            rows.push(("Key file", Input::new(&form.new_key).into_any_element()));
-        }
-        if host.is_none() {
-            rows.push((
-                "Folder",
-                h_flex()
-                    .gap_3()
-                    .child(div().text_color(if folder.is_some() { theme.foreground } else { theme.muted_foreground }).child(folder.clone().unwrap_or_else(|| "none: it lives in Bench".into())))
-                    .child(super::form_action("project-folder", "Choose…", false, cx).on_click(cx.listener(|this, _, window, cx| {
-                        this.click_claimed = true;
-                        this.pick_project_codebase(window, cx)
                     })))
-                    .into_any_element(),
-            ));
+                })
+                .into_any_element();
+            page.push(self.pv_row("Folder", "Optional: a codebase its threads work in (opens in Zed)", control, cx).into_any_element());
         }
-        let note: SharedString = if host.is_some() {
-            "Bench installs and starts the agent there over SSH (Node.js 22.18+ on it) and keeps the threads, skills and MCP there; on its first start it takes over what Hermes kept on that server.".into()
-        } else {
-            "Its threads work in its folder; servers, file hosts, the browser and tasks are attached in a thread with /.".into()
-        };
-        let actions = vec![
-            super::form_action("project-save", "Create", true, cx)
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.click_claimed = true;
-                    this.save_project(window, cx)
-                }))
-                .into_any_element(),
-            super::form_action("project-cancel", "Cancel", false, cx)
-                .on_click(cx.listener(|this, _, _, cx| {
+        page.push(
+            h_flex()
+                .pt_4()
+                .gap_2()
+                .child(super::form_action("project-save", "Create project", true, cx).on_click(cx.listener(|this, _, window, cx| this.save_project(window, cx))))
+                .child(super::form_action("project-cancel", "Cancel", false, cx).on_click(cx.listener(|this, _, _, cx| {
                     this.project_form = None;
+                    this.panel = crate::app::Panel::Chat;
                     cx.notify();
-                }))
+                })))
                 .into_any_element(),
-        ];
-        super::inline_form("New project", rows, Some(note), actions, cx)
+        );
+        v_flex()
+            .id("new-project")
+            .size_full()
+            .overflow_y_scroll()
+            .px_4()
+            .pb_6()
+            .child(v_flex().max_w(px(820.)).children(page))
+            .into_any_element()
     }
 }
 

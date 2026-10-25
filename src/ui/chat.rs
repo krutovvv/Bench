@@ -63,21 +63,19 @@ impl BenchApp {
             }
         }
         let block: Option<AnyElement> = None;
-        // The block comes from the agent: its row, its avatar, like an answer.
-        let theme = cx.theme().clone();
-        // `BENCH_DEMO=new-project`: the new project's form, once (for screenshots).
+        // `BENCH_DEMO=new-project`: the new project's page, once (for screenshots).
         if self.demo && !self.subject_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
             self.subject_opened = true;
             self.new_project_form(window, cx);
         }
+        // The block comes from the agent: its row, its avatar, like an answer.
+        let theme = cx.theme().clone();
         // A form (a new project; a new server or file host) is a block of the thread too: the new
         // project's at the top of its empty thread, the others with the tools, under the
         // conversation.
         // A form opened from an insert shows under that insert (`render_inserts_at`).
         let under_insert = self.form_after.as_ref().is_some_and(|id| self.thread_inserts().iter().any(|i| &i.id == id));
-        let form: Option<(AnyElement, bool)> = if self.project_form.is_some() {
-            Some((self.render_project_form(cx), true))
-        } else if under_insert {
+        let form: Option<(AnyElement, bool)> = if under_insert {
             None
         } else if self.files_remote.form {
             Some((self.render_host_form(cx), false))

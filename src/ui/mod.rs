@@ -435,7 +435,8 @@ impl BenchApp {
                 .into_any_element();
         }
 
-        bar.child(div().px_4().text_sm().child("Settings"))
+        let title = if self.panel == Panel::NewProject { "New project" } else { "Settings" };
+        bar.child(div().px_4().text_sm().font_weight(FontWeight::MEDIUM).child(title))
             .child(div().flex_1())
             .child(
                 div()
@@ -450,6 +451,7 @@ impl BenchApp {
                     .child(crate::icons::Ico::X.icon().small())
                     .on_click(cx.listener(|this, _, _, cx| {
                         this.panel = Panel::Chat;
+                        this.project_form = None;
                         cx.notify();
                     })),
             )
@@ -492,6 +494,7 @@ impl Render for BenchApp {
                 .children(self.render_plan(cx))
                 .into_any_element(),
             Panel::Providers => self.render_providers(cx),
+            Panel::NewProject => self.render_project_form(cx),
         };
 
         // The sidebar folded away: its corner joins the header — room for the window's buttons

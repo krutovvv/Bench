@@ -57,12 +57,9 @@ impl BenchApp {
         );
     }
 
-    /// The sidebar's "+": the new project's form takes the chat area.
+    /// The sidebar's "+": the new project's page, in place of the thread (the thread stays as it was).
     pub fn new_project_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // Its own empty thread: the form is that thread's first block.
-        self.new_session(cx);
-        self.thread_project = String::new();
-        self.panel = super::Panel::Chat;
+        self.panel = super::Panel::NewProject;
         self.ssh.form = None;
         self.files_remote.form = false;
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
@@ -154,6 +151,7 @@ impl BenchApp {
             |this, r, window, cx| match r {
                 Ok(v) => {
                     this.project_form = None;
+                    this.panel = super::Panel::Chat;
                     this.load_projects(window, cx);
                     // A local project starts with its first thread; a remote one with its
                     // server agent's threads (they show once it is connected).
