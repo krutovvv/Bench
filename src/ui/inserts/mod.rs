@@ -18,6 +18,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::Value;
 
@@ -158,8 +159,12 @@ impl HermesApp {
                 .into_any_element()
         };
         let head = h_flex()
+            .px_3()
+            .py_1()
             .gap_1()
             .items_center()
+            .bg(theme.muted.opacity(0.35))
+            .when(body.is_some(), |d| d.border_b_1().border_color(theme.border))
             .child(fold)
             .child(title_el)
             .child(div().flex_1())
@@ -168,18 +173,18 @@ impl HermesApp {
                 this.click_claimed = true;
                 this.remove_insert(&rm_id, cx);
             })));
+        // Light, as the page: a thin border, round corners, the head on a faint strip.
         let frame = v_flex()
             .id(id)
             .w_full()
             .min_w_0()
-            .bg(theme.secondary)
+            .bg(theme.background)
             .border_1()
             .border_color(theme.border)
-            .px_3()
-            .py_1p5()
-            .gap_1p5()
+            .rounded_md()
+            .overflow_hidden()
             .child(head)
-            .children(body);
+            .children(body.map(|b| div().px_3().py_2().child(b)));
         h_flex()
             .w_full()
             .pl(px(super::CHAT_LEFT))

@@ -369,7 +369,7 @@ impl HermesApp {
             .size_full()
             // Rows past the view's height (see Session::min_rows) stay hidden.
             .overflow_hidden()
-            .bg(theme.secondary)
+            .bg(theme.background)
             .px_4()
             .py_2()
             .track_focus(&focus)
