@@ -497,10 +497,13 @@ fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App
                 view.update(cx, |this, cx| this.set_color(id.clone(), k, cx));
             })
     };
+    // The menu reserves a 16px icon column on the left (the other items have icons), which
+    // pushes this row off-centre; pull it back by that width so the swatches sit symmetric.
     h_flex()
         .flex_1()
         .justify_center()
         .gap_2()
+        .ml(px(-16.))
         .py_1()
         .children((0..crate::app::marks::SESSION_COLORS.len()).map(|c| swatch(Some(c))))
         .child(swatch(None))
