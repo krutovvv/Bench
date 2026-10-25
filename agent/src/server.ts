@@ -533,9 +533,10 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
 			mcp: Object.entries(agentMcp(agent)).map(([name, spec]: [string, any]) => {
 				const s = status.find((x) => x.name === name);
-				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null };
+				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null, spec: JSON.stringify(spec, null, 2) };
 			}),
 			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
+			prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
 			hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
 			// The bot's token is not sent back, only whether there is one.
@@ -603,6 +604,41 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 	["DELETE", /^\/api\/projects\/([^/]+)\/hosts\/([^/]+)$/, (_req, m) => {
 		const h = hosts.get(decodeURIComponent(m[2]));
 		if (h && h.project === decodeURIComponent(m[1])) hosts.save({ ...h, project: "" });
+		return { ok: true };
+	}],
+	// Prompts a thread can insert (@ in the composer): the general ones and the project's own.
+	["GET", /^\/api\/projects\/([^/]+)\/prompts$/, (_req, m) => {
+		const id = decodeURIComponent(m[1]);
+		const read = (dir: string, own: boolean) =>
+			fs.existsSync(dir)
+				? fs.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => ({ name: f.replace(/\.md$/, ""), text: fs.readFileSync(path.join(dir, f), "utf8"), own }))
+				: [];
+		const own = read(path.join(envOf(id).dir, "prompts"), true);
+		const general = id === "general" ? [] : read(path.join(agentDir("default"), "prompts"), false).filter((g) => !own.some((o) => o.name === g.name));
+		return { prompts: [...own, ...general].sort((a, b) => a.name.localeCompare(b.name)) };
+	}],
+	["PUT", /^\/api\/projects\/([^/]+)\/prompts\/([^/]+)$/, (req, m) => {
+		const dir = path.join(envOf(decodeURIComponent(m[1])).dir, "prompts");
+		fs.mkdirSync(dir, { recursive: true });
+		fs.writeFileSync(path.join(dir, `${path.basename(decodeURIComponent(m[2]))}.md`), String(req.body?.text ?? ""));
+		return { ok: true };
+	}],
+	["DELETE", /^\/api\/projects\/([^/]+)\/prompts\/([^/]+)$/, (_req, m) => {
+		fs.rmSync(path.join(envOf(decodeURIComponent(m[1])).dir, "prompts", `${path.basename(decodeURIComponent(m[2]))}.md`), { force: true });
+		return { ok: true };
+	}],
+	// One MCP server's config (its entry in mcp.json), as typed.
+	["PUT", /^\/api\/projects\/([^/]+)\/mcp\/([^/]+)\/spec$/, (req, m) => {
+		const { agent } = envOf(decodeURIComponent(m[1]));
+		let spec: any;
+		try {
+			spec = JSON.parse(String(req.body?.text ?? ""));
+		} catch (e) {
+			throw new HttpError(400, `not JSON: ${(e as Error).message}`);
+		}
+		const servers = agentMcp(agent);
+		servers[decodeURIComponent(m[2])] = spec;
+		writeAgentMcp(agent, servers);
 		return { ok: true };
 	}],
 	// A project's own skill goes (its folder).

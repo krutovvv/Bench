@@ -150,6 +150,9 @@ impl HermesApp {
                     .id(("pnew", g))
                     .cursor_pointer()
                     .text_color(muted)
+                    // On hover, as the pencil.
+                    .opacity(0.)
+                    .group_hover(group.clone(), |s| s.opacity(1.))
                     .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
                     .child(Ico::Plus.icon().xsmall())
                     .tooltip(|window, cx| Tooltip::new("New thread in this project").build(window, cx))

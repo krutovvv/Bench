@@ -56,6 +56,11 @@ impl HermesApp {
         // A thread with no turns yet still is a thread: "Loading history…" while it opens, then
         // the composer; a new chat is the composer alone.
         // A thread about something starts with it, live: a task list, a server's terminal, a tool.
+        // @ in the composer offers the open thread's project's prompts.
+        if !self.demo && self.conn.is_some() && self.prompts_for.as_deref() != Some(self.thread_project.as_str()) {
+            self.prompts_for = Some(self.thread_project.clone());
+            self.load_prompts(window, cx);
+        }
         let subject = self.current_subject();
         let block = if let Some(list) = HermesApp::subject_list(&subject) {
             if self.tasks.list != list {

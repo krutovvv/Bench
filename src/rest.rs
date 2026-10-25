@@ -584,30 +584,6 @@ pub fn profile_home(conn: &Connection, profile: &str) -> Result<String> {
     Ok(format!("{home}/.bench/profiles/{name}"))
 }
 
-/// The profile's prompts (`prompts/*.md`), by name.
-pub fn prompts(conn: &Connection, profile: &str) -> Result<Vec<crate::model::Prompt>> {
-    let dir = format!("{}/prompts", profile_home(conn, profile)?);
-    let Ok(entries) = list_dir(conn, profile, &dir) else {
-        return Ok(vec![]); // no folder yet
-    };
-    let mut out = vec![];
-    for (name, path, is_dir) in entries {
-        if is_dir || !name.to_lowercase().ends_with(".md") {
-            continue;
-        }
-        let body = read_text(conn, profile, &path)
-            .map(|f| f.text)
-            .unwrap_or_default();
-        out.push(crate::model::Prompt {
-            title: name[..name.len() - 3].to_string(),
-            body,
-            path,
-        });
-    }
-    out.sort_by_key(|p| p.title.to_lowercase());
-    Ok(out)
-}
-
 
 fn data_url(mime: &str, bytes: &[u8]) -> String {
     format!(

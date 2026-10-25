@@ -130,6 +130,8 @@ pub struct HermesApp {
     pub project_env: Option<ProjectEnv>,
     /// ~/.ssh/config servers that belong to a project: alias → project id (the rest are shared).
     pub ssh_projects: HashMap<String, String>,
+    /// The project whose prompts `prompts` holds (they follow the open thread's project).
+    pub prompts_for: Option<String>,
     /// The agents of remote projects, by server.
     pub remotes: HashMap<String, remotes::RemoteAgent>,
     /// BENCH_SUBJECT was opened (once).
@@ -636,6 +638,7 @@ impl HermesApp {
             project_form: None,
             project_env: None,
             ssh_projects: HashMap::new(),
+            prompts_for: None,
             remotes: HashMap::new(),
             subject_opened: false,
             sites: Default::default(),

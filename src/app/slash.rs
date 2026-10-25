@@ -55,7 +55,8 @@ impl HermesApp {
         let q = text.to_lowercase();
         let mut first: Vec<SlashCommand> = vec![];
         let mut rest: Vec<SlashCommand> = vec![];
-        for c in Self::tool_words().iter().chain(&self.catalog) {
+        // Tools only: the session's commands (/new, /model…) are the window's buttons here.
+        for c in Self::tool_words().iter() {
             let name = c.name.to_lowercase();
             if name.starts_with(&q) {
                 first.push(c.clone());

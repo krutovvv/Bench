@@ -24,12 +24,20 @@ pub struct ProjectEnv {
     pub tg_token: Entity<InputState>,
     pub tg_users: Entity<InputState>,
     pub tg_dirty: bool,
-    /// MCP servers: (name, "http"/"stdio", enabled, connected, tools, error).
-    pub mcp: Vec<(String, String, bool, bool, u64, Option<String>)>,
-    /// Its mcp.json, shown on "JSON".
+    /// The project's name, editable at the block's top.
+    pub name: Entity<InputState>,
+    pub name_dirty: bool,
+    /// MCP servers: (name, "http"/"stdio", enabled, connected, tools, error, its config as JSON).
+    pub mcp: Vec<(String, String, bool, bool, u64, Option<String>, String)>,
+    /// The server opened under its row, and its config being edited.
+    pub mcp_open: Option<String>,
     pub mcp_json: Entity<EditorState>,
-    pub mcp_open: bool,
     pub mcp_dirty: bool,
+    /// Its own prompts (@ in the composer), and the one opened under its row.
+    pub prompts: Vec<String>,
+    pub prompt_open: Option<String>,
+    pub prompt_text: Entity<EditorState>,
+    pub prompt_dirty: bool,
     /// Its own skills: (name, description).
     pub skills: Vec<(String, String)>,
     /// The skill opened under its row, and its SKILL.md being edited.
@@ -62,13 +70,15 @@ impl HermesApp {
         // One editor for all three: the code editor, highlighted (Markdown, JSON), wrapped, no
         // line numbers, no room under the last line; its height follows the text.
         let editor = |language: &'static str, window: &mut Window, cx: &mut Context<Self>| {
-            let e = cx.new(|cx| EditorState::new(window, cx).line_number(false).folding(false).soft_wrap(true).scroll_beyond_last_line(Some(0)));
+            let e = cx.new(|cx| EditorState::new(window, cx).line_number(true).folding(false).soft_wrap(true).scroll_beyond_last_line(Some(0)));
             e.update(cx, |s, cx| s.set_highlighter(language, cx));
             e
         };
         let soul = editor("markdown", window, cx);
         let skill_text = editor("markdown", window, cx);
         let mcp_json = editor("json", window, cx);
+        let prompt_text = editor("markdown", window, cx);
+        let name = cx.new(|cx| InputState::new(window, cx));
         let tg_token = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Bot token from @BotFather (kept as is when empty)"));
         let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
         // A part typed in: its Save shows.
@@ -78,6 +88,8 @@ impl HermesApp {
                     "soul" => e.soul_dirty = true,
                     "skill" => e.skill_dirty = true,
                     "telegram" => e.tg_dirty = true,
+                    "prompt" => e.prompt_dirty = true,
+                    "name" => e.name_dirty = true,
                     _ => e.mcp_dirty = true,
                 }
                 cx.notify();
@@ -86,6 +98,8 @@ impl HermesApp {
         cx.subscribe(&soul, |this, _, ev, cx| dirty(this, "soul", ev, cx)).detach();
         cx.subscribe(&skill_text, |this, _, ev, cx| dirty(this, "skill", ev, cx)).detach();
         cx.subscribe(&mcp_json, |this, _, ev, cx| dirty(this, "mcp", ev, cx)).detach();
+        cx.subscribe(&prompt_text, |this, _, ev, cx| dirty(this, "prompt", ev, cx)).detach();
+        cx.subscribe(&name, |this, _, ev, cx| dirty(this, "name", ev, cx)).detach();
         cx.subscribe(&tg_token, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
         cx.subscribe(&tg_users, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
         ProjectEnv {
@@ -99,10 +113,16 @@ impl HermesApp {
             tg_token,
             tg_users,
             tg_dirty: false,
+            name,
+            name_dirty: false,
             mcp: vec![],
+            mcp_open: None,
             mcp_json,
-            mcp_open: false,
             mcp_dirty: false,
+            prompts: vec![],
+            prompt_open: None,
+            prompt_text,
+            prompt_dirty: false,
             skills: vec![],
             skill_open: None,
             skill_text,
@@ -161,7 +181,20 @@ impl HermesApp {
         };
         let (method, path, body) = match what {
             "soul" => ("PUT", format!("/api/projects/{eid}/soul"), json!({"text": e.soul.read(cx).value().to_string()})),
-            "mcp" => ("PUT", format!("/api/projects/{eid}/mcp"), json!({"text": e.mcp_json.read(cx).value().to_string()})),
+            "mcp" => {
+                let Some(name) = e.mcp_open.clone() else {
+                    return;
+                };
+                ("PUT", format!("/api/projects/{eid}/mcp/{}/spec", enc(&name)), json!({"text": e.mcp_json.read(cx).value().to_string()}))
+            }
+            "prompt" => {
+                let Some(name) = e.prompt_open.clone() else {
+                    return;
+                };
+                ("PUT", format!("/api/projects/{eid}/prompts/{}", enc(&name)), json!({"text": e.prompt_text.read(cx).value().to_string()}))
+            }
+            // The name is the project's own row, on this Mac.
+            "name" => ("PUT", format!("/api/projects/{id}"), json!({"name": e.name.read(cx).value().trim()})),
             "telegram" => {
                 let token = e.tg_token.read(cx).value().trim().to_string();
                 let users: Vec<String> = e.tg_users.read(cx).value().split(',').map(|u| u.trim().to_string()).filter(|u| !u.is_empty()).collect();
@@ -193,10 +226,18 @@ impl HermesApp {
                                 e.tg_dirty = false;
                                 e.tg_token.update(cx, |s, cx| s.set_value("", window, cx));
                             }
+                            "prompt" => e.prompt_dirty = false,
+                            "name" => e.name_dirty = false,
                             _ => e.skill_dirty = false,
                         }
                     }
                     this.load_env(&id, window, cx);
+                    if what == "name" {
+                        this.load_projects(window, cx);
+                    }
+                    if what == "prompt" {
+                        this.load_prompts(window, cx);
+                    }
                 }
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
             },
@@ -215,6 +256,13 @@ impl HermesApp {
                 e.tg_dirty = false;
                 e.tg_token.update(cx, |s, cx| s.set_value("", window, cx));
             }
+            "prompt" => {
+                e.prompt_dirty = false;
+                if let Some(name) = e.prompt_open.take() {
+                    return self.env_open("prompt", name, window, cx);
+                }
+            }
+            "name" => e.name_dirty = false,
             _ => {
                 e.skill_dirty = false;
                 if let Some(name) = e.skill_open.take() {
@@ -253,6 +301,7 @@ impl HermesApp {
         let path = match what {
             "mcp" => format!("/api/projects/{eid}/mcp/{}", enc(&name)),
             "skill" => format!("/api/projects/{eid}/skills/{}", enc(&name)),
+            "prompt" => format!("/api/projects/{eid}/prompts/{}", enc(&name)),
             _ => format!("/api/projects/{eid}/hosts/{}", enc(&name)),
         };
         let profile = self.current_profile();
@@ -266,6 +315,46 @@ impl HermesApp {
                     this.load_remote_hosts(window, cx);
                 }
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+
+    /// An MCP server's or a prompt's row: its text opens under it to edit (again: closes).
+    pub fn env_open(&mut self, what: &'static str, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        let (open, editor, dirty) = if what == "mcp" { (&mut e.mcp_open, &e.mcp_json, &mut e.mcp_dirty) } else { (&mut e.prompt_open, &e.prompt_text, &mut e.prompt_dirty) };
+        if open.as_deref() == Some(&name) && !*dirty {
+            *open = None;
+            cx.notify();
+            return;
+        }
+        *open = Some(name.clone());
+        *dirty = false;
+        let editor = editor.clone();
+        if what == "mcp" {
+            let spec = e.mcp.iter().find(|m| m.0 == name).map(|m| m.6.clone()).unwrap_or_default();
+            editor.update(cx, |s, cx| s.set_value(spec, window, cx));
+            cx.notify();
+            return;
+        }
+        let pid = e.id.clone();
+        let Some((conn, eid)) = self.env_target(&pid) else {
+            return;
+        };
+        let profile = self.current_profile();
+        let path = format!("/api/projects/{eid}/prompts");
+        self.background(
+            window,
+            cx,
+            move || rest::get_raw(&conn, &profile, &path),
+            move |_, r, window, cx| {
+                if let Ok(v) = r {
+                    let text = v["prompts"].as_array().into_iter().flatten().find(|p| p["name"].as_str() == Some(&name)).and_then(|p| p["text"].as_str()).unwrap_or_default().to_string();
+                    editor.update(cx, |s, cx| s.set_value(text, window, cx));
+                }
+                cx.notify();
             },
         );
     }
@@ -339,6 +428,7 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
                 m["connected"].as_bool().unwrap_or(false),
                 m["tools"].as_u64().unwrap_or(0),
                 m["error"].as_str().map(str::to_string),
+                m["spec"].as_str().unwrap_or("{}").to_string(),
             )
         })
         .collect();
@@ -373,8 +463,9 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         let text = v["soul"].as_str().unwrap_or_default().to_string();
         e.soul.update(cx, |s, cx| s.set_value(text, window, cx));
     }
-    if !e.mcp_dirty {
-        let text = v["mcp_json"].as_str().filter(|t| !t.trim().is_empty()).unwrap_or("{\n  \"mcpServers\": {}\n}\n").to_string();
-        e.mcp_json.update(cx, |s, cx| s.set_value(text, window, cx));
+    e.prompts = v["prompts"].as_array().into_iter().flatten().filter_map(|p| p.as_str().map(str::to_string)).collect();
+    if !e.name_dirty {
+        let name = v["project"]["name"].as_str().unwrap_or_default().to_string();
+        e.name.update(cx, |s, cx| s.set_value(name, window, cx));
     }
 }
