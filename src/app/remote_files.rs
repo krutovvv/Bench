@@ -65,7 +65,7 @@ impl RemoteFiles {
     pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let editor = cx.new(|cx| {
             EditorState::new(window, cx)
-                .scroll_beyond_last_line(Some(1))
+                .scroll_beyond_last_line(Some(0))
                 .line_number(true)
                 .soft_wrap(false)
         });

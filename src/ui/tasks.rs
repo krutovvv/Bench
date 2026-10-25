@@ -487,7 +487,7 @@ impl BenchApp {
             )
             .child(field(
                 "When",
-                segmented(
+                super::tools::segmented_tall(
                     "task-when",
                     &["Today", "Evening", "Tomorrow", "Anytime"],
                     when,
@@ -497,7 +497,7 @@ impl BenchApp {
             ))
             .child(field(
                 "Day",
-                Input::new(&self.tasks.day).small().into_any_element(),
+                Input::new(&self.tasks.day).into_any_element(),
             ))
             .child(field(
                 "Time",
@@ -508,14 +508,15 @@ impl BenchApp {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .child(Input::new(&self.tasks.spent).small()),
+                            .child(Input::new(&self.tasks.spent)),
                     )
                     .child(
                         div()
                             .id("task-timer")
                             .flex_none()
-                            .px_2()
-                            .py_0p5()
+                            // As tall as the fields beside it.
+                            .h(px(super::FIELD_H))
+                            .px_3()
                             .gap_1()
                             .flex()
                             .items_center()

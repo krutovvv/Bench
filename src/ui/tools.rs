@@ -480,3 +480,37 @@ pub(super) fn segmented_owned(
         }))
         .into_any_element()
 }
+
+/// `segmented` as tall as a text field, for a form's row beside fields.
+pub(super) fn segmented_tall(
+    id: &'static str,
+    labels: &[&'static str],
+    chosen: usize,
+    cx: &mut Context<BenchApp>,
+    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
+) -> AnyElement {
+    let theme = cx.theme().clone();
+    h_flex()
+        .flex_none()
+        .h(px(super::FIELD_H))
+        .border_1()
+        .rounded_md()
+        .overflow_hidden()
+        .border_color(theme.border)
+        .children(labels.iter().enumerate().map(|(k, label)| {
+            let on = on.clone();
+            div()
+                .id((id, k))
+                .h_full()
+                .flex()
+                .items_center()
+                .px_3()
+                .cursor_pointer()
+                .when(k > 0, |d| d.border_l_1().border_color(theme.border))
+                .when(k == chosen, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
+                .when(k != chosen, |d| d.hover(|s| s.bg(theme.list_hover)))
+                .child(label.to_string())
+                .on_click(cx.listener(move |this, _, window, cx| on(this, k, window, cx)))
+        }))
+        .into_any_element()
+}

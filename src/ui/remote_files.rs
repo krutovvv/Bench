@@ -10,9 +10,8 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::icons::Ico;
 
-/// The editor's height in a titled block, and a line's (the open file is as tall as its lines).
+/// The editor's height in a titled block (in an insert the open file is as tall as its lines).
 const EDITOR_H: f32 = 420.;
-const EDITOR_LINE: f32 = 21.;
 
 fn size_label(n: u64) -> String {
     match n {
@@ -156,7 +155,7 @@ impl BenchApp {
                 cx.notify();
             })));
         let body = div()
-            .h(px(lines as f32 * EDITOR_LINE + 16.))
+            .h(px(lines as f32 * super::editor_line(cx) + 12.))
             .child(Editor::new(&self.files_remote.editor).appearance(false).h_full())
             .into_any_element();
         Some(super::inserts::card(head, body, &theme))

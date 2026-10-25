@@ -2408,7 +2408,8 @@ fn branch_name(text: &str) -> String {
 impl BenchApp {
     /// The composer's text is the open chat's draft (called on every change).
     pub(crate) fn note_draft(&mut self, cx: &mut Context<Self>) {
-        let Some(key) = self.draft_key.clone() else {
+        // A new chat keeps no draft: every new chat starts empty.
+        let Some(key) = self.draft_key.clone().filter(|k| !k.is_empty()) else {
             return;
         };
         let text = self.composer.read(cx).value().to_string();
@@ -2428,8 +2429,21 @@ impl BenchApp {
         if self.draft_key.as_ref() == Some(&key) {
             return;
         }
-        let text = self.drafts.get(&key).cloned().unwrap_or_default();
+        // The new chat just became this thread (an insert, a message): what is typed stays.
+        let became = self.draft_key.as_deref() == Some("") && !key.is_empty() && !self.drafts.contains_key(&key);
+        let text = if became {
+            self.composer.read(cx).value().to_string()
+        } else if key.is_empty() {
+            String::new()
+        } else {
+            // A lone "/word" is a command half picked, not a draft.
+            self.drafts.get(&key).cloned().filter(|t| !(t.starts_with('/') && !t.trim().contains(' '))).unwrap_or_default()
+        };
         self.draft_key = Some(key);
+        if became {
+            self.note_draft(cx);
+            return;
+        }
         self.composer
             .update(cx, |s, cx| s.set_value(text, window, cx));
     }

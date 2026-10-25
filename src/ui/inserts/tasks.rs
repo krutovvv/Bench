@@ -30,9 +30,14 @@ impl InsertKind for Tasks {
         "Tasks".into()
     }
 
-    fn controls(&self, _app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let now = list_of(ins);
-        let chosen = LISTS.iter().position(|l| *l == now).unwrap_or(0);
+        if app.tasks.project != app.thread_project {
+            app.tasks.project = app.thread_project.clone();
+        }
+        // Only the lists that have something (and the one shown): an empty one needs no button.
+        let lists: Vec<List> = LISTS.iter().filter(|l| **l == now || !app.tasks.shown(l).is_empty()).cloned().collect();
+        let chosen = lists.iter().position(|l| *l == now).unwrap_or(0);
         let id = ins.id.clone();
         let theme = cx.theme().clone();
         let add = div()
@@ -47,13 +52,14 @@ impl InsertKind for Tasks {
                 this.new_task(window, cx)
             }))
             .into_any_element();
+        let picks = lists.clone();
         vec![add, super::super::tools::segmented_owned(
             "insert-task-lists",
-            LISTS.iter().map(|l| l.name()).collect(),
+            lists.iter().map(|l| l.name()).collect(),
             chosen,
             cx,
             move |this, k, window, cx| {
-                let list = LISTS[k].clone();
+                let list = picks[k].clone();
                 this.patch_insert(&id, json!({ "state": { "list": list.name().to_lowercase() } }), cx);
                 this.select_task_list(list, window, cx);
             },

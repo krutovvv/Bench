@@ -24,13 +24,14 @@ fn alias_of(key: &str) -> Option<String> {
     }
 }
 
-/// The servers a thread may open: its project's (a thread outside projects: all).
+/// The servers a thread may open: its project's.
 fn servers(app: &BenchApp) -> Vec<(String, String)> {
     let proj = app.thread_project.clone();
     app.ssh
         .servers
         .iter()
-        .filter(|s| proj.is_empty() || app.ssh_projects.get(&s.alias).map(String::as_str).unwrap_or("") == proj)
+        // A project's own servers; outside projects, the servers of no project.
+        .filter(|s| app.ssh_projects.get(&s.alias).map(String::as_str).unwrap_or("") == proj)
         .map(|s| (s.alias.clone(), s.hostname.clone()))
         .collect()
 }
@@ -59,12 +60,11 @@ impl InsertKind for Terminal {
 
     fn switches(&self, app: &BenchApp, ins: &Insert) -> Vec<Switch> {
         let now = alias_of(&ins.key);
-        let mut v = vec![Switch {
-            label: "This Mac".into(),
-            detail: String::new(),
-            chosen: now.as_deref() == Some(crate::term::LOCAL),
-            to: SwitchTo::Patch(json!({"key": "ssh:local"})),
-        }];
+        // This Mac's terminal is /terminal; /ssh is for servers.
+        if now.as_deref() == Some(crate::term::LOCAL) {
+            return vec![];
+        }
+        let mut v = vec![];
         v.extend(servers(app).into_iter().map(|(alias, host)| Switch {
             chosen: now.as_deref() == Some(alias.as_str()),
             to: SwitchTo::Patch(json!({ "key": format!("ssh:{alias}") })),
@@ -144,7 +144,6 @@ impl InsertKind for Terminal {
                     }
                 }
             };
-            rows.push(pick_row(format!("{id}-local"), Ico::Terminal, "This Mac".into(), String::new(), cx, pick("ssh:local".into())));
             for (k, (alias, host)) in servers(app).into_iter().enumerate() {
                 rows.push(pick_row(format!("{id}-s{k}"), Ico::Server, alias.clone(), host, cx, pick(format!("ssh:{alias}"))));
             }

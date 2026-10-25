@@ -91,6 +91,7 @@ impl BenchApp {
         if !c.key.is_empty() {
             let key = c.key.clone();
             self.composer.update(cx, |s, cx| s.set_value("", window, cx));
+            self.note_draft(cx);
             self.attach_tool(key, window, cx);
             return true;
         }

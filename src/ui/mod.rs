@@ -253,6 +253,14 @@ pub const TURN_Y: f32 = 14.;
 /// The head of every block (an insert, a code block, a tool's pane, an open file): one height,
 /// one faint ground, small muted text. `over_body`: a line under it, when something follows.
 pub const BLOCK_HEAD_H: f32 = 32.;
+/// A text field's height (gpui-kit's default input): a form's other controls match it.
+pub const FIELD_H: f32 = 32.;
+
+/// A code editor's line (gpui-kit's editor: the mono font × 1.5): what a block as tall as its
+/// text counts in.
+pub fn editor_line(cx: &App) -> f32 {
+    f32::from(gpui_kit::component::ActiveTheme::theme(cx).mono_font_size) * 1.5
+}
 pub fn block_head(theme: &gpui_kit::component::Theme, over_body: bool) -> Div {
     h_flex()
         .flex_none()

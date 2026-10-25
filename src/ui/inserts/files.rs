@@ -13,13 +13,14 @@ use crate::model::Insert;
 
 pub struct Files;
 
-/// The hosts a thread may open: its project's and the shared ones.
+/// The hosts a thread may open: its project's.
 fn hosts(app: &BenchApp) -> Vec<(String, String, String)> {
     let proj = app.thread_project.clone();
     app.files_remote
         .hosts
         .iter()
-        .filter(|h| proj.is_empty() || h.project.is_empty() || h.project == proj)
+        // A project's own hosts; outside projects, the hosts of no project.
+        .filter(|h| h.project == proj)
         .map(|h| (h.id.clone(), h.name.clone(), format!("{} · {}@{}", h.kind.to_uppercase(), h.user, h.host)))
         .collect()
 }

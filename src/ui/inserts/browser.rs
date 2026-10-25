@@ -63,6 +63,27 @@ impl InsertKind for Browser {
             return Some(ShimmerText::new("Connecting to the browser…").text_base().text_color(muted).into_any_element());
         }
         let url = ins.get("url");
+        // The gateway refused (all tabs busy, a page it does not open…): say so, and offer again.
+        let refused = app.sites.browser.as_ref().and_then(|b| b.state.lock().unwrap().error.clone());
+        if let Some(e) = refused.filter(|_| app.sites.reopening.as_deref() == Some(ins.id.as_str()) || url.is_empty()) {
+            app.sites.reopening = None;
+            return Some(
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(div().flex_1().min_w_0().text_base().text_color(cx.theme().danger).child(e))
+                    .child(
+                        Button::new(SharedString::from(format!("{}-retry", ins.id)))
+                            .small()
+                            .label("Try again")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.click_claimed = true;
+                                this.reopen_thread_tab(cx);
+                            })),
+                    )
+                    .into_any_element(),
+            );
+        }
         if app.sites.reopening.as_deref() == Some(ins.id.as_str()) {
             return Some(ShimmerText::new("Opening the page again…").text_base().text_color(muted).into_any_element());
         }

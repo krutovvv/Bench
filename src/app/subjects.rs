@@ -56,9 +56,9 @@ impl BenchApp {
             None => return None,
         };
         // A project's thread offers the project's own accesses only (a thread outside projects:
-        // all of them). This Mac's terminal is always there.
+        // those of no project). This Mac's terminal is /terminal.
         let proj = self.thread_project.clone();
-        let ours = |p: &str| proj.is_empty() || p == proj;
+        let ours = |p: &str| p == proj;
         let row = |name: String, desc: String, key: String| crate::model::SlashCommand {
             name,
             desc,
@@ -68,7 +68,7 @@ impl BenchApp {
         let mut rows: Vec<crate::model::SlashCommand> = match word.to_lowercase().as_str() {
             "terminal" => vec![row("/terminal".into(), "this Mac's terminal".into(), "ssh:local".into())],
             "ssh" => {
-                let mut v = vec![row("/ssh Terminal".into(), "this Mac".into(), "ssh:local".into())];
+                let mut v = vec![];
                 v.extend(
                     self.ssh
                         .servers

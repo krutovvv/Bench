@@ -12,6 +12,9 @@ use serde_json::json;
 use super::BenchApp;
 use crate::remote_browser::Browser;
 
+/// Where a new thread's tab starts.
+const START_PAGE: &str = "https://www.google.com/";
+
 /// No input and no agent at work this long: the stream pauses.
 const IDLE: std::time::Duration = std::time::Duration::from_secs(60);
 
@@ -113,8 +116,10 @@ impl BenchApp {
         }
         self.sites.reopening = Some(id);
         self.touch_browser();
-        // A new thread's tab starts blank; the agent (or the person) takes it from there.
-        b.open(if url.is_empty() { "about:blank".into() } else { url });
+        // A new thread's tab starts on a search page (the gateway opens only http(s) pages); the
+        // agent, or the person, takes it from there.
+        b.state.lock().unwrap().error = None;
+        b.open(if url.is_empty() { START_PAGE.into() } else { url });
     }
 
     /// The browser changed: a tab the agent opened or moved while it answers in the open thread

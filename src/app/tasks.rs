@@ -25,7 +25,8 @@ pub const RANGES: [(&str, i64); 5] = [
 pub struct TasksMode {
     pub on: bool,
     pub list: List,
-    /// The open thread's project: the block shows its tasks only, new ones go into it ("" = all).
+    /// The open thread's project: the block shows its tasks only, new ones go into it ("": the
+    /// tasks of no project).
     pub project: String,
     pub items: Vec<Task>,
     pub loaded: bool,
@@ -149,7 +150,8 @@ impl TasksMode {
         let mut out: Vec<Task> = self
             .items
             .iter()
-            .filter(|t| self.project.is_empty() || t.project == self.project)
+            // A project's tasks in its threads; outside projects, the tasks of no project.
+            .filter(|t| t.project == self.project)
             .filter(|t| {
                 if q.is_empty() {
                     t.in_list(list, day)

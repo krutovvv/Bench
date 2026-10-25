@@ -148,7 +148,7 @@ impl BenchApp {
                 .mt_1()
                 .border_1().rounded_md()
                 .border_color(theme.border)
-                .h(px(lines as f32 * 21. + 10.))
+                .h(px(lines as f32 * super::editor_line(cx) + 10.))
                 .child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full())
                 .into_any_element()
         };
@@ -173,6 +173,8 @@ impl BenchApp {
             }))
         };
         let row = |id: String, name: String, note: String, bad: bool| {
+            // One line whatever the text: a description's line breaks become spaces.
+            let note = note.split_whitespace().collect::<Vec<_>>().join(" ");
             h_flex()
                 .id(SharedString::from(id.clone()))
                 .group(SharedString::from(id))
