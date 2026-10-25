@@ -130,7 +130,7 @@ The agent keeps everything in Pi's own terms:
 
 The browser inserts use a shared Chrome on a server: a tab per thread, driven through the
 Playwright MCP, and watched through a small gateway. The server is a project of its own,
-browser-server-mcp: an MCP server any agent can use, with a live view Bench supports. Each person gets their own key and no SSH is
+[browser-server-mcp](https://github.com/krutovvv/browser-server-mcp): an MCP server any agent can use, with a live view Bench supports. Each person gets their own key and no SSH is
 needed. Frames arrive at 2 per second at most, and only while someone is watching.
 
 ## Developed from inside itself

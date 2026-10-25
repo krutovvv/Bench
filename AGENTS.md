@@ -83,7 +83,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | `/ftp` | tools `remote_files`, `hosts` (`builtin/remote.ts`, `hosts.ts`); without a host it takes the thread's insert |
 | `/files` | Pi's coding tools (`read`, `write`, `edit`, `bash`) in the project's folder; Bench reads the folder through `/api/fs/…` |
 | `/tools` | no tool of its own: the utility's input and output come in `<block-state>` |
-| `/browser` | the Playwright MCP through `@earendil-works/pi-mcp` (`mcp__browser__*`), one tab per thread (state `{tab,url}`). The server browser is its own project, `~/Projects/browser-server-mcp` (an MCP server with a live view); Bench is one of its clients (`src/remote_browser.rs`) |
+| `/browser` | the Playwright MCP through `@earendil-works/pi-mcp` (`mcp__browser__*`), one tab per thread (state `{tab,url}`). The server browser is its own project, `~/Projects/browser-server-mcp` (github.com/krutovvv/browser-server-mcp) (an MCP server with a live view); Bench is one of its clients (`src/remote_browser.rs`) |
 | Schedule | a durable `defineTask` per job that sleeps until its next run (`builtin/cron.ts`) |
 | Subagents | `delegate`: child conversations owned by the tool's task (`builtin/subagent.ts`) |
 | MCP | `@earendil-works/pi-mcp`, a project's `mcp.json`; OAuth via `mcp-oauth.ts` (callback on `localhost:47823`) |
