@@ -394,23 +394,20 @@ impl BenchApp {
         }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let rows: Vec<AnyElement> = self
-            .queue
-            .clone()
-            .into_iter()
-            .enumerate()
-            .map(|(k, (id, mode, text))| {
-                let (send_id, rm_id) = (id.clone(), id.clone());
-                let steer = mode == "steer";
-                // The files it carries show as the chips they are, not as `[attached: …]`.
-                let (said, paths) = crate::attach::split(&text);
-                let first = said.lines().next().unwrap_or_default().to_string();
+        let mut rows: Vec<AnyElement> = Vec::new();
+        for (k, (id, mode, text)) in self.queue.clone().into_iter().enumerate() {
+            let (send_id, rm_id) = (id.clone(), id.clone());
+            let steer = mode == "steer";
+            // The files it carries show as the chips they are, not as `[attached: …]` — and
+            // under the row, as under a sent message, so the row keeps the height of the others.
+            let (said, paths) = crate::attach::split(&text);
+            let first = said.lines().next().unwrap_or_default().to_string();
+            rows.push(
                 h_flex()
                     .id(("queued", k))
                     .gap_2()
                     .px_3()
                     .h(px(super::CHIP_H))
-                    .overflow_hidden()
                     .items_center()
                     .border_1()
                     .rounded_md()
@@ -423,16 +420,6 @@ impl BenchApp {
                             .child(if steer { "Next" } else { "Queued" }),
                     )
                     .child(div().flex_1().min_w_0().truncate().child(first))
-                    .when(!paths.is_empty(), |d| {
-                        d.children(paths.iter().enumerate().map(|(j, p)| {
-                            self.attachment_chip(
-                                format!("queued-chip-{k}-{j}").into(),
-                                p,
-                                None,
-                                cx,
-                            )
-                        }))
-                    })
                     .when(!steer, |d| {
                         d.child(
                             icon_button(
@@ -441,12 +428,10 @@ impl BenchApp {
                                 "Send now: into the running work",
                                 cx,
                             )
-                            .on_click(cx.listener(
-                                move |this, _, _, cx| {
-                                    this.click_claimed = true;
-                                    this.queued(send_id.clone(), true, cx);
-                                },
-                            )),
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.click_claimed = true;
+                                this.queued(send_id.clone(), true, cx);
+                            })),
                         )
                     })
                     .child(
@@ -457,16 +442,32 @@ impl BenchApp {
                             }),
                         ),
                     )
-                    .into_any_element()
-            })
-            .collect();
+                    .into_any_element(),
+            );
+            if !paths.is_empty() {
+                rows.push(
+                    h_flex()
+                        .w_full()
+                        .gap_2()
+                        .children(paths.iter().enumerate().map(|(j, p)| {
+                            self.attachment_chip(
+                                format!("queued-chip-{k}-{j}").into(),
+                                p,
+                                None,
+                                cx,
+                            )
+                        }))
+                        .into_any_element(),
+                );
+            }
+        }
         Some(
             v_flex()
                 .w_full()
                 .pl(px(super::CHAT_TEXT))
                 .pr(px(super::CHAT_RIGHT))
                 .pt(px(super::TURN_Y))
-                .gap_1()
+                .gap_2()
                 .children(rows)
                 .into_any_element(),
         )
