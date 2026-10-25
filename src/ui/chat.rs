@@ -16,10 +16,11 @@ use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
-/// After how many turns the plan's row sits: after the last turn that had begun when the plan
-/// did. Without a moment of its own (a thread planned before this was kept) it stays at the end,
-/// as it was then.
-fn plan_pos(turns: &[Turn], at: Option<f64>) -> usize {
+/// After how many turns a row of the agent's own work sits: after the last turn that had begun
+/// when the work did. The plan and the background processes both hang by this, so neither
+/// drifts to the newest message — what began earlier stays where it began. Without a moment of
+/// its own (a thread planned before this was kept) it stays at the end, as it was then.
+fn work_pos(turns: &[Turn], at: Option<f64>) -> usize {
     let Some(at) = at else { return turns.len() };
     turns
         .iter()
@@ -29,7 +30,7 @@ fn plan_pos(turns: &[Turn], at: Option<f64>) -> usize {
 
 #[cfg(test)]
 mod plan_tests {
-    use super::plan_pos;
+    use super::work_pos;
     use crate::model::Turn;
 
     fn turn(started: Option<f64>) -> Turn {
@@ -42,13 +43,13 @@ mod plan_tests {
     #[test]
     fn the_plan_sits_where_it_was_made() {
         let turns = [turn(Some(100.)), turn(Some(200.)), turn(Some(300.))];
-        assert_eq!(plan_pos(&turns, Some(150.)), 1, "made during the first turn");
-        assert_eq!(plan_pos(&turns, Some(250.)), 2);
-        assert_eq!(plan_pos(&turns, Some(500.)), 3, "the newest work");
-        assert_eq!(plan_pos(&turns, Some(50.)), 0, "older than the thread: at its top");
-        assert_eq!(plan_pos(&turns, None), 3, "no moment of its own: at the end");
-        assert_eq!(plan_pos(&[turn(None)], Some(10.)), 1, "an undated turn keeps it after");
-        assert_eq!(plan_pos(&[], Some(10.)), 0, "no turns yet");
+        assert_eq!(work_pos(&turns, Some(150.)), 1, "made during the first turn");
+        assert_eq!(work_pos(&turns, Some(250.)), 2);
+        assert_eq!(work_pos(&turns, Some(500.)), 3, "the newest work");
+        assert_eq!(work_pos(&turns, Some(50.)), 0, "older than the thread: at its top");
+        assert_eq!(work_pos(&turns, None), 3, "no moment of its own: at the end");
+        assert_eq!(work_pos(&[turn(None)], Some(10.)), 1, "an undated turn keeps it after");
+        assert_eq!(work_pos(&[], Some(10.)), 0, "no turns yet");
     }
 }
 
@@ -285,8 +286,12 @@ impl BenchApp {
         let n = self.turns.len();
         // The agent's plan, as its row under the work it describes — there, and not after the
         // newest message: a plan made earlier stays where it was made.
-        let plan_after = plan_pos(&self.turns, self.plan_at);
+        let plan_after = work_pos(&self.turns, self.plan_at);
         let mut plan = self.render_plan(cx);
+        // The agent's background processes: its own row too, where the work began, not nailed to
+        // the newest answer.
+        let procs_after = work_pos(&self.turns, self.proc_moment());
+        let mut procs = self.render_processes(cx);
 
         let mut rows: Vec<AnyElement> = self.render_inserts_at(0, n == 0, window, cx);
         for i in 0..n {
@@ -295,10 +300,20 @@ impl BenchApp {
             if plan_after == i + 1 {
                 rows.extend(plan.take());
             }
+            if procs_after == i + 1 {
+                rows.extend(procs.take());
+            }
         }
         if n == 0 && plan_after == 0 {
             rows.extend(plan.take());
         }
+        if n == 0 && procs_after == 0 {
+            rows.extend(procs.take());
+        }
+        // A row whose moment is newer than every turn, or a thread with turns and no plan: the
+        // work rows go after the last one, which is where work_pos points in those cases.
+        rows.extend(plan.take());
+        rows.extend(procs.take());
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
@@ -618,12 +633,12 @@ impl BenchApp {
         let (user, attached_paths) = crate::attach::split(&turn.user);
 
         let sources = self.render_sources(i, cx);
-        // The session's edited files and background processes hang under the last answer: the
-        // agent made them too.
-        let (processes, files) = if i + 1 == self.turns.len() {
-            (self.render_processes(cx), self.render_session_files(cx))
+        // The session's edited files hang under the last answer: the agent made them too. (Its
+        // background processes are a row of their own, where the work began.)
+        let files = if i + 1 == self.turns.len() {
+            self.render_session_files(cx)
         } else {
-            (None, None)
+            None
         };
         // What the background review did with skills and memory, quietly under the answer.
         let reviews: Vec<AnyElement> = turn
@@ -740,7 +755,6 @@ impl BenchApp {
                                     .children(answer)
                                     // What came with the answer, right under its text (the agent's side).
                                     .children(sources)
-                                    .children(processes)
                                     .children(files)
                                     .when(!reviews.is_empty(), |d| {
                                         d.child(v_flex().gap_1().children(reviews))
@@ -1076,8 +1090,9 @@ impl BenchApp {
         )
     }
 
-    /// Under the last answer: the background processes the agent started in this session —
-    /// running or finished, each with Stop (while it runs) and its latest output a click away.
+    /// The background processes the agent started in this session, as a row of its own where the
+    /// work began: running or finished, each with Stop (while it runs) and its latest output a
+    /// click away.
     fn render_processes(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.processes.is_empty() {
             return None;
@@ -1090,12 +1105,12 @@ impl BenchApp {
         let running = self.processes.iter().filter(|p| p.running).count();
         let done = self.processes.len() - running;
         let open = self.processes_open;
-        let mut head = vec![];
+        let mut bits = vec![];
         if running > 0 {
-            head.push(format!("{running} running"));
+            bits.push(format!("{running} running"));
         }
         if done > 0 {
-            head.push(format!("{done} finished"));
+            bits.push(format!("{done} finished"));
         }
         let rows: Vec<AnyElement> = self
             .processes
@@ -1140,8 +1155,8 @@ impl BenchApp {
                     lines[lines.len().saturating_sub(60)..].join("\n")
                 };
                 v_flex()
-                    .border_t_1()
-                    .border_color(theme.border)
+                    // Rules between the processes, not under the head.
+                    .when(k > 0, |d| d.border_t_1().border_color(theme.border))
                     .child(
                         h_flex()
                             .id(("proc", k))
@@ -1245,40 +1260,61 @@ impl BenchApp {
                     .into_any_element()
             })
             .collect();
+        let head = super::block_head(&theme, open)
+            .id("procs-head")
+            // As short as the thread's other small rows, not as tall as a block's head.
+            .h(px(super::CHIP_H))
+            .gap_1p5()
+            .cursor_pointer()
+            .hover(|s| s.text_color(theme.foreground))
+            .child(
+                if open {
+                    Ico::ChevronDown
+                } else {
+                    Ico::ChevronRight
+                }
+                .icon()
+                .xsmall(),
+            )
+            .child(Ico::Terminal.icon().xsmall())
+            .child(
+                div()
+                    .flex_none()
+                    .child(format!("BACKGROUND · {}", bits.join(" · "))),
+            )
+            .when(running > 0, |d| d.child(Ico::Loader.live(false)))
+            .when(!open, |d| d.child(div().flex_1()))
+            .on_click(cx.listener(|this, _, _, cx| {
+                // Folding is the thread's own click: it must not pull the focus to the composer.
+                this.click_claimed = true;
+                this.processes_open = !this.processes_open;
+                cx.notify();
+            }));
+        let frame = v_flex()
+            .id("procs-block")
+            .w_full()
+            .min_w_0()
+            .flex_none()
+            .bg(theme.background)
+            .border_1()
+            .border_color(theme.border)
+            .rounded_md()
+            .overflow_hidden()
+            .child(head)
+            .when(open, |d| d.children(rows));
+        // The agent's row, as its plan's: its avatar, the block in the text column.
         Some(
-            v_flex()
-                .border_1()
-                .rounded_md()
-                .border_color(theme.border)
-                .child(
-                    h_flex()
-                        .id("procs-head")
-                        // As tall as a source chip (px_1p5 py_0p5 around text_xs).
-                        .px_1p5()
-                        .py_0p5()
-                        .gap_1p5()
-                        .items_center()
-                        .text_base()
-                        .text_color(muted)
-                        .cursor_pointer()
-                        .hover(|s| s.text_color(theme.foreground))
-                        .child(
-                            if open {
-                                Ico::ChevronDown
-                            } else {
-                                Ico::ChevronRight
-                            }
-                            .icon()
-                            .xsmall(),
-                        )
-                        .child(format!("BACKGROUND · {}", head.join(" · ")))
-                        .when(running > 0, |d| d.child(Ico::Loader.live(false)))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.processes_open = !this.processes_open;
-                            cx.notify();
-                        })),
-                )
-                .children(rows)
+            h_flex()
+                .w_full()
+                .flex_none()
+                .id("procs-row")
+                .pl(px(super::CHAT_LEFT))
+                .pr(px(super::CHAT_RIGHT))
+                .py(px(super::TURN_Y))
+                .gap(px(super::CHAT_TEXT - super::CHAT_LEFT - super::AVATAR))
+                .items_start()
+                .child(super::avatar(true, &theme))
+                .child(div().flex_1().min_w_0().child(frame))
                 .into_any_element(),
         )
     }

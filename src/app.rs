@@ -2106,6 +2106,14 @@ impl BenchApp {
 
     // ---- right panel: changed files, tree, viewer --------------------------
 
+    /// The moment the agent's newest background process began, in unix seconds: where its
+    /// BACKGROUND row hangs in the thread. The newest, not the first: the row follows the work
+    /// the agent is really doing, but does not slide down as new turns arrive — only when it
+    /// starts something new. None while the session has no processes at all.
+    pub fn proc_moment(&self) -> Option<f64> {
+        newest_start(&self.processes)
+    }
+
     /// Files this session edited, in first-touch order, with their diffs in order.
     pub fn session_files(&self) -> Vec<(String, Vec<String>)> {
         let mut out: Vec<(String, Vec<String>)> = vec![];
@@ -2502,6 +2510,44 @@ fn save_drafts(drafts: &std::collections::HashMap<String, String>) {
         drafts_path(),
         serde_json::to_vec(drafts).unwrap_or_default(),
     );
+}
+
+/// The newest start among the session's background processes (see `BenchApp::proc_moment`).
+fn newest_start(ps: &[crate::model::BgProcess]) -> Option<f64> {
+    ps.iter()
+        .filter_map(|p| p.started)
+        .fold(None, |a: Option<f64>, t| Some(a.map_or(t, |x| x.max(t))))
+}
+
+#[cfg(test)]
+mod proc_moment_tests {
+    use super::newest_start;
+    use crate::model::BgProcess;
+
+    fn proc(started: Option<f64>) -> BgProcess {
+        BgProcess {
+            id: "p".into(),
+            command: "cargo build".into(),
+            running: started.is_some(),
+            exit_code: None,
+            started,
+            exited: None,
+            reason: None,
+            tail: String::new(),
+        }
+    }
+
+    #[test]
+    fn the_row_follows_the_newest_process() {
+        assert_eq!(newest_start(&[]), None, "no processes: no row");
+        assert_eq!(newest_start(&[proc(None)]), None, "a start the agent never gave");
+        assert_eq!(newest_start(&[proc(Some(100.)), proc(Some(300.))]), Some(300.));
+        assert_eq!(
+            newest_start(&[proc(Some(300.)), proc(Some(100.))]),
+            Some(300.),
+            "the order the agent lists them in means nothing"
+        );
+    }
 }
 
 #[cfg(test)]
