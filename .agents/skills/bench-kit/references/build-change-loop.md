@@ -167,6 +167,18 @@ window the person works in and talks to you through. When Dev is good and the pe
 rolling back) and the new one starts on the next open. Both are signed with the Apple Development
 certificate, so macOS grants are given once per app. Uncommitted changes stop the build
 (`BENCH_DIRTY=1` for a throwaway Dev one).
+
+**A grant that is on but doesn't work** (local network above all: the toggle is on in Privacy &
+Security, macOS never asks, and every request to a local service fails, while Bench Dev works).
+macOS matched the app to a dead entry: an old path, or another app with the same Mach-O UUID.
+Its local network list can't be cleaned. `tccutil` doesn't cover it, and
+`/Library/Preferences/com.apple.networkextension.plist` can't be edited on a running Mac (the
+only reset is deleting it from Recovery, which also wipes every VPN). Don't fight it. **Give the
+app a new bundle id** (`ID=` in `scripts/bundle-macos.sh`, then fix the id in this skill and in
+`src/main.rs`): macOS sees a new app and asks for every grant again (network, microphone,
+notifications, reminders). The person confirms them once, and it works. That is how the release
+went from `local.bench` to `local.bench.app` (2026-10-25). `bundle-macos.sh` also gives each app
+its own Mach-O UUID, so Dev and release built from one commit are never twins. Keep that.
 The person tests the bundle, not `target/`. "I see no changes" happened when only the dev build
 was rebuilt. Tell them to try it in Bench Dev.
 
