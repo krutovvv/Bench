@@ -19,7 +19,7 @@ import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
 import { syncTelegram } from "./telegram.ts";
 import { arm, describe, jobs, newJob, nextRun, runJob, type Job } from "./builtin/cron.ts";
-import { connectMcp, mcpStatus } from "./mcp.ts";
+import { authorizeServer, connectMcp, mcpStatus } from "./mcp.ts";
 import { tasks } from "./builtin/tasks.ts";
 import { hosts, importSshConfig, importTransmit, type Host } from "./builtin/hosts.ts";
 import { projects } from "./builtin/projects.ts";
@@ -554,7 +554,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
 			mcp: Object.entries(agentMcp(agent)).map(([name, spec]: [string, any]) => {
 				const s = status.find((x) => x.name === name);
-				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null, spec: JSON.stringify(spec, null, 2) };
+				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null, needs_auth: !!s?.needsAuth, spec: JSON.stringify(spec, null, 2) };
 			}),
 			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
 			prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
@@ -721,6 +721,12 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		jobs.save(next);
 		await arm(next);
 		return cronView(jobs.get(job.id)!);
+	}],
+	// Sign in to a project's HTTP MCP server (OAuth): the page to open; the server connects again
+	// once the browser comes back.
+	["POST", /^\/api\/projects\/([^/]+)\/mcp\/([^/]+)\/authorize$/, async (_req, m) => {
+		const { agent } = envOf(decodeURIComponent(m[1]));
+		return { url: await authorizeServer(agent, decodeURIComponent(m[2])) };
 	}],
 	// A project's new scheduled job (the general environment's: "general").
 	["POST", /^\/api\/projects\/([^/]+)\/cron$/, async (req, m) => {

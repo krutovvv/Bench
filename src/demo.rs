@@ -212,6 +212,7 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
         "mcp": [
             {"name": "ghost", "kind": "http", "enabled": true, "connected": true, "tools": 12},
             {"name": "unsplash", "kind": "stdio", "enabled": true, "connected": true, "tools": 3},
+            {"name": "figma", "kind": "http", "enabled": true, "connected": true, "tools": 0, "error": "needs signing in", "needs_auth": true},
             {"name": "search-console", "kind": "stdio", "enabled": false, "connected": false, "tools": 0}
         ],
         "mcp_json": "{\n  \"mcpServers\": {\n    \"ghost\": { \"url\": \"https://blog.example.com/ghost/mcp\", \"headers\": { \"Authorization\": \"${GHOST_ADMIN_KEY}\" } },\n    \"unsplash\": { \"command\": \"npx\", \"args\": [\"unsplash-mcp\"] },\n    \"search-console\": { \"command\": \"uvx\", \"args\": [\"gsc-mcp\"], \"enabled\": false }\n  }\n}\n",

@@ -29,6 +29,8 @@ pub struct ProjectEnv {
     pub name_dirty: bool,
     /// MCP servers: (name, "http"/"stdio", enabled, connected, tools, error, its config as JSON).
     pub mcp: Vec<(String, String, bool, bool, u64, Option<String>, String)>,
+    /// MCP servers that asked for OAuth: "Authorize" signs in.
+    pub mcp_auth: std::collections::HashSet<String>,
     /// The server opened under its row, and its config being edited.
     pub mcp_open: Option<String>,
     pub mcp_json: Entity<EditorState>,
@@ -169,6 +171,7 @@ impl BenchApp {
             cron_prompt,
             cron_dirty: false,
             folded: Default::default(),
+            mcp_auth: Default::default(),
             armed: None,
             error: None,
         }
@@ -522,6 +525,55 @@ impl BenchApp {
         );
     }
 
+    /// Sign in to an MCP server (OAuth): its page opens in the browser; the agent connects it once
+    /// the browser comes back, and the block reads the environment again until it shows connected.
+    pub fn env_authorize(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
+            return;
+        };
+        let Some((conn, eid)) = self.env_target(&id) else {
+            return;
+        };
+        let path = format!("/api/projects/{eid}/mcp/{}/authorize", enc(&name));
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json(&conn, "POST", &path, &profile, Value::Null),
+            move |this, r, window, cx| match r {
+                Ok(v) => {
+                    match v["url"].as_str().filter(|u| !u.is_empty()) {
+                        Some(url) => {
+                            cx.open_url(url);
+                            this.toast(NotificationType::Info, "Sign in in the browser: the server connects when you are back", window, cx);
+                        }
+                        None => this.toast(NotificationType::Success, "Connected", window, cx),
+                    }
+                    // Read again every 3 s for 3 minutes, until it no longer asks.
+                    cx.spawn_in(window, async move |this, cx| {
+                        for _ in 0..60 {
+                            cx.background_executor().timer(std::time::Duration::from_secs(3)).await;
+                            let more = this
+                                .update_in(cx, |this, window, cx| {
+                                    let waiting = this.project_env.as_ref().is_some_and(|e| e.id == id && e.mcp_auth.contains(&name));
+                                    if waiting {
+                                        this.load_env(&id, window, cx);
+                                    }
+                                    waiting
+                                })
+                                .unwrap_or(false);
+                            if !more {
+                                break;
+                            }
+                        }
+                    })
+                    .detach();
+                }
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+
     /// A section's "+ Add": the start of the request in the composer, the caret after it and the
     /// thread scrolled down to it, for the person to finish and the agent to do.
     pub fn ask_in_composer(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -552,6 +604,13 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
                 m["spec"].as_str().unwrap_or("{}").to_string(),
             )
         })
+        .collect();
+    e.mcp_auth = v["mcp"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|m| m["needs_auth"].as_bool() == Some(true))
+        .filter_map(|m| m["name"].as_str().map(str::to_string))
         .collect();
     e.skills = v["skills"]
         .as_array()

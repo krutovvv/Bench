@@ -8,6 +8,7 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
 import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent } from "@earendil-works/pi-mcp";
+import { authorize, authProviderFor, needsAuth, oauthProvider } from "./mcp-oauth.ts";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -32,6 +33,8 @@ interface Server {
 	client?: McpClient;
 	tools: ToolRegistration[];
 	error?: string;
+	/** It asked for OAuth: "Authorize" signs in. */
+	needsAuth?: boolean;
 }
 
 /** key: "<agent>/<server>" */
@@ -39,7 +42,7 @@ const servers = new Map<string, Server>();
 
 export const mcpTools = (agent: string): ToolRegistration[] => [...servers.values()].filter((s) => s.agent === agent).flatMap((s) => s.tools);
 export const mcpStatus = (agent?: string) =>
-	[...servers.values()].filter((s) => !agent || s.agent === agent).map((s) => ({ agent: s.agent, name: s.name, tools: s.tools.length, error: s.error }));
+	[...servers.values()].filter((s) => !agent || s.agent === agent).map((s) => ({ agent: s.agent, name: s.name, tools: s.tools.length, error: s.error, needsAuth: !!s.needsAuth }));
 
 function exposureOf(spec: any, tool: string, count: number): string {
 	const rules: Record<string, string> = spec.toolExposure ?? {};
@@ -93,7 +96,7 @@ async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 			try {
 				const client = new McpClient({ name: "bench", version: "1.0.0" });
 				const transport = spec.url
-					? new StreamableHttpTransport({ url: spec.url, headers: spec.headers ?? {} })
+					? httpTransport(agent, name, spec)
 					: new StdioTransport({ command: home(spec.command) as string, args: (spec.args ?? []).map(home), env: { ...env, ...(spec.env ?? {}) }, cwd: home(spec.cwd) as string | undefined } as any);
 				await withTimeout(client.connect(transport), timeoutMs, "connect timed out");
 				server.client = client;
@@ -114,10 +117,37 @@ async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 						} as any),
 					);
 			} catch (e) {
-				server.error = String((e as Error)?.message ?? e);
+				server.needsAuth = Boolean(spec.url) && needsAuth(e);
+				server.error = server.needsAuth ? "needs signing in" : String((e as Error)?.message ?? e);
 				console.error(`[mcp] ${agent}/${name}: ${server.error}`);
 			}
 		}),
+	);
+}
+
+/** An HTTP server's transport: with its own headers as given; without an Authorization header,
+ * through OAuth (kept credentials, refreshed; see mcp-oauth.ts). */
+function httpTransport(agent: string, name: string, spec: any, provider = oauthProvider(agent, name, spec.url, spec.oauth)) {
+	const headers = spec.headers ?? {};
+	const own = Object.keys(headers).some((h) => h.toLowerCase() === "authorization");
+	return new StreamableHttpTransport({ url: spec.url, headers, ...(own ? {} : { authProvider: authProviderFor(provider) }) } as any);
+}
+
+/** Sign in to an agent's HTTP MCP server: the page to open in the browser ("" when no sign-in was needed). */
+export async function authorizeServer(agent: string, name: string): Promise<string> {
+	const spec = fill(agentMcp(agent)[name], profileEnv(agent));
+	if (!spec?.url) throw new Error(`no HTTP MCP server "${name}"`);
+	return authorize(
+		agent,
+		name,
+		spec.url,
+		spec.oauth,
+		async (provider) => {
+			const client = new McpClient({ name: "bench", version: "1.0.0" });
+			await withTimeout(client.connect(httpTransport(agent, name, spec, provider)), 30000, "connect timed out");
+			await client.close().catch(() => {});
+		},
+		() => connectMcp(agent),
 	);
 }
 

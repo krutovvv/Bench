@@ -293,6 +293,14 @@ impl BenchApp {
                         this.click_claimed = true;
                         this.env_open("mcp", n.clone(), window, cx)
                     }))
+                    .when(e.mcp_auth.contains(&name), |d| {
+                        let n = name.clone();
+                        d.child(act(format!("{id}-auth").into(), "Authorize".into(), false).text_color(theme.primary).on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            cx.stop_propagation();
+                            this.env_authorize(n.clone(), window, cx)
+                        })))
+                    })
                     .child(remove(id, "mcp", name.clone(), cx)),
             );
             if e.mcp_open.as_deref() == Some(&name) {
