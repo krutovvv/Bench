@@ -572,12 +572,20 @@ impl BenchApp {
                     gpui_kit::component::popover::Popover::new("backend-pop")
                         .anchor(gpui_kit::Anchor::BottomLeft)
                         .trigger(
-                            Button::new("backend")
-                                .ghost()
-                                .small()
-                                .icon(Ico::Activity.icon())
-                                .label(label)
-                                .text_color(color),
+                            // Opening the panel asks macOS what it allows now (the choice may
+                            // have changed in System Settings since the start).
+                            {
+                                let v = view.clone();
+                                Button::new("backend")
+                                    .ghost()
+                                    .small()
+                                    .icon(Ico::Activity.icon())
+                                    .label(label)
+                                    .text_color(color)
+                                    .on_click(move |_, _, cx| {
+                                        v.update(cx, |this, cx| this.notif(false, cx))
+                                    })
+                            }
                         )
                         .content(move |_, _, cx| {
                             let theme = cx.theme().clone();
