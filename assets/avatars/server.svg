@@ -1,16 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The main server: the Keeper, a hooded figure; where a face should be, a rack's panel with lights for eyes. -->
+  <!-- The main server: a marionette hanging on its strings, one arm pulled up; jointed like a machine, posed like a person. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <g transform="translate(256 256) scale(0.994) translate(-256.0 -266.0)">
-    <path d="M176 246 Q176 104 256 100 Q336 104 336 246 L380 432 H132 Z" fill="#1F2329"/>
-    <path d="M206 250 Q206 150 256 148 Q306 150 306 250 Q306 300 256 304 Q206 300 206 250z" fill="#5C78E2"/>
-    <rect x="216" y="196" width="80" height="12" fill="#1F2329"/>
-    <rect x="216" y="238" width="80" height="12" fill="#1F2329"/>
-    <rect x="216" y="270" width="80" height="12" fill="#1F2329"/>
-    <circle cx="238" cy="222" r="7" fill="#E8603C"/>
-    <circle cx="274" cy="222" r="7" fill="#E8603C"/>
-    <circle cx="286" cy="276" r="3" fill="#2FA38A"/>
-    <rect x="252" y="304" width="8" height="128" fill="#5C78E2"/>
-    <polygon points="232.0,340.0 280.0,340.0 272.0,372.0 240.0,372.0" fill="#F2B43C"/>
+  <g transform="translate(256 256) scale(0.764) translate(-264.0 -236.0)">
+    <rect x="176" y="34" width="160" height="14" fill="#F2B43C"/>
+    <rect x="250" y="20" width="12" height="40" fill="#F2B43C"/>
+    <polygon points="260.0,48.0 260.0,118.0 264.0,118.0 264.0,48.0" fill="#1F2329"/>
+    <polygon points="328.0,48.3 350.0,176.3 354.0,175.7 332.0,47.7" fill="#1F2329"/>
+    <polygon points="182.0,48.1 194.0,318.1 198.0,317.9 186.0,47.9" fill="#1F2329"/>
+    <polygon points="199.3,200.1 173.3,256.1 198.7,267.9 224.7,211.9" fill="#1F2329"/>
+    <polygon points="174.2,264.1 184.2,320.1 207.8,315.9 197.8,259.9" fill="#1F2329"/>
+    <polygon points="291.0,216.7 329.0,248.7 347.0,227.3 309.0,195.3" fill="#1F2329"/>
+    <polygon points="349.7,240.6 363.7,178.6 340.3,173.4 326.3,235.4" fill="#1F2329"/>
+    <polygon points="227.2,333.4 217.2,389.4 246.8,394.6 256.8,338.6" fill="#1F2329"/>
+    <polygon points="218.1,393.5 224.1,447.5 251.9,444.5 245.9,390.5" fill="#1F2329"/>
+    <polygon points="258.0,341.4 278.0,393.4 306.0,382.6 286.0,330.6" fill="#1F2329"/>
+    <polygon points="278.2,385.6 268.2,443.6 295.8,448.4 305.8,390.4" fill="#1F2329"/>
+    <polygon points="206.0,192.0 306.0,192.0 294.0,304.0 218.0,304.0" fill="#1F2329"/>
+    <rect x="222" y="306" width="68" height="34" fill="#1F2329"/>
+    <rect x="250" y="178" width="14" height="22" fill="#1F2329"/>
+    <circle cx="262" cy="146" r="40" fill="#1F2329"/>
+    <rect x="244" y="230" width="24" height="24" fill="#E8603C"/>
+    <circle cx="212" cy="206" r="12" fill="#5C78E2"/>
+    <circle cx="300" cy="206" r="12" fill="#5C78E2"/>
+    <circle cx="186" cy="262" r="12" fill="#5C78E2"/>
+    <circle cx="338" cy="238" r="12" fill="#5C78E2"/>
+    <circle cx="242" cy="336" r="12" fill="#5C78E2"/>
+    <circle cx="272" cy="336" r="12" fill="#5C78E2"/>
+    <circle cx="232" cy="392" r="12" fill="#5C78E2"/>
+    <circle cx="292" cy="388" r="12" fill="#5C78E2"/>
   </g>
 </svg>
