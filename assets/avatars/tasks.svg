@@ -1,11 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The task assistant: an hourglass; the sand runs down in a thin stream, as time does. -->
+  <!-- The task assistant: an eclipse; in the black sun a check mark burns. Round, unlike the others. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <rect x="140" y="88" width="232" height="28" fill="#2FA38A"/>
-  <rect x="140" y="396" width="232" height="28" fill="#2FA38A"/>
-  <polygon points="164,116 348,116 268,256 348,396 164,396 244,256" fill="#1F2329"/>
-  <polygon points="214,152 298,152 260,218 252,218" fill="#F2B43C"/>
-  <rect x="253" y="218" width="6" height="128" fill="#F2B43C"/>
-  <polygon points="256,330 320,396 192,396" fill="#F2B43C"/>
-  <circle cx="226" cy="370" r="5" fill="#E8603C"/>
+  <circle cx="268" cy="248" r="150" fill="#F2B43C"/>
+  <circle cx="252" cy="262" r="140" fill="#1F2329"/>
+  <polygon points="176,262 202,236 238,272 316,194 342,220 238,324" fill="#E8603C"/>
+  <circle cx="392" cy="402" r="14" fill="#2FA38A"/>
 </svg>

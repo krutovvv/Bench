@@ -1,14 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The main server: a dark rack humming; one bay glows, from another two lights look out. -->
+  <!-- The main server: three slabs hanging in the air, low and wide, a glow between them. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <rect x="156" y="78" width="200" height="340" fill="#1F2329"/>
-  <rect x="176" y="104" width="160" height="56" fill="#2B313A"/>
-  <rect x="176" y="176" width="160" height="56" fill="#2B313A"/>
-  <rect x="176" y="248" width="160" height="56" fill="#2B313A"/>
-  <rect x="176" y="320" width="160" height="56" fill="#2B313A"/>
-  <circle cx="196" cy="132" r="6" fill="#2FA38A"/><circle cx="214" cy="132" r="6" fill="#2FA38A"/>
-  <rect x="196" y="200" width="120" height="8" fill="#E8603C"/>
-  <circle cx="240" cy="276" r="7" fill="#FFFFFF"/><circle cx="272" cy="276" r="7" fill="#FFFFFF"/>
-  <circle cx="196" cy="348" r="6" fill="#F2B43C"/>
-  <rect x="120" y="418" width="272" height="22" fill="#5C78E2"/>
+  <rect x="84" y="150" width="300" height="60" fill="#1F2329"/>
+  <rect x="128" y="226" width="300" height="60" fill="#1F2329"/>
+  <rect x="84" y="302" width="300" height="60" fill="#5C78E2"/>
+  <rect x="128" y="214" width="256" height="8" fill="#E8603C"/>
+  <circle cx="352" cy="180" r="9" fill="#2FA38A"/>
+  <circle cx="396" cy="256" r="9" fill="#F2B43C"/>
+  <rect x="120" y="398" width="228" height="12" fill="#AFC0F5"/>
 </svg>
