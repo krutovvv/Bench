@@ -99,10 +99,10 @@ impl BenchApp {
     }
 
     fn new_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) -> ProjectEnv {
-        // One editor for all three: the code editor, highlighted (Markdown, JSON), wrapped, no
-        // line numbers, no room under the last line; its height follows the text.
+        // One editor for all: the code editor, highlighted (Markdown, JSON), wrapped, line
+        // numbers, no room under the last line; its height follows the text.
         let editor = |language: &'static str, window: &mut Window, cx: &mut Context<Self>| {
-            let e = cx.new(|cx| EditorState::new(window, cx).line_number(true).folding(false).soft_wrap(true).scroll_beyond_last_line(Some(0)));
+            let e = cx.new(|cx| EditorState::new(window, cx).line_number(true).soft_wrap(true).scroll_beyond_last_line(Some(0)));
             e.update(cx, |s, cx| s.set_highlighter(language, cx));
             e
         };

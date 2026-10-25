@@ -155,7 +155,7 @@ impl BenchApp {
                 cx.notify();
             })));
         let body = div()
-            .h(px(lines as f32 * super::editor_line(cx) + 12.))
+            .h(px(super::editor_height(lines, cx)))
             .child(Editor::new(&self.files_remote.editor).appearance(false).h_full())
             .into_any_element();
         Some(super::inserts::card(head, body, &theme))

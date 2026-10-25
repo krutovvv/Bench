@@ -74,6 +74,7 @@ impl BenchApp {
             .flex()
             .items_center()
             .text_base()
+            .rounded_md()
             .cursor_pointer()
             .when(primary, |d| {
                 d.bg(theme.primary)
@@ -81,7 +82,7 @@ impl BenchApp {
                     .hover(|s| s.bg(theme.primary_hover))
             })
             .when(!primary, |d| {
-                d.border_1().rounded_md()
+                d.border_1()
                     .border_color(theme.border)
                     .hover(|s| s.bg(theme.list_hover))
             })

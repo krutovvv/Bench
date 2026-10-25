@@ -109,16 +109,7 @@ impl InsertKind for Terminal {
             ];
         }
         vec![
-            icon_button(&format!("{}-focus", ins.id), Ico::Terminal, "Focus the terminal", &theme)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
-                    if let Some(t) = this.ssh.tabs.iter().find(|t| t.id == id) {
-                        t.focus.focus(window, cx);
-                    }
-                    cx.notify();
-                }))
-                .into_any_element(),
-            icon_button(&format!("{}-bg", ins.id), Ico::ToBackground, "Send to the background", &theme)
+            icon_button(&format!("{}-bg", ins.id), Ico::Terminal, "Send to the background", &theme)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.click_claimed = true;
                     if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {

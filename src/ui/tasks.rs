@@ -272,8 +272,9 @@ impl BenchApp {
                 .w_full()
                 .mx(px(-12.))
                 .children(strip)
-                .child(v_flex().pt_1().children(rows).when_some(note, |d, (text, color)| {
-                    d.child(div().px_6().py_3().text_base().text_color(color).child(text))
+                .child(v_flex().children(rows).when_some(note, |d, (text, color)| {
+                    // One line, as an empty terminal is.
+                    d.child(div().px_6().text_base().text_color(color).child(text))
                 }))
                 .into_any_element();
         }

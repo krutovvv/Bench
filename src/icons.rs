@@ -84,7 +84,6 @@ icons! {
     Shield => "shield",
     Square => "square",
     Terminal => "square-terminal",
-    ToBackground => "arrow-down-to-line",
     Trash => "trash",
     UserRound => "user-round",
     Volume => "volume-2",

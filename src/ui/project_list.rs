@@ -281,7 +281,7 @@ impl BenchApp {
                 .id(SharedString::from(format!("env-card-save-{what}")))
                 .flex_none()
                 .px_2()
-                .rounded_sm()
+                .rounded_md()
                 .when(dirty, |d| {
                     d.cursor_pointer().bg(theme.primary).text_color(theme.primary_foreground).on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
@@ -317,7 +317,7 @@ impl BenchApp {
             let text = state.read(cx).value().to_string();
             let lines: usize = text.lines().map(|l| l.chars().count() / 100 + 1).sum::<usize>().max(1);
             div()
-                .h(px(lines as f32 * super::editor_line(cx) + 12.))
+                .h(px(super::editor_height(lines, cx)))
                 .child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full())
                 .into_any_element()
         };

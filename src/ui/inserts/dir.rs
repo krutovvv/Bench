@@ -143,7 +143,7 @@ impl InsertKind for Dir {
                 cx.notify();
             })));
         let body = div()
-            .h(px(lines as f32 * super::super::editor_line(cx) + 12.))
+            .h(px(super::super::editor_height(lines, cx)))
             .child(gpui_kit::component::input::Editor::new(&app.local_files.editor).appearance(false).h_full())
             .into_any_element();
         Some(super::card(head, body, &theme))

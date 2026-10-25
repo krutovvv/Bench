@@ -259,6 +259,12 @@ pub const FIELD_H: f32 = 32.;
 pub fn editor_line(cx: &App) -> f32 {
     f32::from(gpui_kit::component::ActiveTheme::theme(cx).mono_font_size) * 1.5
 }
+
+/// An editor showing all of its `lines` with room to spare: the text never overflows it, so
+/// the editor shows no scrollbar and the wheel scrolls the thread, not the editor.
+pub fn editor_height(lines: usize, cx: &App) -> f32 {
+    (lines.max(1) + 1) as f32 * editor_line(cx) + 16.
+}
 pub fn block_head(theme: &gpui_kit::component::Theme, over_body: bool) -> Div {
     h_flex()
         .flex_none()
@@ -579,7 +585,7 @@ pub fn form_action(id: &'static str, label: &'static str, primary: bool, cx: &Ap
     div()
         .id(id)
         .cursor_pointer()
-        .when(primary, |d| d.px_2().bg(bg).text_color(fg).hover(move |s| s.bg(hover)))
+        .when(primary, |d| d.px_2().rounded_md().bg(bg).text_color(fg).hover(move |s| s.bg(hover)))
         .when(!primary, |d| d.text_color(muted).hover(move |s| s.text_color(text)))
         .child(label)
 }
