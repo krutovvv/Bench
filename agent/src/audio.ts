@@ -14,13 +14,31 @@ function endpoint(profile: string, section: "stt" | "tts") {
 	};
 }
 
+// fetch says only "fetch failed"; the reason (refused, unreachable, timed out) is in its cause.
+// A server on the local network that answers everyone else but not the agent is macOS's Local
+// Network privacy: the agent runs under the Bench app that started it, which needs the grant.
+async function post(url: string, init: RequestInit): Promise<Response> {
+	try {
+		return await fetch(url, init);
+	} catch (e) {
+		const c: any = (e as any)?.cause;
+		const why = c?.code ?? c?.message ?? (e as Error).message;
+		const host = new URL(url).host;
+		const local = /^(10|127|192\.168|172\.(1[6-9]|2\d|3[01]))\.|\.local(:|$)/.test(host);
+		const hint = local && /EHOSTUNREACH|ENETUNREACH|EPERM|EACCES/.test(String(why))
+			? " (allow Bench in System Settings → Privacy & Security → Local Network)"
+			: "";
+		throw new Error(`${host}: ${why}${hint}`);
+	}
+}
+
 export async function transcribe(profile: string, audio: Buffer, mime: string, filename = mime.includes("wav") ? "audio.wav" : "audio.ogg"): Promise<string> {
 	const { o, base, key } = endpoint(profile, "stt");
 	const form = new FormData();
 	form.append("file", new Blob([audio], { type: mime }), filename);
 	form.append("model", String(o.model ?? "whisper-1"));
 	if (o.language) form.append("language", String(o.language));
-	const r = await fetch(`${base}/audio/transcriptions`, { method: "POST", headers: key ? { Authorization: `Bearer ${key}` } : {}, body: form });
+	const r = await post(`${base}/audio/transcriptions`, { method: "POST", headers: key ? { Authorization: `Bearer ${key}` } : {}, body: form });
 	if (!r.ok) throw new Error(`transcription failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
 	const j: any = await r.json();
 	return String(j.text ?? "").trim();
@@ -28,7 +46,7 @@ export async function transcribe(profile: string, audio: Buffer, mime: string, f
 
 export async function speak(profile: string, text: string): Promise<{ type: string; audio: Buffer }> {
 	const { o, base, key } = endpoint(profile, "tts");
-	const r = await fetch(`${base}/audio/speech`, {
+	const r = await post(`${base}/audio/speech`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
 		body: JSON.stringify({ model: o.model ?? "tts-1", voice: o.voice ?? "alloy", input: text, response_format: "mp3" }),
