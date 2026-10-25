@@ -197,7 +197,8 @@ impl HermesApp {
         out
     }
 
-    /// Threads that belong to no project, folded at the end until opened.
+    /// General: this Mac's agent's own environment (what every project's threads get too) and
+    /// the threads of no project; folded at the end until opened.
     fn render_loose(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
         let key = "open:loose".to_string();
@@ -214,8 +215,39 @@ impl HermesApp {
             .items_center()
             .text_sm()
             .child(super::head_icon(Ico::Chat, cx))
-            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child("Without a project"))
+            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child("General"))
             .child(div().flex_1())
+            // The pencil: the general environment (soul, MCP, skills, prompts every thread gets).
+            .child(
+                super::head_plus_slot()
+                    .id("general-env")
+                    .cursor_pointer()
+                    .text_color(muted)
+                    .opacity(0.)
+                    .group_hover(group.clone(), |s| s.opacity(1.))
+                    .hover(|s| s.bg(cx.theme().sidebar_accent).text_color(cx.theme().foreground))
+                    .child(Ico::Pencil.icon().xsmall())
+                    .tooltip(|window, cx| Tooltip::new("The general environment").build(window, cx))
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        cx.stop_propagation();
+                        this.open_project_env("general".into(), window, cx)
+                    })),
+            )
+            .child(
+                super::head_plus_slot()
+                    .id("general-new")
+                    .cursor_pointer()
+                    .text_color(muted)
+                    .opacity(0.)
+                    .group_hover(group.clone(), |s| s.opacity(1.))
+                    .hover(|s| s.bg(cx.theme().sidebar_accent).text_color(cx.theme().foreground))
+                    .child(Ico::Plus.icon().xsmall())
+                    .tooltip(|window, cx| Tooltip::new("New thread").build(window, cx))
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        cx.stop_propagation();
+                        this.new_thread_in(String::new(), cx)
+                    })),
+            )
             .child(super::group_chevron(!open, group, cx))
             // Folded by default: the key marks it open.
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))

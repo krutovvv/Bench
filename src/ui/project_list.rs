@@ -150,6 +150,8 @@ impl HermesApp {
             return div().text_color(muted).child("Loading…").into_any_element();
         };
         let remote = self.projects.iter().any(|p| p.id == e.id && p.host.is_some());
+        // The general environment has no name to change and is not removed.
+        let general = e.id == "general";
         // A quiet text action: muted, the foreground on hover; red for removing.
         let act = |id: SharedString, label: String, danger: bool| {
             div()
@@ -247,13 +249,13 @@ impl HermesApp {
         let mut out = v_flex().w_full();
 
         // Its name (a remote project's is its server's agent: named here, on this Mac, too).
-        out = out.child(
+        out = out.when(!general, |d| d.child(
             h_flex()
                 .gap_3()
                 .child(div().flex_none().text_color(muted).child("Name"))
                 .child(div().w(px(320.)).child(gpui_kit::component::input::Input::new(&e.name).appearance(false)))
                 .when(e.name_dirty, |d| d.child(footer("name", "name", true, cx))),
-        );
+        ));
 
         // The soul.
         let soul_text = e.soul.read(cx).value().to_string();
@@ -374,7 +376,7 @@ impl HermesApp {
         let project_armed = is_armed("project:".into());
         out = out
             .when_some(e.error.clone(), |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
-            .child(
+            .when(!general, |d| d.child(
                 h_flex().pt_4().child(div().flex_1()).child(
                     act("env-remove-project".into(), if project_armed { "Remove the project? Its threads stay".into() } else { "Remove project".into() }, true)
                         .on_click(cx.listener(|this, _, window, cx| {
@@ -382,7 +384,7 @@ impl HermesApp {
                             this.env_remove("project", String::new(), window, cx)
                         })),
                 ),
-            );
+            ));
         out.into_any_element()
     }
 }

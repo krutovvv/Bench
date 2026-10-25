@@ -219,7 +219,7 @@ impl HermesApp {
             return Some("Browser".into());
         }
         if let Some(id) = s.strip_prefix("env:") {
-            let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_default();
+            let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| "General".into());
             return Some(format!("{name}: environment"));
         }
         Self::subject_tool(&s).map(|t| t.name().to_string())

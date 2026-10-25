@@ -61,9 +61,11 @@ impl HermesApp {
     /// A project's pencil: its environment's thread (the latest, or a new one in the project).
     pub fn open_project_env(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         self.load_env(&id, window, cx);
-        self.thread_project = id.clone();
+        // "general": this Mac's own environment; its thread belongs to no project.
+        let project = if id == "general" { String::new() } else { id.clone() };
+        self.thread_project = project.clone();
         self.open_subject(format!("env:{id}"), cx);
-        self.thread_project = id;
+        self.thread_project = project;
     }
 
     fn new_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) -> ProjectEnv {
