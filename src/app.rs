@@ -1874,6 +1874,24 @@ impl BenchApp {
     /// Restart the agent on the machine we are connected to, then reconnect. Its runs are
     /// durable, so it never refuses (the `Busy` branch: a backend that refused while work ran,
     /// pressed again within a minute, restarted anyway).
+    /// The gateway panel's notification line: refresh what macOS allows, and with `test` also
+    /// send one — the way to see for oneself that Bench can say it is done from the background.
+    pub fn notif(&mut self, test: bool, cx: &mut Context<Self>) {
+        if test {
+            crate::notify::post("bench.test", "Bench", "This is a test: Bench says it is done.");
+        }
+        crate::notify::check();
+        cx.notify();
+    }
+
+    /// System Settings → Notifications: the choice is macOS's to keep, not ours.
+    pub fn notif_settings(&mut self, cx: &mut Context<Self>) {
+        let _ = std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.notifications")
+            .spawn();
+        cx.notify();
+    }
+
     pub fn restart_gateway(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let target = self.target.clone();
         let interrupt = self

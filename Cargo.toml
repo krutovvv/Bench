@@ -53,7 +53,7 @@ objc2 = "0.6"
 block2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSArray", "NSDate", "NSError", "NSPredicate", "NSCalendar", "NSObject", "NSURL", "NSTimeZone"] }
 objc2-event-kit = { version = "0.3", default-features = false, features = ["std", "block2", "EKCalendar", "EKCalendarItem", "EKError", "EKEventStore", "EKObject", "EKReminder", "EKSource", "EKTypes"] }
-objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }
+objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSettings", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }
 
 # Desktop only: the syntax grammars (C code), HTTP with TLS, the terminal (a PTY and a VT parser).
 [target.'cfg(not(target_family = "wasm"))'.dependencies]

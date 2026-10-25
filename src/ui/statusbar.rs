@@ -755,6 +755,73 @@ impl BenchApp {
                                         })
                                         .children(platforms),
                                 )
+                                // Whether macOS lets Bench speak at all: the one thing that
+                                // stands between "the agent finished" and silence.
+                                .child({
+                                    let v = view.clone();
+                                    let w = view.clone();
+                                    let auth = crate::notify::AUTH
+                                        .load(std::sync::atomic::Ordering::Relaxed);
+                                    v_flex()
+                                        .px_3()
+                                        .py_2()
+                                        .gap_1()
+                                        .border_t_1()
+                                        .border_color(theme.border)
+                                        .child(
+                                            h_flex()
+                                                .gap_2()
+                                                .items_center()
+                                                .child(
+                                                    div()
+                                                        .text_sm()
+                                                        .text_color(muted)
+                                                        .child("NOTIFICATIONS"),
+                                                )
+                                                .child(div().flex_1())
+                                                .child(
+                                                    icon(
+                                                        "notif-test",
+                                                        Ico::Bell,
+                                                        "Send a test notification",
+                                                    )
+                                                    .on_click(move |_, _, cx| {
+                                                        v.update(cx, |this, cx| {
+                                                            this.notif(true, cx)
+                                                        })
+                                                    }),
+                                                ),
+                                        )
+                                        .when(auth != 2, |d| {
+                                            d.child(line(
+                                                auth == 1,
+                                                auth != 1,
+                                                if auth == 1 {
+                                                    "Allowed — a banner when Bench is in the background".into()
+                                                } else {
+                                                    "Not asked yet — macOS asks once, on the next finish".into()
+                                                },
+                                            ))
+                                        })
+                                        .when(auth == 2, |d| {
+                                            d.child(
+                                                div()
+                                                    .id("notif-settings")
+                                                    .cursor_pointer()
+                                                    .text_sm()
+                                                    .text_color(theme.danger)
+                                                    .whitespace_normal()
+                                                    .child(
+                                                        "Refused — macOS keeps Bench quiet. Open System Settings → Notifications and allow it.",
+                                                    )
+                                                    .on_click(move |_, _, cx| {
+                                                        w.update(cx, |this, cx| {
+                                                            this.notif_settings(cx)
+                                                        })
+                                                    }),
+                                            )
+                                        })
+                                })
                                 // Its own log: the last lines of ~/.bench/server.log, where a
                                 // problem says itself before the status has anything to say.
                                 .child(

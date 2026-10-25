@@ -5,13 +5,41 @@
 //! macOS asks the person once ("Bench would like to send notifications"); after that the
 //! choice is theirs, in System Settings → Notifications.
 
+use std::ptr::NonNull;
+use std::sync::atomic::{AtomicU8, Ordering};
+
 use block2::RcBlock;
 use objc2::runtime::Bool;
 use objc2_foundation::{NSError, NSString};
 use objc2_user_notifications::{
-    UNAuthorizationOptions, UNMutableNotificationContent, UNNotificationRequest,
-    UNNotificationSound, UNUserNotificationCenter,
+    UNAuthorizationOptions, UNAuthorizationStatus, UNMutableNotificationContent,
+    UNNotificationRequest, UNNotificationSettings, UNNotificationSound, UNUserNotificationCenter,
 };
+
+/// What macOS lets us do: 0 = not asked yet, 1 = allowed, 2 = refused. macOS answers on its own
+/// thread, so this is an atomic and the interface reads it as it is.
+pub static AUTH: AtomicU8 = AtomicU8::new(0);
+
+fn remember(granted: bool, asked: bool) {
+    AUTH.store(if asked { 0 } else if granted { 1 } else { 2 }, Ordering::Relaxed);
+}
+
+/// Refresh `AUTH` from what macOS says now (the person may have changed their mind in System
+/// Settings without quitting Bench).
+pub fn check() {
+    if !bundled() {
+        return;
+    }
+    let center = UNUserNotificationCenter::currentNotificationCenter();
+    let done = RcBlock::new(|settings: NonNull<UNNotificationSettings>| {
+        let st = unsafe { settings.as_ref() }.authorizationStatus();
+        remember(
+            st == UNAuthorizationStatus::Authorized || st == UNAuthorizationStatus::Provisional,
+            st == UNAuthorizationStatus::NotDetermined,
+        );
+    });
+    center.getNotificationSettingsWithCompletionHandler(&done);
+}
 
 /// Running from inside an .app bundle (the only place notifications can work).
 fn bundled() -> bool {
@@ -26,7 +54,10 @@ pub fn request() {
         return;
     }
     let center = UNUserNotificationCenter::currentNotificationCenter();
-    let done = RcBlock::new(|_granted: Bool, _err: *mut NSError| {});
+    check();
+    let done = RcBlock::new(|granted: Bool, _err: *mut NSError| {
+        remember(granted.as_bool(), false);
+    });
     center.requestAuthorizationWithOptions_completionHandler(
         UNAuthorizationOptions::Alert | UNAuthorizationOptions::Sound,
         &done,

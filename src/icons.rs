@@ -40,6 +40,7 @@ macro_rules! icons {
 icons! {
     Activity => "activity",
     AppWindow => "app-window",
+    Bell => "bell",
     Bot => "bot",
     Brain => "brain",
     ChevronDown => "chevron-down",
