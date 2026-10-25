@@ -10,9 +10,9 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::icons::Ico;
 
-/// The listing's height before it scrolls, and the editor's.
-const LIST_H: f32 = 320.;
+/// The editor's height in a titled block, and a line's (the open file is as tall as its lines).
 const EDITOR_H: f32 = 420.;
+const EDITOR_LINE: f32 = 21.;
 
 fn size_label(n: u64) -> String {
     match n {
@@ -97,17 +97,10 @@ impl BenchApp {
                         .child(div().flex_1().min_w_0().truncate().text_base().text_color(muted).child(f.path.clone())),
                 )
             })
-            .child(
-                v_flex()
-                    .id("remote-list")
-                    .max_h(px(LIST_H))
-                    .overflow_y_scroll()
-                    .border_1().rounded_md()
-                    .border_color(theme.border)
-                    .children(rows)
-                    .children(note),
-            )
-            .when_some(open, |d, path| {
+            // As long as the folder is: the thread scrolls, not the list (no scroll inside a
+            // scroll), and no frame inside the insert's frame.
+            .child(v_flex().id("remote-list").mx(px(-12.)).children(rows).children(note))
+            .when_some(open.filter(|_| titled), |d, path| {
                 d.child(
                     v_flex()
                         .border_1().rounded_md()
@@ -132,6 +125,41 @@ impl BenchApp {
                 )
             })
             .into_any_element()
+    }
+
+    /// The open file as a block of its own, under the insert: its path, Save and Close on top,
+    /// the editor at the file's full height (the thread scrolls, not the editor).
+    pub(super) fn render_open_file(&mut self, close_id: String, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let path = self.files_remote.file.clone()?;
+        let dirty = self.files_remote.dirty;
+        let lines = self.files_remote.editor.read(cx).value().lines().count().max(1);
+        let head = super::block_head(&theme, true)
+            .child(Ico::File.icon().small().text_color(muted))
+            .child(div().flex_1().min_w_0().truncate().text_color(theme.foreground).child(path))
+            .child(
+                gpui_kit::component::button::Button::new("remote-save")
+                    .small()
+                    .map(|b| {
+                        use gpui_kit::component::button::ButtonVariants as _;
+                        if dirty { b.primary() } else { b.ghost() }
+                    })
+                    .label("Save")
+                    .on_click(cx.listener(|this, _, window, cx| this.save_host_file(window, cx))),
+            )
+            .child(super::inserts::icon_button(&close_id, Ico::X, "Close the file", &theme).on_click(cx.listener(|this, _, _, cx| {
+                this.click_claimed = true;
+                if !this.files_remote.dirty {
+                    this.files_remote.file = None;
+                }
+                cx.notify();
+            })));
+        let body = div()
+            .h(px(lines as f32 * EDITOR_LINE + 16.))
+            .child(Editor::new(&self.files_remote.editor).appearance(false).h_full())
+            .into_any_element();
+        Some(super::inserts::card(head, body, &theme))
     }
 
     fn file_row(&mut self, k: usize, name: String, dir: bool, size: String, modified: String, cx: &mut Context<Self>) -> AnyElement {

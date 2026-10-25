@@ -1,7 +1,7 @@
 //! The new project's form (the sidebar's "+"): a name and, if it has one, a folder on disk.
 
 use gpui_kit::component::input::Input;
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -152,7 +152,6 @@ impl BenchApp {
                 .child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full())
                 .into_any_element()
         };
-        let heading = |title: &'static str| div().font_weight(FontWeight::MEDIUM).child(title);
         let armed = e.armed.clone();
         let is_armed = |k: String| armed.as_deref() == Some(&k);
         let remove = |id: String, what: &'static str, name: String, cx: &mut Context<Self>| {
@@ -169,6 +168,7 @@ impl BenchApp {
         let add = |id: &'static str, ask: &'static str, cx: &mut Context<Self>| {
             act(id.into(), "+ Add".into(), false).on_click(cx.listener(move |this, _, window, cx| {
                 this.click_claimed = true;
+                cx.stop_propagation();
                 this.ask_in_composer(ask, window, cx)
             }))
         };
@@ -192,6 +192,43 @@ impl BenchApp {
                 }
                 cx.notify();
             }
+        };
+        // Each part of the environment is a block, as everything in a thread: `block_head` with its
+        // title, a fold and "+ Add", its rows under it. `section` closes the block being built.
+        let folded = e.folded.clone();
+        let mut blocks: Vec<AnyElement> = vec![];
+        let mut cur: (&'static str, Option<AnyElement>) = (if general { "General" } else { "Project" }, None);
+        let mut section = |blocks: &mut Vec<AnyElement>, body: Div, next: (&'static str, Option<AnyElement>), cx: &mut Context<Self>| {
+            let (title, add) = std::mem::replace(&mut cur, next);
+            let shut = folded.contains(title);
+            let head = super::block_head(&theme, !shut)
+                .id(SharedString::from(format!("env-sec-{title}")))
+                .cursor_pointer()
+                .child(if shut { crate::icons::Ico::ChevronRight } else { crate::icons::Ico::ChevronDown }.icon().xsmall())
+                .child(div().text_color(theme.foreground).child(title))
+                .children(add)
+                .child(div().flex_1())
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.click_claimed = true;
+                    if let Some(e) = this.project_env.as_mut() {
+                        if !e.folded.remove(title) {
+                            e.folded.insert(title);
+                        }
+                    }
+                    cx.notify();
+                }));
+            blocks.push(
+                v_flex()
+                    .w_full()
+                    .border_1()
+                    .rounded_md()
+                    .border_color(theme.border)
+                    .overflow_hidden()
+                    .bg(theme.background)
+                    .child(head)
+                    .when(!shut, |d| d.child(div().px_3().py_2().child(body)))
+                    .into_any_element(),
+            );
         };
         let mut out = v_flex().w_full();
 
@@ -236,7 +273,7 @@ impl BenchApp {
         }
 
         // MCP servers: each opens to its own config.
-        out = out.child(h_flex().pt_4().gap_3().child(heading("MCP servers")).child(add("env-mcp-add", "Add an MCP server to this project: ", cx)));
+        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("MCP servers", Some(add("env-mcp-add", "Add an MCP server to this project: ", cx).into_any_element())), cx);
         if e.mcp.is_empty() {
             out = out.child(div().text_color(muted).child("None of its own: the general ones work here too."));
         }
@@ -264,7 +301,7 @@ impl BenchApp {
         }
 
         // Skills.
-        out = out.child(h_flex().pt_4().gap_3().child(heading("Skills")).child(add("env-skill-add", "Write a skill for this project: ", cx)));
+        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Skills", Some(add("env-skill-add", "Write a skill for this project: ", cx).into_any_element())), cx);
         if e.skills.is_empty() {
             out = out.child(div().text_color(muted).child("None of its own: the general ones work here too."));
         }
@@ -286,7 +323,7 @@ impl BenchApp {
         }
 
         // Prompts (@ in the composer).
-        out = out.child(h_flex().pt_4().gap_3().child(heading("Prompts")).child(add("env-prompt-add", "Write a prompt for this project: ", cx)));
+        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Prompts", Some(add("env-prompt-add", "Write a prompt for this project: ", cx).into_any_element())), cx);
         if e.prompts.is_empty() {
             out = out.child(div().text_color(muted).child("None of its own: @ in the composer offers the general ones."));
         }
@@ -308,12 +345,12 @@ impl BenchApp {
         }
 
         // Schedule: what runs on its own, each run a thread of the project.
-        out = out.child(
-            h_flex().pt_4().gap_3().child(heading("Schedule")).child(act("env-cron-add".into(), "+ New job".into(), false).on_click(cx.listener(|this, _, window, cx| {
-                this.click_claimed = true;
-                this.env_open_cron("new".into(), window, cx)
-            }))),
-        );
+        let new_job = act("env-cron-add".into(), "+ New job".into(), false).on_click(cx.listener(|this, _, window, cx| {
+            this.click_claimed = true;
+            cx.stop_propagation();
+            this.env_open_cron("new".into(), window, cx)
+        }));
+        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Schedule", Some(new_job.into_any_element())), cx);
         if e.cron.is_empty() && e.cron_open.as_deref() != Some("new") {
             out = out.child(div().text_color(muted).child("Nothing runs on its own yet: a job runs its prompt in a new thread of the project, on a schedule."));
         }
@@ -378,7 +415,7 @@ impl BenchApp {
 
         // Accesses.
         if !remote {
-            out = out.child(h_flex().pt_4().gap_3().child(heading("Accesses")).child(add("env-host-add", "Add to this project the access: ", cx)));
+            section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("Accesses", Some(add("env-host-add", "Add to this project the access: ", cx).into_any_element())), cx);
             if e.hosts.is_empty() {
                 out = out.child(div().text_color(muted).child("No servers or file hosts yet: /ssh and /ftp in its threads offer only these."));
             }
@@ -388,9 +425,11 @@ impl BenchApp {
             }
         }
 
+        section(&mut blocks, std::mem::replace(&mut out, v_flex().w_full()), ("", None), cx);
+
         // The project's removal, in red.
         let project_armed = is_armed("project:".into());
-        out = out
+        out = v_flex().w_full().gap_3().children(blocks)
             .when_some(e.error.clone(), |d, err| d.child(div().pt_2().text_color(theme.danger).child(err)))
             .when(!general, |d| d.child(
                 h_flex().pt_4().child(div().flex_1()).child(

@@ -118,5 +118,4 @@ icons! {
     Layers => "layers",
     Moon => "moon",
     Star => "star",
-    Tag => "tag",
 }

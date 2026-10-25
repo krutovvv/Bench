@@ -173,25 +173,6 @@ impl TasksMode {
         out
     }
 
-    /// The tags of a list's tasks, the most used first (the strip under the header).
-    pub fn tags_in(&self, list: &List) -> Vec<String> {
-        let day = today();
-        let mut counts: Vec<(String, usize)> = vec![];
-        for t in self.items.iter().filter(|t| t.in_list(list, day) && (self.project.is_empty() || t.project == self.project)) {
-            for g in &t.tags {
-                match counts.iter_mut().find(|(n, _)| n.eq_ignore_ascii_case(g)) {
-                    Some((_, c)) => *c += 1,
-                    None => counts.push((g.clone(), 1)),
-                }
-            }
-        }
-        counts.sort_by(|a, b| {
-            b.1.cmp(&a.1)
-                .then(a.0.to_lowercase().cmp(&b.0.to_lowercase()))
-        });
-        counts.into_iter().map(|(n, _)| n).collect()
-    }
-
     fn send(&self, cmd: Cmd) {
         if let Some(r) = &self.reminders {
             r.send(cmd);
@@ -376,11 +357,6 @@ impl BenchApp {
         cx.notify();
     }
 
-    pub fn set_task_tag_filter(&mut self, tag: Option<String>, cx: &mut Context<Self>) {
-        self.tasks.tag_filter = tag;
-        cx.notify();
-    }
-
     pub fn set_task_range(&mut self, k: usize, cx: &mut Context<Self>) {
         self.tasks.range = k.min(RANGES.len() - 1);
         self.load_tasks();
@@ -400,6 +376,14 @@ impl BenchApp {
         self.tasks.items.retain(|t| {
             !(t.id.starts_with("new:") && t.title.trim().is_empty() && open.as_ref() != Some(&t.id))
         });
+    }
+
+    /// The open card closes (saved first).
+    pub fn close_task(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        self.flush_task(cx);
+        self.tasks.selected = None;
+        self.drop_blank_new();
+        cx.notify();
     }
 
     pub fn select_task(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {

@@ -67,13 +67,11 @@ impl InsertKind for Browser {
             return Some(ShimmerText::new("Opening the page again…").text_base().text_color(muted).into_any_element());
         }
         if url.is_empty() {
-            return Some(
-                div()
-                    .text_base()
-                    .text_color(muted)
-                    .child("This thread's tab in the server's browser. Ask for something — “open the blog's admin” — and the tab shows here, live: click and type in it, then say “continue”.")
-                    .into_any_element(),
-            );
+            // Put in: its tab opens at once.
+            if !app.demo {
+                app.reopen_thread_tab(cx);
+            }
+            return Some(ShimmerText::new("Opening this thread's tab…").text_base().text_color(muted).into_any_element());
         }
         // Its tab went away (the browser restarted, the tab was closed).
         Some(

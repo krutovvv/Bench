@@ -1,6 +1,7 @@
 //! `/tasks`: the task lists in the thread, every list a click away (Today, Upcoming, Anytime,
 //! Logbook…). In a project's thread the project is the tag: its tasks only. Its state: {list}.
 
+use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 use serde_json::json;
 
@@ -21,6 +22,10 @@ impl InsertKind for Tasks {
         key == "tasks"
     }
 
+    fn shared(&self) -> Option<&'static str> {
+        Some("tasks")
+    }
+
     fn title(&self, _app: &BenchApp, _ins: &Insert) -> String {
         "Tasks".into()
     }
@@ -29,7 +34,20 @@ impl InsertKind for Tasks {
         let now = list_of(ins);
         let chosen = LISTS.iter().position(|l| *l == now).unwrap_or(0);
         let id = ins.id.clone();
-        vec![super::super::tools::segmented_owned(
+        let theme = cx.theme().clone();
+        let add = div()
+            .id(SharedString::from(format!("{}-new-task", ins.id)))
+            .px_1()
+            .cursor_pointer()
+            .text_color(theme.muted_foreground)
+            .hover(|s| s.text_color(theme.foreground))
+            .child("+ New task")
+            .on_click(cx.listener(|this, _, window, cx| {
+                this.click_claimed = true;
+                this.new_task(window, cx)
+            }))
+            .into_any_element();
+        vec![add, super::super::tools::segmented_owned(
             "insert-task-lists",
             LISTS.iter().map(|l| l.name()).collect(),
             chosen,
@@ -51,6 +69,21 @@ impl InsertKind for Tasks {
             app.tasks.project = app.thread_project.clone();
         }
         Some(app.render_tasks_block(cx))
+    }
+
+    /// The open task (a click on a row, or a new one), as the next row of the thread.
+    fn follow(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+        let task = app.tasks.selected_task().cloned()?;
+        let theme = cx.theme().clone();
+        let title = if task.title.trim().is_empty() { "New task".to_string() } else { task.title.clone() };
+        let head = super::super::block_head(&theme, true)
+            .child(div().flex_1().min_w_0().truncate().child(title))
+            .child(super::icon_button(&format!("{}-task-close", ins.id), crate::icons::Ico::X, "Close", &theme).on_click(cx.listener(|this, _, window, cx| {
+                this.click_claimed = true;
+                this.close_task(window, cx);
+            })));
+        let body = app.render_task_card(&task, cx);
+        Some(super::card(head, body, &theme))
     }
 
     fn context(&self, _app: &BenchApp, ins: &Insert, _cx: &App) -> String {

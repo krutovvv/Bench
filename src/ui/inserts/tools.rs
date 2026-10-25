@@ -12,8 +12,9 @@ use crate::app::subjects::tool_key;
 use crate::devtools::{GROUPS, Tool};
 use crate::model::Insert;
 
-/// The tool's height in the thread.
-const H: f32 = 320.;
+/// The tool's least height in the thread, and a line's (it grows with its text).
+const MIN_H: f32 = 200.;
+const LINE: f32 = 21.;
 
 pub struct Tools;
 
@@ -29,6 +30,10 @@ fn tool_of(ins: &Insert) -> Tool {
 impl InsertKind for Tools {
     fn owns(&self, key: &str) -> bool {
         key == "tools"
+    }
+
+    fn shared(&self) -> Option<&'static str> {
+        Some("tools")
     }
 
     fn title(&self, _app: &BenchApp, ins: &Insert) -> String {
@@ -66,7 +71,11 @@ impl InsertKind for Tools {
         if app.tools.tool != tool {
             app.select_tool(tool, window, cx);
         }
-        Some(div().h(px(H)).mx(px(-12.)).my(px(-8.)).child(app.render_tools_body(cx)).into_any_element())
+        // As tall as its longer side (input or output): the thread scrolls, not the tool.
+        let lines = |e: &Entity<gpui_kit::component::input::EditorState>| e.read(cx).value().lines().count();
+        let n = lines(&app.tools.input).max(lines(&app.tools.output)) + 2;
+        let h = (n as f32 * LINE + super::super::BLOCK_HEAD_H + 24.).max(MIN_H);
+        Some(div().h(px(h)).mx(px(-12.)).my(px(-8.)).child(app.render_tools_body(cx)).into_any_element())
     }
 
     fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {

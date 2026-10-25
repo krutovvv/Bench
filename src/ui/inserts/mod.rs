@@ -42,10 +42,11 @@ pub enum SwitchTo {
 pub trait InsertKind: Sync {
     /// Whether `key` is this kind's.
     fn owns(&self, key: &str) -> bool;
-    /// Whether an insert already in the thread (`there`) is the one `new` would put in: then it
-    /// takes the new state instead of a second one coming. Default: one per thread.
-    fn same(&self, there: &str, new: &str) -> bool {
-        self.owns(there) && self.owns(new)
+    /// Kinds whose live state is one for the whole app (the task list, the tool, the file
+    /// browser): their name. Of several such inserts one is live — the last clicked, else the
+    /// newest in the thread; the others offer to show it there.
+    fn shared(&self) -> Option<&'static str> {
+        None
     }
     fn title(&self, app: &BenchApp, ins: &Insert) -> String;
     /// The title's menu.
@@ -58,6 +59,11 @@ pub trait InsertKind: Sync {
     }
     /// What it shows, under the head; None: the head alone.
     fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement>;
+    /// What it opened, as the next row of the thread, as if the agent brought it (the open file,
+    /// the open task): only while the insert is live and unfolded.
+    fn follow(&self, _app: &mut BenchApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+        None
+    }
     /// What it shows now, for the agent (sent with each message, never shown).
     fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String;
     /// Put in, or brought back: start what it needs (a terminal, a listing).
@@ -88,17 +94,61 @@ pub fn words() -> Vec<SlashCommand> {
 }
 
 impl BenchApp {
+    /// Whether `ins` shows its kind's app-wide state (see `InsertKind::shared`).
+    fn insert_is_live(&self, kind: &dyn InsertKind, ins: &Insert) -> bool {
+        let Some(name) = kind.shared() else {
+            return true;
+        };
+        let same: Vec<String> = self.thread_inserts().into_iter().filter(|i| kind.owns(&i.key)).map(|i| i.id).collect();
+        match self.insert_live.get(name).filter(|id| same.contains(id)) {
+            Some(id) => *id == ins.id,
+            None => same.last() == Some(&ins.id),
+        }
+    }
+
     /// The inserts put after `after` of the person's messages, each in the person's row.
     pub(super) fn render_inserts_at(&mut self, after: usize, last: bool, window: &mut Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
         self.thread_inserts()
             .into_iter()
             // Those past the end (a reply not here yet) show at the end.
             .filter(|i| i.after == after || (last && i.after > after))
-            .filter_map(|ins| {
-                let kind = kind_of(&ins.key)?;
-                Some(self.render_insert(kind, &ins, window, cx))
+            .flat_map(|ins| {
+                let Some(kind) = kind_of(&ins.key) else {
+                    return vec![];
+                };
+                let mut out = vec![self.render_insert(kind, &ins, window, cx)];
+                if !ins.folded && self.insert_is_live(kind, &ins) {
+                    if let Some(f) = kind.follow(self, &ins, window, cx) {
+                        out.push(self.agent_row(f, cx));
+                    }
+                }
+                out
             })
             .collect()
+    }
+
+    /// A block in the agent's row (its avatar), at the thread's column: what an insert opened.
+    fn agent_row(&mut self, content: AnyElement, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        h_flex()
+            .w_full()
+            .pl(px(super::CHAT_LEFT))
+            .pr(px(super::CHAT_RIGHT))
+            .py(px(super::TURN_Y))
+            .gap(px(super::CHAT_TEXT - super::CHAT_LEFT - super::AVATAR))
+            .items_start()
+            .child(super::avatar(true, &theme))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| {
+                        this.click_claimed = true;
+                        this.follow = false;
+                    }))
+                    .child(content),
+            )
+            .into_any_element()
     }
 
     fn render_insert(&mut self, kind: &'static dyn InsertKind, ins: &Insert, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -106,8 +156,34 @@ impl BenchApp {
         let muted = theme.muted_foreground;
         let title = kind.title(self, ins);
         let switches = kind.switches(self, ins);
-        let controls = kind.controls(self, ins, window, cx);
-        let body = if ins.folded { None } else { kind.body(self, ins, window, cx) };
+        let live = self.insert_is_live(kind, ins);
+        let controls = if live { kind.controls(self, ins, window, cx) } else { vec![] };
+        let body = if ins.folded {
+            None
+        } else if live {
+            kind.body(self, ins, window, cx)
+        } else {
+            let (claim_id, name) = (ins.id.clone(), kind.shared().unwrap_or_default());
+            Some(
+                div()
+                    .id(SharedString::from(format!("{}-claim", ins.id)))
+                    .text_color(muted)
+                    .cursor_pointer()
+                    .hover(|s| s.text_color(theme.foreground))
+                    .child("Shown in another insert of this thread — click to show it here")
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.insert_live.insert(name.to_string(), claim_id.clone());
+                        if let Some(ins) = this.thread_inserts().into_iter().find(|i| i.id == claim_id) {
+                            if let Some(k) = kind_of(&ins.key) {
+                                k.opened(this, &ins, window, cx);
+                            }
+                        }
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            )
+        };
         let id = SharedString::from(ins.id.clone());
         let (fold_id, rm_id) = (ins.id.clone(), ins.id.clone());
         let folded = ins.folded;
@@ -251,4 +327,20 @@ pub(super) fn clip(s: &str, n: usize) -> String {
     } else {
         format!("{}… [cut]", s.chars().take(n).collect::<String>())
     }
+}
+
+/// A block an insert opened (a file, a task): a border, round corners, `block_head` on top with
+/// its title and buttons, the content under it at its full height.
+pub(super) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::Theme) -> AnyElement {
+    v_flex()
+        .w_full()
+        .min_w_0()
+        .border_1()
+        .rounded_md()
+        .border_color(theme.border)
+        .overflow_hidden()
+        .bg(theme.background)
+        .child(head)
+        .child(body)
+        .into_any_element()
 }

@@ -122,6 +122,8 @@ pub struct BenchApp {
     pub inserts: HashMap<String, Vec<crate::model::Insert>>,
     /// A new chat's session is being made (an insert came before any message).
     pub creating: bool,
+    /// Of the inserts whose state is app-wide (tasks, tools, files), the live one per kind.
+    pub insert_live: HashMap<String, String>,
     /// The open thread's messages waiting for the agent: (id, mode, text).
     pub queue: Vec<(String, String, String)>,
     /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
@@ -639,6 +641,7 @@ impl BenchApp {
             inserts: HashMap::new(),
             creating: false,
             queue: Vec::new(),
+            insert_live: HashMap::new(),
             subject_target: None,
             thread_project: String::new(),
             projects: vec![],

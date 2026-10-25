@@ -46,31 +46,15 @@ impl BenchApp {
         (key.to_string(), state)
     }
 
-    /// Put an insert into the open thread, after its last message. A kind that is one per thread
-    /// (the file host, the tasks…) already there takes the new state instead. A new chat becomes
-    /// a thread at once: its session is created now, not with the first message.
+    /// Put an insert into the open thread, after its last message: every "/" puts a new one (ten
+    /// terminals if asked). A new chat becomes a thread at once: its session is created now, not
+    /// with the first message.
     pub fn put_insert(&mut self, slash_key: String, window: &mut Window, cx: &mut Context<Self>) {
         let (key, state) = Self::insert_spec(&slash_key);
         let Some(kind) = kind_of(&key) else {
             return;
         };
         let thread = self.thread_key();
-        let existing = self
-            .inserts
-            .get(&thread)
-            .and_then(|v| v.iter().find(|i| kind.same(&i.key, &key)).cloned());
-        if let Some(ins) = existing {
-            if !state.is_empty() || ins.key != key || ins.folded {
-                let mut merged = ins.state.clone();
-                merged.extend(state);
-                self.patch_insert(&ins.id, json!({"key": key, "state": merged, "folded": false}), cx);
-            }
-            if let Some(ins) = self.thread_inserts().into_iter().find(|i| i.id == ins.id) {
-                kind.opened(self, &ins, window, cx);
-            }
-            cx.notify();
-            return;
-        }
         let ins = Insert {
             id: format!("i{}", &uuid::Uuid::new_v4().simple().to_string()[..10]),
             key,
@@ -82,6 +66,10 @@ impl BenchApp {
         match self.session.clone() {
             Some(session) => self.send_insert(&session, &ins),
             None => self.create_thread_now(window, cx),
+        }
+        // The newest of a shared kind is the live one.
+        if let Some(name) = kind.shared() {
+            self.insert_live.insert(name.to_string(), ins.id.clone());
         }
         kind.opened(self, &ins, window, cx);
         // The insert is where the person looks now.

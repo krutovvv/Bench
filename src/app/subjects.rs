@@ -130,20 +130,22 @@ impl BenchApp {
         self.new_thread_with(key, window, cx);
     }
 
-    /// The terminal tab of `alias`, started if there is none (or it ended).
-    pub fn ensure_terminal(&mut self, alias: &str, window: &mut Window, cx: &mut Context<Self>) -> Option<usize> {
-        if let Some(t) = self.ssh.tab_for(alias) {
-            if !self.ssh.tabs[t]
-                .session
-                .exited
-                .load(std::sync::atomic::Ordering::SeqCst)
-            {
+    /// A terminal insert's own shell on `alias`, started if there is none, it ended, or the
+    /// insert switched to another server.
+    pub fn insert_terminal(&mut self, insert: &str, alias: &str, window: &mut Window, cx: &mut Context<Self>) -> Option<usize> {
+        if let Some(t) = self.ssh.tab_of_insert(insert) {
+            let tab = &self.ssh.tabs[t];
+            if tab.alias == alias && !tab.session.exited.load(std::sync::atomic::Ordering::SeqCst) {
                 return Some(t);
             }
+            self.ssh.tabs[t].session.kill();
             self.ssh.tabs.remove(t);
         }
-        self.spawn_terminal_tab(alias, window, cx)
+        let t = self.spawn_terminal_tab(alias, window, cx)?;
+        self.ssh.tabs[t].insert = insert.to_string();
+        Some(t)
     }
+
 
     /// A tool in a new thread.
     pub fn open_tool_thread(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
@@ -166,20 +168,22 @@ impl BenchApp {
     /// "!command": typed into the thread's terminal (its last terminal insert); a thread with
     /// none gets this Mac's, in the thread's folder.
     pub fn run_bang(&mut self, command: String, window: &mut Window, cx: &mut Context<Self>) {
-        let last = self
-            .thread_inserts()
-            .into_iter()
-            .rev()
-            .find(|i| i.key.starts_with("ssh:"))
-            .map(|i| i.key[4..].to_string());
-        let (alias, fresh) = match last {
-            Some(a) => (if a == "local" { crate::term::LOCAL.to_string() } else { a }, false),
+        let last = self.thread_inserts().into_iter().rev().find(|i| i.key.starts_with("ssh:"));
+        let (ins, fresh) = match last {
+            Some(i) => (i, false),
             None => {
                 self.put_insert("ssh:local".into(), window, cx);
-                (crate::term::LOCAL.to_string(), true)
+                match self.thread_inserts().into_iter().rev().find(|i| i.key == "ssh:local") {
+                    Some(i) => (i, true),
+                    None => return,
+                }
             }
         };
-        if let Some(t) = self.ensure_terminal(&alias, window, cx) {
+        let alias = match &ins.key[4..] {
+            "local" | "" => crate::term::LOCAL.to_string(),
+            a => a.to_string(),
+        };
+        if let Some(t) = self.insert_terminal(&ins.id, &alias, window, cx) {
             // Start where the thread works.
             if fresh {
                 if let Some(dir) = self.folder_of_current() {

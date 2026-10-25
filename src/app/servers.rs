@@ -32,6 +32,8 @@ pub struct Tab {
     /// Sent to the background: it keeps running, its block is a head with a badge, the status
     /// bar lists it.
     pub background: bool,
+    /// The insert it belongs to (each terminal insert has a shell of its own); "" none.
+    pub insert: String,
     _wake: Task<()>,
 }
 
@@ -134,7 +136,12 @@ impl Ssh {
     }
 
     pub fn tab_for(&self, alias: &str) -> Option<usize> {
-        self.tabs.iter().position(|t| t.alias == alias)
+        self.tabs.iter().position(|t| t.alias == alias && t.insert.is_empty())
+    }
+
+    /// The shell of a terminal insert.
+    pub fn tab_of_insert(&self, insert: &str) -> Option<usize> {
+        self.tabs.iter().position(|t| t.insert == insert)
     }
 }
 
@@ -283,6 +290,7 @@ impl BenchApp {
                     focus: cx.focus_handle(),
                     collapsed: false,
                     background: false,
+                    insert: String::new(),
                     _wake: wake,
                 });
                 Some(self.ssh.tabs.len() - 1)

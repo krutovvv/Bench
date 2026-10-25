@@ -44,17 +44,12 @@ impl InsertKind for Terminal {
         key == "ssh" || key.starts_with("ssh:")
     }
 
-    /// Several terminals may sit in a thread, one per server.
-    fn same(&self, there: &str, new: &str) -> bool {
-        there == new
-    }
-
     fn title(&self, app: &BenchApp, ins: &Insert) -> String {
         match alias_of(&ins.key) {
             None => "SSH".into(),
             Some(a) => {
                 let name = if a.is_empty() { "Terminal".to_string() } else { a.clone() };
-                match app.ssh.tab_for(&a) {
+                match app.ssh.tab_of_insert(&ins.id) {
                     Some(t) => app.ssh.tabs[t].session.title().filter(|t| !t.trim().is_empty()).map(|t| format!("{name} · {t}")).unwrap_or(name),
                     None => name,
                 }
@@ -84,7 +79,8 @@ impl InsertKind for Terminal {
         let Some(alias) = alias_of(&ins.key) else {
             return vec![];
         };
-        let Some(t) = app.ssh.tab_for(&alias) else {
+        let _ = alias;
+        let Some(t) = app.ssh.tab_of_insert(&ins.id) else {
             return vec![];
         };
         let theme = cx.theme().clone();
@@ -144,7 +140,7 @@ impl InsertKind for Terminal {
                 move |this: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>| {
                     this.patch_insert(&id, json!({ "key": key }), cx);
                     if let Some(a) = alias_of(&key) {
-                        this.ensure_terminal(&a, window, cx);
+                        this.insert_terminal(&id, &a, window, cx);
                     }
                 }
             };
@@ -166,7 +162,7 @@ impl InsertKind for Terminal {
                     .into_any_element(),
             );
         }
-        let ix = app.ensure_terminal(&alias, window, cx)?;
+        let ix = app.insert_terminal(&ins.id, &alias, window, cx)?;
         let tab = &app.ssh.tabs[ix];
         if tab.background {
             return None;
@@ -187,7 +183,7 @@ impl InsertKind for Terminal {
             return String::new();
         };
         let name = if alias.is_empty() { "this Mac".to_string() } else { alias.clone() };
-        match app.ssh.tab_for(&alias) {
+        match app.ssh.tab_of_insert(&ins.id) {
             Some(t) => format!("The terminal of {name} shows (its last lines):\n```\n{}\n```", app.ssh.tabs[t].session.screen_text(60)),
             None => String::new(),
         }
@@ -195,17 +191,18 @@ impl InsertKind for Terminal {
 
     fn opened(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
         if let Some(a) = alias_of(&ins.key) {
-            if let Some(t) = app.ensure_terminal(&a, window, cx) {
+            if let Some(t) = app.insert_terminal(&ins.id, &a, window, cx) {
                 app.ssh.tabs[t].background = false;
                 app.ssh.tabs[t].focus.focus(window, cx);
             }
         }
     }
 
-    /// The shell goes on in the background (the status bar lists it, Stop ends it).
+    /// Its shell ends with it.
     fn removed(&self, app: &mut BenchApp, ins: &Insert, _cx: &mut Context<BenchApp>) {
-        if let Some(t) = alias_of(&ins.key).and_then(|a| app.ssh.tab_for(&a)) {
-            app.ssh.tabs[t].background = true;
+        if let Some(t) = app.ssh.tab_of_insert(&ins.id) {
+            app.ssh.tabs[t].session.kill();
+            app.ssh.tabs.remove(t);
         }
     }
 }

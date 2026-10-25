@@ -88,7 +88,11 @@ impl BenchApp {
 
     /// The open thread's browser insert: (its id, its tab, its url).
     pub fn thread_browser(&self) -> Option<(String, String, String)> {
-        self.thread_inserts().into_iter().find(|i| i.key == "browser").map(|i| (i.id.clone(), i.get("tab"), i.get("url")))
+        let all: Vec<_> = self.thread_inserts().into_iter().filter(|i| i.key == "browser").collect();
+        // Several in a thread: the live one (see `InsertKind::shared`).
+        let live = self.insert_live.get("browser");
+        let ins = all.iter().find(|i| Some(&i.id) == live).or(all.last())?;
+        Some((ins.id.clone(), ins.get("tab"), ins.get("url")))
     }
 
     /// The open thread's tab, when it is open in the browser.
@@ -98,17 +102,19 @@ impl BenchApp {
         (!tab.is_empty() && b.is_open(&tab)).then_some(tab)
     }
 
-    /// The thread's tab went away: a new one at its address, which becomes the thread's.
+    /// The thread's tab: a new one (at its last address, when it had one), which becomes the
+    /// thread's.
     pub fn reopen_thread_tab(&mut self, cx: &mut Context<Self>) {
         let (Some((id, _, url)), Some(b)) = (self.thread_browser(), self.ensure_browser(cx)) else {
             return;
         };
-        if url.is_empty() {
+        if self.sites.reopening.is_some() {
             return;
         }
         self.sites.reopening = Some(id);
         self.touch_browser();
-        b.open(url);
+        // A new thread's tab starts blank; the agent (or the person) takes it from there.
+        b.open(if url.is_empty() { "about:blank".into() } else { url });
     }
 
     /// The browser changed: a tab the agent opened or moved while it answers in the open thread

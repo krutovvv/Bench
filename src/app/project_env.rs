@@ -53,6 +53,8 @@ pub struct ProjectEnv {
     pub cron_schedule: Entity<InputState>,
     pub cron_prompt: Entity<EditorState>,
     pub cron_dirty: bool,
+    /// Its blocks shut by a click on their head (by title).
+    pub folded: std::collections::HashSet<&'static str>,
     /// A row's remove asked once ("mcp:<name>", "skill:<name>", "host:<id>", "project"): the
     /// second click does it.
     pub armed: Option<String>,
@@ -166,6 +168,7 @@ impl BenchApp {
             cron_schedule,
             cron_prompt,
             cron_dirty: false,
+            folded: Default::default(),
             armed: None,
             error: None,
         }

@@ -230,7 +230,7 @@ impl BenchApp {
                 n += 1;
                 // The open task's card right under its row, whatever the list (the Logbook's
                 // thousand rows would push a card at the end out of sight).
-                if self.tasks.selected.as_deref() == Some(t.id.as_str()) {
+                if !inline && self.tasks.selected.as_deref() == Some(t.id.as_str()) {
                     if let Some(open) = self.tasks.selected_task().cloned() {
                         let card = self.render_task_card(&open, cx);
                         rows.push(
@@ -263,74 +263,8 @@ impl BenchApp {
         } else {
             None
         };
-        // The list's tags, the most used first: "All · client-a · client-b…".
-        let tags = if self.tasks.query.is_empty() {
-            self.tasks.tags_in(&list)
-        } else {
-            vec![]
-        };
-        let picked = self.tasks.tag_filter.clone();
-        let strip = (!tags.is_empty()).then(|| {
-            let chip =
-                |id: SharedString,
-                 label: String,
-                 on: bool,
-                 tag: Option<String>,
-                 cx: &mut Context<Self>| {
-                    div()
-                        .id(id)
-                        .flex_none()
-                        .px_2()
-                        .py_0p5()
-                        .text_sm()
-                        .cursor_pointer()
-                        .when(on, |d| {
-                            d.bg(theme.primary).text_color(theme.primary_foreground)
-                        })
-                        .when(!on, |d| {
-                            d.text_color(muted)
-                                .hover(|s| s.text_color(theme.foreground))
-                        })
-                        .child(label)
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.set_task_tag_filter(tag.clone(), cx)
-                        }))
-                        .into_any_element()
-                };
-            let mut chips = vec![chip(
-                "task-tag-all".into(),
-                "All".into(),
-                picked.is_none(),
-                None,
-                cx,
-            )];
-            for (k, tag) in tags.into_iter().enumerate() {
-                let on = picked
-                    .as_deref()
-                    .is_some_and(|p| p.eq_ignore_ascii_case(&tag));
-                chips.push(chip(
-                    SharedString::from(format!("task-tag-{k}")),
-                    tag.clone(),
-                    on,
-                    Some(tag),
-                    cx,
-                ));
-            }
-            h_flex()
-                .id("task-tags")
-                .flex_none()
-                // Under the header's rule, down to the sidebar search band's bottom rule.
-                .min_h(super::bar_h(cx))
-                .px_6()
-                .py_1()
-                .gap_1()
-                .flex_wrap()
-                .items_center()
-                .border_b_1()
-                .border_color(theme.border)
-                .child(Ico::Tag.icon().xsmall().text_color(muted).mr_1())
-                .children(chips)
-        });
+        // No tags: a project's thread shows that project's tasks, which is what tags were for.
+        let strip: Option<AnyElement> = None;
         if inline {
             // In an insert: its head switches the lists (no heading here); the rows' own px_6
             // pulled back to the insert's edges.
@@ -449,16 +383,6 @@ impl BenchApp {
             .when(!t.notes.trim().is_empty(), |d| {
                 d.child(Ico::FileText.icon().xsmall().text_color(muted))
             })
-            .children(t.tags.iter().take(3).map(|g| {
-                div()
-                    .flex_none()
-                    .px_1p5()
-                    .text_sm()
-                    .text_color(muted)
-                    .border_1().rounded_md()
-                    .border_color(theme.border)
-                    .child(g.clone())
-            }))
             .when(t.important, |d| {
                 d.child(Ico::Flag.icon().xsmall().text_color(theme.danger))
             })
@@ -494,7 +418,7 @@ impl BenchApp {
 
     /// The open task: title, when, important, tags, time (with the timer), the day it was done
     /// (back-dating), notes; Delete at the bottom.
-    fn render_task_card(&mut self, t: &Task, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_task_card(&mut self, t: &Task, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let day = today();
@@ -574,10 +498,6 @@ impl BenchApp {
             .child(field(
                 "Day",
                 Input::new(&self.tasks.day).small().into_any_element(),
-            ))
-            .child(field(
-                "Tags",
-                Input::new(&self.tasks.tags).small().into_any_element(),
             ))
             .child(field(
                 "Time",

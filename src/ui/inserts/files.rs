@@ -33,6 +33,10 @@ impl InsertKind for Files {
         key == "files"
     }
 
+    fn shared(&self) -> Option<&'static str> {
+        Some("files")
+    }
+
     fn title(&self, app: &BenchApp, ins: &Insert) -> String {
         let host = ins.get("host");
         app.files_remote
@@ -108,6 +112,14 @@ impl InsertKind for Files {
             }
         }
         Some(app.render_files_block(&host, false, window, cx))
+    }
+
+    /// The open file, as the next row of the thread.
+    fn follow(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+        if app.files_remote.owner.as_deref() != Some(ins.id.as_str()) {
+            return None;
+        }
+        app.render_open_file(format!("{}-file-close", ins.id), cx)
     }
 
     fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {
