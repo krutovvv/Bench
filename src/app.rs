@@ -276,6 +276,13 @@ pub struct BenchApp {
     /// Keep the view pinned to the newest content until the user scrolls up.
     pub follow: bool,
     pub last_max: Pixels,
+    /// Where the tail was pinned last frame: an upward move past this number is the person's own
+    /// scroll, whatever else changed (see the follow in ui/chat.rs).
+    pub pinned: Pixels,
+    /// Where each turn's row was painted last frame (window space, its top edge), written by the
+    /// rows themselves as they paint: the right-hand rail reads it to say which turn is on screen
+    /// and to jump to the one it was clicked on. A row that has not painted holds a big negative.
+    pub turn_tops: Vec<Pixels>,
     /// Where the composer is in the window, and the window's height (last frame): the `/` list
     /// opens above the line when there is no room under it.
     pub composer_y: Pixels,
@@ -715,6 +722,8 @@ impl BenchApp {
             chat_scroll: ScrollHandle::new(),
             follow: true,
             last_max: px(0.),
+            pinned: px(0.),
+            turn_tops: Vec::new(),
             composer_y: px(0.),
             composer_h: 0.,
             viewport_h: px(0.),
@@ -1385,6 +1394,8 @@ impl BenchApp {
 
     fn reset_scroller(&mut self, cx: &mut Context<Self>) {
         self.follow = true;
+        self.pinned = px(0.);
+        self.turn_tops.clear();
         self.open_steps.clear();
         self.open_source = None;
         cx.notify();

@@ -315,15 +315,24 @@ impl BenchApp {
         // the composer's, not the room the thread scrolls on past it (past_end), so a
         // short thread stays put and nothing calls for "Jump to latest".
         let max = (self.chat_scroll.max_offset().y - px(past)).max(px(0.));
-        let at_bottom = -self.chat_scroll.offset().y >= max - px(4.);
-        if self.follow && !at_bottom && max == self.last_max {
+        let off = -self.chat_scroll.offset().y;
+        let at_bottom = off >= max - px(4.);
+        // While pinned, only a move UP the thread is the person's: the pin itself leaves the
+        // thread at the bottom, and content that shrinks clamps it down, never up. Compared with
+        // where WE pinned it, not with the last frame's height — an answer that streams changes
+        // that height every frame, and then a wheel, a drag or a click on the scrollbar was
+        // undone before anyone saw it, so nothing moved at all.
+        if self.follow && !at_bottom && off > self.pinned + px(1.) {
             self.follow = false; // the user scrolled away
         }
         if at_bottom {
             self.follow = true;
         }
         if self.follow && !at_bottom {
+            self.pinned = max;
             self.chat_scroll.set_offset(point(px(0.), -max));
+        } else if at_bottom {
+            self.pinned = off;
         }
         // An opening thread stays invisible until its content is in and its height held for a
         // few frames (inserts placed, the offset pinned to the bottom), at most `settle` frames.
@@ -355,8 +364,35 @@ impl BenchApp {
         let mut procs = self.render_processes(cx);
 
         let mut rows: Vec<AnyElement> = self.render_inserts_at(0, n == 0, window, cx);
+        // Slots for where each row will paint; the rail reads them, so a thread that lost turns
+        // keeps its numbering straight.
+        self.turn_tops.resize(n, px(-1_000_000.));
+        let view = cx.entity();
         for i in 0..n {
-            rows.push(self.render_turn(i, cx));
+            let view = view.clone();
+            // Each row says where it was painted: the rail needs it to tell which turn is on
+            // screen and to jump to the one clicked. Written while painting, without a notify —
+            // a notify there would paint forever; the rail reads the numbers a frame later.
+            rows.push(
+                div()
+                    .relative()
+                    .child(self.render_turn(i, cx))
+                    .child(
+                        canvas(
+                            move |bounds, _, cx| {
+                                view.update(cx, |this, _| {
+                                    if let Some(slot) = this.turn_tops.get_mut(i) {
+                                        *slot = bounds.origin.y;
+                                    }
+                                });
+                            },
+                            |_, _, _, _| {},
+                        )
+                        .absolute()
+                        .size_full(),
+                    )
+                    .into_any_element(),
+            );
             rows.extend(self.render_inserts_at(i + 1, i + 1 == n, window, cx));
             if plan_after == i + 1 {
                 rows.extend(plan.take());
@@ -858,17 +894,24 @@ impl BenchApp {
     }
 
     /// The turns as ticks in the right gutter (no scrollbar): which one is on screen, a peek at
-    /// each question on hover, a click to jump. Only with two turns or more.
+    /// each question on hover, a click to jump. Only with two turns or more. It stands clear of
+    /// the scrollbar's own strip, so a click there reaches the bar and not the rail.
     fn render_turn_rail(&mut self, at_bottom: bool, cx: &mut Context<Self>) -> Option<AnyElement> {
         let n = self.turns.len();
         if n < 2 {
             return None;
         }
         let theme = cx.theme().clone();
+        // The viewport's top edge, window space: a row at or under it is the one being read.
+        let view_y = self.chat_scroll.bounds().origin.y;
         let current = if at_bottom {
             n - 1
         } else {
-            self.chat_scroll.top_item().min(n - 1)
+            self.turn_tops
+                .iter()
+                .position(|y| f32::from(*y) >= f32::from(view_y) - 2.)
+                .unwrap_or(n - 1)
+                .min(n - 1)
         };
         // Ticks pack tighter as turns add up, so the rail stays a modest column.
         let pitch = (240. / n as f32).clamp(3., 8.);
@@ -899,8 +942,23 @@ impl BenchApp {
                 )
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.follow = false;
-                    this.chat_scroll.scroll_to_top_of_item(i);
+                    // Bring that row's top just under the window's edge: the thread scrolls on
+                    // past its last line, so any row can be read from the top, as in an editor.
+                    if let Some(y) = this
+                        .turn_tops
+                        .get(i)
+                        .copied()
+                        .filter(|y| f32::from(*y) > -1_000.)
+                    {
+                        let off = -f32::from(this.chat_scroll.offset().y)
+                            + f32::from(y)
+                            - f32::from(view_y)
+                            - 8.;
+                        let max = f32::from(this.chat_scroll.max_offset().y);
+                        this.follow = false;
+                        this.chat_scroll
+                            .set_offset(point(px(0.), px(-off.clamp(0., max))));
+                    }
                     cx.notify();
                 }))
         });
@@ -909,7 +967,9 @@ impl BenchApp {
                 .absolute()
                 .top_0()
                 .bottom_0()
-                .right(px(2.))
+                // Clear of the scrollbar: its strip is 16 px at the very edge, and a rail over it
+                // would take the presses meant for the bar.
+                .right(px(20.))
                 .w(px(12.))
                 .justify_center()
                 .child(v_flex().children(ticks))
