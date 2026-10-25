@@ -431,7 +431,12 @@ const routes: Record<string, Route> = {
 	"GET /api/tasks": (req) => ({ tasks: tasks.list(req.query.get("done_since") ?? undefined) }),
 	"POST /api/tasks": (req) => ({ task: tasks.save(req.body) }),
 	// Projects: the sidebar's unit; a folder on disk is optional.
-	"GET /api/projects": () => ({ projects: projects.list() }),
+	// `browser`: the project has the watchable server browser among its own MCP servers (Bench
+	// offers /browser only there); `host_browser`: the machine's own agent has it.
+	"GET /api/projects": () => ({
+		projects: projects.list().map((p) => ({ ...p, browser: !p.host && "browser" in agentMcp(`project:${p.id}`) })),
+		host_browser: "browser" in agentMcp("default"),
+	}),
 	"POST /api/projects": (req) => {
 		if (!String(req.body?.name ?? "").trim()) throw new HttpError(400, "name is required");
 		return { project: projects.save({ ...req.body, name: String(req.body.name).trim() }) };

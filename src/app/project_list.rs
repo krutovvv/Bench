@@ -47,8 +47,10 @@ impl BenchApp {
                             name: p["name"].as_str().unwrap_or_default().into(),
                             folder: p["folder"].as_str().filter(|f| !f.is_empty()).map(str::to_string),
                             host: p["host"].as_str().filter(|h| !h.is_empty()).map(str::to_string),
+                            browser: p["browser"].as_bool().unwrap_or(false),
                         })
                         .collect();
+                    this.host_browser = v["host_browser"].as_bool().unwrap_or(false);
                     // The remote projects' agents, connected beside this Mac's.
                     this.connect_remotes(window, cx);
                 }

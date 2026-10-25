@@ -56,7 +56,8 @@ impl BenchApp {
         let mut first: Vec<SlashCommand> = vec![];
         let mut rest: Vec<SlashCommand> = vec![];
         // Tools only: the session's commands (/new, /model…) are the window's buttons here.
-        for c in Self::tool_words().iter() {
+        let browser = self.browser_offered();
+        for c in Self::tool_words().iter().filter(|c| browser || c.name != "/browser") {
             let name = c.name.to_lowercase();
             if name.starts_with(&q) {
                 first.push(c.clone());
@@ -67,6 +68,18 @@ impl BenchApp {
         first.extend(rest);
         first.truncate(60);
         first
+    }
+
+    /// /browser shows the server browser's tab: offered where the thread's environment has that
+    /// browser's MCP server (a project's own, or Host's), not where another browser works.
+    pub fn browser_offered(&self) -> bool {
+        if self.demo {
+            return true;
+        }
+        match self.projects.iter().find(|p| p.id == self.thread_project) {
+            Some(p) => p.browser,
+            None => self.host_browser,
+        }
     }
 
     /// `/goal ship it` → ("/goal", "ship it") when `/goal` is a known command.

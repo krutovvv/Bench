@@ -331,10 +331,8 @@ export class Runtime {
 			// current tool round.
 			const sub = await live.conversation.submit({ type: "input", content, whenBusy: mode === "queue" ? "followUp" : "steer", requestId: randomUUID() }, ctx);
 			// Watched until Pi places it (its turn starts) or it is taken back.
-			if (mode === "queue") {
-				live.pending.set(String(sub.id), { text, mode: "followUp" });
-				this.queueChanged(live);
-			}
+			live.pending.set(String(sub.id), { text, mode: mode === "queue" ? "followUp" : "steer" });
+			if (mode === "queue") this.queueChanged(live);
 			return;
 		}
 		live.busy = true;
@@ -608,7 +606,15 @@ export class Runtime {
 				const item = live.pending.get(String(rec?.id));
 				if (!item || rec.status !== "placed") break;
 				live.pending.delete(String(rec.id));
-				if (live.busy) live.placed.push(item.text);
+				if (live.busy && item.mode === "steer") {
+					// Joined the running turn (after its current tools): from here the work answers
+					// this message, so its turn starts now, and the answer so far stays with the one
+					// before.
+					if (live.answer) this.store.addMessage(id, { role: "assistant", text: live.answer });
+					live.answer = "";
+					live.blocks.clear();
+					this.emit(id, "message.user", { text: item.text, queued: true });
+				} else if (live.busy) live.placed.push(item.text);
 				else this.emit(id, "message.user", { text: item.text, queued: true });
 				this.queueChanged(live);
 				break;

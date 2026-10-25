@@ -105,6 +105,8 @@ pub struct BenchApp {
     pub thread_project: String,
     /// The person's projects: the sidebar.
     pub projects: Vec<crate::model::ProjectEntry>,
+    /// The machine's own agent (Host) has the watchable server browser.
+    pub host_browser: bool,
     /// The new project's form, in the chat area while open (the sidebar's "+").
     pub project_form: Option<ProjectForm>,
     /// The open environment thread's project environment (its block).
@@ -601,6 +603,7 @@ impl BenchApp {
             subject_target: None,
             thread_project: String::new(),
             projects: vec![],
+            host_browser: false,
             project_form: None,
             project_env: None,
             ssh_projects: HashMap::new(),

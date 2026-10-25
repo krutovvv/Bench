@@ -82,6 +82,8 @@ pub struct ProjectEntry {
     pub folder: Option<String>,
     /// A server whose agent the project is (its threads, environment and files live there).
     pub host: Option<String>,
+    /// Has the watchable server browser among its own MCP servers: /browser is offered there.
+    pub browser: bool,
 }
 
 /// Human name of a session source, for grouping the session list.

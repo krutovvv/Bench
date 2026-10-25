@@ -548,6 +548,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         name: name.into(),
         folder: folder.map(str::to_string),
         host: None,
+        browser: true,
     };
     app.projects = vec![
         project("p-blog", "Northwind blog", None),
