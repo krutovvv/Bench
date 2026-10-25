@@ -352,7 +352,7 @@ impl BenchApp {
                             .children(approval)
                             .children(clarify)
                             .children(subject_block)
-                            // What waits for the agent, over the next message.
+                            // What the person has written and has not yet gone out.
                             .children(queue)
                             // The next message is the thread's last row: it scrolls
                             // away with the thread, "Jump to latest" brings it back.
@@ -387,39 +387,32 @@ impl BenchApp {
     }
 
     /// The messages sent while the agent works, waiting in the thread's queue (Pi's inbox) until
-    /// it answers: each can go now (into the running work) or be taken back.
+    /// it answers. Each is shown as the person's own row — their avatar, their text, their files
+    /// under it — because it is a message they have written, not a note about it: only a caption
+    /// and its two controls say that it has not gone out yet (go now into the running work, or
+    /// be taken back).
     fn render_queue(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.queue.is_empty() {
             return None;
         }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let mut rows: Vec<AnyElement> = Vec::new();
-        for (k, (id, mode, text)) in self.queue.clone().into_iter().enumerate() {
-            let (send_id, rm_id) = (id.clone(), id.clone());
-            let steer = mode == "steer";
-            // The files it carries show as the chips they are, not as `[attached: …]` — and
-            // under the row, as under a sent message, so the row keeps the height of the others.
-            let (said, paths) = crate::attach::split(&text);
-            let first = said.lines().next().unwrap_or_default().to_string();
-            rows.push(
-                h_flex()
-                    .id(("queued", k))
-                    .gap_2()
-                    .px_3()
-                    .h(px(super::CHIP_H))
+        let rows: Vec<AnyElement> = self
+            .queue
+            .clone()
+            .into_iter()
+            .enumerate()
+            .map(|(k, (id, mode, text))| {
+                let (send_id, rm_id) = (id.clone(), id.clone());
+                let steer = mode == "steer";
+                let (said, paths) = crate::attach::split(&text);
+                let actions = h_flex()
+                    .flex_none()
+                    .gap_1()
                     .items_center()
-                    .border_1()
-                    .rounded_md()
-                    .border_color(theme.border)
-                    .child(
-                        div()
-                            .flex_none()
-                            .text_sm()
-                            .text_color(muted)
-                            .child(if steer { "Next" } else { "Queued" }),
-                    )
-                    .child(div().flex_1().min_w_0().truncate().child(first))
+                    .text_sm()
+                    .text_color(muted)
+                    .child(if steer { "Next" } else { "Queued" })
                     .when(!steer, |d| {
                         d.child(
                             icon_button(
@@ -442,35 +435,75 @@ impl BenchApp {
                             }),
                         ),
                     )
-                    .into_any_element(),
-            );
-            if !paths.is_empty() {
-                rows.push(
-                    h_flex()
-                        .w_full()
-                        .gap_2()
-                        .children(paths.iter().enumerate().map(|(j, p)| {
-                            self.attachment_chip(
-                                format!("queued-chip-{k}-{j}").into(),
-                                p,
-                                None,
-                                cx,
-                            )
-                        }))
-                        .into_any_element(),
-                );
-            }
-        }
+                    .into_any_element();
+                self.user_row(format!("queued-{id}"), &said, &paths, Some(actions), true, cx)
+            })
+            .collect();
         Some(
             v_flex()
                 .w_full()
-                .pl(px(super::CHAT_TEXT))
-                .pr(px(super::CHAT_RIGHT))
-                .pt(px(super::TURN_Y))
-                .gap(px(10.))
+                // A little lighter than the sent ones: it has not gone out.
+                .opacity(0.85)
                 .children(rows)
                 .into_any_element(),
         )
+    }
+
+    /// The person's own row, as the thread shows it: their avatar in the gutter, their text at
+    /// the thread's text column, the files that went with it under the text. One row for what is
+    /// already sent and for what waits in the queue — a queued message is a message the person
+    /// has written, not a note about it. `muted` marks one that has not gone out; `actions`
+    /// (send now, take it back) sit at the row's right.
+    fn user_row(
+        &self,
+        key: String,
+        text: &str,
+        paths: &[String],
+        actions: Option<AnyElement>,
+        muted: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        use super::{AVATAR, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT};
+        let attached: Vec<AnyElement> = paths
+            .iter()
+            .enumerate()
+            .map(|(k, p)| {
+                self.attachment_chip(format!("{key}-{k}").into(), p, None, cx)
+            })
+            .collect();
+        h_flex()
+            .w_full()
+            .pl(px(CHAT_LEFT))
+            .pr(px(CHAT_RIGHT))
+            .py(px(super::TURN_Y))
+            .gap(px(CHAT_TEXT - CHAT_LEFT - AVATAR))
+            .items_start()
+            .child(super::avatar(false, &theme))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .whitespace_normal()
+                    .when(muted, |d| d.text_color(theme.muted_foreground))
+                    // Selectable and copyable, like the answers (the same text view).
+                    .when(!text.is_empty(), |d| {
+                        d.child(plain_text(SharedString::from(key.as_str()), text))
+                    })
+                    // The files that went with it.
+                    .when(!attached.is_empty(), |d| {
+                        d.child(
+                            h_flex()
+                                .flex_wrap()
+                                .gap_2()
+                                .when(!text.is_empty(), |d| d.mt(px(10.)))
+                                .pb(px(4.))
+                                .children(attached),
+                        )
+                    }),
+            )
+            .children(actions)
+            .into_any_element()
     }
 
     fn render_turn(&mut self, i: usize, cx: &mut Context<Self>) -> AnyElement {
@@ -583,14 +616,6 @@ impl BenchApp {
         };
         let when = turn.finished.or(turn.started).unwrap_or_default();
         let (user, attached_paths) = crate::attach::split(&turn.user);
-        let has_text = !user.is_empty();
-        let mut attached: Vec<AnyElement> = vec![];
-        attached.extend(
-            attached_paths
-                .iter()
-                .enumerate()
-                .map(|(k, p)| self.attachment_chip(format!("sent-{i}-{k}").into(), p, None, cx)),
-        );
 
         let sources = self.render_sources(i, cx);
         // The session's edited files and background processes hang under the last answer: the
@@ -685,37 +710,14 @@ impl BenchApp {
             .w_full()
             // The conversation is what the window is for: a size up from the sidebar's lists.
             .text_base()
-            .child(
-                h_flex()
-                    .w_full()
-                    .pl(px(CHAT_LEFT))
-                    .pr(px(CHAT_RIGHT))
-                    .py(px(super::TURN_Y))
-                    .gap(px(CHAT_TEXT - CHAT_LEFT - AVATAR))
-                    .items_start()
-                    .child(avatar(false))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .whitespace_normal()
-                            // Selectable and copyable, like the answers (the same text view).
-                            .when(!user.is_empty(), |d| {
-                                d.child(plain_text(format!("user-{i}"), &user))
-                            })
-                            // The files that went with it.
-                            .when(!attached.is_empty(), |d| {
-                                d.child(
-                                    h_flex()
-                                        .flex_wrap()
-                                        .gap_2()
-                                        .when(has_text, |d| d.mt(px(10.)))
-                                        .pb(px(4.))
-                                        .children(attached),
-                                )
-                            }),
-                    ),
-            )
+            .child(self.user_row(
+                format!("user-{i}"),
+                &user,
+                &attached_paths,
+                None,
+                false,
+                cx,
+            ))
             .child(
                 div()
                     .relative()
