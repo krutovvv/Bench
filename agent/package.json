@@ -20,6 +20,7 @@
     "basic-ftp": "6.2.3",
     "croner": "10.0.1",
     "grammy": "1.46.0",
+    "https-proxy-agent": "9.1.0",
     "ssh2-sftp-client": "12.1.1",
     "ws": "8.18.3",
     "yaml": "2.8.1"

@@ -15,7 +15,8 @@ import { Bot, InputFile, type Context as TgContext } from "grammy";
 import fs from "node:fs";
 import path from "node:path";
 import { transcribe } from "./audio.ts";
-import { BENCH_HOME, getSetting } from "./config.ts";
+import { BENCH_HOME, getSetting, profileEnv } from "./config.ts";
+import { HttpsProxyAgent } from "https-proxy-agent";
 import { projects } from "./builtin/projects.ts";
 import type { Emit, Runtime } from "./runtime.ts";
 
@@ -76,7 +77,10 @@ export async function syncTelegram(rt: Runtime): Promise<void> {
 async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void> {
 	const profile = cfg.profile || "default";
 	const allowed = new Set(cfg.allowed_users.map(String));
-	const bot = new Bot(cfg.token);
+	// Where Telegram is reached only through a proxy (TELEGRAM_PROXY, else HTTPS_PROXY in the agent's env).
+	const env = profileEnv("default");
+	const proxy = env.TELEGRAM_PROXY || env.HTTPS_PROXY || env.https_proxy;
+	const bot = new Bot(cfg.token, proxy ? { client: { baseFetchConfig: { agent: new HttpsProxyAgent(proxy), compress: true } } } : undefined);
 	const api = bot.api;
 
 	const turns = new Map<string, Turn>(); // session id -> its running turn
