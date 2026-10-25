@@ -721,10 +721,12 @@ impl BenchApp {
                             let line = |ok: bool, warn: bool, text: String| {
                                 h_flex()
                                     .gap_2()
-                                    .items_center()
+                                    .items_start()
                                     .text_sm()
-                                    .child(dot(ok, warn))
-                                    .child(div().child(text))
+                                    .child(div().pt(px(5.)).child(dot(ok, warn)))
+                                    // A URL or a refusal is longer than the panel: it wraps
+                                    // inside it, never over its edge.
+                                    .child(div().flex_1().min_w_0().whitespace_normal().child(text))
                             };
                             let icon = |id: &'static str, ico: Ico, tip: &'static str| {
                                 div()
@@ -774,7 +776,7 @@ impl BenchApp {
                                     lines.push(line(false, false, r.clone()));
                                 }
                             } else if let Some(e) = &error {
-                                lines.push(line(false, false, crate::ui::clip(e, 80)));
+                                lines.push(line(false, false, e.clone()));
                             }
                             let platforms: Vec<AnyElement> = status
                                 .iter()
@@ -814,13 +816,17 @@ impl BenchApp {
                                             div()
                                                 .text_sm()
                                                 .text_color(theme.danger)
-                                                .child(crate::ui::clip(&e, 90))
+                                                .whitespace_normal()
+                                                .child(e.clone())
                                         }))
                                         .into_any_element()
                                 })
                                 .collect();
                             v_flex()
                                 .w(px(380.))
+                                // Whatever a line holds, the panel keeps it in: nothing paints
+                                // over its edge.
+                                .overflow_hidden()
                                 .child(
                                     h_flex()
                                         .px_3()
@@ -903,7 +909,8 @@ impl BenchApp {
                                             div()
                                                 .text_xs()
                                                 .text_color(muted)
-                                                .child(crate::ui::clip(l, 105))
+                                                .whitespace_normal()
+                                                .child(l.clone())
                                         })),
                                 )
                                 .child(
@@ -914,6 +921,7 @@ impl BenchApp {
                                         .border_color(theme.border)
                                         .text_sm()
                                         .text_color(muted)
+                                        .whitespace_normal()
                                         .child(where_.clone()),
                                 )
                         }),
