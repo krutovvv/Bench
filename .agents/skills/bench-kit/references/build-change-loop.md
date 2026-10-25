@@ -163,8 +163,9 @@ $K/ship.sh            # rebuilds dist/Bench Dev.app and opens it (--release: Ben
 (`dist/Bench Dev.app`, `local.bench.dev`). `ship.sh` quits a running Bench Dev (a normal quit),
 rebuilds it in place and opens it. **Never quit, kill or replace the release app** — it is the
 window the person works in and talks to you through. When Dev is good and the person asks,
-`ship.sh --release` rebuilds Bench: the running one goes on from `Bench.prev.app` (kept for
-rolling back) and the new one starts on the next open. Both are signed with the Apple Development
+`ship.sh --release` rebuilds Bench in place (no `Bench.prev.app` beside it: rolling back means
+rebuilding an earlier commit); the running one goes on from its old copy and the new one starts
+on the next open. Both are signed with the Apple Development
 certificate, so macOS grants are given once per app. Uncommitted changes stop the build
 (`BENCH_DIRTY=1` for a throwaway Dev one).
 

@@ -8,7 +8,8 @@
 #     Bench Dev to quit (a normal quit, never a kill), rebuilds it in place and opens it.
 #   * Bench ("/Applications/Bench.app"): the one the person works in and talks to you through.
 #     Only `ship.sh --release`, when the person asks for it, rebuilds it; it never quits it: the
-#     running one keeps going from Bench.prev.app and the new one starts on the next open.
+#     running one goes on from its old (deleted) copy and the new one starts on the next open.
+#     Nothing is parked beside it — /Applications holds Bench.app only.
 set -euo pipefail
 [[ -x scripts/bundle-macos.sh ]] || { echo "run from the project folder" >&2; exit 1; }
 KIND=dev OPEN=1

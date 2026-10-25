@@ -22,9 +22,9 @@
 # (grants are asked again after every build); BENCH_SIGN=<identity> picks another one.
 #
 # Neither build quits anything. A running Bench Dev stops the Dev build (ship.sh quits it
-# first). A running release app is moved aside to "Bench.prev.app" and keeps running from
-# there; the new one starts the next time the person opens Bench. The previous release stays
-# as Bench.prev.app for rolling back.
+# first). A running release app is left running from its old (deleted) copy; the new one starts
+# the next time the person opens Bench. Nothing is parked beside it: /Applications holds the app
+# only, and rolling back means rebuilding an earlier commit.
 #
 # Commit first: a build is one commit, so uncommitted changes stop it. For a quick experiment,
 # BENCH_DIRTY=1 builds Dev anyway (a release is always a clean commit).
@@ -147,18 +147,11 @@ else
 fi
 
 if [[ "$KIND" == release && -d "$APP" ]]; then
-    PREV="$(dirname "$APP")/Bench.prev.app"
-    if pgrep -f "$PREV/Contents/MacOS/" >/dev/null; then
-        echo "Bench.prev.app is still running — quit it, then release again" >&2
-        rm -rf "$NEW"
-        exit 1
+    if pgrep -f "$APP/Contents/MacOS/" >/dev/null; then
+        echo "a Bench from $APP is still running — the new one starts on its next open" >&2
     fi
-    rm -rf "$PREV"
-    mv "$APP" "$PREV"
-    echo "previous release: $PREV"
-else
-    rm -rf "$APP"
 fi
+rm -rf "$APP"
 mv "$NEW" "$APP"
 
 echo "Built: $APP ($HASH)"
