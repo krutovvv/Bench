@@ -46,10 +46,33 @@ pub struct ProjectEnv {
     pub skill_dirty: bool,
     /// Its accesses: (id, name, kind, address).
     pub hosts: Vec<(String, String, String, String)>,
+    /// Its scheduled jobs; the one opened under its row ("new": a new one's form) and its fields.
+    pub cron: Vec<CronJob>,
+    pub cron_open: Option<String>,
+    pub cron_name: Entity<InputState>,
+    pub cron_schedule: Entity<InputState>,
+    pub cron_prompt: Entity<EditorState>,
+    pub cron_dirty: bool,
     /// A row's remove asked once ("mcp:<name>", "skill:<name>", "host:<id>", "project"): the
     /// second click does it.
     pub armed: Option<String>,
     pub error: Option<String>,
+}
+
+/// A scheduled job of the project (the agent's `cron_jobs`): it runs `prompt` in a new thread of
+/// the project on `schedule` ("every 1d", "0 9 * * 1-5", an ISO time for once).
+#[derive(Clone, Debug, Default)]
+pub struct CronJob {
+    pub id: String,
+    pub name: String,
+    pub prompt: String,
+    pub schedule: String,
+    pub display: String,
+    pub enabled: bool,
+    pub next_run: Option<String>,
+    pub last_run: Option<String>,
+    pub last_status: Option<String>,
+    pub last_output: String,
 }
 
 /// A path segment for the agent's REST routes.
@@ -80,6 +103,9 @@ impl HermesApp {
         let skill_text = editor("markdown", window, cx);
         let mcp_json = editor("json", window, cx);
         let prompt_text = editor("markdown", window, cx);
+        let cron_prompt = editor("markdown", window, cx);
+        let cron_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name: Weekly digest"));
+        let cron_schedule = cx.new(|cx| InputState::new(window, cx).placeholder("every 1d · every 30m · 0 9 * * 1-5 · 2026-11-01T09:00"));
         let name = cx.new(|cx| InputState::new(window, cx));
         let tg_token = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Bot token from @BotFather (kept as is when empty)"));
         let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
@@ -92,6 +118,7 @@ impl HermesApp {
                     "telegram" => e.tg_dirty = true,
                     "prompt" => e.prompt_dirty = true,
                     "name" => e.name_dirty = true,
+                    "cron" => e.cron_dirty = true,
                     _ => e.mcp_dirty = true,
                 }
                 cx.notify();
@@ -104,6 +131,9 @@ impl HermesApp {
         cx.subscribe(&name, |this, _, ev, cx| dirty(this, "name", ev, cx)).detach();
         cx.subscribe(&tg_token, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
         cx.subscribe(&tg_users, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
+        cx.subscribe(&cron_prompt, |this, _, ev, cx| dirty(this, "cron", ev, cx)).detach();
+        cx.subscribe(&cron_name, |this, _, ev, cx| dirty(this, "cron", ev, cx)).detach();
+        cx.subscribe(&cron_schedule, |this, _, ev, cx| dirty(this, "cron", ev, cx)).detach();
         ProjectEnv {
             id: id.to_string(),
             dir: String::new(),
@@ -130,6 +160,12 @@ impl HermesApp {
             skill_text,
             skill_dirty: false,
             hosts: vec![],
+            cron: vec![],
+            cron_open: None,
+            cron_name,
+            cron_schedule,
+            cron_prompt,
+            cron_dirty: false,
             armed: None,
             error: None,
         }
@@ -195,6 +231,21 @@ impl HermesApp {
                 };
                 ("PUT", format!("/api/projects/{eid}/prompts/{}", enc(&name)), json!({"text": e.prompt_text.read(cx).value().to_string()}))
             }
+            "cron" => {
+                let Some(job) = e.cron_open.clone() else {
+                    return;
+                };
+                let fields = json!({
+                    "name": e.cron_name.read(cx).value().trim(),
+                    "schedule": e.cron_schedule.read(cx).value().trim(),
+                    "prompt": e.cron_prompt.read(cx).value().trim(),
+                });
+                if job == "new" {
+                    ("POST", format!("/api/projects/{eid}/cron"), fields)
+                } else {
+                    ("PUT", format!("/api/cron/jobs/{}", enc(&job)), json!({ "updates": fields }))
+                }
+            }
             // The name is the project's own row, on this Mac.
             "name" => ("PUT", format!("/api/projects/{id}"), json!({"name": e.name.read(cx).value().trim()})),
             "telegram" => {
@@ -230,6 +281,13 @@ impl HermesApp {
                             }
                             "prompt" => e.prompt_dirty = false,
                             "name" => e.name_dirty = false,
+                            "cron" => {
+                                e.cron_dirty = false;
+                                // A new job: its form closes, the job is in the list.
+                                if e.cron_open.as_deref() == Some("new") {
+                                    e.cron_open = None;
+                                }
+                            }
                             _ => e.skill_dirty = false,
                         }
                     }
@@ -265,6 +323,14 @@ impl HermesApp {
                 }
             }
             "name" => e.name_dirty = false,
+            "cron" => {
+                e.cron_dirty = false;
+                if let Some(job) = e.cron_open.take() {
+                    if job != "new" {
+                        return self.env_open_cron(job, window, cx);
+                    }
+                }
+            }
             _ => {
                 e.skill_dirty = false;
                 if let Some(name) = e.skill_open.take() {
@@ -304,6 +370,7 @@ impl HermesApp {
             "mcp" => format!("/api/projects/{eid}/mcp/{}", enc(&name)),
             "skill" => format!("/api/projects/{eid}/skills/{}", enc(&name)),
             "prompt" => format!("/api/projects/{eid}/prompts/{}", enc(&name)),
+            "cron" => format!("/api/cron/jobs/{}", enc(&name)),
             _ => format!("/api/projects/{eid}/hosts/{}", enc(&name)),
         };
         let profile = self.current_profile();
@@ -403,6 +470,55 @@ impl HermesApp {
         );
     }
 
+    /// A job's row: its name, schedule and prompt open under it to edit (again: closes); "new":
+    /// an empty form for a new job.
+    pub fn env_open_cron(&mut self, job: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        if e.cron_open.as_deref() == Some(&job) && !e.cron_dirty {
+            e.cron_open = None;
+            cx.notify();
+            return;
+        }
+        let j = e.cron.iter().find(|j| j.id == job).cloned().unwrap_or_default();
+        e.cron_name.update(cx, |s, cx| s.set_value(j.name.clone(), window, cx));
+        e.cron_schedule.update(cx, |s, cx| s.set_value(j.schedule.clone(), window, cx));
+        e.cron_prompt.update(cx, |s, cx| s.set_value(j.prompt.clone(), window, cx));
+        e.cron_open = Some(job.clone());
+        e.cron_dirty = false;
+        if job == "new" {
+            e.cron_name.update(cx, |s, cx| s.focus(window, cx));
+        }
+        cx.notify();
+    }
+
+    /// A job's "Run now", "Pause", "Resume".
+    pub fn env_cron(&mut self, job: String, action: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
+            return;
+        };
+        let Some((conn, _)) = self.env_target(&id) else {
+            return;
+        };
+        let path = format!("/api/cron/jobs/{}/{action}", enc(&job));
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json(&conn, "POST", &path, &profile, Value::Null),
+            move |this, r, window, cx| match r {
+                Ok(_) => {
+                    if action == "trigger" {
+                        this.toast(NotificationType::Info, "Started: its thread shows in the project", window, cx);
+                    }
+                    this.load_env(&id, window, cx);
+                }
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+
     /// A section's "+ Add": the start of the request in the composer, the caret after it and the
     /// thread scrolled down to it, for the person to finish and the agent to do.
     pub fn ask_in_composer(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
@@ -465,6 +581,27 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         let text = v["soul"].as_str().unwrap_or_default().to_string();
         e.soul.update(cx, |s, cx| s.set_value(text, window, cx));
     }
+    e.cron = v["cron"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .map(|j| {
+            let s = |k: &str| j[k].as_str().unwrap_or_default().to_string();
+            let o = |k: &str| j[k].as_str().filter(|s| !s.is_empty()).map(str::to_string);
+            CronJob {
+                id: s("id"),
+                name: s("name"),
+                prompt: s("prompt"),
+                schedule: j["schedule"]["expr"].as_str().unwrap_or_default().to_string(),
+                display: s("schedule_display"),
+                enabled: j["enabled"].as_bool().unwrap_or(true),
+                next_run: o("next_run_at"),
+                last_run: o("last_run_at"),
+                last_status: o("last_status"),
+                last_output: s("last_output"),
+            }
+        })
+        .collect();
     e.prompts = v["prompts"].as_array().into_iter().flatten().filter_map(|p| p.as_str().map(str::to_string)).collect();
     if !e.name_dirty {
         let name = v["project"]["name"].as_str().unwrap_or_default().to_string();

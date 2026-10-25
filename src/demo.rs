@@ -219,7 +219,11 @@ pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>
             {"name": "release-notes", "description": "Turn a changelog into a post: what changed for the reader, not the commit list."},
             {"name": "cover-image", "description": "A 1600×900 cover in the blog's colors, from a photo or a gradient."}
         ],
-        "hosts": [{"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"}]
+        "hosts": [{"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"}],
+        "cron": [
+            {"id": "c-digest", "name": "Weekly digest", "prompt": "Draft the weekly digest from this week's posts and comments; save it as a draft.", "schedule": {"expr": "0 9 * * 1"}, "schedule_display": "0 9 * * 1", "enabled": true, "next_run_at": "2026-10-26T09:00:00+03:00", "last_run_at": "2026-10-19T09:00:00+03:00", "last_status": "ok", "last_output": "The digest draft is saved: 4 posts, 2 top comments."},
+            {"id": "c-links", "name": "Broken links", "prompt": "Check every post's links; list the broken ones with the post.", "schedule": {"expr": "every 1d"}, "schedule_display": "every 1d", "enabled": false, "next_run_at": null, "last_status": null}
+        ]
     });
     crate::app::project_env::apply(e, &v, window, cx);
     // `BENCH_DEMO=env-open`: the soul and a skill opened, as when they are being edited.

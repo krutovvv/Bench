@@ -29,6 +29,20 @@ test("the server starts and answers /api/projects", async () => {
 		fs.writeFileSync(path.join(skill, "SKILL.md"), "---\nname: publish\ndescription: d\n---\nSteps.");
 		const read = await call("GET", `/api/projects/${made.project.id}/skills/publish`);
 		assert.match(read.text, /Steps\./);
+		// The project's schedule: a job made, changed, paused, removed; a bad schedule refused.
+		const job = await call("POST", `/api/projects/${made.project.id}/cron`, { name: "Digest", prompt: "Sum up the week", schedule: "every 1d" });
+		assert.equal(job.schedule_display, "every 1d");
+		assert.ok(job.next_run_at);
+		const bad = await call("POST", `/api/projects/${made.project.id}/cron`, { name: "x", prompt: "y", schedule: "whenever" });
+		assert.match(String(bad.detail ?? ""), /schedule/);
+		const changed = await call("PUT", `/api/cron/jobs/${job.id}`, { updates: { prompt: "Sum up the month", schedule: "every 2d" } });
+		assert.equal(changed.prompt, "Sum up the month");
+		await call("POST", `/api/cron/jobs/${job.id}/pause`);
+		let listed = (await call("GET", `/api/projects/${made.project.id}/env`)).cron;
+		assert.deepEqual(listed.map((j: any) => [j.name, j.enabled]), [["Digest", false]]);
+		await call("DELETE", `/api/cron/jobs/${job.id}`);
+		listed = (await call("GET", `/api/projects/${made.project.id}/env`)).cron;
+		assert.deepEqual(listed, []);
 		// A remote project shows the server agent's general environment.
 		const general = await call("GET", "/api/projects/general/env");
 		assert.equal(general.project.name, "General");

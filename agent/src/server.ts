@@ -18,7 +18,7 @@ import { importHermes, migrateCronFile } from "./import-hermes.ts";
 import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
 import { syncTelegram } from "./telegram.ts";
-import { arm, describe, jobs, nextRun, runJob, type Job } from "./builtin/cron.ts";
+import { arm, describe, jobs, newJob, nextRun, runJob, type Job } from "./builtin/cron.ts";
 import { connectMcp, mcpStatus } from "./mcp.ts";
 import { tasks } from "./builtin/tasks.ts";
 import { hosts, importSshConfig, importTransmit, type Host } from "./builtin/hosts.ts";
@@ -552,6 +552,8 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
 			hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
+			// Its scheduled jobs: what runs when, and how the last run went.
+			cron: jobs.list(agent).map(cronView),
 			// The bot's token is not sent back, only whether there is one.
 			telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token } : null,
 		};
@@ -703,10 +705,38 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		const u = req.body?.updates ?? {};
 		const schedule = typeof u.schedule === "object" ? u.schedule?.expr : u.schedule;
 		const next: Job = { ...job, prompt: u.prompt ?? job.prompt, name: u.name ?? job.name, schedule: schedule ?? job.schedule };
-		next.next_run = nextRun(next.schedule, Date.now(), null);
+		try {
+			next.next_run = nextRun(next.schedule, Date.now(), null);
+		} catch (e) {
+			throw new HttpError(400, `the schedule: ${(e as Error).message}`);
+		}
 		jobs.save(next);
 		await arm(next);
 		return cronView(jobs.get(job.id)!);
+	}],
+	// A project's new scheduled job (the general environment's: "general").
+	["POST", /^\/api\/projects\/([^/]+)\/cron$/, async (req, m) => {
+		const { agent } = envOf(decodeURIComponent(m[1]));
+		const name = String(req.body?.name ?? "").trim();
+		const prompt = String(req.body?.prompt ?? "").trim();
+		const schedule = String(req.body?.schedule ?? "").trim();
+		if (!name || !prompt || !schedule) throw new HttpError(400, "name, prompt and schedule are required");
+		let job: Job;
+		try {
+			job = newJob({ profile: agent, name, prompt, schedule });
+		} catch (e) {
+			throw new HttpError(400, `the schedule: ${(e as Error).message}`);
+		}
+		jobs.save(job);
+		await arm(job);
+		return cronView(jobs.get(job.id)!);
+	}],
+	["DELETE", /^\/api\/cron\/jobs\/([^/]+)$/, async (_req, m) => {
+		const job = jobs.resolve(decodeURIComponent(m[1]));
+		jobs.remove(job.id);
+		// Its sleeping task stops (the job is gone).
+		await arm(job);
+		return { ok: true };
 	}],
 	["POST", /^\/api\/cron\/jobs\/([^/]+)\/(trigger|pause|resume)$/, async (_req, m) => {
 		const id = decodeURIComponent(m[1]);
@@ -889,6 +919,8 @@ function cronView(j: Job) {
 		next_run_at: j.next_run ? new Date(j.next_run).toISOString() : null,
 		last_run_at: j.last_run ? new Date(j.last_run).toISOString() : null,
 		last_status: j.last_status,
+		last_output: (j.last_output ?? "").slice(0, 400),
+		last_session: j.last_session,
 		deliver: j.deliver,
 	};
 }

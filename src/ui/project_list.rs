@@ -307,6 +307,75 @@ impl HermesApp {
             }
         }
 
+        // Schedule: what runs on its own, each run a thread of the project.
+        out = out.child(
+            h_flex().pt_4().gap_3().child(heading("Schedule")).child(act("env-cron-add".into(), "+ New job".into(), false).on_click(cx.listener(|this, _, window, cx| {
+                this.click_claimed = true;
+                this.env_open_cron("new".into(), window, cx)
+            }))),
+        );
+        if e.cron.is_empty() && e.cron_open.as_deref() != Some("new") {
+            out = out.child(div().text_color(muted).child("Nothing runs on its own yet: a job runs its prompt in a new thread of the project, on a schedule."));
+        }
+        let cron_form = |e: &crate::app::ProjectEnv, cx: &mut Context<Self>| {
+            v_flex()
+                .mt_1()
+                .gap_2()
+                .child(gpui_kit::component::input::Input::new(&e.cron_name))
+                .child(gpui_kit::component::input::Input::new(&e.cron_schedule))
+                .child(code(&e.cron_prompt, cx))
+                .child(footer("cron", "cron", e.cron_dirty, cx))
+                .into_any_element()
+        };
+        if e.cron_open.as_deref() == Some("new") {
+            out = out.child(cron_form(e, cx));
+        }
+        for j in e.cron.clone() {
+            let id = format!("env-cron-{}", j.id);
+            let next = j.next_run.as_deref().map(when).unwrap_or_else(|| "no next run".into());
+            let mut note = if j.enabled { format!("{} · next {next}", j.display) } else { format!("{} · paused", j.display) };
+            if let Some(st) = &j.last_status {
+                note.push_str(&format!(" · last: {st}"));
+            }
+            let failed = j.last_status.as_deref().is_some_and(|s| s != "ok");
+            let (open_id, pause_id, run_id) = (j.id.clone(), j.id.clone(), j.id.clone());
+            let enabled = j.enabled;
+            let hover = SharedString::from(id.clone());
+            out = out.child(
+                row(id.clone(), j.name.clone(), note, failed)
+                    .cursor_pointer()
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.env_open_cron(open_id.clone(), window, cx)
+                    }))
+                    .child(
+                        h_flex()
+                            .flex_none()
+                            .gap_3()
+                            .opacity(0.)
+                            .group_hover(hover, |s| s.opacity(1.))
+                            .child(act(format!("{id}-run").into(), "Run now".into(), false).on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                cx.stop_propagation();
+                                this.env_cron(run_id.clone(), "trigger", window, cx)
+                            })))
+                            .child(act(format!("{id}-pause").into(), if enabled { "Pause".into() } else { "Resume".into() }, false).on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                cx.stop_propagation();
+                                this.env_cron(pause_id.clone(), if enabled { "pause" } else { "resume" }, window, cx)
+                            }))),
+                    )
+                    .child(remove(id, "cron", j.id.clone(), cx)),
+            );
+            if e.cron_open.as_deref() == Some(j.id.as_str()) {
+                out = out.child(cron_form(e, cx));
+                if !j.last_output.trim().is_empty() {
+                    let last = j.last_run.as_deref().map(when).unwrap_or_default();
+                    out = out.child(div().pb_2().text_sm().text_color(muted).child(format!("Last run {last}: {}", j.last_output.trim())));
+                }
+            }
+        }
+
         // Accesses.
         if !remote {
             out = out.child(h_flex().pt_4().gap_3().child(heading("Accesses")).child(add("env-host-add", "Add to this project the access: ", cx)));
@@ -333,5 +402,20 @@ impl HermesApp {
                 ),
             ));
         out.into_any_element()
+    }
+}
+
+/// A run's time as read: "today 18:00", "tomorrow 09:00", "Mon 2 Nov 09:00".
+fn when(iso: &str) -> String {
+    let Ok(t) = chrono::DateTime::parse_from_rfc3339(iso) else {
+        return iso.to_string();
+    };
+    let t = t.with_timezone(&chrono::Local);
+    let today = chrono::Local::now().date_naive();
+    match (t.date_naive() - today).num_days() {
+        0 => t.format("today %H:%M").to_string(),
+        1 => t.format("tomorrow %H:%M").to_string(),
+        -1 => t.format("yesterday %H:%M").to_string(),
+        _ => t.format("%a %-d %b %H:%M").to_string(),
     }
 }
