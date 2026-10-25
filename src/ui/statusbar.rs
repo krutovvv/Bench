@@ -330,8 +330,10 @@ impl BenchApp {
             .border_color(theme.border)
             .text_sm()
             // Nothing about where the agent runs or which one: a thread runs with its project.
-            // The backend shows up only when something is wrong (its panel reconnects).
-            // Left: the model, how full its context is, how hard it thinks, what it may run.
+            // Far left: the gateway of the machine this project lives on — always there, healthy
+            // or not; its state in detail, its log, Reconnect and Restart are inside. Then the
+            // model, how full its context is, how hard it thinks, what it may run.
+            .children(self.render_backend(cx))
             .map(|d| {
                 if !ready {
                     d
@@ -381,7 +383,6 @@ impl BenchApp {
                     approvals,
                 ))
             })
-            .children(self.render_backend(cx))
             .child(div().flex_1())
             // Right: icons only — the terminals in the background (if any), attach, dictate,
             // settings.
@@ -624,8 +625,8 @@ fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, c
 }
 
 impl BenchApp {
-    /// "Backend ready" (or what is wrong) and, on click, the gateway's state, its messaging
-    /// platforms, Reconnect and Restart.
+    /// The gateway's state — always, ready or not — and, on click, its state in detail, its
+    /// messaging platforms, the last lines of its log, Reconnect and Restart.
     fn render_backend(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
@@ -633,21 +634,25 @@ impl BenchApp {
             Some(Ok(s)) if self.online() => Some(s.clone()),
             _ => None,
         };
+        // Always shown, healthy or not: the person decides whether to look, not a late error.
+        let working = status.as_ref().map(|s| s.active_agents).unwrap_or(0);
         let (label, color): (String, Hsla) = if self.connecting {
             ("Connecting…".into(), muted)
         } else if !self.online() {
-            ("Backend offline".into(), theme.danger)
+            ("Gateway offline".into(), theme.danger)
         } else {
             match (&self.gw_status, &status) {
-                (Some(Err(_)), _) => ("Backend unreachable".into(), theme.danger),
+                (Some(Err(_)), _) => ("Gateway unreachable".into(), theme.danger),
                 (_, Some(s)) if !s.running => ("Gateway stopped".into(), theme.danger),
                 (_, Some(s)) if s.state != "running" && !s.state.is_empty() => {
                     (format!("Gateway {}", s.state), theme.warning)
                 }
-                (_, Some(s)) if s.overall != "ok" => ("Backend degraded".into(), theme.warning),
-                _ => return None,
+                (_, Some(s)) if s.overall != "ok" => ("Gateway degraded".into(), theme.warning),
+                _ if working > 0 => (format!("Gateway · {working} working"), theme.primary),
+                _ => ("Gateway".into(), theme.primary),
             }
         };
+        let log = self.gw_log.clone();
         let connected = self.online();
         let error = match &self.gw_status {
             Some(Err(e)) => Some(e.clone()),
@@ -785,7 +790,7 @@ impl BenchApp {
                                 })
                                 .collect();
                             v_flex()
-                                .w(px(300.))
+                                .w(px(380.))
                                 .child(
                                     h_flex()
                                         .px_3()
@@ -840,6 +845,36 @@ impl BenchApp {
                                             )
                                         })
                                         .children(platforms),
+                                )
+                                // Its own log: the last lines of ~/.bench/server.log, where a
+                                // problem says itself before the status has anything to say.
+                                .child(
+                                    v_flex()
+                                        .px_3()
+                                        .py_2()
+                                        .gap_px()
+                                        .border_t_1()
+                                        .border_color(theme.border)
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .text_color(muted)
+                                                .child("LOG · ~/.bench/server.log"),
+                                        )
+                                        .when(log.is_empty(), |d| {
+                                            d.child(
+                                                div()
+                                                    .text_sm()
+                                                    .text_color(muted)
+                                                    .child("Nothing logged"),
+                                            )
+                                        })
+                                        .children(log.iter().map(|l| {
+                                            div()
+                                                .text_xs()
+                                                .text_color(muted)
+                                                .child(crate::ui::clip(l, 105))
+                                        })),
                                 )
                                 .child(
                                     div()

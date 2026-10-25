@@ -234,6 +234,73 @@ pub fn restart_gateway(target: &Target, _interrupt: bool) -> Result<Restart> {
     Ok(Restart::Done)
 }
 
+/// The last `lines` of a log, reading only its end (`bytes` at most) — the agent's log grows
+/// while it works, and this runs on a timer.
+fn tail_last(path: &std::path::Path, bytes: u64, lines: usize) -> String {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(len) = std::fs::metadata(path).map(|m| m.len()) else {
+        return String::new();
+    };
+    let start = len.saturating_sub(bytes);
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return String::new();
+    };
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return String::new();
+    }
+    let mut buf = Vec::new();
+    if file.read_to_end(&mut buf).is_err() {
+        return String::new();
+    }
+    let text = String::from_utf8_lossy(&buf).to_string();
+    // The first line may be cut in the middle of it: it is not a line.
+    if start == 0 {
+        text
+    } else {
+        match text.split_once('\n') {
+            Some((_, rest)) => rest.to_string(),
+            None => String::new(),
+        }
+    }
+    .lines()
+    .rev()
+    .take(lines)
+    .collect::<Vec<_>>()
+    .into_iter()
+    .rev()
+    .collect::<Vec<_>>()
+    .join("\n")
+}
+
+/// The last lines of the agent's own log (`~/.bench/server.log` where it runs): what it says
+/// before the status has anything to say. Silent when there is no log yet or the host is away.
+pub fn gateway_log(target: &Target, lines: usize) -> Vec<String> {
+    let raw = match target {
+        Target::Local => tail_last(
+            &crate::pi_agent::agent_home().join("server.log"),
+            64 * 1024,
+            lines,
+        ),
+        Target::Ssh(host) => match crate::ssh::run(
+            host,
+            &format!("tail -n {lines} ~/.bench/server.log 2>/dev/null; true"),
+            None,
+            Duration::from_secs(5),
+        ) {
+            Ok(bytes) => String::from_utf8_lossy(&bytes).to_string(),
+            Err(_) => return vec![],
+        },
+    };
+    raw.lines()
+        .rev()
+        .take(lines)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .map(|s| s.to_string())
+        .collect()
+}
+
 /// A group of chats with no project of its own ("Audit X", a few deep researches): a plain
 /// folder `~/Research/<name>` where the gateway lives, made if missing. The sidebar groups the
 /// chats by it, and what they write lands there. Returns the folder's absolute path.
@@ -345,4 +412,30 @@ pub fn ssh_hosts() -> Vec<String> {
         }
     }
     hosts
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_last_lines_of_a_log() {
+        let dir = std::env::temp_dir().join(format!("bench-tail-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("server.log");
+        // A long line before them, so the read starts in the middle of it.
+        let long = "x".repeat(200 * 1024);
+        let body = (1..=40)
+            .map(|i| format!("line {i}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(&path, format!("{long}\n{body}\n")).unwrap();
+        assert_eq!(tail_last(&path, 64 * 1024, 3), "line 38\nline 39\nline 40");
+        assert_eq!(
+            tail_last(&std::path::Path::new("/bench-nope/server.log"), 1024, 3),
+            "",
+            "no log is no lines"
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

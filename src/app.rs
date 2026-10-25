@@ -194,6 +194,8 @@ pub struct BenchApp {
     /// The gateway's state for the status bar's backend item (refreshed every 10 s):
     /// None before the first answer, Err when the gateway didn't answer.
     pub gw_status: Option<Result<rest::GatewayStatus, String>>,
+    /// The last lines of the agent's log, from where it runs (its own status item shows them).
+    pub gw_log: Vec<String>,
     /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
     pub catalog: Vec<crate::model::SlashCommand>,
     pub slash_sel: usize,
@@ -535,21 +537,31 @@ impl BenchApp {
                 }
             }
         });
-        // The backend item in the status bar: the gateway's state, every 10 s while connected.
+        // The gateway item in the status bar: its state and the last lines of its log, every 10 s
+        // while connected. Both come from where this project's agent runs, so a project on a
+        // server shows that server's gateway.
         let backend = cx.spawn(async move |this, cx| {
             loop {
                 let Ok(job) = this.update(cx, |this, _| {
-                    this.conn.clone().map(|c| (c, this.current_profile()))
+                    this.conn
+                        .clone()
+                        .map(|c| (c, this.current_profile(), this.target.clone()))
                 }) else {
                     break;
                 };
-                if let Some((conn, profile)) = job {
+                if let Some((conn, profile, target)) = job {
                     let r = cx
-                        .background_spawn(async move { rest::gateway_status(&conn, &profile) })
+                        .background_spawn(async move {
+                            (
+                                rest::gateway_status(&conn, &profile),
+                                connection::gateway_log(&target, 12),
+                            )
+                        })
                         .await;
                     if this
                         .update(cx, |this, cx| {
-                            this.gw_status = Some(r.map_err(|e| format!("{e:#}")));
+                            this.gw_status = Some(r.0.map_err(|e| format!("{e:#}")));
+                            this.gw_log = r.1;
                             cx.notify();
                         })
                         .is_err()
@@ -655,6 +667,7 @@ impl BenchApp {
             profile_models: vec![],
             pv: Default::default(),
             gw_status: None,
+            gw_log: Vec::new(),
             catalog: vec![],
             slash_sel: 0,
             slash_closed: false,
@@ -780,6 +793,7 @@ impl BenchApp {
         self.reset_chat(cx);
         self.pv = Default::default();
         self.gw_status = None;
+        self.gw_log.clear();
         let dir = connection::state_dir();
         let _ = std::fs::create_dir_all(&dir)
             .and_then(|_| std::fs::write(dir.join("last-target"), target.label()));
