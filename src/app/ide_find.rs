@@ -10,7 +10,7 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use super::ide_ops::{Fs, SKIP_DIRS, list_files};
 use crate::app::RightTab;
 use crate::ssh::{q, run};
@@ -146,7 +146,7 @@ fn grep(fs: &Fs, root: &str, query: &str) -> Result<(Vec<Hit>, bool)> {
     Ok((hits, capped))
 }
 
-impl HermesApp {
+impl BenchApp {
     // ---- ⌃G ------------------------------------------------------------------
 
     pub fn open_go_line(&mut self, window: &mut Window, cx: &mut Context<Self>) {

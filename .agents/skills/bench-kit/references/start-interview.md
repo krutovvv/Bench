@@ -35,7 +35,7 @@ specification; build exactly this.
 
 Bench is one chat with the agent, threads grouped by **project**; each tool they work with
 becomes a **kind of insert**: a small live app they put into a thread with `/`, with the agent's
-tool for it (`build-subject.md`). What belongs to a project (its soul, servers, hosts, bot,
+tool for it (`build-insert.md`). What belongs to a project (its soul, servers, hosts, bot,
 scheduled jobs) goes into the project's environment. First see whether one of the five that
 exist covers it:
 

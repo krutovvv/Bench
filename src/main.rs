@@ -370,7 +370,7 @@ pub fn open_main_window(cx: &mut App) {
         ..Default::default()
     };
     if let Err(e) = gpui_kit::open_window(options, cx, |window, cx| {
-        cx.new(|cx| app::HermesApp::new(window, cx))
+        cx.new(|cx| app::BenchApp::new(window, cx))
     }) {
         eprintln!("open window: {e:#}");
     }

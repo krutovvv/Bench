@@ -10,7 +10,7 @@
 
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::model::{BgProcess, FileEdit, Place, Profile, SessionRow, Step, Target, Turn, Usage};
 
 fn demo_file(name: &str) -> String {
@@ -105,7 +105,7 @@ fn task(id: &str, title: &str, tags: &[&str], day: Option<i64>) -> crate::tasks:
 }
 
 /// Made-up servers (SSH mode) and tasks (Tasks mode), so every mode has something to show.
-fn other_modes(app: &mut HermesApp) {
+fn other_modes(app: &mut BenchApp) {
     app.ssh.servers = vec![
         server("web-1", "203.0.113.10", "Production"),
         server("web-2", "203.0.113.11", "Production"),
@@ -178,7 +178,7 @@ deploy@{alias}:~$ "
 }
 
 /// A thread about something (`tasks:today`, `ssh:web-1`…): one turn, done.
-fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn) {
+fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, turn: Turn) {
     let mut row = session(id, title, 2, false, "desktop");
     // An environment is the thread's top; a tool, an insert before the first message.
     if subject.starts_with("env:") {
@@ -190,7 +190,7 @@ fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn)
             Some(("ssh", "")) => "ssh:local".into(),
             _ => subject.to_string(),
         };
-        let (key, mut state) = HermesApp::insert_spec(&spec);
+        let (key, mut state) = BenchApp::insert_spec(&spec);
         if key == "browser" {
             state.insert("tab".into(), serde_json::json!("demo-tab"));
             state.insert("url".into(), serde_json::json!("https://blog.example.com/admin/posts/new"));
@@ -202,7 +202,7 @@ fn thread(app: &mut HermesApp, id: &str, title: &str, subject: &str, turn: Turn)
 }
 
 /// The blog project's environment, for its environment thread.
-pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>) {
+pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
     let Some(e) = app.project_env.as_mut() else {
         return;
     };
@@ -234,7 +234,7 @@ pub fn env(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>
 }
 
 /// One thread per subject, so every sidebar group opens to something.
-fn subject_threads(app: &mut HermesApp, now: f64) {
+fn subject_threads(app: &mut BenchApp, now: f64) {
     let done = |user: &str, steps: Vec<Step>, answer: &str, secs: f64| Turn {
         user: user.into(),
         steps,
@@ -363,7 +363,7 @@ pub fn processes(now: f64) -> Vec<BgProcess> {
 }
 
 /// Fill the window with the demo instead of connecting.
-pub fn load(app: &mut HermesApp, cx: &mut Context<HermesApp>) {
+pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
     let now = crate::app::now_secs();
     app.demo = true;
     app.target = Target::Local;

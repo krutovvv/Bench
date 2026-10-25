@@ -7,14 +7,14 @@ use gpui_kit::*;
 use serde_json::{Map, json};
 
 use super::{InsertKind, Switch, SwitchTo, clip, pick_row};
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::icons::Ico;
 use crate::model::Insert;
 
 pub struct Files;
 
 /// The hosts a thread may open: its project's and the shared ones.
-fn hosts(app: &HermesApp) -> Vec<(String, String, String)> {
+fn hosts(app: &BenchApp) -> Vec<(String, String, String)> {
     let proj = app.thread_project.clone();
     app.files_remote
         .hosts
@@ -24,7 +24,7 @@ fn hosts(app: &HermesApp) -> Vec<(String, String, String)> {
         .collect()
 }
 
-fn new_host(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>) {
+fn new_host(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
     app.new_host_form(window, cx);
 }
 
@@ -33,7 +33,7 @@ impl InsertKind for Files {
         key == "files"
     }
 
-    fn title(&self, app: &HermesApp, ins: &Insert) -> String {
+    fn title(&self, app: &BenchApp, ins: &Insert) -> String {
         let host = ins.get("host");
         app.files_remote
             .hosts
@@ -43,7 +43,7 @@ impl InsertKind for Files {
             .unwrap_or_else(|| "Files".into())
     }
 
-    fn switches(&self, app: &HermesApp, ins: &Insert) -> Vec<Switch> {
+    fn switches(&self, app: &BenchApp, ins: &Insert) -> Vec<Switch> {
         let now = ins.get("host");
         let mut v: Vec<Switch> = hosts(app)
             .into_iter()
@@ -58,7 +58,7 @@ impl InsertKind for Files {
         v
     }
 
-    fn controls(&self, app: &mut HermesApp, ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) -> Vec<AnyElement> {
+    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let f = &app.files_remote;
         if f.owner.as_deref() != Some(ins.id.as_str()) || f.path.is_empty() {
             return vec![];
@@ -66,7 +66,7 @@ impl InsertKind for Files {
         vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(f.path.clone()).into_any_element()]
     }
 
-    fn body(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) -> Option<AnyElement> {
+    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         let host = ins.get("host");
         if host.is_empty() {
             let id = ins.id.clone();
@@ -110,7 +110,7 @@ impl InsertKind for Files {
         Some(app.render_files_block(&host, false, window, cx))
     }
 
-    fn context(&self, app: &HermesApp, ins: &Insert, cx: &App) -> String {
+    fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {
         let f = &app.files_remote;
         let host = ins.get("host");
         if host.is_empty() {
@@ -131,7 +131,7 @@ impl InsertKind for Files {
         out
     }
 
-    fn opened(&self, app: &mut HermesApp, _ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) {
+    fn opened(&self, app: &mut BenchApp, _ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
         if app.files_remote.hosts.is_empty() {
             app.load_remote_hosts(window, cx);
         }

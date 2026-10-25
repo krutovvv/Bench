@@ -11,7 +11,7 @@ use gpui_kit::*;
 
 use super::media::plain_text;
 use super::{clip, clock, plural};
-use crate::app::{HermesApp, tool_label};
+use crate::app::{BenchApp, tool_label};
 use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
@@ -32,7 +32,7 @@ pub(super) fn terminal_height(session: &crate::term::Session) -> f32 {
     (used * line + 16.).min(TERMINAL_MAX)
 }
 
-impl HermesApp {
+impl BenchApp {
     /// New chat: optionally work in a git project, optionally in a branch of its own.
     pub(super) fn render_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         // A thread with no turns yet still is a thread: "Loading history…" while it opens, then

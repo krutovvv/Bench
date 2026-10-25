@@ -14,7 +14,7 @@ use gpui_kit::*;
 
 use gpui_kit::component::diff::DiffFile;
 
-use super::{FileMode, FileView, HermesApp, RightTab, common_dir, diff_state};
+use super::{FileMode, FileView, BenchApp, RightTab, common_dir, diff_state};
 use crate::lang::{language_for, language_for_text};
 use crate::model::Target;
 use crate::{remote, rest};
@@ -58,7 +58,7 @@ pub struct Ide {
     pub remote_file: Option<RemoteFile>,
     /// Watches the open server file's local copy while it is open.
     watch: Option<Task<()>>,
-    /// Open files, in tab order (`ide_tabs.rs`); the active one is `HermesApp::file`.
+    /// Open files, in tab order (`ide_tabs.rs`); the active one is `BenchApp::file`.
     pub tabs: Vec<String>,
     /// The other tabs as they were left.
     pub parked: std::collections::HashMap<String, Parked>,
@@ -105,7 +105,7 @@ fn mtime(p: &PathBuf) -> Option<SystemTime> {
     std::fs::metadata(p).and_then(|m| m.modified()).ok()
 }
 
-impl HermesApp {
+impl BenchApp {
     pub fn ide_open(&self) -> bool {
         self.right.is_some()
     }
@@ -530,7 +530,7 @@ impl HermesApp {
 }
 
 /// The tree and the viewer/editor: roots, folders, opening and saving, Zed.
-impl HermesApp {
+impl BenchApp {
     /// Switch the right panel's tab (opening it if closed).
     pub fn toggle_right_tab(&mut self, tab: RightTab, window: &mut Window, cx: &mut Context<Self>) {
         self.right = Some(tab);

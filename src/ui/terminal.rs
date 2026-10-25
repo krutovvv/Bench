@@ -12,7 +12,7 @@ use alacritty_terminal::vte::ansi::{Color, CursorShape, Rgb};
 use gpui_kit::component::{ActiveTheme as _, Theme};
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::term::{Layout, Palette, Session, Size};
 
 /// One Light / One Dark ANSI colors (0–15).
@@ -345,7 +345,7 @@ fn grid(session: Arc<Session>, focused: bool, theme: &Theme) -> impl IntoElement
     .size_full()
 }
 
-impl HermesApp {
+impl BenchApp {
     pub(super) fn render_terminal(
         &mut self,
         ix: usize,

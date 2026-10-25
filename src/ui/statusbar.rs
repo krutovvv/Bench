@@ -9,11 +9,11 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::compact;
-use crate::app::{HermesApp, Panel};
+use crate::app::{BenchApp, Panel};
 use crate::icons::Ico;
 use crate::model::{EFFORTS, Step};
 
-impl HermesApp {
+impl BenchApp {
     /// Model: live usage, else the open session, else the profile, else the default profile.
     fn model_name(&self) -> String {
         let non_empty = |s: &String| !s.is_empty();
@@ -85,7 +85,7 @@ impl HermesApp {
                       items: Vec<(
             String,
             bool,
-            Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)>,
+            Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>,
         )>| {
             let items = std::rc::Rc::new(items);
             let view = view.clone();
@@ -128,7 +128,7 @@ impl HermesApp {
             .iter()
             .enumerate()
             .map(|(i, e)| {
-                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
                     Box::new(move |this, _, cx| this.set_effort(i, cx));
                 (
                     e.to_string(),
@@ -140,7 +140,7 @@ impl HermesApp {
         let approvals: Vec<_> = crate::model::APPROVAL_MODES
             .iter()
             .map(|m| {
-                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
                     Box::new(move |this, _, cx| this.set_approval_mode(m, cx));
                 let label = match *m {
                     "off" => "off — never ask",
@@ -162,7 +162,7 @@ impl HermesApp {
             .iter()
             .enumerate()
             .map(|(i, c)| {
-                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> =
+                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
                     Box::new(move |this, _, cx| this.set_model(i, cx));
                 let checked = self.model_pick.map_or(c.model == current_model, |k| k == i);
                 let label = if c.tag.is_empty() {
@@ -285,7 +285,7 @@ impl HermesApp {
         });
 
         // Terminals sent to the background: each brings it back into its thread; Stop all ends them.
-        let mut background_terms: Vec<(String, bool, Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)>)> = self
+        let mut background_terms: Vec<(String, bool, Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>)> = self
             .ssh
             .tabs
             .iter()
@@ -293,7 +293,7 @@ impl HermesApp {
             .enumerate()
             .map(|(k, t)| {
                 let id = t.id;
-                let f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)> = Box::new(move |this, _, cx| {
+                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> = Box::new(move |this, _, cx| {
                     if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
                         t.background = false;
                         t.collapsed = false;
@@ -420,7 +420,7 @@ impl HermesApp {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     /// Rough tokens of the open chat: its text at ~3.5 characters a token.
     fn estimate_tokens(&self) -> u64 {
         let chars: usize = self
@@ -585,7 +585,7 @@ fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, c
     panel
 }
 
-impl HermesApp {
+impl BenchApp {
     /// "Backend ready" (or what is wrong) and, on click, the gateway's state, its messaging
     /// platforms, Reconnect and Restart.
     fn render_backend(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {

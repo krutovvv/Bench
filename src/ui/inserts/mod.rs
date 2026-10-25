@@ -21,7 +21,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use serde_json::Value;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::icons::Ico;
 use crate::model::{Insert, SlashCommand};
 
@@ -36,7 +36,7 @@ pub struct Switch {
 
 pub enum SwitchTo {
     Patch(Value),
-    Run(fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)),
+    Run(fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)),
 }
 
 pub trait InsertKind: Sync {
@@ -47,22 +47,22 @@ pub trait InsertKind: Sync {
     fn same(&self, there: &str, new: &str) -> bool {
         self.owns(there) && self.owns(new)
     }
-    fn title(&self, app: &HermesApp, ins: &Insert) -> String;
+    fn title(&self, app: &BenchApp, ins: &Insert) -> String;
     /// The title's menu.
-    fn switches(&self, _app: &HermesApp, _ins: &Insert) -> Vec<Switch> {
+    fn switches(&self, _app: &BenchApp, _ins: &Insert) -> Vec<Switch> {
         vec![]
     }
     /// The head's own controls, left of "remove".
-    fn controls(&self, _app: &mut HermesApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<HermesApp>) -> Vec<AnyElement> {
+    fn controls(&self, _app: &mut BenchApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         vec![]
     }
     /// What it shows, under the head; None: the head alone.
-    fn body(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) -> Option<AnyElement>;
+    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement>;
     /// What it shows now, for the agent (sent with each message, never shown).
-    fn context(&self, app: &HermesApp, ins: &Insert, cx: &App) -> String;
+    fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String;
     /// Put in, or brought back: start what it needs (a terminal, a listing).
-    fn opened(&self, _app: &mut HermesApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<HermesApp>) {}
-    fn removed(&self, _app: &mut HermesApp, _ins: &Insert, _cx: &mut Context<HermesApp>) {}
+    fn opened(&self, _app: &mut BenchApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<BenchApp>) {}
+    fn removed(&self, _app: &mut BenchApp, _ins: &Insert, _cx: &mut Context<BenchApp>) {}
 }
 
 static KINDS: &[&dyn InsertKind] = &[&terminal::Terminal, &files::Files, &tasks::Tasks, &tools::Tools, &browser::Browser];
@@ -87,7 +87,7 @@ pub fn words() -> Vec<SlashCommand> {
     .collect()
 }
 
-impl HermesApp {
+impl BenchApp {
     /// The inserts put after `after` of the person's messages, each in the person's row.
     pub(super) fn render_inserts_at(&mut self, after: usize, last: bool, window: &mut Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
         self.thread_inserts()
@@ -221,8 +221,8 @@ pub(super) fn pick_row(
     ico: Ico,
     label: String,
     detail: String,
-    cx: &mut Context<HermesApp>,
-    on: impl Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>) + 'static,
+    cx: &mut Context<BenchApp>,
+    on: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
 ) -> AnyElement {
     let theme = cx.theme().clone();
     h_flex()

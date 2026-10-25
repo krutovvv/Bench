@@ -2,7 +2,7 @@
 
 Every Bench has this frame and keeps it (Bench's `src/ui/mod.rs`). A new tool doesn't get a
 frame of its own: it is a subject — a sidebar group, a live block at the top of its thread, the
-conversation under it (`build-subject.md`). Never remove the sidebar, the header or the status bar.
+conversation under it (`build-insert.md`). Never remove the sidebar, the header or the status bar.
 
 Picture: `assets/gallery.png` (the piece gallery), `assets/ui/tools-mode.png` (Bench's Tools block).
 
@@ -123,4 +123,4 @@ controls: fixed `px` heights drift apart at the S/L font sizes.
 There are no modes. Tasks, Servers, Files, Browser, Tools and the project groups are sidebar
 groups; a click opens the latest thread about that subject (or a new one), its live block on
 top (`src/app/subjects.rs`, `render_chat` in `src/ui/chat.rs`). ⌘1 chats, ⌘2 this Mac's terminal,
-⌘3 the current tool, ⌘4 Today's tasks (`src/app/keys.rs`). Recipe: `build-subject.md`.
+⌘3 the current tool, ⌘4 Today's tasks (`src/app/keys.rs`). Recipe: `build-insert.md`.

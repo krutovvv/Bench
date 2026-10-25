@@ -22,7 +22,7 @@ them); a "from Keychain" button can fill one in (`security find-internet-passwor
 ## Who else writes there
 
 The agent (its tool), cron jobs, Telegram, another Bench window, another machine. So Bench
-re-reads the list now and then and never assumes it is the only writer (`build-subject.md`, "a
+re-reads the list now and then and never assumes it is the only writer (`build-insert.md`, "a
 list re-read from its source": keep unsaved new items, don't overwrite a card being typed into).
 
 ## Bench's Tasks, the worked example

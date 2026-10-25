@@ -4,11 +4,11 @@
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::gateway::Cmd;
 use crate::model::BgProcess;
 
-impl HermesApp {
+impl BenchApp {
     /// Ask the gateway again (the poll, and right after a Stop).
     pub(crate) fn poll_processes(&self) {
         if let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) {

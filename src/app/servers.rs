@@ -12,7 +12,7 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::connection::{self, HostCheck};
 use crate::model::Target;
 use crate::sshconfig::{self, Server};
@@ -67,8 +67,8 @@ pub struct Ssh {
 }
 
 impl Ssh {
-    pub fn new(window: &mut Window, cx: &mut Context<HermesApp>) -> Self {
-        let input = |ph: &'static str, window: &mut Window, cx: &mut Context<HermesApp>| {
+    pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
+        let input = |ph: &'static str, window: &mut Window, cx: &mut Context<BenchApp>| {
             cx.new(|cx| InputState::new(window, cx).placeholder(ph))
         };
         let search = input("Search servers", window, cx);
@@ -142,7 +142,7 @@ fn collapsed_path() -> std::path::PathBuf {
     connection::state_dir().join("collapsed.json")
 }
 
-impl HermesApp {
+impl BenchApp {
     /// Fold or unfold a sidebar group (its header was clicked).
     pub fn toggle_group(&mut self, key: String, cx: &mut Context<Self>) {
         if !self.ssh.collapsed.remove(&key) {

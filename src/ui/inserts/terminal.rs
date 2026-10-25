@@ -7,7 +7,7 @@ use gpui_kit::*;
 use serde_json::json;
 
 use super::{InsertKind, Switch, SwitchTo, icon_button, pick_row};
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::icons::Ico;
 use crate::model::Insert;
 
@@ -25,7 +25,7 @@ fn alias_of(key: &str) -> Option<String> {
 }
 
 /// The servers a thread may open: its project's (a thread outside projects: all).
-fn servers(app: &HermesApp) -> Vec<(String, String)> {
+fn servers(app: &BenchApp) -> Vec<(String, String)> {
     let proj = app.thread_project.clone();
     app.ssh
         .servers
@@ -35,7 +35,7 @@ fn servers(app: &HermesApp) -> Vec<(String, String)> {
         .collect()
 }
 
-fn new_server(app: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>) {
+fn new_server(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
     app.edit_server(None, None, window, cx);
 }
 
@@ -49,7 +49,7 @@ impl InsertKind for Terminal {
         there == new
     }
 
-    fn title(&self, app: &HermesApp, ins: &Insert) -> String {
+    fn title(&self, app: &BenchApp, ins: &Insert) -> String {
         match alias_of(&ins.key) {
             None => "SSH".into(),
             Some(a) => {
@@ -62,7 +62,7 @@ impl InsertKind for Terminal {
         }
     }
 
-    fn switches(&self, app: &HermesApp, ins: &Insert) -> Vec<Switch> {
+    fn switches(&self, app: &BenchApp, ins: &Insert) -> Vec<Switch> {
         let now = alias_of(&ins.key);
         let mut v = vec![Switch {
             label: "This Mac".into(),
@@ -80,7 +80,7 @@ impl InsertKind for Terminal {
         v
     }
 
-    fn controls(&self, app: &mut HermesApp, ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) -> Vec<AnyElement> {
+    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let Some(alias) = alias_of(&ins.key) else {
             return vec![];
         };
@@ -134,14 +134,14 @@ impl InsertKind for Terminal {
         ]
     }
 
-    fn body(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) -> Option<AnyElement> {
+    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         let Some(alias) = alias_of(&ins.key) else {
             // Which one: this Mac, a server, or a new one.
             let id = ins.id.clone();
             let mut rows = vec![];
             let pick = |key: String| {
                 let id = id.clone();
-                move |this: &mut HermesApp, window: &mut Window, cx: &mut Context<HermesApp>| {
+                move |this: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>| {
                     this.patch_insert(&id, json!({ "key": key }), cx);
                     if let Some(a) = alias_of(&key) {
                         this.ensure_terminal(&a, window, cx);
@@ -182,7 +182,7 @@ impl InsertKind for Terminal {
         Some(div().h(px(h)).mx(px(-12.)).overflow_hidden().child(app.render_terminal(ix, window, cx)).into_any_element())
     }
 
-    fn context(&self, app: &HermesApp, ins: &Insert, _cx: &App) -> String {
+    fn context(&self, app: &BenchApp, ins: &Insert, _cx: &App) -> String {
         let Some(alias) = alias_of(&ins.key) else {
             return String::new();
         };
@@ -193,7 +193,7 @@ impl InsertKind for Terminal {
         }
     }
 
-    fn opened(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) {
+    fn opened(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
         if let Some(a) = alias_of(&ins.key) {
             if let Some(t) = app.ensure_terminal(&a, window, cx) {
                 app.ssh.tabs[t].background = false;
@@ -203,7 +203,7 @@ impl InsertKind for Terminal {
     }
 
     /// The shell goes on in the background (the status bar lists it, Stop ends it).
-    fn removed(&self, app: &mut HermesApp, ins: &Insert, _cx: &mut Context<HermesApp>) {
+    fn removed(&self, app: &mut BenchApp, ins: &Insert, _cx: &mut Context<BenchApp>) {
         if let Some(t) = alias_of(&ins.key).and_then(|a| app.ssh.tab_for(&a)) {
             app.ssh.tabs[t].background = true;
         }

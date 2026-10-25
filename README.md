@@ -118,7 +118,7 @@ queue. [`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md) is a set 
 for **adding such a tool to Bench**: one more kind of insert, made the same way as the five
 above, in the same look:
 
-- **the recipe** ([`build-subject.md`](.agents/skills/bench-kit/references/build-subject.md)):
+- **the recipe** ([`build-insert.md`](.agents/skills/bench-kit/references/build-insert.md)):
   the insert's key and state, its `InsertKind` (title, switcher, controls, body, what it tells
   the agent), its `/` word, the agent's tool and prompt line, with the browser insert as the main
   worked example and the other four after it, and a checklist of every file a new one touches;

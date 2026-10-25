@@ -2,7 +2,7 @@
 # A Bench for another person: a copy of this Bench (the agent client, its threads and tools,
 # the agent in agent/), renamed so it lives beside other apps. The name in the window and the
 # Dock stays "Bench", the icon stays Bench's. Then hide the groups they don't use (src/bench.rs)
-# and add their tools as threads (references/build-subject.md).
+# and add their tools as threads (references/build-insert.md).
 # Usage: new-bench.sh [crate-name] [dest-dir]
 #   crate-name  lowercase, dashes; the binary, the data folder and the bundle id local.<crate>
 #               (default: bench)

@@ -12,7 +12,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::ide_ops::EditKind;
-use crate::app::{FileMode, HermesApp, RightTab};
+use crate::app::{FileMode, BenchApp, RightTab};
 use crate::icons::Ico;
 
 fn file_name(path: &str) -> String {
@@ -22,7 +22,7 @@ fn file_name(path: &str) -> String {
         .unwrap_or_else(|| path.to_string())
 }
 
-impl HermesApp {
+impl BenchApp {
     pub(super) fn render_right(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         // A server's tree has no session changes.
@@ -1211,7 +1211,7 @@ impl HermesApp {
 /// rename, delete (twice). The root (`root`) offers only the new ones: it is never renamed or
 /// deleted from here.
 fn tree_menu(
-    view: Entity<HermesApp>,
+    view: Entity<BenchApp>,
     path: String,
     is_dir: bool,
     armed: bool,
@@ -1224,7 +1224,7 @@ fn tree_menu(
             path.rsplit_once('/')
                 .map_or(path.clone(), |(d, _)| d.to_string())
         };
-        let act = |f: Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)>| {
+        let act = |f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>| {
             let view = view.clone();
             move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
                 view.update(cx, |this, cx| f(this, window, cx))

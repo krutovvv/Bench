@@ -1,6 +1,6 @@
 # Content: what the body shows
 
-A thread's block (at its top, `build-subject.md`) or the body shows the thing being worked on. Pick the ready piece:
+A thread's block (at its top, `build-insert.md`) or the body shows the thing being worked on. Pick the ready piece:
 
 | The person asks for | Use | Section |
 |---|---|---|
@@ -192,7 +192,7 @@ it rather than assembling the recipes by hand.
 
 The recipes were written and verified (compiles and runs) in the template app, `templates/app/`
 (`MainApp`) — now only the piece library, not a way to start an app. In a Bench the same code goes
-on `HermesApp`, and the editor is shown in a subject's block (`build-subject.md`) instead of
+on `BenchApp`, and the editor is shown in a subject's block (`build-insert.md`) instead of
 `render_body`. The template already has `_subscriptions` — add only `editor` and `file`.
 
 `src/app.rs` — import, field, creation, loading:

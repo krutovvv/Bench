@@ -45,12 +45,12 @@ src/connection.rs    how to reach the agent (local / SSH tunnel), state_dir(), g
 src/pi_agent.rs      installs and starts the agent (agent/) on this Mac and over SSH
 src/gateway.rs       worker thread: WebSocket JSON-RPC, Cmd in / Evt out, pending-call table
 src/rest.rs          blocking REST calls, one fn per endpoint
-src/app.rs           HermesApp (the name is older than the agent): all state + event handling + actions (the "controller")
-src/app/*.rs         feature slices as `impl HermesApp` in child modules (can use private items):
+src/app.rs           BenchApp (the name is older than the agent): all state + event handling + actions (the "controller")
+src/app/*.rs         feature slices as `impl BenchApp` in child modules (can use private items):
                      projects.rs (git), cron.rs, prompts.rs, profiles.rs, slash.rs, marks.rs,
                      subjects.rs (a thread's subject: Tasks, a server, files, the browser, a tool)
 src/task_store.rs    tasks: the agent's bench.sqlite via its REST `/api/tasks` (its `tasks` tool sees the same list)
-src/ui/mod.rs        Render for HermesApp: layout skeleton, header, shared helpers (bar_h, plural…)
+src/ui/mod.rs        Render for BenchApp: layout skeleton, header, shared helpers (bar_h, plural…)
 src/ui/*.rs          one file per area: sidebar, chat, composer, statusbar, files, panels (settings)
 --- Bench additions (servers + mini IDE) ---
 src/sshconfig.rs     servers = ~/.ssh/config Host blocks (+ `# folder:`/`# path:`), safe writes
@@ -66,13 +66,13 @@ src/app/keys.rs      window-wide shortcuts (root capture_key_down)
 scripts/bundle-macos.sh, assets/icons/*.svg, assets/themes/*.json, assets/logo.svg
 ```
 
-Rule: views (`ui/`) only read state and call `HermesApp` methods; I/O lives in `rest.rs`,
+Rule: views (`ui/`) only read state and call `BenchApp` methods; I/O lives in `rest.rs`,
 `gateway.rs`, `connection.rs`; feature logic in `app/*.rs`. Child modules of `app` see its private
 fields — no need to make everything `pub`.
 
 ## Threads and async
 
-- **UI thread** owns `HermesApp` (`Entity<HermesApp>`). Never block it.
+- **UI thread** owns `BenchApp` (`Entity<BenchApp>`). Never block it.
 - **Long-lived connection** (WebSocket): a `std::thread` with `mpsc::Receiver<Cmd>` in and an
   `async_channel::Sender<Evt>` out. The UI drains events in a task:
 

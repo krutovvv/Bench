@@ -4,10 +4,10 @@
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::rest;
 
-impl HermesApp {
+impl BenchApp {
     /// The open thread's prompts (its project's and the general ones).
     pub(crate) fn load_prompts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let project = self.thread_project.clone();

@@ -8,7 +8,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::rest;
 
 #[derive(Clone, Debug, Default)]
@@ -62,7 +62,7 @@ pub struct RemoteFiles {
 pub const HOST_KINDS: [&str; 3] = ["ftp", "ftps", "sftp"];
 
 impl RemoteFiles {
-    pub fn new(window: &mut Window, cx: &mut Context<HermesApp>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let editor = cx.new(|cx| {
             EditorState::new(window, cx)
                 .scroll_beyond_last_line(Some(1))
@@ -70,7 +70,7 @@ impl RemoteFiles {
                 .soft_wrap(false)
         });
         let password = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Password"));
-        let mut field = |cx: &mut Context<HermesApp>| cx.new(|cx| InputState::new(window, cx));
+        let mut field = |cx: &mut Context<BenchApp>| cx.new(|cx| InputState::new(window, cx));
         let (f_name, f_host, f_port, f_user, f_path) = (field(cx), field(cx), field(cx), field(cx), field(cx));
         let f_password = cx.new(|cx| InputState::new(window, cx).masked(true));
         Self {
@@ -120,7 +120,7 @@ fn enc(s: &str) -> String {
         .collect()
 }
 
-impl HermesApp {
+impl BenchApp {
     /// The file hosts (FTP, FTPS, SFTP) from the agent's store, once per connection.
     pub fn load_remote_hosts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(conn) = self.conn.clone() else {

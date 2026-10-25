@@ -30,7 +30,7 @@ thread. That is the result to keep, not to rebuild differently each time.
 
 **Growing this Bench.** A person's needs differ from the user's: one has clients, another the
 shop's orders, a third a build queue. Each of those becomes one more kind of thread, made the
-same way as the five that exist (`build-subject.md`): a subject key, a live block, a sidebar
+same way as the five that exist (`build-insert.md`): a subject key, a live block, a sidebar
 group, an agent tool, a short prompt section, the block's state sent with each message. The kit
 holds the look, the pieces, the recipes and the mistakes already paid for, so an agent — even a
 modest model — adds a tool that looks and works like the others.
@@ -81,7 +81,7 @@ the shape of the last one.
 2. **Propose threads**: for each job, which kind of thread it is — one of the five, or a new one
    (what its sidebar lists, what its block shows, what the agent's tool does). Small and concrete:
    the core of each job first.
-3. **Build one tool at a time** (`build-subject.md`), each through the change loop
+3. **Build one tool at a time** (`build-insert.md`), each through the change loop
    (`build-change-loop.md`): build, run, screenshot, commit, a new app next to the running one.
 4. **Grow it when they ask.** Never remove what works for them.
 

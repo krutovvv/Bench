@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::connection::Connection;
 use crate::gateway::{Cmd, Evt, Gateway};
 use crate::model::Target;
@@ -19,7 +19,7 @@ pub struct RemoteAgent {
     pub error: Option<String>,
 }
 
-impl HermesApp {
+impl BenchApp {
     /// Connect to the agents of the remote projects (once each).
     pub fn connect_remotes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let hosts: Vec<String> = self.projects.iter().filter_map(|p| p.host.clone()).collect();

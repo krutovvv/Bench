@@ -7,7 +7,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::rest;
 
 pub struct ProjectEnv {
@@ -80,7 +80,7 @@ fn enc(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
 
-impl HermesApp {
+impl BenchApp {
     /// A project's pencil: its environment's thread (the latest, or a new one in the project).
     pub fn open_project_env(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         self.load_env(&id, window, cx);
@@ -110,7 +110,7 @@ impl HermesApp {
         let tg_token = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Bot token from @BotFather (kept as is when empty)"));
         let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
         // A part typed in: its Save shows.
-        fn dirty(this: &mut HermesApp, which: &str, ev: &InputEvent, cx: &mut Context<HermesApp>) {
+        fn dirty(this: &mut BenchApp, which: &str, ev: &InputEvent, cx: &mut Context<BenchApp>) {
             if let (InputEvent::Change, Some(e)) = (ev, this.project_env.as_mut()) {
                 match which {
                     "soul" => e.soul_dirty = true,

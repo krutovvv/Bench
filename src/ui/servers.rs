@@ -9,10 +9,10 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::icons::Ico;
 
-impl HermesApp {
+impl BenchApp {
 
     /// The header's right end in both modes: the SSH switch (pressed = SSH mode: servers and
     /// their terminals; released = sessions) and a new window. The IDE keeps its own close

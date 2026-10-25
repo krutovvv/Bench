@@ -7,7 +7,7 @@ use gpui_kit::*;
 use serde_json::json;
 
 use super::{InsertKind, Switch, SwitchTo, clip};
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::app::subjects::tool_key;
 use crate::devtools::{GROUPS, Tool};
 use crate::model::Insert;
@@ -31,11 +31,11 @@ impl InsertKind for Tools {
         key == "tools"
     }
 
-    fn title(&self, _app: &HermesApp, ins: &Insert) -> String {
+    fn title(&self, _app: &BenchApp, ins: &Insert) -> String {
         tool_of(ins).name().to_string()
     }
 
-    fn switches(&self, _app: &HermesApp, ins: &Insert) -> Vec<Switch> {
+    fn switches(&self, _app: &BenchApp, ins: &Insert) -> Vec<Switch> {
         let now = tool_of(ins);
         GROUPS
             .iter()
@@ -49,7 +49,7 @@ impl InsertKind for Tools {
             .collect()
     }
 
-    fn controls(&self, app: &mut HermesApp, ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) -> Vec<AnyElement> {
+    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let tool = tool_of(ins);
         let modes = tool.modes();
         let mut out = vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(tool.hint()).into_any_element()];
@@ -61,7 +61,7 @@ impl InsertKind for Tools {
         out
     }
 
-    fn body(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) -> Option<AnyElement> {
+    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         let tool = tool_of(ins);
         if app.tools.tool != tool {
             app.select_tool(tool, window, cx);
@@ -69,7 +69,7 @@ impl InsertKind for Tools {
         Some(div().h(px(H)).mx(px(-12.)).my(px(-8.)).child(app.render_tools_body(cx)).into_any_element())
     }
 
-    fn context(&self, app: &HermesApp, ins: &Insert, cx: &App) -> String {
+    fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {
         let tool = tool_of(ins);
         if app.tools.tool != tool {
             return String::new();
@@ -85,7 +85,7 @@ impl InsertKind for Tools {
         )
     }
 
-    fn opened(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) {
+    fn opened(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
         app.select_tool(tool_of(ins), window, cx);
     }
 }

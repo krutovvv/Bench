@@ -1,4 +1,4 @@
-//! Rendering. Each file adds `render_*` methods to `HermesApp`.
+//! Rendering. Each file adds `render_*` methods to `BenchApp`.
 
 mod asks;
 mod chat;
@@ -32,7 +32,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::{HermesApp, Panel};
+use crate::app::{BenchApp, Panel};
 
 /// A sidebar's search: a transparent band on the sidebar's own color, no rules, no frame; the
 /// magnifier right over the group icons. Always there (⌘F focuses it).
@@ -70,7 +70,7 @@ pub fn bar_h(cx: &App) -> Pixels {
 /// Rows under a group header (sessions of a project, servers of a folder) start where the
 /// header's name does: 1rem inset + 1rem icon + 0.375rem gap, less the row's 2px stripe and
 /// 2px the icon box is narrower than 1rem (measured).
-impl HermesApp {
+impl BenchApp {
     /// The strip beside the window buttons at the top of every sidebar, with the mode toggles
     /// (Tools, then Tasks) in its top-right corner (the sidebar's own corner, as SSH has the
     /// window's).
@@ -322,7 +322,7 @@ pub fn clip(s: &str, n: usize) -> String {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     /// "app · fix-login": the chat's project and branch, with the git actions.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         use gpui_kit::component::button::{Button, ButtonVariants as _};
@@ -342,7 +342,7 @@ impl HermesApp {
                 .icon(crate::icons::Ico::GitBranch.icon())
                 .label(label)
                 .dropdown_menu(move |menu, _, _| {
-                    let act = |f: fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)| {
+                    let act = |f: fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)| {
                         let view = view.clone();
                         move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
                             view.update(cx, |this, cx| f(this, window, cx))
@@ -449,7 +449,7 @@ impl HermesApp {
     }
 }
 
-impl Render for HermesApp {
+impl Render for BenchApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // The open chat's unsent text in the composer (app.rs, drafts).
         self.sync_draft(window, cx);
@@ -547,7 +547,7 @@ impl Render for HermesApp {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     /// Sidebar | main | IDE (when open), resizable. Maximized, the IDE takes both places: its
     /// tree where the sidebar is (same width), its editor where the chat/terminal is.
     fn render_layout(

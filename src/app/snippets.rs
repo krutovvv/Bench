@@ -6,7 +6,7 @@
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::app::ide_find::Hit;
 
 pub const PREFIX: &str = "[selection: ";
@@ -94,7 +94,7 @@ pub fn split(text: &str) -> (String, Vec<(String, usize, usize)>) {
     (out.join("\n").trim().to_string(), refs)
 }
 
-impl HermesApp {
+impl BenchApp {
     /// The editor's selection (or the cursor's line) as a snippet of the open file.
     fn selection_snippet(&self, cx: &App) -> Option<Snippet> {
         let view = self.file.as_ref()?;

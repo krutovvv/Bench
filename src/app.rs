@@ -109,7 +109,7 @@ pub struct Live {
     pub label: SharedString,
 }
 
-pub struct HermesApp {
+pub struct BenchApp {
     pub targets: Vec<Target>,
     pub target: Target,
     /// The gateway list as a Select (kept for its subscription; the status bar has its own menu).
@@ -342,7 +342,7 @@ pub struct HermesApp {
     _tasks: Vec<Task<()>>,
 }
 
-impl HermesApp {
+impl BenchApp {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // "The agent finished" notifications: macOS asks once.
         crate::notify::request();
@@ -2402,7 +2402,7 @@ fn branch_name(text: &str) -> String {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     /// The composer's text is the open chat's draft (called on every change).
     pub(crate) fn note_draft(&mut self, cx: &mut Context<Self>) {
         let Some(key) = self.draft_key.clone() else {

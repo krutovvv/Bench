@@ -4,14 +4,14 @@
 use gpui_kit::component::{ActiveTheme as _, Theme};
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::term::Palette;
 
 pub fn palette(_theme: &Theme) -> Palette {
     Palette
 }
 
-impl HermesApp {
+impl BenchApp {
     pub(super) fn render_terminal(
         &mut self,
         _ix: usize,

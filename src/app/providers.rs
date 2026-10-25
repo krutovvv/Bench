@@ -10,7 +10,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::connection;
 use crate::rest::{self, ModelChoice};
 
@@ -90,7 +90,7 @@ pub struct Providers {
 
 fn field(
     window: &mut Window,
-    cx: &mut Context<HermesApp>,
+    cx: &mut Context<BenchApp>,
     text: &str,
     hint: &str,
 ) -> Entity<InputState> {
@@ -107,7 +107,7 @@ fn text(input: &Entity<InputState>, cx: &App) -> String {
     input.read(cx).value().trim().to_string()
 }
 
-impl HermesApp {
+impl BenchApp {
     fn picker_prefs_path(&self) -> std::path::PathBuf {
         let key: String = format!("{}-{}", self.target.label(), self.current_profile())
             .chars()

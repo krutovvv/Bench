@@ -7,7 +7,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::icons::Ico;
 
 /// The listing's height before it scrolls, and the editor's.
@@ -22,7 +22,7 @@ fn size_label(n: u64) -> String {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     pub(super) fn render_files_block(&mut self, id: &str, titled: bool, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         self.ensure_remote_listing(id, window, cx);
         let theme = cx.theme().clone();
@@ -161,7 +161,7 @@ impl HermesApp {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     /// A new file host, inside the thread: into the agent's store (this project's), then attached.
     pub(super) fn render_host_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let f = &self.files_remote;

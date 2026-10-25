@@ -29,7 +29,7 @@ parser, cron parser). Taken from Bench (`~/Projects/bench-kit/src/devtools/`), t
 3. `cargo test devtools` — the tests must pass before any UI.
 4. The mode around it: `../tools-mode/app_tools.rs` (state and actions) and
    `../tools-mode/ui_tools.rs` (sidebar, header, panes) are Bench's files as they are — they use
-   Bench's `HermesApp`; rename it to the app's struct (`MainApp`) and follow
+   Bench's `BenchApp`; rename it to the app's struct (`MainApp`) and follow
    `references/build-modes.md` to wire them in. Drop the tools the person doesn't
    need from `GROUPS` in `mod.rs` (and their `Tool` variants).
 

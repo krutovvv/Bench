@@ -10,7 +10,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::tools::segmented;
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::app::tasks::RANGES;
 use crate::icons::Ico;
 use crate::tasks::{self, List, Task, today};
@@ -24,7 +24,7 @@ fn list_icon(list: &List) -> Ico {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
 
     pub(super) fn render_tasks_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();

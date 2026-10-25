@@ -8,7 +8,7 @@
 use gpui_kit::*;
 use serde_json::{Map, Value, json};
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::gateway::Cmd;
 use crate::model::Insert;
 use crate::ui::inserts::kind_of;
@@ -16,7 +16,7 @@ use crate::ui::inserts::kind_of;
 /// A new chat's inserts until its session exists.
 const DRAFT: &str = "draft";
 
-impl HermesApp {
+impl BenchApp {
     /// The open thread's inserts, in order.
     pub fn thread_inserts(&self) -> Vec<Insert> {
         self.inserts.get(&self.thread_key()).cloned().unwrap_or_default()

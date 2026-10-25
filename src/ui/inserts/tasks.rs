@@ -5,7 +5,7 @@ use gpui_kit::*;
 use serde_json::json;
 
 use super::InsertKind;
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::model::Insert;
 use crate::tasks::{LISTS, List};
 
@@ -21,11 +21,11 @@ impl InsertKind for Tasks {
         key == "tasks"
     }
 
-    fn title(&self, _app: &HermesApp, _ins: &Insert) -> String {
+    fn title(&self, _app: &BenchApp, _ins: &Insert) -> String {
         "Tasks".into()
     }
 
-    fn controls(&self, _app: &mut HermesApp, ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) -> Vec<AnyElement> {
+    fn controls(&self, _app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let now = list_of(ins);
         let chosen = LISTS.iter().position(|l| *l == now).unwrap_or(0);
         let id = ins.id.clone();
@@ -42,7 +42,7 @@ impl InsertKind for Tasks {
         )]
     }
 
-    fn body(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) -> Option<AnyElement> {
+    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         let list = list_of(ins);
         if app.tasks.list != list {
             app.select_task_list(list, window, cx);
@@ -53,11 +53,11 @@ impl InsertKind for Tasks {
         Some(app.render_tasks_block(cx))
     }
 
-    fn context(&self, _app: &HermesApp, ins: &Insert, _cx: &App) -> String {
+    fn context(&self, _app: &BenchApp, ins: &Insert, _cx: &App) -> String {
         format!("The tasks insert shows the {} list.", list_of(ins).name())
     }
 
-    fn opened(&self, app: &mut HermesApp, ins: &Insert, window: &mut Window, cx: &mut Context<HermesApp>) {
+    fn opened(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
         app.start_reminders(cx);
         app.load_tasks();
         app.select_task_list(list_of(ins), window, cx);

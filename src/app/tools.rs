@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use gpui_kit::component::input::{EditorState, InputEvent, InputState};
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::devtools::{self, Kind, RegexFlags, Tool};
 
 pub struct Tools {
@@ -41,7 +41,7 @@ pub struct Tools {
 }
 
 impl Tools {
-    pub fn new(window: &mut Window, cx: &mut Context<HermesApp>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools"));
         let input = cx.new(|cx| {
             EditorState::new(window, cx)
@@ -110,7 +110,7 @@ impl Tools {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     pub fn select_tool(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
         let t = &mut self.tools;
         let old = t.input.read(cx).value().to_string();

@@ -5,11 +5,11 @@
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use super::ide::Parked;
 use crate::lang::language_for_text;
 
-impl HermesApp {
+impl BenchApp {
     /// Before another file takes the editor: keep this one's state.
     pub(super) fn park_current(&mut self, cx: &mut Context<Self>) {
         let Some(view) = self.file.take() else {

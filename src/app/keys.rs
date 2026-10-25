@@ -4,10 +4,10 @@
 
 use gpui_kit::*;
 
-use super::{HermesApp, Panel};
+use super::{BenchApp, Panel};
 use crate::theme::Size;
 
-impl HermesApp {
+impl BenchApp {
     /// Returns true when the key was a shortcut (and is not passed on).
     pub fn global_key(
         &mut self,

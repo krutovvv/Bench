@@ -7,11 +7,11 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 
-type Act = Box<dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>)>;
+type Act = Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>;
 
-impl HermesApp {
+impl BenchApp {
     fn pv_heading(&self, text: impl Into<SharedString>, cx: &App) -> Div {
         div()
             .pt_6()

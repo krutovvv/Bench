@@ -7,7 +7,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::icons::Ico;
 
 /// The avatar's and the buttons' offsets from the row's top: 0, as in a message (the text's own
@@ -22,7 +22,7 @@ const SLASH_ROW: f32 = 30.;
 /// Bars in the waveform; it scrolls right to left, newest on the right (25 ms each = 3 s).
 const WAVE_BARS: usize = 120;
 
-impl HermesApp {
+impl BenchApp {
     /// Commands matching a bare `/word`, in a small list right above the input.
     fn render_slash(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let matches = self.slash_matches(cx);

@@ -67,7 +67,7 @@ fn crops_to_1200x630() {
 }
 ```
 (`use image::GenericImageView as _;` for `.dimensions()`.) Its UI is a tool in the Tools group: drop or
-paste an image in, the cropped preview out, Save as… (`build-subject.md`).
+paste an image in, the cropped preview out, Save as… (`build-insert.md`).
 
 ## macOS without crates
 

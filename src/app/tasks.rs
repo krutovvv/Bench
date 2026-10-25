@@ -8,7 +8,7 @@ use web_time::Instant;
 use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::reminders::{Cmd, Evt};
 use crate::task_store::TaskStore;
 use crate::tasks::{self, List, Task, today};
@@ -56,9 +56,9 @@ pub struct TasksMode {
 }
 
 impl TasksMode {
-    pub fn new(window: &mut Window, cx: &mut Context<HermesApp>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let input =
-            |placeholder: &'static str, window: &mut Window, cx: &mut Context<HermesApp>| {
+            |placeholder: &'static str, window: &mut Window, cx: &mut Context<BenchApp>| {
                 cx.new(|cx| InputState::new(window, cx).placeholder(placeholder))
             };
         let search = input("Search tasks", window, cx);
@@ -199,7 +199,7 @@ impl TasksMode {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     /// The Reminders thread, started the first time Tasks opens (macOS asks for access once).
     pub(crate) fn start_reminders(&mut self, cx: &mut Context<Self>) {
         // The demo's tasks are made up; Reminders stays untouched.

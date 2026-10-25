@@ -4,10 +4,10 @@
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::devtools::{GROUPS, Tool};
 
-impl HermesApp {
+impl BenchApp {
     /// The latest thread about `key` (or the one `subject_target` names), or a new chat that
     /// will carry it.
     pub fn open_subject(&mut self, key: String, cx: &mut Context<Self>) {

@@ -9,7 +9,7 @@ use std::sync::Arc;
 use gpui_kit::*;
 use serde_json::json;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::remote_browser::Browser;
 
 /// No input and no agent at work this long: the stream pauses.
@@ -29,7 +29,7 @@ pub struct Sites {
     pub demo_frame: Option<Arc<RenderImage>>,
 }
 
-impl HermesApp {
+impl BenchApp {
     /// The server's browser, connected on first use.
     pub fn ensure_browser(&mut self, cx: &mut Context<Self>) -> Option<Arc<Browser>> {
         if let Some(b) = &self.sites.browser {

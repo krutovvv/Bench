@@ -9,10 +9,10 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::devtools::{Kind, Tool};
 
-impl HermesApp {
+impl BenchApp {
 
     pub(super) fn render_tools_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
@@ -393,7 +393,7 @@ pub(super) fn pane_bar(
     title: &str,
     error: Option<String>,
     buttons: Vec<AnyElement>,
-    cx: &mut Context<HermesApp>,
+    cx: &mut Context<BenchApp>,
 ) -> AnyElement {
     let theme = cx.theme();
     super::block_head(theme, true)
@@ -413,8 +413,8 @@ pub(super) fn pane_bar(
 pub(super) fn small_button(
     id: &'static str,
     label: &'static str,
-    cx: &mut Context<HermesApp>,
-    on: impl Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>) + 'static,
+    cx: &mut Context<BenchApp>,
+    on: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
 ) -> AnyElement {
     let theme = cx.theme().clone();
     div()
@@ -437,8 +437,8 @@ pub(super) fn segmented(
     id: &'static str,
     labels: &[&'static str],
     chosen: usize,
-    cx: &mut Context<HermesApp>,
-    on: impl Fn(&mut HermesApp, usize, &mut Window, &mut Context<HermesApp>) + Clone + 'static,
+    cx: &mut Context<BenchApp>,
+    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
 ) -> AnyElement {
     segmented_owned(
         id,
@@ -453,8 +453,8 @@ pub(super) fn segmented_owned(
     id: &'static str,
     labels: Vec<String>,
     chosen: usize,
-    cx: &mut Context<HermesApp>,
-    on: impl Fn(&mut HermesApp, usize, &mut Window, &mut Context<HermesApp>) + Clone + 'static,
+    cx: &mut Context<BenchApp>,
+    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
 ) -> AnyElement {
     let theme = cx.theme().clone();
     h_flex()

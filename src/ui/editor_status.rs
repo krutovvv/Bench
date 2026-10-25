@@ -8,18 +8,18 @@ use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 
 pub struct EditorStatus {
     editor: Entity<EditorState>,
-    app: WeakEntity<HermesApp>,
+    app: WeakEntity<BenchApp>,
     _observe: Subscription,
 }
 
 impl EditorStatus {
     pub fn new(
         editor: Entity<EditorState>,
-        app: WeakEntity<HermesApp>,
+        app: WeakEntity<BenchApp>,
         cx: &mut Context<Self>,
     ) -> Self {
         let observe = cx.observe(&editor, |_, _, cx| cx.notify());

@@ -47,7 +47,7 @@ Files shows only when there are hosts. Browser works only with a server browser 
 ## 3. Add theirs
 
 Each thing they work on that the five don't cover becomes a new kind of thread:
-`build-subject.md`. One at a time, through the change loop (`build-change-loop.md`).
+`build-insert.md`. One at a time, through the change loop (`build-change-loop.md`).
 
 ## 4. Build, check, ship
 

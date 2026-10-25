@@ -5,10 +5,10 @@
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::model::SlashCommand;
 
-impl HermesApp {
+impl BenchApp {
     /// `@word` at the end of the composer text: (byte offset of the `@`, the word).
     fn prompt_token(text: &str) -> Option<(usize, String)> {
         let start = text.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);

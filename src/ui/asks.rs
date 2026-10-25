@@ -8,10 +8,10 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::icons::Ico;
 
-impl HermesApp {
+impl BenchApp {
     /// The question card: choices (one click answers; with multi-select, tick then Send), an
     /// answer of your own, or Decline.
     pub(super) fn render_clarify(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {

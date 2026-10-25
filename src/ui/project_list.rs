@@ -5,9 +5,9 @@ use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 
-impl HermesApp {
+impl BenchApp {
     /// A new project, inside the thread: its name, where its agent runs (this Mac, a server from
     /// ~/.ssh/config, or another one typed in), a folder on disk if it has one.
     pub(super) fn render_project_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
@@ -84,7 +84,7 @@ impl HermesApp {
     }
 }
 
-impl HermesApp {
+impl BenchApp {
     /// A project's environment at the top of its thread, as a document of rows: its name, soul,
     /// Telegram bot, MCP servers, skills, prompts and accesses. A row opens in place as a code
     /// block (line numbers, highlighting) with Save / Revert under it, and closes again; "+ Add"

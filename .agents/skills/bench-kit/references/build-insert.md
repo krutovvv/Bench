@@ -128,7 +128,7 @@ In order, `cargo build` after each line:
 2. `agent/src/builtin/<kind>.ts` — the agent's tool (or an MCP server in the project's
    `mcp.json`), and the REST routes Bench uses to read the same data (`agent/src/server.ts`).
 3. `src/app/<kind>.rs` — the state it needs while it lives and its actions; `pub(crate) mod` in
-   `src/app.rs`, the field on `HermesApp`.
+   `src/app.rs`, the field on `BenchApp`.
 4. `src/ui/inserts/<kind>.rs` — its `InsertKind`; `mod` and a line in `KINDS` (`ui/inserts/mod.rs`).
 5. `src/ui/inserts/mod.rs` `words()` — its `/` word; `app/inserts.rs` `insert_spec` when a row
    carries state; `app/subjects.rs` `tool_slash` for its rows.

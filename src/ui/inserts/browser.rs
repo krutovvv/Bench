@@ -10,13 +10,13 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
 
 use super::InsertKind;
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::model::Insert;
 
 pub struct Browser;
 
 /// The thread's tab, when open: (id, url, title).
-fn tab_of(app: &HermesApp, ins: &Insert) -> Option<(String, String, String)> {
+fn tab_of(app: &BenchApp, ins: &Insert) -> Option<(String, String, String)> {
     let tab = ins.get("tab");
     if app.demo {
         return (!tab.is_empty()).then(|| (tab, ins.get("url"), "New post".into()));
@@ -32,14 +32,14 @@ impl InsertKind for Browser {
         key == "browser"
     }
 
-    fn title(&self, app: &HermesApp, ins: &Insert) -> String {
+    fn title(&self, app: &BenchApp, ins: &Insert) -> String {
         match tab_of(app, ins) {
             Some((_, _, t)) if !t.trim().is_empty() => format!("Browser · {t}"),
             _ => "Browser".into(),
         }
     }
 
-    fn controls(&self, app: &mut HermesApp, ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) -> Vec<AnyElement> {
+    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let url = tab_of(app, ins).map(|t| t.1).unwrap_or_else(|| ins.get("url"));
         if url.is_empty() {
             return vec![];
@@ -47,7 +47,7 @@ impl InsertKind for Browser {
         vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(url).into_any_element()]
     }
 
-    fn body(&self, app: &mut HermesApp, ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) -> Option<AnyElement> {
+    fn body(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         let muted = cx.theme().muted_foreground;
         if let Some(e) = &app.sites_error {
             return Some(div().text_base().text_color(cx.theme().danger).child(e.clone()).into_any_element());
@@ -95,7 +95,7 @@ impl InsertKind for Browser {
         )
     }
 
-    fn context(&self, app: &HermesApp, ins: &Insert, _cx: &App) -> String {
+    fn context(&self, app: &BenchApp, ins: &Insert, _cx: &App) -> String {
         match tab_of(app, ins) {
             Some((_, url, title)) => format!(
                 "This thread's tab in the shared browser is at {url} (title: {title}). Work only in it: select it with mcp__browser__browser_tabs (list, then select the one at this address)."
@@ -108,7 +108,7 @@ impl InsertKind for Browser {
         }
     }
 
-    fn opened(&self, app: &mut HermesApp, _ins: &Insert, _window: &mut Window, cx: &mut Context<HermesApp>) {
+    fn opened(&self, app: &mut BenchApp, _ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) {
         app.ensure_browser(cx);
         app.touch_browser();
     }

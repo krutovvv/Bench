@@ -55,7 +55,7 @@
 - **Mode toggles over the sidebar**, in the strip beside the window buttons (Tools, then Tasks);
   the status bar's right corner holds only New window and Settings. *Superseded 2026-10-24:*
   there are no modes; Tasks, Servers, Tools are sidebar groups, each opening a thread
-  (`build-subject.md`); the strip holds Open folder, + and Hide sidebar. The status bar rule stands.
+  (`build-insert.md`); the strip holds Open folder, + and Hide sidebar. The status bar rule stands.
 - **Cards are frames, not fills**: code blocks, audio, video, Changed files — a 1px frame, no
   background; header lines all the same height. A darker code background read as "тёмный вид".
 - **Code in answers has a header**: language left, Copy right, like every AI chat.

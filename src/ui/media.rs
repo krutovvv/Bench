@@ -13,7 +13,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::HermesApp;
+use crate::app::BenchApp;
 use crate::audio::{self, Playback};
 use crate::icons::Ico;
 use crate::media::{self, Fetched, Kind, Loaded, Segment, file_name, latex_text};
@@ -208,7 +208,7 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
         .into_any_element()
 }
 
-impl HermesApp {
+impl BenchApp {
     pub(super) fn render_answer(&mut self, i: usize, cx: &mut Context<Self>) -> Vec<AnyElement> {
         // Blank lines around a segment (models often start with "\n\n") would show as empty
         // paragraphs: an answer is as tall as its text.

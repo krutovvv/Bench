@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::connection;
 use crate::model::{Project, Target};
 use crate::rest;
@@ -20,7 +20,7 @@ pub enum GitArm {
     Delete,
 }
 
-impl HermesApp {
+impl BenchApp {
     fn projects_path(&self) -> std::path::PathBuf {
         let key: String = format!("{}-{}", self.target.label(), self.current_profile())
             .chars()

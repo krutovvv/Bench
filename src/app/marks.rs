@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::connection;
 
 /// Session colors: red, orange, yellow, green, blue, violet, pink (saved by index: new ones go
@@ -37,7 +37,7 @@ pub(super) fn load() -> HashMap<String, Mark> {
         .unwrap_or_default()
 }
 
-impl HermesApp {
+impl BenchApp {
     fn store_marks(&self) {
         // Another window may have changed other sessions' marks: merge into what is on disk.
         let mut all = load();

@@ -104,5 +104,5 @@ the filled one in the accent. 26 so the composer stays the header's 36 (at 30 it
 button, muted; while `on` it is accent on `list_active` and its tooltip reads "Back" + the
 shortcut. Bench's strip, left to right: Open folder ("New session in a folder…"), + ("New
 session  ⌘N"), Hide sidebar; all open or hide something, so `on` is always false. It is not a
-mode switch: there are no modes, a tool is a subject (`build-subject.md`). The same strip is on
+mode switch: there are no modes, a tool is a subject (`build-insert.md`). The same strip is on
 top of every sidebar variant, so its icons stay put.

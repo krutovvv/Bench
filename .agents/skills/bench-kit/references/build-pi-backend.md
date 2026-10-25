@@ -85,7 +85,7 @@ thread (a server thread: in its terminal). Terminals fit their text (`used_rows`
 
 ## The server browser in threads (Browser group)
 
-The browser threads are Bench's centrepiece (`build-subject.md`). The browser is a shared Chrome
+The browser threads are Bench's centrepiece (`build-insert.md`). The browser is a shared Chrome
 on a server: `browser-server/` (Dockerfile, compose, set-up in `browser-server/README.md`) runs
 Chrome, the Playwright MCP the agent drives, and the **`/live` gateway** for people
 (`browser-server/live.mjs`), routed by Traefik at `https://<your browser host>/live`. No SSH:

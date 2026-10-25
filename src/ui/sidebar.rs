@@ -9,13 +9,13 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::plural;
-use crate::app::{HermesApp, Panel};
+use crate::app::{BenchApp, Panel};
 use crate::icons::Ico;
 
 /// A session title: the sidebar's 14px.
 pub(super) const SESSION_TITLE: f32 = 14.;
 
-impl HermesApp {
+impl BenchApp {
     pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
@@ -391,7 +391,7 @@ impl HermesApp {
                         .icon(Ico::Ellipsis.icon())
                         .dropdown_menu(move |menu, _, _| {
                             let act = |f: Box<
-                                dyn Fn(&mut HermesApp, &mut Window, &mut Context<HermesApp>),
+                                dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>),
                             >| {
                                 let view = view.clone();
                                 move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
@@ -506,7 +506,7 @@ impl HermesApp {
 }
 
 /// The swatches row of a session's menu: the colors and "none".
-fn color_row(view: &Entity<HermesApp>, id: &str, current: Option<usize>, cx: &App) -> AnyElement {
+fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App) -> AnyElement {
     let theme = cx.theme();
     let swatch = |k: Option<usize>| {
         let (view, id) = (view.clone(), id.to_string());
@@ -547,5 +547,5 @@ fn color_row(view: &Entity<HermesApp>, id: &str, current: Option<usize>, cx: &Ap
         .into_any_element()
 }
 
-impl HermesApp {
+impl BenchApp {
 }

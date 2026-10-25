@@ -111,7 +111,7 @@ branch as a ghost xsmall Button with a dropdown), then 24px icon toggles (`p_1`,
 accent + `list_active` bg, tooltip with the shortcut, e.g. "New window  ⌘⇧N"). At the right
 end: "Open files ⌘B" (shown while the chat or server thread has files to open; `render_header_tail`,
 `ui/servers.rs`). New window lives in the status bar before Settings. Tasks, Servers and Tools
-are not switches anywhere: they are sidebar groups, each opening a thread (`build-subject.md`).
+are not switches anywhere: they are sidebar groups, each opening a thread (`build-insert.md`).
 Item-specific actions (open in Zed, files) go to the item's "⋯" menu, not the header. In settings the same strip holds tabs: each tab
 `h_full px_4 text_sm border_r_1`, active = content bg + foreground, others muted.
 

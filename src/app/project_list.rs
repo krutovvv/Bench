@@ -8,7 +8,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::json;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::model::ProjectEntry;
 use crate::rest;
 
@@ -26,7 +26,7 @@ pub struct ProjectForm {
     pub new_key: Entity<InputState>,
 }
 
-impl HermesApp {
+impl BenchApp {
     pub fn load_projects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(conn) = self.conn.clone() else {
             return;

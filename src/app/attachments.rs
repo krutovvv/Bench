@@ -4,10 +4,10 @@ use std::path::PathBuf;
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::attach;
 
-impl HermesApp {
+impl BenchApp {
     pub fn add_attachments(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
         for p in paths {
             if p.is_file() && !self.attachments.contains(&p) {

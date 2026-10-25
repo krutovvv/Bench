@@ -9,7 +9,7 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::model::Target;
 use crate::ssh::{q, run};
 
@@ -191,7 +191,7 @@ pub fn fuzzy(query: &str, path: &str) -> Option<i32> {
     Some(score * 100 - p.len() as i32)
 }
 
-impl HermesApp {
+impl BenchApp {
     pub(super) fn fs(&self) -> Fs {
         match (&self.ide.server, &self.target) {
             (Some(alias), _) => Fs::Ssh(alias.clone()),

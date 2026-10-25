@@ -2,10 +2,10 @@
 
 use gpui_kit::*;
 
-use super::HermesApp;
+use super::BenchApp;
 use crate::gateway::Cmd;
 
-impl HermesApp {
+impl BenchApp {
     /// `answer` empty = declined (the agent goes on without it).
     pub fn answer_clarify(&mut self, answer: String, window: &mut Window, cx: &mut Context<Self>) {
         let (Some(req), Some(profile)) = (self.clarify.take(), self.profile.clone()) else {

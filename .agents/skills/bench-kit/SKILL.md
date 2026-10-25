@@ -49,7 +49,7 @@ often the person talks to you **through Bench itself** while you change Bench. S
    environment (soul, MCP, skills, prompts, accesses, Telegram, schedule) is what its threads get,
    edited in its environment block. A tool is an **insert** put into a thread with `/`, kept by the
    agent in Pi's terms (an entry where it was put, a document of its state), reliable and restored
-   on return (`references/build-subject.md`). Something the agent produces during a turn shows in
+   on return (`references/build-insert.md`). Something the agent produces during a turn shows in
    that turn's answer (a card, a chart).
 2. **One look, and the look is the method.** Zed-like, flat, slightly round (the theme's radius;
    `rounded_md` for every bordered block), precisely spaced, one accent; every block's head is
@@ -79,7 +79,7 @@ often the person talks to you **through Bench itself** while you change Bench. S
    `scripts/new-bench.sh <crate>` copies this Bench. Build and run it untouched first
    (`cargo build && ./target/debug/<crate>`). Groups they don't need are hidden by the flags in
    `src/bench.rs`.
-3. **Add a tool = a new kind of insert** (`references/build-subject.md`): key and state → its
+3. **Add a tool = a new kind of insert** (`references/build-insert.md`): key and state → its
    `InsertKind` (one file in `src/ui/inserts/`) → its `/` word → the agent's tool, prompt line and
    live state → a demo thread. Copy the nearest of the five.
 4. **Build every view from the catalog** (`references/ui-catalog.md` → `ui-*.md`). Never style
@@ -119,7 +119,7 @@ Rules that keep it right:
 **Build** — how Bench is put together and grown
 | Page | What |
 |---|---|
-| `references/build-subject.md` | **Adding a tool: a new kind of insert** — how inserts are kept in Pi, the `InsertKind` trait, the five existing kinds as examples, body patterns, the checklist of files |
+| `references/build-insert.md` | **Adding a tool: a new kind of insert** — how inserts are kept in Pi, the `InsertKind` trait, the five existing kinds as examples, body patterns, the checklist of files |
 | `references/build-pi-backend.md` | The agent: Pi Durable server in `agent/`, installed and started by Bench (also over SSH); extensions, tools, subject sections, the server browser |
 | `references/build-agent-client.md` | Bench's side of the protocol: sessions, events, Stop, questions, media |
 | `references/build-new-app.md` | A copy of Bench for another person (`new-bench.sh`), the shared build folder, the flags in `src/bench.rs` |

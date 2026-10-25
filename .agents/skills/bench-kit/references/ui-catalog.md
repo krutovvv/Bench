@@ -48,7 +48,7 @@ Where each piece goes in the window, and how to move or fit one: `ui-areas.md`.
 | Code / text editor | `assets/ui/tools-mode.png` (right pane) | `EditorState` + `Editor` | `ui-content.md` |
 | Markdown, HTML, plain selectable text | `assets/ui/tools-mode.png` (left pane: HTML) | `TextView::markdown` / `::html` | `ui-content.md` |
 | Code block with a header (language, Copy) | — | Bench `render_code` | `ui-content.md` |
-| A list re-read from its source (Tasks) | — | Bench `src/ui/tasks.rs` | `build-subject.md` |
+| A list re-read from its source (Tasks) | — | Bench `src/ui/tasks.rs` | `build-insert.md` |
 | Image, diff, terminal | — | `img`, `Diff`, Bench `term.rs` | `ui-content.md` |
 | Empty state ("Open a file to start") | `assets/ui/empty-state.png` | `kit::empty_state` | `ui-content.md` |
 | Tooltip, toast, popover, popup list, loader | — | `Tooltip`, `push_notification`, `Popover` | `ui-overlays.md` |
