@@ -73,8 +73,10 @@ Each project carries its **environment**, the way Claude Code reads a repository
 - its schedule (jobs that run a prompt in a new thread on their own).
 
 You edit it in the thread too: each part is a block in the project's environment thread, and a
-change opens as a card under that block. **Host** is the machine's own project, for installing,
-building and looking after the computer itself.
+change opens as a card under that block. **Host-Mac** is this computer's own project, for
+installing, building and looking after it. A server added as a project (**Host-Dev**,
+**Host-RPi**) works entirely there: its agent, threads, terminal, files, skills, MCP servers and
+schedule all live and run on that server.
 
 The only classic settings are behind the gear: model providers and the look.
 

@@ -41,8 +41,10 @@ person: there are projects.
   - schedule (cron).
 
   It is edited in its environment thread, one agent message per section, with the card under the
-  section being edited. **Host** is the machine's own project (installing, building, looking
-  after the machine).
+  section being edited. **Host-Mac** is this machine's own project (installing, building,
+  looking after the machine). A server project (`host` set, e.g. Host-Dev) runs entirely on its
+  server: its agent there keeps the threads, skills, MCP, schedule; `/terminal` (`ssh:local`) is
+  the thread's machine (`thread_machine()`), so it opens on that server.
 - **The gear** holds the only classic settings: providers and the look.
 
 ## The code map
