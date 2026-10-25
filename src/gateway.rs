@@ -623,6 +623,12 @@ fn run(
                     replay.push(json!({"type": "session.info", "session_id": runtime,
                                        "payload": r["info"]}));
                 }
+                // The thread's numbers from its last turn: the bar shows them at once, not
+                // after the next answer.
+                if r["usage"].is_object() {
+                    replay.push(json!({"type": "session.usage", "session_id": runtime,
+                                       "payload": {"usage": r["usage"]}}));
+                }
                 if r["queue"].is_array() {
                     replay.push(json!({"type": "session.queue", "session_id": runtime,
                                        "payload": {"items": r["queue"]}}));

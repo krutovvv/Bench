@@ -98,3 +98,22 @@ test("telegram: a batch keeps the order the messages came in and waits for voice
 	assert.equal(f.onlyForwarded, true);
 	assert.equal(f.text(), "");
 });
+
+const { Store } = await import("../src/store.ts");
+const { totalsOf, usagePayload } = await import("../src/usage.ts");
+
+test("usage: a thread's counters are kept and come back on a fresh store", () => {
+	const st = new Store();
+	const row = st.create({ id: "u1", conversation: 1, profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
+	assert.deepEqual(row.usage, { input: 0, output: 0, calls: 0 });
+	st.update("u1", { usage: { input: 1200, output: 340, calls: 2, cached: 900, tps: 31.4 } });
+	// A new Store = the agent process restarted: the same numbers are still there.
+	assert.deepEqual(new Store().get("u1")!.usage, { input: 1200, output: 340, calls: 2, cached: 900, tps: 31.4 });
+	const frame = usagePayload("m", totalsOf(st.get("u1")!.usage), 8000);
+	assert.equal(frame.context_used, 1200);
+	assert.equal(frame.context_max, 8000);
+	assert.equal(frame.cache_hit_pct, 75);
+	assert.equal(frame.avg_tps, 31.4);
+	assert.deepEqual(totalsOf("junk"), { input: 0, output: 0, calls: 0 });
+	st.delete("u1");
+});

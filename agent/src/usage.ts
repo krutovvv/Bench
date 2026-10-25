@@ -1,0 +1,50 @@
+// What a thread used: tokens in and out, the size of its context, how fast the model wrote.
+// The agent owns these numbers (only it sees the API's usage frames), so it also keeps them:
+// Bench's status bar reads the same figures after a restart that it showed while the work ran.
+
+/** The counters of one thread. `input` is the last call's window (≈ the context in use);
+ *  `output` and `calls` add up over the thread; `tps` is the last turn's blended rate. */
+export interface Totals {
+	input: number;
+	output: number;
+	calls: number;
+	cached?: number;
+	tps?: number;
+	started?: number;
+}
+
+export const EMPTY_TOTALS: Totals = { input: 0, output: 0, calls: 0 };
+
+/** Read stored counters back: anything unreadable is "nothing used yet". */
+export function totalsOf(v: unknown): Totals {
+	if (!v || typeof v !== "object") return { ...EMPTY_TOTALS };
+	const n = (k: string) => {
+		const x = (v as any)[k];
+		return typeof x === "number" && isFinite(x) && x >= 0 ? x : 0;
+	};
+	const cached = (v as any).cached;
+	const tps = (v as any).tps;
+	return {
+		input: n("input"),
+		output: n("output"),
+		calls: n("calls"),
+		...(typeof cached === "number" ? { cached } : {}),
+		...(typeof tps === "number" ? { tps } : {}),
+		...((v as any).started ? { started: (v as any).started } : {}),
+	};
+}
+
+/** The frame Bench shows: `max` is the model's context window. */
+export function usagePayload(model: string, u: Totals, max: number): Record<string, unknown> {
+	return {
+		model,
+		context_used: u.input,
+		context_max: max,
+		compressions: 0,
+		cache_hit_pct: u.input ? Math.round(((u.cached ?? 0) / u.input) * 100) : 0,
+		input: u.input,
+		output: u.output,
+		calls: u.calls,
+		avg_tps: u.tps ?? 0,
+	};
+}

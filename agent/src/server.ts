@@ -16,6 +16,7 @@ import { timezone } from "./config.ts";
 import { agentMcp, AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting, agentDir, agents, providers, readConfig, readEnv, readAgent, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp, migrateProfiles } from "./config.ts";
 import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
+import { usagePayload } from "./usage.ts";
 import { syncTelegram } from "./telegram.ts";
 import { arm, describe, jobs, newJob, nextRun, runJob, type Job } from "./builtin/cron.ts";
 import { authorizeServer, connectMcp, mcpStatus } from "./mcp.ts";
@@ -119,6 +120,8 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 			prompts: rt.pendingPrompts(session_id),
 			info: { reasoning_effort: row.effort, model: row.model, cwd: row.cwd, revision: 0, execution_generation: live.generation },
 			todo_state: { todos: row.todos },
+			// The thread's numbers, so the status bar has them before the first answer here.
+			usage: usagePayload(row.model, live.usage, resolveModel(row.profile, { model: row.model, provider: row.provider }).contextLength),
 		};
 	},
 	"session.history": async ({ session_id }) => ({ messages: rt.store.messages(session_id) }),

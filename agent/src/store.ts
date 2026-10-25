@@ -3,6 +3,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import { db } from "./config.ts";
+import { totalsOf, type Totals } from "./usage.ts";
 
 export interface Todo {
 	id: string;
@@ -31,6 +32,9 @@ export interface SessionRow {
 	subject?: string;
 	/** The project the thread belongs to (`projects.id`); "" = none. */
 	project?: string;
+	/** The thread's token counters as of its last finished turn; zeroes for a thread that has
+	 *  not run yet. Kept so Bench shows them again when the thread is reopened. */
+	usage: Totals;
 }
 
 export class Store {
@@ -43,7 +47,8 @@ export class Store {
 				id TEXT PRIMARY KEY, conversation TEXT NOT NULL, profile TEXT NOT NULL, title TEXT DEFAULT '',
 				source TEXT DEFAULT 'local', cwd TEXT DEFAULT '', model TEXT DEFAULT '', provider TEXT DEFAULT '',
 				effort TEXT DEFAULT '', created REAL, updated REAL, message_count INTEGER DEFAULT 0,
-				todos TEXT DEFAULT '[]', chat_id TEXT, display_name TEXT, deleted INTEGER DEFAULT 0
+				todos TEXT DEFAULT '[]', usage TEXT DEFAULT '', chat_id TEXT, display_name TEXT,
+				deleted INTEGER DEFAULT 0
 			);
 			CREATE TABLE IF NOT EXISTS messages (
 				session_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, ts REAL NOT NULL,
@@ -51,7 +56,8 @@ export class Store {
 			);
 			CREATE INDEX IF NOT EXISTS messages_session ON messages(session_id, ts);
 		`);
-		for (const col of ["subject", "project"])
+		// usage: the thread's token counters, settled at every turn end (src/usage.ts).
+		for (const col of ["subject", "project", "usage"])
 			try {
 				this.db.exec(`ALTER TABLE sessions ADD COLUMN ${col} TEXT DEFAULT ''`);
 			} catch {}
@@ -60,10 +66,16 @@ export class Store {
 	}
 
 	private row(r: any): SessionRow {
-		return { ...r, todos: JSON.parse(r.todos || "[]") };
+		let usage: Totals;
+		try {
+			usage = totalsOf(JSON.parse(r.usage || "{}"));
+		} catch {
+			usage = totalsOf(null);
+		}
+		return { ...r, todos: JSON.parse(r.todos || "[]"), usage };
 	}
 
-	create(s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "title"> & { title?: string }): SessionRow {
+	create(s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "title" | "usage"> & { title?: string }): SessionRow {
 		const now = Date.now() / 1000;
 		this.db
 			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, subject, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
@@ -97,7 +109,7 @@ export class Store {
 		const args: any[] = [];
 		for (const [k, v] of Object.entries(fields)) {
 			sets.push(`${k} = ?`);
-			args.push(k === "todos" ? JSON.stringify(v) : k === "conversation" ? String(v) : v);
+			args.push(k === "conversation" ? String(v) : typeof v === "object" && v !== null ? JSON.stringify(v) : v);
 		}
 		if (!sets.length) return;
 		this.db.prepare(`UPDATE sessions SET ${sets.join(", ")} WHERE id = ?`).run(...args, id);

@@ -16,6 +16,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
 import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort, resolveModel, setSetting, type ModelChoice } from "./config.ts";
+import { EMPTY_TOTALS, totalsOf, usagePayload } from "./usage.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { setHost, type Host, type SessionInfo } from "./host.ts";
@@ -45,7 +46,7 @@ interface Live {
 	answer: string;
 	prompts: Map<string, Pending>;
 	stop?: () => Promise<unknown>;
-	usage: { input: number; output: number; calls: number; started: number; cached?: number; tps?: number };
+	usage: Totals & { started: number };
 	approvedForSession: Set<string>;
 	/** Arguments of the running tool calls, by call id. */
 	toolArgs: Map<string, any>;
@@ -271,7 +272,9 @@ export class Runtime {
 			blocks: new Map(),
 			answer: "",
 			prompts: new Map(),
-			usage: { input: 0, output: 0, calls: 0, started: Date.now() },
+			// The counters survive in the row: reopening the thread continues the same numbers
+			// rather than starting from zero (a fresh turn re-reads the window anyway).
+			usage: { ...totalsOf(row.usage), started: Date.now() },
 			approvedForSession: new Set(),
 			toolArgs: new Map(),
 			inserts: [],
@@ -726,28 +729,27 @@ export class Runtime {
 		}
 	}
 
+	private usageFrame(live: Live): Record<string, unknown> {
+		const choice = resolveModel(live.row.profile, { model: live.row.model, provider: live.row.provider });
+		return usagePayload(live.row.model, live.usage, choice.contextLength);
+	}
+
 	private emitUsage(live: Live): void {
 		const secs = Math.max(1, (Date.now() - live.usage.started) / 1000);
 		// Speed of the turn in progress; between turns, the last turn's.
 		if (live.busy) live.usage.tps = Math.round((live.usage.output / secs) * 10) / 10;
-		this.emit(live.row.id, "session.usage", {
-			usage: {
-				model: live.row.model,
-				context_used: live.usage.input,
-				context_max: resolveModel(live.row.profile, { model: live.row.model, provider: live.row.provider }).contextLength,
-				compressions: 0,
-				cache_hit_pct: live.usage.input ? Math.round(((live.usage.cached ?? 0) / live.usage.input) * 100) : 0,
-				input: live.usage.input,
-				output: live.usage.output,
-				calls: live.usage.calls,
-				avg_tps: live.usage.tps ?? 0,
-			},
-		});
+		this.emit(live.row.id, "session.usage", { usage: this.usageFrame(live) });
+		// Between turns these are the thread's settled numbers: save them, so the bar is not
+		// empty when the thread or the app is reopened.
+		if (!live.busy) this.store.update(live.row.id, { usage: { ...live.usage } });
 	}
 
 	private finish(live: Live): void {
 		if (!live.busy) return;
 		live.busy = false;
+		// The turn's blended rate, as one number worth remembering.
+		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);
+		if (live.usage.output) live.usage.tps = Math.round((live.usage.output / turnSecs) * 10) / 10;
 		const id = live.row.id;
 		const text = live.answer;
 		if (text) this.store.addMessage(id, { role: "assistant", text });
