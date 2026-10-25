@@ -179,8 +179,10 @@ impl BenchApp {
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .gap_1()
-                            // Files waiting to go, over the text.
+                            .gap_2()
+                            // Files waiting to go, over the text: as much air over the caret as a
+                            // sent message gives its chips (`mt_2`), or the picture reads as part
+                            // of the first line.
                             .when(!chips.is_empty(), |d| {
                                 d.child(h_flex().flex_wrap().gap_1p5().pt_1().children(chips))
                             })
