@@ -20,7 +20,6 @@ use crate::rest::{self, ModelChoice};
 /// list of keys, since a key with no MCP server or card reading it is dead weight.
 pub struct KeyField {
     pub key: String,
-    pub hint: String,
     pub value: String,
     pub input: Entity<InputState>,
 }
@@ -270,10 +269,6 @@ impl BenchApp {
             let value = shown.get(key).cloned().unwrap_or_default();
             KeyField {
                 key: key.to_string(),
-                hint: env[key]["description"]
-                    .as_str()
-                    .unwrap_or_default()
-                    .to_string(),
                 input: field(window, cx, &value, "Not set"),
                 value,
             }
