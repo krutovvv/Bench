@@ -274,7 +274,7 @@ impl BenchApp {
                 .pr_6()
                 .py_1p5()
                 .flex_wrap()
-                .gap_1()
+                .gap_2()
                 .items_center()
                 .children(chips)
                 .into_any_element()
