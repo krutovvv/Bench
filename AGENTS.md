@@ -74,7 +74,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Piece | In Pi's terms |
 |---|---|
 | Thread | a Pi conversation in `~/.bench/pi.sqlite`; every step durable, a turn survives a restart |
-| Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed}}}`, changed in commits. RPC `session.insert`, `session.insert.patch`; `session.resume` returns them |
+| Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `session.insert`, `session.insert.patch`; `session.resume` returns them |
 | What the agent knows of inserts | the `inserts` prompt section, read with `input.read.snapshot(Inserts, conversationId)`, one line per kind (`prompt.ts` `inserted()`), plus `<block-state>` with each message |
 | Prompt | Pi sections (soul, environment, inserts, project, skills, notes), resent only when changed |
 | Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Pi 1.4 leaves an aborted item in the inbox, so `dropFromInbox` removes it in a commit |
