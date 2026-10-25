@@ -149,7 +149,10 @@ export async function runJob(job: Job): Promise<void> {
 		job.last_status = "ok";
 		job.last_output = r.text;
 		job.last_session = r.sessionId;
-		if (job.deliver && r.text.trim()) await host().deliver(job.deliver, r.text).catch((e) => (job.last_status = `delivery failed: ${(e as Error).message}`));
+		// A project's job answers through that project's bot ("telegram:<project>/<chat>").
+		const project = job.profile.startsWith("project:") ? job.profile.slice(8) : "";
+		const target = project && job.deliver.startsWith("telegram:") && !job.deliver.includes("/") ? `telegram:${project}/${job.deliver.slice(9)}` : job.deliver;
+		if (target && r.text.trim()) await host().deliver(target, r.text).catch((e) => (job.last_status = `delivery failed: ${(e as Error).message}`));
 	} catch (e) {
 		job.last_status = `error: ${(e as Error).message}`;
 	}

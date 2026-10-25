@@ -135,8 +135,25 @@ function httpTransport(agent: string, name: string, spec: any, provider = oauthP
 
 /** Sign in to an agent's HTTP MCP server: the page to open in the browser ("" when no sign-in was needed). */
 export async function authorizeServer(agent: string, name: string): Promise<string> {
-	const spec = fill(agentMcp(agent)[name], profileEnv(agent));
+	let spec = fill(agentMcp(agent)[name], profileEnv(agent));
 	if (!spec?.url) throw new Error(`no HTTP MCP server "${name}"`);
+	// Its own Authorization header the server refuses (an expired key): signing in replaces it with
+	// OAuth, so the header goes from mcp.json.
+	const header = Object.keys(spec.headers ?? {}).find((h) => h.toLowerCase() === "authorization");
+	if (header) {
+		const client = new McpClient({ name: "bench", version: "1.0.0" });
+		try {
+			await withTimeout(client.connect(httpTransport(agent, name, spec)), 30000, "connect timed out");
+			await client.close().catch(() => {});
+			await connectMcp(agent);
+			return "";
+		} catch (e) {
+			if (!needsAuth(e)) throw e;
+		}
+		dropHeader(agent, name, header);
+		const { [header]: _, ...rest } = spec.headers;
+		spec = { ...spec, headers: rest };
+	}
 	return authorize(
 		agent,
 		name,
@@ -149,6 +166,17 @@ export async function authorizeServer(agent: string, name: string): Promise<stri
 		},
 		() => connectMcp(agent),
 	);
+}
+
+/** Take a header out of a server's entry in the agent's own mcp.json (as written, not filled). */
+function dropHeader(agent: string, name: string, header: string): void {
+	const file = path.join(agentDir(agent), "mcp.json");
+	const doc = JSON.parse(fs.readFileSync(file, "utf8"));
+	const entry = doc.mcpServers?.[name];
+	if (!entry?.headers) return;
+	delete entry.headers[header];
+	if (!Object.keys(entry.headers).length) delete entry.headers;
+	fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {

@@ -69,10 +69,10 @@ impl RemoteFiles {
                 .line_number(true)
                 .soft_wrap(false)
         });
-        let password = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Password"));
+        let password = cx.new(|cx| InputState::new(window, cx).placeholder("Password"));
         let mut field = |cx: &mut Context<BenchApp>| cx.new(|cx| InputState::new(window, cx));
         let (f_name, f_host, f_port, f_user, f_path) = (field(cx), field(cx), field(cx), field(cx), field(cx));
-        let f_password = cx.new(|cx| InputState::new(window, cx).masked(true));
+        let f_password = cx.new(|cx| InputState::new(window, cx));
         Self {
             password,
             form: false,

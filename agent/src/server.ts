@@ -560,8 +560,8 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
 			// Its scheduled jobs: what runs when, and how the last run went.
 			cron: jobs.list(agent).map(cronView),
-			// The bot's token is not sent back, only whether there is one.
-			telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token } : null,
+			// The bot's token is shown whole (the person's own machine and bot).
+			telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token, token: p.telegram.token ?? "" } : null,
 		};
 	}],
 	// A project's own Telegram bot: its token and who may write to it; "" token = none.

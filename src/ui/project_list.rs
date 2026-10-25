@@ -182,7 +182,7 @@ impl BenchApp {
         let first = soul_text.lines().map(|l| l.trim_start_matches('#').trim()).find(|l| !l.is_empty()).unwrap_or("not described yet").to_string();
         rows.push(row("soul", String::new(), "Soul".into(), first, false, general, cx));
         let tg_note = match &e.telegram {
-            Some((name, users, true)) => format!("{} · {} may write", if name.is_empty() { "a bot".to_string() } else { format!("@{name}") }, users.len()),
+            Some((name, users, token)) if !token.is_empty() => format!("{} · {} may write", if name.is_empty() { "a bot".to_string() } else { format!("@{name}") }, users.len()),
             _ => "no bot of its own".into(),
         };
         rows.push(row("telegram", String::new(), "Telegram".into(), tg_note, false, false, cx));

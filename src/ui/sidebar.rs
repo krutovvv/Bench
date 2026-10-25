@@ -514,7 +514,7 @@ fn session_menu(view: Entity<BenchApp>, id: String, pinned: bool) -> impl Fn(gpu
             let view = view.clone();
             move |_: &ClickEvent, window: &mut Window, cx: &mut App| view.update(cx, |this, cx| f(this, window, cx))
         };
-        let (pin_id, del, files_id) = (id.clone(), id.clone(), id.clone());
+        let (pin_id, del) = (id.clone(), id.clone());
         let (swatch_view, swatch_id) = (view.clone(), id.clone());
         menu.item(
             PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
@@ -527,13 +527,6 @@ fn session_menu(view: Entity<BenchApp>, id: String, pinned: bool) -> impl Fn(gpu
             let current = swatch_view.read(cx).mark_of(&swatch_id).color;
             color_row(&swatch_view, &swatch_id, current, cx)
         }))
-        .separator()
-        .item(PopupMenuItem::new("Open in Zed").icon(Ico::Zed.icon()).on_click(act(Box::new(move |this, _, cx| {
-            if let Some(dir) = this.folder_of(&files_id) {
-                let host = this.host_of_session(&files_id);
-                this.open_in_zed(&dir, None, Some(host.as_str()), cx);
-            }
-        }))))
         .separator()
         .item(PopupMenuItem::new("Delete").icon(Ico::Trash.icon()).on_click(act(Box::new(move |this, window, cx| this.delete_session(del.clone(), window, cx)))))
     }

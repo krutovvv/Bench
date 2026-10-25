@@ -66,11 +66,13 @@ export async function syncTelegram(rt: Runtime): Promise<void> {
 	for (const [key, cfg] of wanted)
 		if (!running.has(key))
 			await startBot(rt, cfg, key).catch((e) => console.error(`[telegram] ${key || "general"}: ${(e as Error).message}`));
-	// Scheduled answers to a chat: through the general bot, else the first that runs.
+	// Scheduled answers to a chat ("<project>/<chat>" or "<chat>"): through that project's bot, else
+	// the general one, else the first that runs.
 	rt.deliverers.set("telegram", async (to, text) => {
-		const bot = running.get("") ?? [...running.values()][0];
+		const [project, chat] = to.includes("/") ? to.split("/", 2) : ["", to];
+		const bot = running.get(project) ?? running.get("") ?? [...running.values()][0];
 		if (!bot) throw new Error("no Telegram bot runs");
-		await bot.send(Number(to), text);
+		await bot.send(Number(chat), text);
 	});
 }
 

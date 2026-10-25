@@ -390,16 +390,17 @@ impl BenchApp {
             // Dictation: a red square while recording, a spinner while transcribing.
             .child({
                 let recording = self.recorder.is_some();
-                let (icon, tip) = if self.transcribing {
-                    (Ico::Loader, "Transcribing…")
-                } else if recording {
-                    (Ico::Square, "Stop and transcribe  ⌘⇧D")
+                if self.transcribing {
+                    item("mic")
+                        .text_color(muted)
+                        .child(gpui_kit::component::spinner::Spinner::new().icon(Ico::Loader.icon()).small())
+                        .tooltip(|window, cx| Tooltip::new("Transcribing…").build(window, cx))
                 } else {
-                    (Ico::Mic, "Dictate  ⌘⇧D")
-                };
-                button("mic", icon, tip, false)
-                    .when(recording, |d| d.text_color(cx.theme().danger))
-                    .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
+                    let (icon, tip) = if recording { (Ico::Square, "Stop and transcribe  ⌘⇧D") } else { (Ico::Mic, "Dictate  ⌘⇧D") };
+                    button("mic", icon, tip, false)
+                        .when(recording, |d| d.text_color(cx.theme().danger))
+                        .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
+                }
             })
             .child(
                 button(

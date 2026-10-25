@@ -18,8 +18,8 @@ pub struct ProjectEnv {
     pub soul: Entity<EditorState>,
     pub soul_open: bool,
     pub soul_dirty: bool,
-    /// Its own Telegram bot: (@name, allowed user ids, has a token); a row, opened to edit.
-    pub telegram: Option<(String, Vec<String>, bool)>,
+    /// Its own Telegram bot: (@name, allowed user ids, its token); a row, opened to edit.
+    pub telegram: Option<(String, Vec<String>, String)>,
     pub tg_open: bool,
     pub tg_token: Entity<InputState>,
     pub tg_users: Entity<InputState>,
@@ -117,7 +117,7 @@ impl BenchApp {
         let cron_schedule = cx.new(|cx| InputState::new(window, cx).placeholder("every 1d · every 30m · 0 9 * * 1-5 · 2026-11-01T09:00"));
         let name = cx.new(|cx| InputState::new(window, cx));
         let new_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name"));
-        let tg_token = cx.new(|cx| InputState::new(window, cx).masked(true).placeholder("Bot token from @BotFather (kept as is when empty)"));
+        let tg_token = cx.new(|cx| InputState::new(window, cx).placeholder("Bot token from @BotFather"));
         let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
         // A part typed in: its Save shows.
         fn dirty(this: &mut BenchApp, which: &str, ev: &InputEvent, cx: &mut Context<BenchApp>) {
@@ -315,10 +315,7 @@ impl BenchApp {
                         match what {
                             "soul" => e.soul_dirty = false,
                             "mcp" => e.mcp_dirty = false,
-                            "telegram" => {
-                                e.tg_dirty = false;
-                                e.tg_token.update(cx, |s, cx| s.set_value("", window, cx));
-                            }
+                            "telegram" => e.tg_dirty = false,
                             "prompt" => e.prompt_dirty = false,
                             "name" => e.name_dirty = false,
                             "cron" => {
@@ -353,10 +350,7 @@ impl BenchApp {
         match what {
             "soul" => e.soul_dirty = false,
             "mcp" => e.mcp_dirty = false,
-            "telegram" => {
-                e.tg_dirty = false;
-                e.tg_token.update(cx, |s, cx| s.set_value("", window, cx));
-            }
+            "telegram" => e.tg_dirty = false,
             "prompt" => {
                 e.prompt_dirty = false;
                 if let Some(name) = e.prompt_open.take() {
@@ -719,12 +713,14 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         (
             t.get("username").and_then(Value::as_str).unwrap_or_default().to_string(),
             t.get("allowed_users").and_then(Value::as_array).map(|a| a.iter().filter_map(|u| u.as_str().map(str::to_string)).collect()).unwrap_or_default(),
-            t.get("has_token").and_then(Value::as_bool).unwrap_or(false),
+            t.get("token").and_then(Value::as_str).unwrap_or_default().to_string(),
         )
     });
     if !e.tg_dirty {
         let users = e.telegram.as_ref().map(|t| t.1.join(", ")).unwrap_or_default();
         e.tg_users.update(cx, |s, cx| s.set_value(users, window, cx));
+        let token = e.telegram.as_ref().map(|t| t.2.clone()).unwrap_or_default();
+        e.tg_token.update(cx, |s, cx| s.set_value(token, window, cx));
     }
     if !e.soul_dirty {
         let text = v["soul"].as_str().unwrap_or_default().to_string();
