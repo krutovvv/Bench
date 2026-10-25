@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Steps climb toward an eclipse: a black sun with a burning rim. -->
+  <rect width="512" height="512" fill="#DEE1E6"/>
+  <circle cx="318" cy="172" r="90" fill="#F2B43C"/>
+  <circle cx="306" cy="164" r="82" fill="#1F2329"/>
+  <path d="M96 420 V372 H172 V324 H248 V276 H324 V420z" fill="#1F2329"/>
+  <rect x="96" y="420" width="320" height="18" fill="#E8603C"/>
+</svg>

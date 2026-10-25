@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- A door left ajar: dark inside, light along its edge, and one eye watching from the gap. -->
+  <rect width="512" height="512" fill="#DEE1E6"/>
+  <path d="M136 416 h236 l52 44 h-340z" fill="#F2B43C"/>
+  <rect x="136" y="96" width="236" height="320" fill="#1F2329"/>
+  <rect x="372" y="96" width="10" height="320" fill="#F2B43C"/>
+  <path d="M184 220 Q244 170 304 220 Q244 270 184 220z" fill="#FFFFFF"/>
+  <circle cx="264" cy="220" r="26" fill="#E8603C"/>
+  <circle cx="268" cy="220" r="11" fill="#1F2329"/>
+</svg>
