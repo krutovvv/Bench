@@ -1,21 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- The task assistant: a still figure with six arms, each holding one thing to do, and a third eye. -->
+  <!-- The task assistant: an hourglass; the sand runs down in a thin stream, as time does. -->
   <rect width="512" height="512" fill="#DEE1E6"/>
-  <polygon points="253.4,285.5 114.3,341.7 119.5,354.7 258.6,298.5" fill="#1F2329"/>
-  <rect x="79.5" y="339.4" width="34" height="34" fill="#E8603C"/>
-  <polygon points="257.7,285.2 112.1,248.9 108.8,262.5 254.3,298.8" fill="#1F2329"/>
-  <circle cx="89.1" cy="250.4" r="18" fill="#2FA38A"/>
-  <polygon points="261.4,287.5 164.9,172.6 154.2,181.6 250.6,296.5" fill="#1F2329"/>
-  <polygon points="145.4,140.2 165.4,176.2 125.4,176.2" fill="#5C78E2"/>
-  <polygon points="261.4,296.5 357.8,181.6 347.1,172.6 250.6,287.5" fill="#1F2329"/>
-  <rect x="349.6" y="143.2" width="34" height="34" fill="#F2B43C"/>
-  <polygon points="257.7,298.8 403.2,262.5 399.9,248.9 254.3,285.2" fill="#1F2329"/>
-  <circle cx="422.9" cy="250.4" r="18" fill="#E8603C"/>
-  <polygon points="253.4,298.5 392.5,354.7 397.7,341.7 258.6,285.5" fill="#1F2329"/>
-  <polygon points="415.5,336.4 435.5,372.4 395.5,372.4" fill="#2FA38A"/>
-  <path d="M200 448 L222 268 h68 L312 448z" fill="#1F2329"/>
-  <circle cx="256" cy="222" r="44" fill="#1F2329"/>
-  <circle cx="240" cy="228" r="6" fill="#F2B43C"/>
-  <circle cx="272" cy="228" r="6" fill="#F2B43C"/>
-  <rect x="251" y="198" width="10" height="16" fill="#E8603C"/>
+  <rect x="140" y="88" width="232" height="28" fill="#2FA38A"/>
+  <rect x="140" y="396" width="232" height="28" fill="#2FA38A"/>
+  <polygon points="164,116 348,116 268,256 348,396 164,396 244,256" fill="#1F2329"/>
+  <polygon points="214,152 298,152 260,218 252,218" fill="#F2B43C"/>
+  <rect x="253" y="218" width="6" height="128" fill="#F2B43C"/>
+  <polygon points="256,330 320,396 192,396" fill="#F2B43C"/>
+  <circle cx="226" cy="370" r="5" fill="#E8603C"/>
 </svg>
