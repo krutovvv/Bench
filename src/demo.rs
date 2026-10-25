@@ -22,7 +22,6 @@ fn session(id: &str, title: &str, messages: u64, running: bool, source: &str) ->
         id: id.into(),
         title: title.into(),
         messages,
-        model: "Qwen3.8-Next-Flash".into(),
         running,
         source: source.into(),
         subject: String::new(),

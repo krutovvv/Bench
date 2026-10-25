@@ -11,41 +11,9 @@ use gpui_kit::*;
 use super::compact;
 use crate::app::{BenchApp, Panel};
 use crate::icons::Ico;
-use crate::model::{EFFORTS, Step};
+use crate::model::Step;
 
 impl BenchApp {
-    /// Model: live usage, else the open session, else the profile, else the default profile.
-    fn model_name(&self) -> String {
-        let non_empty = |s: &String| !s.is_empty();
-        self.usage
-            .as_ref()
-            .map(|u| u.model.clone())
-            .filter(non_empty)
-            .or_else(|| {
-                let id = self.session.as_ref()?;
-                self.sessions
-                    .iter()
-                    .find(|s| &s.id == id)
-                    .map(|s| s.model.clone())
-            })
-            .filter(non_empty)
-            .or_else(|| {
-                let p = self.profile.as_ref()?;
-                self.profiles
-                    .iter()
-                    .find(|x| &x.name == p)
-                    .map(|x| x.model.clone())
-            })
-            .filter(non_empty)
-            .or_else(|| {
-                self.profiles
-                    .iter()
-                    .find(|x| x.name == "default")
-                    .map(|x| x.model.clone())
-            })
-            .filter(non_empty)
-            .unwrap_or_else(|| "—".into())
-    }
 
     pub(super) fn render_statusbar(
         &mut self,
@@ -123,63 +91,6 @@ impl BenchApp {
                     }),
             )
         };
-
-        let efforts = EFFORTS
-            .iter()
-            .enumerate()
-            .map(|(i, e)| {
-                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
-                    Box::new(move |this, _, cx| this.set_effort(i, cx));
-                (
-                    e.to_string(),
-                    self.effort_other.is_none() && i == self.effort,
-                    f,
-                )
-            })
-            .collect();
-        let approvals: Vec<_> = crate::model::APPROVAL_MODES
-            .iter()
-            .map(|m| {
-                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
-                    Box::new(move |this, _, cx| this.set_approval_mode(m, cx));
-                let label = match *m {
-                    "off" => "off — never ask",
-                    "smart" => "smart — ask for risky commands",
-                    _ => "manual — ask every time",
-                };
-                (
-                    label.to_string(),
-                    self.approval_mode.as_deref() == Some(*m),
-                    f,
-                )
-            })
-            .collect();
-        // Nothing about the profile until its own settings are in.
-        let ready = self.online() && self.profile_ready;
-        let current_model = self.model_name();
-        let models: Vec<_> = self
-            .profile_models
-            .iter()
-            .enumerate()
-            .map(|(i, c)| {
-                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
-                    Box::new(move |this, _, cx| this.set_model(i, cx));
-                let checked = self.model_pick.map_or(c.model == current_model, |k| k == i);
-                let label = if c.tag.is_empty() {
-                    c.model.clone()
-                } else {
-                    format!("{}  ·  {}", c.model, c.tag)
-                };
-                (label, checked, f)
-            })
-            .collect();
-        let model_groups: Vec<(usize, String)> = self
-            .profile_models
-            .iter()
-            .enumerate()
-            .filter(|(i, c)| *i == 0 || self.profile_models[i - 1].group != c.group)
-            .map(|(i, c)| (i, c.group.clone()))
-            .collect();
 
         // Context: the agent's numbers once a turn has run; before that (a reopened chat) a rough
         // estimate from the transcript, marked "~". The limit falls back to model.context_length.
@@ -334,55 +245,8 @@ impl BenchApp {
             // or not; its state in detail, its log, Reconnect and Restart are inside. Then the
             // model, how full its context is, how hard it thinks, what it may run.
             .children(self.render_backend(cx))
-            .map(|d| {
-                if !ready {
-                    d
-                } else if models.is_empty() || self.session.is_some() {
-                    d.child(
-                        item("model")
-                            .child(Ico::Cpu.icon().small())
-                            .child(current_model),
-                    )
-                } else {
-                    d.child(picker(
-                        "model",
-                        Ico::Cpu,
-                        current_model,
-                        None,
-                        model_groups,
-                        models,
-                    ))
-                }
-            })
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
-            .when(ready, |d| {
-                d.child(picker(
-                    "effort",
-                    Ico::Brain,
-                    self.effort_other
-                        .clone()
-                        .unwrap_or_else(|| EFFORTS[self.effort].to_string()),
-                    Some(if self.session.is_some() {
-                        "This chat"
-                    } else {
-                        "The new chat"
-                    }),
-                    vec![],
-                    efforts,
-                ))
-            })
-            .when_some(self.approval_mode.clone().filter(|_| ready), |d, mode| {
-                d.child(picker(
-                    "approvals",
-                    Ico::Shield,
-                    mode,
-                    // The agent keeps approvals in the profile's config, not per chat.
-                    Some("All chats of this agent"),
-                    vec![],
-                    approvals,
-                ))
-            })
             .child(div().flex_1())
             // Right: icons only — the terminals in the background (if any), attach, dictate,
             // settings.
@@ -515,6 +379,15 @@ impl BenchApp {
     fn session_stats(&self, used: u64, max: u64, estimated: bool) -> Vec<(String, String)> {
         let mut rows: Vec<(String, String)> = vec![];
         let tilde = if estimated { "~" } else { "" };
+        // Which model this thread answers with; the project sets it in its environment.
+        if let Some(m) = self
+            .usage
+            .as_ref()
+            .map(|u| u.model.clone())
+            .filter(|m| !m.is_empty())
+        {
+            rows.push(("Model".into(), m));
+        }
         rows.push((
             "Context".into(),
             if max > 0 {

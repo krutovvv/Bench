@@ -29,7 +29,6 @@ pub struct SessionRow {
     pub id: String,
     pub title: String,
     pub messages: u64,
-    pub model: String,
     pub running: bool,
     /// Where the session lives: "local" (desktop/CLI), "telegram", "cron", …
     pub source: String,

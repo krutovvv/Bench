@@ -78,12 +78,6 @@ pub enum Cmd {
         runtime: Option<String>,
     },
     /// Switch the session's model (primary or one of the profile's fallbacks).
-    SetModel {
-        profile: String,
-        session: String,
-        model: String,
-        provider: String,
-    },
     /// Drop the last exchange and ask the same question again.
     Regenerate {
         profile: String,
@@ -116,11 +110,6 @@ pub enum Cmd {
         session: String,
         name: String,
         arg: String,
-    },
-    /// `approvals.mode` for the profile: off / smart / manual.
-    SetApproval {
-        profile: String,
-        mode: String,
     },
     /// Answer a question (`answer` empty = declined).
     Clarify {
@@ -354,23 +343,6 @@ impl Rpc {
                 }
                 self.call("session.create", params, Pending::Create)?
             }
-            Cmd::SetModel {
-                profile,
-                session,
-                model,
-                provider,
-            } => {
-                let command = if provider.is_empty() {
-                    format!("/model {model}")
-                } else {
-                    format!("/model {model} --provider {provider}")
-                };
-                self.call(
-                    "slash.exec",
-                    json!({"session_id": session, "profile": profile, "command": command}),
-                    Pending::Ignore,
-                )?
-            }
             Cmd::Queue {
                 session,
                 text,
@@ -445,11 +417,6 @@ impl Rpc {
                 let params = json!({"session_id": session, "profile": profile, "command": command});
                 self.call("slash.exec", params, Pending::Dispatch(session))?
             }
-            Cmd::SetApproval { profile, mode } => self.call(
-                "config.set",
-                json!({"profile": profile, "key": "approvals.mode", "value": mode}),
-                Pending::Ignore,
-            )?,
             Cmd::Clarify {
                 profile,
                 req,
@@ -717,7 +684,6 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                         .unwrap_or("Untitled")
                         .into(),
                     messages: s["message_count"].as_u64().unwrap_or(0),
-                    model: s["model"].as_str().unwrap_or_default().into(),
                     running: s["running"].as_bool().unwrap_or(false),
                     source: s["source"].as_str().unwrap_or_default().into(),
                     subject: s["subject"].as_str().unwrap_or_default().into(),

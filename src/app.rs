@@ -256,9 +256,6 @@ pub struct BenchApp {
     pub search_query: String,
     pub search_hits: Option<Vec<(String, String)>>,
     search_seq: u64,
-    /// The model picked in the status bar for this session (None = profile default).
-    pub model_pick: Option<usize>,
-    model_pending: bool,
     effort_pending: bool,
 
     pub panel: Panel,
@@ -705,8 +702,6 @@ impl BenchApp {
             search_query: String::new(),
             search_hits: None,
             search_seq: 0,
-            model_pick: None,
-            model_pending: false,
             effort_pending: false,
             panel: Panel::Chat,
             skills: vec![],
@@ -976,7 +971,6 @@ impl BenchApp {
                             id: session.clone(),
                             title: "Untitled".into(),
                             messages: 0,
-                            model: String::new(),
                             running: true,
                             source: "desktop".into(),
                             subject: self.new_subject.clone(),
@@ -991,7 +985,6 @@ impl BenchApp {
                 self.save_place();
                 self.runtime = Some(runtime.clone());
                 if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
-                    self.apply_model_pick(&profile, &runtime);
                     let effort = self.take_effort();
                     match self.parse_command(&text) {
                         Some((name, arg)) => self.cmd(Cmd::Dispatch {
@@ -1370,8 +1363,6 @@ impl BenchApp {
         self.clarify = None;
         self.todos.clear();
         self.plan_at = None;
-        self.model_pick = None;
-        self.model_pending = false;
         // Speeds describe the model and server, not the chat: keep them, restart the counters.
         self.speed.restart();
         self.project = None;
@@ -1557,16 +1548,6 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// Pick the model for a new session (primary or a fallback); applied once it is created.
-    pub fn set_model(&mut self, i: usize, cx: &mut Context<Self>) {
-        if self.session.is_some() {
-            return;
-        }
-        self.model_pick = Some(i);
-        self.model_pending = true;
-        cx.notify();
-    }
-
     /// Debounced: only the last query typed within 300 ms goes to the gateway.
     fn search_sessions(&mut self, q: String, window: &mut Window, cx: &mut Context<Self>) {
         if q == self.search_query {
@@ -1602,28 +1583,6 @@ impl BenchApp {
             });
         })
         .detach();
-    }
-
-    fn apply_model_pick(&mut self, profile: &str, session: &str) {
-        if !std::mem::take(&mut self.model_pending) {
-            return;
-        }
-        let Some((model, provider)) = self
-            .model_pick
-            .and_then(|i| self.profile_models.get(i))
-            .map(|c| (c.model.clone(), c.provider.clone()))
-        else {
-            return;
-        };
-        if let Some(u) = self.usage.as_mut() {
-            u.model = model.clone();
-        }
-        self.cmd(Cmd::SetModel {
-            profile: profile.to_string(),
-            session: session.to_string(),
-            model,
-            provider,
-        });
     }
 
     /// An open session takes the level at once (its next turn runs on it, the gateway confirms
@@ -2017,7 +1976,6 @@ impl BenchApp {
             this.profile_context = context;
             this.profile_models = models;
             this.add_picker_models();
-            this.model_pick = None;
             let level = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v));
             if let Some(i) = level {
                 this.profile_effort = i;
@@ -2160,18 +2118,6 @@ impl BenchApp {
             profile,
             req,
             choice,
-        });
-        cx.notify();
-    }
-
-    pub fn set_approval_mode(&mut self, mode: &str, cx: &mut Context<Self>) {
-        let Some(profile) = self.profile.clone() else {
-            return;
-        };
-        self.approval_mode = Some(mode.to_string());
-        self.cmd(Cmd::SetApproval {
-            profile,
-            mode: mode.to_string(),
         });
         cx.notify();
     }
