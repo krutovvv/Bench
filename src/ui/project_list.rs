@@ -16,7 +16,12 @@ impl BenchApp {
             return div().into_any_element();
         };
         let (name, host, folder) = (form.name.clone(), form.host.clone(), form.folder.clone());
-        let (new_host, new_user, new_port, new_key) = (form.new_host.clone(), form.new_user.clone(), form.new_port.clone(), form.new_key.clone());
+        let (new_host, new_user, new_port, new_key) = (
+            form.new_host.clone(),
+            form.new_user.clone(),
+            form.new_port.clone(),
+            form.new_key.clone(),
+        );
         let mut page: Vec<AnyElement> = vec![
             div()
                 .pt_6()
@@ -29,31 +34,89 @@ impl BenchApp {
         ];
         // Where it runs: this Mac, or a server (its agent there keeps the threads, skills, MCP).
         let on_server = host.is_some();
-        let place = super::tools::segmented_tall("project-place", &["This Mac", "A server"], on_server as usize, cx, |this, k, _, cx| {
-            if let Some(f) = this.project_form.as_mut() {
-                f.host = if k == 0 { None } else { Some(this.ssh.servers.first().map(|s| s.alias.clone()).unwrap_or_default()) };
-            }
-            cx.notify();
-        });
-        page.push(self.pv_row("Runs on", "Where its agent works and keeps its threads", h_flex().child(place).into_any_element(), cx).into_any_element());
-        if let Some(chosen) = host.clone() {
-            // The servers from ~/.ssh/config, and a new one typed in.
-            let mut labels: Vec<String> = self.ssh.servers.iter().map(|s| s.alias.clone()).collect();
-            let at = labels.iter().position(|a| *a == chosen).unwrap_or(labels.len());
-            labels.push("New server…".into());
-            let aliases = labels.clone();
-            let pick = super::tools::segmented_tall_owned("project-server", labels, at, cx, move |this, k, _, cx| {
+        let place = super::tools::segmented_tall(
+            "project-place",
+            &["This Mac", "A server"],
+            on_server as usize,
+            cx,
+            |this, k, _, cx| {
                 if let Some(f) = this.project_form.as_mut() {
-                    f.host = Some(if k + 1 == aliases.len() { String::new() } else { aliases[k].clone() });
+                    f.host = if k == 0 {
+                        None
+                    } else {
+                        Some(
+                            this.ssh
+                                .servers
+                                .first()
+                                .map(|s| s.alias.clone())
+                                .unwrap_or_default(),
+                        )
+                    };
                 }
                 cx.notify();
-            });
-            page.push(self.pv_row("Server", "A host from ~/.ssh/config, or a new one", h_flex().flex_wrap().child(pick).into_any_element(), cx).into_any_element());
+            },
+        );
+        page.push(
+            self.pv_row(
+                "Runs on",
+                "Where its agent works and keeps its threads",
+                h_flex().child(place).into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        );
+        if let Some(chosen) = host.clone() {
+            // The servers from ~/.ssh/config, and a new one typed in.
+            let mut labels: Vec<String> =
+                self.ssh.servers.iter().map(|s| s.alias.clone()).collect();
+            let at = labels
+                .iter()
+                .position(|a| *a == chosen)
+                .unwrap_or(labels.len());
+            labels.push("New server…".into());
+            let aliases = labels.clone();
+            let pick = super::tools::segmented_tall_owned(
+                "project-server",
+                labels,
+                at,
+                cx,
+                move |this, k, _, cx| {
+                    if let Some(f) = this.project_form.as_mut() {
+                        f.host = Some(if k + 1 == aliases.len() {
+                            String::new()
+                        } else {
+                            aliases[k].clone()
+                        });
+                    }
+                    cx.notify();
+                },
+            );
+            page.push(
+                self.pv_row(
+                    "Server",
+                    "A host from ~/.ssh/config, or a new one",
+                    h_flex().flex_wrap().child(pick).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
             if chosen.is_empty() {
-                page.push(self.pv_row("Address", "Its IP or domain", self.pv_input(&new_host), cx).into_any_element());
-                page.push(self.pv_row("Login", "The user on it", self.pv_input(&new_user), cx).into_any_element());
-                page.push(self.pv_row("Port", "Empty: 22", self.pv_input(&new_port), cx).into_any_element());
-                page.push(self.pv_row("Key file", "Empty: ssh-agent", self.pv_input(&new_key), cx).into_any_element());
+                page.push(
+                    self.pv_row("Address", "Its IP or domain", self.pv_input(&new_host), cx)
+                        .into_any_element(),
+                );
+                page.push(
+                    self.pv_row("Login", "The user on it", self.pv_input(&new_user), cx)
+                        .into_any_element(),
+                );
+                page.push(
+                    self.pv_row("Port", "Empty: 22", self.pv_input(&new_port), cx)
+                        .into_any_element(),
+                );
+                page.push(
+                    self.pv_row("Key file", "Empty: ssh-agent", self.pv_input(&new_key), cx)
+                        .into_any_element(),
+                );
             }
             page.push(
                 div()
@@ -68,29 +131,65 @@ impl BenchApp {
             let control = h_flex()
                 .gap_2()
                 .items_center()
-                .child(div().min_w_0().truncate().text_base().text_color(if has { theme.foreground } else { muted }).child(folder.clone().unwrap_or_else(|| "None".into())))
-                .child(super::form_action("project-folder", if has { "Change…" } else { "Choose…" }, false, cx).on_click(cx.listener(|this, _, window, cx| this.pick_project_codebase(window, cx))))
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .text_base()
+                        .text_color(if has { theme.foreground } else { muted })
+                        .child(folder.clone().unwrap_or_else(|| "None".into())),
+                )
+                .child(
+                    super::form_action(
+                        "project-folder",
+                        if has { "Change…" } else { "Choose…" },
+                        false,
+                        cx,
+                    )
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.pick_project_codebase(window, cx)),
+                    ),
+                )
                 .when(has, |d| {
-                    d.child(super::form_action("project-folder-clear", "Clear", false, cx).on_click(cx.listener(|this, _, _, cx| {
-                        if let Some(f) = this.project_form.as_mut() {
-                            f.folder = None;
-                        }
-                        cx.notify();
-                    })))
+                    d.child(
+                        super::form_action("project-folder-clear", "Clear", false, cx).on_click(
+                            cx.listener(|this, _, _, cx| {
+                                if let Some(f) = this.project_form.as_mut() {
+                                    f.folder = None;
+                                }
+                                cx.notify();
+                            }),
+                        ),
+                    )
                 })
                 .into_any_element();
-            page.push(self.pv_row("Folder", "Optional: a codebase its threads work in (opens in Zed)", control, cx).into_any_element());
+            page.push(
+                self.pv_row(
+                    "Folder",
+                    "Optional: a codebase its threads work in (opens in Zed)",
+                    control,
+                    cx,
+                )
+                .into_any_element(),
+            );
         }
         page.push(
             h_flex()
                 .pt_4()
                 .gap_2()
-                .child(super::form_action("project-save", "Create project", true, cx).on_click(cx.listener(|this, _, window, cx| this.save_project(window, cx))))
-                .child(super::form_action("project-cancel", "Cancel", false, cx).on_click(cx.listener(|this, _, _, cx| {
-                    this.project_form = None;
-                    this.panel = crate::app::Panel::Chat;
-                    cx.notify();
-                })))
+                .child(
+                    super::form_action("project-save", "Create project", true, cx)
+                        .on_click(cx.listener(|this, _, window, cx| this.save_project(window, cx))),
+                )
+                .child(
+                    super::form_action("project-cancel", "Cancel", false, cx).on_click(
+                        cx.listener(|this, _, _, cx| {
+                            this.project_form = None;
+                            this.panel = crate::app::Panel::Chat;
+                            cx.notify();
+                        }),
+                    ),
+                )
                 .into_any_element(),
         );
         v_flex()
@@ -112,35 +211,58 @@ impl BenchApp {
     /// A project's environment as rows in blocks (the task list's look: a line between rows, a
     /// row lit under the pointer); a row's click opens its card under the block, as the agent's
     /// answer (`render_env_card`), where it is edited, saved or removed.
-    pub(super) fn render_env_sections(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Vec<(&'static str, AnyElement)> {
+    pub(super) fn render_env_sections(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Vec<(&'static str, AnyElement)> {
         let _ = window;
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(e) = self.project_env.as_ref() else {
-            return vec![("", div().text_color(muted).child("Loading…").into_any_element())];
+            return vec![(
+                "",
+                div().text_color(muted).child("Loading…").into_any_element(),
+            )];
         };
-        let remote = self.projects.iter().any(|p| p.id == e.id && p.host.is_some());
+        let remote = self
+            .projects
+            .iter()
+            .any(|p| p.id == e.id && p.host.is_some());
         let general = e.id == "general";
         let card = e.card.clone();
         // A quiet text action in a head: muted, the foreground on hover.
         let act = |id: SharedString, label: &'static str| {
-            div().id(id).flex_none().cursor_pointer().text_color(muted).hover(|s| s.text_color(theme.foreground)).child(label)
+            div()
+                .id(id)
+                .flex_none()
+                .cursor_pointer()
+                .text_color(muted)
+                .hover(|s| s.text_color(theme.foreground))
+                .child(label)
         };
         // "+ Add": a new one's card (paste it, or ask the agent from there); accesses are the
         // agent's to add.
-        let add = |id: &'static str, kind: &'static str, ask: &'static str, cx: &mut Context<Self>| {
-            act(id.into(), "+ Add").on_click(cx.listener(move |this, _, window, cx| {
-                this.click_claimed = true;
-                cx.stop_propagation();
-                if kind.is_empty() {
-                    this.ask_in_composer(ask, window, cx)
-                } else {
-                    this.env_card(kind, "new".into(), window, cx)
-                }
-            }))
-        };
+        let add =
+            |id: &'static str, kind: &'static str, ask: &'static str, cx: &mut Context<Self>| {
+                act(id.into(), "+ Add").on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    cx.stop_propagation();
+                    if kind.is_empty() {
+                        this.ask_in_composer(ask, window, cx)
+                    } else {
+                        this.env_card(kind, "new".into(), window, cx)
+                    }
+                }))
+            };
         // A row: its name, a one-line note; lit when its card is open.
-        let row = |kind: &'static str, name: String, label: String, note: String, bad: bool, first: bool, cx: &mut Context<Self>| {
+        let row = |kind: &'static str,
+                   name: String,
+                   label: String,
+                   note: String,
+                   bad: bool,
+                   first: bool,
+                   cx: &mut Context<Self>| {
             let note = note.split_whitespace().collect::<Vec<_>>().join(" ");
             let on = card.as_ref().is_some_and(|(k, n)| *k == kind && *n == name);
             h_flex()
@@ -149,25 +271,52 @@ impl BenchApp {
                 .py_1p5()
                 .gap_2()
                 .cursor_pointer()
-                .when(!first, |d| d.border_t_1().border_color(theme.border.opacity(0.5)))
+                .when(!first, |d| {
+                    d.border_t_1().border_color(theme.border.opacity(0.5))
+                })
                 .when(on, |d| d.bg(theme.list_active))
                 .hover(|s| s.bg(theme.list_hover))
                 .child(div().flex_none().child(label))
-                .child(div().flex_1().min_w_0().truncate().text_color(if bad { theme.danger } else { muted }).child(note))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_color(if bad { theme.danger } else { muted })
+                        .child(note),
+                )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
                     this.env_card(kind, name.clone(), window, cx)
                 }))
                 .into_any_element()
         };
-        let empty = |text: &'static str| div().px_3().py_2().text_color(muted).child(text).into_any_element();
+        let empty = |text: &'static str| {
+            div()
+                .px_3()
+                .py_2()
+                .text_color(muted)
+                .child(text)
+                .into_any_element()
+        };
         let folded = e.folded.clone();
-        let section = |title: &'static str, extra: Option<AnyElement>, rows: Vec<AnyElement>, cx: &mut Context<Self>| {
+        let section = |title: &'static str,
+                       extra: Option<AnyElement>,
+                       rows: Vec<AnyElement>,
+                       cx: &mut Context<Self>| {
             let shut = folded.contains(title);
             let head = super::block_head(&theme, !shut)
                 .id(SharedString::from(format!("env-sec-{title}")))
                 .cursor_pointer()
-                .child(if shut { crate::icons::Ico::ChevronRight } else { crate::icons::Ico::ChevronDown }.icon().xsmall())
+                .child(
+                    if shut {
+                        crate::icons::Ico::ChevronRight
+                    } else {
+                        crate::icons::Ico::ChevronDown
+                    }
+                    .icon()
+                    .xsmall(),
+                )
                 .child(div().text_color(theme.foreground).child(title))
                 .children(extra)
                 .child(div().flex_1())
@@ -196,31 +345,81 @@ impl BenchApp {
         // The project: its name, soul, Telegram bot.
         let mut rows = vec![];
         if !general {
-            rows.push(row("name", String::new(), "Name".into(), e.name.read(cx).value().to_string(), false, true, cx));
+            rows.push(row(
+                "name",
+                String::new(),
+                "Name".into(),
+                e.name.read(cx).value().to_string(),
+                false,
+                true,
+                cx,
+            ));
         }
         let soul_text = e.soul.read(cx).value().to_string();
-        let first = soul_text.lines().map(|l| l.trim_start_matches('#').trim()).find(|l| !l.is_empty()).unwrap_or("not described yet").to_string();
-        rows.push(row("soul", String::new(), "Soul".into(), first, false, general, cx));
+        let first = soul_text
+            .lines()
+            .map(|l| l.trim_start_matches('#').trim())
+            .find(|l| !l.is_empty())
+            .unwrap_or("not described yet")
+            .to_string();
+        rows.push(row(
+            "soul",
+            String::new(),
+            "Soul".into(),
+            first,
+            false,
+            general,
+            cx,
+        ));
         let tg_note = match &e.telegram {
-            Some((name, users, token)) if !token.is_empty() => format!("{} · {} may write", if name.is_empty() { "a bot".to_string() } else { format!("@{name}") }, users.len()),
+            Some((name, users, token)) if !token.is_empty() => format!(
+                "{} · {} may write",
+                if name.is_empty() {
+                    "a bot".to_string()
+                } else {
+                    format!("@{name}")
+                },
+                users.len()
+            ),
             _ => "no bot of its own".into(),
         };
-        rows.push(row("telegram", String::new(), "Telegram".into(), tg_note, false, false, cx));
-        blocks.push((if general { "Host" } else { "Project" }, section(if general { "Host" } else { "Project" }, None, rows, cx)));
+        rows.push(row(
+            "telegram",
+            String::new(),
+            "Telegram".into(),
+            tg_note,
+            false,
+            false,
+            cx,
+        ));
+        blocks.push((
+            if general { "Host" } else { "Project" },
+            section(if general { "Host" } else { "Project" }, None, rows, cx),
+        ));
 
         // MCP servers.
         let mut rows = vec![];
         if e.mcp.is_empty() {
             rows.push(empty("None of its own: the general ones work here too."));
         }
-        for (k, (name, kind, enabled, connected, tools, error, _)) in e.mcp.clone().into_iter().enumerate() {
+        for (k, (name, kind, enabled, connected, tools, error, _)) in
+            e.mcp.clone().into_iter().enumerate()
+        {
             let note = match (enabled, &error, connected) {
                 (false, _, _) => format!("{kind} · off"),
                 (_, Some(err), _) => format!("{kind} · {err}"),
                 (_, _, true) => format!("{kind} · {tools} tools"),
                 _ => format!("{kind} · connects with the project's first thread"),
             };
-            rows.push(row("mcp", name.clone(), name, note, error.is_some() && enabled, k == 0, cx));
+            rows.push(row(
+                "mcp",
+                name.clone(),
+                name,
+                note,
+                error.is_some() && enabled,
+                k == 0,
+                cx,
+            ));
         }
         let extra = add("env-mcp-add", "mcp", "", cx).into_any_element();
         blocks.push(("MCP servers", section("MCP servers", Some(extra), rows, cx)));
@@ -239,10 +438,20 @@ impl BenchApp {
         // Prompts (@ in the composer).
         let mut rows = vec![];
         if e.prompts.is_empty() {
-            rows.push(empty("None of its own: @ in the composer offers the general ones."));
+            rows.push(empty(
+                "None of its own: @ in the composer offers the general ones.",
+            ));
         }
         for (k, name) in e.prompts.clone().into_iter().enumerate() {
-            rows.push(row("prompt", name.clone(), name, String::new(), false, k == 0, cx));
+            rows.push(row(
+                "prompt",
+                name.clone(),
+                name,
+                String::new(),
+                false,
+                k == 0,
+                cx,
+            ));
         }
         let extra = add("env-prompt-add", "prompt", "", cx).into_any_element();
         blocks.push(("Prompts", section("Prompts", Some(extra), rows, cx)));
@@ -253,13 +462,29 @@ impl BenchApp {
             rows.push(empty("Nothing runs on its own yet: a job runs its prompt in a new thread of the project, on a schedule."));
         }
         for (k, j) in e.cron.clone().into_iter().enumerate() {
-            let next = j.next_run.as_deref().map(when).unwrap_or_else(|| "no next run".into());
-            let mut note = if j.enabled { format!("{} · next {next}", j.display) } else { format!("{} · paused", j.display) };
+            let next = j
+                .next_run
+                .as_deref()
+                .map(when)
+                .unwrap_or_else(|| "no next run".into());
+            let mut note = if j.enabled {
+                format!("{} · next {next}", j.display)
+            } else {
+                format!("{} · paused", j.display)
+            };
             if let Some(st) = &j.last_status {
                 note.push_str(&format!(" · last: {st}"));
             }
             let failed = j.last_status.as_deref().is_some_and(|s| s != "ok");
-            rows.push(row("cron", j.id.clone(), j.name.clone(), note, failed, k == 0, cx));
+            rows.push(row(
+                "cron",
+                j.id.clone(),
+                j.name.clone(),
+                note,
+                failed,
+                k == 0,
+                cx,
+            ));
         }
         let new_job = act("env-cron-add".into(), "+ New job")
             .on_click(cx.listener(|this, _, window, cx| {
@@ -274,17 +499,31 @@ impl BenchApp {
         if !remote {
             let mut rows = vec![];
             if e.hosts.is_empty() {
-                rows.push(empty("No servers or file hosts yet: /ssh and /ftp in its threads offer only these."));
+                rows.push(empty(
+                    "No servers or file hosts yet: /ssh and /ftp in its threads offer only these.",
+                ));
             }
             for (k, (hid, name, kind, at)) in e.hosts.clone().into_iter().enumerate() {
-                rows.push(row("host", hid, name, format!("{kind} · {at}"), false, k == 0, cx));
+                rows.push(row(
+                    "host",
+                    hid,
+                    name,
+                    format!("{kind} · {at}"),
+                    false,
+                    k == 0,
+                    cx,
+                ));
             }
-            let extra = add("env-host-add", "", "Add to this project the access: ", cx).into_any_element();
+            let extra =
+                add("env-host-add", "", "Add to this project the access: ", cx).into_any_element();
             blocks.push(("Accesses", section("Accesses", Some(extra), rows, cx)));
         }
 
         if let Some(err) = e.error.clone() {
-            blocks.push(("", div().text_color(theme.danger).child(err).into_any_element()));
+            blocks.push((
+                "",
+                div().text_color(theme.danger).child(err).into_any_element(),
+            ));
         }
         blocks
     }
@@ -318,7 +557,13 @@ impl BenchApp {
         let e = self.project_env.as_ref()?;
         let (kind, name) = e.card.clone()?;
         let act = |id: String, label: String, color: Hsla| {
-            div().id(SharedString::from(id)).flex_none().cursor_pointer().text_color(color).hover(|s| s.opacity(0.8)).child(label)
+            div()
+                .id(SharedString::from(id))
+                .flex_none()
+                .cursor_pointer()
+                .text_color(color)
+                .hover(|s| s.opacity(0.8))
+                .child(label)
         };
         let save = |what: &'static str, dirty: bool, cx: &mut Context<Self>| {
             div()
@@ -327,10 +572,13 @@ impl BenchApp {
                 .px_2()
                 .rounded_md()
                 .when(dirty, |d| {
-                    d.cursor_pointer().bg(theme.primary).text_color(theme.primary_foreground).on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        this.env_save(what, window, cx)
-                    }))
+                    d.cursor_pointer()
+                        .bg(theme.primary)
+                        .text_color(theme.primary_foreground)
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            this.env_save(what, window, cx)
+                        }))
                 })
                 .when(!dirty, |d| d.text_color(muted))
                 .child("Save")
@@ -347,22 +595,39 @@ impl BenchApp {
             })
         };
         let armed = e.armed.clone();
-        let remove = |what: &'static str, target: String, label: &'static str, cx: &mut Context<Self>| {
-            let on = armed.as_deref() == Some(format!("{what}:{target}").as_str());
-            act(format!("env-card-rm-{what}"), if on { format!("{label}?") } else { label.to_string() }, theme.danger)
+        let remove =
+            |what: &'static str, target: String, label: &'static str, cx: &mut Context<Self>| {
+                let on = armed.as_deref() == Some(format!("{what}:{target}").as_str());
+                act(
+                    format!("env-card-rm-{what}"),
+                    if on {
+                        format!("{label}?")
+                    } else {
+                        label.to_string()
+                    },
+                    theme.danger,
+                )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
                     this.env_remove(what, target.clone(), window, cx)
                 }))
                 .into_any_element()
-        };
+            };
         // A text: a code editor as tall as its wrapped text (the thread scrolls, not it).
         let code = |state: &Entity<gpui_kit::component::input::EditorState>, cx: &App| {
             let text = state.read(cx).value().to_string();
-            let lines: usize = text.lines().map(|l| l.chars().count() / 100 + 1).sum::<usize>().max(1);
+            let lines: usize = text
+                .lines()
+                .map(|l| l.chars().count() / 100 + 1)
+                .sum::<usize>()
+                .max(1);
             div()
                 .h(px(super::editor_height(lines, cx)))
-                .child(gpui_kit::component::input::Editor::new(state).appearance(false).h_full())
+                .child(
+                    gpui_kit::component::input::Editor::new(state)
+                        .appearance(false)
+                        .h_full(),
+                )
                 .into_any_element()
         };
         let pad = |d: Div| d.px_3().py_2().gap_2().into_any_element();
@@ -372,12 +637,25 @@ impl BenchApp {
                 actions.push(save("name", e.name_dirty, cx));
                 actions.extend(revert("name", e.name_dirty, cx));
                 actions.push(remove("project", String::new(), "Remove the project", cx));
-                ("Name".into(), pad(v_flex().child(gpui_kit::component::input::Input::new(&e.name)).child(div().text_sm().text_color(muted).child("Removing the project keeps its threads."))))
+                (
+                    "Name".into(),
+                    pad(v_flex()
+                        .child(gpui_kit::component::input::Input::new(&e.name))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(muted)
+                                .child("Removing the project keeps its threads."),
+                        )),
+                )
             }
             "soul" => {
                 actions.push(save("soul", e.soul_dirty, cx));
                 actions.extend(revert("soul", e.soul_dirty, cx));
-                ("Soul: what the project is, how to work in it".into(), code(&e.soul, cx))
+                (
+                    "Soul: what the project is, how to work in it".into(),
+                    code(&e.soul, cx),
+                )
             }
             "telegram" => {
                 actions.push(save("telegram", e.tg_dirty, cx));
@@ -405,12 +683,27 @@ impl BenchApp {
                 actions.push(ask);
                 actions.push(save(kind, true, cx));
                 let (title, editor, named) = match kind {
-                    "mcp" => ("New MCP server: its name, and its config (Pi's format: {\"url\", \"headers\"} or {\"command\", \"args\", \"env\"})", &e.mcp_json, true),
-                    "skill" => ("New skill: paste its SKILL.md (its front matter names it)", &e.skill_text, false),
+                    "mcp" => (
+                        "New MCP server: its name, and its config (Pi's format: {\"url\", \"headers\"} or {\"command\", \"args\", \"env\"})",
+                        &e.mcp_json,
+                        true,
+                    ),
+                    "skill" => (
+                        "New skill: paste its SKILL.md (its front matter names it)",
+                        &e.skill_text,
+                        false,
+                    ),
                     _ => ("New prompt: its name, and its text", &e.prompt_text, true),
                 };
                 let body = v_flex()
-                    .when(named, |d| d.child(div().px_3().pt_2().child(gpui_kit::component::input::Input::new(&e.new_name))))
+                    .when(named, |d| {
+                        d.child(
+                            div()
+                                .px_3()
+                                .pt_2()
+                                .child(gpui_kit::component::input::Input::new(&e.new_name)),
+                        )
+                    })
                     .child(code(editor, cx))
                     .into_any_element();
                 (title.to_string(), body)
@@ -469,12 +762,25 @@ impl BenchApp {
                             .into_any_element(),
                     );
                     actions.push(
-                        act("env-card-pause".into(), if enabled { "Pause".into() } else { "Resume".into() }, muted)
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                this.env_cron(pause.clone(), if enabled { "pause" } else { "resume" }, window, cx)
-                            }))
-                            .into_any_element(),
+                        act(
+                            "env-card-pause".into(),
+                            if enabled {
+                                "Pause".into()
+                            } else {
+                                "Resume".into()
+                            },
+                            muted,
+                        )
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            this.env_cron(
+                                pause.clone(),
+                                if enabled { "pause" } else { "resume" },
+                                window,
+                                cx,
+                            )
+                        }))
+                        .into_any_element(),
                     );
                 }
                 actions.push(save("cron", e.cron_dirty, cx));
@@ -482,33 +788,59 @@ impl BenchApp {
                 if job.is_some() {
                     actions.push(remove("cron", name.clone(), "Remove", cx));
                 }
-                let last = job.as_ref().filter(|j| !j.last_output.trim().is_empty()).map(|j| {
-                    let at = j.last_run.as_deref().map(when).unwrap_or_default();
-                    div().text_sm().text_color(muted).child(format!("Last run {at}: {}", j.last_output.trim()))
-                });
+                let last = job
+                    .as_ref()
+                    .filter(|j| !j.last_output.trim().is_empty())
+                    .map(|j| {
+                        let at = j.last_run.as_deref().map(when).unwrap_or_default();
+                        div()
+                            .text_sm()
+                            .text_color(muted)
+                            .child(format!("Last run {at}: {}", j.last_output.trim()))
+                    });
                 (
-                    job.as_ref().map(|j| format!("Job · {}", j.name)).unwrap_or_else(|| "New job".into()),
+                    job.as_ref()
+                        .map(|j| format!("Job · {}", j.name))
+                        .unwrap_or_else(|| "New job".into()),
                     pad(v_flex()
                         .child(gpui_kit::component::input::Input::new(&e.cron_name))
                         .child(gpui_kit::component::input::Input::new(&e.cron_schedule))
-                        .child(div().border_1().rounded_md().border_color(theme.border).child(code(&e.cron_prompt, cx)))
+                        .child(
+                            div()
+                                .border_1()
+                                .rounded_md()
+                                .border_color(theme.border)
+                                .child(code(&e.cron_prompt, cx)),
+                        )
                         .children(last)),
                 )
             }
             "host" => {
                 let (hid, hname, hkind, at) = e.hosts.iter().find(|h| h.0 == name).cloned()?;
                 actions.push(remove("host", hid, "Remove from the project", cx));
-                (format!("Access · {hname}"), pad(v_flex().child(div().text_color(muted).child(format!("{hkind} · {at}")))))
+                (
+                    format!("Access · {hname}"),
+                    pad(v_flex().child(div().text_color(muted).child(format!("{hkind} · {at}")))),
+                )
             }
             _ => return None,
         };
-        let close = super::inserts::icon_button("env-card-close", crate::icons::Ico::X, "Close", &theme).on_click(cx.listener(move |this, _, window, cx| {
-            this.click_claimed = true;
-            this.env_card(kind, name.clone(), window, cx)
-        }));
+        let close =
+            super::inserts::icon_button("env-card-close", crate::icons::Ico::X, "Close", &theme)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    this.env_card(kind, name.clone(), window, cx)
+                }));
         let head = super::block_head(&theme, true)
             .gap_3()
-            .child(div().flex_1().min_w_0().truncate().text_color(theme.foreground).child(title))
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .text_color(theme.foreground)
+                    .child(title),
+            )
             .children(actions)
             .child(close);
         Some(super::inserts::card(head, body, &theme))

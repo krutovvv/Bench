@@ -173,7 +173,8 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
     let copy = code.trim_end_matches('\n').to_string();
     v_flex()
         .w_full()
-        .border_1().rounded_md()
+        .border_1()
+        .rounded_md()
         .overflow_hidden()
         .border_color(theme.border)
         .child(
@@ -193,7 +194,9 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
                         .items_center()
                         .cursor_pointer()
                         .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                        .tooltip(|window, cx| gpui_kit::component::tooltip::Tooltip::new("Copy").build(window, cx))
+                        .tooltip(|window, cx| {
+                            gpui_kit::component::tooltip::Tooltip::new("Copy").build(window, cx)
+                        })
                         .child(Ico::Copy.icon().small())
                         .on_click(move |_, window, cx| {
                             cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
@@ -388,7 +391,8 @@ impl BenchApp {
                 .px_2()
                 .py_1()
                 .items_center()
-                .border_1().rounded_md()
+                .border_1()
+                .rounded_md()
                 .border_color(theme.border)
                 .text_base()
                 .child(icon.icon().xsmall().text_color(theme.muted_foreground))
@@ -425,7 +429,8 @@ impl BenchApp {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .border_1().rounded_md()
+                    .border_1()
+                    .rounded_md()
                     .border_color(theme.border)
                     .text_color(theme.muted_foreground)
                     .child(Ico::Loader.live(true))
@@ -474,7 +479,8 @@ impl BenchApp {
                 .relative()
                 .w(w)
                 .h(h)
-                .border_1().rounded_md()
+                .border_1()
+                .rounded_md()
                 .border_color(theme.border)
                 .cursor_pointer()
                 .child(img(src).size_full())
@@ -638,7 +644,8 @@ impl BenchApp {
                 let k2 = key.clone();
                 v_flex()
                     .max_w(px(MAX_W + 160.))
-                    .border_1().rounded_md()
+                    .border_1()
+                    .rounded_md()
                     .border_color(theme.border)
                     .child(
                         h_flex()
@@ -778,7 +785,8 @@ impl BenchApp {
             .pr_2()
             .gap_1p5()
             .items_center()
-            .border_1().rounded_md()
+            .border_1()
+            .rounded_md()
             .border_color(theme.border)
             .bg(theme.background)
             .text_base()
@@ -830,5 +838,4 @@ impl BenchApp {
             })
             .into_any_element()
     }
-
 }

@@ -37,9 +37,9 @@ mod remote;
 mod remote_browser;
 mod rest;
 mod speed;
-mod task_store;
 mod ssh;
 mod sshconfig;
+mod task_store;
 mod tasks;
 #[cfg(not(target_family = "wasm"))]
 mod term;
@@ -368,4 +368,3 @@ pub fn open_main_window(cx: &mut App) {
         eprintln!("open window: {e:#}");
     }
 }
-

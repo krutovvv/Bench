@@ -71,7 +71,8 @@ impl RemoteFiles {
         });
         let password = cx.new(|cx| InputState::new(window, cx).placeholder("Password"));
         let mut field = |cx: &mut Context<BenchApp>| cx.new(|cx| InputState::new(window, cx));
-        let (f_name, f_host, f_port, f_user, f_path) = (field(cx), field(cx), field(cx), field(cx), field(cx));
+        let (f_name, f_host, f_port, f_user, f_path) =
+            (field(cx), field(cx), field(cx), field(cx), field(cx));
         let f_password = cx.new(|cx| InputState::new(window, cx));
         Self {
             password,
@@ -139,7 +140,15 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "DELETE", &format!("/api/hosts/{}", enc(&id)), &profile, Value::Null),
+            move || {
+                rest::send_json(
+                    &conn,
+                    "DELETE",
+                    &format!("/api/hosts/{}", enc(&id)),
+                    &profile,
+                    Value::Null,
+                )
+            },
             |this, r, window, cx| match r {
                 Ok(_) => this.load_remote_hosts(window, cx),
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
@@ -158,7 +167,12 @@ impl BenchApp {
             move || rest::get_raw(&conn, &profile, "/api/hosts"),
             |this, r, _, cx| {
                 if let Ok(v) = r {
-                    let all: Vec<RemoteHost> = v["hosts"].as_array().into_iter().flatten().map(host_of).collect();
+                    let all: Vec<RemoteHost> = v["hosts"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(host_of)
+                        .collect();
                     // Which project each ~/.ssh/config server belongs to (its row in the store).
                     this.ssh_projects = all
                         .iter()
@@ -183,12 +197,21 @@ impl BenchApp {
         self.panel = super::Panel::Chat;
         self.ssh.form = None;
         let f = &self.files_remote;
-        for e in [&f.f_name, &f.f_host, &f.f_port, &f.f_user, &f.f_password, &f.f_path] {
+        for e in [
+            &f.f_name,
+            &f.f_host,
+            &f.f_port,
+            &f.f_user,
+            &f.f_password,
+            &f.f_path,
+        ] {
             e.update(cx, |s, cx| s.set_value("", window, cx));
         }
         self.files_remote.f_kind = 0;
         self.files_remote.form = true;
-        self.files_remote.f_name.update(cx, |s, cx| s.focus(window, cx));
+        self.files_remote
+            .f_name
+            .update(cx, |s, cx| s.focus(window, cx));
         cx.notify();
     }
 
@@ -201,7 +224,12 @@ impl BenchApp {
         let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
         let (name, host) = (v(&f.f_name), v(&f.f_host));
         if host.is_empty() {
-            self.toast(NotificationType::Error, "The host's address is empty".to_string(), window, cx);
+            self.toast(
+                NotificationType::Error,
+                "The host's address is empty".to_string(),
+                window,
+                cx,
+            );
             return;
         }
         let port = v(&f.f_port).parse::<u16>().ok();
@@ -264,7 +292,13 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::get_raw(&conn, &profile, &format!("/api/hosts/{id}/ls?path={}", enc(&path))),
+            move || {
+                rest::get_raw(
+                    &conn,
+                    &profile,
+                    &format!("/api/hosts/{id}/ls?path={}", enc(&path)),
+                )
+            },
             move |this, r, _, cx| {
                 let f = &mut this.files_remote;
                 // A late answer from a host the block has left.
@@ -283,7 +317,13 @@ impl BenchApp {
                                 name: e["name"].as_str().unwrap_or_default().to_string(),
                                 dir: e["type"].as_str() == Some("dir"),
                                 size: e["size"].as_u64().unwrap_or(0),
-                                modified: e["modified"].as_str().unwrap_or_default().chars().take(16).collect::<String>().replace('T', " "),
+                                modified: e["modified"]
+                                    .as_str()
+                                    .unwrap_or_default()
+                                    .chars()
+                                    .take(16)
+                                    .collect::<String>()
+                                    .replace('T', " "),
                             })
                             .collect();
                     }
@@ -295,10 +335,24 @@ impl BenchApp {
     }
 
     /// A row's click: a folder opens in place, a file opens in the editor under the list.
-    pub fn open_remote_entry(&mut self, name: String, dir: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_remote_entry(
+        &mut self,
+        name: String,
+        dir: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let base = self.files_remote.path.trim_end_matches('/').to_string();
         let path = if name == ".." {
-            base.rsplit_once('/').map(|(p, _)| if p.is_empty() { "/".to_string() } else { p.to_string() }).unwrap_or_else(|| "/".into())
+            base.rsplit_once('/')
+                .map(|(p, _)| {
+                    if p.is_empty() {
+                        "/".to_string()
+                    } else {
+                        p.to_string()
+                    }
+                })
+                .unwrap_or_else(|| "/".into())
         } else {
             format!("{base}/{name}")
         };
@@ -312,7 +366,14 @@ impl BenchApp {
 
     /// A host's folder and open file as an insert last showed them (its thread reopened, or
     /// another insert showed another host meanwhile). Nothing changes while edits are unsaved.
-    pub fn show_files_at(&mut self, host: &str, path: &str, file: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn show_files_at(
+        &mut self,
+        host: &str,
+        path: &str,
+        file: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.files_remote.dirty {
             return;
         }
@@ -338,7 +399,13 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::get_raw(&conn, &profile, &format!("/api/hosts/{id}/file?path={}&max=2000000", enc(&p))),
+            move || {
+                rest::get_raw(
+                    &conn,
+                    &profile,
+                    &format!("/api/hosts/{id}/file?path={}&max=2000000", enc(&p)),
+                )
+            },
             move |this, r, window, cx| {
                 match r {
                     Ok(v) => match v["text"].as_str() {
@@ -351,7 +418,12 @@ impl BenchApp {
                                 s.set_value(text.to_string(), window, cx)
                             });
                         }
-                        None => this.toast(NotificationType::Info, "Not a text file: download it with the agent", window, cx),
+                        None => this.toast(
+                            NotificationType::Info,
+                            "Not a text file: download it with the agent",
+                            window,
+                            cx,
+                        ),
                     },
                     Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
                 }
@@ -373,7 +445,15 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "PUT", &format!("/api/hosts/{id}/file"), &profile, json!({"path": path, "text": text})),
+            move || {
+                rest::send_json(
+                    &conn,
+                    "PUT",
+                    &format!("/api/hosts/{id}/file"),
+                    &profile,
+                    json!({"path": path, "text": text}),
+                )
+            },
             |this, r, window, cx| {
                 match r {
                     Ok(_) => {
@@ -415,11 +495,15 @@ impl BenchApp {
                     args.extend(["-a", h.user.as_str()]);
                 }
                 args.push("-w");
-                let out = std::process::Command::new("/usr/bin/security").args(&args).output()?;
+                let out = std::process::Command::new("/usr/bin/security")
+                    .args(&args)
+                    .output()?;
                 if !out.status.success() {
                     anyhow::bail!("no password for {} in the keychain", h.host);
                 }
-                Ok(String::from_utf8_lossy(&out.stdout).trim_end_matches('\n').to_string())
+                Ok(String::from_utf8_lossy(&out.stdout)
+                    .trim_end_matches('\n')
+                    .to_string())
             },
             |this, r, window, cx| match r {
                 Ok(p) => this.store_host_password(p, window, cx),
@@ -428,7 +512,12 @@ impl BenchApp {
         );
     }
 
-    fn store_host_password(&mut self, password: String, window: &mut Window, cx: &mut Context<Self>) {
+    fn store_host_password(
+        &mut self,
+        password: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
             return;
         };
@@ -439,15 +528,24 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "PUT", &format!("/api/hosts/{id}"), &profile, json!({"password": password})),
+            move || {
+                rest::send_json(
+                    &conn,
+                    "PUT",
+                    &format!("/api/hosts/{id}"),
+                    &profile,
+                    json!({"password": password}),
+                )
+            },
             |this, r, window, cx| match r {
                 Ok(_) => {
-                    this.files_remote.password.update(cx, |s, cx| s.set_value("", window, cx));
+                    this.files_remote
+                        .password
+                        .update(cx, |s, cx| s.set_value("", window, cx));
                     this.list_remote(String::new(), window, cx);
                 }
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
             },
         );
     }
-
 }

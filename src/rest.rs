@@ -47,14 +47,26 @@ fn get(conn: &Connection, path: &str, profile: &str) -> Result<Value> {
         // The agent's own message ("501 Login incorrect."), not the URL.
         Err(ureq::Error::Status(code, r)) => {
             let body: Value = r.into_json().unwrap_or(Value::Null);
-            Err(anyhow!("{}", body["detail"].as_str().map(str::to_string).unwrap_or_else(|| format!("{path}: status {code}"))))
+            Err(anyhow!(
+                "{}",
+                body["detail"]
+                    .as_str()
+                    .map(str::to_string)
+                    .unwrap_or_else(|| format!("{path}: status {code}"))
+            ))
         }
         Err(e) => Err(anyhow!("{path}: {e}")),
     }
 }
 
 /// A JSON request (POST, PUT, DELETE) with a 30 s timeout.
-pub fn send_json(conn: &Connection, method: &str, path: &str, profile: &str, body: Value) -> Result<Value> {
+pub fn send_json(
+    conn: &Connection,
+    method: &str,
+    path: &str,
+    profile: &str,
+    body: Value,
+) -> Result<Value> {
     send(conn, method, path, profile, body, 30)
 }
 
@@ -518,8 +530,6 @@ pub fn session_places(
         .collect())
 }
 
-
-
 /// The profile's folder in the agent's home on its machine: `~/.bench/profiles/<name>`
 /// (`default` for the default profile).
 pub fn profile_home(conn: &Connection, profile: &str) -> Result<String> {
@@ -534,7 +544,6 @@ pub fn profile_home(conn: &Connection, profile: &str) -> Result<String> {
     };
     Ok(format!("{home}/.bench/profiles/{name}"))
 }
-
 
 fn data_url(mime: &str, bytes: &[u8]) -> String {
     format!(

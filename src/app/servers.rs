@@ -136,7 +136,9 @@ impl Ssh {
     }
 
     pub fn tab_for(&self, alias: &str) -> Option<usize> {
-        self.tabs.iter().position(|t| t.alias == alias && t.insert.is_empty())
+        self.tabs
+            .iter()
+            .position(|t| t.alias == alias && t.insert.is_empty())
     }
 
     /// The shell of a terminal insert.
@@ -522,9 +524,15 @@ impl BenchApp {
                     "name": s.alias, "kind": "ssh", "host": if s.hostname.is_empty() { s.alias.clone() } else { s.hostname.clone() },
                     "user": s.user, "source": format!("ssh_config:{}", s.alias), "project": self.thread_project,
                 });
-                self.ssh_projects.insert(s.alias.clone(), self.thread_project.clone());
+                self.ssh_projects
+                    .insert(s.alias.clone(), self.thread_project.clone());
                 let profile = self.current_profile();
-                self.background(window, cx, move || crate::rest::send_json(&conn, "POST", "/api/hosts", &profile, body), |_, _, _, _| {});
+                self.background(
+                    window,
+                    cx,
+                    move || crate::rest::send_json(&conn, "POST", "/api/hosts", &profile, body),
+                    |_, _, _, _| {},
+                );
             }
         }
         // Into the thread it was added from.

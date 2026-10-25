@@ -179,7 +179,12 @@ impl BenchApp {
                             .gap_2()
                             .pb_1()
                             .items_center()
-                            .child(div().text_base().font_weight(FontWeight::MEDIUM).child(title))
+                            .child(
+                                div()
+                                    .text_base()
+                                    .font_weight(FontWeight::MEDIUM)
+                                    .child(title),
+                            )
                             .when(current, |d| {
                                 d.child(
                                     div()
@@ -272,7 +277,8 @@ impl BenchApp {
                     .gap_1()
                     .px_2()
                     .py_0p5()
-                    .border_1().rounded_md()
+                    .border_1()
+                    .rounded_md()
                     .border_color(theme.border)
                     .text_sm()
                     .cursor_pointer()
@@ -362,7 +368,8 @@ impl BenchApp {
                     .when(!results.is_empty(), |d| {
                         d.child(
                             v_flex()
-                                .border_1().rounded_md()
+                                .border_1()
+                                .rounded_md()
                                 .border_color(theme.border)
                                 .children(results),
                         )

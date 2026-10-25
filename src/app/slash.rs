@@ -57,7 +57,10 @@ impl BenchApp {
         let mut rest: Vec<SlashCommand> = vec![];
         // Tools only: the session's commands (/new, /model…) are the window's buttons here.
         let browser = self.browser_offered();
-        for c in Self::tool_words().iter().filter(|c| browser || c.name != "/browser") {
+        for c in Self::tool_words()
+            .iter()
+            .filter(|c| browser || c.name != "/browser")
+        {
             let name = c.name.to_lowercase();
             if name.starts_with(&q) {
                 first.push(c.clone());
@@ -103,7 +106,8 @@ impl BenchApp {
         // A tool: attached to the thread at once; the line is cleared.
         if !c.key.is_empty() {
             let key = c.key.clone();
-            self.composer.update(cx, |s, cx| s.set_value("", window, cx));
+            self.composer
+                .update(cx, |s, cx| s.set_value("", window, cx));
             self.note_draft(cx);
             self.attach_tool(key, window, cx);
             return true;

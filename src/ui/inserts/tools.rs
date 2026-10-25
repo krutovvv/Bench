@@ -53,28 +53,62 @@ impl InsertKind for Tools {
             .collect()
     }
 
-    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn controls(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Vec<AnyElement> {
         let tool = tool_of(ins);
         let modes = tool.modes();
-        let mut out = vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(tool.hint()).into_any_element()];
+        let mut out = vec![
+            div()
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child(tool.hint())
+                .into_any_element(),
+        ];
         if !modes.is_empty() {
-            out.push(super::super::tools::segmented("insert-tool-mode", modes, app.tools.mode(tool), cx, |this, k, window, cx| {
-                this.set_tool_mode(k, window, cx)
-            }));
+            out.push(super::super::tools::segmented(
+                "insert-tool-mode",
+                modes,
+                app.tools.mode(tool),
+                cx,
+                |this, k, window, cx| this.set_tool_mode(k, window, cx),
+            ));
         }
         out
     }
 
-    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn body(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         let tool = tool_of(ins);
         if app.tools.tool != tool {
             app.select_tool(tool, window, cx);
         }
         // As tall as its longer side (input or output): the thread scrolls, not the tool.
-        let lines = |e: &Entity<gpui_kit::component::input::EditorState>| e.read(cx).value().lines().count();
+        let lines = |e: &Entity<gpui_kit::component::input::EditorState>| {
+            e.read(cx).value().lines().count()
+        };
         let n = lines(&app.tools.input).max(lines(&app.tools.output)) + 2;
-        let h = (n as f32 * super::super::editor_line(cx) + super::super::BLOCK_HEAD_H + 24.).max(MIN_H);
-        Some(div().h(px(h)).mx(px(-12.)).my(px(-8.)).child(app.render_tools_body(cx)).into_any_element())
+        let h = (n as f32 * super::super::editor_line(cx) + super::super::BLOCK_HEAD_H + 24.)
+            .max(MIN_H);
+        Some(
+            div()
+                .h(px(h))
+                .mx(px(-12.))
+                .my(px(-8.))
+                .child(app.render_tools_body(cx))
+                .into_any_element(),
+        )
     }
 
     fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {
@@ -93,7 +127,13 @@ impl InsertKind for Tools {
         )
     }
 
-    fn opened(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
+    fn opened(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
         app.select_tool(tool_of(ins), window, cx);
     }
 }

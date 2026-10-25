@@ -23,7 +23,11 @@ impl BenchApp {
                 .id(SharedString::from(format!("site-wait-{tab}")))
                 .py_2()
                 .cursor_pointer()
-                .child(ShimmerText::new("Opening the page…").text_base().text_color(muted))
+                .child(
+                    ShimmerText::new("Opening the page…")
+                        .text_base()
+                        .text_color(muted),
+                )
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.click_claimed = true;
                     this.touch_browser();
@@ -36,12 +40,25 @@ impl BenchApp {
         let bounds = self.sites.bounds.clone();
         let key = tab.clone();
         // Width from the last layout (the thread's text column); height by the frame's aspect.
-        let width = bounds.borrow().get(&tab).map(|b| f32::from(b.size.width)).unwrap_or(720.);
+        let width = bounds
+            .borrow()
+            .get(&tab)
+            .map(|b| f32::from(b.size.width))
+            .unwrap_or(720.);
         let height = (width * fh / fw.max(1.)).min(MAX_H);
         let (pw, ph) = if w > 0. { (w, h) } else { (fw, fh) };
-        let focus = self.sites.focus.get_or_insert_with(|| cx.focus_handle()).clone();
+        let focus = self
+            .sites
+            .focus
+            .get_or_insert_with(|| cx.focus_handle())
+            .clone();
         let b_down = self.sites.browser.clone();
-        let (b_up, b_move, b_wheel, b_key) = (b_down.clone(), b_down.clone(), b_down.clone(), b_down.clone());
+        let (b_up, b_move, b_wheel, b_key) = (
+            b_down.clone(),
+            b_down.clone(),
+            b_down.clone(),
+            b_down.clone(),
+        );
         let to_page = {
             let bounds = bounds.clone();
             let key = key.clone();
@@ -52,7 +69,8 @@ impl BenchApp {
                 Some((x, y))
             }
         };
-        let (tp_down, tp_up, tp_move, tp_wheel) = (to_page.clone(), to_page.clone(), to_page.clone(), to_page);
+        let (tp_down, tp_up, tp_move, tp_wheel) =
+            (to_page.clone(), to_page.clone(), to_page.clone(), to_page);
         let paused = self.sites.browser.as_ref().is_some_and(|b| b.is_paused());
         v_flex()
             .w_full()
@@ -67,11 +85,22 @@ impl BenchApp {
                     // The picture never leaves its frame (a frame of another size than the
                     // last one must not spill over the thread).
                     .overflow_hidden()
-                    .border_1().rounded_md()
-                    .border_color(if live { theme.primary.opacity(0.5) } else { theme.border })
+                    .border_1()
+                    .rounded_md()
+                    .border_color(if live {
+                        theme.primary.opacity(0.5)
+                    } else {
+                        theme.border
+                    })
                     .when(live, |d| d.track_focus(&focus).cursor(CursorStyle::Arrow))
                     .when(!live, |d| d.cursor_pointer())
-                    .child(img(ImageSource::Render(frame.clone())).absolute().inset_0().size_full().object_fit(ObjectFit::Contain))
+                    .child(
+                        img(ImageSource::Render(frame.clone()))
+                            .absolute()
+                            .inset_0()
+                            .size_full()
+                            .object_fit(ObjectFit::Contain),
+                    )
                     // Where the frame is on screen, for mapping the pointer to the page.
                     .child(
                         canvas(
@@ -91,7 +120,8 @@ impl BenchApp {
                         MouseButton::Left,
                         cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                             this.click_claimed = true;
-                            let was_paused = this.sites.browser.as_ref().is_some_and(|b| b.is_paused());
+                            let was_paused =
+                                this.sites.browser.as_ref().is_some_and(|b| b.is_paused());
                             this.touch_browser();
                             // The first click on a paused view only wakes it.
                             if live && was_paused {
@@ -116,7 +146,11 @@ impl BenchApp {
                         })
                         .on_mouse_move(move |ev: &MouseMoveEvent, _, _| {
                             if let (Some(b), Some((x, y))) = (&b_move, tp_move(ev.position)) {
-                                let button = if ev.pressed_button == Some(MouseButton::Left) { "left" } else { "none" };
+                                let button = if ev.pressed_button == Some(MouseButton::Left) {
+                                    "left"
+                                } else {
+                                    "none"
+                                };
                                 b.mouse("mouseMoved", x, y, button, 0);
                             }
                         })
@@ -127,15 +161,17 @@ impl BenchApp {
                                 cx.stop_propagation();
                             }
                         })
-                        .on_key_down(cx.listener(move |this, ev: &KeyDownEvent, _, cx| {
-                            this.sites.touched = Some(web_time::Instant::now());
-                            if let Some(b) = &b_key {
-                                if send_key(b, &ev.keystroke, cx) {
-                                    cx.stop_propagation();
+                        .on_key_down(cx.listener(
+                            move |this, ev: &KeyDownEvent, _, cx| {
+                                this.sites.touched = Some(web_time::Instant::now());
+                                if let Some(b) = &b_key {
+                                    if send_key(b, &ev.keystroke, cx) {
+                                        cx.stop_propagation();
+                                    }
                                 }
-                            }
-                            let _ = this;
-                        }))
+                                let _ = this;
+                            },
+                        ))
                     }),
             )
             .child(
@@ -146,7 +182,9 @@ impl BenchApp {
                     .text_base()
                     .text_color(muted)
                     .truncate()
-                    .when(paused && !self.demo, |d| d.child("Paused — click the page to watch it live")),
+                    .when(paused && !self.demo, |d| {
+                        d.child("Paused — click the page to watch it live")
+                    }),
             )
             .into_any_element()
     }
@@ -155,7 +193,10 @@ impl BenchApp {
 /// A key to the page: text as typed, the special keys by name, ⌘V pastes. Whether it was sent.
 fn send_key(b: &Arc<crate::remote_browser::Browser>, ks: &Keystroke, cx: &mut App) -> bool {
     let m = &ks.modifiers;
-    let mods = (m.alt as u32) | ((m.control as u32) << 1) | ((m.platform as u32) << 2) | ((m.shift as u32) << 3);
+    let mods = (m.alt as u32)
+        | ((m.control as u32) << 1)
+        | ((m.platform as u32) << 2)
+        | ((m.shift as u32) << 3);
     if m.platform && ks.key == "v" {
         if let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) {
             b.text(&text);
@@ -186,7 +227,12 @@ fn send_key(b: &Arc<crate::remote_browser::Browser>, ks: &Keystroke, cx: &mut Ap
         // ⌘A and the like, as the page's own shortcuts.
         let k = ks.key.to_uppercase();
         if k.len() == 1 {
-            b.key(&ks.key, &format!("Key{k}"), k.chars().next().unwrap() as u32, mods);
+            b.key(
+                &ks.key,
+                &format!("Key{k}"),
+                k.chars().next().unwrap() as u32,
+                mods,
+            );
             return true;
         }
         return false;

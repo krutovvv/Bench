@@ -53,7 +53,9 @@ impl BenchApp {
             ("\\", false) => self.toggle_sidebar(cx),
             // ⌘⌫ / ⌘⌦: delete the open thread (the first press arms it in the sidebar, the
             // second deletes), as Move to Trash in Finder; a bare ⌫ stays the composer's.
-            ("backspace" | "delete", false) if self.panel == Panel::Chat && self.session.is_some() => {
+            ("backspace" | "delete", false)
+                if self.panel == Panel::Chat && self.session.is_some() =>
+            {
                 let id = self.session.clone().unwrap_or_default();
                 self.delete_session(id, window, cx);
             }

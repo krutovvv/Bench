@@ -370,8 +370,14 @@ mod tests {
     #[test]
     fn removes_one_block() {
         let text = "Host a\n  HostName 1.1.1.1\n\nHost b\n  HostName 2.2.2.2\n  # folder: X\n\nHost c\n  User u\n";
-        assert_eq!(remove_from(text, "b").unwrap(), "Host a\n  HostName 1.1.1.1\n\nHost c\n  User u\n");
-        assert_eq!(remove_from(text, "c").unwrap(), "Host a\n  HostName 1.1.1.1\n\nHost b\n  HostName 2.2.2.2\n  # folder: X\n\n");
+        assert_eq!(
+            remove_from(text, "b").unwrap(),
+            "Host a\n  HostName 1.1.1.1\n\nHost c\n  User u\n"
+        );
+        assert_eq!(
+            remove_from(text, "c").unwrap(),
+            "Host a\n  HostName 1.1.1.1\n\nHost b\n  HostName 2.2.2.2\n  # folder: X\n\n"
+        );
         assert!(remove_from(text, "zz").is_err());
     }
 

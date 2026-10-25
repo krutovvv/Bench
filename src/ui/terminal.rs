@@ -255,7 +255,9 @@ fn grid(session: Arc<Session>, focused: bool, theme: &Theme) -> impl IntoElement
             let cols = ((bounds.size.width / cell_w).floor() as usize).max(2);
             // The view may be shorter than the program's screen (a terminal in a thread): the
             // rows under it are cut off by the view.
-            let rows = ((bounds.size.height / line_h).floor() as usize).max(1).max(session.min_rows());
+            let rows = ((bounds.size.height / line_h).floor() as usize)
+                .max(1)
+                .max(session.min_rows());
             session.resize(
                 Size { cols, rows },
                 Layout {

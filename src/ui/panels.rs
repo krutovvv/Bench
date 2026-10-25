@@ -8,7 +8,6 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 
 impl BenchApp {
-
     pub(super) fn render_appearance(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         use crate::theme::{ACCENTS, Mode};
         let theme = cx.theme().clone();
@@ -36,7 +35,8 @@ impl BenchApp {
                          items: Vec<(&'static str, bool, crate::theme::Appearance)>,
                          cx: &mut Context<Self>| {
             h_flex()
-                .border_1().rounded_md()
+                .border_1()
+                .rounded_md()
                 .border_color(theme.border)
                 .children(items.into_iter().enumerate().map(|(k, (label, on, next))| {
                     div()
@@ -91,7 +91,8 @@ impl BenchApp {
                         div()
                             .id(("accent", k))
                             .p(px(3.))
-                            .border_1().rounded_md()
+                            .border_1()
+                            .rounded_md()
                             .border_color(if on {
                                 theme.foreground
                             } else {

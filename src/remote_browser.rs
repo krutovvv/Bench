@@ -62,11 +62,17 @@ pub struct State {
 fn access() -> Result<(String, String)> {
     let file = crate::connection::state_dir().join("browser.json");
     let v: Value = serde_json::from_slice(&std::fs::read(&file).map_err(|_| {
-        anyhow!("No browser access yet: ask for your key (live.mjs add <name>) and put it in {}", file.display())
+        anyhow!(
+            "No browser access yet: ask for your key (live.mjs add <name>) and put it in {}",
+            file.display()
+        )
     })?)?;
     let url = v["url"].as_str().unwrap_or_default().to_string();
     if url.is_empty() {
-        return Err(anyhow!("{} has no url: the gateway's address, wss://<host>/live", file.display()));
+        return Err(anyhow!(
+            "{} has no url: the gateway's address, wss://<host>/live",
+            file.display()
+        ));
     }
     Ok((url, v["token"].as_str().unwrap_or_default().to_string()))
 }
@@ -96,7 +102,8 @@ impl Browser {
             match tungstenite::connect(full.as_str()) {
                 Ok((ws, _)) => me.run(ws, rx, wake),
                 Err(e) => {
-                    me.state.lock().unwrap().error = Some(format!("The browser's gateway refused: {e}"));
+                    me.state.lock().unwrap().error =
+                        Some(format!("The browser's gateway refused: {e}"));
                     let _ = wake.try_send(());
                 }
             }
@@ -104,7 +111,12 @@ impl Browser {
         Ok(b)
     }
 
-    fn run(self: Arc<Self>, mut ws: WebSocket<MaybeTlsStream<TcpStream>>, rx: mpsc::Receiver<Value>, wake: async_channel::Sender<()>) {
+    fn run(
+        self: Arc<Self>,
+        mut ws: WebSocket<MaybeTlsStream<TcpStream>>,
+        rx: mpsc::Receiver<Value>,
+        wake: async_channel::Sender<()>,
+    ) {
         let timeout = Some(Duration::from_millis(40));
         match ws.get_mut() {
             MaybeTlsStream::Plain(s) => {
@@ -129,7 +141,10 @@ impl Browser {
                 Ok(Message::Close(_)) => break,
                 Ok(_) => continue,
                 Err(tungstenite::Error::Io(e))
-                    if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut) =>
+                    if matches!(
+                        e.kind(),
+                        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                    ) =>
                 {
                     continue;
                 }
@@ -140,7 +155,11 @@ impl Browser {
             };
             let mut s = self.state.lock().unwrap();
             if let Some(list) = m["tabs"].as_array() {
-                let before: HashMap<String, String> = s.pages.iter().map(|p| (p.id.clone(), p.url.clone())).collect();
+                let before: HashMap<String, String> = s
+                    .pages
+                    .iter()
+                    .map(|p| (p.id.clone(), p.url.clone()))
+                    .collect();
                 s.pages = list
                     .iter()
                     .map(|t| Page {
@@ -151,7 +170,8 @@ impl Browser {
                     })
                     .collect();
                 // The first list is what was already open; later new tabs are the running turn's.
-                let ids: Vec<(String, bool)> = s.pages.iter().map(|p| (p.id.clone(), p.asleep)).collect();
+                let ids: Vec<(String, bool)> =
+                    s.pages.iter().map(|p| (p.id.clone(), p.asleep)).collect();
                 for (id, asleep) in ids {
                     if known.insert(id.clone()) && !first && !asleep {
                         s.fresh.push(id);
@@ -170,7 +190,11 @@ impl Browser {
                     }
                 }
                 first = false;
-                let urls: Vec<(String, String)> = s.pages.iter().map(|p| (p.id.clone(), p.url.clone())).collect();
+                let urls: Vec<(String, String)> = s
+                    .pages
+                    .iter()
+                    .map(|p| (p.id.clone(), p.url.clone()))
+                    .collect();
                 for (id, url) in urls {
                     if let Some(shot) = s.shots.get_mut(&id) {
                         if !url.is_empty() && url != "about:blank" {
@@ -181,9 +205,17 @@ impl Browser {
             } else if let Some(data) = m["frame"].as_str() {
                 let tab = m["tab"].as_str().unwrap_or_default().to_string();
                 if let Some((frame, jpeg)) = decode(data) {
-                    let url = s.pages.iter().find(|p| p.id == tab).map(|p| p.url.clone()).unwrap_or_default();
+                    let url = s
+                        .pages
+                        .iter()
+                        .find(|p| p.id == tab)
+                        .map(|p| p.url.clone())
+                        .unwrap_or_default();
                     let old = s.shots.get(&tab).cloned().unwrap_or_default();
-                    let (w, h) = (m["w"].as_f64().unwrap_or(0.) as f32, m["h"].as_f64().unwrap_or(0.) as f32);
+                    let (w, h) = (
+                        m["w"].as_f64().unwrap_or(0.) as f32,
+                        m["h"].as_f64().unwrap_or(0.) as f32,
+                    );
                     s.shots.insert(
                         tab,
                         Shot {
@@ -205,7 +237,11 @@ impl Browser {
             drop(s);
             let _ = wake.try_send(());
         }
-        self.state.lock().unwrap().error.get_or_insert_with(|| "The browser's connection closed".into());
+        self.state
+            .lock()
+            .unwrap()
+            .error
+            .get_or_insert_with(|| "The browser's connection closed".into());
         let _ = wake.try_send(());
     }
 
@@ -241,7 +277,9 @@ impl Browser {
 
     /// Stop (or resume) the stream; the last frame stays on screen.
     pub fn set_paused(&self, paused: bool) {
-        let was = self.paused.swap(paused, std::sync::atomic::Ordering::Relaxed);
+        let was = self
+            .paused
+            .swap(paused, std::sync::atomic::Ordering::Relaxed);
         if paused && !was {
             self.state.lock().unwrap().active = None;
             self.op(json!({"op": "unwatch"}));
@@ -253,11 +291,21 @@ impl Browser {
     }
 
     pub fn is_open(&self, id: &str) -> bool {
-        self.state.lock().unwrap().pages.iter().any(|p| p.id == id && !p.asleep)
+        self.state
+            .lock()
+            .unwrap()
+            .pages
+            .iter()
+            .any(|p| p.id == id && !p.asleep)
     }
 
     pub fn is_asleep(&self, id: &str) -> bool {
-        self.state.lock().unwrap().pages.iter().any(|p| p.id == id && p.asleep)
+        self.state
+            .lock()
+            .unwrap()
+            .pages
+            .iter()
+            .any(|p| p.id == id && p.asleep)
     }
 
     /// A mouse event at a point of the page (CSS pixels).

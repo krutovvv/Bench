@@ -94,7 +94,11 @@ impl BenchApp {
     pub fn open_project_env(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         self.load_env(&id, window, cx);
         // "general": this Mac's own environment; its thread belongs to no project.
-        let project = if id == "general" { String::new() } else { id.clone() };
+        let project = if id == "general" {
+            String::new()
+        } else {
+            id.clone()
+        };
         self.thread_project = project.clone();
         self.open_subject(format!("env:{id}"), cx);
         self.thread_project = project;
@@ -104,7 +108,12 @@ impl BenchApp {
         // One editor for all: the code editor, highlighted (Markdown, JSON), wrapped, line
         // numbers, no room under the last line; its height follows the text.
         let editor = |language: &'static str, window: &mut Window, cx: &mut Context<Self>| {
-            let e = cx.new(|cx| EditorState::new(window, cx).line_number(true).soft_wrap(true).scroll_beyond_last_line(Some(0)));
+            let e = cx.new(|cx| {
+                EditorState::new(window, cx)
+                    .line_number(true)
+                    .soft_wrap(true)
+                    .scroll_beyond_last_line(Some(0))
+            });
             e.update(cx, |s, cx| s.set_highlighter(language, cx));
             e
         };
@@ -113,12 +122,20 @@ impl BenchApp {
         let mcp_json = editor("json", window, cx);
         let prompt_text = editor("markdown", window, cx);
         let cron_prompt = editor("markdown", window, cx);
-        let cron_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name: Weekly digest"));
-        let cron_schedule = cx.new(|cx| InputState::new(window, cx).placeholder("every 1d · every 30m · 0 9 * * 1-5 · 2026-11-01T09:00"));
+        let cron_name =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Its name: Weekly digest"));
+        let cron_schedule = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("every 1d · every 30m · 0 9 * * 1-5 · 2026-11-01T09:00")
+        });
         let name = cx.new(|cx| InputState::new(window, cx));
         let new_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name"));
-        let tg_token = cx.new(|cx| InputState::new(window, cx).placeholder("Bot token from @BotFather"));
-        let tg_users = cx.new(|cx| InputState::new(window, cx).placeholder("Telegram user ids who may write to it, comma-separated"));
+        let tg_token =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Bot token from @BotFather"));
+        let tg_users = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("Telegram user ids who may write to it, comma-separated")
+        });
         // A part typed in: its Save shows.
         fn dirty(this: &mut BenchApp, which: &str, ev: &InputEvent, cx: &mut Context<BenchApp>) {
             if let (InputEvent::Change, Some(e)) = (ev, this.project_env.as_mut()) {
@@ -134,16 +151,30 @@ impl BenchApp {
                 cx.notify();
             }
         }
-        cx.subscribe(&soul, |this, _, ev, cx| dirty(this, "soul", ev, cx)).detach();
-        cx.subscribe(&skill_text, |this, _, ev, cx| dirty(this, "skill", ev, cx)).detach();
-        cx.subscribe(&mcp_json, |this, _, ev, cx| dirty(this, "mcp", ev, cx)).detach();
-        cx.subscribe(&prompt_text, |this, _, ev, cx| dirty(this, "prompt", ev, cx)).detach();
-        cx.subscribe(&name, |this, _, ev, cx| dirty(this, "name", ev, cx)).detach();
-        cx.subscribe(&tg_token, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
-        cx.subscribe(&tg_users, |this, _, ev, cx| dirty(this, "telegram", ev, cx)).detach();
-        cx.subscribe(&cron_prompt, |this, _, ev, cx| dirty(this, "cron", ev, cx)).detach();
-        cx.subscribe(&cron_name, |this, _, ev, cx| dirty(this, "cron", ev, cx)).detach();
-        cx.subscribe(&cron_schedule, |this, _, ev, cx| dirty(this, "cron", ev, cx)).detach();
+        cx.subscribe(&soul, |this, _, ev, cx| dirty(this, "soul", ev, cx))
+            .detach();
+        cx.subscribe(&skill_text, |this, _, ev, cx| dirty(this, "skill", ev, cx))
+            .detach();
+        cx.subscribe(&mcp_json, |this, _, ev, cx| dirty(this, "mcp", ev, cx))
+            .detach();
+        cx.subscribe(&prompt_text, |this, _, ev, cx| {
+            dirty(this, "prompt", ev, cx)
+        })
+        .detach();
+        cx.subscribe(&name, |this, _, ev, cx| dirty(this, "name", ev, cx))
+            .detach();
+        cx.subscribe(&tg_token, |this, _, ev, cx| dirty(this, "telegram", ev, cx))
+            .detach();
+        cx.subscribe(&tg_users, |this, _, ev, cx| dirty(this, "telegram", ev, cx))
+            .detach();
+        cx.subscribe(&cron_prompt, |this, _, ev, cx| dirty(this, "cron", ev, cx))
+            .detach();
+        cx.subscribe(&cron_name, |this, _, ev, cx| dirty(this, "cron", ev, cx))
+            .detach();
+        cx.subscribe(&cron_schedule, |this, _, ev, cx| {
+            dirty(this, "cron", ev, cx)
+        })
+        .detach();
         ProjectEnv {
             id: id.to_string(),
             dir: String::new(),
@@ -232,7 +263,11 @@ impl BenchApp {
             return;
         };
         let (method, path, body) = match what {
-            "soul" => ("PUT", format!("/api/projects/{eid}/soul"), json!({"text": e.soul.read(cx).value().to_string()})),
+            "soul" => (
+                "PUT",
+                format!("/api/projects/{eid}/soul"),
+                json!({"text": e.soul.read(cx).value().to_string()}),
+            ),
             "mcp" => {
                 let Some(mut name) = e.mcp_open.clone() else {
                     return;
@@ -244,7 +279,11 @@ impl BenchApp {
                         return;
                     }
                 }
-                ("PUT", format!("/api/projects/{eid}/mcp/{}/spec", enc(&name)), json!({"text": e.mcp_json.read(cx).value().to_string()}))
+                (
+                    "PUT",
+                    format!("/api/projects/{eid}/mcp/{}/spec", enc(&name)),
+                    json!({"text": e.mcp_json.read(cx).value().to_string()}),
+                )
             }
             "prompt" => {
                 let Some(mut name) = e.prompt_open.clone() else {
@@ -257,7 +296,11 @@ impl BenchApp {
                         return;
                     }
                 }
-                ("PUT", format!("/api/projects/{eid}/prompts/{}", enc(&name)), json!({"text": e.prompt_text.read(cx).value().to_string()}))
+                (
+                    "PUT",
+                    format!("/api/projects/{eid}/prompts/{}", enc(&name)),
+                    json!({"text": e.prompt_text.read(cx).value().to_string()}),
+                )
             }
             "cron" => {
                 let Some(job) = e.cron_open.clone() else {
@@ -271,14 +314,29 @@ impl BenchApp {
                 if job == "new" {
                     ("POST", format!("/api/projects/{eid}/cron"), fields)
                 } else {
-                    ("PUT", format!("/api/cron/jobs/{}", enc(&job)), json!({ "updates": fields }))
+                    (
+                        "PUT",
+                        format!("/api/cron/jobs/{}", enc(&job)),
+                        json!({ "updates": fields }),
+                    )
                 }
             }
             // The name is the project's own row, on this Mac.
-            "name" => ("PUT", format!("/api/projects/{id}"), json!({"name": e.name.read(cx).value().trim()})),
+            "name" => (
+                "PUT",
+                format!("/api/projects/{id}"),
+                json!({"name": e.name.read(cx).value().trim()}),
+            ),
             "telegram" => {
                 let token = e.tg_token.read(cx).value().trim().to_string();
-                let users: Vec<String> = e.tg_users.read(cx).value().split(',').map(|u| u.trim().to_string()).filter(|u| !u.is_empty()).collect();
+                let users: Vec<String> = e
+                    .tg_users
+                    .read(cx)
+                    .value()
+                    .split(',')
+                    .map(|u| u.trim().to_string())
+                    .filter(|u| !u.is_empty())
+                    .collect();
                 let mut body = json!({"allowed_users": users});
                 if !token.is_empty() {
                     body["token"] = json!(token);
@@ -293,7 +351,11 @@ impl BenchApp {
                 if name == "new" {
                     ("POST", format!("/api/projects/{eid}/skills"), text)
                 } else {
-                    ("PUT", format!("/api/projects/{eid}/skills/{}", enc(&name)), text)
+                    (
+                        "PUT",
+                        format!("/api/projects/{eid}/skills/{}", enc(&name)),
+                        text,
+                    )
                 }
             }
         };
@@ -379,7 +441,13 @@ impl BenchApp {
 
     /// A row's Remove, twice: armed, then done. `what`: "mcp", "skill", "host" (out of the
     /// project), "project".
-    pub fn env_remove(&mut self, what: &'static str, name: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn env_remove(
+        &mut self,
+        what: &'static str,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(e) = self.project_env.as_mut() else {
             return;
         };
@@ -428,11 +496,21 @@ impl BenchApp {
     }
 
     /// An MCP server's or a prompt's row: its text opens under it to edit (again: closes).
-    pub fn env_open(&mut self, what: &'static str, name: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn env_open(
+        &mut self,
+        what: &'static str,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(e) = self.project_env.as_mut() else {
             return;
         };
-        let (open, editor, dirty) = if what == "mcp" { (&mut e.mcp_open, &e.mcp_json, &mut e.mcp_dirty) } else { (&mut e.prompt_open, &e.prompt_text, &mut e.prompt_dirty) };
+        let (open, editor, dirty) = if what == "mcp" {
+            (&mut e.mcp_open, &e.mcp_json, &mut e.mcp_dirty)
+        } else {
+            (&mut e.prompt_open, &e.prompt_text, &mut e.prompt_dirty)
+        };
         if open.as_deref() == Some(&name) && !*dirty {
             *open = None;
             cx.notify();
@@ -442,7 +520,12 @@ impl BenchApp {
         *dirty = false;
         let editor = editor.clone();
         if what == "mcp" {
-            let spec = e.mcp.iter().find(|m| m.0 == name).map(|m| m.6.clone()).unwrap_or_default();
+            let spec = e
+                .mcp
+                .iter()
+                .find(|m| m.0 == name)
+                .map(|m| m.6.clone())
+                .unwrap_or_default();
             editor.update(cx, |s, cx| s.set_value(spec, window, cx));
             cx.notify();
             return;
@@ -459,7 +542,14 @@ impl BenchApp {
             move || rest::get_raw(&conn, &profile, &path),
             move |_, r, window, cx| {
                 if let Ok(v) = r {
-                    let text = v["prompts"].as_array().into_iter().flatten().find(|p| p["name"].as_str() == Some(&name)).and_then(|p| p["text"].as_str()).unwrap_or_default().to_string();
+                    let text = v["prompts"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .find(|p| p["name"].as_str() == Some(&name))
+                        .and_then(|p| p["text"].as_str())
+                        .unwrap_or_default()
+                        .to_string();
                     editor.update(cx, |s, cx| s.set_value(text, window, cx));
                 }
                 cx.notify();
@@ -480,8 +570,11 @@ impl BenchApp {
         e.skill_open = Some(name.clone());
         e.skill_dirty = false;
         if self.demo {
-            let text = format!("---\nname: {name}\ndescription: A made-up skill of the demo.\n---\n\nWhat to do, step by step.");
-            e.skill_text.update(cx, |s, cx| s.set_value(text, window, cx));
+            let text = format!(
+                "---\nname: {name}\ndescription: A made-up skill of the demo.\n---\n\nWhat to do, step by step."
+            );
+            e.skill_text
+                .update(cx, |s, cx| s.set_value(text, window, cx));
             cx.notify();
             return;
         }
@@ -497,9 +590,14 @@ impl BenchApp {
             move || rest::get_raw(&conn, &profile, &path),
             move |this, r, window, cx| match r {
                 Ok(v) => {
-                    if let Some(e) = this.project_env.as_mut().filter(|e| e.skill_open.as_deref() == Some(&name)) {
+                    if let Some(e) = this
+                        .project_env
+                        .as_mut()
+                        .filter(|e| e.skill_open.as_deref() == Some(&name))
+                    {
                         let text = v["text"].as_str().unwrap_or_default().to_string();
-                        e.skill_text.update(cx, |s, cx| s.set_value(text, window, cx));
+                        e.skill_text
+                            .update(cx, |s, cx| s.set_value(text, window, cx));
                         e.skill_dirty = false;
                     }
                     cx.notify();
@@ -510,11 +608,20 @@ impl BenchApp {
     }
 
     /// A row's click: its card opens under the block (again: it closes); one card at a time.
-    pub fn env_card(&mut self, kind: &'static str, name: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn env_card(
+        &mut self,
+        kind: &'static str,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(e) = self.project_env.as_mut() else {
             return;
         };
-        let again = e.card.as_ref().is_some_and(|(k, n)| *k == kind && *n == name);
+        let again = e
+            .card
+            .as_ref()
+            .is_some_and(|(k, n)| *k == kind && *n == name);
         e.soul_open = false;
         e.tg_open = false;
         e.mcp_open = None;
@@ -568,10 +675,18 @@ impl BenchApp {
             cx.notify();
             return;
         }
-        let j = e.cron.iter().find(|j| j.id == job).cloned().unwrap_or_default();
-        e.cron_name.update(cx, |s, cx| s.set_value(j.name.clone(), window, cx));
-        e.cron_schedule.update(cx, |s, cx| s.set_value(j.schedule.clone(), window, cx));
-        e.cron_prompt.update(cx, |s, cx| s.set_value(j.prompt.clone(), window, cx));
+        let j = e
+            .cron
+            .iter()
+            .find(|j| j.id == job)
+            .cloned()
+            .unwrap_or_default();
+        e.cron_name
+            .update(cx, |s, cx| s.set_value(j.name.clone(), window, cx));
+        e.cron_schedule
+            .update(cx, |s, cx| s.set_value(j.schedule.clone(), window, cx));
+        e.cron_prompt
+            .update(cx, |s, cx| s.set_value(j.prompt.clone(), window, cx));
         e.cron_open = Some(job.clone());
         e.cron_dirty = false;
         if job == "new" {
@@ -581,7 +696,13 @@ impl BenchApp {
     }
 
     /// A job's "Run now", "Pause", "Resume".
-    pub fn env_cron(&mut self, job: String, action: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn env_cron(
+        &mut self,
+        job: String,
+        action: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
             return;
         };
@@ -597,7 +718,12 @@ impl BenchApp {
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     if action == "trigger" {
-                        this.toast(NotificationType::Info, "Started: its thread shows in the project", window, cx);
+                        this.toast(
+                            NotificationType::Info,
+                            "Started: its thread shows in the project",
+                            window,
+                            cx,
+                        );
                     }
                     this.load_env(&id, window, cx);
                 }
@@ -626,17 +752,27 @@ impl BenchApp {
                     match v["url"].as_str().filter(|u| !u.is_empty()) {
                         Some(url) => {
                             cx.open_url(url);
-                            this.toast(NotificationType::Info, "Sign in in the browser: the server connects when you are back", window, cx);
+                            this.toast(
+                                NotificationType::Info,
+                                "Sign in in the browser: the server connects when you are back",
+                                window,
+                                cx,
+                            );
                         }
                         None => this.toast(NotificationType::Success, "Connected", window, cx),
                     }
                     // Read again every 3 s for 3 minutes, until it no longer asks.
                     cx.spawn_in(window, async move |this, cx| {
                         for _ in 0..60 {
-                            cx.background_executor().timer(std::time::Duration::from_secs(3)).await;
+                            cx.background_executor()
+                                .timer(std::time::Duration::from_secs(3))
+                                .await;
                             let more = this
                                 .update_in(cx, |this, window, cx| {
-                                    let waiting = this.project_env.as_ref().is_some_and(|e| e.id == id && e.mcp_auth.contains(&name));
+                                    let waiting = this
+                                        .project_env
+                                        .as_ref()
+                                        .is_some_and(|e| e.id == id && e.mcp_auth.contains(&name));
                                     if waiting {
                                         this.load_env(&id, window, cx);
                                     }
@@ -697,7 +833,12 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         .as_array()
         .into_iter()
         .flatten()
-        .map(|k| (k["name"].as_str().unwrap_or_default().to_string(), k["description"].as_str().unwrap_or_default().to_string()))
+        .map(|k| {
+            (
+                k["name"].as_str().unwrap_or_default().to_string(),
+                k["description"].as_str().unwrap_or_default().to_string(),
+            )
+        })
         .collect();
     e.hosts = v["hosts"]
         .as_array()
@@ -705,22 +846,45 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         .flatten()
         .map(|h| {
             let s = |k: &str| h[k].as_str().unwrap_or_default().to_string();
-            let at = if s("user").is_empty() { s("host") } else { format!("{}@{}", s("user"), s("host")) };
+            let at = if s("user").is_empty() {
+                s("host")
+            } else {
+                format!("{}@{}", s("user"), s("host"))
+            };
             (s("id"), s("name"), s("kind"), at)
         })
         .collect();
     e.telegram = v["telegram"].as_object().map(|t| {
         (
-            t.get("username").and_then(Value::as_str).unwrap_or_default().to_string(),
-            t.get("allowed_users").and_then(Value::as_array).map(|a| a.iter().filter_map(|u| u.as_str().map(str::to_string)).collect()).unwrap_or_default(),
-            t.get("token").and_then(Value::as_str).unwrap_or_default().to_string(),
+            t.get("username")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            t.get("allowed_users")
+                .and_then(Value::as_array)
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|u| u.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default(),
+            t.get("token")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
         )
     });
     if !e.tg_dirty {
-        let users = e.telegram.as_ref().map(|t| t.1.join(", ")).unwrap_or_default();
-        e.tg_users.update(cx, |s, cx| s.set_value(users, window, cx));
+        let users = e
+            .telegram
+            .as_ref()
+            .map(|t| t.1.join(", "))
+            .unwrap_or_default();
+        e.tg_users
+            .update(cx, |s, cx| s.set_value(users, window, cx));
         let token = e.telegram.as_ref().map(|t| t.2.clone()).unwrap_or_default();
-        e.tg_token.update(cx, |s, cx| s.set_value(token, window, cx));
+        e.tg_token
+            .update(cx, |s, cx| s.set_value(token, window, cx));
     }
     if !e.soul_dirty {
         let text = v["soul"].as_str().unwrap_or_default().to_string();
@@ -737,7 +901,10 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
                 id: s("id"),
                 name: s("name"),
                 prompt: s("prompt"),
-                schedule: j["schedule"]["expr"].as_str().unwrap_or_default().to_string(),
+                schedule: j["schedule"]["expr"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string(),
                 display: s("schedule_display"),
                 enabled: j["enabled"].as_bool().unwrap_or(true),
                 next_run: o("next_run_at"),
@@ -747,9 +914,17 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
             }
         })
         .collect();
-    e.prompts = v["prompts"].as_array().into_iter().flatten().filter_map(|p| p.as_str().map(str::to_string)).collect();
+    e.prompts = v["prompts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|p| p.as_str().map(str::to_string))
+        .collect();
     if !e.name_dirty {
-        let name = v["project"]["name"].as_str().unwrap_or_default().to_string();
+        let name = v["project"]["name"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
         e.name.update(cx, |s, cx| s.set_value(name, window, cx));
     }
 }

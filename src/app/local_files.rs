@@ -45,8 +45,24 @@ pub struct FileForm {
 
 impl LocalFiles {
     pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
-        let editor = cx.new(|cx| EditorState::new(window, cx).scroll_beyond_last_line(Some(0)).line_number(true).soft_wrap(false));
-        Self { owner: None, path: String::new(), entries: vec![], loading: false, error: None, file: None, saved: String::new(), truncated: false, editor, form: None }
+        let editor = cx.new(|cx| {
+            EditorState::new(window, cx)
+                .scroll_beyond_last_line(Some(0))
+                .line_number(true)
+                .soft_wrap(false)
+        });
+        Self {
+            owner: None,
+            path: String::new(),
+            entries: vec![],
+            loading: false,
+            error: None,
+            file: None,
+            saved: String::new(),
+            truncated: false,
+            editor,
+            form: None,
+        }
     }
 
     /// The open file was edited since it was opened or saved.
@@ -67,11 +83,21 @@ impl BenchApp {
 
     /// The thread's project's folder ("" when it has none: the agent's home).
     pub fn project_folder(&self) -> String {
-        self.projects.iter().find(|p| p.id == self.thread_project).and_then(|p| p.folder.clone()).unwrap_or_default()
+        self.projects
+            .iter()
+            .find(|p| p.id == self.thread_project)
+            .and_then(|p| p.folder.clone())
+            .unwrap_or_default()
     }
 
     /// Show a folder (and a file in it), as an insert last left it.
-    pub fn show_dir(&mut self, path: String, file: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn show_dir(
+        &mut self,
+        path: String,
+        file: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some((conn, profile)) = self.files_conn() else {
             return;
         };
@@ -92,7 +118,10 @@ impl BenchApp {
                 f.loading = false;
                 match r {
                     Ok(mut entries) => {
-                        entries.sort_by(|a, b| b.2.cmp(&a.2).then(a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+                        entries.sort_by(|a, b| {
+                            b.2.cmp(&a.2)
+                                .then(a.0.to_lowercase().cmp(&b.0.to_lowercase()))
+                        });
                         f.entries = entries;
                     }
                     Err(e) => f.error = Some(format!("{e:#}")),
@@ -107,7 +136,13 @@ impl BenchApp {
     }
 
     /// A row's click: a folder opens in place, a file under the insert.
-    pub fn open_local_entry(&mut self, path: String, dir: bool, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn open_local_entry(
+        &mut self,
+        path: String,
+        dir: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if dir {
             self.show_dir(path, String::new(), window, cx);
         } else {
@@ -126,7 +161,12 @@ impl BenchApp {
             move || rest::read_text(&conn, &profile, &p),
             move |this, r, window, cx| {
                 match r {
-                    Ok(t) if t.binary => this.toast(NotificationType::Info, "Not a text file: open it in Zed", window, cx),
+                    Ok(t) if t.binary => this.toast(
+                        NotificationType::Info,
+                        "Not a text file: open it in Zed",
+                        window,
+                        cx,
+                    ),
                     Ok(t) => {
                         let language = crate::lang::language_for_text(&path, &t.text);
                         let f = &mut this.local_files;
@@ -146,11 +186,18 @@ impl BenchApp {
     }
 
     pub fn save_local_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some((conn, profile)), Some(path)) = (self.files_conn(), self.local_files.file.clone()) else {
+        let (Some((conn, profile)), Some(path)) =
+            (self.files_conn(), self.local_files.file.clone())
+        else {
             return;
         };
         if self.local_files.truncated {
-            self.toast(NotificationType::Error, "Too big to show whole: not saved", window, cx);
+            self.toast(
+                NotificationType::Error,
+                "Too big to show whole: not saved",
+                window,
+                cx,
+            );
             return;
         }
         let text = self.local_files.editor.read(cx).value().to_string();
@@ -170,11 +217,34 @@ impl BenchApp {
     }
 
     /// "New file" / "New folder" on an insert's head: the card that names it.
-    pub fn open_file_form(&mut self, insert: String, remote: bool, folder: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let name = cx.new(|cx| InputState::new(window, cx).placeholder(if folder { "Folder name" } else { "File name, e.g. notes.md" }));
+    pub fn open_file_form(
+        &mut self,
+        insert: String,
+        remote: bool,
+        folder: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let name = cx.new(|cx| {
+            InputState::new(window, cx).placeholder(if folder {
+                "Folder name"
+            } else {
+                "File name, e.g. notes.md"
+            })
+        });
         name.update(cx, |s, cx| s.focus(window, cx));
-        let content = cx.new(|cx| TextareaState::new(window, cx).auto_grow(6, 100_000).placeholder("What it holds (may stay empty)"));
-        self.local_files.form = Some(FileForm { insert, remote, folder, name, content });
+        let content = cx.new(|cx| {
+            TextareaState::new(window, cx)
+                .auto_grow(6, 100_000)
+                .placeholder("What it holds (may stay empty)")
+        });
+        self.local_files.form = Some(FileForm {
+            insert,
+            remote,
+            folder,
+            name,
+            content,
+        });
         cx.notify();
     }
 
@@ -201,9 +271,21 @@ impl BenchApp {
                 cx,
                 move || {
                     if folder {
-                        rest::send_json(&conn, "POST", &format!("/api/hosts/{id}/mkdir"), &profile, json!({"path": path}))
+                        rest::send_json(
+                            &conn,
+                            "POST",
+                            &format!("/api/hosts/{id}/mkdir"),
+                            &profile,
+                            json!({"path": path}),
+                        )
                     } else {
-                        rest::send_json(&conn, "PUT", &format!("/api/hosts/{id}/file"), &profile, json!({"path": path, "text": text}))
+                        rest::send_json(
+                            &conn,
+                            "PUT",
+                            &format!("/api/hosts/{id}/file"),
+                            &profile,
+                            json!({"path": path, "text": text}),
+                        )
                     }
                 },
                 |this, r, window, cx| match r {
@@ -225,7 +307,14 @@ impl BenchApp {
                 cx,
                 move || {
                     if folder {
-                        rest::send_json(&conn, "POST", "/api/fs/mkdir", &profile, json!({"path": path})).map(|_| ())
+                        rest::send_json(
+                            &conn,
+                            "POST",
+                            "/api/fs/mkdir",
+                            &profile,
+                            json!({"path": path}),
+                        )
+                        .map(|_| ())
                     } else {
                         rest::write_text(&conn, &profile, &path, &text)
                     }
@@ -244,7 +333,13 @@ impl BenchApp {
 
     /// A row's trash: the first click arms it, the second removes the file or folder (a local
     /// folder with what is in it; a host's folder only when empty).
-    pub fn delete_entry(&mut self, remote: bool, path: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn delete_entry(
+        &mut self,
+        remote: bool,
+        path: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let key = format!("entry:{path}");
         if self.confirm_delete.as_deref() != Some(key.as_str()) {
             self.confirm_delete = Some(key);
@@ -261,7 +356,15 @@ impl BenchApp {
             self.background(
                 window,
                 cx,
-                move || rest::send_json(&conn, "DELETE", &format!("/api/hosts/{id}/file?path={}", super::remote_files::enc(&q)), &profile, Value::Null),
+                move || {
+                    rest::send_json(
+                        &conn,
+                        "DELETE",
+                        &format!("/api/hosts/{id}/file?path={}", super::remote_files::enc(&q)),
+                        &profile,
+                        Value::Null,
+                    )
+                },
                 move |this, r, window, cx| match r {
                     Ok(_) => {
                         if this.files_remote.file.as_deref() == Some(path.as_str()) {
@@ -281,7 +384,15 @@ impl BenchApp {
             self.background(
                 window,
                 cx,
-                move || rest::send_json(&conn, "POST", "/api/fs/delete", &profile, json!({"path": q})),
+                move || {
+                    rest::send_json(
+                        &conn,
+                        "POST",
+                        "/api/fs/delete",
+                        &profile,
+                        json!({"path": q}),
+                    )
+                },
                 move |this, r, window, cx| match r {
                     Ok(_) => {
                         if this.local_files.file.as_deref() == Some(path.as_str()) {

@@ -27,14 +27,16 @@ impl TaskStore {
         let (tx, rx) = mpsc::channel::<Cmd>();
         std::thread::spawn(move || {
             if let Err(e) = move_from_reminders(&conn, &profile) {
-                let _ =
-                    evt.try_send(Evt::Error(format!("Moving tasks from Reminders: {e:#}")));
+                let _ = evt.try_send(Evt::Error(format!("Moving tasks from Reminders: {e:#}")));
             }
             for cmd in rx {
                 let r = match cmd {
-                    Cmd::Load { done_since } => load(&conn, &profile, done_since).map(Evt::Loaded).map(Some),
-                    Cmd::Save { task, token } => save(&conn, &profile, &task)
-                        .map(|id| Some(Evt::Created { token, id })),
+                    Cmd::Load { done_since } => {
+                        load(&conn, &profile, done_since).map(Evt::Loaded).map(Some)
+                    }
+                    Cmd::Save { task, token } => {
+                        save(&conn, &profile, &task).map(|id| Some(Evt::Created { token, id }))
+                    }
                     Cmd::Delete(id) => crate::rest::send_json(
                         &conn,
                         "DELETE",
@@ -75,7 +77,11 @@ fn from_json(v: &Value) -> Task {
         notes: s("notes"),
         tags: v["tags"]
             .as_array()
-            .map(|a| a.iter().filter_map(|t| t.as_str().map(str::to_string)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|t| t.as_str().map(str::to_string))
+                    .collect()
+            })
             .unwrap_or_default(),
         day: day(&v["day"]),
         evening: v["evening"].as_bool().unwrap_or(false),
@@ -119,7 +125,13 @@ fn save(conn: &Connection, profile: &str, t: &Task) -> Result<String> {
     let v = if t.id.is_empty() {
         crate::rest::send_json(conn, "POST", "/api/tasks", profile, to_json(t))?
     } else {
-        crate::rest::send_json(conn, "PUT", &format!("/api/tasks/{}", t.id), profile, to_json(t))?
+        crate::rest::send_json(
+            conn,
+            "PUT",
+            &format!("/api/tasks/{}", t.id),
+            profile,
+            to_json(t),
+        )?
     };
     v["task"]["id"]
         .as_str()
@@ -156,18 +168,21 @@ fn move_from_reminders(conn: &Connection, profile: &str) -> Result<()> {
         json!({ "tasks": backup }),
     )?;
     // Every reminder must be in the agent's store before any is removed.
-    let have: std::collections::HashSet<String> = crate::rest::get_raw(conn, profile, "/api/tasks?done_since=1970-01-01")?["tasks"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|t| t["source_id"].as_str().map(str::to_string))
-        .collect();
+    let have: std::collections::HashSet<String> =
+        crate::rest::get_raw(conn, profile, "/api/tasks?done_since=1970-01-01")?["tasks"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|t| t["source_id"].as_str().map(str::to_string))
+            .collect();
     let missing = all
         .iter()
         .filter(|t| !have.contains(&format!("reminder:{}", t.id)))
         .count();
     if missing > 0 {
-        return Err(anyhow!("{missing} tasks did not arrive; Reminders left as they are"));
+        return Err(anyhow!(
+            "{missing} tasks did not arrive; Reminders left as they are"
+        ));
     }
     let mut removed = 0;
     for t in &all {
@@ -175,7 +190,10 @@ fn move_from_reminders(conn: &Connection, profile: &str) -> Result<()> {
             removed += 1;
         }
     }
-    std::fs::write(&marker, format!("{} moved, {removed} removed from Reminders\n", all.len()))?;
+    std::fs::write(
+        &marker,
+        format!("{} moved, {removed} removed from Reminders\n", all.len()),
+    )?;
     Ok(())
 }
 

@@ -36,7 +36,11 @@ impl BenchApp {
         let list_h = (matches.len() as f32).min(SLASH_ROWS) * SLASH_ROW + 10.;
         let below = f32::from(self.composer_y) + super::TURN_Y + 30.;
         let room = f32::from(self.viewport_h) - 36. - below;
-        let top = if room < list_h && f32::from(self.composer_y) > list_h + 48. { super::TURN_Y - list_h - 6. } else { super::TURN_Y + 30. };
+        let top = if room < list_h && f32::from(self.composer_y) > list_h + 48. {
+            super::TURN_Y - list_h - 6.
+        } else {
+            super::TURN_Y + 30.
+        };
         let rows = matches.into_iter().enumerate().map(|(i, c)| {
             let on = i == sel;
             h_flex()
@@ -49,11 +53,7 @@ impl BenchApp {
                 .cursor_pointer()
                 .when(on, |d| d.bg(theme.list_active))
                 .hover(|s| s.bg(theme.list_hover))
-                .child(
-                    div()
-                        .flex_none()
-                        .child(c.name),
-                )
+                .child(div().flex_none().child(c.name))
                 .child(
                     div()
                         .flex_1()
@@ -83,7 +83,8 @@ impl BenchApp {
                 .child(
                     div()
                         .bg(theme.popover)
-                        .border_1().rounded_md()
+                        .border_1()
+                        .rounded_md()
                         .border_color(theme.border)
                         .py_1()
                         .child(
@@ -152,7 +153,9 @@ impl BenchApp {
             // Where it is in the window, for the `/` list (above or under the line).
             .child(
                 canvas(
-                    move |bounds, _, cx| view.update(cx, |this, _| this.composer_y = bounds.origin.y),
+                    move |bounds, _, cx| {
+                        view.update(cx, |this, _| this.composer_y = bounds.origin.y)
+                    },
                     |_, _, _, _| {},
                 )
                 .absolute()
@@ -226,7 +229,9 @@ impl BenchApp {
                                                 // Large = the messages' size; it grows with the
                                                 // text (no scroll of its own: the thread scrolls).
                                                 div().ml(px(-12.)).my(px(-10.)).child(
-                                                    Textarea::new(&self.composer).appearance(false).large(),
+                                                    Textarea::new(&self.composer)
+                                                        .appearance(false)
+                                                        .large(),
                                                 ),
                                             )
                                             .when(recording, |d| d.child(self.render_wave(&theme))),

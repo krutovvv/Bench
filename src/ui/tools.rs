@@ -13,7 +13,6 @@ use crate::app::BenchApp;
 use crate::devtools::{Kind, Tool};
 
 impl BenchApp {
-
     pub(super) fn render_tools_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let tool = self.tools.tool;
@@ -273,7 +272,8 @@ impl BenchApp {
                         .py_0p5()
                         .text_sm()
                         .font_family(crate::theme::MONO)
-                        .border_1().rounded_md()
+                        .border_1()
+                        .rounded_md()
                         .border_color(theme.border)
                         .cursor_pointer()
                         .when(on, |d| {
@@ -423,7 +423,8 @@ pub(super) fn small_button(
         .px_2()
         .py_0p5()
         .text_sm()
-        .border_1().rounded_md()
+        .border_1()
+        .rounded_md()
         .border_color(theme.border)
         .cursor_pointer()
         .hover(|s| s.bg(theme.list_hover))
@@ -459,7 +460,8 @@ pub(super) fn segmented_owned(
     let theme = cx.theme().clone();
     h_flex()
         .flex_none()
-        .border_1().rounded_md()
+        .border_1()
+        .rounded_md()
         .overflow_hidden()
         .border_color(theme.border)
         .children(labels.into_iter().enumerate().map(|(k, label)| {
@@ -489,7 +491,13 @@ pub(super) fn segmented_tall(
     cx: &mut Context<BenchApp>,
     on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
 ) -> AnyElement {
-    segmented_tall_owned(id, labels.iter().map(|s| s.to_string()).collect(), chosen, cx, on)
+    segmented_tall_owned(
+        id,
+        labels.iter().map(|s| s.to_string()).collect(),
+        chosen,
+        cx,
+        on,
+    )
 }
 
 /// `segmented_tall` with labels made at run time (a form's list of servers).
@@ -518,7 +526,9 @@ pub(super) fn segmented_tall_owned(
                 .px_3()
                 .cursor_pointer()
                 .when(k > 0, |d| d.border_l_1().border_color(theme.border))
-                .when(k == chosen, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
+                .when(k == chosen, |d| {
+                    d.bg(theme.primary).text_color(theme.primary_foreground)
+                })
                 .when(k != chosen, |d| d.hover(|s| s.bg(theme.list_hover)))
                 .child(label)
                 .on_click(cx.listener(move |this, _, window, cx| on(this, k, window, cx)))

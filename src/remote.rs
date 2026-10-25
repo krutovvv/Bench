@@ -2,9 +2,6 @@
 
 use std::path::PathBuf;
 
-
-
-
 /// Where a server's file is kept while open on this Mac.
 pub fn cache_path(alias: &str, remote: &str) -> PathBuf {
     crate::ssh::home()
@@ -13,9 +10,6 @@ pub fn cache_path(alias: &str, remote: &str) -> PathBuf {
         .join(remote.trim_start_matches('/'))
 }
 
-
-
-
 /// The server file a cache path is the local copy of: (alias, path on the server).
 pub fn origin(local: &str) -> Option<(String, String)> {
     let base = cache_path("", "");
@@ -23,8 +17,6 @@ pub fn origin(local: &str) -> Option<(String, String)> {
     let (alias, path) = rest.split_once('/')?;
     Some((alias.to_string(), format!("/{path}")))
 }
-
-
 
 #[cfg(test)]
 mod tests {

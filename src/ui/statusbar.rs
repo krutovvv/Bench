@@ -285,7 +285,11 @@ impl BenchApp {
         });
 
         // Terminals sent to the background: each brings it back into its thread; Stop all ends them.
-        let mut background_terms: Vec<(String, bool, Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>)> = self
+        let mut background_terms: Vec<(
+            String,
+            bool,
+            Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>,
+        )> = self
             .ssh
             .tabs
             .iter()
@@ -293,13 +297,14 @@ impl BenchApp {
             .enumerate()
             .map(|(k, t)| {
                 let id = t.id;
-                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> = Box::new(move |this, _, cx| {
-                    if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
-                        t.background = false;
-                        t.collapsed = false;
-                    }
-                    cx.notify();
-                });
+                let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
+                    Box::new(move |this, _, cx| {
+                        if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                            t.background = false;
+                            t.collapsed = false;
+                        }
+                        cx.notify();
+                    });
                 (format!("Terminal {}", k + 1), false, f)
             })
             .collect();
@@ -381,7 +386,14 @@ impl BenchApp {
             // Right: icons only — the terminals in the background (if any), attach, dictate,
             // settings.
             .when(!background_terms.is_empty(), |d| {
-                d.child(picker("bg-terminals", Ico::Terminal, String::new(), Some("Running terminals"), vec![], background_terms))
+                d.child(picker(
+                    "bg-terminals",
+                    Ico::Terminal,
+                    String::new(),
+                    Some("Running terminals"),
+                    vec![],
+                    background_terms,
+                ))
             })
             .child(
                 button("attach", Ico::Paperclip, "Attach files", false)
@@ -393,10 +405,18 @@ impl BenchApp {
                 if self.transcribing {
                     item("mic")
                         .text_color(muted)
-                        .child(gpui_kit::component::spinner::Spinner::new().icon(Ico::Loader.icon()).small())
+                        .child(
+                            gpui_kit::component::spinner::Spinner::new()
+                                .icon(Ico::Loader.icon())
+                                .small(),
+                        )
                         .tooltip(|window, cx| Tooltip::new("Transcribing…").build(window, cx))
                 } else {
-                    let (icon, tip) = if recording { (Ico::Square, "Stop and transcribe  ⌘⇧D") } else { (Ico::Mic, "Dictate  ⌘⇧D") };
+                    let (icon, tip) = if recording {
+                        (Ico::Square, "Stop and transcribe  ⌘⇧D")
+                    } else {
+                        (Ico::Mic, "Dictate  ⌘⇧D")
+                    };
                     button("mic", icon, tip, false)
                         .when(recording, |d| d.text_color(cx.theme().danger))
                         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))

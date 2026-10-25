@@ -13,7 +13,6 @@ use crate::app::BenchApp;
 use crate::icons::Ico;
 
 impl BenchApp {
-
     /// The header's right end in both modes: the SSH switch (pressed = SSH mode: servers and
     /// their terminals; released = sessions) and a new window. The IDE keeps its own close
     /// button at the far right of its panel.
@@ -188,9 +187,18 @@ impl BenchApp {
             ("Folder", f(&self.ssh.f_path)),
         ];
         let actions = vec![
-            super::form_action("srv-save", if editing.is_some() { "Save and connect" } else { "Add and connect" }, true, cx)
-                .on_click(cx.listener(|this, _, window, cx| this.save_server(window, cx)))
-                .into_any_element(),
+            super::form_action(
+                "srv-save",
+                if editing.is_some() {
+                    "Save and connect"
+                } else {
+                    "Add and connect"
+                },
+                true,
+                cx,
+            )
+            .on_click(cx.listener(|this, _, window, cx| this.save_server(window, cx)))
+            .into_any_element(),
             super::form_action("srv-key", "Choose a key…", false, cx)
                 .on_click(cx.listener(|this, _, window, cx| this.pick_key_file(window, cx)))
                 .into_any_element(),

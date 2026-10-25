@@ -369,16 +369,33 @@ impl Rpc {
                     Pending::Ignore,
                 )?
             }
-            Cmd::Queue { session, text, context } => {
+            Cmd::Queue {
+                session,
+                text,
+                context,
+            } => {
                 let mut params = json!({"session_id": session, "text": text, "mode": "queue"});
                 if !context.is_empty() {
                     params["context"] = json!(context);
                 }
                 self.call("prompt.submit", params, Pending::Ignore)?
             }
-            Cmd::QueueWithdraw { session, id } => self.call("session.queue.withdraw", json!({"session_id": session, "id": id}), Pending::Ignore)?,
-            Cmd::QueueSend { session, id } => self.call("session.queue.send", json!({"session_id": session, "id": id}), Pending::Ignore)?,
-            Cmd::Insert { session, id, key, state } => self.call(
+            Cmd::QueueWithdraw { session, id } => self.call(
+                "session.queue.withdraw",
+                json!({"session_id": session, "id": id}),
+                Pending::Ignore,
+            )?,
+            Cmd::QueueSend { session, id } => self.call(
+                "session.queue.send",
+                json!({"session_id": session, "id": id}),
+                Pending::Ignore,
+            )?,
+            Cmd::Insert {
+                session,
+                id,
+                key,
+                state,
+            } => self.call(
                 "session.insert",
                 json!({"session_id": session, "id": id, "key": key, "state": state}),
                 Pending::Inserts(session.clone()),
@@ -756,7 +773,13 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
 }
 
 fn inserts(v: &Value) -> Vec<crate::model::Insert> {
-    v.as_array().map(|a| a.iter().filter_map(crate::model::Insert::from_json).collect()).unwrap_or_default()
+    v.as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(crate::model::Insert::from_json)
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn on_event(p: &Value, emit: &impl Fn(Evt)) {

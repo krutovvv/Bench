@@ -19,7 +19,10 @@ const DRAFT: &str = "draft";
 impl BenchApp {
     /// The open thread's inserts, in order.
     pub fn thread_inserts(&self) -> Vec<Insert> {
-        self.inserts.get(&self.thread_key()).cloned().unwrap_or_default()
+        self.inserts
+            .get(&self.thread_key())
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// What a "/" row puts in: "files:<id>" → files on that host, "tasks:<list>", "tools:<tool>";
@@ -62,7 +65,10 @@ impl BenchApp {
             folded: false,
             after: self.turns.len(),
         };
-        self.inserts.entry(thread.clone()).or_default().push(ins.clone());
+        self.inserts
+            .entry(thread.clone())
+            .or_default()
+            .push(ins.clone());
         match self.session.clone() {
             Some(session) => self.send_insert(&session, &ins),
             None => self.create_thread_now(),
@@ -131,14 +137,23 @@ impl BenchApp {
         }
         // A draft's inserts reach the agent when its session does (`inserts_created`).
         if let Some(session) = self.session.clone() {
-            self.cmd(Cmd::PatchInsert { session, id: id.to_string(), patch });
+            self.cmd(Cmd::PatchInsert {
+                session,
+                id: id.to_string(),
+                patch,
+            });
         }
         cx.notify();
     }
 
     /// An insert's state as it is on screen now (the folder a file host shows…): sent when it
     /// differs from what the agent has.
-    pub fn sync_insert_state(&mut self, id: &str, state: Map<String, Value>, cx: &mut Context<Self>) {
+    pub fn sync_insert_state(
+        &mut self,
+        id: &str,
+        state: Map<String, Value>,
+        cx: &mut Context<Self>,
+    ) {
         let same = self
             .inserts
             .get(&self.thread_key())
@@ -177,6 +192,8 @@ impl BenchApp {
 
     /// Whether the open thread shows the browser (unfolded): its frames flow only then.
     pub fn thread_has_browser(&self) -> bool {
-        self.thread_inserts().iter().any(|i| i.key == "browser" && !i.folded)
+        self.thread_inserts()
+            .iter()
+            .any(|i| i.key == "browser" && !i.folded)
     }
 }

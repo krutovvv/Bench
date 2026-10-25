@@ -13,9 +13,7 @@ use chrono::{Local, NaiveDate, TimeZone as _};
 use objc2::rc::Retained;
 use objc2::runtime::Bool;
 use objc2_event_kit::{EKAuthorizationStatus, EKEntityType, EKEventStore, EKReminder};
-use objc2_foundation::{
-    NSArray, NSDate, NSDateComponentUndefined, NSError, NSString,
-};
+use objc2_foundation::{NSArray, NSDate, NSDateComponentUndefined, NSError, NSString};
 
 use crate::tasks::Task;
 
@@ -38,8 +36,6 @@ pub enum Evt {
     Created { token: u64, id: String },
     Error(String),
 }
-
-
 
 fn day_of(date: &NSDate) -> NaiveDate {
     let secs = date.timeIntervalSince1970() as i64;
@@ -88,7 +84,6 @@ fn to_task(r: &EKReminder) -> Task {
     t
 }
 
-
 fn find(store: &EKEventStore, id: &str) -> Option<Retained<EKReminder>> {
     let item = unsafe { store.calendarItemWithIdentifier(&NSString::from_str(id)) }?;
     item.downcast::<EKReminder>().ok()
@@ -111,10 +106,12 @@ fn load(store: &EKEventStore, done_since: NaiveDate) -> Result<Vec<Task>> {
     Ok(out)
 }
 
-
 /// Every reminder, open and done (the one-time move into Bench's own store).
 pub fn load_all(store: &EKEventStore) -> Result<Vec<Task>> {
-    load(store, NaiveDate::from_ymd_opt(1971, 1, 1).unwrap_or_default())
+    load(
+        store,
+        NaiveDate::from_ymd_opt(1971, 1, 1).unwrap_or_default(),
+    )
 }
 
 pub fn remove(store: &EKEventStore, id: &str) -> Result<()> {

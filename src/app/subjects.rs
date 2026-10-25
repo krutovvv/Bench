@@ -18,7 +18,11 @@ impl BenchApp {
         self.project_form = None;
         let target = match self.subject_target.take() {
             Some(t) => t,
-            None => self.sessions.iter().find(|s| s.subject == key).map(|s| s.id.clone()),
+            None => self
+                .sessions
+                .iter()
+                .find(|s| s.subject == key)
+                .map(|s| s.id.clone()),
         };
         match target {
             Some(id) => self.open_session(id, cx),
@@ -68,7 +72,11 @@ impl BenchApp {
         let mut rows: Vec<crate::model::SlashCommand> = match word.to_lowercase().as_str() {
             "terminal" => {
                 let host = self.thread_host();
-                let desc = if host.is_empty() { "this Mac's terminal".to_string() } else { format!("the terminal on {host}, where this project runs") };
+                let desc = if host.is_empty() {
+                    "this Mac's terminal".to_string()
+                } else {
+                    format!("the terminal on {host}, where this project runs")
+                };
                 vec![row("/terminal".into(), desc, "ssh:local".into())]
             }
             "ssh" => {
@@ -77,10 +85,27 @@ impl BenchApp {
                     self.ssh
                         .servers
                         .iter()
-                        .filter(|s| ours(self.ssh_projects.get(&s.alias).map(String::as_str).unwrap_or("")))
-                        .map(|s| row(format!("/ssh {}", s.alias), s.hostname.clone(), format!("ssh:{}", s.alias))),
+                        .filter(|s| {
+                            ours(
+                                self.ssh_projects
+                                    .get(&s.alias)
+                                    .map(String::as_str)
+                                    .unwrap_or(""),
+                            )
+                        })
+                        .map(|s| {
+                            row(
+                                format!("/ssh {}", s.alias),
+                                s.hostname.clone(),
+                                format!("ssh:{}", s.alias),
+                            )
+                        }),
                 );
-                v.push(row("/ssh New server…".into(), "add one to ~/.ssh/config".into(), "new:ssh".into()));
+                v.push(row(
+                    "/ssh New server…".into(),
+                    "add one to ~/.ssh/config".into(),
+                    "new:ssh".into(),
+                ));
                 v
             }
             "ftp" => {
@@ -89,25 +114,53 @@ impl BenchApp {
                     .hosts
                     .iter()
                     .filter(|h| ours(&h.project))
-                    .map(|h| row(format!("/ftp {}", h.name), format!("{}@{}", h.user, h.host), format!("files:{}", h.id)))
+                    .map(|h| {
+                        row(
+                            format!("/ftp {}", h.name),
+                            format!("{}@{}", h.user, h.host),
+                            format!("files:{}", h.id),
+                        )
+                    })
                     .collect();
-                v.push(row("/ftp New host…".into(), "FTP, FTPS or SFTP".into(), "new:ftp".into()));
+                v.push(row(
+                    "/ftp New host…".into(),
+                    "FTP, FTPS or SFTP".into(),
+                    "new:ftp".into(),
+                ));
                 v
             }
-            "browser" => vec![row("/browser".into(), "the server's browser: its tab, live".into(), "browser".into())],
+            "browser" => vec![row(
+                "/browser".into(),
+                "the server's browser: its tab, live".into(),
+                "browser".into(),
+            )],
             "tasks" => crate::tasks::LISTS
                 .iter()
-                .map(|l| row(format!("/tasks {}", l.name()), "the task lists, on this one".into(), format!("tasks:{}", l.name().to_lowercase())))
+                .map(|l| {
+                    row(
+                        format!("/tasks {}", l.name()),
+                        "the task lists, on this one".into(),
+                        format!("tasks:{}", l.name().to_lowercase()),
+                    )
+                })
                 .collect(),
             "tools" | "tool" => GROUPS
                 .iter()
                 .flat_map(|g| g.tools.iter().map(move |t| (*t, g.name)))
-                .map(|(t, g)| row(format!("/tools {}", t.name()), g.to_string(), format!("tools:{}", tool_key(t))))
+                .map(|(t, g)| {
+                    row(
+                        format!("/tools {}", t.name()),
+                        g.to_string(),
+                        format!("tools:{}", tool_key(t)),
+                    )
+                })
                 .collect(),
             _ => return None,
         };
         if !q.is_empty() {
-            rows.retain(|r| r.name.to_lowercase().contains(&q) || r.desc.to_lowercase().contains(&q));
+            rows.retain(|r| {
+                r.name.to_lowercase().contains(&q) || r.desc.to_lowercase().contains(&q)
+            });
         }
         Some(rows)
     }
@@ -136,14 +189,29 @@ impl BenchApp {
     }
 
     /// A server's terminal in a new thread.
-    pub fn open_server_thread(&mut self, alias: String, window: &mut Window, cx: &mut Context<Self>) {
-        let key = if alias.is_empty() { "ssh:local".to_string() } else { format!("ssh:{alias}") };
+    pub fn open_server_thread(
+        &mut self,
+        alias: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let key = if alias.is_empty() {
+            "ssh:local".to_string()
+        } else {
+            format!("ssh:{alias}")
+        };
         self.new_thread_with(key, window, cx);
     }
 
     /// A terminal insert's own shell on `alias`, started if there is none, it ended, or the
     /// insert switched to another server.
-    pub fn insert_terminal(&mut self, insert: &str, alias: &str, window: &mut Window, cx: &mut Context<Self>) -> Option<usize> {
+    pub fn insert_terminal(
+        &mut self,
+        insert: &str,
+        alias: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<usize> {
         if let Some(t) = self.ssh.tab_of_insert(insert) {
             let tab = &self.ssh.tabs[t];
             if tab.alias == alias && !tab.session.exited.load(std::sync::atomic::Ordering::SeqCst) {
@@ -157,7 +225,6 @@ impl BenchApp {
         Some(t)
     }
 
-
     /// A tool in a new thread.
     pub fn open_tool_thread(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
         self.new_thread_with(format!("tools:{}", tool_key(tool)), window, cx);
@@ -167,7 +234,12 @@ impl BenchApp {
     pub fn subject_title(&self) -> Option<String> {
         let s = self.current_subject();
         let id = s.strip_prefix("env:")?;
-        let name = self.projects.iter().find(|p| p.id == id).map(|p| p.name.clone()).unwrap_or_else(|| crate::app::LOCAL_HOST.into());
+        let name = self
+            .projects
+            .iter()
+            .find(|p| p.id == id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| crate::app::LOCAL_HOST.into());
         Some(format!("{name}: environment"))
     }
 
@@ -179,12 +251,21 @@ impl BenchApp {
     /// "!command": typed into the thread's terminal (its last terminal insert); a thread with
     /// none gets this Mac's, in the thread's folder.
     pub fn run_bang(&mut self, command: String, window: &mut Window, cx: &mut Context<Self>) {
-        let last = self.thread_inserts().into_iter().rev().find(|i| i.key.starts_with("ssh:"));
+        let last = self
+            .thread_inserts()
+            .into_iter()
+            .rev()
+            .find(|i| i.key.starts_with("ssh:"));
         let (ins, fresh) = match last {
             Some(i) => (i, false),
             None => {
                 self.put_insert("ssh:local".into(), window, cx);
-                match self.thread_inserts().into_iter().rev().find(|i| i.key == "ssh:local") {
+                match self
+                    .thread_inserts()
+                    .into_iter()
+                    .rev()
+                    .find(|i| i.key == "ssh:local")
+                {
                     Some(i) => (i, true),
                     None => return,
                 }
@@ -198,11 +279,15 @@ impl BenchApp {
             // Start where the thread works.
             if fresh {
                 if let Some(dir) = self.folder_of_current() {
-                    self.ssh.tabs[t].session.write(format!("cd {}\r", shell_quote(&dir)).as_bytes());
+                    self.ssh.tabs[t]
+                        .session
+                        .write(format!("cd {}\r", shell_quote(&dir)).as_bytes());
                 }
             }
             if !command.is_empty() {
-                self.ssh.tabs[t].session.write(format!("{command}\r").as_bytes());
+                self.ssh.tabs[t]
+                    .session
+                    .write(format!("{command}\r").as_bytes());
             }
             self.ssh.tabs[t].background = false;
             self.ssh.tabs[t].focus.focus(window, cx);
@@ -212,7 +297,10 @@ impl BenchApp {
 
     /// The open thread's folder, when it works in one.
     fn folder_of_current(&self) -> Option<String> {
-        self.session.as_ref().and_then(|id| self.folder_of(id)).or_else(|| self.new_project.clone())
+        self.session
+            .as_ref()
+            .and_then(|id| self.folder_of(id))
+            .or_else(|| self.new_project.clone())
     }
 
     /// What the thread's live block shows right now, for the agent (sent with each message, not
@@ -239,8 +327,16 @@ impl BenchApp {
         format!(
             "The environment block shows the folder {}, MCP servers: {}, skills: {}.",
             e.dir,
-            if mcp.is_empty() { "none".to_string() } else { mcp.join(", ") },
-            if skills.is_empty() { "none".to_string() } else { skills.join(", ") },
+            if mcp.is_empty() {
+                "none".to_string()
+            } else {
+                mcp.join(", ")
+            },
+            if skills.is_empty() {
+                "none".to_string()
+            } else {
+                skills.join(", ")
+            },
         )
     }
 }

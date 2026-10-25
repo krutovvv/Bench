@@ -18,8 +18,8 @@ mod tools;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::Value;
 
@@ -56,24 +56,56 @@ pub trait InsertKind: Sync {
         vec![]
     }
     /// The head's own controls, left of "remove".
-    fn controls(&self, _app: &mut BenchApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn controls(
+        &self,
+        _app: &mut BenchApp,
+        _ins: &Insert,
+        _window: &mut Window,
+        _cx: &mut Context<BenchApp>,
+    ) -> Vec<AnyElement> {
         vec![]
     }
     /// What it shows, under the head; None: the head alone.
-    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement>;
+    fn body(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement>;
     /// What it opened, as the next row of the thread, as if the agent brought it (the open file,
     /// the open task): only while the insert is live and unfolded.
-    fn follow(&self, _app: &mut BenchApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn follow(
+        &self,
+        _app: &mut BenchApp,
+        _ins: &Insert,
+        _window: &mut Window,
+        _cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         None
     }
     /// What it shows now, for the agent (sent with each message, never shown).
     fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String;
     /// Put in, or brought back: start what it needs (a terminal, a listing).
-    fn opened(&self, _app: &mut BenchApp, _ins: &Insert, _window: &mut Window, _cx: &mut Context<BenchApp>) {}
+    fn opened(
+        &self,
+        _app: &mut BenchApp,
+        _ins: &Insert,
+        _window: &mut Window,
+        _cx: &mut Context<BenchApp>,
+    ) {
+    }
     fn removed(&self, _app: &mut BenchApp, _ins: &Insert, _cx: &mut Context<BenchApp>) {}
 }
 
-static KINDS: &[&dyn InsertKind] = &[&terminal::Terminal, &dir::Dir, &files::Files, &tasks::Tasks, &tools::Tools, &browser::Browser];
+static KINDS: &[&dyn InsertKind] = &[
+    &terminal::Terminal,
+    &dir::Dir,
+    &files::Files,
+    &tasks::Tasks,
+    &tools::Tools,
+    &browser::Browser,
+];
 
 pub fn kind_of(key: &str) -> Option<&'static dyn InsertKind> {
     KINDS.iter().copied().find(|k| k.owns(key))
@@ -88,11 +120,20 @@ pub fn words() -> Vec<SlashCommand> {
         ("/files", "The project's folder: open, edit, save", "dir"),
         ("/ftp", "A file host: folders and files, edit them", "files"),
         ("/tasks", "The task lists", "tasks"),
-        ("/tools", "Everyday utilities: Base64, JSON, regex, cron…", "tools"),
+        (
+            "/tools",
+            "Everyday utilities: Base64, JSON, regex, cron…",
+            "tools",
+        ),
         ("/browser", "The server's browser: its tab, live", "browser"),
     ]
     .into_iter()
-    .map(|(n, d, k)| SlashCommand { name: n.into(), desc: d.into(), category: "Insert".into(), key: k.into() })
+    .map(|(n, d, k)| SlashCommand {
+        name: n.into(),
+        desc: d.into(),
+        category: "Insert".into(),
+        key: k.into(),
+    })
     .collect()
 }
 
@@ -102,7 +143,12 @@ impl BenchApp {
         let Some(name) = kind.shared() else {
             return true;
         };
-        let same: Vec<String> = self.thread_inserts().into_iter().filter(|i| kind.owns(&i.key)).map(|i| i.id).collect();
+        let same: Vec<String> = self
+            .thread_inserts()
+            .into_iter()
+            .filter(|i| kind.owns(&i.key))
+            .map(|i| i.id)
+            .collect();
         match self.insert_live.get(name).filter(|id| same.contains(id)) {
             Some(id) => *id == ins.id,
             None => same.last() == Some(&ins.id),
@@ -110,7 +156,13 @@ impl BenchApp {
     }
 
     /// The inserts put after `after` of the person's messages, each in the person's row.
-    pub(super) fn render_inserts_at(&mut self, after: usize, last: bool, window: &mut Window, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    pub(super) fn render_inserts_at(
+        &mut self,
+        after: usize,
+        last: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         self.thread_inserts()
             .into_iter()
             // Those past the end (a reply not here yet) show at the end.
@@ -144,7 +196,11 @@ impl BenchApp {
     }
 
     /// A block in the agent's row (its avatar), at the thread's column: what an insert opened.
-    pub(in crate::ui) fn agent_row(&mut self, content: AnyElement, cx: &mut Context<Self>) -> AnyElement {
+    pub(in crate::ui) fn agent_row(
+        &mut self,
+        content: AnyElement,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         h_flex()
             .w_full()
@@ -158,22 +214,35 @@ impl BenchApp {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| {
-                        this.click_claimed = true;
-                        this.follow = false;
-                    }))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, _| {
+                            this.click_claimed = true;
+                            this.follow = false;
+                        }),
+                    )
                     .child(content),
             )
             .into_any_element()
     }
 
-    fn render_insert(&mut self, kind: &'static dyn InsertKind, ins: &Insert, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_insert(
+        &mut self,
+        kind: &'static dyn InsertKind,
+        ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let title = kind.title(self, ins);
         let switches = kind.switches(self, ins);
         let live = self.insert_is_live(kind, ins);
-        let controls = if live { kind.controls(self, ins, window, cx) } else { vec![] };
+        let controls = if live {
+            kind.controls(self, ins, window, cx)
+        } else {
+            vec![]
+        };
         let body = if ins.folded {
             None
         } else if live {
@@ -190,7 +259,9 @@ impl BenchApp {
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
                         this.insert_live.insert(name.to_string(), claim_id.clone());
-                        if let Some(ins) = this.thread_inserts().into_iter().find(|i| i.id == claim_id) {
+                        if let Some(ins) =
+                            this.thread_inserts().into_iter().find(|i| i.id == claim_id)
+                        {
                             if let Some(k) = kind_of(&ins.key) {
                                 k.opened(this, &ins, window, cx);
                             }
@@ -209,7 +280,15 @@ impl BenchApp {
             .cursor_pointer()
             .text_color(muted)
             .hover(|s| s.text_color(theme.foreground))
-            .child(if folded { Ico::ChevronRight } else { Ico::ChevronDown }.icon().xsmall())
+            .child(
+                if folded {
+                    Ico::ChevronRight
+                } else {
+                    Ico::ChevronDown
+                }
+                .icon()
+                .xsmall(),
+            )
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.click_claimed = true;
                 this.patch_insert(&fold_id, serde_json::json!({ "folded": !folded }), cx);
@@ -219,8 +298,10 @@ impl BenchApp {
         } else {
             let view = cx.entity();
             let ins_id = ins.id.clone();
-            let items: Vec<(String, String, bool, std::rc::Rc<SwitchTo>)> =
-                switches.into_iter().map(|s| (s.label, s.detail, s.chosen, std::rc::Rc::new(s.to))).collect();
+            let items: Vec<(String, String, bool, std::rc::Rc<SwitchTo>)> = switches
+                .into_iter()
+                .map(|s| (s.label, s.detail, s.chosen, std::rc::Rc::new(s.to)))
+                .collect();
             Button::new(SharedString::from(format!("{id}-switch")))
                 .ghost()
                 .small()
@@ -228,25 +309,35 @@ impl BenchApp {
                 .dropdown_menu(move |mut menu, _, _| {
                     for (label, detail, chosen, to) in items.iter().cloned() {
                         let (view, ins_id) = (view.clone(), ins_id.clone());
-                        let text = if detail.is_empty() { label } else { format!("{label}  ·  {detail}") };
-                        menu = menu.item(PopupMenuItem::new(text).checked(chosen).on_click(move |_, window, cx| {
-                            let to = to.clone();
-                            let ins_id = ins_id.clone();
-                            view.update(cx, |this, cx| match &*to {
-                                SwitchTo::Patch(p) => {
-                                    this.patch_insert(&ins_id, p.clone(), cx);
-                                    if let Some(ins) = this.thread_inserts().into_iter().find(|i| i.id == ins_id) {
-                                        if let Some(k) = kind_of(&ins.key) {
-                                            k.opened(this, &ins, window, cx);
+                        let text = if detail.is_empty() {
+                            label
+                        } else {
+                            format!("{label}  ·  {detail}")
+                        };
+                        menu = menu.item(PopupMenuItem::new(text).checked(chosen).on_click(
+                            move |_, window, cx| {
+                                let to = to.clone();
+                                let ins_id = ins_id.clone();
+                                view.update(cx, |this, cx| match &*to {
+                                    SwitchTo::Patch(p) => {
+                                        this.patch_insert(&ins_id, p.clone(), cx);
+                                        if let Some(ins) = this
+                                            .thread_inserts()
+                                            .into_iter()
+                                            .find(|i| i.id == ins_id)
+                                        {
+                                            if let Some(k) = kind_of(&ins.key) {
+                                                k.opened(this, &ins, window, cx);
+                                            }
                                         }
                                     }
-                                }
-                                SwitchTo::Run(f) => {
-                                    this.form_after = Some(ins_id.clone());
-                                    f(this, window, cx)
-                                }
-                            })
-                        }));
+                                    SwitchTo::Run(f) => {
+                                        this.form_after = Some(ins_id.clone());
+                                        f(this, window, cx)
+                                    }
+                                })
+                            },
+                        ));
                     }
                     menu
                 })
@@ -258,10 +349,18 @@ impl BenchApp {
             .child(title_el)
             .child(div().flex_1())
             .children(controls)
-            .child(icon_button(&format!("{id}-rm"), Ico::X, "Remove from the thread", &theme).on_click(cx.listener(move |this, _, _, cx| {
-                this.click_claimed = true;
-                this.remove_insert(&rm_id, cx);
-            })));
+            .child(
+                icon_button(
+                    &format!("{id}-rm"),
+                    Ico::X,
+                    "Remove from the thread",
+                    &theme,
+                )
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.click_claimed = true;
+                    this.remove_insert(&rm_id, cx);
+                })),
+            );
         // Light, as the page: a thin border, round corners, the head on a faint strip.
         let frame = v_flex()
             .id(id)
@@ -288,10 +387,13 @@ impl BenchApp {
                     .min_w_0()
                     // Working in an insert keeps the focus there, and doesn't pull the thread
                     // to its end when it grows.
-                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| {
-                        this.click_claimed = true;
-                        this.follow = false;
-                    }))
+                    .on_mouse_down(
+                        MouseButton::Left,
+                        cx.listener(|this, _, _, _| {
+                            this.click_claimed = true;
+                            this.follow = false;
+                        }),
+                    )
                     .child(frame),
             )
             .into_any_element()
@@ -299,7 +401,12 @@ impl BenchApp {
 }
 
 /// A small icon in an insert's head.
-pub(super) fn icon_button(id: &str, ico: Ico, tip: &'static str, theme: &gpui_kit::component::Theme) -> Stateful<Div> {
+pub(super) fn icon_button(
+    id: &str,
+    ico: Ico,
+    tip: &'static str,
+    theme: &gpui_kit::component::Theme,
+) -> Stateful<Div> {
     div()
         .id(SharedString::from(id.to_string()))
         .p_0p5()
@@ -331,7 +438,15 @@ pub(super) fn pick_row(
         .hover(|s| s.bg(theme.list_hover))
         .child(ico.icon().small().text_color(theme.muted_foreground))
         .child(div().flex_none().child(label))
-        .child(div().flex_1().min_w_0().truncate().text_sm().text_color(theme.muted_foreground).child(detail))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .text_color(theme.muted_foreground)
+                .child(detail),
+        )
         .on_click(cx.listener(move |this, _, window, cx| {
             this.click_claimed = true;
             on(this, window, cx)
@@ -365,14 +480,28 @@ pub(super) fn pick_row_removable(
         .hover(|s| s.bg(theme.list_hover))
         .child(ico.icon().small().text_color(theme.muted_foreground))
         .child(div().flex_none().child(label))
-        .child(div().flex_1().min_w_0().truncate().text_sm().text_color(theme.muted_foreground).child(detail))
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .text_color(theme.muted_foreground)
+                .child(detail),
+        )
         .child(
             div()
                 .id(SharedString::from(format!("{id}-rm")))
                 .flex_none()
                 .px_1()
                 .text_sm()
-                .when(!armed, |d| d.opacity(0.).group_hover(group, |s| s.opacity(1.)).text_color(theme.muted_foreground).hover(|s| s.text_color(theme.danger)).child(Ico::Trash.icon().small()))
+                .when(!armed, |d| {
+                    d.opacity(0.)
+                        .group_hover(group, |s| s.opacity(1.))
+                        .text_color(theme.muted_foreground)
+                        .hover(|s| s.text_color(theme.danger))
+                        .child(Ico::Trash.icon().small())
+                })
                 .when(armed, |d| d.text_color(theme.danger).child("Delete?"))
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
@@ -414,28 +543,49 @@ pub(super) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::The
 
 /// "New file" and "New folder" on the head of a files insert (`/files`, `/ftp`): a card under it
 /// names the new one.
-pub(super) fn file_buttons(ins_id: &str, remote: bool, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+pub(super) fn file_buttons(
+    ins_id: &str,
+    remote: bool,
+    cx: &mut Context<BenchApp>,
+) -> Vec<AnyElement> {
     let theme = cx.theme().clone();
-    [(false, Ico::FilePlus, "New file"), (true, Ico::FolderPlus, "New folder")]
-        .into_iter()
-        .map(|(folder, ico, tip)| {
-            let id = ins_id.to_string();
-            icon_button(&format!("{ins_id}-new-{folder}"), ico, tip, &theme)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
-                    this.open_file_form(id.clone(), remote, folder, window, cx)
-                }))
-                .into_any_element()
-        })
-        .collect()
+    [
+        (false, Ico::FilePlus, "New file"),
+        (true, Ico::FolderPlus, "New folder"),
+    ]
+    .into_iter()
+    .map(|(folder, ico, tip)| {
+        let id = ins_id.to_string();
+        icon_button(&format!("{ins_id}-new-{folder}"), ico, tip, &theme)
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.click_claimed = true;
+                this.open_file_form(id.clone(), remote, folder, window, cx)
+            }))
+            .into_any_element()
+    })
+    .collect()
 }
 
 /// The card naming a new file or folder, under the insert that asked for it.
-pub(super) fn file_form(app: &BenchApp, ins_id: &str, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-    let f = app.local_files.form.as_ref().filter(|f| f.insert == ins_id)?;
-    let mut rows = vec![("Name", gpui_kit::component::input::Input::new(&f.name).into_any_element())];
+pub(super) fn file_form(
+    app: &BenchApp,
+    ins_id: &str,
+    cx: &mut Context<BenchApp>,
+) -> Option<AnyElement> {
+    let f = app
+        .local_files
+        .form
+        .as_ref()
+        .filter(|f| f.insert == ins_id)?;
+    let mut rows = vec![(
+        "Name",
+        gpui_kit::component::input::Input::new(&f.name).into_any_element(),
+    )];
     if !f.folder {
-        rows.push(("Content", gpui_kit::component::input::Textarea::new(&f.content).into_any_element()));
+        rows.push((
+            "Content",
+            gpui_kit::component::input::Textarea::new(&f.content).into_any_element(),
+        ));
     }
     let actions = vec![
         super::form_action("file-form-create", "Create", true, cx)
@@ -452,12 +602,25 @@ pub(super) fn file_form(app: &BenchApp, ins_id: &str, cx: &mut Context<BenchApp>
             }))
             .into_any_element(),
     ];
-    Some(super::inline_form(if f.folder { "New folder" } else { "New file" }, rows, None, actions, cx))
+    Some(super::inline_form(
+        if f.folder { "New folder" } else { "New file" },
+        rows,
+        None,
+        actions,
+        cx,
+    ))
 }
 
 /// A file row's trash, on the row's hover; the first click arms it ("Delete?" stays shown), the
 /// second removes the file or folder.
-pub(in crate::ui) fn row_trash(app: &BenchApp, id: SharedString, group: SharedString, remote: bool, path: String, cx: &mut Context<BenchApp>) -> AnyElement {
+pub(in crate::ui) fn row_trash(
+    app: &BenchApp,
+    id: SharedString,
+    group: SharedString,
+    remote: bool,
+    path: String,
+    cx: &mut Context<BenchApp>,
+) -> AnyElement {
     let theme = cx.theme().clone();
     let armed = app.confirm_delete.as_deref() == Some(format!("entry:{path}").as_str());
     div()
@@ -466,7 +629,13 @@ pub(in crate::ui) fn row_trash(app: &BenchApp, id: SharedString, group: SharedSt
         .px_1()
         .cursor_pointer()
         .text_sm()
-        .when(!armed, |d| d.opacity(0.).group_hover(group, |s| s.opacity(1.)).text_color(theme.muted_foreground).hover(|s| s.text_color(theme.danger)).child(Ico::Trash.icon().small()))
+        .when(!armed, |d| {
+            d.opacity(0.)
+                .group_hover(group, |s| s.opacity(1.))
+                .text_color(theme.muted_foreground)
+                .hover(|s| s.text_color(theme.danger))
+                .child(Ico::Trash.icon().small())
+        })
         .when(armed, |d| d.text_color(theme.danger).child("Delete?"))
         .on_click(cx.listener(move |this, _, window, cx| {
             this.click_claimed = true;

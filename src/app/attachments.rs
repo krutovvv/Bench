@@ -19,7 +19,12 @@ impl BenchApp {
 
     /// The paperclip: files picked in the system's dialog, attached as a drop would.
     pub fn pick_attachments(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let picked = cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: true, prompt: Some("Attach".into()) });
+        let picked = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: true,
+            prompt: Some("Attach".into()),
+        });
         cx.spawn_in(window, async move |this, cx| {
             if let Ok(Ok(Some(paths))) = picked.await {
                 let _ = this.update(cx, |this, cx| this.add_attachments(paths, cx));

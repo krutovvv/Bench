@@ -21,7 +21,13 @@ fn hosts(app: &BenchApp) -> Vec<(String, String, String)> {
         .iter()
         // A project's own hosts; outside projects, the hosts of no project.
         .filter(|h| h.project == proj)
-        .map(|h| (h.id.clone(), h.name.clone(), format!("{} · {}@{}", h.kind.to_uppercase(), h.user, h.host)))
+        .map(|h| {
+            (
+                h.id.clone(),
+                h.name.clone(),
+                format!("{} · {}@{}", h.kind.to_uppercase(), h.user, h.host),
+            )
+        })
         .collect()
 }
 
@@ -59,21 +65,46 @@ impl InsertKind for Files {
                 detail,
             })
             .collect();
-        v.push(Switch { label: "New host…".into(), detail: "FTP, FTPS or SFTP".into(), chosen: false, to: SwitchTo::Run(new_host) });
+        v.push(Switch {
+            label: "New host…".into(),
+            detail: "FTP, FTPS or SFTP".into(),
+            chosen: false,
+            to: SwitchTo::Run(new_host),
+        });
         v
     }
 
-    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn controls(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Vec<AnyElement> {
         let f = &app.files_remote;
         if f.owner.as_deref() != Some(ins.id.as_str()) || f.path.is_empty() {
             return vec![];
         }
-        let mut v = vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(f.path.clone()).into_any_element()];
+        let mut v = vec![
+            div()
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child(f.path.clone())
+                .into_any_element(),
+        ];
         v.extend(super::file_buttons(&ins.id, true, cx));
         v
     }
 
-    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn body(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         let host = ins.get("host");
         if host.is_empty() {
             let id = ins.id.clone();
@@ -82,15 +113,35 @@ impl InsertKind for Files {
                 let id = id.clone();
                 let armed = app.confirm_delete.as_deref() == Some(format!("host:{hid}").as_str());
                 let gone = hid.clone();
-                rows.push(super::pick_row_removable(format!("{id}-h{k}"), Ico::Server, name, detail, armed, cx, move |this, _, cx| {
-                    this.patch_insert(&id, json!({ "state": { "host": hid, "path": "", "file": "" } }), cx);
-                }, move |this, window, cx| this.remove_file_host(gone.clone(), window, cx)));
+                rows.push(super::pick_row_removable(
+                    format!("{id}-h{k}"),
+                    Ico::Server,
+                    name,
+                    detail,
+                    armed,
+                    cx,
+                    move |this, _, cx| {
+                        this.patch_insert(
+                            &id,
+                            json!({ "state": { "host": hid, "path": "", "file": "" } }),
+                            cx,
+                        );
+                    },
+                    move |this, window, cx| this.remove_file_host(gone.clone(), window, cx),
+                ));
             }
             let from = id.clone();
-            rows.push(pick_row(format!("{id}-new"), Ico::Plus, "Add a host…".into(), "FTP, FTPS or SFTP".into(), cx, move |this, window, cx| {
-                this.form_after = Some(from.clone());
-                new_host(this, window, cx)
-            }));
+            rows.push(pick_row(
+                format!("{id}-new"),
+                Ico::Plus,
+                "Add a host…".into(),
+                "FTP, FTPS or SFTP".into(),
+                cx,
+                move |this, window, cx| {
+                    this.form_after = Some(from.clone());
+                    new_host(this, window, cx)
+                },
+            ));
             return Some(v_flex().children(rows).into_any_element());
         }
         let theme = cx.theme().clone();
@@ -103,7 +154,9 @@ impl InsertKind for Files {
                         .py_1()
                         .text_base()
                         .text_color(theme.muted_foreground)
-                        .child(format!("{file} has edits not saved in another thread: save them there first."))
+                        .child(format!(
+                            "{file} has edits not saved in another thread: save them there first."
+                        ))
                         .into_any_element(),
                 );
             }
@@ -112,7 +165,11 @@ impl InsertKind for Files {
         } else {
             // What it shows now is its state.
             let f = &app.files_remote;
-            if f.host.as_deref() == Some(host.as_str()) && !f.loading && f.error.is_none() && !f.path.is_empty() {
+            if f.host.as_deref() == Some(host.as_str())
+                && !f.loading
+                && f.error.is_none()
+                && !f.path.is_empty()
+            {
                 let mut state = Map::new();
                 state.insert("host".into(), json!(host));
                 state.insert("path".into(), json!(f.path));
@@ -124,7 +181,13 @@ impl InsertKind for Files {
     }
 
     /// The open file, as the next row of the thread.
-    fn follow(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn follow(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         if app.files_remote.owner.as_deref() != Some(ins.id.as_str()) {
             return None;
         }
@@ -133,7 +196,14 @@ impl InsertKind for Files {
         let file = app.render_open_file(format!("{}-file-close", ins.id), cx);
         match (form, file) {
             (None, None) => None,
-            (a, b) => Some(gpui_kit::component::v_flex().w_full().gap_4().children(a).children(b).into_any_element()),
+            (a, b) => Some(
+                gpui_kit::component::v_flex()
+                    .w_full()
+                    .gap_4()
+                    .children(a)
+                    .children(b)
+                    .into_any_element(),
+            ),
         }
     }
 
@@ -146,8 +216,23 @@ impl InsertKind for Files {
         if f.owner.as_deref() != Some(ins.id.as_str()) || f.host.as_deref() != Some(host.as_str()) {
             return String::new();
         }
-        let names: Vec<String> = f.entries.iter().take(80).map(|e| if e.dir { format!("{}/", e.name) } else { e.name.clone() }).collect();
-        let mut out = format!("The file host insert (host id {host}) is in the folder {}. It lists: {}", f.path, names.join(", "));
+        let names: Vec<String> = f
+            .entries
+            .iter()
+            .take(80)
+            .map(|e| {
+                if e.dir {
+                    format!("{}/", e.name)
+                } else {
+                    e.name.clone()
+                }
+            })
+            .collect();
+        let mut out = format!(
+            "The file host insert (host id {host}) is in the folder {}. It lists: {}",
+            f.path,
+            names.join(", ")
+        );
         if let Some(file) = &f.file {
             out.push_str(&format!(
                 "\nOpen in its editor: {file}{}\n```\n{}\n```",
@@ -158,7 +243,13 @@ impl InsertKind for Files {
         out
     }
 
-    fn opened(&self, app: &mut BenchApp, _ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
+    fn opened(
+        &self,
+        app: &mut BenchApp,
+        _ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
         if app.files_remote.hosts.is_empty() {
             app.load_remote_hosts(window, cx);
         }

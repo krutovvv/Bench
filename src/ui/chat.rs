@@ -34,13 +34,20 @@ pub(super) fn terminal_height(session: &crate::term::Session) -> f32 {
 
 impl BenchApp {
     /// New chat: optionally work in a git project, optionally in a branch of its own.
-    pub(super) fn render_chat(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_chat(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         self.viewport_h = window.viewport_size().height;
         // A thread with no turns yet still is a thread: "Loading history…" while it opens, then
         // the composer; a new chat is the composer alone.
         // A thread about something starts with it, live: a task list, a server's terminal, a tool.
         // @ in the composer offers the open thread's project's prompts.
-        if !self.demo && self.conn.is_some() && self.prompts_for.as_deref() != Some(self.thread_project.as_str()) {
+        if !self.demo
+            && self.conn.is_some()
+            && self.prompts_for.as_deref() != Some(self.thread_project.as_str())
+        {
             self.prompts_for = Some(self.thread_project.clone());
             self.load_prompts(window, cx);
         }
@@ -66,13 +73,20 @@ impl BenchApp {
         let block: Option<AnyElement> = None;
         // `BENCH_DEMO_DRAFT=text`: the composer filled once (for screenshots of a typed line).
         if self.demo && self.composer.read(cx).value().is_empty() {
-            if let Some(text) = std::env::var("BENCH_DEMO_DRAFT").ok().filter(|_| !self.demo_draft_done) {
+            if let Some(text) = std::env::var("BENCH_DEMO_DRAFT")
+                .ok()
+                .filter(|_| !self.demo_draft_done)
+            {
                 self.demo_draft_done = true;
-                self.composer.update(cx, |s, cx| s.set_value(text, window, cx));
+                self.composer
+                    .update(cx, |s, cx| s.set_value(text, window, cx));
             }
         }
         // `BENCH_DEMO=new-project`: the new project's page, once (for screenshots).
-        if self.demo && !self.subject_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
+        if self.demo
+            && !self.subject_opened
+            && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project")
+        {
             self.subject_opened = true;
             self.new_project_form(window, cx);
         }
@@ -82,7 +96,10 @@ impl BenchApp {
         // project's at the top of its empty thread, the others with the tools, under the
         // conversation.
         // A form opened from an insert shows under that insert (`render_inserts_at`).
-        let under_insert = self.form_after.as_ref().is_some_and(|id| self.thread_inserts().iter().any(|i| &i.id == id));
+        let under_insert = self
+            .form_after
+            .as_ref()
+            .is_some_and(|id| self.thread_inserts().iter().any(|i| &i.id == id));
         let form: Option<(AnyElement, bool)> = if under_insert {
             None
         } else if self.files_remote.form {
@@ -117,16 +134,22 @@ impl BenchApp {
                         .min_w_0()
                         // Working in the block (opening a skill, typing) must not pull the
                         // thread to its end when the block grows.
-                        .on_mouse_down(MouseButton::Left, cx.listener(|this, _, _, _| {
-                            this.click_claimed = true;
-                            this.follow = false;
-                        }))
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _, _, _| {
+                                this.click_claimed = true;
+                                this.follow = false;
+                            }),
+                        )
                         .child(content),
                 )
                 .into_any_element()
         });
         let mut subject_block = subject_block;
-        let placeholder: Option<AnyElement> = if subject_block.is_some() || !env_rows.is_empty() || !self.thread_inserts().is_empty() {
+        let placeholder: Option<AnyElement> = if subject_block.is_some()
+            || !env_rows.is_empty()
+            || !self.thread_inserts().is_empty()
+        {
             None
         } else if !self.turns.is_empty() {
             None
@@ -140,8 +163,19 @@ impl BenchApp {
                     .py(px(super::TURN_Y))
                     .gap_3()
                     .items_center()
-                    .child(div().flex_1().min_w_0().text_base().text_color(theme.danger).child(format!("Could not open the thread: {why}")))
-                    .child(super::form_action("history-retry", "Retry", false, cx).on_click(cx.listener(move |this, _, _, cx| this.open_session(id.clone(), cx))))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_base()
+                            .text_color(theme.danger)
+                            .child(format!("Could not open the thread: {why}")),
+                    )
+                    .child(
+                        super::form_action("history-retry", "Retry", false, cx).on_click(
+                            cx.listener(move |this, _, _, cx| this.open_session(id.clone(), cx)),
+                        ),
+                    )
                     .into_any_element(),
             )
         } else if self.session.is_some() && self.runtime.is_none() {
@@ -201,7 +235,11 @@ impl BenchApp {
             } else {
                 self.settle_stable = 0;
             }
-            self.settle = if self.settle_stable >= 3 { 0 } else { self.settle - 1 };
+            self.settle = if self.settle_stable >= 3 {
+                0
+            } else {
+                self.settle - 1
+            };
             window.request_animation_frame();
         }
         let hidden = self.settle > 0;
@@ -240,7 +278,8 @@ impl BenchApp {
                         MouseButton::Left,
                         cx.listener(|this, ev: &MouseUpEvent, window, cx| {
                             let still = this.click_at.take().is_some_and(|p| {
-                                (p.x - ev.position.x).abs() < px(4.) && (p.y - ev.position.y).abs() < px(4.)
+                                (p.x - ev.position.x).abs() < px(4.)
+                                    && (p.y - ev.position.y).abs() < px(4.)
                             });
                             if still && !this.click_claimed {
                                 this.composer.update(cx, |s, cx| s.focus(window, cx));
@@ -286,7 +325,8 @@ impl BenchApp {
                         .py_1()
                         .text_base()
                         .bg(theme.background)
-                        .border_1().rounded_md()
+                        .border_1()
+                        .rounded_md()
                         .border_color(theme.border)
                         .text_color(theme.muted_foreground)
                         .cursor_pointer()
@@ -325,18 +365,38 @@ impl BenchApp {
                     .border_1()
                     .rounded_md()
                     .border_color(theme.border)
-                    .child(div().flex_none().text_sm().text_color(muted).child(if steer { "Next" } else { "Queued" }))
+                    .child(
+                        div()
+                            .flex_none()
+                            .text_sm()
+                            .text_color(muted)
+                            .child(if steer { "Next" } else { "Queued" }),
+                    )
                     .child(div().flex_1().min_w_0().truncate().child(first))
                     .when(!steer, |d| {
-                        d.child(icon_button(("queued-send", k), Ico::Play, "Send now: into the running work", cx).on_click(cx.listener(move |this, _, _, cx| {
-                            this.click_claimed = true;
-                            this.queued(send_id.clone(), true, cx);
-                        })))
+                        d.child(
+                            icon_button(
+                                ("queued-send", k),
+                                Ico::Play,
+                                "Send now: into the running work",
+                                cx,
+                            )
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    this.click_claimed = true;
+                                    this.queued(send_id.clone(), true, cx);
+                                },
+                            )),
+                        )
                     })
-                    .child(icon_button(("queued-rm", k), Ico::X, "Take it back", cx).on_click(cx.listener(move |this, _, _, cx| {
-                        this.click_claimed = true;
-                        this.queued(rm_id.clone(), false, cx);
-                    })))
+                    .child(
+                        icon_button(("queued-rm", k), Ico::X, "Take it back", cx).on_click(
+                            cx.listener(move |this, _, _, cx| {
+                                this.click_claimed = true;
+                                this.queued(rm_id.clone(), false, cx);
+                            }),
+                        ),
+                    )
                     .into_any_element()
             })
             .collect();
@@ -719,7 +779,8 @@ impl BenchApp {
                 .mt_2()
                 .p_3()
                 .gap_2()
-                .border_1().rounded_md()
+                .border_1()
+                .rounded_md()
                 .border_color(theme.warning)
                 .child(
                     h_flex()
@@ -841,7 +902,8 @@ impl BenchApp {
                                 .mt_0p5()
                                 .p_2()
                                 .bg(theme.secondary)
-                                .border_1().rounded_md()
+                                .border_1()
+                                .rounded_md()
                                 .border_color(theme.border)
                                 .font_family(crate::theme::MONO)
                                 .text_base()
@@ -894,7 +956,8 @@ impl BenchApp {
                     .gap_1()
                     .px_1p5()
                     .py_0p5()
-                    .border_1().rounded_md()
+                    .border_1()
+                    .rounded_md()
                     .border_color(if active { theme.primary } else { theme.border })
                     .text_base()
                     .text_color(if active {
@@ -1099,7 +1162,8 @@ impl BenchApp {
                                 .mb_2()
                                 .p_2()
                                 .bg(theme.secondary)
-                                .border_1().rounded_md()
+                                .border_1()
+                                .rounded_md()
                                 .border_color(theme.border)
                                 .font_family(crate::theme::MONO)
                                 .text_base()
@@ -1119,7 +1183,8 @@ impl BenchApp {
             .collect();
         Some(
             v_flex()
-                .border_1().rounded_md()
+                .border_1()
+                .rounded_md()
                 .border_color(theme.border)
                 .child(
                     h_flex()
@@ -1247,7 +1312,8 @@ impl BenchApp {
             .collect();
         Some(
             v_flex()
-                .border_1().rounded_md()
+                .border_1()
+                .rounded_md()
                 .border_color(theme.border)
                 // Folded by default: one line with the totals; a click lists the files.
                 .child(

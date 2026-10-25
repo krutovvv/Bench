@@ -286,7 +286,8 @@ impl Session {
     /// Called while painting: the grid follows the view's size.
     /// See `min_rows`.
     pub fn set_min_rows(&self, rows: usize) {
-        self.min_rows.store(rows, std::sync::atomic::Ordering::Relaxed);
+        self.min_rows
+            .store(rows, std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn min_rows(&self) -> usize {

@@ -11,7 +11,11 @@ impl BenchApp {
     /// The open thread's prompts (its project's and the general ones).
     pub(crate) fn load_prompts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let project = self.thread_project.clone();
-        let target = if project.is_empty() { self.conn.clone().map(|c| (c, "general".to_string())) } else { self.env_target(&project) };
+        let target = if project.is_empty() {
+            self.conn.clone().map(|c| (c, "general".to_string()))
+        } else {
+            self.env_target(&project)
+        };
         let Some((conn, eid)) = target else {
             return;
         };

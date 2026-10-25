@@ -39,18 +39,46 @@ impl InsertKind for Browser {
         }
     }
 
-    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
-        let url = tab_of(app, ins).map(|t| t.1).unwrap_or_else(|| ins.get("url"));
+    fn controls(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Vec<AnyElement> {
+        let url = tab_of(app, ins)
+            .map(|t| t.1)
+            .unwrap_or_else(|| ins.get("url"));
         if url.is_empty() {
             return vec![];
         }
-        vec![div().min_w_0().truncate().text_sm().text_color(cx.theme().muted_foreground).child(url).into_any_element()]
+        vec![
+            div()
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .text_color(cx.theme().muted_foreground)
+                .child(url)
+                .into_any_element(),
+        ]
     }
 
-    fn body(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn body(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         let muted = cx.theme().muted_foreground;
         if let Some(e) = &app.sites_error {
-            return Some(div().text_base().text_color(cx.theme().danger).child(e.clone()).into_any_element());
+            return Some(
+                div()
+                    .text_base()
+                    .text_color(cx.theme().danger)
+                    .child(e.clone())
+                    .into_any_element(),
+            );
         }
         if !app.demo && app.sites.browser.is_none() {
             app.ensure_browser(cx);
@@ -58,20 +86,42 @@ impl InsertKind for Browser {
         if let Some((tab, _, _)) = tab_of(app, ins) {
             return Some(app.render_tab(tab, cx));
         }
-        let ready = app.sites.browser.as_ref().is_some_and(|b| b.state.lock().unwrap().ready);
+        let ready = app
+            .sites
+            .browser
+            .as_ref()
+            .is_some_and(|b| b.state.lock().unwrap().ready);
         if !ready && !app.demo {
-            return Some(ShimmerText::new("Connecting to the browser…").text_base().text_color(muted).into_any_element());
+            return Some(
+                ShimmerText::new("Connecting to the browser…")
+                    .text_base()
+                    .text_color(muted)
+                    .into_any_element(),
+            );
         }
         let url = ins.get("url");
         // The gateway refused (all tabs busy, a page it does not open…): say so, and offer again.
-        let refused = app.sites.browser.as_ref().and_then(|b| b.state.lock().unwrap().error.clone());
-        if let Some(e) = refused.filter(|_| app.sites.reopening.as_deref() == Some(ins.id.as_str()) || url.is_empty()) {
+        let refused = app
+            .sites
+            .browser
+            .as_ref()
+            .and_then(|b| b.state.lock().unwrap().error.clone());
+        if let Some(e) = refused
+            .filter(|_| app.sites.reopening.as_deref() == Some(ins.id.as_str()) || url.is_empty())
+        {
             app.sites.reopening = None;
             return Some(
                 h_flex()
                     .gap_2()
                     .items_center()
-                    .child(div().flex_1().min_w_0().text_base().text_color(cx.theme().danger).child(e))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .text_base()
+                            .text_color(cx.theme().danger)
+                            .child(e),
+                    )
                     .child(
                         Button::new(SharedString::from(format!("{}-retry", ins.id)))
                             .small()
@@ -85,21 +135,38 @@ impl InsertKind for Browser {
             );
         }
         if app.sites.reopening.as_deref() == Some(ins.id.as_str()) {
-            return Some(ShimmerText::new("Opening the page again…").text_base().text_color(muted).into_any_element());
+            return Some(
+                ShimmerText::new("Opening the page again…")
+                    .text_base()
+                    .text_color(muted)
+                    .into_any_element(),
+            );
         }
         if url.is_empty() {
             // Put in: its tab opens at once.
             if !app.demo {
                 app.reopen_thread_tab(cx);
             }
-            return Some(ShimmerText::new("Opening this thread's tab…").text_base().text_color(muted).into_any_element());
+            return Some(
+                ShimmerText::new("Opening this thread's tab…")
+                    .text_base()
+                    .text_color(muted)
+                    .into_any_element(),
+            );
         }
         // Its tab went away (the browser restarted, the tab was closed).
         Some(
             h_flex()
                 .gap_2()
                 .items_center()
-                .child(div().flex_1().min_w_0().text_base().text_color(muted).child(format!("The tab of {url} is closed.")))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .text_base()
+                        .text_color(muted)
+                        .child(format!("The tab of {url} is closed.")),
+                )
                 .child(
                     Button::new(SharedString::from(format!("{}-reopen", ins.id)))
                         .small()
@@ -127,7 +194,13 @@ impl InsertKind for Browser {
         }
     }
 
-    fn opened(&self, app: &mut BenchApp, _ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) {
+    fn opened(
+        &self,
+        app: &mut BenchApp,
+        _ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
         app.ensure_browser(cx);
         app.touch_browser();
     }

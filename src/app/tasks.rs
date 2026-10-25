@@ -58,10 +58,9 @@ pub struct TasksMode {
 
 impl TasksMode {
     pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
-        let input =
-            |placeholder: &'static str, window: &mut Window, cx: &mut Context<BenchApp>| {
-                cx.new(|cx| InputState::new(window, cx).placeholder(placeholder))
-            };
+        let input = |placeholder: &'static str, window: &mut Window, cx: &mut Context<BenchApp>| {
+            cx.new(|cx| InputState::new(window, cx).placeholder(placeholder))
+        };
         let search = input("Search tasks", window, cx);
         let title = input("Task", window, cx);
         let tags = input("work, client-x", window, cx);
@@ -185,7 +184,10 @@ impl TasksMode {
                 }
             }
         }
-        counts.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.to_lowercase().cmp(&b.0.to_lowercase())));
+        counts.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then(a.0.to_lowercase().cmp(&b.0.to_lowercase()))
+        });
         counts.into_iter().map(|(n, _)| n).collect()
     }
 
@@ -488,7 +490,11 @@ impl BenchApp {
     /// A new task in the open list, its card open with the title field focused.
     /// A project's tag (`tasks::slug` of its name); None for Host.
     pub fn project_tag(&self, project: &str) -> Option<String> {
-        self.projects.iter().find(|p| p.id == project).map(|p| tasks::slug(&p.name)).filter(|s| !s.is_empty())
+        self.projects
+            .iter()
+            .find(|p| p.id == project)
+            .map(|p| tasks::slug(&p.name))
+            .filter(|s| !s.is_empty())
     }
 
     /// The tasks follow the open thread: in a project its tag filters the list (dropped with a
@@ -514,7 +520,9 @@ impl BenchApp {
             }
             None => tags.push(tag),
         }
-        self.tasks.tags.update(cx, |s, cx| s.set_value(tags.join(", "), window, cx));
+        self.tasks
+            .tags
+            .update(cx, |s, cx| s.set_value(tags.join(", "), window, cx));
         self.task_fields_changed(cx);
         cx.notify();
     }
@@ -644,5 +652,4 @@ impl BenchApp {
         }
         cx.notify();
     }
-
 }

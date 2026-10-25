@@ -25,7 +25,6 @@ fn list_icon(list: &List) -> Ico {
 }
 
 impl BenchApp {
-
     pub(super) fn render_tasks_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let list = self.tasks.list.clone();
@@ -136,7 +135,11 @@ impl BenchApp {
                     // The next seven days that have something ("Tomorrow · 26 Oct"), then by month.
                     for k in 1..=7 {
                         let d = day + chrono::Duration::days(k);
-                        let name = if k == 1 { "Tomorrow".to_string() } else { d.format("%A").to_string() };
+                        let name = if k == 1 {
+                            "Tomorrow".to_string()
+                        } else {
+                            d.format("%A").to_string()
+                        };
                         let label = format!("{name} · {}", d.format("%-d %b"));
                         let on: Vec<Task> =
                             shown.iter().filter(|t| t.day == Some(d)).cloned().collect();
@@ -206,7 +209,8 @@ impl BenchApp {
                                 .flex_none()
                                 .mx_6()
                                 .my_1()
-                                .border_1().rounded_md()
+                                .border_1()
+                                .rounded_md()
                                 .border_color(theme.border)
                                 .child(card)
                                 .into_any_element(),
@@ -233,7 +237,11 @@ impl BenchApp {
         };
         // The list's tags, the most used first: "All · skorozvon · client-b…". A project's thread
         // opens on its project's tag (`sync_task_project`); "All" drops it.
-        let mut tags = if self.tasks.query.is_empty() { self.tasks.tags_in(&list) } else { vec![] };
+        let mut tags = if self.tasks.query.is_empty() {
+            self.tasks.tags_in(&list)
+        } else {
+            vec![]
+        };
         let picked = self.tasks.tag_filter.clone();
         if let Some(p) = &picked {
             if !tags.iter().any(|g| g.eq_ignore_ascii_case(p)) {
@@ -241,7 +249,11 @@ impl BenchApp {
             }
         }
         let strip = (!tags.is_empty()).then(|| {
-            let chip = |id: SharedString, label: String, on: bool, tag: Option<String>, cx: &mut Context<Self>| {
+            let chip = |id: SharedString,
+                        label: String,
+                        on: bool,
+                        tag: Option<String>,
+                        cx: &mut Context<Self>| {
                 div()
                     .id(id)
                     .flex_none()
@@ -253,8 +265,14 @@ impl BenchApp {
                     .border_1()
                     .text_sm()
                     .cursor_pointer()
-                    .when(on, |d| d.border_color(theme.primary).text_color(theme.primary))
-                    .when(!on, |d| d.border_color(theme.border).text_color(muted).hover(|s| s.text_color(theme.foreground)))
+                    .when(on, |d| {
+                        d.border_color(theme.primary).text_color(theme.primary)
+                    })
+                    .when(!on, |d| {
+                        d.border_color(theme.border)
+                            .text_color(muted)
+                            .hover(|s| s.text_color(theme.foreground))
+                    })
                     .child(label)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.click_claimed = true;
@@ -262,10 +280,24 @@ impl BenchApp {
                     }))
                     .into_any_element()
             };
-            let mut chips = vec![chip("task-tag-all".into(), "All".into(), picked.is_none(), None, cx)];
+            let mut chips = vec![chip(
+                "task-tag-all".into(),
+                "All".into(),
+                picked.is_none(),
+                None,
+                cx,
+            )];
             for (k, tag) in tags.into_iter().enumerate() {
-                let on = picked.as_deref().is_some_and(|p| p.eq_ignore_ascii_case(&tag));
-                chips.push(chip(SharedString::from(format!("task-tag-{k}")), tag.clone(), on, Some(tag), cx));
+                let on = picked
+                    .as_deref()
+                    .is_some_and(|p| p.eq_ignore_ascii_case(&tag));
+                chips.push(chip(
+                    SharedString::from(format!("task-tag-{k}")),
+                    tag.clone(),
+                    on,
+                    Some(tag),
+                    cx,
+                ));
             }
             h_flex()
                 .id("task-tags")
@@ -302,10 +334,21 @@ impl BenchApp {
                 .pb_4()
                 .children(rows)
                 .when_some(note, |d, (text, color)| {
-                    d.child(div().px_6().py_3().text_base().text_color(color).child(text))
+                    d.child(
+                        div()
+                            .px_6()
+                            .py_3()
+                            .text_base()
+                            .text_color(color)
+                            .child(text),
+                    )
                 }),
         );
-        h_flex().size_full().items_stretch().child(list_pane).into_any_element()
+        h_flex()
+            .size_full()
+            .items_stretch()
+            .child(list_pane)
+            .into_any_element()
     }
 
     fn render_task_row(&mut self, n: usize, t: &Task, cx: &mut Context<Self>) -> AnyElement {
@@ -361,7 +404,8 @@ impl BenchApp {
                     .flex()
                     .items_center()
                     .justify_center()
-                    .border_1().rounded_md()
+                    .border_1()
+                    .rounded_md()
                     .border_color(if done { theme.primary } else { theme.input })
                     .when(done, |d| {
                         d.bg(theme.primary)
@@ -522,10 +566,7 @@ impl BenchApp {
                     move |this, k, window, cx| this.set_task_when(i2.clone(), k, window, cx),
                 ),
             ))
-            .child(field(
-                "Day",
-                Input::new(&self.tasks.day).into_any_element(),
-            ))
+            .child(field("Day", Input::new(&self.tasks.day).into_any_element()))
             // The projects as tags: a click puts the project's tag on the task (or takes it off).
             .child(field("Project", {
                 let on: Vec<String> = t.tags.iter().map(|g| g.to_lowercase()).collect();
@@ -547,8 +588,15 @@ impl BenchApp {
                             .rounded_md()
                             .border_1()
                             .cursor_pointer()
-                            .when(chosen, |d| d.bg(theme.primary).border_color(theme.primary).text_color(theme.primary_foreground))
-                            .when(!chosen, |d| d.border_color(theme.border).hover(|s| s.bg(theme.list_hover)))
+                            .when(chosen, |d| {
+                                d.bg(theme.primary)
+                                    .border_color(theme.primary)
+                                    .text_color(theme.primary_foreground)
+                            })
+                            .when(!chosen, |d| {
+                                d.border_color(theme.border)
+                                    .hover(|s| s.bg(theme.list_hover))
+                            })
                             .child(tag.clone())
                             .on_click(cx.listener(move |this, _, window, cx| {
                                 this.click_claimed = true;
@@ -557,7 +605,11 @@ impl BenchApp {
                             .into_any_element()
                     })
                     .collect();
-                h_flex().flex_wrap().gap_1().children(chips).into_any_element()
+                h_flex()
+                    .flex_wrap()
+                    .gap_1()
+                    .children(chips)
+                    .into_any_element()
             }))
             .child(field(
                 "Tags",
@@ -585,7 +637,8 @@ impl BenchApp {
                             .flex()
                             .items_center()
                             .text_sm()
-                            .border_1().rounded_md()
+                            .border_1()
+                            .rounded_md()
                             .border_color(if running { theme.primary } else { theme.border })
                             .text_color(if running {
                                 theme.primary
@@ -621,7 +674,8 @@ impl BenchApp {
             })
             .child(
                 div()
-                    .border_1().rounded_md()
+                    .border_1()
+                    .rounded_md()
                     .border_color(theme.border)
                     .px_1()
                     .child(Textarea::new(&self.tasks.notes).appearance(false)),
@@ -636,7 +690,8 @@ impl BenchApp {
                             .px_2()
                             .py_0p5()
                             .text_sm()
-                            .border_1().rounded_md()
+                            .border_1()
+                            .rounded_md()
                             .border_color(theme.border)
                             .cursor_pointer()
                             .hover(|s| s.bg(theme.list_hover))
@@ -656,7 +711,8 @@ impl BenchApp {
                             .px_2()
                             .py_0p5()
                             .text_sm()
-                            .border_1().rounded_md()
+                            .border_1()
+                            .rounded_md()
                             .border_color(if armed { theme.danger } else { theme.border })
                             .text_color(if armed { theme.danger } else { muted })
                             .cursor_pointer()

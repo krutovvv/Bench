@@ -45,8 +45,14 @@ impl BenchApp {
                         .map(|p| ProjectEntry {
                             id: p["id"].as_str().unwrap_or_default().into(),
                             name: p["name"].as_str().unwrap_or_default().into(),
-                            folder: p["folder"].as_str().filter(|f| !f.is_empty()).map(str::to_string),
-                            host: p["host"].as_str().filter(|h| !h.is_empty()).map(str::to_string),
+                            folder: p["folder"]
+                                .as_str()
+                                .filter(|f| !f.is_empty())
+                                .map(str::to_string),
+                            host: p["host"]
+                                .as_str()
+                                .filter(|h| !h.is_empty())
+                                .map(str::to_string),
                             browser: p["browser"].as_bool().unwrap_or(false),
                         })
                         .collect();
@@ -74,7 +80,15 @@ impl BenchApp {
         let new_user = field("Login", window, cx);
         let new_port = field("22", window, cx);
         let new_key = field("Private key file (empty = ssh-agent)", window, cx);
-        self.project_form = Some(ProjectForm { name, folder: None, host: None, new_host, new_user, new_port, new_key });
+        self.project_form = Some(ProjectForm {
+            name,
+            folder: None,
+            host: None,
+            new_host,
+            new_user,
+            new_port,
+            new_key,
+        });
         cx.notify();
     }
 
@@ -116,7 +130,12 @@ impl BenchApp {
         };
         let name = form.name.read(cx).value().trim().to_string();
         if name.is_empty() {
-            self.toast(NotificationType::Error, "The project needs a name".to_string(), window, cx);
+            self.toast(
+                NotificationType::Error,
+                "The project needs a name".to_string(),
+                window,
+                cx,
+            );
             return;
         }
         // Another server: into ~/.ssh/config first, named after the project.
@@ -125,7 +144,12 @@ impl BenchApp {
             let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
             let address = v(&form.new_host);
             if address.is_empty() {
-                self.toast(NotificationType::Error, "The server's address is empty".to_string(), window, cx);
+                self.toast(
+                    NotificationType::Error,
+                    "The server's address is empty".to_string(),
+                    window,
+                    cx,
+                );
                 return;
             }
             let alias: String = name
@@ -135,10 +159,26 @@ impl BenchApp {
                 .collect::<String>()
                 .trim_matches('-')
                 .to_string();
-            let alias = if alias.is_empty() { address.clone() } else { alias };
-            let server = crate::sshconfig::Server { alias: alias.clone(), hostname: address, user: v(&form.new_user), port: v(&form.new_port), identity: v(&form.new_key), ..Default::default() };
+            let alias = if alias.is_empty() {
+                address.clone()
+            } else {
+                alias
+            };
+            let server = crate::sshconfig::Server {
+                alias: alias.clone(),
+                hostname: address,
+                user: v(&form.new_user),
+                port: v(&form.new_port),
+                identity: v(&form.new_key),
+                ..Default::default()
+            };
             if let Err(e) = crate::sshconfig::save(None, &server) {
-                self.toast(NotificationType::Error, format!("~/.ssh/config: {e:#}"), window, cx);
+                self.toast(
+                    NotificationType::Error,
+                    format!("~/.ssh/config: {e:#}"),
+                    window,
+                    cx,
+                );
                 return;
             }
             host = Some(alias);
@@ -157,7 +197,9 @@ impl BenchApp {
                     this.load_projects(window, cx);
                     // A local project starts with its first thread; a remote one with its
                     // server agent's threads (they show once it is connected).
-                    if let (Some(id), None) = (v["project"]["id"].as_str(), v["project"]["host"].as_str()) {
+                    if let (Some(id), None) =
+                        (v["project"]["id"].as_str(), v["project"]["host"].as_str())
+                    {
                         this.new_thread_in(id.to_string(), cx);
                     }
                 }

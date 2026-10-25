@@ -22,17 +22,33 @@ pub struct RemoteAgent {
 impl BenchApp {
     /// Connect to the agents of the remote projects (once each).
     pub fn connect_remotes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let hosts: Vec<String> = self.projects.iter().filter_map(|p| p.host.clone()).collect();
+        let hosts: Vec<String> = self
+            .projects
+            .iter()
+            .filter_map(|p| p.host.clone())
+            .collect();
         for host in hosts {
             if self.remotes.contains_key(&host) || self.demo {
                 continue;
             }
             let (tx, rx) = async_channel::unbounded::<Evt>();
             let gateway = Gateway::start(Target::Ssh(host.clone()), tx);
-            self.remotes.insert(host.clone(), RemoteAgent { gateway, conn: None, error: None });
+            self.remotes.insert(
+                host.clone(),
+                RemoteAgent {
+                    gateway,
+                    conn: None,
+                    error: None,
+                },
+            );
             cx.spawn_in(window, async move |this, cx| {
                 while let Ok(evt) = rx.recv().await {
-                    if this.update_in(cx, |this, window, cx| this.on_remote_event(&host, evt, window, cx)).is_err() {
+                    if this
+                        .update_in(cx, |this, window, cx| {
+                            this.on_remote_event(&host, evt, window, cx)
+                        })
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -43,7 +59,13 @@ impl BenchApp {
 
     /// An event from a server's agent: its connection and its threads are its own; what a
     /// thread streams goes where the local one's would.
-    fn on_remote_event(&mut self, host: &str, evt: Evt, window: &mut Window, cx: &mut Context<Self>) {
+    fn on_remote_event(
+        &mut self,
+        host: &str,
+        evt: Evt,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         match evt {
             Evt::Connected(conn) => {
                 if let Some(r) = self.remotes.get_mut(host) {
@@ -62,13 +84,23 @@ impl BenchApp {
             // The server's agent has no profiles to pick: its threads are the project's.
             Evt::Profiles(_) | Evt::Catalog(_) => {}
             Evt::Sessions(_, rows) => {
-                let project = self.projects.iter().find(|p| p.host.as_deref() == Some(host)).map(|p| p.id.clone()).unwrap_or_default();
+                let project = self
+                    .projects
+                    .iter()
+                    .find(|p| p.host.as_deref() == Some(host))
+                    .map(|p| p.id.clone())
+                    .unwrap_or_default();
                 self.sessions.retain(|s| s.host != host);
-                self.sessions.extend(rows.into_iter().filter(|s| s.source != "subagent").map(|mut s| {
-                    s.host = host.to_string();
-                    s.project = project.clone();
-                    s
-                }));
+                self.sessions
+                    .extend(
+                        rows.into_iter()
+                            .filter(|s| s.source != "subagent")
+                            .map(|mut s| {
+                                s.host = host.to_string();
+                                s.project = project.clone();
+                                s
+                            }),
+                    );
                 cx.notify();
             }
             Evt::SessionsChanged | Evt::Deleted => {
@@ -84,7 +116,11 @@ impl BenchApp {
     /// Where the open thread's shell runs: its project's server, or this Mac (`term::LOCAL`).
     pub fn thread_machine(&self) -> String {
         let host = self.thread_host();
-        if host.is_empty() { crate::term::LOCAL.to_string() } else { host }
+        if host.is_empty() {
+            crate::term::LOCAL.to_string()
+        } else {
+            host
+        }
     }
 
     pub fn thread_host(&self) -> String {
@@ -100,7 +136,11 @@ impl BenchApp {
     }
 
     pub fn host_of_session(&self, id: &str) -> String {
-        self.sessions.iter().find(|s| s.id == id).map(|s| s.host.clone()).unwrap_or_default()
+        self.sessions
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.host.clone())
+            .unwrap_or_default()
     }
 
     /// Send a command to the agent it concerns: the thread's own (a server's, or this Mac's).
@@ -127,15 +167,29 @@ impl BenchApp {
             profile: if remote { "default".into() } else { profile },
             cwd,
             subject: self.new_subject.clone(),
-            project: if remote { String::new() } else { self.thread_project.clone() },
+            project: if remote {
+                String::new()
+            } else {
+                self.thread_project.clone()
+            },
         }
     }
 
     /// The connection a project's environment is read through, and its id there: a remote
     /// project is its server agent's general environment.
     pub fn env_target(&self, project: &str) -> Option<(Arc<Connection>, String)> {
-        match self.projects.iter().find(|p| p.id == project).and_then(|p| p.host.clone()) {
-            Some(host) => self.remotes.get(&host)?.conn.clone().map(|c| (c, "general".to_string())),
+        match self
+            .projects
+            .iter()
+            .find(|p| p.id == project)
+            .and_then(|p| p.host.clone())
+        {
+            Some(host) => self
+                .remotes
+                .get(&host)?
+                .conn
+                .clone()
+                .map(|c| (c, "general".to_string())),
             None => self.conn.clone().map(|c| (c, project.to_string())),
         }
     }

@@ -14,7 +14,11 @@ pub struct Tasks;
 
 fn list_of(ins: &Insert) -> List {
     let name = ins.get("list");
-    LISTS.iter().find(|l| l.name().eq_ignore_ascii_case(&name)).cloned().unwrap_or(LISTS[0].clone())
+    LISTS
+        .iter()
+        .find(|l| l.name().eq_ignore_ascii_case(&name))
+        .cloned()
+        .unwrap_or(LISTS[0].clone())
 }
 
 impl InsertKind for Tasks {
@@ -30,11 +34,21 @@ impl InsertKind for Tasks {
         "Tasks".into()
     }
 
-    fn controls(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn controls(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Vec<AnyElement> {
         let now = list_of(ins);
         app.sync_task_project();
         // Only the lists that have something (and the one shown): an empty one needs no button.
-        let lists: Vec<List> = LISTS.iter().filter(|l| **l == now || !app.tasks.shown(l).is_empty()).cloned().collect();
+        let lists: Vec<List> = LISTS
+            .iter()
+            .filter(|l| **l == now || !app.tasks.shown(l).is_empty())
+            .cloned()
+            .collect();
         let chosen = lists.iter().position(|l| *l == now).unwrap_or(0);
         let id = ins.id.clone();
         let theme = cx.theme().clone();
@@ -51,20 +65,33 @@ impl InsertKind for Tasks {
             }))
             .into_any_element();
         let picks = lists.clone();
-        vec![add, super::super::tools::segmented_owned(
-            "insert-task-lists",
-            lists.iter().map(|l| l.name()).collect(),
-            chosen,
-            cx,
-            move |this, k, window, cx| {
-                let list = picks[k].clone();
-                this.patch_insert(&id, json!({ "state": { "list": list.name().to_lowercase() } }), cx);
-                this.select_task_list(list, window, cx);
-            },
-        )]
+        vec![
+            add,
+            super::super::tools::segmented_owned(
+                "insert-task-lists",
+                lists.iter().map(|l| l.name()).collect(),
+                chosen,
+                cx,
+                move |this, k, window, cx| {
+                    let list = picks[k].clone();
+                    this.patch_insert(
+                        &id,
+                        json!({ "state": { "list": list.name().to_lowercase() } }),
+                        cx,
+                    );
+                    this.select_task_list(list, window, cx);
+                },
+            ),
+        ]
     }
 
-    fn body(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn body(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         let list = list_of(ins);
         if app.tasks.list != list {
             app.select_task_list(list, window, cx);
@@ -74,16 +101,34 @@ impl InsertKind for Tasks {
     }
 
     /// The open task (a click on a row, or a new one), as the next row of the thread.
-    fn follow(&self, app: &mut BenchApp, ins: &Insert, _window: &mut Window, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn follow(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         let task = app.tasks.selected_task().cloned()?;
         let theme = cx.theme().clone();
-        let title = if task.title.trim().is_empty() { "New task".to_string() } else { task.title.clone() };
+        let title = if task.title.trim().is_empty() {
+            "New task".to_string()
+        } else {
+            task.title.clone()
+        };
         let head = super::super::block_head(&theme, true)
             .child(div().flex_1().min_w_0().truncate().child(title))
-            .child(super::icon_button(&format!("{}-task-close", ins.id), crate::icons::Ico::X, "Close", &theme).on_click(cx.listener(|this, _, window, cx| {
-                this.click_claimed = true;
-                this.close_task(window, cx);
-            })));
+            .child(
+                super::icon_button(
+                    &format!("{}-task-close", ins.id),
+                    crate::icons::Ico::X,
+                    "Close",
+                    &theme,
+                )
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.click_claimed = true;
+                    this.close_task(window, cx);
+                })),
+            );
         let body = app.render_task_card(&task, cx);
         Some(super::card(head, body, &theme))
     }
@@ -92,7 +137,13 @@ impl InsertKind for Tasks {
         format!("The tasks insert shows the {} list.", list_of(ins).name())
     }
 
-    fn opened(&self, app: &mut BenchApp, ins: &Insert, window: &mut Window, cx: &mut Context<BenchApp>) {
+    fn opened(
+        &self,
+        app: &mut BenchApp,
+        ins: &Insert,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
         app.start_reminders(cx);
         app.load_tasks();
         app.select_task_list(list_of(ins), window, cx);

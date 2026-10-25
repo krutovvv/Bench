@@ -207,7 +207,6 @@ fn write_private(path: &PathBuf, text: &str) -> Result<()> {
     Ok(())
 }
 
-
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }

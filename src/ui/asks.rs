@@ -38,7 +38,8 @@ impl BenchApp {
                             div()
                                 .size(px(14.))
                                 .flex_none()
-                                .border_1().rounded_md()
+                                .border_1()
+                                .rounded_md()
                                 .border_color(if on { theme.primary } else { theme.input })
                                 .when(on, |d| d.bg(theme.primary)),
                         )
@@ -67,7 +68,8 @@ impl BenchApp {
                 .mt_2()
                 .p_3()
                 .gap_2()
-                .border_1().rounded_md()
+                .border_1()
+                .rounded_md()
                 .border_color(theme.primary)
                 .child(
                     h_flex()

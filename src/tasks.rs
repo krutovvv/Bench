@@ -49,18 +49,50 @@ pub fn slug(name: &str) -> String {
     let latin: String = name
         .to_lowercase()
         .chars()
-        .map(|c| match c {
-            'а' => "a", 'б' => "b", 'в' => "v", 'г' => "g", 'д' => "d", 'е' | 'ё' => "e", 'ж' => "zh",
-            'з' => "z", 'и' => "i", 'й' => "y", 'к' => "k", 'л' => "l", 'м' => "m", 'н' => "n",
-            'о' => "o", 'п' => "p", 'р' => "r", 'с' => "s", 'т' => "t", 'у' => "u", 'ф' => "f",
-            'х' => "h", 'ц' => "ts", 'ч' => "ch", 'ш' => "sh", 'щ' => "sch", 'ъ' | 'ь' => "",
-            'ы' => "y", 'э' => "e", 'ю' => "yu", 'я' => "ya",
-            c if c.is_ascii_alphanumeric() => return c.to_string(),
-            _ => "-",
-        }
-        .to_string())
+        .map(|c| {
+            match c {
+                'а' => "a",
+                'б' => "b",
+                'в' => "v",
+                'г' => "g",
+                'д' => "d",
+                'е' | 'ё' => "e",
+                'ж' => "zh",
+                'з' => "z",
+                'и' => "i",
+                'й' => "y",
+                'к' => "k",
+                'л' => "l",
+                'м' => "m",
+                'н' => "n",
+                'о' => "o",
+                'п' => "p",
+                'р' => "r",
+                'с' => "s",
+                'т' => "t",
+                'у' => "u",
+                'ф' => "f",
+                'х' => "h",
+                'ц' => "ts",
+                'ч' => "ch",
+                'ш' => "sh",
+                'щ' => "sch",
+                'ъ' | 'ь' => "",
+                'ы' => "y",
+                'э' => "e",
+                'ю' => "yu",
+                'я' => "ya",
+                c if c.is_ascii_alphanumeric() => return c.to_string(),
+                _ => "-",
+            }
+            .to_string()
+        })
         .collect();
-    latin.split('-').filter(|w| !w.is_empty()).collect::<Vec<_>>().join("-")
+    latin
+        .split('-')
+        .filter(|w| !w.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 pub fn now() -> i64 {

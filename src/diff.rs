@@ -97,8 +97,6 @@ pub fn before(current: &str, diffs: &[String]) -> Option<String> {
     Some(text)
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use super::*;

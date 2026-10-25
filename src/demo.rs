@@ -193,9 +193,21 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, turn: Turn) 
         let (key, mut state) = BenchApp::insert_spec(&spec);
         if key == "browser" {
             state.insert("tab".into(), serde_json::json!("demo-tab"));
-            state.insert("url".into(), serde_json::json!("https://blog.example.com/admin/posts/new"));
+            state.insert(
+                "url".into(),
+                serde_json::json!("https://blog.example.com/admin/posts/new"),
+            );
         }
-        app.inserts.insert(id.into(), vec![crate::model::Insert { id: format!("i-{id}"), key, state, folded: false, after: 0 }]);
+        app.inserts.insert(
+            id.into(),
+            vec![crate::model::Insert {
+                id: format!("i-{id}"),
+                key,
+                state,
+                folded: false,
+                after: 0,
+            }],
+        );
     }
     app.sessions.push(row);
     app.demo_threads.insert(id.into(), vec![turn]);
@@ -231,7 +243,8 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
     if std::env::var("BENCH_DEMO").as_deref() == Ok("env-open") && e.card.is_none() {
         app.env_card("skill", "release-notes".into(), window, cx);
         if let Some(e) = app.project_env.as_mut() {
-            e.folded.extend(["Project", "MCP servers", "Prompts", "Schedule", "Accesses"]);
+            e.folded
+                .extend(["Project", "MCP servers", "Prompts", "Schedule", "Accesses"]);
         }
     }
 }
@@ -273,7 +286,10 @@ The RFC moved to tomorrow.",
         "ssh:web-1",
         done(
             "Renew the certificates before they expire on Friday.",
-            vec![tool("ssh_run", "certbot renew"), tool("ssh_run", "systemctl reload nginx")],
+            vec![
+                tool("ssh_run", "certbot renew"),
+                tool("ssh_run", "systemctl reload nginx"),
+            ],
             "Renewed both certificates (until **January 22**) and reloaded nginx; the site answers over \
 the new ones.",
             31.0,
@@ -308,7 +324,10 @@ Say so and I'll run it here.",
             "Open the blog's admin, make a draft from release-notes.md and stop before publishing.",
             vec![
                 tool("browser_tabs", "new"),
-                tool("browser_navigate", "https://blog.example.com/admin/posts/new"),
+                tool(
+                    "browser_navigate",
+                    "https://blog.example.com/admin/posts/new",
+                ),
                 tool("browser_fill_form", "title, body, tags"),
                 tool("browser_snapshot", ""),
             ],
@@ -319,7 +338,8 @@ is published.\n\nThe page is right here — click and type in it if something ne
             48.0,
         ),
     );
-    app.sites.demo_frame = crate::remote_browser::image_of(include_bytes!("../assets/demo/site.jpg"));
+    app.sites.demo_frame =
+        crate::remote_browser::image_of(include_bytes!("../assets/demo/site.jpg"));
     thread(
         app,
         "d-env",
@@ -538,7 +558,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
         })
         .detach();
     }
-    app.demo_threads.insert("d-landing".into(), app.turns.clone());
+    app.demo_threads
+        .insert("d-landing".into(), app.turns.clone());
     app.session = Some("d-landing".into());
     other_modes(app);
     subject_threads(app, now);

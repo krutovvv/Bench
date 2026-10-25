@@ -27,7 +27,10 @@ impl BenchApp {
                 Some(hits) if hits.is_empty() => list.push(self.sidebar_note("Nothing found", cx)),
                 Some(hits) => {
                     for (k, (id, snippet)) in hits.iter().enumerate() {
-                        list.push(self.render_search_hit(k, id, snippet, cx).into_any_element());
+                        list.push(
+                            self.render_search_hit(k, id, snippet, cx)
+                                .into_any_element(),
+                        );
                     }
                 }
             }
@@ -41,7 +44,9 @@ impl BenchApp {
                 .copied()
                 .filter(|&i| {
                     let s = &self.sessions[i];
-                    s.host.is_empty() && (s.project.is_empty() || !self.projects.iter().any(|p| p.id == s.project))
+                    s.host.is_empty()
+                        && (s.project.is_empty()
+                            || !self.projects.iter().any(|p| p.id == s.project))
                 })
                 .collect();
             list.extend(self.render_loose(loose, cx));
@@ -100,7 +105,13 @@ impl BenchApp {
 
     /// A project: its head (an icon for what it is, the name, the fold, "+" for a new thread in
     /// it), then its threads on the head's guide.
-    fn render_project(&mut self, g: usize, p: &crate::model::ProjectEntry, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn render_project(
+        &mut self,
+        g: usize,
+        p: &crate::model::ProjectEntry,
+        rows: Vec<usize>,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let key = format!("p:{}", p.id);
@@ -115,61 +126,101 @@ impl BenchApp {
         // A remote project's agent: connecting, or why it is not there.
         let remote_note = p.host.as_ref().and_then(|h| match self.remotes.get(h) {
             Some(r) if r.conn.is_some() => None,
-            Some(r) => Some(r.error.clone().map(|e| format!("{h}: {e}")).unwrap_or_else(|| format!("Connecting to {h}…"))),
+            Some(r) => Some(
+                r.error
+                    .clone()
+                    .map(|e| format!("{h}: {e}"))
+                    .unwrap_or_else(|| format!("Connecting to {h}…")),
+            ),
             None => Some(format!("{h}: not connected")),
         });
         let (new_id, del_id, env_id) = (p.id.clone(), p.id.clone(), p.id.clone());
         let pinned = self.mark_of(&format!("p:{}", p.id)).pinned;
-        let zed = p.folder.clone().filter(|f| !f.is_empty()).map(|f| (f, p.host.clone()));
-        let mut out = vec![h_flex()
-            .id(("phead", g))
-            .group(group.clone())
-            .cursor_pointer()
-            .px_4()
-            .pt(rems(if g == 0 { 0.5 } else { 0.75 }))
-            .pb_1()
-            .gap_1p5()
-            .items_center()
-            .text_sm()
-            .child(super::head_icon(icon, cx))
-            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child(p.name.clone()))
-            .child(div().flex_1())
-            // "⋯" (on hover): its environment, pin, remove — as a right click.
-            .child(
-                div()
-                    .flex_none()
-                    .opacity(0.)
-                    .group_hover(group.clone(), |s| s.opacity(1.))
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(Button::new(("pmore", g)).ghost().xsmall().icon(Ico::Ellipsis.icon()).dropdown_menu(project_menu(cx.entity(), env_id.clone(), pinned, zed.clone()))),
-            )
-            .child(
-                super::head_plus_slot()
-                    .id(("pnew", g))
-                    .cursor_pointer()
-                    .text_color(muted)
-                    // On hover, as the pencil.
-                    .opacity(0.)
-                    .group_hover(group.clone(), |s| s.opacity(1.))
-                    .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
-                    .child(Ico::Plus.icon().xsmall())
-                    .tooltip(|window, cx| Tooltip::new("New thread in this project").build(window, cx))
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        cx.stop_propagation();
-                        this.new_thread_in(new_id.clone(), cx)
-                    })),
-            )
-            // The fold, always the rightmost and always shown (open: down, folded: right).
-            .child(
-                div()
-                    .flex_none()
-                    .p_0p5()
-                    .text_color(muted)
-                    .child(if collapsed { Ico::ChevronRight } else { Ico::ChevronDown }.icon().xsmall()),
-            )
-            .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
-            .context_menu(project_menu(cx.entity(), del_id.clone(), pinned, zed.clone()))
-            .into_any_element()];
+        let zed = p
+            .folder
+            .clone()
+            .filter(|f| !f.is_empty())
+            .map(|f| (f, p.host.clone()));
+        let mut out = vec![
+            h_flex()
+                .id(("phead", g))
+                .group(group.clone())
+                .cursor_pointer()
+                .px_4()
+                .pt(rems(if g == 0 { 0.5 } else { 0.75 }))
+                .pb_1()
+                .gap_1p5()
+                .items_center()
+                .text_sm()
+                .child(super::head_icon(icon, cx))
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(muted)
+                        .child(p.name.clone()),
+                )
+                .child(div().flex_1())
+                // "⋯" (on hover): its environment, pin, remove — as a right click.
+                .child(
+                    div()
+                        .flex_none()
+                        .opacity(0.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            Button::new(("pmore", g))
+                                .ghost()
+                                .xsmall()
+                                .icon(Ico::Ellipsis.icon())
+                                .dropdown_menu(project_menu(
+                                    cx.entity(),
+                                    env_id.clone(),
+                                    pinned,
+                                    zed.clone(),
+                                )),
+                        ),
+                )
+                .child(
+                    super::head_plus_slot()
+                        .id(("pnew", g))
+                        .cursor_pointer()
+                        .text_color(muted)
+                        // On hover, as the pencil.
+                        .opacity(0.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
+                        .child(Ico::Plus.icon().xsmall())
+                        .tooltip(|window, cx| {
+                            Tooltip::new("New thread in this project").build(window, cx)
+                        })
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            cx.stop_propagation();
+                            this.new_thread_in(new_id.clone(), cx)
+                        })),
+                )
+                // The fold, always the rightmost and always shown (open: down, folded: right).
+                .child(
+                    div().flex_none().p_0p5().text_color(muted).child(
+                        if collapsed {
+                            Ico::ChevronRight
+                        } else {
+                            Ico::ChevronDown
+                        }
+                        .icon()
+                        .xsmall(),
+                    ),
+                )
+                .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
+                .context_menu(project_menu(
+                    cx.entity(),
+                    del_id.clone(),
+                    pinned,
+                    zed.clone(),
+                ))
+                .into_any_element(),
+        ];
         if collapsed {
             return out;
         }
@@ -188,7 +239,10 @@ impl BenchApp {
         }
         let n = rows.len();
         for (k, i) in rows.into_iter().enumerate() {
-            out.push(self.render_session_row(i, Some(k + 1 == n), cx).into_any_element());
+            out.push(
+                self.render_session_row(i, Some(k + 1 == n), cx)
+                    .into_any_element(),
+            );
         }
         out
     }
@@ -200,60 +254,80 @@ impl BenchApp {
         let key = "open:loose".to_string();
         let open = self.ssh.collapsed.contains(&key);
         let group: SharedString = "loose-head".into();
-        let mut out = vec![h_flex()
-            .id("loose-head")
-            .group(group.clone())
-            .cursor_pointer()
-            .px_4()
-            .pt(rems(0.5))
-            .pb_1()
-            .gap_1p5()
-            .items_center()
-            .text_sm()
-            .child(super::head_icon(Ico::Server, cx))
-            .child(div().min_w_0().truncate().font_weight(FontWeight::MEDIUM).text_color(muted).child(crate::app::LOCAL_HOST))
-            .child(div().flex_1())
-            // The pencil: the general environment (soul, MCP, skills, prompts every thread gets).
-            .child(
-                super::head_plus_slot()
-                    .id("general-env")
-                    .cursor_pointer()
-                    .text_color(muted)
-                    .opacity(0.)
-                    .group_hover(group.clone(), |s| s.opacity(1.))
-                    .hover(|s| s.bg(cx.theme().sidebar_accent).text_color(cx.theme().foreground))
-                    .child(Ico::Pencil.icon().xsmall())
-                    .tooltip(|window, cx| Tooltip::new("The general environment").build(window, cx))
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        cx.stop_propagation();
-                        this.open_project_env("general".into(), window, cx)
-                    })),
-            )
-            .child(
-                super::head_plus_slot()
-                    .id("general-new")
-                    .cursor_pointer()
-                    .text_color(muted)
-                    .opacity(0.)
-                    .group_hover(group.clone(), |s| s.opacity(1.))
-                    .hover(|s| s.bg(cx.theme().sidebar_accent).text_color(cx.theme().foreground))
-                    .child(Ico::Plus.icon().xsmall())
-                    .tooltip(|window, cx| Tooltip::new("New thread").build(window, cx))
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        cx.stop_propagation();
-                        this.new_thread_in(String::new(), cx)
-                    })),
-            )
-            .child(super::group_chevron(!open, group, cx))
-            // Folded by default: the key marks it open.
-            .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
-            .into_any_element()];
+        let mut out = vec![
+            h_flex()
+                .id("loose-head")
+                .group(group.clone())
+                .cursor_pointer()
+                .px_4()
+                .pt(rems(0.5))
+                .pb_1()
+                .gap_1p5()
+                .items_center()
+                .text_sm()
+                .child(super::head_icon(Ico::Server, cx))
+                .child(
+                    div()
+                        .min_w_0()
+                        .truncate()
+                        .font_weight(FontWeight::MEDIUM)
+                        .text_color(muted)
+                        .child(crate::app::LOCAL_HOST),
+                )
+                .child(div().flex_1())
+                // The pencil: the general environment (soul, MCP, skills, prompts every thread gets).
+                .child(
+                    super::head_plus_slot()
+                        .id("general-env")
+                        .cursor_pointer()
+                        .text_color(muted)
+                        .opacity(0.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .hover(|s| {
+                            s.bg(cx.theme().sidebar_accent)
+                                .text_color(cx.theme().foreground)
+                        })
+                        .child(Ico::Pencil.icon().xsmall())
+                        .tooltip(|window, cx| {
+                            Tooltip::new("The general environment").build(window, cx)
+                        })
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.open_project_env("general".into(), window, cx)
+                        })),
+                )
+                .child(
+                    super::head_plus_slot()
+                        .id("general-new")
+                        .cursor_pointer()
+                        .text_color(muted)
+                        .opacity(0.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .hover(|s| {
+                            s.bg(cx.theme().sidebar_accent)
+                                .text_color(cx.theme().foreground)
+                        })
+                        .child(Ico::Plus.icon().xsmall())
+                        .tooltip(|window, cx| Tooltip::new("New thread").build(window, cx))
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            cx.stop_propagation();
+                            this.new_thread_in(String::new(), cx)
+                        })),
+                )
+                .child(super::group_chevron(!open, group, cx))
+                // Folded by default: the key marks it open.
+                .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
+                .into_any_element(),
+        ];
         if !open {
             return out;
         }
         let n = rows.len();
         for (k, i) in rows.into_iter().enumerate() {
-            out.push(self.render_session_row(i, Some(k + 1 == n), cx).into_any_element());
+            out.push(
+                self.render_session_row(i, Some(k + 1 == n), cx)
+                    .into_any_element(),
+            );
         }
         out
     }
@@ -445,13 +519,23 @@ impl BenchApp {
                     .flex_1()
                     .min_w_0()
                     // A working session's title carries a moving highlight, to find it at a glance.
-                    .child(h_flex().gap_1().items_center().when(pinned, |d| d.child(Ico::Pin.icon().xsmall().text_color(muted))).child(div().min_w_0().text_size(px(SESSION_TITLE)).truncate().map(|d| {
-                        if working {
-                            d.child(ShimmerText::new(s.title.clone()))
-                        } else {
-                            d.child(s.title.clone())
-                        }
-                    })))
+                    .child(
+                        h_flex()
+                            .gap_1()
+                            .items_center()
+                            .when(pinned, |d| {
+                                d.child(Ico::Pin.icon().xsmall().text_color(muted))
+                            })
+                            .child(div().min_w_0().text_size(px(SESSION_TITLE)).truncate().map(
+                                |d| {
+                                    if working {
+                                        d.child(ShimmerText::new(s.title.clone()))
+                                    } else {
+                                        d.child(s.title.clone())
+                                    }
+                                },
+                            )),
+                    )
                     // Compact: the title alone (a working session still shimmers).
                     .when(!compact, |d| {
                         d.child(div().text_xs().text_color(muted).child(meta))
@@ -476,7 +560,8 @@ fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App
             .items_center()
             .justify_center()
             .cursor_pointer()
-            .border_1().rounded_md()
+            .border_1()
+            .rounded_md()
             .border_color(if on {
                 theme.foreground
             } else {
@@ -510,20 +595,32 @@ fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App
         .into_any_element()
 }
 
-
 /// A thread's menu (its "⋯" and a right click): pin, color, Zed, delete.
-fn session_menu(view: Entity<BenchApp>, id: String, pinned: bool) -> impl Fn(gpui_kit::component::menu::PopupMenu, &mut Window, &mut Context<gpui_kit::component::menu::PopupMenu>) -> gpui_kit::component::menu::PopupMenu + 'static {
+fn session_menu(
+    view: Entity<BenchApp>,
+    id: String,
+    pinned: bool,
+) -> impl Fn(
+    gpui_kit::component::menu::PopupMenu,
+    &mut Window,
+    &mut Context<gpui_kit::component::menu::PopupMenu>,
+) -> gpui_kit::component::menu::PopupMenu
++ 'static {
     move |menu, _, _| {
         let act = |f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>| {
             let view = view.clone();
-            move |_: &ClickEvent, window: &mut Window, cx: &mut App| view.update(cx, |this, cx| f(this, window, cx))
+            move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
+                view.update(cx, |this, cx| f(this, window, cx))
+            }
         };
         let (pin_id, del) = (id.clone(), id.clone());
         let (swatch_view, swatch_id) = (view.clone(), id.clone());
         menu.item(
             PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
                 .icon(Ico::Pin.icon())
-                .on_click(act(Box::new(move |this, _, cx| this.toggle_pin(pin_id.clone(), cx)))),
+                .on_click(act(Box::new(move |this, _, cx| {
+                    this.toggle_pin(pin_id.clone(), cx)
+                }))),
         )
         .separator()
         // Reads the color live, so a click shows at once in the open menu.
@@ -532,29 +629,67 @@ fn session_menu(view: Entity<BenchApp>, id: String, pinned: bool) -> impl Fn(gpu
             color_row(&swatch_view, &swatch_id, current, cx)
         }))
         .separator()
-        .item(PopupMenuItem::new("Delete").icon(Ico::Trash.icon()).on_click(act(Box::new(move |this, window, cx| this.delete_session(del.clone(), window, cx)))))
+        .item(
+            PopupMenuItem::new("Delete")
+                .icon(Ico::Trash.icon())
+                .on_click(act(Box::new(move |this, window, cx| {
+                    this.delete_session(del.clone(), window, cx)
+                }))),
+        )
     }
 }
 
 /// A project's menu (its "⋯" and a right click): its environment, pin, remove.
-fn project_menu(view: Entity<BenchApp>, id: String, pinned: bool, zed: Option<(String, Option<String>)>) -> impl Fn(gpui_kit::component::menu::PopupMenu, &mut Window, &mut Context<gpui_kit::component::menu::PopupMenu>) -> gpui_kit::component::menu::PopupMenu + 'static {
+fn project_menu(
+    view: Entity<BenchApp>,
+    id: String,
+    pinned: bool,
+    zed: Option<(String, Option<String>)>,
+) -> impl Fn(
+    gpui_kit::component::menu::PopupMenu,
+    &mut Window,
+    &mut Context<gpui_kit::component::menu::PopupMenu>,
+) -> gpui_kit::component::menu::PopupMenu
++ 'static {
     move |menu, _, _| {
         let act = |f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>| {
             let view = view.clone();
-            move |_: &ClickEvent, window: &mut Window, cx: &mut App| view.update(cx, |this, cx| f(this, window, cx))
+            move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
+                view.update(cx, |this, cx| f(this, window, cx))
+            }
         };
         let (env_id, pin_id, del) = (id.clone(), format!("p:{id}"), id.clone());
-        menu.item(PopupMenuItem::new("Environment").icon(Ico::Pencil.icon()).on_click(act(Box::new(move |this, window, cx| this.open_project_env(env_id.clone(), window, cx)))))
-            .item(
-                PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
-                    .icon(Ico::Pin.icon())
-                    .on_click(act(Box::new(move |this, _, cx| this.toggle_pin(pin_id.clone(), cx)))),
+        menu.item(
+            PopupMenuItem::new("Environment")
+                .icon(Ico::Pencil.icon())
+                .on_click(act(Box::new(move |this, window, cx| {
+                    this.open_project_env(env_id.clone(), window, cx)
+                }))),
+        )
+        .item(
+            PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
+                .icon(Ico::Pin.icon())
+                .on_click(act(Box::new(move |this, _, cx| {
+                    this.toggle_pin(pin_id.clone(), cx)
+                }))),
+        )
+        // A project with a folder opens in Zed (a server's over SSH).
+        .when_some(zed.clone(), |menu, (folder, host)| {
+            menu.item(
+                PopupMenuItem::new("Open in Zed")
+                    .icon(Ico::Zed.icon())
+                    .on_click(act(Box::new(move |this, _, cx| {
+                        this.open_in_zed(&folder, None, host.as_deref(), cx)
+                    }))),
             )
-            // A project with a folder opens in Zed (a server's over SSH).
-            .when_some(zed.clone(), |menu, (folder, host)| {
-                menu.item(PopupMenuItem::new("Open in Zed").icon(Ico::Zed.icon()).on_click(act(Box::new(move |this, _, cx| this.open_in_zed(&folder, None, host.as_deref(), cx)))))
-            })
-            .separator()
-            .item(PopupMenuItem::new("Remove project").icon(Ico::Trash.icon()).on_click(act(Box::new(move |this, window, cx| this.delete_project(del.clone(), window, cx)))))
+        })
+        .separator()
+        .item(
+            PopupMenuItem::new("Remove project")
+                .icon(Ico::Trash.icon())
+                .on_click(act(Box::new(move |this, window, cx| {
+                    this.delete_project(del.clone(), window, cx)
+                }))),
+        )
     }
 }

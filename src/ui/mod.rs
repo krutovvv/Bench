@@ -6,12 +6,12 @@ mod composer;
 pub(crate) mod inserts;
 mod media;
 mod panels;
-mod providers;
-mod servers;
-mod remote_files;
 mod project_list;
-mod sites;
+mod providers;
+mod remote_files;
+mod servers;
 mod sidebar;
+mod sites;
 mod statusbar;
 mod tasks;
 #[cfg(not(target_family = "wasm"))]
@@ -116,9 +116,9 @@ impl BenchApp {
                 let _ = tip;
                 // "+": a new project (the sidebar holds projects only).
                 d.child(
-                    toggle("new-item", crate::icons::Ico::Plus, "New project", false).on_click(cx.listener(
-                        |this, _, window, cx| this.new_project_form(window, cx),
-                    )),
+                    toggle("new-item", crate::icons::Ico::Plus, "New project", false).on_click(
+                        cx.listener(|this, _, window, cx| this.new_project_form(window, cx)),
+                    ),
                 )
             })
             .child(
@@ -189,7 +189,12 @@ pub fn head_icon(icon: crate::icons::Ico, cx: &App) -> impl IntoElement {
 
 /// The room a head's "+" takes, kept when it has none, so every chevron sits at one x.
 pub fn head_plus_slot() -> Div {
-    div().flex_none().size(px(16.)).flex().items_center().justify_center()
+    div()
+        .flex_none()
+        .size(px(16.))
+        .flex()
+        .items_center()
+        .justify_center()
 }
 
 pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl IntoElement {
@@ -253,7 +258,11 @@ pub const TURN_Y: f32 = 14.;
 pub const BLOCK_HEAD_H: f32 = 32.;
 /// A file's icon and its color, by what it is, as an editor's file tree shows them: folders in
 /// blue, code in its own colors, config, data, pictures, media, archives each told apart.
-pub fn file_icon(name: &str, dir: bool, theme: &gpui_kit::component::Theme) -> (crate::icons::Ico, Hsla) {
+pub fn file_icon(
+    name: &str,
+    dir: bool,
+    theme: &gpui_kit::component::Theme,
+) -> (crate::icons::Ico, Hsla) {
     use crate::icons::Ico;
     if dir {
         return (Ico::Folder, theme.blue);
@@ -261,18 +270,31 @@ pub fn file_icon(name: &str, dir: bool, theme: &gpui_kit::component::Theme) -> (
     let lower = name.to_lowercase();
     let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
     match ext {
-        "rs" | "go" | "c" | "h" | "cpp" | "hpp" | "swift" | "kt" | "java" | "cs" | "zig" | "scala" => (Ico::FileCode, theme.red),
-        "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "vue" | "svelte" | "astro" => (Ico::FileCode, theme.yellow),
+        "rs" | "go" | "c" | "h" | "cpp" | "hpp" | "swift" | "kt" | "java" | "cs" | "zig"
+        | "scala" => (Ico::FileCode, theme.red),
+        "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "vue" | "svelte" | "astro" => {
+            (Ico::FileCode, theme.yellow)
+        }
         "py" | "rb" | "php" | "lua" | "pl" | "ex" | "exs" => (Ico::FileCode, theme.blue),
-        "html" | "htm" | "css" | "scss" | "sass" | "less" | "xml" | "svg" => (Ico::FileCode, theme.magenta),
+        "html" | "htm" | "css" | "scss" | "sass" | "less" | "xml" | "svg" => {
+            (Ico::FileCode, theme.magenta)
+        }
         "json" | "jsonc" | "json5" => (Ico::FileJson, theme.yellow),
-        "yml" | "yaml" | "toml" | "ini" | "conf" | "cfg" | "env" | "properties" | "plist" => (Ico::FileCog, theme.cyan),
-        "md" | "mdx" | "txt" | "rst" | "org" | "csv" | "log" => (Ico::FileText, theme.muted_foreground),
+        "yml" | "yaml" | "toml" | "ini" | "conf" | "cfg" | "env" | "properties" | "plist" => {
+            (Ico::FileCog, theme.cyan)
+        }
+        "md" | "mdx" | "txt" | "rst" | "org" | "csv" | "log" => {
+            (Ico::FileText, theme.muted_foreground)
+        }
         "sh" | "bash" | "zsh" | "fish" | "ps1" => (Ico::FileTerminal, theme.green),
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" | "bmp" | "tiff" | "heic" => (Ico::FileImage, theme.magenta),
+        "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" | "bmp" | "tiff" | "heic" => {
+            (Ico::FileImage, theme.magenta)
+        }
         "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" => (Ico::FileAudio, theme.cyan),
         "mp4" | "mov" | "mkv" | "webm" | "avi" => (Ico::FileVideo, theme.cyan),
-        "zip" | "gz" | "tgz" | "bz2" | "xz" | "7z" | "rar" | "tar" | "zst" => (Ico::FileArchive, theme.yellow),
+        "zip" | "gz" | "tgz" | "bz2" | "xz" | "7z" | "rar" | "tar" | "zst" => {
+            (Ico::FileArchive, theme.yellow)
+        }
         "lock" | "pem" | "key" | "crt" => (Ico::FileLock, theme.muted_foreground),
         _ if matches!(lower.as_str(), "dockerfile" | "makefile") => (Ico::FileCog, theme.cyan),
         // A dotfile is a program's settings (.zshrc, .gitconfig, .npmrc).
@@ -371,7 +393,11 @@ impl BenchApp {
     /// itself is the agent's: ask it to commit, or to undo.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let p = self.project.clone()?;
-        let label = if p.branch.is_empty() { p.name() } else { format!("{} · {}", p.name(), p.branch) };
+        let label = if p.branch.is_empty() {
+            p.name()
+        } else {
+            format!("{} · {}", p.name(), p.branch)
+        };
         let theme = cx.theme();
         Some(
             h_flex()
@@ -437,27 +463,37 @@ impl BenchApp {
                 .into_any_element();
         }
 
-        let title = if self.panel == Panel::NewProject { "New project" } else { "Settings" };
-        bar.child(div().px_4().text_sm().font_weight(FontWeight::MEDIUM).child(title))
-            .child(div().flex_1())
-            .child(
-                div()
-                    .id("settings-close")
-                    .px_3()
-                    .h_full()
-                    .flex()
-                    .items_center()
-                    .cursor_pointer()
-                    .text_color(theme.muted_foreground)
-                    .hover(|s| s.text_color(theme.foreground))
-                    .child(crate::icons::Ico::X.icon().small())
-                    .on_click(cx.listener(|this, _, _, cx| {
-                        this.panel = Panel::Chat;
-                        this.project_form = None;
-                        cx.notify();
-                    })),
-            )
-            .into_any_element()
+        let title = if self.panel == Panel::NewProject {
+            "New project"
+        } else {
+            "Settings"
+        };
+        bar.child(
+            div()
+                .px_4()
+                .text_sm()
+                .font_weight(FontWeight::MEDIUM)
+                .child(title),
+        )
+        .child(div().flex_1())
+        .child(
+            div()
+                .id("settings-close")
+                .px_3()
+                .h_full()
+                .flex()
+                .items_center()
+                .cursor_pointer()
+                .text_color(theme.muted_foreground)
+                .hover(|s| s.text_color(theme.foreground))
+                .child(crate::icons::Ico::X.icon().small())
+                .on_click(cx.listener(|this, _, _, cx| {
+                    this.panel = Panel::Chat;
+                    this.project_form = None;
+                    cx.notify();
+                })),
+        )
+        .into_any_element()
     }
 }
 
@@ -561,7 +597,12 @@ impl Render for BenchApp {
 impl BenchApp {
     /// Sidebar | main, the sidebar resizable (its width kept). Code opens in Zed: no panel of
     /// files here.
-    fn render_layout(&mut self, main: Div, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_layout(
+        &mut self,
+        main: Div,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let hidden = self.sidebar_hidden;
         let shape = (false, false, hidden);
         if self.layout_synced != Some(shape) {
@@ -572,7 +613,9 @@ impl BenchApp {
         let _ = window;
         // Every drag of the divider is the sidebar's width from now on.
         let view = cx.entity();
-        let remember = move |state: &Entity<gpui_kit::component::resizable::ResizableState>, _: &mut Window, cx: &mut App| {
+        let remember = move |state: &Entity<gpui_kit::component::resizable::ResizableState>,
+                             _: &mut Window,
+                             cx: &mut App| {
             let sizes = state.read(cx).sizes().clone();
             view.update(cx, |this, _| {
                 if let (Some(w), false) = (sizes.first(), this.sidebar_hidden) {
@@ -581,7 +624,10 @@ impl BenchApp {
             });
         };
         // Fixed: a window resize goes to the thread; the sidebar keeps its width.
-        let left = resizable_panel().size(self.sidebar_w).size_range(px(200.)..px(480.)).fixed();
+        let left = resizable_panel()
+            .size(self.sidebar_w)
+            .size_range(px(200.)..px(480.))
+            .fixed();
         h_resizable("layout")
             .with_state(&state)
             .with_handle_appearance(quiet_divider())
@@ -594,7 +640,13 @@ impl BenchApp {
 
 /// A form inside the thread, as the environment block's rows: a muted label, the field; a short
 /// note; then its actions (the primary one filled). No page of its own, no hints column.
-pub fn inline_form(title: &'static str, rows: Vec<(&'static str, AnyElement)>, note: Option<SharedString>, actions: Vec<AnyElement>, cx: &App) -> AnyElement {
+pub fn inline_form(
+    title: &'static str,
+    rows: Vec<(&'static str, AnyElement)>,
+    note: Option<SharedString>,
+    actions: Vec<AnyElement>,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
     v_flex()
         .w_full()
@@ -604,7 +656,13 @@ pub fn inline_form(title: &'static str, rows: Vec<(&'static str, AnyElement)>, n
             h_flex()
                 .gap_3()
                 .items_center()
-                .child(div().w(px(110.)).flex_none().text_color(theme.muted_foreground).child(label))
+                .child(
+                    div()
+                        .w(px(110.))
+                        .flex_none()
+                        .text_color(theme.muted_foreground)
+                        .child(label),
+                )
                 .child(div().flex_1().max_w(px(560.)).child(field))
         }))
         .children(note.map(|n| div().pt_1().text_color(theme.muted_foreground).child(n)))
@@ -613,9 +671,19 @@ pub fn inline_form(title: &'static str, rows: Vec<(&'static str, AnyElement)>, n
 }
 
 /// A form's action: the primary one filled, the others quiet text.
-pub fn form_action(id: &'static str, label: &'static str, primary: bool, cx: &App) -> Stateful<Div> {
+pub fn form_action(
+    id: &'static str,
+    label: &'static str,
+    primary: bool,
+    cx: &App,
+) -> Stateful<Div> {
     let theme = cx.theme();
-    let (fg, bg, hover, muted) = (theme.primary_foreground, theme.primary, theme.primary_hover, theme.muted_foreground);
+    let (fg, bg, hover, muted) = (
+        theme.primary_foreground,
+        theme.primary,
+        theme.primary_hover,
+        theme.muted_foreground,
+    );
     let text = theme.foreground;
     div()
         .id(id)
@@ -623,8 +691,15 @@ pub fn form_action(id: &'static str, label: &'static str, primary: bool, cx: &Ap
         .flex()
         .items_center()
         .cursor_pointer()
-        .when(primary, |d| d.px_3().rounded_md().bg(bg).text_color(fg).hover(move |s| s.bg(hover)))
-        .when(!primary, |d| d.text_color(muted).hover(move |s| s.text_color(text)))
+        .when(primary, |d| {
+            d.px_3()
+                .rounded_md()
+                .bg(bg)
+                .text_color(fg)
+                .hover(move |s| s.bg(hover))
+        })
+        .when(!primary, |d| {
+            d.text_color(muted).hover(move |s| s.text_color(text))
+        })
         .child(label)
 }
-

@@ -91,7 +91,11 @@ impl BenchApp {
 
     /// The open thread's browser insert: (its id, its tab, its url).
     pub fn thread_browser(&self) -> Option<(String, String, String)> {
-        let all: Vec<_> = self.thread_inserts().into_iter().filter(|i| i.key == "browser").collect();
+        let all: Vec<_> = self
+            .thread_inserts()
+            .into_iter()
+            .filter(|i| i.key == "browser")
+            .collect();
         // Several in a thread: the live one (see `InsertKind::shared`).
         let live = self.insert_live.get("browser");
         let ins = all.iter().find(|i| Some(&i.id) == live).or(all.last())?;
@@ -119,7 +123,11 @@ impl BenchApp {
         // A new thread's tab starts on a search page (the gateway opens only http(s) pages); the
         // agent, or the person, takes it from there.
         b.state.lock().unwrap().error = None;
-        b.open(if url.is_empty() { START_PAGE.into() } else { url });
+        b.open(if url.is_empty() {
+            START_PAGE.into()
+        } else {
+            url
+        });
     }
 
     /// The browser changed: a tab the agent opened or moved while it answers in the open thread
@@ -130,11 +138,18 @@ impl BenchApp {
         };
         let (fresh, moved, woke) = {
             let mut st = b.state.lock().unwrap();
-            (std::mem::take(&mut st.fresh), std::mem::take(&mut st.moved), std::mem::take(&mut st.woke))
+            (
+                std::mem::take(&mut st.fresh),
+                std::mem::take(&mut st.moved),
+                std::mem::take(&mut st.woke),
+            )
         };
         if let Some((id, tab, url)) = self.thread_browser() {
             let mut claim = None;
-            if let Some(new) = fresh.last().filter(|_| self.sites.reopening.as_deref() == Some(id.as_str())) {
+            if let Some(new) = fresh
+                .last()
+                .filter(|_| self.sites.reopening.as_deref() == Some(id.as_str()))
+            {
                 self.sites.reopening = None;
                 claim = Some(new.clone());
             } else if self.live.is_some() {
@@ -149,7 +164,15 @@ impl BenchApp {
             }
             // The tab's address as it goes, for opening it again.
             if let Some(tab) = self.thread_tab() {
-                let now = b.state.lock().unwrap().pages.iter().find(|p| p.id == tab).map(|p| p.url.clone()).unwrap_or_default();
+                let now = b
+                    .state
+                    .lock()
+                    .unwrap()
+                    .pages
+                    .iter()
+                    .find(|p| p.id == tab)
+                    .map(|p| p.url.clone())
+                    .unwrap_or_default();
                 if !now.is_empty() && now != url {
                     self.patch_insert(&id, json!({ "state": { "tab": tab, "url": now } }), cx);
                 }

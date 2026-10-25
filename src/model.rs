@@ -70,7 +70,11 @@ impl Insert {
 
     /// A string field of its state.
     pub fn get(&self, field: &str) -> String {
-        self.state.get(field).and_then(Value::as_str).unwrap_or_default().to_string()
+        self.state
+            .get(field)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string()
     }
 }
 

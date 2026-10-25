@@ -16,22 +16,22 @@ use gpui_kit::*;
 mod asks;
 mod attachments;
 pub(crate) mod inserts;
-pub(crate) mod local_files;
 mod keys;
+pub(crate) mod local_files;
 pub mod marks;
 mod processes;
-pub(crate) mod projects;
-pub(crate) mod project_list;
 pub(crate) mod project_env;
+pub(crate) mod project_list;
+pub(crate) mod projects;
 pub(crate) mod remotes;
 pub use project_env::ProjectEnv;
 pub use project_list::ProjectForm;
 mod prompts;
 pub(crate) mod providers;
-pub(crate) mod servers;
-mod slash;
 pub(crate) mod remote_files;
+pub(crate) mod servers;
 pub(crate) mod sites;
+mod slash;
 pub(crate) mod subjects;
 pub(crate) mod tasks;
 pub(crate) mod tools;
@@ -731,7 +731,11 @@ impl BenchApp {
             cx.spawn_in(window, async move |this, cx| {
                 let _ = this.update_in(cx, |this, window, cx| {
                     // The server's thread (this machine's terminal when none was named).
-                    let alias = if alias.is_empty() { crate::term::LOCAL.to_string() } else { alias };
+                    let alias = if alias.is_empty() {
+                        crate::term::LOCAL.to_string()
+                    } else {
+                        alias
+                    };
                     this.open_server_thread(alias, window, cx);
                 });
             })
@@ -789,7 +793,11 @@ impl BenchApp {
         let Some(session) = self.runtime.clone() else {
             return;
         };
-        self.cmd(if send_now { Cmd::QueueSend { session, id } } else { Cmd::QueueWithdraw { session, id } });
+        self.cmd(if send_now {
+            Cmd::QueueSend { session, id }
+        } else {
+            Cmd::QueueWithdraw { session, id }
+        });
         cx.notify();
     }
 
@@ -820,7 +828,6 @@ impl BenchApp {
                 self.reload_servers(cx);
                 self.load_remote_hosts(window, cx);
                 self.load_projects(window, cx);
-
             }
             Evt::Error(e) => {
                 self.connecting = false;
@@ -856,7 +863,9 @@ impl BenchApp {
             Evt::Sessions(p, rows) => {
                 // BENCH_SUBJECT=tool:base64 (or tasks:today, ssh:rpi, browser:<id>…): open that
                 // thread once the sessions are known, for screenshots of each block.
-                let subject_at_start = std::env::var("BENCH_SUBJECT").ok().filter(|_| !self.subject_opened);
+                let subject_at_start = std::env::var("BENCH_SUBJECT")
+                    .ok()
+                    .filter(|_| !self.subject_opened);
                 if self.profile.as_deref() == Some(&p) {
                     let unknown_tg = rows
                         .iter()
@@ -1002,7 +1011,12 @@ impl BenchApp {
                 cx.notify();
             }
             Evt::InsertFailed(sid, e) => {
-                self.toast(NotificationType::Error, format!("The insert didn't change: {e}"), window, cx);
+                self.toast(
+                    NotificationType::Error,
+                    format!("The insert didn't change: {e}"),
+                    window,
+                    cx,
+                );
                 // The agent's list is the truth: read it again.
                 if self.session.as_deref() == Some(&sid) {
                     self.open_session(sid, cx);
@@ -1391,11 +1405,20 @@ impl BenchApp {
             self.turns = turns.clone();
             self.settle_ready = true;
         }
-        self.thread_project = self.sessions.iter().find(|s| s.id == id).map(|s| s.project.clone()).unwrap_or_default();
+        self.thread_project = self
+            .sessions
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.project.clone())
+            .unwrap_or_default();
         if self.demo {
             self.turns = self.demo_threads.get(&id).cloned().unwrap_or_default();
             self.settle_ready = true;
-            self.processes = if id == "d-landing" { crate::demo::processes(now_secs()) } else { Vec::new() };
+            self.processes = if id == "d-landing" {
+                crate::demo::processes(now_secs())
+            } else {
+                Vec::new()
+            };
             cx.notify();
             return;
         }
@@ -1433,13 +1456,25 @@ impl BenchApp {
         let rid = id.clone();
         // A remote project's thread is its server agent's to delete.
         let host = self.host_of_session(&id);
-        let remote = (!host.is_empty()).then(|| self.remotes.get(&host).and_then(|r| r.conn.clone())).flatten();
+        let remote = (!host.is_empty())
+            .then(|| self.remotes.get(&host).and_then(|r| r.conn.clone()))
+            .flatten();
         if let Some(conn) = remote {
             let p = profile.clone();
-            self.background(window, cx, move || rest::delete_session(&conn, &p, &rid), move |this, r, window, cx| match r {
-                Ok(()) => this.refresh_sessions(),
-                Err(e) => this.toast(NotificationType::Error, format!("Could not delete: {e:#}"), window, cx),
-            });
+            self.background(
+                window,
+                cx,
+                move || rest::delete_session(&conn, &p, &rid),
+                move |this, r, window, cx| match r {
+                    Ok(()) => this.refresh_sessions(),
+                    Err(e) => this.toast(
+                        NotificationType::Error,
+                        format!("Could not delete: {e:#}"),
+                        window,
+                        cx,
+                    ),
+                },
+            );
             return;
         }
         self.rest(
@@ -1474,7 +1509,6 @@ impl BenchApp {
         self.confirm_delete = None;
         cx.notify();
     }
-
 
     /// Pick the model for a new session (primary or a fallback); applied once it is created.
     pub fn set_model(&mut self, i: usize, cx: &mut Context<Self>) {
@@ -1592,24 +1626,35 @@ impl BenchApp {
         // "!command": run it in this thread's terminal (opened under the thread).
         if let Some(command) = typed.strip_prefix('!') {
             let command = command.trim().to_string();
-            self.composer.update(cx, |s, cx| s.set_value("", window, cx));
+            self.composer
+                .update(cx, |s, cx| s.set_value("", window, cx));
             self.run_bang(command, window, cx);
             return;
         }
         // While the agent works, a message waits in the thread's queue (files come after it).
         if self.live.is_some() {
             if !files.is_empty() {
-                self.toast(NotificationType::Info, "Files go with the next message, once the agent answers", window, cx);
+                self.toast(
+                    NotificationType::Info,
+                    "Files go with the next message, once the agent answers",
+                    window,
+                    cx,
+                );
                 return;
             }
             let Some(session) = self.runtime.clone() else {
                 return;
             };
             let text = typed;
-            self.composer.update(cx, |s, cx| s.set_value("", window, cx));
+            self.composer
+                .update(cx, |s, cx| s.set_value("", window, cx));
             self.note_draft(cx);
             let context = self.block_context(cx);
-            self.cmd(Cmd::Queue { session, text, context });
+            self.cmd(Cmd::Queue {
+                session,
+                text,
+                context,
+            });
             cx.notify();
             return;
         }
@@ -2166,12 +2211,15 @@ impl BenchApp {
                                     window,
                                     cx,
                                 ),
-                                Err(e) => this.toast(
-                                    NotificationType::Error,
-                                    format!("Transcription: {e:#}"),
-                                    window,
-                                    cx,
-                                ),
+                                Err(e) => {
+                                    let e = format!("{e:#}");
+                                    let msg = if crate::pi_agent::ask_local_network(&e) {
+                                        "Transcription: allow Bench on the local network (macOS asks now), then dictate again".to_string()
+                                    } else {
+                                        format!("Transcription: {e}")
+                                    };
+                                    this.toast(NotificationType::Error, msg, window, cx)
+                                }
                             }
                         },
                     );
@@ -2295,7 +2343,6 @@ fn clip_line(s: &str) -> String {
     }
 }
 
-
 impl BenchApp {
     /// The composer's text is the open chat's draft (called on every change).
     pub(crate) fn note_draft(&mut self, cx: &mut Context<Self>) {
@@ -2321,14 +2368,20 @@ impl BenchApp {
             return;
         }
         // The new chat just became this thread (an insert, a message): what is typed stays.
-        let became = self.draft_key.as_deref() == Some("") && !key.is_empty() && !self.drafts.contains_key(&key);
+        let became = self.draft_key.as_deref() == Some("")
+            && !key.is_empty()
+            && !self.drafts.contains_key(&key);
         let text = if became {
             self.composer.read(cx).value().to_string()
         } else if key.is_empty() {
             String::new()
         } else {
             // A lone "/word" is a command half picked, not a draft.
-            self.drafts.get(&key).cloned().filter(|t| !(t.starts_with('/') && !t.trim().contains(' '))).unwrap_or_default()
+            self.drafts
+                .get(&key)
+                .cloned()
+                .filter(|t| !(t.starts_with('/') && !t.trim().contains(' ')))
+                .unwrap_or_default()
         };
         self.draft_key = Some(key);
         if became {

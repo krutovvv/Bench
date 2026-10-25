@@ -379,3 +379,36 @@ pub fn ensure_remote(host: &str) -> Result<(u16, String)> {
         _ => bail!("{host}: the agent wrote no port"),
     }
 }
+
+/// The agent runs under the Bench that started it, so macOS's Local Network privacy refuses its
+/// connections to the local network (EHOSTUNREACH) until Bench has been allowed, and a child
+/// process never brings up the prompt itself. When the agent reports such an error
+/// ("192.168.1.100:10240: EHOSTUNREACH …"), Bench connects to the same address once, which
+/// makes macOS ask "Allow Bench to find devices on your local network?". True when it did.
+pub fn ask_local_network(error: &str) -> bool {
+    let Some(i) = error.find(": EHOSTUNREACH") else {
+        return false;
+    };
+    let addr = error[..i].rsplit([' ', '"']).next().unwrap_or_default();
+    let Ok(addr) = addr.parse::<std::net::SocketAddr>() else {
+        return false;
+    };
+    std::thread::spawn(move || {
+        let _ = std::net::TcpStream::connect_timeout(&addr, Duration::from_secs(3));
+    });
+    true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ask_local_network;
+
+    #[test]
+    fn local_network_error_is_recognized() {
+        assert!(ask_local_network(
+            "502: 127.0.0.1:9: EHOSTUNREACH (allow Bench in System Settings)"
+        ));
+        assert!(!ask_local_network("502: 127.0.0.1:9: ECONNREFUSED"));
+        assert!(!ask_local_network("502: fetch failed"));
+    }
+}
