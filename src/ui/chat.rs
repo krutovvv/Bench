@@ -34,7 +34,7 @@ fn work_pos(turns: &[Turn], at: Option<f64>) -> usize {
 
 #[cfg(test)]
 mod past_end_tests {
-    use super::{past_end, LINE};
+    use super::{LINE, past_end};
     #[test]
     fn the_last_row_reaches_the_top_and_never_past_it() {
         // A 900-px window, a composer of one line (48): the room is what the window has left.
@@ -42,7 +42,11 @@ mod past_end_tests {
         assert!(big > 700. && big < 900., "{big}");
         // A taller composer takes room away; a small window keeps at least a line of it.
         assert!(past_end(900., 300.) < big);
-        assert_eq!(past_end(100., 400.), LINE, "no room: still a line to scroll");
+        assert_eq!(
+            past_end(100., 400.),
+            LINE,
+            "no room: still a line to scroll"
+        );
         assert!(
             past_end(900., 48.) + 48. + super::super::STATUS_H <= 900.,
             "the room plus the composer plus the bar is never more than the window: a row is              never cut by the top edge"
@@ -65,12 +69,28 @@ mod plan_tests {
     #[test]
     fn the_plan_sits_where_it_was_made() {
         let turns = [turn(Some(100.)), turn(Some(200.)), turn(Some(300.))];
-        assert_eq!(work_pos(&turns, Some(150.)), 1, "made during the first turn");
+        assert_eq!(
+            work_pos(&turns, Some(150.)),
+            1,
+            "made during the first turn"
+        );
         assert_eq!(work_pos(&turns, Some(250.)), 2);
         assert_eq!(work_pos(&turns, Some(500.)), 3, "the newest work");
-        assert_eq!(work_pos(&turns, Some(50.)), 0, "older than the thread: at its top");
-        assert_eq!(work_pos(&turns, None), 3, "no moment of its own: at the end");
-        assert_eq!(work_pos(&[turn(None)], Some(10.)), 1, "an undated turn keeps it after");
+        assert_eq!(
+            work_pos(&turns, Some(50.)),
+            0,
+            "older than the thread: at its top"
+        );
+        assert_eq!(
+            work_pos(&turns, None),
+            3,
+            "no moment of its own: at the end"
+        );
+        assert_eq!(
+            work_pos(&[turn(None)], Some(10.)),
+            1,
+            "an undated turn keeps it after"
+        );
         assert_eq!(work_pos(&[], Some(10.)), 0, "no turns yet");
     }
 }
@@ -474,10 +494,12 @@ impl BenchApp {
                                 "Send now: into the running work",
                                 cx,
                             )
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.click_claimed = true;
-                                this.queued(send_id.clone(), true, cx);
-                            })),
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    this.click_claimed = true;
+                                    this.queued(send_id.clone(), true, cx);
+                                },
+                            )),
                         )
                     })
                     .child(
@@ -489,7 +511,14 @@ impl BenchApp {
                         ),
                     )
                     .into_any_element();
-                self.user_row(format!("queued-{id}"), &said, &paths, Some(actions), true, cx)
+                self.user_row(
+                    format!("queued-{id}"),
+                    &said,
+                    &paths,
+                    Some(actions),
+                    true,
+                    cx,
+                )
             })
             .collect();
         Some(
@@ -521,9 +550,7 @@ impl BenchApp {
         let attached: Vec<AnyElement> = paths
             .iter()
             .enumerate()
-            .map(|(k, p)| {
-                self.attachment_chip(format!("{key}-{k}").into(), p, None, cx)
-            })
+            .map(|(k, p)| self.attachment_chip(format!("{key}-{k}").into(), p, None, cx))
             .collect();
         h_flex()
             .w_full()
@@ -591,15 +618,37 @@ impl BenchApp {
         let expanded = turn.expanded;
         let group: SharedString = format!("turn{i}").into();
 
-        // One-line summary; only the error count is red.
+        // One line, and the counters come first: they hardly move, so the eye has one place for
+        // them. What the agent says it is doing goes last, where the length may jump.
         let summary = (has_steps || live.is_some()).then(|| {
-            let mut tail: Vec<String> = vec![];
-            if tools > 0 {
-                tail.push(plural(tools, "action", "actions", "actions"));
-            }
-            if let Some((_, s)) = &live {
-                tail.push(clock(*s));
-            }
+            let acts = if tools > 0 {
+                plural(tools, "action", "actions", "actions")
+            } else {
+                String::new()
+            };
+            let errs = if errors > 0 {
+                plural(errors, "error", "errors", "errors")
+            } else {
+                String::new()
+            };
+            // A live turn counts up; a finished one keeps the time it took.
+            let time = match &live {
+                Some((_, s)) => Some(clock(*s)),
+                None => turn
+                    .started
+                    .zip(turn.finished)
+                    .map(|(a, b)| clock((b - a).max(0.) as u64)),
+            };
+            // Each part after the first says so with a "· ".
+            let sep = |first| if first { "" } else { "· " };
+            let (has_a, has_e, has_t) = (!acts.is_empty(), !errs.is_empty(), time.is_some());
+            let err_s = if has_e {
+                format!("{}{errs}", sep(!has_a))
+            } else {
+                String::new()
+            };
+            let time_s = time.map(|t| format!("{}{t}", sep(!has_a && !has_e)));
+            let said_s = sep(!has_a && !has_e && !has_t);
             h_flex()
                 .id(("steps", i))
                 .gap_1p5()
@@ -621,27 +670,26 @@ impl BenchApp {
                     .icon()
                     .xsmall(),
                 )
+                .when(has_a, |d| d.child(div().flex_none().child(acts)))
+                .when(has_e, |d| {
+                    d.child(div().flex_none().text_color(theme.danger).child(err_s))
+                })
+                .when_some(time_s, |d, t| d.child(div().flex_none().child(t)))
                 .map(|d| match &live {
-                    // One line: what the agent says it is doing, cut with "…" before the counters.
+                    // The agent's line takes what is left of the row and cuts with an ellipsis.
                     Some((label, _)) => d.child(
-                        div()
-                            .flex_shrink(1.)
+                        h_flex()
                             .min_w_0()
-                            .truncate()
-                            .child(ShimmerText::new(label.clone()).text_color(muted)),
+                            .flex_shrink(1.)
+                            .child(div().flex_none().child(said_s.to_string()))
+                            .child(
+                                div()
+                                    .min_w_0()
+                                    .truncate()
+                                    .child(ShimmerText::new(label.clone()).text_color(muted)),
+                            ),
                     ),
-                    None => d.child(div().flex_none().child("Done")),
-                })
-                .when(!tail.is_empty(), |d| {
-                    d.child(div().flex_none().child(format!("· {}", tail.join(" · "))))
-                })
-                .when(errors > 0, |d| {
-                    d.child(
-                        div()
-                            .flex_none()
-                            .text_color(theme.danger)
-                            .child(format!("· {}", plural(errors, "error", "errors", "errors"))),
-                    )
+                    None => d.child(div().flex_none().child(format!("{said_s}Done"))),
                 })
                 .on_click(cx.listener(move |this, _, _, cx| this.toggle_turn(i, cx)))
         });
@@ -763,14 +811,7 @@ impl BenchApp {
             .w_full()
             // The conversation is what the window is for: a size up from the sidebar's lists.
             .text_base()
-            .child(self.user_row(
-                format!("user-{i}"),
-                &user,
-                &attached_paths,
-                None,
-                false,
-                cx,
-            ))
+            .child(self.user_row(format!("user-{i}"), &user, &attached_paths, None, false, cx))
             .child(
                 div()
                     .relative()
