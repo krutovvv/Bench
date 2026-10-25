@@ -115,11 +115,21 @@ impl BenchApp {
         v_flex()
             .id("composer")
             .relative()
-            // Where it is in the window, for the `/` list (above or under the line).
+            // Where it is in the window, for the `/` list (above or under the line), and how
+            // tall it is: the thread above scrolls past its last row by the room the window has
+            // left over, so the composer's height is part of that arithmetic.
             .child(
                 canvas(
                     move |bounds, _, cx| {
-                        view.update(cx, |this, _| this.composer_y = bounds.origin.y)
+                        view.update(cx, |this, cx| {
+                            this.composer_y = bounds.origin.y;
+                            let h = f32::from(bounds.size.height);
+                            if (this.composer_h - h).abs() > 0.5 {
+                                this.composer_h = h;
+                                // The thread's scroll room depends on it: one more frame, settled.
+                                cx.notify();
+                            }
+                        })
                     },
                     |_, _, _, _| {},
                 )

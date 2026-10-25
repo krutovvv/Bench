@@ -322,7 +322,7 @@ impl BenchApp {
             ));
         }
         h_flex()
-            .h(px(28.))
+            .h(px(super::STATUS_H - 1.))
             .flex_none()
             .w_full()
             .bg(theme.status_bar)

@@ -16,6 +16,10 @@ use crate::history::host_of;
 use crate::icons::Ico;
 use crate::model::{Step, Turn};
 
+fn past_end(viewport: f32, composer: f32) -> f32 {
+    (viewport - super::STATUS_H - composer - LINE).max(LINE)
+}
+
 /// After how many turns a row of the agent's own work sits: after the last turn that had begun
 /// when the work did. The plan and the background processes both hang by this, so neither
 /// drifts to the newest message — what began earlier stays where it began. Without a moment of
@@ -26,6 +30,24 @@ fn work_pos(turns: &[Turn], at: Option<f64>) -> usize {
         .iter()
         .position(|t| t.started.is_some_and(|s| s > at))
         .unwrap_or(turns.len())
+}
+
+#[cfg(test)]
+mod past_end_tests {
+    use super::{past_end, LINE};
+    #[test]
+    fn the_last_row_reaches_the_top_and_never_past_it() {
+        // A 900-px window, a composer of one line (48): the room is what the window has left.
+        let big = past_end(900., 48.);
+        assert!(big > 700. && big < 900., "{big}");
+        // A taller composer takes room away; a small window keeps at least a line of it.
+        assert!(past_end(900., 300.) < big);
+        assert_eq!(past_end(100., 400.), LINE, "no room: still a line to scroll");
+        assert!(
+            past_end(900., 48.) + 48. + super::super::STATUS_H <= 900.,
+            "the room plus the composer plus the bar is never more than the window: a row is              never cut by the top edge"
+        );
+    }
 }
 
 #[cfg(test)]
@@ -53,8 +75,15 @@ mod plan_tests {
     }
 }
 
-/// Below the composer the thread can scroll on, as a code editor past its last line.
-const SCROLL_PAST_END: f32 = 240.;
+/// One line of the thread's text, enough to keep a row whole at the edge.
+const LINE: f32 = 24.;
+
+/// The room the thread can scroll on past its last row, as a code editor past its last line:
+/// enough to bring that row to the very top of the window, so the reading position is the
+/// person's, not always the bottom. The composer rides at the end of the thread and the status
+/// bar under the window, so both are counted out of the window's height; the estimate errs on
+/// the small side — a row stopping a few pixels under the top edge is invisible, one cut by it
+/// is not.
 /// A terminal's most: under it, it fits its text.
 const TERMINAL_MAX: f32 = 280.;
 
@@ -77,6 +106,15 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         self.viewport_h = window.viewport_size().height;
+        // How far the thread may scroll past its last row, recomputed with the window and the
+        // draft in the composer (both change the room).
+        // Measured, and only estimated for the first frame, before the composer has been painted.
+        let composer_h = if self.composer_h > 0. {
+            self.composer_h
+        } else {
+            f32::from(self.viewport_h) * 0.1 + LINE
+        };
+        let past = past_end(f32::from(self.viewport_h), composer_h);
         // A thread with no turns yet still is a thread: "Loading history…" while it opens, then
         // the composer; a new chat is the composer alone.
         // A thread about something starts with it, live: a task list, a server's terminal, a tool.
@@ -251,9 +289,9 @@ impl BenchApp {
         };
 
         // Follow the tail: stay pinned to the composer until the user scrolls up. "The bottom" is
-        // the composer's, not the room the thread scrolls on past it (SCROLL_PAST_END), so a
+        // the composer's, not the room the thread scrolls on past it (past_end), so a
         // short thread stays put and nothing calls for "Jump to latest".
-        let max = (self.chat_scroll.max_offset().y - px(SCROLL_PAST_END)).max(px(0.));
+        let max = (self.chat_scroll.max_offset().y - px(past)).max(px(0.));
         let at_bottom = -self.chat_scroll.offset().y >= max - px(4.);
         if self.follow && !at_bottom && max == self.last_max {
             self.follow = false; // the user scrolled away
@@ -354,7 +392,7 @@ impl BenchApp {
                     // code editor scrolls past its end.
                     // With the first row's own TURN_Y: the avatar's top is CHAT_LEFT down.
                     .pt(px(super::CHAT_LEFT - super::TURN_Y))
-                    .pb(px(SCROLL_PAST_END))
+                    .pb(px(past))
                     // The window's whole width from its left edge, as an editor's text (no cap,
                     // no centering).
                     .child(
