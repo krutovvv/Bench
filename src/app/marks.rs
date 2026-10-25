@@ -9,15 +9,11 @@ use gpui_kit::*;
 use super::BenchApp;
 use crate::connection;
 
-/// Session colors (saved by index: new ones go at the end, so a saved color never changes).
-/// The teal was added last (index 7) but is shown between green and blue — see [`COLOR_ORDER`].
-pub const SESSION_COLORS: [u32; 8] = [
-    0xD0605A, 0xD99A4E, 0xD6C24A, 0x6DB86A, 0x5C8FD8, 0x9A6AD6, 0xD46A9F, 0x55C3B5,
+/// Session colors: red, orange, yellow, green, blue, violet, pink (saved by index: new ones go
+/// at the end, so a saved color never changes).
+pub const SESSION_COLORS: [u32; 7] = [
+    0xD0605A, 0xD99A4E, 0xD6C24A, 0x6DB86A, 0x5C8FD8, 0x9A6AD6, 0xD46A9F,
 ];
-
-/// Which index to show in each left-to-right slot of the swatch row: the rainbow order
-/// red, orange, yellow, green, teal, blue, violet, pink. Indices stay stable underneath.
-pub const COLOR_ORDER: [usize; 8] = [0, 1, 2, 3, 7, 4, 5, 6];
 
 #[derive(Clone, Copy, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Mark {
