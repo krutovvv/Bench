@@ -728,7 +728,15 @@ impl BenchApp {
                                 div()
                                     .min_w_0()
                                     .truncate()
-                                    .child(ShimmerText::new(label.clone()).text_color(muted)),
+                                    // The size is said out loud, not inherited: the animated
+                                    // label sits in a box of its own, and whatever it picks up
+                                    // from around it must not be another body than the counters'
+                                    // beside it.
+                                    .child(
+                                        ShimmerText::new(label.clone())
+                                            .text_base()
+                                            .text_color(muted),
+                                    ),
                             ),
                     ),
                     None => d.child(div().flex_none().child(format!("{said_s}Done"))),
