@@ -1,7 +1,8 @@
-//! The server browser's tabs, live in threads, through its `/live` gateway
-//! (browser-server/live.mjs on the browser's server): a WebSocket with the person's own key
-//! (`~/.bench/ui/browser.json`: { url, token }), a narrow set of operations — the tabs, watch one,
-//! wake a sleeping one, open, close, mouse, wheel, text, keys — and no raw DevTools protocol.
+//! The server browser's tabs, live in threads, through its `/live` gateway (`live.mjs` of
+//! browser-server-mcp, a project of its own, on the browser's server): a WebSocket with the
+//! person's own key (`~/.bench/ui/browser.json`: { url, token }), a narrow set of operations —
+//! the tabs, watch one, wake a sleeping one, open, close, mouse, wheel, text, keys — and no raw
+//! DevTools protocol.
 //! The gateway sends at most two frames a second, only while someone watches, and keeps the
 //! server's memory in budget (idle tabs fall asleep: a picture and their address; `wake`
 //! reopens them). Only the site shows (no browser UI): every tab the agent opens during a turn is

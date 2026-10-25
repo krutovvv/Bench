@@ -27,7 +27,6 @@ conversation with the agent is the unit of work, not a side panel of an editor.
   from scratch: native and fast, on macOS, Linux, Windows and in the browser (WebAssembly);
 - [Pi Durable](https://github.com/earendil-works/pi) for the agent (`agent/`, Node.js): durable
   conversations, tools, extensions, scheduled tasks, MCP;
-- Playwright and Chrome for the shared server browser (`browser-server/`, Docker);
 - grammY for Telegram.
 
 A workbench, not a chat window: you bring the tools you need for this job to the conversation,
@@ -130,8 +129,8 @@ The agent keeps everything in Pi's own terms:
 - **subagents** are child conversations owned by the tool call that started them.
 
 The browser inserts use a shared Chrome on a server: a tab per thread, driven through the
-Playwright MCP, and watched through a small gateway. It all comes as one Docker setup in
-[`browser-server/`](browser-server/README.md). Each person gets their own key and no SSH is
+Playwright MCP, and watched through a small gateway. The server is a project of its own,
+browser-server-mcp: an MCP server any agent can use, with a live view Bench supports. Each person gets their own key and no SSH is
 needed. Frames arrive at 2 per second at most, and only while someone is watching.
 
 ## Developed from inside itself

@@ -106,7 +106,7 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   explicit `host` argument they use what the thread has inserted (`sessionOf(id).inserts`: the
   last terminal for `ssh_run`, the last file host for `remote_files`, `hostFor`).
 - **Browser**: the Playwright MCP on the browser server, an ordinary MCP server in the agent's
-  `mcp.json` (`url` + `Authorization: ${BROWSER_MCP_AUTH}`, `browser-server/README.md`), connected
+  `mcp.json` (`url` + `Authorization: ${BROWSER_MCP_AUTH}`, browser-server-mcp's README), connected
   through `@earendil-works/pi-mcp`. One tab per thread: the prompt line says to work only in the
   thread's tab (its address comes in `<block-state>`), and Bench gives the tab a turn opened to
   that thread (`src/app/sites.rs`).
@@ -127,9 +127,10 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
 ## The server browser (the `/browser` insert)
 
 The browser insert is Bench's centrepiece (`build-insert.md`). The browser is a shared Chrome
-on a server: `browser-server/` (Dockerfile, compose, set-up in `browser-server/README.md`) runs
-Chrome, the Playwright MCP the agent drives, and the **`/live` gateway** for people
-(`browser-server/live.mjs`), routed by Traefik at `https://<your browser host>/live`. No SSH:
+on a server: **browser-server-mcp**, a project of its own (`~/Projects/browser-server-mcp`:
+Dockerfile, compose, set-up in its README). It is just an MCP server; it runs Chrome, the
+Playwright MCP the agent drives, and the **`/live` gateway** for people (its `live.mjs`), which
+Bench supports, routed by Traefik at `https://<your browser host>/live`. No SSH:
 each person has their own key (`docker compose exec browser node /opt/live.mjs add <name>`; only
 its sha256 is stored; `remove`, `list`), kept in `~/.bench/ui/browser.json` (0600). The gateway
 passes a narrow set of operations (tabs, watch, wake, open, close, mouse, wheel, text, keys) —

@@ -11,7 +11,7 @@ read it first; the others are simpler cases of the same shape.
 
 | Key (state) | `/` word | What's live | The agent's tool | What Bench sends with each message |
 |---|---|---|---|---|
-| `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`ui/inserts/browser.rs`; tab per thread, streaming: `app/sites.rs`, `remote_browser.rs`) | the browser MCP (Playwright on the server, `browser-server/`) | the tab's address and title, and "work only in it" |
+| `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`ui/inserts/browser.rs`; tab per thread, streaming: `app/sites.rs`, `remote_browser.rs`) | the browser MCP (Playwright on the server: browser-server-mcp, its own project) | the tab's address and title, and "work only in it" |
 | `tasks` {list} | `/tasks` | every list a click apart; in a project its tasks only (`ui/inserts/tasks.rs`) | `tasks` (`agent/src/builtin/tasks.ts`) | which list is shown |
 | `ssh:<alias>` (`ssh:local` this Mac; `ssh` alone: pick one) | `/terminal`, `/ssh` | the terminal, as tall as its text (`ui/inserts/terminal.rs`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
 | `dir` {path, file} | `/files` | the project's own folder (this Mac, or a remote project's server via `/api/fs/…`): folders open in place, a file opens under the insert, Save writes it back (`ui/inserts/dir.rs`, `app/local_files.rs`; one live browser for the app, `InsertKind::shared`) | Pi's `read`/`write`/`edit`/`bash` in the thread's folder | the folder and the open file |
@@ -86,8 +86,8 @@ tool it calls; screenshot (`build-verification.md`). Add a demo thread with it i
 ## How the browser insert works, end to end
 
 The pattern for anything live from elsewhere:
-1. The browser runs on a server (`browser-server/`: Chrome, the Playwright MCP the agent drives,
-   and a `/live` gateway for people: a personal key, a narrow set of operations, a log).
+1. The browser runs on a server (browser-server-mcp, its own project at `~/Projects/browser-server-mcp`:
+   Chrome, the Playwright MCP the agent drives, and a `/live` gateway for people: a personal key, a narrow set of operations, a log).
 2. Each thread has its own tab (2026-10-25, the person: "one thread works with one site, another
    with another; if the tab falls off, the thread opens a new one through MCP"). The insert's
    state keeps {tab, url}. The tab the agent opens or moves while it answers in the open thread
