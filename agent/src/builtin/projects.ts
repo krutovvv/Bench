@@ -21,6 +21,8 @@ export interface Project {
 	 * threads' files and commands are there (`ssh-env.ts`), its folder is a path on it.
 	 */
 	machine?: string | null;
+	/** Its agent works in its folder and nowhere else (`confined-env.ts`). */
+	confined?: boolean;
 	/** Its own Telegram bot: { token, allowed_users: [ids], username (once it ran) }. */
 	telegram?: { token: string; allowed_users: string[]; username?: string } | null;
 }
@@ -38,9 +40,12 @@ function table() {
 	try {
 		db().exec("ALTER TABLE projects ADD COLUMN machine TEXT");
 	} catch {}
+	try {
+		db().exec("ALTER TABLE projects ADD COLUMN confined INTEGER");
+	} catch {}
 }
 
-const row = (r: any): Project => ({ ...r, telegram: r.telegram ? JSON.parse(r.telegram) : null });
+const row = (r: any): Project => ({ ...r, telegram: r.telegram ? JSON.parse(r.telegram) : null, confined: !!r.confined });
 
 export const projects = {
 	list(): Project[] {
@@ -54,10 +59,10 @@ export const projects = {
 	},
 	save(p: Partial<Project> & { name: string }): Project {
 		table();
-		const full: Project = { id: p.id || randomBytes(6).toString("hex"), name: p.name, folder: p.folder || null, created: p.created ?? Math.floor(Date.now() / 1000), telegram: p.telegram ?? null, host: p.host || null, machine: p.machine || null };
+		const full: Project = { id: p.id || randomBytes(6).toString("hex"), name: p.name, folder: p.folder || null, created: p.created ?? Math.floor(Date.now() / 1000), telegram: p.telegram ?? null, host: p.host || null, machine: p.machine || null, confined: !!p.confined };
 		db()
-			.prepare("INSERT INTO projects (id, name, folder, created, telegram, host, machine) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, folder=excluded.folder, telegram=excluded.telegram, host=excluded.host, machine=excluded.machine")
-			.run(full.id, full.name, full.folder, full.created, full.telegram ? JSON.stringify(full.telegram) : null, full.host ?? null, full.machine ?? null);
+			.prepare("INSERT INTO projects (id, name, folder, created, telegram, host, machine, confined) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, folder=excluded.folder, telegram=excluded.telegram, host=excluded.host, machine=excluded.machine, confined=excluded.confined")
+			.run(full.id, full.name, full.folder, full.created, full.telegram ? JSON.stringify(full.telegram) : null, full.host ?? null, full.machine ?? null, full.confined ? 1 : 0);
 		return full;
 	},
 	/** The project goes; its threads stay, without a project. */

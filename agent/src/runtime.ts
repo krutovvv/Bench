@@ -12,6 +12,7 @@ import { createRegistry, Harness, InboxDoc, watchEvents, type AgentEvent, type C
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { machineEnv } from "./ssh-env.ts";
+import { confined } from "./confined-env.ts";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -676,10 +677,11 @@ export class Runtime {
 
 	/** The execution environment of a conversation: this machine's, or its project's machine over SSH. */
 	private async envFor(conversationId: string, cwd: string | undefined): Promise<ExecutionEnv> {
-		const project = this.host().session(conversationId)?.project;
-		const machine = project ? projects.get(project)?.machine : undefined;
-		if (!machine) return new NodeExecutionEnv({ cwd: cwd || process.env.HOME || "/" });
-		return machineEnv(machine, cwd || projects.get(project!)?.folder || "");
+		const id = this.host().session(conversationId)?.project;
+		const p = id ? projects.get(id) : undefined;
+		const env: ExecutionEnv = p?.machine ? await machineEnv(p.machine, cwd || p.folder || "") : new NodeExecutionEnv({ cwd: cwd || process.env.HOME || "/" });
+		// Kept in its folder: its tools and commands stay there (`confined-env.ts`).
+		return p?.confined && p.folder ? confined(env, env.cwd, !p.machine) : env;
 	}
 
 	private sessionInfo(row: SessionRow): SessionInfo {

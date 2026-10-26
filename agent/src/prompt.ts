@@ -32,7 +32,8 @@ export function soul(s: SessionInfo): string {
 		const where = p?.machine
 			? `\n\nIts work is on the server \`${p.machine}\`${p.folder ? `, in ${p.folder}` : ""}: read, write, edit and bash act there over SSH, not on the machine you run on. Paths are that server's.`
 			: "";
-		parts.push(`# The project: ${name}\n\n${own || "(no description yet)"}${where}`);
+		const kept = p?.confined && p.folder ? `\n\nWork only in its folder ${p.folder}: your tools refuse anything outside it, and commands cannot write outside it.` : "";
+		parts.push(`# The project: ${name}\n\n${own || "(no description yet)"}${where}${kept}`);
 	}
 	return parts.filter(Boolean).join("\n\n");
 }

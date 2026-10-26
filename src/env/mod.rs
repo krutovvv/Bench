@@ -17,6 +17,7 @@ pub mod accesses;
 pub mod lsp;
 pub mod mcp;
 pub mod name;
+pub mod place;
 pub mod project_form;
 pub mod prompts;
 pub mod run;
@@ -43,6 +44,7 @@ pub struct ProjectEnv {
     /// Where it lives (`~/.bench/projects/<id>`).
     pub dir: String,
     pub name: name::NameEnv,
+    pub place: place::PlaceEnv,
     pub soul: soul::SoulEnv,
     pub lsp: lsp::LspEnv,
     pub telegram: telegram::TelegramEnv,
@@ -68,6 +70,7 @@ pub struct ProjectEnv {
 /// The sections, in the order their rows are drawn; neighbours with the same `block` share it.
 pub static SECTIONS: &[&dyn Section] = &[
     &name::Name,
+    &place::Place,
     &soul::Soul,
     &telegram::Telegram,
     &run::Run,
@@ -159,6 +162,7 @@ impl BenchApp {
             id: id.to_string(),
             dir: String::new(),
             name: name::NameEnv::new(window, cx),
+            place: place::PlaceEnv::new(window, cx),
             soul: soul::SoulEnv::new(window, cx),
             lsp: lsp::LspEnv::new(window, cx),
             telegram: telegram::TelegramEnv::new(window, cx),
