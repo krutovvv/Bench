@@ -377,7 +377,7 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
             {"id": "c-links", "name": "Broken links", "prompt": "Check every post's links; list the broken ones with the post.", "schedule": {"expr": "every 1d"}, "schedule_display": "every 1d", "enabled": false, "next_run_at": null, "last_status": null}
         ]
     });
-    crate::app::project_env::apply(e, &v, window, cx);
+    crate::env::apply(e, &v, window, cx);
     // `BENCH_DEMO=env-open`: a skill's card open, as when it is being edited.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("env-open") && e.card.is_none() {
         app.env_card("skill", "release-notes".into(), window, cx);

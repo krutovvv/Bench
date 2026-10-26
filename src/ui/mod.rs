@@ -4,7 +4,6 @@ mod asks;
 mod composer;
 pub(crate) mod media;
 mod panels;
-mod project_list;
 mod providers;
 mod sidebar;
 mod statusbar;

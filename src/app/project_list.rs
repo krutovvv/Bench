@@ -3,28 +3,12 @@
 //! keeps for it. A thread belongs to one project; its tools (a server, a host, the browser,
 //! tasks, a utility) are attached inside the thread with `/` (`subjects.rs`).
 
-use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
-use serde_json::json;
 
 use super::BenchApp;
 use crate::model::ProjectEntry;
 use crate::rest;
-
-/// The new project's form (the sidebar's "+").
-pub struct ProjectForm {
-    pub name: Entity<InputState>,
-    /// A codebase on disk, if it has one.
-    pub folder: Option<String>,
-    /// A server whose agent the project is (an ~/.ssh/config host); None = this Mac, Some("") =
-    /// another server, typed in below (it goes into ~/.ssh/config too).
-    pub host: Option<String>,
-    pub new_host: Entity<InputState>,
-    pub new_user: Entity<InputState>,
-    pub new_port: Entity<InputState>,
-    pub new_key: Entity<InputState>,
-}
 
 impl BenchApp {
     pub fn load_projects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -64,150 +48,6 @@ impl BenchApp {
             },
         );
     }
-
-    /// The sidebar's "+": the new project's page, in place of the thread (the thread stays as it was).
-    pub fn new_project_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.panel = super::Panel::NewProject;
-        self.ssh.form = None;
-        self.files_remote.form = false;
-        let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
-        name.update(cx, |s, cx| s.focus(window, cx));
-        let field = |hint: &str, window: &mut Window, cx: &mut Context<Self>| {
-            let hint = hint.to_string();
-            cx.new(|cx| InputState::new(window, cx).placeholder(hint))
-        };
-        let new_host = field("Address or domain", window, cx);
-        let new_user = field("Login", window, cx);
-        let new_port = field("22", window, cx);
-        let new_key = field("Private key file (empty = ssh-agent)", window, cx);
-        self.project_form = Some(ProjectForm {
-            name,
-            folder: None,
-            host: None,
-            new_host,
-            new_user,
-            new_port,
-            new_key,
-        });
-        cx.notify();
-    }
-
-    /// The form's "Choose…": a folder on disk the project works in.
-    pub fn pick_project_codebase(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let picked = cx.prompt_for_paths(PathPromptOptions {
-            files: false,
-            directories: true,
-            multiple: false,
-            prompt: Some("The project's folder".into()),
-        });
-        cx.spawn_in(window, async move |this, cx| {
-            let Ok(Ok(Some(paths))) = picked.await else {
-                return;
-            };
-            let Some(path) = paths.into_iter().next() else {
-                return;
-            };
-            let _ = this.update_in(cx, |this, window, cx| {
-                let folder = path.to_string_lossy().to_string();
-                if let Some(f) = this.project_form.as_mut() {
-                    // An empty name takes the folder's.
-                    if f.name.read(cx).value().trim().is_empty() {
-                        let base = folder.rsplit('/').next().unwrap_or(&folder).to_string();
-                        f.name.update(cx, |s, cx| s.set_value(base, window, cx));
-                    }
-                    f.folder = Some(folder);
-                }
-                cx.notify();
-            });
-        })
-        .detach();
-    }
-
-    /// Create the form's project and start its first thread.
-    pub fn save_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(form)) = (self.conn.clone(), self.project_form.as_ref()) else {
-            return;
-        };
-        let name = form.name.read(cx).value().trim().to_string();
-        if name.is_empty() {
-            self.toast(
-                NotificationType::Error,
-                "The project needs a name".to_string(),
-                window,
-                cx,
-            );
-            return;
-        }
-        // Another server: into ~/.ssh/config first, named after the project.
-        let mut host = form.host.clone();
-        if host.as_deref() == Some("") {
-            let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
-            let address = v(&form.new_host);
-            if address.is_empty() {
-                self.toast(
-                    NotificationType::Error,
-                    "The server's address is empty".to_string(),
-                    window,
-                    cx,
-                );
-                return;
-            }
-            let alias: String = name
-                .to_lowercase()
-                .chars()
-                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-                .collect::<String>()
-                .trim_matches('-')
-                .to_string();
-            let alias = if alias.is_empty() {
-                address.clone()
-            } else {
-                alias
-            };
-            let server = crate::sshconfig::Server {
-                alias: alias.clone(),
-                hostname: address,
-                user: v(&form.new_user),
-                port: v(&form.new_port),
-                identity: v(&form.new_key),
-                ..Default::default()
-            };
-            if let Err(e) = crate::sshconfig::save(None, &server) {
-                self.toast(
-                    NotificationType::Error,
-                    format!("~/.ssh/config: {e:#}"),
-                    window,
-                    cx,
-                );
-                return;
-            }
-            host = Some(alias);
-        }
-        let body = json!({"name": name, "folder": form.folder, "host": host});
-        self.reload_servers(cx);
-        let profile = self.current_profile();
-        self.background(
-            window,
-            cx,
-            move || rest::send_json(&conn, "POST", "/api/projects", &profile, body),
-            |this, r, window, cx| match r {
-                Ok(v) => {
-                    this.project_form = None;
-                    this.panel = super::Panel::Chat;
-                    this.load_projects(window, cx);
-                    // A local project starts with its first thread; a remote one with its
-                    // server agent's threads (they show once it is connected).
-                    if let (Some(id), None) =
-                        (v["project"]["id"].as_str(), v["project"]["host"].as_str())
-                    {
-                        this.new_thread_in(id.to_string(), cx);
-                    }
-                }
-                Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
-            },
-        );
-    }
-
     /// A project's "+": a new thread in it (it works in the project's folder).
     pub fn new_thread_in(&mut self, project: String, cx: &mut Context<Self>) {
         self.project_form = None;
