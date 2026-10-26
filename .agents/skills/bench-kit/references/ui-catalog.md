@@ -30,6 +30,7 @@ takes them again).
 | Who speaks | `avatar(agent, theme)` | `block.rs` |
 | One line saying nothing is there | `empty_state` | `block.rs` |
 | A list row, a group | `list_row(id, title, meta, selected, nested, actions, cx)`, `pick_row(id, icon, label, detail, cx)`, `group_chevron`, `nest_guide` | `list.rs` |
+| A choice of the agent's question (wraps) | `choice_row(id, cx)` — a row as wide as the card, never a `Button` (its label is one line) | `list.rs` |
 | A head's icon, its "+" room | `head_icon`, `head_icon_in(icon, color, cx)` (a marked project's colour), `head_plus_slot()` | `list.rs` |
 | A file's icon | `file_icon(name, dir, theme)` | `list.rs` |
 | Bars | `header_bar`, `pane_bar`, `status_text`, `status_button`, `search_band` | `bars.rs` |

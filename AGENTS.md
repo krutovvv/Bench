@@ -83,7 +83,7 @@ built this way: `docs/architecture.md`. In short:
 | `src/inserts/` | **The insert registry** (`mod.rs`: `InsertKind`, `KINDS`, `words()`) and one folder per kind: `terminal`, `files` (/files), `ftp`, `tasks`, `tools`, `browser` — each `mod.rs` + `state.rs` (+ `view.rs`) |
 | `src/env/` | A project's environment: `Section` + `SECTIONS`, one file per section |
 | `src/gateway.rs`, `src/rest.rs`, `src/connection.rs`, `src/pi_agent.rs` | The protocol to the agent (WebSocket JSON-RPC + REST), installing/starting it locally or over SSH |
-| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|tasks\|server\|tool\|env\|env-open`; the other hooks in `.agents/skills/bench-kit/references/build-verification.md`) |
+| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|tasks\|server\|tool\|env\|env-open`; `BENCH_CLARIFY=1` [+`_MULTI=1`] puts the agent's question card over the thread; the other hooks in `.agents/skills/bench-kit/references/build-verification.md`) |
 | `agent/src/server.ts`, `agent/src/modules/` | The agent's server: starts, collects the modules (each declares its RPC and REST routes) |
 | `agent/src/runtime.ts`, `agent/src/thread.ts` | Pi conversations, the queue, inserts; the journal as the items Bench shows |
 | `agent/src/inserts.ts` | The insert entry and document |

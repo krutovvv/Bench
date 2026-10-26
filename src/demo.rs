@@ -786,6 +786,22 @@ fewer form fields. Then check what it did to signups and give me a short summary
     }
     // `BENCH_PANEL=providers` (+ `BENCH_GEAR_TAB=<0|1|2>`): the gear open, for screenshots.
     // The new project's page has its own hook: `BENCH_DEMO=new-project` (ui/thread/mod.rs).
+    // `BENCH_CLARIFY=1` (with `BENCH_CLARIFY_MULTI=1`) over a demo thread: the agent's question
+    // card, its choices long enough to show they wrap.
+    if std::env::var("BENCH_CLARIFY").is_ok() {
+        app.clarify = Some(crate::model::ClarifyReq {
+            session: app.session.clone().unwrap_or_default(),
+            prompt_id: "demo".into(),
+            generation: None,
+            question: "Как оформить разделы шестерни (Settings)?".into(),
+            choices: vec![
+                "Навигация слева, как в System Settings: колонка ~180px с иконками и названиями разделов (Agents, Presets, Appearance), активный подсвечен акцентной полоской.".into(),
+                "Настоящие табы сверху: иконка + название, активный с акцентным подчёркиванием, без рамок-кнопок. Меньше менять, но это всё ещё горизонтальная навигация.".into(),
+                "Тихая боковая навигация как у сайдбара: те же строки, что в списке проектов (иконка + имя, акцентная полоска 2px у активного), отделена тонкой линией.".into(),
+            ],
+            multi_select: std::env::var("BENCH_CLARIFY_MULTI").is_ok(),
+        });
+    }
     if std::env::var("BENCH_PANEL").as_deref() == Ok("providers") {
         app.gear_tab = std::env::var("BENCH_GEAR_TAB")
             .ok()

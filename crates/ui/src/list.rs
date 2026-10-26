@@ -156,6 +156,24 @@ pub fn pick_row(
         )
 }
 
+/// A whole answer of its own in a card (a `clarify` choice): as wide as the card, its text
+/// wrapped over lines. A button cannot be this: its label is one line, and it would push the
+/// card past the thread's column.
+pub fn choice_row(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme().clone();
+    div()
+        .id(id)
+        .w_full()
+        .min_w_0()
+        .px_2()
+        .py_1()
+        .border_1()
+        .rounded_md()
+        .border_color(theme.input)
+        .cursor_pointer()
+        .hover(|s| s.border_color(theme.primary).bg(theme.list_hover))
+}
+
 /// A file's icon and color by its name, as an editor's tree shows them.
 pub fn file_icon(name: &str, dir: bool, theme: &Theme) -> (Ico, Hsla) {
     if dir {

@@ -30,7 +30,7 @@ impl BenchApp {
                         .id(("clarify-pick", k))
                         .gap_2()
                         .py_1()
-                        .items_center()
+                        .items_start()
                         .text_base()
                         .cursor_pointer()
                         .hover(|s| s.text_color(theme.foreground))
@@ -38,6 +38,7 @@ impl BenchApp {
                             div()
                                 .size(px(14.))
                                 .flex_none()
+                                .mt(px(2.))
                                 .border_1()
                                 .rounded_md()
                                 .border_color(if on { theme.primary } else { theme.input })
@@ -49,10 +50,10 @@ impl BenchApp {
                         )
                         .into_any_element()
                 } else {
-                    Button::new(("clarify-choice", k))
-                        .small()
-                        .outline()
-                        .label(label.clone())
+                    // A row as wide as the card, its text wrapped: a Button is one line as long
+                    // as the choice and ran past the card.
+                    super::choice_row(("clarify-choice", k), cx)
+                        .child(label.clone())
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.answer_clarify(label.clone(), window, cx)
                         }))
@@ -63,6 +64,7 @@ impl BenchApp {
         let any_picked = !picked.is_empty();
         Some(
             v_flex()
+                .min_w_0()
                 .ml(px(super::CHAT_TEXT))
                 .mr(px(super::CHAT_RIGHT))
                 .mt_2()
@@ -95,7 +97,7 @@ impl BenchApp {
                     if req.multi_select {
                         d.child(v_flex().pl_6().children(choices))
                     } else {
-                        d.child(h_flex().pl_6().flex_wrap().gap_2().children(choices))
+                        d.child(v_flex().pl_6().gap_2().children(choices))
                     }
                 })
                 .child(
