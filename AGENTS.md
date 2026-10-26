@@ -84,6 +84,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | `/files` | Pi's coding tools (`read`, `write`, `edit`, `bash`) in the project's folder; Bench reads the folder through `/api/fs/…` |
 | `/tools` | no tool of its own: the utility's input and output come in `<block-state>` |
 | `/browser` | the Playwright MCP through `@earendil-works/pi-mcp` (`mcp__browser__*`), one tab per thread (state `{tab,url}`). The server browser is its own project, `~/Projects/browser-server-mcp` (github.com/krutovvv/browser-server-mcp) (an MCP server with a live view); Bench is one of its clients (`src/remote_browser.rs`) |
+| Model | one for every thread of every project, set in the gear: the general agent's `defaultProvider`/`defaultModel`; a project has no model of its own. The fallback (`fallback_providers[0]`) is a pi-ai provider of ours (`fallback.ts`): the main model's error or silence sends the same request to it (Pi retries only with the same model), and `session.info {fallback}` turns the status bar red |
 | Schedule | a durable `defineTask` per job that sleeps until its next run (`builtin/cron.ts`) |
 | Subagents | `delegate`: child conversations owned by the tool's task (`builtin/subagent.ts`) |
 | MCP | `@earendil-works/pi-mcp`, a project's `mcp.json`; OAuth via `mcp-oauth.ts` (callback on `localhost:47823`) |
