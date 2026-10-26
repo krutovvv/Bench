@@ -200,6 +200,17 @@ fn pid_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
+/// The agent outlived the app that started it: its parent is launchd now. macOS judges its
+/// local-network access by that app, so such an agent fails every request to a LAN model at once
+/// ("Connection error.", in a few milliseconds) until it is started again by a living app.
+fn orphaned(pid: u32) -> bool {
+    Command::new("ps")
+        .args(["-o", "ppid=", "-p", &pid.to_string()])
+        .output()
+        .ok()
+        .is_some_and(|o| String::from_utf8_lossy(&o.stdout).trim() == "1")
+}
+
 fn stop() {
     if let Some(pid) = saved().and_then(|v| v["pid"].as_u64()) {
         let _ = Command::new("kill").arg(pid.to_string()).status();
@@ -223,7 +234,11 @@ pub fn ensure() -> Result<(u16, String)> {
         if let (Some(port), Some(token)) = (v["port"].as_u64(), v["token"].as_str()) {
             if let Some(st) = status(port as u16, token) {
                 let idle = st["active_agents"].as_u64().unwrap_or(0) == 0;
-                if v["build"].as_str() == Some(hash.as_str()) || !idle {
+                // An orphan is restarted even mid-run: its runs are durable, and a bash call cut
+                // off (ship.sh, which quit the previous app) comes back to the model as
+                // `interrupted`, never rerun.
+                let orphan = v["pid"].as_u64().is_some_and(|pid| orphaned(pid as u32));
+                if !orphan && (v["build"].as_str() == Some(hash.as_str()) || !idle) {
                     return Ok((port as u16, token.to_string()));
                 }
                 stop();
