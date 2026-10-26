@@ -885,17 +885,6 @@ impl BenchApp {
                 .when(has_steps, |d| {
                     d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
                 })
-                .child(
-                    (if expanded {
-                        Ico::ChevronDown
-                    } else {
-                        Ico::ChevronRight
-                    })
-                    // Shown from the start: an invisible one read as a stray indent before the
-                    // first step arrived.
-                    .icon()
-                    .xsmall(),
-                )
                 .when(has_a, |d| d.child(div().flex_none().child(acts)))
                 .when(has_e, |d| {
                     d.child(div().flex_none().text_color(theme.danger).child(err_s))
@@ -932,9 +921,10 @@ impl BenchApp {
             let items: Vec<AnyElement> = (0..self.turns[i].steps.len())
                 .map(|k| self.render_step(i, k, cx))
                 .collect();
+            // The rule at the text's own left, the steps a little right of it: the row that
+            // opens them is text too, so nothing here hangs left of the answer's first letter.
             v_flex()
-                .ml(px(6.))
-                .pl_4()
+                .pl_3()
                 .gap_1()
                 .border_l_1()
                 .border_color(theme.border)
