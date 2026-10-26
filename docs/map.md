@@ -54,7 +54,8 @@ agent/src/
   runtime.ts     Pi conversations, the queue, inserts
   thread.ts      Pi's journal → the items Bench shows
   builtin/       the agent's tools
-docs/            architecture.md (why), map.md (where), thread-rewrite.md (the thread's design)
+docs/            architecture.md (why), map.md (where), thread-rewrite.md (the thread's design),
+                 remote-projects.md (agents, machines, projects on servers)
 ```
 
 ## Names worth knowing
