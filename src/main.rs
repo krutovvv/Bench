@@ -7,9 +7,6 @@
 // The browser build (web/) leaves out what needs a real system (terminals, probes, the state
 // folder); what only the desktop calls is unused there.
 #![cfg_attr(target_family = "wasm", allow(dead_code, unused_imports))]
-// GPUI's builder chains nest a macro inside a macro inside a macro, and under `cfg(test)` the
-// harness adds another layer on top: the default limit of 128 is close enough that a new test in
-// a big view file trips it with nothing wrong in the test itself.
 
 mod app;
 mod attach;
