@@ -146,6 +146,9 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 		};
 	},
 	"session.history": async ({ session_id }) => ({ messages: rt.store.messages(session_id) }),
+	// The thread as a journal (src/thread.ts): items after `since`, the queue, the inserts' state.
+	// Live changes follow as thread.append / thread.stream / thread.queue / thread.inserts / thread.run.
+	"thread.open": async ({ session_id, since }) => rt.thread(String(session_id), Number(since) || 0),
 	"session.close": async ({ session_id }) => {
 		if (!rt.isBusy(session_id)) await rt.close(session_id);
 		return { ok: true };

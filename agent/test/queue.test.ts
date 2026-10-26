@@ -53,7 +53,10 @@ test("send now: the message goes to the head of the queue, not its end", async (
 		models: { m: {} },
 	});
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m" } as any);
-	const rt = new Runtime(() => {});
+	const told: any[][] = [];
+	const rt = new Runtime((_sid, type, payload: any) => {
+		if (type === "thread.queue") told.push(payload.items.map((i: any) => i.text));
+	});
 	await rt.open();
 	const { row } = await rt.create("default", undefined, "local");
 	const id = row.id;
@@ -77,6 +80,9 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	const second = after.find((i) => i.text === "second")!.id;
 	await rt.sendNow(id, second);
 	assert.deepEqual((await rt.queue(id)).map((i) => i.text), ["second", "third"]);
+	// Bench hears each order as thread.queue, straight from the inbox's commits.
+	assert.deepEqual(told.at(-1), ["second", "third"]);
+	assert.ok(told.some((q) => q.join() === "third,second"));
 
 	// A stalled run never ends on its own: stop it, or closing waits for it forever.
 	await rt.interrupt(id);

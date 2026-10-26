@@ -19,6 +19,7 @@ import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort,
 import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
+import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, FAIL_KIND, itemsOfAll, queueOf, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { noThinking } from "./thinking.ts";
@@ -76,10 +77,6 @@ export interface QueuedMessage {
 	text: string;
 }
 
-/** The text of a user message's content (a string, or blocks). */
-function contentText(c: any): string {
-	return typeof c === "string" ? c : Array.isArray(c) ? c.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("") : "";
-}
 
 /** An old thread's subject as an insert: "files:<id>" → files {host}, "tasks:today" → tasks {list}… */
 function legacyInsert(subject: string): { key: string; state: JsonObject } | undefined {
@@ -93,16 +90,10 @@ function legacyInsert(subject: string): { key: string; state: JsonObject } | und
 	return undefined;
 }
 
-const BLOCK_OPEN = "<block-state>";
-const BLOCK_CLOSE = "</block-state>";
 /** How a stopped run says so in the history: one quoted line, the same live and after a restart. */
 const RUN_STOPPED = "> The run stopped: ";
 
-/** A user message without the block state Bench sent with it. */
-export function stripBlock(text: string): string {
-	const at = text.lastIndexOf(BLOCK_OPEN);
-	return at >= 0 && text.trimEnd().endsWith(BLOCK_CLOSE) ? text.slice(0, at).trimEnd() : text;
-}
+export { stripBlock };
 
 /**
  * A waiting message's content with its words replaced: the block state Bench sent with it stays
@@ -111,7 +102,7 @@ export function stripBlock(text: string): string {
  * attachments.
  */
 export function withText(content: any, text: string): any {
-	const said = contentText(content);
+	const said = textOf(content);
 	const at = said.lastIndexOf(BLOCK_OPEN);
 	const block = at >= 0 && said.trimEnd().endsWith(BLOCK_CLOSE) ? `\n\n${said.slice(at)}` : "";
 	const body = `${text}${block}`;
@@ -173,6 +164,7 @@ export class Runtime {
 				this.modelRef(row.profile);
 			} catch {}
 		}
+		this.watchCommits();
 		this.harness.resume();
 		// Runs a previous process left unfinished continue now: watch their sessions so their
 		// answers reach the index and Bench sees them as running.
@@ -436,7 +428,7 @@ export class Runtime {
 		const inbox = (await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx)) as any;
 		return ((inbox?.items ?? []) as any[])
 			.filter((i) => i.mode !== "write")
-			.map((i) => ({ id: String(i.id), mode: i.mode, text: stripBlock(contentText(i.content)) }));
+			.map((i) => ({ id: String(i.id), mode: i.mode, text: stripBlock(textOf(i.content)) }));
 	}
 
 	/**
@@ -531,7 +523,7 @@ export class Runtime {
 		await this.dropFromInbox(live, submission);
 		// Its turn shows when Pi places it (after the current tools, or when the run answers).
 		const sub = await live.conversation.submit({ type: "input", content: item.content, ...(live.busy ? { whenBusy: "steer" } : {}), requestId: randomUUID() } as any, ctx);
-		live.pending.set(String(sub.id), { text: stripBlock(contentText(item.content)), mode: "steer" });
+		live.pending.set(String(sub.id), { text: stripBlock(textOf(item.content)), mode: "steer" });
 		// A new submission lands at the END of the inbox, and a boundary places what stands first
 		// of its kind — so without this move "send now" sends the message last, which is its
 		// opposite. It is the message the person just chose, so it goes to the head, ahead of
@@ -750,6 +742,7 @@ export class Runtime {
 					live.busy = true;
 					live.generation++;
 					this.emit(id, "message.start", {});
+					this.emit(id, "thread.run", { running: true });
 				}
 				break;
 			case "message_start": {
@@ -835,6 +828,8 @@ export class Runtime {
 		const push = (kind: string, text: string) => {
 			if (!text) return;
 			this.emit(id, kind === "thinking" ? "reasoning.delta" : "message.delta", { text });
+			// The answer being written, before its entry exists. The entry's `thread.append` replaces it.
+			this.emit(id, "thread.stream", { kind: kind === "thinking" ? "thought" : "text", delta: text });
 		};
 		const cur = live.blocks.get(c.contentIndex);
 		if (c.type === "text_delta" || c.type === "thinking_delta") {
@@ -880,11 +875,17 @@ export class Runtime {
 		if (!text || live.fail?.includes(text)) return;
 		live.fail = live.fail ? `${live.fail}; ${text}` : text;
 		this.emit(live.row.id, "message.fail", { text: RUN_STOPPED + text });
+		// Kept in the journal, so a reopened thread still says why it stopped. Display-only: the
+		// model never sees it.
+		void live.conversation
+			.submit({ type: "write", entry: { kind: FAIL_KIND, data: { text } }, requestId: randomUUID() } as any, ctx)
+			.catch((err) => console.error("[fail entry]", err));
 	}
 
 	private finish(live: Live): void {
 		if (!live.busy) return;
 		live.busy = false;
+		this.emit(live.row.id, "thread.run", { running: false });
 		// The turn's blended rate, as one number worth remembering.
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);
 		if (live.usage.output) live.usage.tps = Math.round((live.usage.output / turnSecs) * 10) / 10;
@@ -922,6 +923,47 @@ export class Runtime {
 			this.store.update(live.row.id, { title: fallback });
 		}
 		this.emit(live.row.id, "sessions.changed", {});
+	}
+
+	// ---- thread (thread.open and the thread.* events) ------------------------
+
+	/** Send each commit's new entries, queue and inserts to the threads that are open. */
+	private watchCommits(): void {
+		this.harness.subscribeCommits((publication: any) => {
+			for (const ch of changesOf(publication.changes, (c) => this.byConversation.has(c))) {
+				const id = this.byConversation.get(ch.conversation)!.row.id;
+				if (ch.append) this.emit(id, "thread.append", { items: ch.append });
+				if (ch.queue) this.emit(id, "thread.queue", { items: ch.queue });
+				if (ch.inserts) this.emit(id, "thread.inserts", { items: ch.inserts });
+			}
+		});
+	}
+
+	/**
+	 * The thread as Bench draws it: every journal item after `since` (all of them without it), the
+	 * queue, the inserts' state, and whether a run is live. `head` is the last entry id: Bench asks
+	 * with `since: head` after a reconnect and gets only what it missed.
+	 */
+	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; head: number }> {
+		const live = await this.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		const entries: any[] = [];
+		let cursor: any;
+		do {
+			const page = await this.storage.scanEntries({ conversationId: live.conversation.id, order: "ascending" }, 500, cursor, ctx);
+			entries.push(...page.items);
+			cursor = page.next;
+		} while (cursor);
+		const head = entries.reduce((m, e) => Math.max(m, Number(e.id)), since);
+		const doc = (await this.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		const inbox = await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx);
+		return {
+			items: itemsOfAll(entries.filter((e) => Number(e.id) > since)),
+			queue: queueOf(inbox as any),
+			inserts: doc?.items ?? {},
+			running: live.busy,
+			head,
+		};
 	}
 
 	// ---- history (session.resume) -------------------------------------------
