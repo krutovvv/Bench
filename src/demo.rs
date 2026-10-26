@@ -715,12 +715,17 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Ok("server") => Some("d-web1"),
         Ok("tool") => Some("d-tool"),
         Ok("env") | Ok("env-open") => Some("d-env"),
-        Ok("landing") | Ok("top") => None,
+        Ok("landing") | Ok("top") | Ok("new") => None,
         _ => Some("d-site"),
     };
     if let Some(id) = open {
         app.session = Some(id.into());
         app.thread = app.demo_threads.get(id).cloned().unwrap_or_default();
+    }
+    // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
+    if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {
+        app.session = None;
+        app.thread = Default::default();
     }
     app.processes = processes(now);
     if open.is_some() {

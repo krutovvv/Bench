@@ -154,6 +154,8 @@ pub struct BenchApp {
     pub history_error: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer.
     pub demo_draft_done: bool,
+    /// `BENCH_DEMO_SCROLL=end` was done.
+    pub demo_scrolled: bool,
     pub live: Option<Live>,
     queued: Option<String>,
     /// Send was pressed while dictating: send once the speech is recognized.
@@ -642,6 +644,7 @@ impl BenchApp {
             texts: Default::default(),
             history_error: None,
             demo_draft_done: false,
+            demo_scrolled: false,
             live: None,
             queued: None,
             attachments: vec![],

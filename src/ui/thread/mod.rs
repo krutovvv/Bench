@@ -41,6 +41,9 @@ pub struct View {
     following: bool,
     /// The wheel turned down since the last frame: following may start again.
     scrolled_down: bool,
+    /// The room past the end, worked out before the list lays out (`room_past_end`): the list
+    /// cannot be asked while it renders its items.
+    room: Pixels,
 }
 
 impl Default for View {
@@ -53,6 +56,7 @@ impl Default for View {
             ticker: None,
             following: false,
             scrolled_down: false,
+            room: px(0.),
         }
     }
 }
@@ -91,6 +95,23 @@ impl View {
         self.list
             .bounds_for_item(self.tail())
             .is_some_and(|b| b.bottom() <= self.list.viewport_bounds().bottom() + px(2.))
+    }
+
+    /// The room the thread scrolls on past its end, as an editor past its last line: exactly
+    /// enough that, scrolled to the bottom, the tail (the composer) stands where it stands in a
+    /// new thread — just under the air at the top. A new thread is then exactly as tall as its
+    /// viewport and does not scroll at all. The tail's height is the last frame's; `window_h`
+    /// stands in for the viewport before the list's first layout.
+    fn room_past_end(&self, window_h: Pixels) -> Pixels {
+        let viewport = match self.list.viewport_bounds().size.height {
+            h if h > px(0.) => h,
+            _ => window_h - px(crate::ui::STATUS_H + 36.),
+        };
+        let tail = self
+            .list
+            .bounds_for_item(self.tail())
+            .map_or(px(0.), |b| b.size.height);
+        (viewport - px(crate::ui::CHAT_LEFT - crate::ui::TURN_Y) - tail).max(px(0.))
     }
 
     /// The composer reaches the viewport's bottom edge, or is past it (or is not laid out). Above
@@ -146,6 +167,7 @@ impl BenchApp {
     /// The rows of the open thread into the list, if the thread changed since the last frame.
     fn sync_rows(&mut self, cx: &mut Context<Self>) {
         self.tv.watch();
+        self.tv.room = self.tv.room_past_end(self.viewport_h);
         let version = self.thread.version();
         let owner = self.session.clone();
         if version != self.tv.version || owner != self.tv.owner {
@@ -206,6 +228,11 @@ impl BenchApp {
             self.new_project_form(window, cx);
         }
         self.sync_rows(cx);
+        // `BENCH_DEMO_SCROLL=end`: the thread scrolled as far down as it goes (for screenshots).
+        if self.demo && !self.demo_scrolled && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end") {
+            self.demo_scrolled = true;
+            self.tv.list.scroll_to_end();
+        }
         let theme = cx.theme().clone();
         let tail = self.tv.tail();
         let below = self.tv.list.item_is_below_viewport(tail) == Some(true);
@@ -324,8 +351,7 @@ impl BenchApp {
         } else if ix == n + 1 {
             self.render_tail(window, cx)
         } else {
-            // Room past the end: the last row can be scrolled up to the top.
-            div().h(self.viewport_h * 0.7).into_any_element()
+            div().h(self.tv.room).into_any_element()
         };
         // The first row keeps as much air above it as the thread has at its sides.
         if ix == 0 {
