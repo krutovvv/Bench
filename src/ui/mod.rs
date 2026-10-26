@@ -25,7 +25,7 @@ use crate::app::{BenchApp, Panel};
 pub use bench_ui::{
     AVATAR, BAR_CONTROL_REMS, BLOCK_HEAD_H, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, CHIP_H, FIELD_H,
     LEAD, RING_CLEAR, STATUS_H, THUMB, TURN_Y, avatar, block_head, clip, clock, compact,
-    editor_height, editor_line, file_icon, form_action, group_chevron, head_icon, head_icon_in, head_plus_slot,
+    editor_height, editor_line, file_icon, form_action, group_chevron, head_icon_in, head_plus_slot,
     inline_form, nest_guide, nest_pl, plural, search_band,
 };
 

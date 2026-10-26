@@ -287,6 +287,11 @@ impl BenchApp {
     /// the threads of no project; first in the sidebar, folded until opened.
     fn render_loose(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
+        let host_color: Option<Hsla> = self
+            .mark_of(&format!("p:{}", crate::model::ProjectKey::HOST))
+            .color
+            .and_then(|c| crate::app::marks::MARK_COLORS.get(c))
+            .map(|c| rgb(*c).into());
         let key = "open:loose".to_string();
         let open = self.ssh.collapsed.contains(&key);
         let group: SharedString = "loose-head".into();
@@ -301,36 +306,36 @@ impl BenchApp {
                 .gap_1p5()
                 .items_center()
                 .text_sm()
-                .child(super::head_icon(Ico::Server, cx))
+                .child(super::head_icon_in(Ico::Server, host_color, cx))
                 .child(
                     div()
                         .min_w_0()
                         .truncate()
                         .font_weight(FontWeight::MEDIUM)
-                        .text_color(muted)
+                        .text_color(host_color.unwrap_or(muted))
                         .child(crate::app::LOCAL_HOST),
                 )
                 .child(div().flex_1())
-                // The pencil: the general environment (soul, MCP, skills, prompts every thread gets).
+                // "⋯" (on hover), as a right click: its environment, its color — the same menu as
+                // a project's, without pin and remove (it is always first, and always there).
                 .child(
-                    super::head_plus_slot()
-                        .id("general-env")
-                        .cursor_pointer()
-                        .text_color(muted)
+                    div()
+                        .flex_none()
                         .opacity(0.)
                         .group_hover(group.clone(), |s| s.opacity(1.))
-                        .hover(|s| {
-                            s.bg(cx.theme().sidebar_accent)
-                                .text_color(cx.theme().foreground)
-                        })
-                        .child(Ico::Pencil.icon().xsmall())
-                        .tooltip(|window, cx| {
-                            Tooltip::new("The general environment").build(window, cx)
-                        })
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            cx.stop_propagation();
-                            this.open_project_env("general".into(), window, cx)
-                        })),
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            Button::new("general-more")
+                                .ghost()
+                                .xsmall()
+                                .icon(Ico::Ellipsis.icon())
+                                .dropdown_menu(item_menu(
+                                    cx.entity(),
+                                    Item::Project(crate::model::ProjectKey::HOST.into()),
+                                    false,
+                                    None,
+                                )),
+                        ),
                 )
                 .child(
                     super::head_plus_slot()
@@ -353,6 +358,12 @@ impl BenchApp {
                 .child(super::group_chevron(!open, group, cx))
                 // Folded by default: the key marks it open.
                 .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
+                .context_menu(item_menu(
+                    cx.entity(),
+                    Item::Project(crate::model::ProjectKey::HOST.into()),
+                    false,
+                    None,
+                ))
                 .into_any_element(),
         ];
         if !open {
@@ -713,13 +724,23 @@ fn item_menu(
             }
             Item::Thread(_) => menu,
         };
-        menu.item(
-            PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
-                .icon(Ico::Pin.icon())
-                .on_click(act(Box::new(move |this, _, cx| {
-                    this.toggle_pin(pin_key.clone(), cx)
-                }))),
-        )
+        // This Mac's Host is always first: no pin. An agent's Host is never removed (a server's
+        // agent leaves Bench in the gear).
+        let key_of = |i: &Item| match i {
+            Item::Project(id) => Some(crate::model::ProjectKey::parse(id)),
+            Item::Thread(_) => None,
+        };
+        let host = key_of(&item).is_some_and(|k| k.is_host());
+        let pinnable = !key_of(&item).is_some_and(|k| k.is_host() && k.agent.is_empty());
+        menu.when(pinnable, |menu| {
+            menu.item(
+                PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
+                    .icon(Ico::Pin.icon())
+                    .on_click(act(Box::new(move |this, _, cx| {
+                        this.toggle_pin(pin_key.clone(), cx)
+                    }))),
+            )
+        })
         // A thread is renamed here; a project in its environment (its Name).
         .when(matches!(rename, Item::Thread(_)), |menu| {
             menu.item(
@@ -736,8 +757,7 @@ fn item_menu(
             let current = swatch_view.read(cx).mark_of(&swatch_key).color;
             color_row(&swatch_view, &swatch_key, current, cx)
         }))
-        .separator()
-        .item(
+        .when(!host, |menu| menu.separator().item(
             PopupMenuItem::new(match del {
                 Item::Thread(_) => "Delete…",
                 Item::Project(_) => "Remove project…",
@@ -747,7 +767,7 @@ fn item_menu(
                 Item::Thread(id) => this.arm_delete(id.clone(), cx),
                 Item::Project(id) => this.delete_project(id.clone(), window, cx),
             }))),
-        )
+        ))
     }
 }
 

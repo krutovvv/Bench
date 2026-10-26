@@ -329,6 +329,8 @@ impl BenchApp {
         let id = e.id.clone();
         if what == "project" {
             self.project_env = None;
+            // Asked already, in its card.
+            self.confirm_delete = Some(format!("p:{id}"));
             self.delete_project(id, window, cx);
             self.new_session(cx);
             self.thread_project = String::new();

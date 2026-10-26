@@ -126,6 +126,17 @@ export default ({ rt }: Ctx): Module => ({
 				return { ok: true };
 			},
 		],
+		// A language server out of lsp.json.
+		[
+			"DELETE",
+			/^\/api\/projects\/([^/]+)\/lsp\/([^/]+)$/,
+			(_req, m) => {
+				const agent = envOf(id1(m)).agent;
+				const { [decodeURIComponent(m[2]!)]: _gone, ...rest } = readLsp(agent);
+				writeLsp(agent, rest);
+				return { ok: true };
+			},
+		],
 		// Language servers: the whole lsp.json (text, as edited), or a preset added by name.
 		[
 			"PUT",

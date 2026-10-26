@@ -11,7 +11,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Card, Request, Section, add, code, empty, revert, row, save};
+use super::section::{Card, Request, Section, add, code, empty, remove, revert, row, save};
 use super::{ProjectEnv, editor, on_change};
 use crate::app::BenchApp;
 use crate::rest;
@@ -146,6 +146,10 @@ impl Section for Lsp {
         }
         let mut actions = vec![save("lsp", e.lsp.dirty, cx)];
         actions.extend(revert("lsp", e.lsp.dirty, cx));
+        // Opened from its row: that server can go (asked once).
+        if e.lsp.servers.iter().any(|s| s.name == name) {
+            actions.push(remove(e, "lsp", name.to_string(), "Remove this server", cx));
+        }
         Some(Card::new(
             "lsp.json: command, args, extensions; npm and fetch install into ${LSP}",
             code(&e.lsp.text, cx),
@@ -212,6 +216,9 @@ impl Section for Lsp {
     }
     fn saved(&self, e: &mut ProjectEnv) {
         e.lsp.dirty = false;
+    }
+    fn remove_path(&self, eid: &str, name: &str) -> Option<String> {
+        Some(format!("/api/projects/{eid}/lsp/{}", super::enc(name)))
     }
     fn revert(&self, app: &mut BenchApp, _: &mut Window, _: &mut Context<BenchApp>) -> bool {
         if let Some(e) = app.project_env.as_mut() {
