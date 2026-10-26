@@ -29,7 +29,9 @@ Never search `~/.cargo/registry` for how gpui-kit draws something: the answer yo
 constant or an element in `crates/ui`, or a page here (`ui-overlays.md` for menus). If it is
 missing there, add it there. When the framework's own source must be read: gpui-kit is a facade
 over `gpui-component-0.8.0` (`~/.cargo/registry/src/index.crates.io-*/gpui-component-0.8.0/src`);
-gpui itself is `vendor/gpui-base` (patched). Go there directly, with one grep.
+gpui itself is `vendor/gpui-base` (patched), its `text_xs`… in `gpui-pre-0.3.9/src/styled.rs`.
+Go there directly, with one grep. A `Button` that ignores a font size or won't wrap: the answer
+is in `ui-gotchas.md` ("A `Button` is not a row of text").
 
 ## The two cores (read before touching them)
 

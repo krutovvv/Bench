@@ -11,6 +11,8 @@ import sys
 
 from PIL import Image
 
+if len(sys.argv) < 7:
+    sys.exit(__doc__)
 src, x, y, w, h, out = sys.argv[1], *map(float, sys.argv[2:6]), sys.argv[6]
 scale = float(sys.argv[7]) if len(sys.argv) > 7 else 1.0
 img = Image.open(src)

@@ -38,17 +38,21 @@ Take a shot of **your own copy**. Never click, type or take a shot in the person
 app keeps running untouched.
 
 ```bash
-cargo build --release 2>&1 | grep -E '^(warning|error)|Finished'
-$K/shot.sh target/release/bench /tmp/before.png 8          # prints the size in px and pt
+cargo build 2>&1 | grep -E '^(warning|error)|Finished'
+$K/shot.sh target/debug/bench /tmp/before.png 8          # prints the size in px and pt
 ```
 - Pick the state first: `BENCH_DEMO=…` (made-up threads: `1`, `landing`, `top`, `long`, `new`,
   `tasks`, `server`, `tool`, `env`, `env-open`…) or `BENCH_HOME=<a copy of ~/.bench>` (real
-  data, never the person's own folder): `$K/shot.sh target/release/bench /tmp/before.png 8
+  data, never the person's own folder): `$K/shot.sh target/debug/bench /tmp/before.png 8
   BENCH_DEMO=landing`. Every demo state and hook: `build-verification.md`. Only when neither
   reaches the state, a temporary hook (step 5).
 - The data sits behind a macOS permission (the microphone, notifications)? A bare binary is
   refused, and Bench is one app: commit, ask the person to ship, and check it with them in Bench.
 - Wait longer when the app connects over SSH: 25–40 s.
+
+Look at it: read the shot itself (the read tool shrinks a 2480×1600 shot to fit and says by
+how much), then `crop.py` the area at 2× for detail. Numbers come from the scripts below, never
+from ImageMagick one-liners written on the spot: those cost one agent 14 steps of wrong crops.
 
 Then read the numbers:
 ```bash
@@ -116,7 +120,7 @@ Hooks that worked:
 ## 6. Build
 
 ```bash
-cargo build --release 2>&1 | grep -E '^(warning|error)' -A7 | head -40
+cargo build 2>&1 | grep -E '^(warning|error)' -A7 | head -40
 ```
 - Zero warnings, not "it built". An unused import is a leftover of the old code; delete it.
 - The first build of a new project takes minutes. Run it in the background or with a long
@@ -144,8 +148,10 @@ list, the dark theme if colors changed.
 ```bash
 grep -rl 'DEBUG-TMP' src | xargs sed -i '' '/DEBUG-TMP/d'   # remove every hook line
 grep -rn 'DEBUG-TMP\|DEBUG_' src                              # must print nothing
-cargo fmt && cargo build --release 2>&1 | grep -E '^(warning|error)'; cargo test 2>&1 | grep 'test result'
+cargo fmt && cargo build 2>&1 | grep -E '^(warning|error)'; cargo test 2>&1 | grep 'test result'
 ```
+`cargo fmt` changes only your files: the tree is kept formatted. If it ever touches a file you
+didn't change, that file was committed unformatted: leave it in its own commit, not yours.
 Hooks: none left. Warnings: none. Tests: all pass. Delete the test files you made outside
 `/tmp` and the scratch folders.
 

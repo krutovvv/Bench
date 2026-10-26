@@ -25,6 +25,17 @@ errors after each edit come from the project's language servers (rust-analyzer i
   `src/ui/tools.rs` clash once both are imported. Name views after what they show:
   `src/ui/tool_view.rs`.
 
+## A `Button` is not a row of text
+
+Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo registry:
+- **Its label's font comes from its size, not from the parent.** `.small()` sets the label's
+  size inside the button (`button_text_size`), so a `.text_xs()` on the bar or on the button
+  itself changes nothing. A label of another size is a child: `Button::new(id).ghost().small()
+  .child(div().text_xs().child(label))` (the status bar, `src/ui/statusbar.rs`).
+- **Its label is one line** (`whitespace_nowrap` + `text_ellipsis`) and the button is as wide
+  as it: a long label pushes it past its card. Text that must wrap (a choice of the agent's
+  question) is a row, not a button: `choice_row(id, cx).child(text)` (`crates/ui/src/list.rs`).
+
 ## Layout helpers
 
 - Resizable split: `h_resizable("id").child(resizable_panel().size(px(280.)).size_range(px(200.)..px(480.)).child(..))`.
