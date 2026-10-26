@@ -200,6 +200,31 @@ fn pid_alive(pid: u32) -> bool {
         .unwrap_or(false)
 }
 
+/// The PATH the agent runs with. An app opened from the Finder gets only the system folders, so
+/// the agent's MCP servers (`npx …`) and its bash (`cargo`, `brew`) found nothing: node's own
+/// folder, Homebrew's and cargo's go first.
+fn agent_path(node: &Path) -> String {
+    let first = [
+        node.parent().map(Path::to_path_buf),
+        Some(home().join(".cargo/bin")),
+        Some(home().join(".local/bin")),
+        Some(PathBuf::from("/opt/homebrew/bin")),
+        Some(PathBuf::from("/usr/local/bin")),
+    ];
+    let rest = std::env::var("PATH").unwrap_or_else(|_| "/usr/bin:/bin:/usr/sbin:/sbin".into());
+    let mut dirs: Vec<String> = Vec::new();
+    let all = first
+        .into_iter()
+        .flatten()
+        .map(|d| d.to_string_lossy().into_owned());
+    for d in all.chain(rest.split(':').map(str::to_string)) {
+        if !d.is_empty() && !dirs.contains(&d) {
+            dirs.push(d);
+        }
+    }
+    dirs.join(":")
+}
+
 /// The agent outlived the app that started it: its parent is launchd now. macOS judges its
 /// local-network access by that app, so such an agent fails every request to a LAN model at once
 /// ("Connection error.", in a few milliseconds) until it is started again by a living app.
@@ -255,6 +280,7 @@ pub fn ensure() -> Result<(u16, String)> {
         .arg("src/server.ts")
         .current_dir(&app)
         .env("BENCH_AGENT_BUILD", &hash)
+        .env("PATH", agent_path(&node))
         .stdin(Stdio::null())
         .stdout(log.try_clone()?)
         .stderr(log)
