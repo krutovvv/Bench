@@ -37,11 +37,13 @@ const DANGEROUS: [RegExp, string][] = [
 	[/curl[^|]*\|\s*(ba|z)?sh\b/i, "runs a downloaded script"],
 ];
 
+import { globTool, grepTool, lsTool } from "../builtin/search.ts";
+
 const Coding = createCodingTools();
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...(Coding.tools ?? []), clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, remoteFiles, hostsTool],
+	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, remoteFiles, hostsTool],
 	tasks: [CronTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),

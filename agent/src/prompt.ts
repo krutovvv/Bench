@@ -51,6 +51,9 @@ export function environment(s: SessionInfo): string {
 		`Today is ${day} (${timezone()}). For the exact time, run date.`,
 		`Machine: ${os.type() === "Darwin" ? "macOS" : os.type()}, home ${os.homedir()}. Working directory: ${s.cwd}.`,
 		"Bench's own data (tasks, hosts, sessions, settings) is reached through your tools, not files.",
+		// The tools for code, said once: a long thread spent most of its steps reading files through
+		// bash in small windows and editing them with scripts.
+		"Files: find with grep (text), glob (names) and ls (a folder's tree); read a file whole with read (up to 2000 lines at once, not in small pieces); change it with edit, all its changes in one call (edits[]); new files with write. bash is for running things — builds, tests, git — not for reading or editing files.",
 		PLATFORM[s.source] ?? PLATFORM.local,
 	].join("\n");
 }
