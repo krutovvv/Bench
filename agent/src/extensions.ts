@@ -121,7 +121,7 @@ export async function loadExtensions(registry: { install(e: pi.Extension): void 
 	};
 	for (const agent of agents()) {
 		await loadAgent(agent);
-		// Edits are picked up without a restart.
+		// Edits are picked up without a restart. The watch alone does not keep the process alive.
 		let timer: NodeJS.Timeout | undefined;
 		fs.watch(path.join(agentDir(agent), "extensions"), () => {
 			clearTimeout(timer);
@@ -129,7 +129,7 @@ export async function loadExtensions(registry: { install(e: pi.Extension): void 
 				await loadAgent(agent);
 				onChange();
 			}, 300);
-		});
+		}).unref();
 	}
 }
 

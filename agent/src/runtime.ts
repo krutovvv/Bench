@@ -18,6 +18,7 @@ import { arm, jobs, setScheduler } from "./builtin/cron.ts";
 import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort, resolveFallback, resolveModel, setSetting, type ModelChoice } from "./config.ts";
 import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
+import { moveToFront } from "./queue.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { noThinking } from "./thinking.ts";
@@ -531,6 +532,14 @@ export class Runtime {
 		// Its turn shows when Pi places it (after the current tools, or when the run answers).
 		const sub = await live.conversation.submit({ type: "input", content: item.content, ...(live.busy ? { whenBusy: "steer" } : {}), requestId: randomUUID() } as any, ctx);
 		live.pending.set(String(sub.id), { text: stripBlock(contentText(item.content)), mode: "steer" });
+		// A new submission lands at the END of the inbox, and a boundary places what stands first
+		// of its kind — so without this move "send now" sends the message last, which is its
+		// opposite. It is the message the person just chose, so it goes to the head, ahead of
+		// whatever waited before it (those keep their order behind it).
+		await live.conversation.commit(async (tx) => {
+			const box = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
+			moveToFront(box.items, String(sub.id));
+		}, ctx);
 		this.queueChanged(live);
 	}
 
