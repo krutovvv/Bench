@@ -18,7 +18,9 @@ person: there are projects.
 
 - **Thread**: a document of **messages** (the person's, the agent's, with its steps) and the
   person's **inserts**. One conversation in Pi. It never switches mode or gets renamed because of
-  an insert.
+  an insert. Bench shows Pi's journal of it as rows (`crates/thread`), on a list that **nothing
+  moves but the person** — a run that ends, a row that grows, an answer that arrives never scroll
+  it (`docs/thread-rewrite.md`).
 - **Insert**: a small live tool put into a thread with `/`. The words are `/terminal`, `/ssh`,
   `/files`, `/ftp`, `/tasks`, `/tools`, `/browser`. Every `/` adds a new insert where the
   conversation is. An insert:
@@ -32,21 +34,35 @@ person: there are projects.
 - **Card**: a form or an editor that appears in the thread as an agent-message block, under the
   insert or section that asked for it. Examples: a new server, a task, an MCP server, a skill, a
   cron job, an open file. Bench has no settings pages for such jobs.
-- **Project**: the sidebar's only unit. It may have a folder (threads work in it; its ⋯ menu has
-  "Open in Zed") and may live on a server (its agent runs there, over SSH). Its **environment**:
+- **Agent**: a process of `agent/` that runs threads. This Mac's always; a server's when the
+  person adds it in the gear (Bench installs and starts it over SSH). The Mac's agent keeps the
+  list of servers' agents. Each agent has its own models, voice and general Telegram bot.
+- **Project**: the sidebar's only unit. It belongs to one agent and says where its work is
+  (`docs/remote-projects.md`):
+  - **agent**: this Mac's or a server's;
+  - **machine**: the agent's own, or — with this Mac's agent — a server it works on over SSH
+    (nothing installed there);
+  - **folder** on that machine, optional; its agent can be **kept in it** (tools refuse paths
+    outside, commands cannot write outside).
+
+  In code a project is a `ProjectKey` (agent, id there) and where it lives a `Location`;
+  `src/app/places.rs` answers "where" for everything else. Its **environment**:
   - soul (`SYSTEM.md`);
-  - MCP servers (`mcp.json`, OAuth where needed);
+  - MCP servers (`mcp.json`, OAuth where needed), language servers (`lsp.json`);
   - skills, prompts;
-  - accesses (SSH and file hosts);
+  - machines (SSH) and file hosts;
+  - model: reasoning, approvals, compaction;
   - Telegram bot;
   - schedule (cron).
 
   It is edited in its environment thread, one agent message per section, with the card under the
-  section being edited. **Host** is this machine's own project (always first in the sidebar) (installing, building,
-  looking after the machine). A server project (`host` set, e.g. Dev) runs entirely on its
-  server: its agent there keeps the threads, skills, MCP, schedule; `/terminal` (`ssh:local`) is
-  the thread's machine (`thread_machine()`), so it opens on that server.
-- **The gear** holds the only classic settings: providers and the look.
+  section being edited. **Host** is an agent's own environment: this Mac's is always first in the
+  sidebar (installing, building, looking after the machine); a server's (e.g. Dev) names that
+  server and is followed by the server's own projects. `/terminal` opens on the thread's machine
+  (`thread_machine()`).
+- **The gear** holds the only classic settings, in tabs: Agents (each one's models and voice;
+  add and remove servers' agents), Presets (MCP and language servers a project takes with one
+  click, compaction shares, reasoning levels), Appearance.
 
 ## The code map
 
@@ -61,16 +77,19 @@ built this way: `docs/architecture.md`. In short:
 | `crates/thread` | The thread as rows from Pi's journal; the rules of order are tests |
 | `crates/devtools` | The /tools utilities as tested pure functions |
 | `src/main.rs`, `src/app.rs`, `src/app/*.rs` | Start; `BenchApp` and its actions, one file per area (`events`, `sessions`, `send`, `keys`, `voice`…) |
-| `src/ui/` | The frame: `mod.rs` (layout, header), `sidebar.rs`, `statusbar.rs`, `composer.rs`, `media.rs`; `ui/thread/` the open thread on `gpui::list` |
+| `src/app/places.rs`, `src/app/agents.rs` | **Projects and agents**: where each project lives (`ProjectKey`, `Location` in `model.rs`), the sidebar's projects from their sources; the links to this Mac's and servers' agents |
+| `src/app/sidebar_items.rs`, `src/app/marks.rs`, `src/app/presets.rs` | What is done to a thread or project in the sidebar (pin, color, rename, ⌫⌫, ↑↓); the person's presets |
+| `src/ui/` | The frame: `mod.rs` (layout, header), `sidebar.rs`, `statusbar.rs`, `composer.rs`, `media.rs`, `providers.rs` (the gear's tabs); `ui/thread/` the open thread on `gpui::list` |
 | `src/inserts/` | **The insert registry** (`mod.rs`: `InsertKind`, `KINDS`, `words()`) and one folder per kind: `terminal`, `files` (/files), `ftp`, `tasks`, `tools`, `browser` — each `mod.rs` + `state.rs` (+ `view.rs`) |
 | `src/env/` | A project's environment: `Section` + `SECTIONS`, one file per section |
 | `src/gateway.rs`, `src/rest.rs`, `src/connection.rs`, `src/pi_agent.rs` | The protocol to the agent (WebSocket JSON-RPC + REST), installing/starting it locally or over SSH |
-| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|tasks\|server\|tool\|env\|env-open`) |
+| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|tasks\|server\|tool\|env\|env-open`; the other hooks in `.agents/skills/bench-kit/references/build-verification.md`) |
 | `agent/src/server.ts`, `agent/src/modules/` | The agent's server: starts, collects the modules (each declares its RPC and REST routes) |
 | `agent/src/runtime.ts`, `agent/src/thread.ts` | Pi conversations, the queue, inserts; the journal as the items Bench shows |
 | `agent/src/inserts.ts` | The insert entry and document |
 | `agent/src/prompt.ts`, `agent/src/extensions/assistant.ts` | The prompt sections and the default extension (tools, sections, hooks) |
-| `agent/src/builtin/` | The agent's own tools: `tasks`, `ssh`, `remote`, `hosts`, `cron`, `subagent`, `memory`, `skills`, `ask`, `projects` |
+| `agent/src/builtin/` | The agent's own tools and stores: `tasks`, `ssh`, `remote`, `hosts`, `cron`, `subagent`, `memory`, `skills`, `ask`, `projects`, `servers` (the servers' agents), `presets`, `search` (grep, glob, ls) |
+| `agent/src/ssh-env.ts`, `confined-env.ts`, `lsp.ts` | A project's machine over SSH as Pi's `ExecutionEnv`; a project kept in its folder; its language servers (diagnostics after every edit) |
 | `agent/src/mcp.ts`, `mcp-oauth.ts`, `telegram.ts` | MCP servers (pi-mcp, OAuth), Telegram bots (grammY, a proxy where needed) |
 
 ## How the agent uses Pi Durable
@@ -91,6 +110,9 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | `/tools` | no tool of its own: the utility's input and output come in `<block-state>` |
 | `/browser` | the Playwright MCP through `@earendil-works/pi-mcp` (`mcp__browser__*`), one tab per thread (state `{tab,url}`). The server browser is its own project, `~/Projects/browser-server-mcp` (github.com/krutovvv/browser-server-mcp) (an MCP server with a live view); Bench is one of its clients (`src/remote_browser.rs`) |
 | Model | one for every thread of every project, set in the gear: the general agent's `defaultProvider`/`defaultModel`; a project has no model of its own. The fallback (`fallback_providers[0]`) is a pi-ai provider of ours (`fallback.ts`): the main model's error or silence sends the same request to it (Pi retries only with the same model), and `session.info {fallback}` turns the status bar red |
+| Where tools work | Pi's `ExecutionEnv`, one per conversation (`runtime.ts` `envFor`): `NodeExecutionEnv` on the agent's machine, `SshExecutionEnv` (`ssh-env.ts`) on a project's machine over SSH, wrapped by `confined-env.ts` for a project kept in its folder. Pi's read/write/edit/bash and our grep/glob/ls work through it unchanged |
+| Compaction | Pi's compaction policy; a project's share of the window becomes a per-model override under its own provider (`project_<id>.<provider>`), through a getter Pi reads at every use (`compactionOverrides`) |
+| After an edit | a `ToolTask` `afterTool` hook adds the file's diagnostics from the project's language servers (`lsp.ts`) to edit and write results |
 | Schedule | a durable `defineTask` per job that sleeps until its next run (`builtin/cron.ts`) |
 | Subagents | `delegate`: child conversations owned by the tool's task (`builtin/subagent.ts`) |
 | MCP | `@earendil-works/pi-mcp`, a project's `mcp.json`; OAuth via `mcp-oauth.ts` (callback on `localhost:47823`) |
