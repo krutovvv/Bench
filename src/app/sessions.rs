@@ -26,6 +26,7 @@ impl BenchApp {
         self.effort_other = None;
         self.effort = self.profile_effort;
         self.thread = Default::default();
+        self.texts.clear();
         self.history_error = None;
         self.live = None;
         self.queued = None;

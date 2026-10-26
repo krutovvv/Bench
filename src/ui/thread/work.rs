@@ -11,7 +11,6 @@ use serde_json::Value;
 use super::message::speaker_row;
 use crate::app::{BenchApp, now_secs, tool_label};
 use crate::icons::Ico;
-use crate::ui::media::plain_text;
 use crate::ui::{clip, clock, plural};
 
 impl BenchApp {
@@ -48,6 +47,7 @@ impl BenchApp {
         if let Some(s) = secs.filter(|s| *s >= 1.) {
             parts.push((clock(s as u64), muted));
         }
+        let has_parts = !parts.is_empty();
         // What the agent is doing now: its last step, said in a line.
         let doing = live.then(|| match steps.last() {
             Some(Step::Tool { name, preview, .. }) => tool_label(name, preview),
@@ -76,11 +76,15 @@ impl BenchApp {
                         .truncate()
                         .child(ShimmerText::new(label).text_base().text_color(muted)),
                 ),
-                None => d.child(div().flex_none().child(if tools > 0 || errors > 0 {
-                    "· Done"
-                } else {
-                    "Done"
-                })),
+                // A piece of work without tool calls was the model thinking before it answered.
+                None => d.child(div().flex_none().child(
+                    match (has_parts, tools > 0 || errors > 0) {
+                        (true, true) => "· Done",
+                        (false, true) => "Done",
+                        (true, false) => "· Thought",
+                        (false, false) => "Thought",
+                    },
+                )),
             })
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.click_claimed = true;
@@ -89,18 +93,22 @@ impl BenchApp {
                 }
                 cx.notify();
             }));
+        let items: Vec<AnyElement> = if open {
+            steps
+                .iter()
+                .enumerate()
+                .map(|(k, s)| self.render_step(key, k, s, cx))
+                .collect()
+        } else {
+            vec![]
+        };
         let list = open.then(|| {
             v_flex()
                 .pl_3()
                 .gap_1()
                 .border_l_1()
                 .border_color(theme.border)
-                .children(
-                    steps
-                        .iter()
-                        .enumerate()
-                        .map(|(k, s)| self.render_step(key, k, s, cx)),
-                )
+                .children(items)
         });
         speaker_row(
             Some(true),
@@ -111,7 +119,13 @@ impl BenchApp {
     }
 
     /// One step; a click unfolds its details (reasoning, arguments, output).
-    fn render_step(&self, key: &str, k: usize, step: &Step, cx: &mut Context<Self>) -> AnyElement {
+    fn render_step(
+        &mut self,
+        key: &str,
+        k: usize,
+        step: &Step,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let open = self.open_steps.contains(&(key.to_string(), k));
@@ -154,6 +168,17 @@ impl BenchApp {
         };
         let expandable = !details.is_empty();
         let step_key = (key.to_string(), k);
+        let bodies: Vec<(&str, AnyElement)> = if open {
+            details
+                .into_iter()
+                .map(|(title, body)| {
+                    let text = self.kept_plain(&format!("step-{key}-{k}-{title}"), &body, cx);
+                    (title, text.into_any_element())
+                })
+                .collect()
+        } else {
+            vec![]
+        };
         v_flex()
             .child(
                 h_flex()
@@ -175,7 +200,7 @@ impl BenchApp {
                     })),
             )
             .when(open && expandable, |d| {
-                d.children(details.into_iter().map(|(title, body)| {
+                d.children(bodies.into_iter().map(|(title, body)| {
                     v_flex()
                         .ml_5()
                         .mt_1()
@@ -191,7 +216,7 @@ impl BenchApp {
                                 .border_color(theme.border)
                                 .font_family(crate::theme::MONO)
                                 .text_color(theme.foreground)
-                                .child(plain_text(format!("step-{key}-{k}-{title}"), &body)),
+                                .child(body),
                         )
                 }))
             })

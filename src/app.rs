@@ -148,6 +148,8 @@ pub struct BenchApp {
     pub tv: crate::ui::thread::View,
     /// Opened pieces of work and steps, by the work row's key.
     pub open_work: HashSet<String>,
+    /// The open thread's texts, parsed once (`ui::media::Texts`).
+    pub texts: crate::ui::media::Texts,
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
     pub history_error: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer.
@@ -637,6 +639,7 @@ impl BenchApp {
             thread_cache: HashMap::new(),
             tv: Default::default(),
             open_work: HashSet::new(),
+            texts: Default::default(),
             history_error: None,
             demo_draft_done: false,
             live: None,

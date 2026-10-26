@@ -14,6 +14,8 @@ mod queued;
 mod rail;
 mod work;
 
+use std::cell::Cell;
+use std::rc::Rc;
 use std::time::Duration;
 
 use ::thread::Row;
@@ -35,16 +37,30 @@ pub struct View {
     owner: Option<String>,
     /// While a run is live, a timer repaints once a second (its clock).
     ticker: Option<Task<()>>,
+    /// Keep the composer in view as the thread grows. On after a send or "Jump to latest"; off
+    /// as soon as the person scrolls up; on again when they scroll down to the composer.
+    following: bool,
+    /// The person scrolled since the last frame (set by the list's scroll handler).
+    scrolled: Rc<Cell<bool>>,
+    /// Where the list's top was last frame: a scroll that lowered it went up.
+    last_top: (usize, Pixels),
 }
 
 impl Default for View {
     fn default() -> Self {
+        let list = ListState::new(3, ListAlignment::Top, px(800.));
+        let scrolled = Rc::new(Cell::new(false));
+        let seen = scrolled.clone();
+        list.set_scroll_handler(move |_, _, _| seen.set(true));
         Self {
-            list: ListState::new(3, ListAlignment::Top, px(800.)),
+            list,
             rows: vec![],
             version: u64::MAX,
             owner: None,
             ticker: None,
+            following: false,
+            scrolled,
+            last_top: (0, px(0.)),
         }
     }
 }
@@ -60,15 +76,41 @@ impl View {
         self.rows.len() + 1
     }
 
-    /// Give the list `rows`. Unchanged rows keep their measured heights; a thread of another
-    /// owner starts at the top. `follow`: keep the composer in view if it was.
-    fn sync(&mut self, owner: Option<&str>, rows: Vec<Row>, follow: bool) {
+    /// The person's scroll since the last frame: up stops following, down to the composer
+    /// starts it again.
+    fn watch(&mut self) {
+        let top = self.list.logical_scroll_top();
+        let now = (top.item_ix, top.offset_in_item);
+        if self.scrolled.replace(false) {
+            if now < self.last_top {
+                self.following = false;
+            } else if self.composer_seen() {
+                self.following = true;
+            }
+        }
+        self.last_top = now;
+    }
+
+    /// The composer's bottom edge is inside the viewport.
+    fn composer_seen(&self) -> bool {
+        self.list
+            .bounds_for_item(self.tail())
+            .is_some_and(|b| b.bottom() <= self.list.viewport_bounds().bottom() + px(2.))
+    }
+
+    /// Give the list `rows` and answer the first row that changed. Unchanged rows keep their
+    /// measured heights; a thread of another owner starts at the top, not following.
+    fn sync(&mut self, owner: Option<&str>, rows: Vec<Row>, follow: bool) -> usize {
+        if follow {
+            self.following = true;
+        }
         if owner != self.owner.as_deref() {
             self.owner = owner.map(str::to_string);
             self.rows = rows;
             self.list.reset(self.rows.len() + 3);
             self.list.scroll_to(ListOffset::default());
-            return;
+            self.following = follow;
+            return 0;
         }
         let same = self
             .rows
@@ -77,32 +119,33 @@ impl View {
             .take_while(|(a, b)| a == b)
             .count();
         if same == self.rows.len() && same == rows.len() {
-            return;
+            return same;
         }
-        let tail_seen = self.list.item_is_below_viewport(self.tail()) == Some(false)
-            && self.list.item_is_above_viewport(self.tail()) == Some(false);
         let old = self.rows.len();
         self.rows = rows;
         self.list.splice(
             Self::item_of(same)..Self::item_of(old),
             self.rows.len() - same,
         );
-        if follow || tail_seen {
+        if self.following {
             self.list.scroll_to_reveal_item(self.tail());
         }
+        same
     }
 }
 
 impl BenchApp {
     /// The rows of the open thread into the list, if the thread changed since the last frame.
     fn sync_rows(&mut self, cx: &mut Context<Self>) {
+        self.tv.watch();
         let version = self.thread.version();
         let owner = self.session.clone();
         if version != self.tv.version || owner != self.tv.owner {
             self.tv.version = version;
             let rows = self.thread.rows();
             let follow = std::mem::take(&mut self.follow);
-            self.tv.sync(owner.as_deref(), rows, follow);
+            let changed = self.tv.sync(owner.as_deref(), rows, follow);
+            self.parse_ahead(changed, cx);
         }
         // A live run's clock moves once a second.
         if self.thread.running() && self.tv.ticker.is_none() {
@@ -220,8 +263,36 @@ impl BenchApp {
     }
 
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
+        self.tv.following = true;
         self.tv.list.scroll_to_reveal_item(self.tv.tail());
         cx.notify();
+    }
+
+    /// Start parsing the texts of the rows from `from` on, before they are on screen: a row
+    /// scrolled into view then has its whole height in its first frame.
+    fn parse_ahead(&mut self, from: usize, cx: &mut Context<Self>) {
+        for row in self.tv.rows[from.min(self.tv.rows.len())..].to_vec() {
+            match row {
+                Row::User { key, text, .. } => {
+                    let (said, _) = crate::attach::split(&text);
+                    if !said.is_empty() {
+                        self.texts
+                            .state(&key, &crate::ui::media::escape_plain(&said), cx);
+                    }
+                }
+                Row::Answer { key, text, .. } => {
+                    for (k, seg) in crate::ui::media::answer_segments(&text)
+                        .into_iter()
+                        .enumerate()
+                    {
+                        if let crate::media::Segment::Text(t) = seg {
+                            self.texts.state(&format!("answer-{key}-{k}"), &t, cx);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
     }
 
     /// One item of the list.

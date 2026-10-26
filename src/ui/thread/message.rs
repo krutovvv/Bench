@@ -8,7 +8,6 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::icons::Ico;
-use crate::ui::media::plain_text;
 use crate::ui::{AVATAR, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, TURN_Y, avatar};
 
 /// The row frame: the avatar (or its empty place) in the gutter, `body` at the text column.
@@ -43,7 +42,7 @@ impl BenchApp {
     /// The person's own row: their text, the files that went with it. `muted`: not gone out yet
     /// (queued); `actions` sit at its right; `field` replaces the text while it is being fixed.
     pub(crate) fn user_row(
-        &self,
+        &mut self,
         key: String,
         text: &str,
         paths: &[String],
@@ -58,12 +57,11 @@ impl BenchApp {
             .enumerate()
             .map(|(k, p)| self.attachment_chip(format!("{key}-{k}").into(), p, None, cx))
             .collect();
+        let said = (field.is_none() && !text.is_empty()).then(|| self.kept_plain(&key, text, cx));
         let body = div()
             .whitespace_normal()
             .when(muted, |d| d.text_color(theme.muted_foreground))
-            .when(field.is_none() && !text.is_empty(), |d| {
-                d.child(plain_text(SharedString::from(key.clone()), text))
-            })
+            .children(said)
             .when_some(field, |d, f| d.child(f))
             .when(!attached.is_empty(), |d| {
                 d.child(

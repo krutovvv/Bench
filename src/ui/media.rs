@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::text::{
-    MarkdownNode, MarkdownParseContext, MarkdownPlugin, TextView, markdown_ast,
+    MarkdownNode, MarkdownParseContext, MarkdownPlugin, TextView, TextViewState, markdown_ast,
 };
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
@@ -103,9 +103,71 @@ impl MarkdownPlugin for BlockMath {
     }
 }
 
-/// Text exactly as written (the user's own message), selectable and copyable like an answer:
-/// Markdown's characters are escaped, line breaks kept, leading spaces made non-breaking.
-pub(crate) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
+/// The thread's texts, parsed once and kept while the thread is open: id → (its state, the text
+/// it holds). A text view keeps its parse only while it is on screen; a long one (over 4 KB)
+/// coming back into view was parsed again in the background, drawn short for a frame and then
+/// grew — which moved the thread under the wheel. Kept here, a row has its height at once.
+#[derive(Default)]
+pub struct Texts(std::collections::HashMap<String, (Entity<TextViewState>, String)>);
+
+/// An answer as its parts, in order, without empty prose between them. The ids of its parts are
+/// `answer-<row key>-<k>` and `code-<row key>-<k>`, k its place here.
+pub(crate) fn answer_segments(text: &str) -> Vec<Segment> {
+    media::segments(text.trim())
+        .into_iter()
+        .filter_map(|s| match s {
+            Segment::Text(t) => {
+                let t = t.trim().to_string();
+                (!t.is_empty()).then_some(Segment::Text(t))
+            }
+            other => Some(other),
+        })
+        .collect()
+}
+
+impl Texts {
+    pub fn clear(&mut self) {
+        self.0.clear();
+    }
+
+    /// The state for `id` holding `markdown`: made (its parse starts) or brought up to date.
+    pub fn state(&mut self, id: &str, markdown: &str, cx: &mut App) -> Entity<TextViewState> {
+        if let Some((state, had)) = self.0.get_mut(id) {
+            if had != markdown {
+                *had = markdown.to_string();
+                state.update(cx, |s, cx| s.set_text(markdown, cx));
+            }
+            return state.clone();
+        }
+        let state = cx.new(|cx| TextViewState::markdown(markdown, cx));
+        self.0
+            .insert(id.to_string(), (state.clone(), markdown.to_string()));
+        state
+    }
+}
+
+impl BenchApp {
+    /// An answer's prose (Markdown, with formulas), from the thread's kept texts.
+    pub(crate) fn kept_markdown(
+        &mut self,
+        id: &str,
+        text: &str,
+        cx: &mut Context<Self>,
+    ) -> TextView {
+        let state = self.texts.state(id, text, cx);
+        answer_style(TextView::new(&state))
+    }
+
+    /// The person's own words exactly as written, from the thread's kept texts.
+    pub(crate) fn kept_plain(&mut self, id: &str, text: &str, cx: &mut Context<Self>) -> TextView {
+        let state = self.texts.state(id, &escape_plain(text), cx);
+        TextView::new(&state)
+    }
+}
+
+/// Text exactly as written, as Markdown: its characters escaped, line breaks kept, leading spaces
+/// made non-breaking.
+pub(crate) fn escape_plain(text: &str) -> String {
     let lines: Vec<String> = text
         .lines()
         .map(|line| {
@@ -131,45 +193,54 @@ pub(crate) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
         })
         .collect();
     // Two spaces before a newline: a line break inside the paragraph (blank lines stay paragraphs).
-    TextView::markdown(ElementId::Name(id.into()), lines.join("  \n"))
+    lines.join("  \n")
+}
+
+/// Text exactly as written (a short one, outside the thread): selectable and copyable.
+pub(crate) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
+    TextView::markdown(ElementId::Name(id.into()), escape_plain(text))
 }
 
 /// Markdown as answers show it: with formulas. Code blocks keep the monospace font (trees and
 /// columns stay aligned) at the chat text's size, not the theme's larger code size.
 pub(crate) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
-    TextView::markdown(ElementId::Name(id.into()), text)
-        .plugin(InlineMath)
-        .plugin(BlockMath)
-        .style(
-            gpui_kit::component::text::TextViewStyle::default().code_block(
-                StyleRefinement::default()
-                    .text_size(rems(0.8125))
-                    .line_height(relative(super::LEAD)),
-            ),
-        )
+    answer_style(TextView::markdown(ElementId::Name(id.into()), text))
+}
+
+fn answer_style(view: TextView) -> TextView {
+    view.plugin(InlineMath).plugin(BlockMath).style(
+        gpui_kit::component::text::TextViewStyle::default().code_block(
+            StyleRefinement::default()
+                .text_size(rems(0.8125))
+                .line_height(relative(super::LEAD)),
+        ),
+    )
 }
 
 /// A code block in an answer, as chat UIs show one: a header with the language on the left and
 /// a copy button on the right, the highlighted code under it (one frame around both).
-fn render_code(i: &str, k: usize, lang: String, code: String, cx: &App) -> AnyElement {
+fn render_code(
+    body: TextView,
+    i: &str,
+    k: usize,
+    lang: String,
+    code: String,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
-    let fence = if code.contains("```") { "~~~~" } else { "```" };
-    let body = TextView::markdown(
-        ElementId::Name(format!("code-{i}-{k}").into()),
-        format!("{fence}{lang}\n{code}{fence}"),
-    )
-    // Any action, even an empty one, keeps the language out of the code's own corner.
-    .code_block_actions(|_, _, _| div())
-    .style(
-        gpui_kit::component::text::TextViewStyle::default().code_block(
-            StyleRefinement::default()
-                .text_size(rems(0.8125))
-                .line_height(relative(super::LEAD))
-                .border_0()
-                // No fill, like the audio, video and changed-files cards: the frame alone.
-                .bg(gpui_kit::transparent_black()),
-        ),
-    );
+    let body = body
+        // Any action, even an empty one, keeps the language out of the code's own corner.
+        .code_block_actions(|_, _, _| div())
+        .style(
+            gpui_kit::component::text::TextViewStyle::default().code_block(
+                StyleRefinement::default()
+                    .text_size(rems(0.8125))
+                    .line_height(relative(super::LEAD))
+                    .border_0()
+                    // No fill, like the audio, video and changed-files cards: the frame alone.
+                    .bg(gpui_kit::transparent_black()),
+            ),
+        );
     let copy = code.trim_end_matches('\n').to_string();
     v_flex()
         .w_full()
@@ -222,23 +293,22 @@ impl BenchApp {
     ) -> Vec<AnyElement> {
         // Blank lines around a segment (models often start with "\n\n") would show as empty
         // paragraphs: an answer is as tall as its text.
-        media::segments(text.trim())
+        answer_segments(text)
             .into_iter()
-            .filter_map(|s| match s {
-                Segment::Text(t) => {
-                    let t = t.trim().to_string();
-                    (!t.is_empty()).then_some(Segment::Text(t))
-                }
-                other => Some(other),
-            })
             .enumerate()
             .map(|(k, s)| match s {
-                Segment::Text(text) => {
-                    markdown(format!("answer-{key}-{k}"), text).into_any_element()
-                }
+                Segment::Text(text) => self
+                    .kept_markdown(&format!("answer-{key}-{k}"), &text, cx)
+                    .into_any_element(),
                 Segment::Media(path) => self.render_media(key, k, path, cx),
                 Segment::Mermaid(code) => self.render_diagram(key, k, code, cx),
-                Segment::Code { lang, code } => render_code(key, k, lang, code, cx),
+                Segment::Code { lang, code } => {
+                    let fence = if code.contains("```") { "~~~~" } else { "```" };
+                    let md = format!("{fence}{lang}\n{code}{fence}");
+                    let body =
+                        TextView::new(&self.texts.state(&format!("code-{key}-{k}"), &md, cx));
+                    render_code(body, key, k, lang, code, cx)
+                }
             })
             .collect()
     }
