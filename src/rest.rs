@@ -651,23 +651,6 @@ pub fn env_vars(conn: &Connection, profile: &str) -> Result<Value> {
     get(conn, "/api/env", profile)
 }
 
-pub fn set_env(conn: &Connection, profile: &str, key: &str, value: &str) -> Result<()> {
-    send(
-        conn,
-        "PUT",
-        "/api/env",
-        profile,
-        json!({"key": key, "value": value}),
-        30,
-    )?;
-    Ok(())
-}
-
-pub fn remove_env(conn: &Connection, profile: &str, key: &str) -> Result<()> {
-    send(conn, "DELETE", "/api/env", profile, json!({"key": key}), 30)?;
-    Ok(())
-}
-
 /// Merge keys into the profile's config (the agent deep-merges what is sent over it).
 pub fn merge_config(conn: &Connection, profile: &str, config: Value) -> Result<()> {
     send(

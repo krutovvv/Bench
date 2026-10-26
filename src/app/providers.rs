@@ -1,6 +1,6 @@
 //! Settings → Providers and Messages, for the current machine and profile, through the agent's
-//! API: custom (OpenAI-compatible) endpoints, OpenRouter with the models picked for the model
-//! list, the fallback model, voice (speech to text, text to speech) and Telegram. A key is set
+//! API: providers (OpenAI-compatible endpoints, OpenRouter among them), the fallback model,
+//! voice (speech to text, text to speech) and Telegram. A key is set
 //! on the card that uses it, never in a list of names.
 
 use std::collections::HashMap;
@@ -11,18 +11,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::BenchApp;
-use crate::connection;
-use crate::rest::{self, ModelChoice};
-
-/// One `.env` value with its field: what it is and the value as the agent shows it (redacted:
-/// it says the key is set). Saving an unchanged field does nothing; an emptied one removes the key.
-/// Only the cards that own a key use it (an endpoint's, OpenRouter's): the settings page has no
-/// list of keys, since a key with no MCP server or card reading it is dead weight.
-pub struct KeyField {
-    pub key: String,
-    pub value: String,
-    pub input: Entity<InputState>,
-}
+use crate::rest::{self};
 
 /// A custom endpoint's form.
 pub struct EndpointForm {
@@ -55,27 +44,12 @@ pub struct Voice {
     pub tts_voice: Entity<InputState>,
 }
 
-/// What Bench itself remembers per machine and profile: the OpenRouter models picked for the
-/// model list.
-#[derive(Default, serde::Serialize, serde::Deserialize)]
-pub struct PickerPrefs {
-    #[serde(default)]
-    pub openrouter: Vec<String>,
-}
-
 #[derive(Default)]
 pub struct Providers {
     pub loaded: bool,
     pub endpoints: Vec<EndpointForm>,
-    pub openrouter_key: Option<KeyField>,
     pub voice: Option<Voice>,
     pub fallback: Option<(String, String)>,
-    pub prefs: PickerPrefs,
-    pub or_search: Option<Entity<InputState>>,
-    pub or_query: String,
-    /// OpenRouter's whole model list (ids), fetched once when needed.
-    pub or_catalog: Vec<String>,
-    pub or_loading: bool,
     /// A provider armed for deletion (its id; the second click deletes it).
     pub armed: Option<String>,
     _subscriptions: Vec<Subscription>,
@@ -101,55 +75,9 @@ fn text(input: &Entity<InputState>, cx: &App) -> String {
 }
 
 impl BenchApp {
-    fn picker_prefs_path(&self) -> std::path::PathBuf {
-        let key: String = format!("{}-{}", self.target.label(), self.current_profile())
-            .chars()
-            .map(|c| {
-                if c.is_alphanumeric() || c == '-' {
-                    c
-                } else {
-                    '_'
-                }
-            })
-            .collect();
-        connection::state_dir().join(format!("models-{key}.json"))
-    }
-
-    fn save_picker_prefs(&self) {
-        let _ = std::fs::create_dir_all(connection::state_dir());
-        if let Ok(text) = serde_json::to_string_pretty(&self.pv.prefs) {
-            let _ = std::fs::write(self.picker_prefs_path(), text);
-        }
-    }
-
-    /// After the profile's own models: the OpenRouter models picked here, then
-    /// each provider's models kept together (the main model's group first).
+    /// The model picker's list: each provider's models kept together (the main model's group
+    /// first).
     pub(crate) fn add_picker_models(&mut self) {
-        self.pv.prefs = std::fs::read_to_string(self.picker_prefs_path())
-            .ok()
-            .and_then(|t| serde_json::from_str(&t).ok())
-            .unwrap_or_default();
-        let extra: Vec<ModelChoice> = self
-            .pv
-            .prefs
-            .openrouter
-            .iter()
-            .map(|m| ModelChoice {
-                model: m.clone(),
-                provider: "openrouter".into(),
-                group: "OpenRouter".into(),
-                tag: "",
-            })
-            .collect();
-        for c in extra {
-            if !self
-                .profile_models
-                .iter()
-                .any(|x| x.model == c.model && x.provider == c.provider)
-            {
-                self.profile_models.push(c);
-            }
-        }
         let mut order: Vec<String> = vec![];
         for c in &self.profile_models {
             if !order.contains(&c.group) {
@@ -165,22 +93,6 @@ impl BenchApp {
 
     /// Fill both tabs from the agent.
     pub(crate) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.pv.or_search.is_none() {
-            let search =
-                cx.new(|cx| InputState::new(window, cx).placeholder("Search OpenRouter models"));
-            let sub = cx.subscribe_in(
-                &search,
-                window,
-                |this, s, ev: &gpui_kit::component::input::InputEvent, _, cx| {
-                    if let gpui_kit::component::input::InputEvent::Change = ev {
-                        this.pv.or_query = s.read(cx).value().trim().to_lowercase();
-                        cx.notify();
-                    }
-                },
-            );
-            self.pv.or_search = Some(search);
-            self.pv._subscriptions.push(sub);
-        }
         self.rest(
             window,
             cx,
@@ -201,8 +113,6 @@ impl BenchApp {
                 ),
             },
         );
-        // Ahead of the search field's first use, so nothing appears and vanishes under it.
-        self.load_openrouter_catalog(window, cx);
     }
 
     fn fill_providers(
@@ -271,19 +181,6 @@ impl BenchApp {
                 }
             })
             .collect();
-
-        let key_field = |key: &str, window: &mut Window, cx: &mut Context<Self>| {
-            let value = shown.get(key).cloned().unwrap_or_default();
-            KeyField {
-                key: key.to_string(),
-                input: field(window, cx, &value, "Not set"),
-                value,
-            }
-        };
-        // Keys are set where they are used: in a card (an endpoint's, OpenRouter's), or in an
-        // MCP server's own config. The old list of every `.env` key is gone; the agent still
-        // fills `${NAME}` from them, and they stay in its store.
-        self.pv.openrouter_key = Some(key_field("OPENROUTER_API_KEY", window, cx));
 
         let f = &yaml["fallback_providers"][0];
         self.pv.fallback = f["model"].as_str().map(|m| {
@@ -468,36 +365,6 @@ impl BenchApp {
         );
     }
 
-    /// Save a key as its field shows it (OpenRouter's, the one key the agent keeps in its env
-    /// rather than on a card): a changed value is written, an emptied field removes the key,
-    /// an unchanged one does nothing.
-    pub fn save_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        let field = self.pv.openrouter_key.iter().find(|f| f.key == key);
-        let Some(f) = field else { return };
-        let value = text(&f.input, cx);
-        if value == f.value {
-            return;
-        }
-        self.rest(
-            window,
-            cx,
-            move |conn, profile| {
-                if value.is_empty() {
-                    rest::remove_env(conn, profile, &key)
-                } else {
-                    rest::set_env(conn, profile, &key, &value)
-                }
-            },
-            |this, r, window, cx| match r {
-                Ok(()) => {
-                    this.toast(NotificationType::Success, "Saved", window, cx);
-                    this.load_providers(window, cx);
-                }
-                Err(e) => this.toast(NotificationType::Error, format!("Key: {e:#}"), window, cx),
-            },
-        );
-    }
-
     /// Delete a provider: a form not saved yet just goes; a saved one goes on the second click.
     pub fn delete_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         let id = self.pv.endpoints[i].id.clone();
@@ -524,60 +391,6 @@ impl BenchApp {
                     window,
                     cx,
                 ),
-            },
-        );
-    }
-
-    pub fn toggle_openrouter_model(&mut self, model: String, cx: &mut Context<Self>) {
-        let list = &mut self.pv.prefs.openrouter;
-        if let Some(i) = list.iter().position(|m| *m == model) {
-            list.remove(i);
-        } else {
-            list.push(model);
-        }
-        self.save_picker_prefs();
-        self.profile_models
-            .retain(|c| c.provider != "openrouter" || c.tag != "");
-        self.add_picker_models();
-        cx.notify();
-    }
-
-    /// OpenRouter's model list (public, no key needed), once.
-    pub fn load_openrouter_catalog(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.pv.or_loading || !self.pv.or_catalog.is_empty() {
-            return;
-        }
-        self.pv.or_loading = true;
-        self.background(
-            window,
-            cx,
-            || {
-                let v: Value = ureq::get("https://openrouter.ai/api/v1/models")
-                    .timeout(std::time::Duration::from_secs(20))
-                    .call()?
-                    .into_json()?;
-                Ok(v["data"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|m| m["id"].as_str().map(str::to_string))
-                    .collect::<Vec<_>>())
-            },
-            |this, r: anyhow::Result<Vec<String>>, window, cx| {
-                this.pv.or_loading = false;
-                match r {
-                    Ok(mut ids) => {
-                        ids.sort();
-                        this.pv.or_catalog = ids;
-                    }
-                    Err(e) => this.toast(
-                        NotificationType::Error,
-                        format!("OpenRouter: {e:#}"),
-                        window,
-                        cx,
-                    ),
-                }
-                cx.notify();
             },
         );
     }
