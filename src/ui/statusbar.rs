@@ -36,6 +36,8 @@ impl BenchApp {
             item(id)
                 .cursor_pointer()
                 .when(active, |d| d.text_color(theme.primary))
+                .text_color(muted)
+                .text_xs()
                 .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
                 .child(icon.icon().small())
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
@@ -43,6 +45,8 @@ impl BenchApp {
 
         // A label as wide as its text that opens a menu of choices.
         // `note`: a line above the choices saying what they apply to.
+        // A Button's `.label()` takes its font from the control's size, so bar labels are passed
+        // as children with the bar's extra-small font.
         let picker = |id: &'static str,
                       icon: Ico,
                       label: String,
@@ -61,7 +65,11 @@ impl BenchApp {
             // With a label: the icon sits inside the button, so hover lights up both.
             let icon_only = label.is_empty();
             let button = Button::new(id).ghost().small().icon(icon.icon());
-            let button = if icon_only { button } else { button.label(label) };
+            let button = if icon_only {
+                button.text_xs()
+            } else {
+                button.child(div().text_xs().child(label))
+            };
             let wrap = if icon_only {
                 h_flex().h_full().items_center().px_1()
             } else {
@@ -137,7 +145,7 @@ impl BenchApp {
                         .ghost()
                         .small()
                         .icon(Ico::MemoryStick.icon())
-                        .label(label)
+                        .child(div().text_xs().child(label))
                         .text_color(color),
                 )
                 .content(move |_, _, cx| {
@@ -192,7 +200,7 @@ impl BenchApp {
                         .ghost()
                         .small()
                         .icon(Ico::Gauge.icon())
-                        .label(label)
+                        .child(div().text_xs().child(label))
                         .text_color(muted),
                 )
                 .content(move |_, _, cx| speed_panel(&samples, prefill, generation, cx))
@@ -242,7 +250,8 @@ impl BenchApp {
             .bg(theme.status_bar)
             .border_t_1()
             .border_color(theme.border)
-            .text_sm()
+            // The bar's font: a row's extra-small, like the header and the pane strips.
+            .text_xs()
             // Nothing about where the agent runs or which one: a thread runs with its project.
             // Far left: the gateway of the machine this project lives on — always there, healthy
             // or not; its state in detail, its log, Reconnect and Restart are inside. Then the
@@ -260,6 +269,7 @@ impl BenchApp {
                 h_flex().h_full().items_center().pl_1().child(
                     item("fallback")
                         .text_color(theme.danger)
+                        .text_xs()
                         .child(Ico::CircleAlert.icon().small())
                         .child(format!("Main model down · on fallback {model}"))
                         .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx)),
@@ -359,7 +369,7 @@ impl BenchApp {
                             .rounded_md()
                             .bg(theme.danger)
                             .text_color(theme.danger_foreground)
-                            .text_sm()
+                            .text_xs()
                             .hover(|s| s.opacity(0.85))
                             .child(Ico::Square.icon().xsmall())
                             .child("Stop")
@@ -601,7 +611,7 @@ impl BenchApp {
                                     .ghost()
                                     .small()
                                     .icon(Ico::Activity.icon())
-                                    .label(label)
+                                    .child(div().text_xs().child(label))
                                     .text_color(color)
                                     .on_click(move |_, _, cx| {
                                         v.update(cx, |this, cx| this.notif(false, cx))
