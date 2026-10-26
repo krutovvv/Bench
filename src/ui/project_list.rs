@@ -459,9 +459,10 @@ impl BenchApp {
             blocks.push(("Model", section("Model", None, rows, cx)));
         }
 
-        // MCP servers: each row carries a sign of what the agent knows of it, and a Check that
-        // asks the server directly. A server says nothing until something asks it for its tools,
-        // so "not tried yet" is its own state and says so out loud — it is not a working server.
+        // MCP servers: each row carries a sign of what the agent knows of it. A server says
+        // nothing until something asks it for its tools, so "not tried yet" is its own state and
+        // says so out loud — it is not a working server. Asking is one action for the project, in
+        // the head, because a check reconnects the project's servers together, not one at a time.
         let checking = e.mcp_checking;
         let mut rows = vec![];
         if e.mcp.is_empty() {
@@ -487,31 +488,16 @@ impl BenchApp {
                     .into_any_element()
             };
             let mut actions: Vec<AnyElement> = Vec::new();
-            if m.enabled {
-                if m.needs_auth {
-                    let who = name.clone();
-                    actions.push(
-                        act(format!("env-mcp-auth-{name}").into(), "Authorize")
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                cx.stop_propagation();
-                                this.env_authorize(who.clone(), window, cx)
-                            }))
-                            .into_any_element(),
-                    );
-                }
+            if m.needs_auth {
+                let who = name.clone();
                 actions.push(
-                    act(
-                        format!("env-mcp-check-{name}").into(),
-                        if m.checked { "Recheck" } else { "Check" },
-                    )
-                    .when(checking, |d| d.opacity(0.5))
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        cx.stop_propagation();
-                        this.env_check_mcp(window, cx)
-                    }))
-                    .into_any_element(),
+                    act(format!("env-mcp-auth-{name}").into(), "Authorize")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            cx.stop_propagation();
+                            this.env_authorize(who.clone(), window, cx)
+                        }))
+                        .into_any_element(),
                 );
             }
             rows.push(row_with(
@@ -556,6 +542,16 @@ impl BenchApp {
                     .into_any_element(),
             );
         }
+        head.push(
+            act("env-mcp-check".into(), "Check")
+                .when(checking, |d| d.opacity(0.5))
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.click_claimed = true;
+                    cx.stop_propagation();
+                    this.env_check_mcp(window, cx)
+                }))
+                .into_any_element(),
+        );
         head.push(add("env-mcp-add", "mcp", "", cx).into_any_element());
         let extra = h_flex()
             .gap_3()

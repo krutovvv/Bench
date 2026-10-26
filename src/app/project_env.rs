@@ -1346,6 +1346,11 @@ impl BenchApp {
     /// the difference between "unknown" and "working"; the agent answers when the slowest has had
     /// its say, so this is the one environment job allowed to take a minute.
     pub fn env_check_mcp(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // One check at a time: a second reconnect while the first is in flight would answer out
+        // of order and show a stale set.
+        if self.project_env.as_ref().is_some_and(|e| e.mcp_checking) {
+            return;
+        }
         let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
             return;
         };
