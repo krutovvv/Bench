@@ -28,7 +28,9 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change how the agent runs a thread | `agent/src/runtime.ts`; what Bench reads of it: `agent/src/thread.ts` |
 | change how work is done on a server (a project's machine over SSH) | `agent/src/ssh-env.ts` (Pi's `ExecutionEnv`; its tests are Pi's conformance suite, `test/ssh-env.test.ts`) |
 | change the agents Bench talks to (this Mac's, servers') | `src/app/agents.rs`; the gear's list in `src/ui/providers.rs` |
-| change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts` |
+| change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts`; grep, glob, ls: `agent/src/builtin/search.ts` |
+| change a project's language servers (diagnostics after every edit) | `agent/src/lsp.ts`, the presets in `agent/src/lsp-presets.ts`; the section `src/env/lsp.rs` |
+| change when a project's conversations are compacted | `compactionPolicy` in `agent/src/config.ts`; the row in `src/env/run.rs` |
 | change the demo (screenshots) | `src/demo.rs` |
 
 ## The tree

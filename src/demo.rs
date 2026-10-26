@@ -365,6 +365,18 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
             {"name": "search-console", "kind": "stdio", "enabled": false, "connected": false, "tools": 0}
         ],
         "mcp_json": "{\n  \"mcpServers\": {\n    \"ghost\": { \"url\": \"https://blog.example.com/ghost/mcp\", \"headers\": { \"Authorization\": \"${GHOST_ADMIN_KEY}\" } },\n    \"unsplash\": { \"command\": \"npx\", \"args\": [\"unsplash-mcp\"] },\n    \"search-console\": { \"command\": \"uvx\", \"args\": [\"gsc-mcp\"], \"enabled\": false }\n  }\n}\n",
+        "lsp": {
+            "servers": {
+                "typescript": {"command": "${LSP}/node_modules/.bin/typescript-language-server", "args": ["--stdio"], "extensions": ["ts", "tsx", "js", "jsx"]},
+                "php": {"command": "${LSP}/node_modules/.bin/intelephense", "args": ["--stdio"], "extensions": ["php"]}
+            },
+            "states": {"typescript": "running"},
+            "presets": [
+                {"key": "typescript", "title": "TypeScript, JavaScript", "extensions": ["ts", "tsx", "js", "jsx"]},
+                {"key": "php", "title": "PHP and WordPress (ACF, Polylang, WooCommerce stubs)", "extensions": ["php"]},
+                {"key": "css", "title": "CSS, SCSS, Less", "extensions": ["css", "scss", "less"]}
+            ]
+        },
         "compaction": 0.9,
         "window": 131072,
         "skills": [

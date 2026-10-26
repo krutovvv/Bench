@@ -125,8 +125,6 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 - **Disk space is tight.** Clean `target/` (`cargo clean --profile dev`) before it fills.
 - **Checks.** `cargo build` with zero warnings, `cargo test --workspace`, and
   `cd agent && node --test test/*.test.ts` for agent changes.
-- **One task, one thread.** A long thread is compacted and the agent loses what it read; start a
-  new thread for a new task.
 
 ## The look, in short
 

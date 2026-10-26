@@ -10,6 +10,8 @@ import { projects } from "../builtin/projects.ts";
 import { listSkills as skillsOf } from "../builtin/skills.ts";
 import { HttpError, type Ctx, type Module } from "../http.ts";
 import { authorizeServer, connectMcp, mcpStatus } from "../mcp.ts";
+import { lspStates, readLsp, writeLsp } from "../lsp.ts";
+import { LSP_PRESETS } from "../lsp-presets.ts";
 import { syncTelegram } from "../telegram.ts";
 import { cronView } from "./cron.ts";
 
@@ -78,6 +80,12 @@ export default ({ rt }: Ctx): Module => ({
 				return {
 					// When its conversations are summarized (the Model section), and the window it is
 					// a share of.
+					// Its language servers (lsp.json), how each is doing, and the presets to add.
+					lsp: {
+						servers: readLsp(agent),
+						states: lspStates(agent),
+						presets: Object.entries(LSP_PRESETS).map(([key, p]) => ({ key, title: p.title, extensions: p.spec.extensions })),
+					},
 					compaction: compactionAt(agent) ?? null,
 					window: resolveModel().contextLength,
 					project: p,
@@ -115,6 +123,29 @@ export default ({ rt }: Ctx): Module => ({
 				if (p.id === "general") setSetting("telegram", token ? { ...(getSetting("telegram") ?? {}), token, allowed_users: allowed } : undefined);
 				else projects.save({ ...(projects.get(p.id) as any), telegram: token ? { token, allowed_users: allowed } : null });
 				await syncTelegram(rt);
+				return { ok: true };
+			},
+		],
+		// Language servers: the whole lsp.json (text, as edited), or a preset added by name.
+		[
+			"PUT",
+			/^\/api\/projects\/([^/]+)\/lsp$/,
+			(req, m) => {
+				const agent = envOf(id1(m)).agent;
+				if (req.body?.preset) {
+					const p = LSP_PRESETS[String(req.body.preset)];
+					if (!p) throw new HttpError(404, `no preset ${req.body.preset}`);
+					writeLsp(agent, { ...readLsp(agent), [String(req.body.preset)]: p.spec });
+					return { ok: true };
+				}
+				let parsed: any;
+				try {
+					parsed = JSON.parse(String(req.body?.text ?? ""));
+				} catch (e) {
+					throw new HttpError(400, `not JSON: ${(e as Error).message}`);
+				}
+				if (typeof parsed?.servers !== "object") throw new HttpError(400, "it needs a servers object");
+				writeLsp(agent, parsed.servers);
 				return { ok: true };
 			},
 		],

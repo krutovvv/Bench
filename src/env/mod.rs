@@ -14,6 +14,7 @@
 //! `SECTIONS` where its rows go, and its part of the agent's `/api/projects/<id>/env`.
 
 pub mod accesses;
+pub mod lsp;
 pub mod mcp;
 pub mod name;
 pub mod project_form;
@@ -43,6 +44,7 @@ pub struct ProjectEnv {
     pub dir: String,
     pub name: name::NameEnv,
     pub soul: soul::SoulEnv,
+    pub lsp: lsp::LspEnv,
     pub telegram: telegram::TelegramEnv,
     pub run: run::RunEnv,
     pub mcp: mcp::McpEnv,
@@ -70,6 +72,7 @@ pub static SECTIONS: &[&dyn Section] = &[
     &telegram::Telegram,
     &run::Run,
     &mcp::Mcp,
+    &lsp::Lsp,
     &skills::Skills,
     &prompts::Prompts,
     &schedule::Schedule,
@@ -157,6 +160,7 @@ impl BenchApp {
             dir: String::new(),
             name: name::NameEnv::new(window, cx),
             soul: soul::SoulEnv::new(window, cx),
+            lsp: lsp::LspEnv::new(window, cx),
             telegram: telegram::TelegramEnv::new(window, cx),
             run: Default::default(),
             mcp: mcp::McpEnv::new(window, cx),

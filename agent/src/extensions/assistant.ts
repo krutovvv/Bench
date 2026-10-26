@@ -4,7 +4,11 @@
 // few short sections (src/prompt.ts). An agent can select other extensions next to it or instead
 // of it (its settings.json "extensions").
 
-import { defineExtension, hook, section, ToolTask } from "@earendil-works/pi-durable";
+import fs from "node:fs";
+import path from "node:path";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { Type } from "@earendil-works/pi-ai";
+import { defineExtension, defineTool, hook, section, ToolTask } from "@earendil-works/pi-durable";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
 import { clarify, sessionSearch, todo } from "../builtin/ask.ts";
@@ -38,12 +42,50 @@ const DANGEROUS: [RegExp, string][] = [
 ];
 
 import { globTool, grepTool, lsTool } from "../builtin/search.ts";
+import { projects } from "../builtin/projects.ts";
+import { diagnosticsFor, knownDiagnostics } from "../lsp.ts";
+import { machineEnv } from "../ssh-env.ts";
+
+/** A file a tool named, where it is and what it holds now (on the project's machine, if any). */
+async function placeOf(info: { cwd: string; project?: string }, p: string): Promise<{ file: string; machine?: string; text: string } | undefined> {
+	if (!p) return undefined;
+	const machine = info.project ? (projects.get(info.project)?.machine ?? undefined) : undefined;
+	if (machine) {
+		const env = await machineEnv(machine, info.cwd);
+		const file = path.posix.resolve(env.cwd, p);
+		const r = await env.readTextFile(file, BACKGROUND_CONTEXT);
+		return r.ok ? { file, machine, text: r.value } : undefined;
+	}
+	const file = path.resolve(info.cwd, p);
+	try {
+		return { file, text: fs.readFileSync(file, "utf8") };
+	} catch {
+		return undefined;
+	}
+}
+
+/** What the project's language servers say: about one file, or everything they have seen. */
+const diagnosticsTool = defineTool({
+	name: "diagnostics",
+	description:
+		"Errors and warnings from the project's language servers (its lsp.json): for one file, checked now, or for every file they have seen. After edit and write they come with the result by themselves.",
+	parameters: Type.Object({ path: Type.Optional(Type.String({ description: "A file; empty: every file seen" })) }),
+	async execute(args: any, api: any) {
+		const info = host().session(api.conversationId);
+		if (!info) throw new Error("no session");
+		if (!args.path) return { output: [{ type: "text" as const, text: knownDiagnostics(info.profile) }] };
+		const at = await placeOf(info, String(args.path));
+		if (!at) throw new Error(`cannot read ${args.path}`);
+		const d = await diagnosticsFor(info.profile, info.cwd, at.machine, at.file, at.text);
+		return { output: [{ type: "text" as const, text: d ?? "No language server of this project knows this kind of file (its lsp.json)." }] };
+	},
+});
 
 const Coding = createCodingTools();
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, remoteFiles, hostsTool],
+	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, remoteFiles, hostsTool],
 	tasks: [CronTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),
@@ -74,6 +116,17 @@ export const assistant = defineExtension({
 				if (!hit) return undefined;
 				const choice = await host().approve(info.id, command, hit[1]);
 				return choice === "deny" ? { block: `The person declined this command (${hit[1]}). Do not retry it; ask or choose another way.` } : undefined;
+			},
+			// The file's errors from the project's language servers, with the edit that made them
+			// (`lsp.ts`): the model sees them as an editor shows them, without asking.
+			afterTool: async (call: any, result: any, api: any) => {
+				if ((call.name !== "edit" && call.name !== "write") || result?.isError) return undefined;
+				const info = host().session(api.conversationId);
+				if (!info) return undefined;
+				const at = await placeOf(info, String(call.arguments?.path ?? ""));
+				if (!at) return undefined;
+				const diag = await diagnosticsFor(info.profile, info.cwd, at.machine, at.file, at.text).catch(() => undefined);
+				return diag ? { ...result, output: [...(result.output ?? []), { type: "text", text: diag }] } : undefined;
 			},
 		} as any),
 	],
