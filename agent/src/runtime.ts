@@ -156,7 +156,9 @@ export class Runtime {
 			settings: {
 				retry: { maxRetries: Number(readConfig("default")?.agent?.api_max_retries ?? 3) },
 				toolExecution: "parallel",
-				afterFailedRun: "continue",
+				// No `afterFailedRun`: after a run the model failed, the queue behind it waits for the
+				// person's next message. "continue" fed every waiting message to a model that could not
+				// be reached, and a whole queue was spent on "Connection error." in a minute.
 			},
 			onReport: (error: unknown, info: any) => console.error("[pi]", info?.type, String((error as Error)?.message ?? error).slice(0, 300)),
 		} as any, ctx);
