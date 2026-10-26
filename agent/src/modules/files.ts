@@ -59,7 +59,13 @@ export default (): Module => ({
 			fs.mkdirSync(expand(req.body.path), { recursive: true });
 			return { ok: true };
 		},
-		"POST /api/files/upload": (req) => {
+		"POST /api/files/upload": async (req) => {
+			// On a project's machine (this agent working on a server): through its environment.
+			const m = await onMachine(req.body?.machine, String(req.body?.path ?? ""));
+			if (m) {
+				await fsCall(async () => getOrThrow(await m.env.writeFile(m.path, dataUrl(req.body.data_url), ctx)));
+				return { ok: true, path: m.path };
+			}
 			const p = expand(req.body.path);
 			if (fs.existsSync(p) && req.body.overwrite === false) throw new HttpError(409, "exists");
 			fs.mkdirSync(path.dirname(p), { recursive: true });

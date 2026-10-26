@@ -88,7 +88,12 @@ impl BenchApp {
     /// with session.info); a chat not created yet takes it with its first message.
     /// The reasoning levels offered anew (the presets'): the composer's choice follows, the
     /// level kept where it is still offered.
-    pub fn set_efforts(&mut self, levels: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn set_efforts(
+        &mut self,
+        levels: Vec<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let current = self.efforts.get(self.effort).cloned();
         let profile = self.efforts.get(self.profile_effort).cloned();
         self.efforts = levels;
@@ -96,7 +101,11 @@ impl BenchApp {
         let at = |v: Option<String>| v.and_then(|v| self.efforts.iter().position(|e| *e == v));
         self.effort = at(current).unwrap_or(last);
         self.profile_effort = at(profile).unwrap_or(last);
-        let labels: Vec<SharedString> = self.efforts.iter().map(|e| SharedString::from(e.clone())).collect();
+        let labels: Vec<SharedString> = self
+            .efforts
+            .iter()
+            .map(|e| SharedString::from(e.clone()))
+            .collect();
         let selected = self.effort;
         self.effort_choice.update(cx, |s, cx| {
             s.set_items(labels, window, cx);
@@ -186,13 +195,14 @@ impl BenchApp {
                 return;
             };
             let target = self.thread_target();
+            let machine = self.files_machine();
             let profile2 = profile.clone();
             let keep = files.clone();
             cx.spawn_in(window, async move |this, cx| {
                 let prepared = cx
-                    .background_spawn(
-                        async move { attach::prepare(&conn, &target, &profile2, &files) },
-                    )
+                    .background_spawn(async move {
+                        attach::prepare(&conn, &target, machine.as_deref(), &profile2, &files)
+                    })
                     .await;
                 let _ = this.update_in(cx, |this, window, cx| match prepared {
                     Ok(prep) => {
@@ -254,11 +264,14 @@ impl BenchApp {
             return;
         };
         let target = self.thread_target();
+        let machine = self.files_machine();
         let keep = files.clone();
         cx.spawn_in(window, async move |this, cx| {
             let p = profile.clone();
             let prepared = cx
-                .background_spawn(async move { attach::prepare(&conn, &target, &p, &files) })
+                .background_spawn(async move {
+                    attach::prepare(&conn, &target, machine.as_deref(), &p, &files)
+                })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match prepared {
                 Ok(prep) => {

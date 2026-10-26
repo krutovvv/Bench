@@ -2,9 +2,9 @@
 
 use std::time::Duration;
 
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{anyhow, Context as _, Result};
 use base64::Engine as _;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::connection::Connection;
 use crate::model::SkillRow;
@@ -600,6 +600,28 @@ fn data_url(mime: &str, bytes: &[u8]) -> String {
 
 /// Write a file on the gateway's machine (inside the profile's managed files).
 pub fn upload_file(conn: &Connection, profile: &str, path: &str, bytes: &[u8]) -> Result<()> {
+    upload_file_to(conn, profile, None, path, bytes)
+}
+
+/// Write a file on `machine` (None: the agent's own) through the agent.
+pub fn upload_file_to(
+    conn: &Connection,
+    profile: &str,
+    machine: Option<&str>,
+    path: &str,
+    bytes: &[u8],
+) -> Result<()> {
+    if machine.is_some() {
+        send(
+            conn,
+            "POST",
+            "/api/files/upload",
+            profile,
+            json!({"path": path, "data_url": data_url("application/octet-stream", bytes), "overwrite": true, "machine": machine}),
+            600,
+        )?;
+        return Ok(());
+    }
     let dir = path.rsplit_once('/').map(|(d, _)| d).unwrap_or(path);
     let _ = send(
         conn,

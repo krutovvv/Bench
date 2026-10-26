@@ -89,6 +89,10 @@ test("/api/fs with a machine: read, write, list, rename and remove there", async
 		assert.ok(fs.existsSync(`${dir}/a/two.txt`));
 		await r["POST /api/fs/delete"]!(b({ machine, path: `${dir}/a` }));
 		assert.ok(!fs.existsSync(`${dir}/a`));
+		// An attachment: the bytes land on the machine, in a folder made for them.
+		const bytes = Buffer.from([0, 1, 2, 255]);
+		await r["POST /api/files/upload"]!(b({ machine, path: `${dir}/att/1-x.bin`, data_url: `data:application/octet-stream;base64,${bytes.toString("base64")}` }));
+		assert.deepStrictEqual(fs.readFileSync(`${dir}/att/1-x.bin`), bytes);
 		await assert.rejects(r["GET /api/fs/read-text"]!(q({ machine, path: `${dir}/missing` })) as Promise<unknown>, /No such|not/i);
 	} finally {
 		fs.rmSync(dir, { recursive: true, force: true });

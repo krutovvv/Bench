@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
 
-use crate::connection::{Connection, state_dir};
+use crate::connection::{state_dir, Connection};
 use crate::model::Target;
 use crate::rest;
 
@@ -63,9 +63,13 @@ fn is_temporary(path: &Path) -> bool {
 }
 
 /// Blocking: call off the UI thread.
+/// `machine`: the project's work is on that machine, not the agent's (this Mac's agent working on
+/// a server): the files go to its temp folder, where the agent's tools look — one-off, gone with
+/// the server's next reboot.
 pub fn prepare(
     conn: &Connection,
     target: &Target,
+    machine: Option<&str>,
     profile: &str,
     files: &[PathBuf],
 ) -> Result<Prepared> {
@@ -80,7 +84,11 @@ pub fn prepare(
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| "file".into());
         let bytes = std::fs::read(file).with_context(|| format!("read {name}"))?;
-        let path = if *target == Target::Local && !is_temporary(file) {
+        let path = if let Some(m) = machine {
+            let dest = format!("/tmp/bench-attachments/{stamp}-{name}");
+            rest::upload_file_to(conn, profile, Some(m), &dest, &bytes)?;
+            dest
+        } else if *target == Target::Local && !is_temporary(file) {
             file.to_string_lossy().to_string()
         } else {
             if home.is_none() {
