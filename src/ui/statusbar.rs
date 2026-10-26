@@ -248,7 +248,7 @@ impl BenchApp {
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             .child(div().flex_1())
             // Right: icons only — the terminals in the background (if any), attach, dictate,
-            // settings.
+            // settings, and Stop at the very edge.
             .when(!background_terms.is_empty(), |d| {
                 d.child(picker(
                     "bg-terminals",
@@ -258,38 +258,6 @@ impl BenchApp {
                     vec![],
                     background_terms,
                 ))
-            })
-            // Stop: while the agent works, the way to halt it belongs with the bar's other
-            // controls — left of the paperclip — not hanging over the text (⌘. does the same).
-            .when(self.live.is_some(), |d| {
-                d.child(
-                    // A filled chip, not another flat icon: this is the one control of the bar
-                    // that undoes work in progress, and it shows only while there is some.
-                    // A touch more room on its right than on its left: a filled chip reads
-                    // crowded beside a flat icon at the plain gap.
-                    h_flex().h_full().items_center().pl_2().pr_1().child(
-                        div()
-                            .id("stop")
-                            .h(px(20.))
-                            .px_2()
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .cursor_pointer()
-                            .rounded_md()
-                            .bg(theme.danger)
-                            .text_color(theme.danger_foreground)
-                            .text_sm()
-                            .hover(|s| s.opacity(0.85))
-                            .child(Ico::Square.icon().xsmall())
-                            .child("Stop")
-                            .tooltip(|window, cx| Tooltip::new("Stop  ⌘.").build(window, cx))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.click_claimed = true;
-                                this.stop(cx);
-                            })),
-                    ),
-                )
             })
             .child(
                 button("attach", Ico::Paperclip, "Attach files", false)
@@ -356,6 +324,34 @@ impl BenchApp {
                     }
                 })),
             )
+            // Stop last, at the window's edge: a filled chip is the heaviest thing on the bar, so
+            // it belongs at the end, not among the flat icons (⌘. does the same).
+            .when(self.live.is_some(), |d| {
+                d.child(
+                    h_flex().h_full().items_center().pl_1().pr_2().child(
+                        div()
+                            .id("stop")
+                            .h(px(20.))
+                            .px_2()
+                            .flex()
+                            .items_center()
+                            .gap_1()
+                            .cursor_pointer()
+                            .rounded_md()
+                            .bg(theme.danger)
+                            .text_color(theme.danger_foreground)
+                            .text_sm()
+                            .hover(|s| s.opacity(0.85))
+                            .child(Ico::Square.icon().xsmall())
+                            .child("Stop")
+                            .tooltip(|window, cx| Tooltip::new("Stop  ⌘.").build(window, cx))
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                this.click_claimed = true;
+                                this.stop(cx);
+                            })),
+                    ),
+                )
+            })
     }
 }
 
