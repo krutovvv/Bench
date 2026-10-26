@@ -57,6 +57,12 @@ pub enum Cmd {
         session: String,
         id: String,
     },
+    /// The words of a message that still waits: it has not gone anywhere, so they may be fixed.
+    QueueEdit {
+        session: String,
+        id: String,
+        text: String,
+    },
     Send {
         profile: String,
         session: String,
@@ -370,6 +376,11 @@ impl Rpc {
             Cmd::QueueSend { session, id } => self.call(
                 "session.queue.send",
                 json!({"session_id": session, "id": id}),
+                Pending::Ignore,
+            )?,
+            Cmd::QueueEdit { session, id, text } => self.call(
+                "session.queue.edit",
+                json!({"session_id": session, "id": id, "text": text}),
                 Pending::Ignore,
             )?,
             Cmd::Insert {

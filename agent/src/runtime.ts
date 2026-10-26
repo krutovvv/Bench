@@ -96,6 +96,21 @@ export function stripBlock(text: string): string {
 	return at >= 0 && text.trimEnd().endsWith(BLOCK_CLOSE) ? text.slice(0, at).trimEnd() : text;
 }
 
+/**
+ * A waiting message's content with its words replaced: the block state Bench sent with it stays
+ * (the model still sees what the insert showed), and so does every attachment — only the person's
+ * words change. Reading and writing use the same two shapes: a string, or a text block then the
+ * attachments.
+ */
+export function withText(content: any, text: string): any {
+	const said = contentText(content);
+	const at = said.lastIndexOf(BLOCK_OPEN);
+	const block = at >= 0 && said.trimEnd().endsWith(BLOCK_CLOSE) ? `\n\n${said.slice(at)}` : "";
+	const body = `${text}${block}`;
+	const files = Array.isArray(content) ? content.filter((b: any) => b?.type !== "text") : [];
+	return files.length ? [{ type: "text", text: body }, ...files] : body;
+}
+
 export class Runtime {
 	store = new Store();
 	harness!: Harness;
@@ -425,6 +440,35 @@ export class Runtime {
 			const at = inbox.items.findIndex((i: any) => String(i.id) === submission);
 			if (at >= 0) inbox.items.splice(at, 1);
 		}, ctx);
+	}
+
+	/**
+	 * Change the words of a message that still waits in the queue. It has not gone anywhere, so a
+	 * wrong word is fixable; one already placed in the run is not — Pi settles that submission — and
+	 * comes back as `not_queued`. The same inbox document we already patch to take a message out.
+	 */
+	async edit(id: string, submission: string, text: string): Promise<"edited" | "not_queued"> {
+		const live = await this.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		let done = false;
+		await live.conversation.commit(async (tx) => {
+			const inbox = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
+			const at = inbox.items.findIndex((i: any) => String(i.id) === submission);
+			if (at < 0 || inbox.items[at].mode === "write") return;
+			inbox.items[at] = { ...inbox.items[at], content: withText(inbox.items[at].content, text) };
+			done = true;
+		}, ctx);
+		if (done) {
+			// History keeps the words the person meant, not the ones they fixed: the message was
+			// stored when it was sent, before it ever waited.
+			const watched = live.pending.get(submission);
+			if (watched) {
+				this.store.editUserMessage(live.row.id, watched.text, text);
+				watched.text = text;
+			}
+		}
+		this.queueChanged(live);
+		return done ? "edited" : "not_queued";
 	}
 
 	/** Send a waiting message now: out of the queue, into the running work (or a new run). */

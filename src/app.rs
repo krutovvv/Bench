@@ -101,6 +101,8 @@ pub struct BenchApp {
     pub insert_live: HashMap<String, String>,
     /// The open thread's messages waiting for the agent: (id, mode, text).
     pub queue: Vec<(String, String, String)>,
+    /// The waiting message whose words the person is fixing, and the field they fix them in.
+    pub queue_edit: Option<(String, Entity<TextareaState>)>,
     /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
     /// new one (the row's "+"), `Some(Some(id))` = that thread (a row under the subject).
     pub subject_target: Option<Option<String>>,
@@ -630,6 +632,7 @@ impl BenchApp {
             creating: false,
             insert_draft: Vec::new(),
             queue: Vec::new(),
+            queue_edit: None,
             insert_live: HashMap::new(),
             form_after: None,
             subject_target: None,
@@ -844,6 +847,51 @@ impl BenchApp {
         self.profile.clone().unwrap_or_default()
     }
 
+    /// Fix the words of a waiting message. It has not gone anywhere, so a wrong word is cheap to
+    /// change; one the agent has already taken up cannot (Pi settles it) — that row is gone by then.
+    pub fn queue_edit_open(
+        &mut self,
+        id: String,
+        text: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let field = cx.new(|cx| {
+            TextareaState::new(window, cx)
+                .auto_grow(1, 100_000)
+                .submit_on_enter(false)
+        });
+        field.update(cx, |s, cx| s.set_value(text, window, cx));
+        cx.subscribe_in(&field, window, |this, _, ev: &InputEvent, window, cx| {
+            // Enter is a new line, as in the composer; ⌘Enter keeps the change.
+            if matches!(ev, InputEvent::PressEnter { secondary: true, .. }) {
+                this.queue_edit_save(window, cx);
+            }
+        })
+        .detach();
+        self.queue_edit = Some((id, field.clone()));
+        field.update(cx, |s, cx| s.focus(window, cx));
+        cx.notify();
+    }
+
+    pub fn queue_edit_save(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        let Some((id, field)) = self.queue_edit.take() else {
+            return;
+        };
+        let text = field.read(cx).value().trim().to_string();
+        if let Some(session) = self.runtime.clone() {
+            if !text.is_empty() {
+                self.cmd(Cmd::QueueEdit { session, id, text });
+            }
+        }
+        cx.notify();
+    }
+
+    pub fn queue_edit_cancel(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        self.queue_edit = None;
+        cx.notify();
+    }
+
     /// Events carry the runtime id.
     fn is_current(&self, sid: &str) -> bool {
         self.runtime.as_deref() == Some(sid)
@@ -1034,6 +1082,14 @@ impl BenchApp {
                 }
             }
             Evt::Queue(sid, items) if self.is_current(&sid) => {
+                // A message that left the queue (sent, taken back) has nothing left to fix.
+                if self
+                    .queue_edit
+                    .as_ref()
+                    .is_some_and(|(id, _)| !items.iter().any(|(i, _, _)| i == id))
+                {
+                    self.queue_edit = None;
+                }
                 self.queue = items;
                 cx.notify();
             }
@@ -1379,6 +1435,7 @@ impl BenchApp {
         self.inserts.remove("draft");
         self.creating = false;
         self.queue.clear();
+        self.queue_edit = None;
         // A new chat starts on the profile's level.
         self.effort_other = None;
         self.effort = self.profile_effort;

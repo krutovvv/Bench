@@ -151,6 +151,16 @@ export class Store {
 			this.db.prepare("UPDATE sessions SET message_count = message_count + 1, updated = ? WHERE id = ?").run(Date.now() / 1000, sessionId);
 	}
 
+	/** The words of a message taken back from the queue: history must not keep the old ones. The
+	 * newest user message with those words is the one they edited. */
+	editUserMessage(sessionId: string, from: string, to: string): void {
+		this.db
+			.prepare(
+				"UPDATE messages SET text = ? WHERE rowid = (SELECT rowid FROM messages WHERE session_id = ? AND role = 'user' AND text = ? ORDER BY rowid DESC LIMIT 1)",
+			)
+			.run(to, sessionId, from);
+	}
+
 	messages(sessionId: string): { role: string; text: string; timestamp: number; tool_name?: string; tool_call_id?: string; args?: unknown }[] {
 		return this.db
 			.prepare("SELECT role, text, ts, tool_name, tool_call_id, args FROM messages WHERE session_id = ? ORDER BY rowid")

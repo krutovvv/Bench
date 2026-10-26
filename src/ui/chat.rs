@@ -2,6 +2,7 @@
 //! (each unfoldable), the answer, sources and hover actions; under the last answer, the
 //! files this session changed.
 
+use gpui_kit::component::input::Textarea;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::tooltip::Tooltip;
@@ -607,47 +608,96 @@ impl BenchApp {
             .into_iter()
             .enumerate()
             .map(|(k, (id, mode, text))| {
-                let (send_id, rm_id) = (id.clone(), id.clone());
+                let (send_id, rm_id, edit_id, edit_text) =
+                    (id.clone(), id.clone(), id.clone(), text.clone());
                 let steer = mode == "steer";
                 let (said, paths) = crate::attach::split(&text);
+                // The row's own words are being fixed: its text gives way to a field.
+                let field = self
+                    .queue_edit
+                    .as_ref()
+                    .filter(|(e, _)| e == &id)
+                    .map(|(_, st)| st.clone());
                 let actions = h_flex()
                     .flex_none()
                     .gap_1()
                     .items_center()
                     .text_sm()
                     .text_color(muted)
-                    .child(if steer { "Next" } else { "Queued" })
-                    .when(!steer, |d| {
+                    .child(if field.is_some() {
+                        "Editing"
+                    } else if steer {
+                        "Next"
+                    } else {
+                        "Queued"
+                    })
+                    .when(field.is_some(), |d| {
+                        d.child(
+                            icon_button(("queued-save", k), Ico::Check, "Keep these words (⌘Enter)", cx)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.click_claimed = true;
+                                    this.queue_edit_save(window, cx);
+                                })),
+                        )
+                    })
+                    .when(field.is_none(), |d| {
                         d.child(
                             icon_button(
-                                ("queued-send", k),
-                                Ico::Play,
-                                "Send now: into the running work",
+                                ("queued-edit", k),
+                                Ico::Pencil,
+                                "Fix the words before it goes out",
                                 cx,
                             )
-                            .on_click(cx.listener(
-                                move |this, _, _, cx| {
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                this.queue_edit_open(edit_id.clone(), edit_text.clone(), window, cx);
+                            })),
+                        )
+                        .when(!steer, |d| {
+                            d.child(
+                                icon_button(
+                                    ("queued-send", k),
+                                    Ico::Play,
+                                    "Send now: into the running work",
+                                    cx,
+                                )
+                                .on_click(cx.listener(move |this, _, _, cx| {
                                     this.click_claimed = true;
                                     this.queued(send_id.clone(), true, cx);
-                                },
-                            )),
-                        )
+                                })),
+                            )
+                        })
                     })
                     .child(
                         icon_button(("queued-rm", k), Ico::X, "Take it back", cx).on_click(
-                            cx.listener(move |this, _, _, cx| {
+                            cx.listener(move |this, _, window, cx| {
                                 this.click_claimed = true;
-                                this.queued(rm_id.clone(), false, cx);
+                                if this.queue_edit.as_ref().is_some_and(|(e, _)| e == &rm_id) {
+                                    this.queue_edit_cancel(window, cx);
+                                } else {
+                                    this.queued(rm_id.clone(), false, cx);
+                                }
                             }),
                         ),
                     )
                     .into_any_element();
+                let editor = field.map(|st| {
+                    // The same field as the composer's, at the same size and leading; the row is
+                    // as tall as the text (no scroll of its own).
+                    div()
+                        .ml(px(-12.))
+                        .my(px(-10.))
+                        .line_height(relative(super::LEAD))
+                        .child(Textarea::new(&st).appearance(false).large())
+                        .into_any_element()
+                });
                 self.user_row(
                     format!("queued-{id}"),
                     &said,
                     &paths,
                     Some(actions),
                     true,
+                    editor,
                     cx,
                 )
             })
@@ -666,7 +716,8 @@ impl BenchApp {
     /// the thread's text column, the files that went with it under the text. One row for what is
     /// already sent and for what waits in the queue — a queued message is a message the person
     /// has written, not a note about it. `muted` marks one that has not gone out; `actions`
-    /// (send now, take it back) sit at the row's right.
+    /// (fix the words, send now, take it back) sit at the row's right; `field` replaces the text
+    /// with the one being fixed.
     fn user_row(
         &self,
         key: String,
@@ -674,6 +725,7 @@ impl BenchApp {
         paths: &[String],
         actions: Option<AnyElement>,
         muted: bool,
+        field: Option<AnyElement>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
@@ -698,9 +750,12 @@ impl BenchApp {
                     .whitespace_normal()
                     .when(muted, |d| d.text_color(theme.muted_foreground))
                     // Selectable and copyable, like the answers (the same text view).
-                    .when(!text.is_empty(), |d| {
-                        d.child(plain_text(SharedString::from(key.as_str()), text))
+                    .when(field.is_none(), |d| {
+                        d.when(!text.is_empty(), |d| {
+                            d.child(plain_text(SharedString::from(key.as_str()), text))
+                        })
                     })
+                    .when_some(field, |d, f| d.child(f))
                     // The files that went with it.
                     .when(!attached.is_empty(), |d| {
                         d.child(
@@ -950,7 +1005,7 @@ impl BenchApp {
             .w_full()
             // The conversation is what the window is for: a size up from the sidebar's lists.
             .text_base()
-            .child(self.user_row(format!("user-{i}"), &user, &attached_paths, None, false, cx))
+            .child(self.user_row(format!("user-{i}"), &user, &attached_paths, None, false, None, cx))
             .child(
                 div()
                     .relative()

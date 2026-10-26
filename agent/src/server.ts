@@ -153,6 +153,9 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 		await rt.sendNow(String(session_id), String(id));
 		return { ok: true };
 	},
+	// A waiting message has not gone anywhere: its words may still be fixed.
+	"session.queue.edit": async ({ session_id, id, text }) => ({ result: await rt.edit(String(session_id), String(id), String(text ?? "")) }),
+
 	"session.interrupt": async ({ session_id }) => {
 		await rt.interrupt(session_id);
 		return { ok: true };

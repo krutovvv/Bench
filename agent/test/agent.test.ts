@@ -137,3 +137,36 @@ test("a plan's moment is saved with its steps", () => {
 	assert.equal(back.todos[0].id, "a");
 	st.delete("p1");
 });
+
+test("a waiting message keeps its attachments and block state when its words are fixed", async () => {
+	const { withText } = await import("../src/runtime.ts");
+	// Plain words.
+	assert.equal(withText("old", "new"), "new");
+	// The block state Bench sent with it stays for the model.
+	assert.equal(withText("old\n\n<block-state>\nthe terminal shows x\n</block-state>", "new"), "new\n\n<block-state>\nthe terminal shows x\n</block-state>");
+	// Attachments stay, in their order, behind the new words.
+	const withImage = [
+		{ type: "text", text: "old" },
+		{ type: "image", data: "AAA", mimeType: "image/png" },
+	];
+	assert.deepEqual(withText(withImage, "new"), [
+		{ type: "text", text: "new" },
+		{ type: "image", data: "AAA", mimeType: "image/png" },
+	]);
+	// Reading what we wrote gives the new words back, without the block state.
+	const { stripBlock } = await import("../src/runtime.ts");
+	assert.equal(stripBlock(withText("old\n\n<block-state>\nx\n</block-state>", "new")), "new");
+});
+
+test("history keeps the fixed words of a message taken back from the queue", async () => {
+	const { Store } = await import("../src/store.ts");
+	const st = new Store();
+	st.create({ id: "q1", conversation: 3, profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
+	st.addMessage("q1", { role: "user", text: "send the log" });
+	st.addMessage("q1", { role: "assistant", text: "ok" });
+	st.addMessage("q1", { role: "user", text: "send the log" });
+	st.editUserMessage("q1", "send the log", "send the ERROR log");
+	const texts = st.messages("q1").map((m) => m.text);
+	assert.deepEqual(texts, ["send the log", "ok", "send the ERROR log"], "the newest one with those words is theirs");
+	st.delete("q1");
+});
