@@ -11,11 +11,13 @@
 //! 5. An insert sits where its entry is; a removed one is not shown.
 //! 6. A message just sent shows at once, after the journal, until the journal has it.
 
+pub mod diff;
 mod rows;
 mod state;
 #[cfg(test)]
 mod tests;
 
+pub use diff::{Change, diff};
 pub use protocol::ThreadEvent;
 pub use rows::{Row, Step};
 pub use state::Thread;

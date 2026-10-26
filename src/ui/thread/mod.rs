@@ -107,25 +107,28 @@ impl View {
             self.following = follow;
             return 0;
         }
-        let same = self
-            .rows
-            .iter()
-            .zip(&rows)
-            .take_while(|(a, b)| a == b)
-            .count();
-        if same == self.rows.len() && same == rows.len() {
-            return same;
-        }
-        let old = self.rows.len();
+        // Rows at their place are measured again (the reader keeps their place, even inside a row
+        // being written); only the number of rows changes by splicing, at the end (`thread::diff`).
+        let change = ::thread::diff(&self.rows, &rows);
+        let first = change
+            .remeasure
+            .as_ref()
+            .map(|r| r.start)
+            .or(change.splice.as_ref().map(|(r, _)| r.start))
+            .unwrap_or(rows.len());
         self.rows = rows;
-        self.list.splice(
-            Self::item_of(same)..Self::item_of(old),
-            self.rows.len() - same,
-        );
-        if self.following {
+        if let Some(r) = change.remeasure {
+            self.list
+                .remeasure_items(Self::item_of(r.start)..Self::item_of(r.end));
+        }
+        if let Some((r, count)) = change.splice {
+            self.list
+                .splice(Self::item_of(r.start)..Self::item_of(r.end), count);
+        }
+        if self.following && first < self.rows.len() {
             self.list.scroll_to_reveal_item(self.tail());
         }
-        same
+        first
     }
 }
 
