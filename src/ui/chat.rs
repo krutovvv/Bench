@@ -20,7 +20,7 @@ use crate::model::{Step, Turn};
 /// The air the deepest scroll leaves under the top edge of the window. The row's own padding
 /// keeps it whole; what the room was missing was this fixed breath — measuring the last row's
 /// height turned out to be the wrong lever, since it made the depth change with every row.
-const AIR: f32 = 16.;
+const AIR: f32 = 22.;
 
 fn past_end(viewport: f32, composer: f32) -> f32 {
     (viewport - super::STATUS_H - composer - LINE - AIR).max(LINE)
