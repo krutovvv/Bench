@@ -26,6 +26,8 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change what Bench sends or receives | `src/gateway.rs` (WebSocket), `src/rest.rs` (REST); types shared with the agent in `crates/protocol` |
 | change the agent's answer to an RPC or a REST route | `agent/src/modules/<area>.ts` |
 | change how the agent runs a thread | `agent/src/runtime.ts`; what Bench reads of it: `agent/src/thread.ts` |
+| change how work is done on a server (a project's machine over SSH) | `agent/src/ssh-env.ts` (Pi's `ExecutionEnv`; its tests are Pi's conformance suite, `test/ssh-env.test.ts`) |
+| change the agents Bench talks to (this Mac's, servers') | `src/app/agents.rs`; the gear's list in `src/ui/providers.rs` |
 | change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts` |
 | change the demo (screenshots) | `src/demo.rs` |
 

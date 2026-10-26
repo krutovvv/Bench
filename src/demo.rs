@@ -690,6 +690,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         folder: folder.map(str::to_string),
         host: None,
         remote_id: None,
+        machine: None,
         browser: true,
     };
     app.projects = vec![

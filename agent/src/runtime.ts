@@ -9,7 +9,9 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { InsertEntry, Inserts, insertsOf, patchInsert, type InsertView } from "./inserts.ts";
 import type { JsonObject } from "@earendil-works/chord";
 import { createRegistry, Harness, InboxDoc, watchEvents, type AgentEvent, type Conversation } from "@earendil-works/pi-durable";
+import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
+import { machineEnv } from "./ssh-env.ts";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
@@ -144,8 +146,9 @@ export class Runtime {
 		this.harness = await Harness.open(this.storage, {
 			models: this.models,
 			registry,
-			// Pi's coding tools work in the conversation's directory.
-			env: ({ cwd }: any) => new NodeExecutionEnv({ cwd: cwd ?? process.env.HOME ?? "/" }),
+			// Pi's coding tools work in the conversation's directory — on its project's machine, when
+			// that is another one (`ssh-env.ts`).
+			env: ({ conversationId, cwd }: any) => this.envFor(String(conversationId), cwd),
 			identity: { attribution: { name: "bench-agent", url: "https://github.com/krutovvv/bench" } },
 			settings: {
 				// Six tries back off over about a minute: long enough to ride out a busy model (503
@@ -293,7 +296,8 @@ export class Runtime {
 		// works in its folder.
 		const project = profile.startsWith("project:") ? profile.slice(8) : "";
 		if (project && !extra.project) extra = { ...extra, project };
-		const dir = cwd && fs.existsSync(cwd) ? cwd : project ? projects.dir(project) : defaultCwd(profile);
+		const machine = project ? projects.get(project)?.machine : undefined;
+		const dir = machine ? (cwd ?? projects.dir(project)) : cwd && fs.existsSync(cwd) ? cwd : project ? projects.dir(project) : defaultCwd(profile);
 		const conversation = await this.harness.createConversation(
 			{ ownership: { kind: "ownerless" }, agent: { model: this.modelRef(profile), thinkingLevel: this.thinking(reasoningEffort(profile)), cwd: dir, extensions: forAgent(readAgent(profile).extensions, profile) } } as any,
 			ctx,
@@ -643,6 +647,14 @@ export class Runtime {
 		this.store.update(id, { subject });
 		const live = this.live.get(id);
 		if (live) live.row.subject = subject;
+	}
+
+	/** The execution environment of a conversation: this machine's, or its project's machine over SSH. */
+	private async envFor(conversationId: string, cwd: string | undefined): Promise<ExecutionEnv> {
+		const project = this.host().session(conversationId)?.project;
+		const machine = project ? projects.get(project)?.machine : undefined;
+		if (!machine) return new NodeExecutionEnv({ cwd: cwd || process.env.HOME || "/" });
+		return machineEnv(machine, cwd || projects.get(project!)?.folder || "");
 	}
 
 	private sessionInfo(row: SessionRow): SessionInfo {

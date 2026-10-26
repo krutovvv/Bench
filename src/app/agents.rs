@@ -115,6 +115,7 @@ impl BenchApp {
                             folder: p["folder"].as_str().filter(|f| !f.is_empty()).map(str::to_string),
                             host: Some(host.clone()),
                             remote_id: Some(rid.to_string()),
+                            machine: None,
                             browser: p["browser"].as_bool().unwrap_or(false),
                         })
                     })
@@ -311,11 +312,15 @@ impl BenchApp {
     /// Where the open thread's shell runs: its project's server, or this Mac (`term::LOCAL`).
     pub fn thread_machine(&self) -> String {
         let host = self.thread_host();
-        if host.is_empty() {
-            crate::inserts::terminal::session::LOCAL.to_string()
-        } else {
-            host
+        if !host.is_empty() {
+            return host;
         }
+        // This Mac's agent working on a server: the project's machine.
+        self.projects
+            .iter()
+            .find(|p| p.id == self.thread_project)
+            .and_then(|p| p.machine.clone())
+            .unwrap_or_else(|| crate::inserts::terminal::session::LOCAL.to_string())
     }
 
     pub fn thread_host(&self) -> String {

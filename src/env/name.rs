@@ -55,6 +55,19 @@ impl Section for Name {
             true,
             cx,
         )];
+        // Worked on a server by this Mac's agent: which one.
+        if let Some((alias, address)) = machine_of(app, &e.id) {
+            rows.push(row(
+                e,
+                "name",
+                "machine".into(),
+                "Works on".into(),
+                format!("{alias} — {address} · this Mac's agent, over SSH"),
+                false,
+                false,
+                cx,
+            ));
+        }
         // A project on a server: which one, and whether its agent there answers.
         if let Some(server) = server_of(app, &e.id) {
             rows.push(row(
@@ -73,6 +86,29 @@ impl Section for Name {
     fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
         let e = app.project_env.as_ref()?;
         let muted = cx.theme().muted_foreground;
+        if name == "machine" {
+            let (alias, address) = machine_of(app, &e.id)?;
+            let folder = app
+                .projects
+                .iter()
+                .find(|p| p.id == e.id)
+                .and_then(|p| p.folder.clone())
+                .unwrap_or_else(|| "its login directory".into());
+            let lines = [
+                format!("ssh {alias} — {address}, in {folder}"),
+                "This Mac's agent works there over SSH, one connection kept open: read, write, \
+                 edit and bash act on that machine, /terminal opens there. Nothing is installed on \
+                 it; the models and settings are this Mac's, and it answers while this Mac is on."
+                    .to_string(),
+            ];
+            return Some(Card::new(
+                "Works on",
+                pad(v_flex().gap_1().children(lines.into_iter().enumerate().map(|(k, l)| {
+                    div().when(k > 0, |d| d.text_color(muted)).child(l)
+                }))),
+                vec![],
+            ));
+        }
         if name == "server" {
             let server = server_of(app, &e.id)?;
             let lines = [
@@ -176,19 +212,31 @@ impl ServerInfo {
     }
 }
 
-fn server_of(app: &BenchApp, project: &str) -> Option<ServerInfo> {
-    let alias = app.projects.iter().find(|p| p.id == project)?.host.clone()?;
-    let address = app
-        .ssh
+/// `user@hostname:port` of an ~/.ssh/config alias.
+fn address_of(app: &BenchApp, alias: &str) -> String {
+    app.ssh
         .servers
         .iter()
         .find(|s| s.alias == alias)
         .map(|s| {
             let user = if s.user.is_empty() { String::new() } else { format!("{}@", s.user) };
             let port = if s.port.is_empty() || s.port == "22" { String::new() } else { format!(":{}", s.port) };
-            format!("{user}{}{port}", if s.hostname.is_empty() { &alias } else { &s.hostname })
+            format!("{user}{}{port}", if s.hostname.is_empty() { alias } else { &s.hostname })
         })
-        .unwrap_or_else(|| "not in ~/.ssh/config".into());
+        .unwrap_or_else(|| "not in ~/.ssh/config".into())
+}
+
+/// The machine this Mac's agent works on for the project, and its address.
+fn machine_of(app: &BenchApp, project: &str) -> Option<(String, String)> {
+    let p = app.projects.iter().find(|p| p.id == project)?;
+    let alias = p.machine.clone().filter(|_| p.host.is_none())?;
+    let address = address_of(app, &alias);
+    Some((alias, address))
+}
+
+fn server_of(app: &BenchApp, project: &str) -> Option<ServerInfo> {
+    let alias = app.projects.iter().find(|p| p.id == project)?.host.clone()?;
+    let address = address_of(app, &alias);
     let remote = app.agents.get(&alias);
     Some(ServerInfo {
         alias,

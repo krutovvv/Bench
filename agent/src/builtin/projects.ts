@@ -15,6 +15,11 @@ export interface Project {
 	created: number;
 	/** A server whose agent the project is (an ~/.ssh/config alias of the Mac Bench runs on). */
 	host?: string | null;
+	/**
+	 * The machine its work is done on, when not this agent's own: an ~/.ssh/config alias here. Its
+	 * threads' files and commands are there (`ssh-env.ts`), its folder is a path on it.
+	 */
+	machine?: string | null;
 	/** Its own Telegram bot: { token, allowed_users: [ids], username (once it ran) }. */
 	telegram?: { token: string; allowed_users: string[]; username?: string } | null;
 }
@@ -28,6 +33,9 @@ function table() {
 	} catch {}
 	try {
 		db().exec("ALTER TABLE projects ADD COLUMN host TEXT");
+	} catch {}
+	try {
+		db().exec("ALTER TABLE projects ADD COLUMN machine TEXT");
 	} catch {}
 }
 
@@ -45,10 +53,10 @@ export const projects = {
 	},
 	save(p: Partial<Project> & { name: string }): Project {
 		table();
-		const full: Project = { id: p.id || randomBytes(6).toString("hex"), name: p.name, folder: p.folder || null, created: p.created ?? Math.floor(Date.now() / 1000), telegram: p.telegram ?? null, host: p.host || null };
+		const full: Project = { id: p.id || randomBytes(6).toString("hex"), name: p.name, folder: p.folder || null, created: p.created ?? Math.floor(Date.now() / 1000), telegram: p.telegram ?? null, host: p.host || null, machine: p.machine || null };
 		db()
-			.prepare("INSERT INTO projects (id, name, folder, created, telegram, host) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, folder=excluded.folder, telegram=excluded.telegram, host=excluded.host")
-			.run(full.id, full.name, full.folder, full.created, full.telegram ? JSON.stringify(full.telegram) : null, full.host ?? null);
+			.prepare("INSERT INTO projects (id, name, folder, created, telegram, host, machine) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name, folder=excluded.folder, telegram=excluded.telegram, host=excluded.host, machine=excluded.machine")
+			.run(full.id, full.name, full.folder, full.created, full.telegram ? JSON.stringify(full.telegram) : null, full.host ?? null, full.machine ?? null);
 		return full;
 	},
 	/** The project goes; its threads stay, without a project. */
@@ -62,9 +70,11 @@ export const projects = {
 		const p = projects.get(id);
 		if (p?.telegram && p.telegram.username !== username) projects.save({ ...p, telegram: { ...p.telegram, username } });
 	},
-	/** Where its threads work: its own folder, else files/ in its environment. */
+	/** Where its threads work: its own folder, else files/ in its environment. A project on another
+	 * machine works in its folder there (empty: its login directory, found when its env opens). */
 	dir(id: string): string {
 		const p = projects.get(id);
+		if (p?.machine) return p.folder ?? "";
 		if (p?.folder && fs.existsSync(p.folder)) return p.folder;
 		const own = path.join(projects.env(id), "files");
 		fs.mkdirSync(own, { recursive: true });

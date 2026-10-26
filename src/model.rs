@@ -89,6 +89,9 @@ pub struct ProjectEntry {
     /// Its id on that server's agent; None: the agent's own environment ("general", its Host —
     /// a row on this Mac that names the server). Unused for this Mac's projects.
     pub remote_id: Option<String>,
+    /// The machine its work is done on when not its agent's own (an ~/.ssh/config host of this
+    /// Mac): this Mac's agent works there over SSH.
+    pub machine: Option<String>,
     /// Has the watchable server browser among its own MCP servers: /browser is offered there.
     pub browser: bool,
 }

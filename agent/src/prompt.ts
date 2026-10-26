@@ -26,8 +26,13 @@ export function soul(s: SessionInfo): string {
 	// A project's own soul: what it is, how to work in it.
 	if (isProject(s.profile)) {
 		const own = read(path.join(agentDir(s.profile), "SYSTEM.md"));
-		const name = projects.get(s.profile.slice(8))?.name ?? "this project";
-		parts.push(`# The project: ${name}\n\n${own || "(no description yet)"}`);
+		const p = projects.get(s.profile.slice(8));
+		const name = p?.name ?? "this project";
+		// Worked on another machine: say where, so commands and paths are meant for it.
+		const where = p?.machine
+			? `\n\nIts work is on the server \`${p.machine}\`${p.folder ? `, in ${p.folder}` : ""}: read, write, edit and bash act there over SSH, not on the machine you run on. Paths are that server's.`
+			: "";
+		parts.push(`# The project: ${name}\n\n${own || "(no description yet)"}${where}`);
 	}
 	return parts.filter(Boolean).join("\n\n");
 }

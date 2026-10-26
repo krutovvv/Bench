@@ -38,6 +38,10 @@ impl BenchApp {
                                 .filter(|h| !h.is_empty())
                                 .map(str::to_string),
                             remote_id: None,
+                            machine: p["machine"]
+                                .as_str()
+                                .filter(|m| !m.is_empty())
+                                .map(str::to_string),
                             browser: p["browser"].as_bool().unwrap_or(false),
                         })
                         .collect();

@@ -28,6 +28,9 @@ pub struct ProjectForm {
     pub new_key: Entity<InputState>,
     /// A folder on the chosen server, typed (there is no picker for a server's disk).
     pub server_folder: Entity<InputState>,
+    /// With this Mac's agent: the machine its work is done on (an ~/.ssh/config host), None =
+    /// this Mac. Nothing is installed there: the agent works on it over SSH.
+    pub machine: Option<String>,
 }
 
 impl BenchApp {
@@ -53,6 +56,7 @@ impl BenchApp {
             host: None,
             new_host,
             server_folder,
+            machine: None,
             new_user,
             new_port,
             new_key,
@@ -181,6 +185,7 @@ impl BenchApp {
                                 folder: v["project"]["folder"].as_str().map(str::to_string),
                                 host: Some(alias.clone()),
                                 remote_id: Some(rid.to_string()),
+                                machine: None,
                                 browser: false,
                             };
                             let mut list = this.server_projects.remove(&alias).unwrap_or_default();
@@ -196,7 +201,15 @@ impl BenchApp {
             );
             return;
         }
-        let body = json!({"name": name, "folder": form.folder, "host": host});
+        // This Mac's agent working on a server: its folder is a path there.
+        let (machine, folder) = match (&host, &form.machine) {
+            (None, Some(m)) => {
+                let f = form.server_folder.read(cx).value().trim().to_string();
+                (Some(m.clone()), (!f.is_empty()).then_some(f))
+            }
+            _ => (None, form.folder.clone()),
+        };
+        let body = json!({"name": name, "folder": folder, "host": host, "machine": machine});
         self.reload_servers(cx);
         let profile = self.current_profile();
         self.background(
@@ -359,6 +372,63 @@ impl BenchApp {
                     .into_any_element(),
             );
         } else {
+            // This Mac's agent, its work on this Mac or on a server over SSH (like an agent in a
+            // terminal: nothing is installed there, the models are this Mac's).
+            let machine = self.project_form.as_ref().and_then(|f| f.machine.clone());
+            let mut labels = vec!["This Mac".to_string()];
+            labels.extend(self.ssh.servers.iter().map(|s| s.alias.clone()));
+            let at = machine
+                .as_ref()
+                .and_then(|m| labels.iter().position(|l| l == m))
+                .unwrap_or(0);
+            let names = labels.clone();
+            let pick = crate::inserts::tools::view::segmented_tall_owned(
+                "project-machine",
+                labels,
+                at,
+                cx,
+                move |this, k, _, cx| {
+                    if let Some(f) = this.project_form.as_mut() {
+                        f.machine = (k > 0).then(|| names[k].clone());
+                    }
+                    cx.notify();
+                },
+            );
+            page.push(
+                self.pv_row(
+                    "Works on",
+                    "Where its files and commands are",
+                    h_flex().flex_wrap().child(pick).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+        if let (None, Some(m)) = (
+            host.clone(),
+            self.project_form.as_ref().and_then(|f| f.machine.clone()),
+        ) {
+            let input = self.project_form.as_ref().map(|f| f.server_folder.clone());
+            if let Some(input) = input {
+                page.push(
+                    self.pv_row(
+                        "Folder",
+                        format!("Optional: where on {m} its threads work"),
+                        self.pv_input(&input),
+                        cx,
+                    )
+                    .into_any_element(),
+                );
+            }
+            page.push(
+                div()
+                    .pt_2()
+                    .text_sm()
+                    .text_color(muted)
+                    .child(format!("This Mac's agent works on {m} over SSH: nothing is installed there, its models and settings are this Mac's, and it answers while this Mac is on."))
+                    .into_any_element(),
+            );
+        } else if host.is_none() {
             let has = folder.is_some();
             let control = h_flex()
                 .gap_2()
