@@ -33,6 +33,13 @@ In Bench:
   the project's machine through its agent (`agent/src/modules/files.ts`).
 - Attachments of such a project go to its machine's `/tmp/bench-attachments/` (one-off, gone with
   a reboot): `attach::prepare` with `files_machine()`, `/api/files/upload` with `machine`.
+- What the folder itself says — AGENTS.md / CLAUDE.md up to the repository's root, `.agents/skills`
+  and `.claude/skills` — is read where the folder is: `agent/src/repo.ts` (one script over the
+  connection, kept 30 s). Never `fs` a project's folder in the agent: it may be on a server.
+- One server's connection carries at most six commands at once (`ssh-env.ts` `Gate`: sshd's
+  MaxSessions is 10); a command whose connection dropped says so in its output.
+- What a machine lacks for a project's language servers (Node, a program) is the server's
+  "failed: …" state before any starts (`lsp.ts` `lspNeeds`), red in the Language servers section.
 - The prompt says where the work is (`prompt.ts` `soul`: the server, the folder, kept in it).
 - A server's agent is installed and updated by Bench (`pi_agent.rs` `ensure_remote`; an older
   idle one is replaced on connecting).

@@ -13,6 +13,7 @@ import YAML from "yaml";
 import { agentDir, isProject } from "../config.ts";
 import { sessionOf } from "../host.ts";
 import { projects } from "./projects.ts";
+import { machineOf, readSkill, skillFiles, skillFor } from "../repo.ts";
 
 /** Where a skill lives: the project's own, the working folder's (.agents/skills, .claude/skills), the general agent's. */
 export type SkillScope = "project" | "repo" | "general";
@@ -41,10 +42,11 @@ export function frontMatter(text: string): Record<string, any> {
  * given). One name, one skill: the project's own win, then the folder's. The Host project's skills
  * (the machine's: its tools, its builds) are Host's alone; another project does not see them.
  */
-export function listSkills(profile: string, folder?: string): Skill[] {
+export function listSkills(profile: string, folder?: string, repoSkills?: Skill[]): Skill[] {
 	const own = isProject(profile) ? skillsIn(path.join(agentDir(profile), "skills"), "project") : [];
 	const work = folder ?? (isProject(profile) ? (projects.get(profile.slice(8))?.folder ?? "") : "");
-	const repo = repoSkillDirs(work).flatMap((d) => skillsIn(d, "repo"));
+	// A folder on a project's server is read there (`repo.ts`), and its skills are given.
+	const repo = repoSkills ?? repoSkillDirs(work).flatMap((d) => skillsIn(d, "repo"));
 	const general = isProject(profile) ? [] : skillsIn(path.join(agentDir(profile), "skills"), "general");
 	const out: Skill[] = [];
 	for (const k of [...own, ...repo, ...general]) if (!out.some((o) => o.name === k.name)) out.push(k);
@@ -94,13 +96,11 @@ export const skillView = defineTool({
 		file: Type.Optional(Type.String({ description: "A file inside the skill folder, e.g. references/api.md" })),
 	}),
 	execute: async (args, api) => {
-		const { profile, cwd } = sessionOf(api.conversationId);
-		const skill = findSkill(profile, args.name, cwd);
+		const { profile, cwd, project } = sessionOf(api.conversationId);
+		const skill = await skillFor(profile, args.name, cwd, machineOf(project));
 		if (!skill) throw new Error(`no skill "${args.name}"; see the skills list`);
-		const target = path.resolve(skill.dir, args.file ?? "SKILL.md");
-		if (!target.startsWith(skill.dir + path.sep) && target !== path.join(skill.dir, "SKILL.md")) throw new Error("file is outside the skill folder");
-		const body = fs.readFileSync(target, "utf8");
-		const files = args.file ? [] : fs.readdirSync(skill.dir, { recursive: true }).map(String).filter((f) => f !== "SKILL.md" && fs.statSync(path.join(skill.dir, f)).isFile());
+		const body = await readSkill(skill, args.file ?? "SKILL.md");
+		const files = args.file ? [] : await skillFiles(skill);
 		return text(files.length ? `${body}\n\n[Files in this skill: ${files.join(", ")}]` : body);
 	},
 });
@@ -120,9 +120,11 @@ export const skillManage = defineTool({
 		file: Type.Optional(Type.String({ description: "Path inside the skill (write_file)" })),
 	}),
 	execute: async (args, api) => {
-		const { profile, cwd } = sessionOf(api.conversationId);
+		const { profile, cwd, project } = sessionOf(api.conversationId);
 		if (!/^[a-z0-9][a-z0-9._-]*$/i.test(args.name)) throw new Error("name: letters, digits, '.', '_', '-'");
-		const existing = findSkill(profile, args.name, cwd);
+		const existing = await skillFor(profile, args.name, cwd, machineOf(project));
+		if (existing?.machine && args.action !== "create")
+			throw new Error(`"${args.name}" is in the project's folder on ${existing.machine}: change its files there with edit or write (${existing.dir})`);
 		if (args.action === "create") {
 			if (existing) throw new Error(`skill "${args.name}" exists; use edit or patch`);
 			if (!args.content?.startsWith("---")) throw new Error("content must start with front matter (---)");

@@ -9,7 +9,7 @@ import os from "node:os";
 import path from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { projects } from "./builtin/projects.ts";
-import { frontMatter, repoSkillDirs, skillsIn, type Skill } from "./builtin/skills.ts";
+import { frontMatter, listSkills, repoSkillDirs, skillsIn, type Skill } from "./builtin/skills.ts";
 import { machineEnv, quote } from "./ssh-env.ts";
 
 /** One instructions file: its path and what it says (at most 20 000 characters). */
@@ -137,6 +137,15 @@ async function readRemote(machine: string, folder: string): Promise<Repo> {
 	const order = (k: Skill) => roots.length - 1 - roots.findIndex((r) => k.dir.startsWith(`${r}/`));
 	const skills = found.filter((k) => !found.some((o) => k.dir.startsWith(`${o.dir}/`))).sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
 	return { instructions, skills };
+}
+
+/** Every skill a thread of `profile` can use, working in `folder` (on `machine`, or here). */
+export async function skillsFor(profile: string, folder: string | undefined, machine?: string): Promise<Skill[]> {
+	return machine && folder ? listSkills(profile, folder, (await repoOf(folder, machine)).skills) : listSkills(profile, folder);
+}
+
+export async function skillFor(profile: string, name: string, folder: string | undefined, machine?: string): Promise<Skill | undefined> {
+	return (await skillsFor(profile, folder, machine)).find((s) => s.name === name || path.basename(s.dir) === name);
 }
 
 /** A file of a skill (SKILL.md by default), wherever the skill is. */

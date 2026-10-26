@@ -53,7 +53,7 @@ test("skills: create, list in the prompt, view, patch, delete", async () => {
 	const body = "---\nname: deploy\ndescription: Ship the app to the server\n---\n\nRun ./ship.sh\n";
 	await run(skillManage, { action: "create", name: "deploy", category: "devops", content: body });
 	assert.equal(listSkills("default")[0].name, "deploy");
-	assert.match(skills(session)!, /- deploy: Ship the app to the server/);
+	assert.match((await skills(session))!, /- deploy: Ship the app to the server/);
 	await run(skillManage, { action: "patch", name: "deploy", old_string: "./ship.sh", new_string: "scripts/ship.sh" });
 	const r = await skillView.execute({ name: "deploy" }, { conversationId: 1 } as any, undefined as any);
 	assert.match((r as any).output[0].text, /scripts\/ship\.sh/);
@@ -86,7 +86,7 @@ test("skills: a project's own, its folder's .agents/skills and .claude/skills up
 	const thread = { id: "s2", profile: `project:${p.id}`, cwd: sub, source: "local" };
 	setHost({ session: () => thread } as any);
 	try {
-		assert.match(skills(thread)!, /- kit: the repo's kit/);
+		assert.match((await skills(thread))!, /- kit: the repo's kit/);
 		const r = await skillView.execute({ name: "kit" }, { conversationId: 1 } as any, undefined as any);
 		assert.match((r as any).output[0].text, /Steps\.[\s\S]*references\/more\.md/);
 	} finally {

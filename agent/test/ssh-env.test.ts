@@ -98,3 +98,76 @@ test("/api/fs with a machine: read, write, list, rename and remove there", async
 		fs.rmSync(dir, { recursive: true, force: true });
 	}
 });
+
+test("a server folder's own instructions and skills are read there", async () => {
+	if (real) return; // the stand-in shares this disk
+	const { repoOf, skillsFor, readSkill, skillFiles, forgetRepos } = await import("../src/repo.ts");
+	const { projects } = await import("../src/builtin/projects.ts");
+	const { projectContext, skills } = await import("../src/prompt.ts");
+	const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "bench-repo-")));
+	try {
+		const theme = path.join(root, "wp-content", "themes", "shop");
+		fs.mkdirSync(path.join(root, ".git"), { recursive: true });
+		fs.mkdirSync(theme, { recursive: true });
+		fs.writeFileSync(path.join(root, "AGENTS.md"), "Root rules.");
+		fs.writeFileSync(path.join(theme, "CLAUDE.md"), "Theme rules.");
+		const skill = path.join(theme, ".agents", "skills", "wp", "acf-fields");
+		fs.mkdirSync(path.join(skill, "references"), { recursive: true });
+		fs.writeFileSync(path.join(skill, "SKILL.md"), "---\nname: acf-fields\ndescription: How fields are added\n---\nBody.");
+		fs.writeFileSync(path.join(skill, "references", "api.md"), "API");
+		fs.mkdirSync(path.join(root, ".claude", "skills", "acf-fields"), { recursive: true });
+		fs.writeFileSync(path.join(root, ".claude", "skills", "acf-fields", "SKILL.md"), "---\nname: acf-fields\ndescription: farther\n---\n");
+
+		const repo = await repoOf(theme, "fake");
+		assert.deepStrictEqual(repo.instructions.map((i) => [i.file, i.text]), [[path.join(root, "AGENTS.md"), "Root rules."], [path.join(theme, "CLAUDE.md"), "Theme rules."]]);
+		const p = projects.save({ name: "Shop", folder: theme, machine: "fake" });
+		const list = await skillsFor(`project:${p.id}`, theme, "fake");
+		const acf = list.find((k) => k.name === "acf-fields")!;
+		assert.strictEqual(acf.dir, skill, "the nearest one of a name");
+		assert.strictEqual(acf.category, "wp");
+		assert.strictEqual(acf.machine, "fake");
+		assert.match(await readSkill(acf), /Body\./);
+		assert.deepStrictEqual(await skillFiles(acf), ["references/api.md"]);
+		await assert.rejects(readSkill(acf, "../../x"), /outside/);
+
+		const info = { id: "t", profile: `project:${p.id}`, cwd: theme, source: "bench", project: p.id };
+		assert.match((await projectContext(info))!, /Root rules\.[\s\S]*Theme rules\./);
+		assert.match((await skills(info))!, /acf-fields: How fields are added/);
+		forgetRepos();
+	} finally {
+		fs.rmSync(root, { recursive: true, force: true });
+	}
+});
+
+test("one server's connection carries at most six commands at once; the rest wait their turn", async () => {
+	if (real) return;
+	const env = new SshExecutionEnv("fake", "/");
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bench-gate-"));
+	try {
+		const runs = await Promise.all(
+			Array.from({ length: 16 }, () => env.run(`touch ${dir}/$$; sleep 0.3; ls ${dir} | wc -l; rm ${dir}/$$`, BACKGROUND_CONTEXT)),
+		);
+		assert.ok(runs.every((r) => r.code === 0));
+		const most = Math.max(...runs.map((r) => Number(r.stdout.toString().trim())));
+		assert.ok(most <= 6 && most >= 2, `at most six at once, ran ${most}`);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("a command whose connection was lost says so", async () => {
+	if (real) return;
+	const was = process.env.BENCH_SSH;
+	const lost = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "bench-lost-")), "ssh");
+	fs.writeFileSync(lost, "#!/bin/sh\necho partial\necho 'client_loop: send disconnect: Broken pipe' >&2\nexit 255\n", { mode: 0o755 });
+	process.env.BENCH_SSH = lost;
+	try {
+		let out = "";
+		const r = getOrThrow(await new SshExecutionEnv("fake", "/").exec("composer install", { onOutput: (t: string) => (out += t) }, BACKGROUND_CONTEXT));
+		assert.strictEqual(r.exitCode, 255);
+		assert.match(out, /partial[\s\S]*connection to fake was lost[\s\S]*nohup/);
+	} finally {
+		process.env.BENCH_SSH = was;
+		fs.rmSync(path.dirname(lost), { recursive: true, force: true });
+	}
+});

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { BACKGROUND_CONTEXT as BACKGROUND } from "@earendil-works/chord/context";
 import { readAgent, resolveModel, writeAgent } from "../config.ts";
-import { findSkill } from "../builtin/skills.ts";
+import { machineOf, readSkill, skillFor } from "../repo.ts";
 import type { Ctx, Module } from "../http.ts";
 
 const COMMANDS: [string, string][] = [
@@ -54,9 +54,9 @@ export default ({ rt, broadcast }: Ctx): Module => {
 			}
 			default: {
 				// A skill: its body becomes the turn (/skill-name).
-				const skill = findSkill(profile || row?.profile || "default", name.slice(1), row?.cwd || undefined);
+				const skill = await skillFor(profile || row?.profile || "default", name.slice(1), row?.cwd || undefined, machineOf(row?.project ?? undefined));
 				if (skill) {
-					const body = fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8");
+					const body = await readSkill(skill);
 					return { type: "skill", message: `[SYSTEM: The user has invoked the "${name.slice(1)}" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]\n\n${body}${arg ? `\n\nThe user has provided the following instruction alongside the skill invocation: ${arg}` : ""}` };
 				}
 				return { type: "info", output: `Unknown command: ${name}` };

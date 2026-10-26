@@ -10,6 +10,7 @@ import path from "node:path";
 import { agentDir, homeAgent, isProject, timezone } from "./config.ts";
 import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
+import { machineOf, repoOf, skillsFor } from "./repo.ts";
 import { projects } from "./builtin/projects.ts";
 import { hosts } from "./builtin/hosts.ts";
 import type { SessionInfo } from "./host.ts";
@@ -59,8 +60,15 @@ export function environment(s: SessionInfo): string {
 	].join("\n");
 }
 
-/** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory. */
-export function projectContext(s: SessionInfo): string | undefined {
+/** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory, read where
+ * it is (a project's server too: `repo.ts`). */
+export async function projectContext(s: SessionInfo): Promise<string | undefined> {
+	const machine = machineOf(s.project);
+	if (machine) {
+		const { instructions } = await repoOf(s.cwd, machine).catch(() => ({ instructions: [] }));
+		const parts = instructions.map((i) => `## ${path.posix.relative(s.cwd, i.file) || path.posix.basename(i.file)}\n\n${i.text}`);
+		return parts.length ? `# Project instructions\n\n${parts.join("\n\n")}` : undefined;
+	}
 	if (path.resolve(s.cwd) === os.homedir()) return undefined;
 	let root = s.cwd;
 	try {
@@ -83,8 +91,8 @@ export function projectContext(s: SessionInfo): string | undefined {
 	return parts.length ? `# Project instructions\n\n${parts.join("\n\n")}` : undefined;
 }
 
-export function skills(s: SessionInfo): string | undefined {
-	const list = listSkills(s.profile, s.cwd);
+export async function skills(s: SessionInfo): Promise<string | undefined> {
+	const list = await skillsFor(s.profile, s.cwd, machineOf(s.project)).catch(() => listSkills(s.profile, s.cwd, []));
 	if (!list.length) return undefined;
 	const lines = list.map((k) => `- ${k.name}: ${k.description.replace(/\s+/g, " ").slice(0, 120)}`);
 	return `# Skills\nThe person's own procedures. When one fits the task, load it with skill_view first and follow it.\n${lines.join("\n")}`;

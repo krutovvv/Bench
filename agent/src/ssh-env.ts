@@ -62,6 +62,36 @@ export function sshOptions(host: string): string[] {
 	];
 }
 
+/**
+ * Channels one server's connection carries at once. sshd opens at most 10 sessions on a connection
+ * (MaxSessions), and a language server and Bench's own panels hold some: past this a command waits
+ * its turn instead of failing with "channel open failed" when a turn runs tools in parallel.
+ */
+const CHANNELS = 6;
+
+class Gate {
+	private busy = 0;
+	private waiting: (() => void)[] = [];
+	async take(): Promise<void> {
+		if (this.busy < CHANNELS) {
+			this.busy++;
+			return;
+		}
+		await new Promise<void>((r) => this.waiting.push(r));
+	}
+	give(): void {
+		const next = this.waiting.shift();
+		if (next) next();
+		else this.busy--;
+	}
+}
+
+const gates = new Map<string, Gate>();
+const gateOf = (host: string) => gates.get(host) ?? gates.set(host, new Gate()).get(host)!;
+
+/** What ssh says when the connection, not the command, failed (it then exits with 255). */
+const LOST = /client_loop|Connection (closed|reset|timed out|refused)|Broken pipe|lost connection|Could not resolve hostname|kex_exchange|banner exchange|Network is unreachable|Operation timed out/i;
+
 /** `s` as one word for a POSIX shell (and for the login shell ssh hands the command to). */
 export const quote = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`;
 
@@ -132,7 +162,17 @@ export class SshExecutionEnv implements ExecutionEnv {
 	}
 
 	/** Run a shell script on the server, `input` on its stdin. */
-	run(script: string, context: Context, input?: Uint8Array): Promise<Run> {
+	async run(script: string, context: Context, input?: Uint8Array): Promise<Run> {
+		const gate = gateOf(this.host);
+		await gate.take();
+		try {
+			return await this.runNow(script, context, input);
+		} finally {
+			gate.give();
+		}
+	}
+
+	private runNow(script: string, context: Context, input?: Uint8Array): Promise<Run> {
 		return new Promise((resolve) => {
 			const child = spawn(sshProgram(), [...sshOptions(this.host), `sh -c ${quote(PRELUDE + script)}`], { stdio: ["pipe", "pipe", "pipe"] });
 			const out: Buffer[] = [];
@@ -207,7 +247,28 @@ export class SshExecutionEnv implements ExecutionEnv {
 		const script = `cd ${quote(cwd)} 2>/dev/null || { echo "Working directory does not exist: ${cwd.replace(/"/g, "")}" >&2; exit 254; }; ${env}${run}`;
 		// The local environment runs ssh: its timeout, abort, window and spill hold as they are.
 		const { cwd: _cwd, env: _env, inheritEnv: _inherit, ...rest } = options ?? {};
-		return this.local.exec([sshProgram(), ...sshOptions(this.host), `sh -c ${quote(script)}`], rest, context);
+		// The last of what it said, to tell a lost connection from the command's own failure.
+		let tail = "";
+		const onOutput: ShellExecOptions["onOutput"] = (text, ctx, info) => {
+			tail = (tail + text).slice(-600);
+			rest.onOutput?.(text, ctx, info);
+		};
+		const gate = gateOf(this.host);
+		await gate.take();
+		let r: Result<ShellExecResult, ExecutionError>;
+		try {
+			r = await this.local.exec([sshProgram(), ...sshOptions(this.host), `sh -c ${quote(script)}`], { ...rest, onOutput }, context);
+		} finally {
+			gate.give();
+		}
+		// Said plainly: the next command reconnects, but this one's end there is unknown.
+		if (r.ok && r.value.exitCode === 255 && LOST.test(tail))
+			rest.onOutput?.(
+				`\n[The connection to ${this.host} was lost while this ran; it may or may not have finished there. The next command reconnects. A long command is safer as \`nohup <command> > /tmp/<name>.log 2>&1 &\`, then read its log.]\n`,
+				context,
+				{ stream: "stderr" },
+			);
+		return r;
 	}
 
 	// ---- files ---------------------------------------------------------------------------------

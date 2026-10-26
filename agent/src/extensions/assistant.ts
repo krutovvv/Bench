@@ -26,7 +26,7 @@ import { environment, inserted, notes, projectContext, skills, soul, subject } f
 import { Inserts } from "../inserts.ts";
 
 const of = (input: any) => host().session(input.conversationId);
-const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined) => (input: any) => {
+const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined | Promise<string | undefined>) => (input: any) => {
 	const info = of(input);
 	return info ? render(info) : undefined;
 };

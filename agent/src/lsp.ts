@@ -61,6 +61,40 @@ export function lspStates(profile: string): Record<string, string> {
 	return out;
 }
 
+/**
+ * What a project's servers need and its machine lacks, before any of them is started: npm
+ * packages need node and npm there, any other server its own program, fetched files curl. Read
+ * in a login shell, as `install` runs; kept a little while (the environment asks on every open).
+ */
+export async function lspNeeds(profile: string, machine: string | undefined): Promise<Record<string, string>> {
+	const servers = Object.entries(readLsp(profile));
+	if (!servers.length) return {};
+	const needs = (s: LspSpec) => [...(s.npm?.length ? ["node", "npm"] : s.command.includes("${LSP}") ? [] : [s.command]), ...(s.fetch?.length ? ["curl"] : [])];
+	const programs = [...new Set(servers.flatMap(([, s]) => needs(s)))];
+	if (!programs.length) return {};
+	const key = `${machine ?? ""}|${programs.join(" ")}`;
+	const hit = lacking.get(key);
+	const missing = hit && Date.now() - hit.at < 60_000 ? hit.missing : await lacks(programs, machine).catch(() => [] as string[]);
+	lacking.set(key, { at: Date.now(), missing });
+	const out: Record<string, string> = {};
+	const where = machine ?? "this machine";
+	for (const [name, s] of servers) {
+		const no = needs(s).filter((p) => missing.includes(p));
+		if (no.length) out[name] = `failed: no ${no.map((p) => (p === "node" ? "Node" : p)).join(", ")} on ${where} — install ${no.includes("node") ? "Node.js (with npm)" : no.join(", ")} there`;
+	}
+	return out;
+}
+
+const lacking = new Map<string, { at: number; missing: string[] }>();
+
+async function lacks(programs: string[], machine: string | undefined): Promise<string[]> {
+	const script = programs.map((p) => `command -v ${quote(p)} >/dev/null 2>&1 || echo ${quote(p)}`).join("; ");
+	const out = machine
+		? (await (await machineEnv(machine, "")).run(`bash -lc ${quote(script)} 2>/dev/null || sh -c ${quote(script)}`, BACKGROUND_CONTEXT)).stdout.toString()
+		: (await run("bash", ["-lc", script], { timeout: 10_000 })).stdout;
+	return out.split("\n").map((l) => l.trim()).filter(Boolean);
+}
+
 const LANGUAGE: Record<string, string> = {
 	ts: "typescript", tsx: "typescriptreact", js: "javascript", jsx: "javascriptreact", mjs: "javascript", cjs: "javascript",
 	php: "php", css: "css", scss: "scss", less: "less", html: "html", htm: "html", json: "json", jsonc: "jsonc",

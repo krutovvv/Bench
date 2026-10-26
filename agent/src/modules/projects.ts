@@ -7,10 +7,11 @@ import { agentDir, agentMcp, compactionAt, getSetting, resolveModel, setSetting,
 import { arm, jobs, newJob, type Job } from "../builtin/cron.ts";
 import { hosts } from "../builtin/hosts.ts";
 import { projects } from "../builtin/projects.ts";
-import { listSkills as skillsOf } from "../builtin/skills.ts";
+import { listSkills } from "../builtin/skills.ts";
+import { readSkill, skillsFor } from "../repo.ts";
 import { HttpError, type Ctx, type Module } from "../http.ts";
 import { authorizeServer, connectMcp, mcpStatus } from "../mcp.ts";
-import { lspStates, readLsp, writeLsp } from "../lsp.ts";
+import { lspNeeds, lspStates, readLsp, writeLsp } from "../lsp.ts";
 import { syncTelegram } from "../telegram.ts";
 import { cronView } from "./cron.ts";
 
@@ -23,6 +24,12 @@ function envOf(id: string): { agent: string; dir: string; project: { id: string;
 	const p = projects.get(id);
 	if (!p) throw new HttpError(404, "no such project");
 	return { agent: `project:${id}`, dir: projects.env(id), project: p };
+}
+
+/** Every skill a project's threads can use (its folder's read where it is: `repo.ts`). */
+function skillsOf(agent: string) {
+	const p = agent.startsWith("project:") ? projects.get(agent.slice(8)) : undefined;
+	return p?.machine ? skillsFor(agent, p.folder, p.machine).catch(() => listSkills(agent, p.folder, [])) : Promise.resolve(listSkills(agent));
 }
 
 /** The project's MCP servers as the block shows them. `checked`: something tried the server
@@ -72,7 +79,7 @@ export default ({ rt }: Ctx): Module => ({
 		[
 			"GET",
 			/^\/api\/projects\/([^/]+)\/env$/,
-			(_req, m) => {
+			async (_req, m) => {
 				const id = id1(m);
 				const { agent, dir, project: p } = envOf(id);
 				const soulFile = path.join(dir, "SYSTEM.md");
@@ -80,7 +87,8 @@ export default ({ rt }: Ctx): Module => ({
 					// When its conversations are summarized (the Model section), and the window it is
 					// a share of.
 					// Its language servers (lsp.json) and how each is doing.
-					lsp: { servers: readLsp(agent), states: lspStates(agent) },
+					// What its machine lacks for them is said before any is started (no Node there).
+					lsp: { servers: readLsp(agent), states: { ...lspStates(agent), ...(await lspNeeds(agent, projects.get(id)?.machine ?? undefined)) } },
 					compaction: compactionAt(agent) ?? null,
 					window: resolveModel().contextLength,
 					project: p,
@@ -88,7 +96,7 @@ export default ({ rt }: Ctx): Module => ({
 					soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
 					mcp: mcpView(agent),
 					// Every skill its threads can use, with where it lives: its own, its folder's (Host: the machine's).
-					skills: skillsOf(agent).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
+					skills: (await skillsOf(agent)).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
 					prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 					mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
 					hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user, port: h.port, path: h.path })),
@@ -238,10 +246,10 @@ export default ({ rt }: Ctx): Module => ({
 		[
 			"GET",
 			/^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/,
-			(_req, m) => {
-				const skill = skillsOf(envOf(id1(m)).agent).find((k) => k.name === decodeURIComponent(m[2]));
+			async (_req, m) => {
+				const skill = (await skillsOf(envOf(id1(m)).agent)).find((k) => k.name === decodeURIComponent(m[2]));
 				if (!skill) throw new HttpError(404, "no such skill");
-				return { name: skill.name, dir: skill.dir, scope: skill.scope, text: fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8") };
+				return { name: skill.name, dir: skill.dir, scope: skill.scope, text: await readSkill(skill) };
 			},
 		],
 		[
@@ -261,9 +269,9 @@ export default ({ rt }: Ctx): Module => ({
 		[
 			"PUT",
 			/^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/,
-			(req, m) => {
+			async (req, m) => {
 				const { agent, dir } = envOf(id1(m));
-				const skill = skillsOf(agent).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
+				const skill = (await skillsOf(agent)).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
 				if (!skill) throw new HttpError(404, "no such skill of the project");
 				fs.writeFileSync(path.join(skill.dir, "SKILL.md"), String(req.body?.text ?? ""));
 				return { ok: true };
@@ -274,7 +282,7 @@ export default ({ rt }: Ctx): Module => ({
 			/^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/,
 			(_req, m) => {
 				const { agent, dir } = envOf(id1(m));
-				const skill = skillsOf(agent).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
+				const skill = listSkills(agent).find((k) => k.name === decodeURIComponent(m[2]) && k.dir.startsWith(dir));
 				if (!skill) throw new HttpError(404, "no such skill");
 				fs.rmSync(skill.dir, { recursive: true, force: true });
 				return { ok: true };

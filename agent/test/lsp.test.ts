@@ -11,7 +11,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-lsp-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_SSH = path.join(import.meta.dirname, "fake-ssh.sh");
-const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics } = await import("../src/lsp.ts");
+const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds } = await import("../src/lsp.ts");
 after(() => {
 	writeLsp("project:p1", {});
 	fs.rmSync(home, { recursive: true, force: true });
@@ -35,4 +35,16 @@ test("errors of a file come back; fixed, it says none; an unknown kind says noth
 test("a project on a server: its server runs there, through the SSH connection", async () => {
 	const out = await diagnosticsFor("project:p1", root, "fake", path.join(root, "c.tsx"), "ERROR\n");
 	assert.match(out!, /c\.tsx:1:1 error: found ERROR/);
+});
+
+test("what the machine lacks for a server is said before it starts", async () => {
+	writeLsp("project:p2", {
+		php: { command: "${LSP}/node_modules/.bin/intelephense", extensions: ["php"], npm: ["intelephense@1"] },
+		ra: { command: "no-such-program-bench", extensions: ["rs"] },
+		ours: fake,
+	});
+	const needs = await lspNeeds("project:p2", "fake");
+	assert.deepEqual(Object.keys(needs), ["ra"], "node and npm are here; the fake's own program is");
+	assert.match(needs.ra!, /^failed: no no-such-program-bench on fake/);
+	writeLsp("project:p2", {});
 });
