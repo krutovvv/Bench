@@ -619,7 +619,19 @@ export class Runtime {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const found = await live.conversation.commit(async (tx) => patchInsert((await tx.doc(Inserts as any, live.conversation.id)) as any, insertId, patch), ctx);
-		if (!found) throw new Error(`no insert ${insertId}`);
+		if (found) return this.inserts(id);
+		// The item is gone from the document while its entry is in the transcript: the thread is
+		// from before the document, or a commit lost the item. Bench shows such an insert (the
+		// entry says it is there), so its next change writes the state again rather than failing —
+		// a failed insert made Bench read the whole thread anew, and that wiped the person's draft
+		// and the messages waiting in the queue.
+		const known = (await this.inserts(id)).find((v) => v.id === insertId);
+		if (!known) throw new Error(`no insert ${insertId}`);
+		await live.conversation.commit(async (tx) => {
+			const doc = (await tx.doc(Inserts as any, live.conversation.id)) as any;
+			doc.items[insertId] = { key: known.key, state: {}, folded: false, removed: false };
+			patchInsert(doc, insertId, patch);
+		}, ctx);
 		return this.inserts(id);
 	}
 

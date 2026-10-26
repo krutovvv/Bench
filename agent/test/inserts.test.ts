@@ -12,7 +12,7 @@ process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
 after(() => fs.rmSync(home, { recursive: true, force: true }));
 
-const { insertsOf, patchInsert } = await import("../src/inserts.ts");
+const { Inserts, insertsOf, patchInsert } = await import("../src/inserts.ts");
 const { inserted } = await import("../src/prompt.ts");
 const { Runtime } = await import("../src/runtime.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
@@ -100,4 +100,31 @@ test("an old thread's subject becomes its first insert", async () => {
 		[["files", { host: "h9" }]],
 	);
 	assert.equal(rt.store.get(live.row.id)!.subject, "");
+});
+
+test("an insert whose saved state went missing is healed, not refused", async () => {
+	const rt = new Runtime(() => {});
+	await rt.open();
+	const live = await rt.create("default", undefined, "local");
+	const id = live.row.id;
+	await rt.insert(id, "ih", "ssh:local");
+	// The entry stayed while the document lost the item: a thread from before the document, or a
+	// commit that dropped it. Bench still shows the insert, because the entry says it is there.
+	await live.conversation.commit(
+		async (tx) => {
+			const doc = (await tx.doc(Inserts as any, live.conversation.id)) as any;
+			delete doc.items.ih;
+		},
+		BACKGROUND_CONTEXT,
+	);
+	assert.deepEqual((await rt.inserts(id)).map((i) => i.id), ["ih"], "shown from its entry");
+	// Its next change must heal the state. It used to throw, and Bench answered a failed insert by
+	// reading the whole thread again — which wiped the person's draft and their queue.
+	await rt.patchInsert(id, "ih", { folded: true });
+	const healed = (await rt.inserts(id)).find((i) => i.id === "ih")!;
+	assert.equal(healed.key, "ssh:local", "the entry's key is kept");
+	assert.equal(healed.folded, true);
+	// An id no entry knows is still nobody's insert.
+	await assert.rejects(rt.patchInsert(id, "ghost", { folded: true }));
+	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 });
