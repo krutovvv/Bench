@@ -9,6 +9,7 @@ mod panels;
 mod project_list;
 mod providers;
 mod remote_files;
+mod rows;
 mod servers;
 mod sidebar;
 mod sites;
