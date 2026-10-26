@@ -311,8 +311,14 @@ pub const FIELD_H: f32 = 28.;
 /// plus this.
 pub const STATUS_H: f32 = 29.;
 
+/// The thread's leading, in lines: one place, so the composer and the messages cannot drift
+/// apart — a textarea by itself is tighter (1.23 measured), and that read as a different rhythm
+/// between what is typed and what was sent.
+pub const LEAD: f32 = 1.5;
+
 /// The height of every small row and chip in the thread: an attachment's chip, a message that
 /// waits in the queue, a plan's head. One height, so these rows do not jump about each other.
+/// A field is as tall as a chip (`FIELD_H` = `CHIP_H`): nothing small grows past either.
 pub const CHIP_H: f32 = FIELD_H;
 
 /// A picture's square, in the composer and in a sent message: big enough to tell at a glance

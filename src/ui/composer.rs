@@ -9,10 +9,6 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 
-/// The avatar's offset from the row's top (it replaces the avatar's own): the textarea's line
-/// sits higher than a message's, so the avatar goes up to center on it (the caret).
-
-const AVATAR_TOP: f32 = -2.5;
 
 /// Rows the command list shows before it scrolls, and their height.
 const SLASH_ROWS: f32 = 8.;
@@ -175,7 +171,7 @@ impl BenchApp {
                     .text_base()
                     // The person's avatar even in a new chat: an empty sheet with no sign of whose
                     // turn it is was not clear (the user, after trying a bare caret).
-                    .child(super::avatar(false, &theme).mt(px(AVATAR_TOP)))
+                    .child(super::avatar(false, &theme))
                     .child(
                         v_flex()
                             .flex_1()
@@ -194,7 +190,7 @@ impl BenchApp {
                                     // message's does. Large = the messages' size; it grows
                                     // with the text (no scroll of its own: the thread
                                     // scrolls).
-                                    div().ml(px(-12.)).my(px(-10.)).child(
+                                    div().ml(px(-12.)).my(px(-10.)).line_height(relative(super::LEAD)).child(
                                         Textarea::new(&self.composer).appearance(false).large(),
                                     ),
                                 ),

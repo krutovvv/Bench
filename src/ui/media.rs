@@ -144,7 +144,7 @@ pub(super) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
             gpui_kit::component::text::TextViewStyle::default().code_block(
                 StyleRefinement::default()
                     .text_size(rems(0.8125))
-                    .line_height(relative(1.5)),
+                    .line_height(relative(super::LEAD)),
             ),
         )
 }
@@ -164,7 +164,7 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
         gpui_kit::component::text::TextViewStyle::default().code_block(
             StyleRefinement::default()
                 .text_size(rems(0.8125))
-                .line_height(relative(1.5))
+                .line_height(relative(super::LEAD))
                 .border_0()
                 // No fill, like the audio, video and changed-files cards: the frame alone.
                 .bg(gpui_kit::transparent_black()),
