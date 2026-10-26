@@ -1,6 +1,7 @@
 //! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::tooltip::Tooltip;
@@ -9,6 +10,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::plural;
+use crate::app::sidebar_items::Item;
 use crate::app::{BenchApp, Panel};
 use crate::icons::Ico;
 
@@ -35,36 +37,12 @@ impl BenchApp {
                 }
             }
         } else {
-            // Projects, each with its threads: the sidebar's only unit.
-            let visible = self.visible_sessions();
-            // Host first, always: this machine's own project (looking after it), with the threads
-            // of no project, Telegram's and cron's.
-            let loose: Vec<usize> = visible
-                .iter()
-                .copied()
-                .filter(|&i| {
-                    let s = &self.sessions[i];
-                    s.host.is_empty()
-                        && (s.project.is_empty()
-                            || !self.projects.iter().any(|p| p.id == s.project))
-                })
-                .collect();
+            // Projects, each with its threads: the sidebar's only unit. Host first, always: this
+            // machine's own project, with the threads of no project, Telegram's and cron's; then
+            // the projects, pinned ones first (`sidebar_items.rs` — ↑ ↓ walk the same order).
+            let (loose, groups) = self.sidebar_groups();
             list.extend(self.render_loose(loose, cx));
-            // Pinned projects first, each project's pinned threads first.
-            let mut projects = self.projects.clone();
-            projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
-            for (g, p) in projects.into_iter().enumerate() {
-                // A project's threads: of its agent, in it (a server's are placed by `agents.rs`).
-                let host = p.host.clone().unwrap_or_default();
-                let mut rows: Vec<usize> = visible
-                    .iter()
-                    .copied()
-                    .filter(|&i| {
-                        let s = &self.sessions[i];
-                        s.host == host && s.project == p.id
-                    })
-                    .collect();
-                rows.sort_by_key(|&i| !self.mark_of(&self.sessions[i].id).pinned);
+            for (g, (p, rows)) in groups.into_iter().enumerate() {
                 list.extend(self.render_project(g + 1, &p, rows, cx));
             }
             if self.projects.is_empty() && !self.connecting {
@@ -82,6 +60,11 @@ impl BenchApp {
             .child(
                 v_flex()
                     .id("sessions")
+                    // After a click on a thread: ↑ ↓ open the next, ⌫ deletes (`sidebar_items.rs`).
+                    .track_focus(&self.sidebar_focus)
+                    .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                        this.sidebar_key(&ev.keystroke, window, cx)
+                    }))
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
@@ -134,8 +117,16 @@ impl BenchApp {
             ),
             None => Some(format!("{h}: not connected")),
         });
-        let (new_id, del_id, env_id) = (p.id.clone(), p.id.clone(), p.id.clone());
-        let pinned = self.mark_of(&format!("p:{}", p.id)).pinned;
+        let (new_id, menu_id) = (p.id.clone(), p.id.clone());
+        let mark = self.mark_of(&format!("p:{}", p.id));
+        let pinned = mark.pinned;
+        // A chosen color is the project's icon and name, no background: it marks the group.
+        let color: Option<Hsla> = mark
+            .color
+            .and_then(|c| crate::app::marks::MARK_COLORS.get(c))
+            .map(|c| rgb(*c).into());
+        let armed = self.confirm_delete.as_deref() == Some(format!("p:{}", p.id).as_str());
+        let renaming = self.renaming_field(&Item::Project(p.id.clone()));
         let zed = p
             .folder
             .clone()
@@ -152,17 +143,60 @@ impl BenchApp {
                 .gap_1p5()
                 .items_center()
                 .text_sm()
-                .child(super::head_icon(icon, cx))
-                .child(
-                    div()
+                .child(super::head_icon_in(icon, color, cx))
+                .child(match renaming {
+                    Some(field) => div()
+                        .flex_1()
+                        .min_w_0()
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(Input::new(&field).xsmall())
+                        .into_any_element(),
+                    None => div()
                         .min_w_0()
                         .truncate()
                         .font_weight(FontWeight::MEDIUM)
-                        .text_color(muted)
-                        .child(p.name.clone()),
-                )
+                        .text_color(color.unwrap_or(muted))
+                        .child(p.name.clone())
+                        .into_any_element(),
+                })
                 .child(div().flex_1())
-                // "⋯" (on hover): its environment, pin, remove — as a right click.
+                // Removing asks first: its environment goes with it.
+                .when(armed, |d| {
+                    let yes = p.id.clone();
+                    d.child(
+                        h_flex()
+                            .gap_1()
+                            .text_xs()
+                            .child(
+                                div()
+                                    .id(("premove-yes", g))
+                                    .px_1p5()
+                                    .py_0p5()
+                                    .rounded_md()
+                                    .bg(theme.danger)
+                                    .text_color(theme.danger_foreground)
+                                    .child("Remove")
+                                    .on_click(cx.listener(move |this, _, window, cx| {
+                                        cx.stop_propagation();
+                                        this.delete_project(yes.clone(), window, cx)
+                                    })),
+                            )
+                            .child(
+                                div()
+                                    .id(("premove-no", g))
+                                    .px_1()
+                                    .py_0p5()
+                                    .text_color(muted)
+                                    .hover(|s| s.text_color(theme.foreground))
+                                    .child("Cancel")
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        cx.stop_propagation();
+                                        this.cancel_delete(cx)
+                                    })),
+                            ),
+                    )
+                })
+                // "⋯" (on hover): the same menu as a right click.
                 .child(
                     div()
                         .flex_none()
@@ -174,9 +208,9 @@ impl BenchApp {
                                 .ghost()
                                 .xsmall()
                                 .icon(Ico::Ellipsis.icon())
-                                .dropdown_menu(project_menu(
+                                .dropdown_menu(item_menu(
                                     cx.entity(),
-                                    env_id.clone(),
+                                    Item::Project(menu_id.clone()),
                                     pinned,
                                     zed.clone(),
                                 )),
@@ -213,9 +247,9 @@ impl BenchApp {
                     ),
                 )
                 .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
-                .context_menu(project_menu(
+                .context_menu(item_menu(
                     cx.entity(),
-                    del_id.clone(),
+                    Item::Project(menu_id.clone()),
                     pinned,
                     zed.clone(),
                 ))
@@ -395,7 +429,6 @@ impl BenchApp {
         let muted = theme.muted_foreground;
         let s = &self.sessions[i];
         let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(&s.id);
-        let armed = self.confirm_delete.as_deref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
         let count = if s.running {
             "working…".to_string()
@@ -407,43 +440,10 @@ impl BenchApp {
             Some(p) if !p.branch.is_empty() => format!("{} · {count}", p.branch),
             _ => count,
         };
-        let (open_id, del_id) = (s.id.clone(), s.id.clone());
+        let open_id = s.id.clone();
         let compact = self.appearance.compact_sidebar;
 
-        let delete = if armed {
-            h_flex()
-                .gap_1()
-                .text_xs()
-                .child(
-                    div()
-                        .id(("del-yes", i))
-                        .px_1p5()
-                        .py_0p5()
-                        .bg(theme.danger)
-                        .text_color(theme.danger_foreground)
-                        .cursor_pointer()
-                        .child("Delete")
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            cx.stop_propagation();
-                            this.delete_session(del_id.clone(), window, cx)
-                        })),
-                )
-                .child(
-                    div()
-                        .id(("del-no", i))
-                        .px_1()
-                        .py_0p5()
-                        .cursor_pointer()
-                        .text_color(muted)
-                        .hover(|s| s.text_color(theme.foreground))
-                        .child("Cancel")
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.cancel_delete(cx)
-                        })),
-                )
-                .into_any_element()
-        } else {
+        let delete = {
             // "⋯" on hover: pin, color, its files (the mini IDE; Zed is one click from there),
             // delete.
             let view = cx.entity();
@@ -459,7 +459,7 @@ impl BenchApp {
                         .ghost()
                         .xsmall()
                         .icon(Ico::Ellipsis.icon())
-                        .dropdown_menu(session_menu(view.clone(), id.clone(), mark.pinned)),
+                        .dropdown_menu(item_menu(view.clone(), Item::Thread(id.clone()), mark.pinned, None)),
                 )
                 .into_any_element()
         };
@@ -469,7 +469,7 @@ impl BenchApp {
         let stripe = self
             .mark_of(&s.id)
             .color
-            .and_then(|c| crate::app::marks::SESSION_COLORS.get(c))
+            .and_then(|c| crate::app::marks::MARK_COLORS.get(c))
             .map(|c| -> Hsla { rgb(*c).into() });
 
         let pinned = self.mark_of(&s.id).pinned;
@@ -526,15 +526,28 @@ impl BenchApp {
                             .when(pinned, |d| {
                                 d.child(Ico::Pin.icon().xsmall().text_color(muted))
                             })
-                            .child(div().min_w_0().text_size(px(SESSION_TITLE)).truncate().map(
-                                |d| {
-                                    if working {
-                                        d.child(ShimmerText::new(s.title.clone()))
-                                    } else {
-                                        d.child(s.title.clone())
-                                    }
-                                },
-                            )),
+                            .child(match self.renaming_field(&Item::Thread(s.id.clone())) {
+                                // Renamed in place: the field where the title was.
+                                Some(field) => div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .text_size(px(SESSION_TITLE))
+                                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                                    .child(Input::new(&field).small())
+                                    .into_any_element(),
+                                None => div()
+                                    .min_w_0()
+                                    .text_size(px(SESSION_TITLE))
+                                    .truncate()
+                                    .map(|d| {
+                                        if working {
+                                            d.child(ShimmerText::new(s.title.clone()))
+                                        } else {
+                                            d.child(s.title.clone())
+                                        }
+                                    })
+                                    .into_any_element(),
+                            }),
                     )
                     // Compact: the title alone (a working session still shimmers).
                     .when(!compact, |d| {
@@ -542,8 +555,12 @@ impl BenchApp {
                     }),
             )
             .child(delete)
-            .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))
-            .context_menu(session_menu(cx.entity(), menu_id, pinned))
+            // Opened, and the sidebar takes the keys: ↑ ↓ to the next, ⌫ deletes it.
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.open_session(open_id.clone(), cx);
+                window.focus(&this.sidebar_focus, cx);
+            }))
+            .context_menu(item_menu(cx.entity(), Item::Thread(menu_id), pinned, None))
     }
 }
 
@@ -571,7 +588,7 @@ fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App
                 Some(c) => d.child(
                     div()
                         .size(px(12.))
-                        .bg(Hsla::from(rgb(crate::app::marks::SESSION_COLORS[c]))),
+                        .bg(Hsla::from(rgb(crate::app::marks::MARK_COLORS[c]))),
                 ),
                 None => d
                     .text_color(theme.muted_foreground)
@@ -590,59 +607,16 @@ fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App
         .gap_2()
         .ml(px(-16.))
         .py_1()
-        .children((0..crate::app::marks::SESSION_COLORS.len()).map(|c| swatch(Some(c))))
+        .children((0..crate::app::marks::MARK_COLORS.len()).map(|c| swatch(Some(c))))
         .child(swatch(None))
         .into_any_element()
 }
 
-/// A thread's menu (its "⋯" and a right click): pin, color, Zed, delete.
-fn session_menu(
+/// The menu of a sidebar item (its "⋯" and a right click), the same for a thread and a
+/// project: a project's own entries (environment, Zed), then pin, color, rename, delete.
+fn item_menu(
     view: Entity<BenchApp>,
-    id: String,
-    pinned: bool,
-) -> impl Fn(
-    gpui_kit::component::menu::PopupMenu,
-    &mut Window,
-    &mut Context<gpui_kit::component::menu::PopupMenu>,
-) -> gpui_kit::component::menu::PopupMenu
-+ 'static {
-    move |menu, _, _| {
-        let act = |f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>| {
-            let view = view.clone();
-            move |_: &ClickEvent, window: &mut Window, cx: &mut App| {
-                view.update(cx, |this, cx| f(this, window, cx))
-            }
-        };
-        let (pin_id, del) = (id.clone(), id.clone());
-        let (swatch_view, swatch_id) = (view.clone(), id.clone());
-        menu.item(
-            PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
-                .icon(Ico::Pin.icon())
-                .on_click(act(Box::new(move |this, _, cx| {
-                    this.toggle_pin(pin_id.clone(), cx)
-                }))),
-        )
-        .separator()
-        // Reads the color live, so a click shows at once in the open menu.
-        .item(PopupMenuItem::element(move |_, cx| {
-            let current = swatch_view.read(cx).mark_of(&swatch_id).color;
-            color_row(&swatch_view, &swatch_id, current, cx)
-        }))
-        .separator()
-        .item(
-            PopupMenuItem::new("Delete")
-                .icon(Ico::Trash.icon())
-                .on_click(act(Box::new(move |this, window, cx| {
-                    this.delete_session(del.clone(), window, cx)
-                }))),
-        )
-    }
-}
-
-/// A project's menu (its "⋯" and a right click): its environment, pin, remove.
-fn project_menu(
-    view: Entity<BenchApp>,
-    id: String,
+    item: Item,
     pinned: bool,
     zed: Option<(String, Option<String>)>,
 ) -> impl Fn(
@@ -658,38 +632,64 @@ fn project_menu(
                 view.update(cx, |this, cx| f(this, window, cx))
             }
         };
-        let (env_id, pin_id, del) = (id.clone(), format!("p:{id}"), id.clone());
+        let key = item.mark_key();
+        let (pin_key, swatch_view, swatch_key) = (key.clone(), view.clone(), key.clone());
+        let (rename, del) = (item.clone(), item.clone());
+        let menu = match &item {
+            Item::Project(id) => {
+                let env_id = id.clone();
+                menu.item(
+                    PopupMenuItem::new("Environment")
+                        .icon(Ico::Pencil.icon())
+                        .on_click(act(Box::new(move |this, window, cx| {
+                            this.open_project_env(env_id.clone(), window, cx)
+                        }))),
+                )
+                // A project with a folder opens in Zed (a server's over SSH).
+                .when_some(zed.clone(), |menu, (folder, host)| {
+                    menu.item(
+                        PopupMenuItem::new("Open in Zed")
+                            .icon(Ico::Zed.icon())
+                            .on_click(act(Box::new(move |this, _, cx| {
+                                this.open_in_zed(&folder, None, host.as_deref(), cx)
+                            }))),
+                    )
+                })
+                .separator()
+            }
+            Item::Thread(_) => menu,
+        };
         menu.item(
-            PopupMenuItem::new("Environment")
-                .icon(Ico::Pencil.icon())
-                .on_click(act(Box::new(move |this, window, cx| {
-                    this.open_project_env(env_id.clone(), window, cx)
-                }))),
-        )
-        .item(
             PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
                 .icon(Ico::Pin.icon())
                 .on_click(act(Box::new(move |this, _, cx| {
-                    this.toggle_pin(pin_id.clone(), cx)
+                    this.toggle_pin(pin_key.clone(), cx)
                 }))),
         )
-        // A project with a folder opens in Zed (a server's over SSH).
-        .when_some(zed.clone(), |menu, (folder, host)| {
-            menu.item(
-                PopupMenuItem::new("Open in Zed")
-                    .icon(Ico::Zed.icon())
-                    .on_click(act(Box::new(move |this, _, cx| {
-                        this.open_in_zed(&folder, None, host.as_deref(), cx)
-                    }))),
-            )
-        })
+        .item(
+            PopupMenuItem::new("Rename")
+                .icon(Ico::Pencil.icon())
+                .on_click(act(Box::new(move |this, window, cx| {
+                    this.start_rename(rename.clone(), window, cx)
+                }))),
+        )
+        .separator()
+        // Reads the color live, so a click shows at once in the open menu.
+        .item(PopupMenuItem::element(move |_, cx| {
+            let current = swatch_view.read(cx).mark_of(&swatch_key).color;
+            color_row(&swatch_view, &swatch_key, current, cx)
+        }))
         .separator()
         .item(
-            PopupMenuItem::new("Remove project")
-                .icon(Ico::Trash.icon())
-                .on_click(act(Box::new(move |this, window, cx| {
-                    this.delete_project(del.clone(), window, cx)
-                }))),
+            PopupMenuItem::new(match del {
+                Item::Thread(_) => "Delete",
+                Item::Project(_) => "Remove project…",
+            })
+            .icon(Ico::Trash.icon())
+            .on_click(act(Box::new(move |this, window, cx| match &del {
+                Item::Thread(id) => this.delete_session(id.clone(), window, cx),
+                Item::Project(id) => this.delete_project(id.clone(), window, cx),
+            }))),
         )
     }
 }

@@ -9,13 +9,18 @@ use crate::metrics::nest_pl;
 
 /// A head's icon in a fixed 16 px square, so names after icons of any drawing start at one x.
 pub fn head_icon(icon: Ico, cx: &App) -> impl IntoElement {
+    head_icon_in(icon, None, cx)
+}
+
+/// `head_icon` in a color of the person's choosing (a marked project), else muted.
+pub fn head_icon_in(icon: Ico, color: Option<Hsla>, cx: &App) -> impl IntoElement {
     div()
         .flex_none()
         .size(px(16.))
         .flex()
         .items_center()
         .justify_center()
-        .child(icon.icon().small().text_color(cx.theme().muted_foreground))
+        .child(icon.icon().small().text_color(color.unwrap_or(cx.theme().muted_foreground)))
 }
 
 /// The room a head's "+" takes, kept when it has none, so every chevron sits at one x.

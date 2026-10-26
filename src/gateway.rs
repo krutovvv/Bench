@@ -100,6 +100,11 @@ pub enum Cmd {
         session: String,
         effort: String,
     },
+    /// The person's name for a thread.
+    Rename {
+        session: String,
+        title: String,
+    },
     /// The profile's slash commands (and skills).
     Catalog {
         profile: String,
@@ -382,6 +387,11 @@ impl Rpc {
             Cmd::SetEffort { session, effort } => self.call(
                 "config.set",
                 json!({"key": "reasoning", "value": effort, "session_id": session}),
+                Pending::Ignore,
+            )?,
+            Cmd::Rename { session, title } => self.call(
+                "session.title",
+                json!({"session_id": session, "title": title}),
                 Pending::Ignore,
             )?,
             Cmd::Catalog { profile } => self.call(

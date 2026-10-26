@@ -248,6 +248,15 @@ impl BenchApp {
             self.new_project_form(window, cx);
         }
         self.sync_rows(window, cx);
+        // `BENCH_DEMO_RENAME=<thread id>`: that thread being renamed (for screenshots).
+        if self.demo {
+            static RENAME: std::sync::Once = std::sync::Once::new();
+            if let Ok(id) = std::env::var("BENCH_DEMO_RENAME") {
+                RENAME.call_once(|| {
+                    self.start_rename(crate::app::sidebar_items::Item::Thread(id), window, cx)
+                });
+            }
+        }
         // `BENCH_DEMO_SCROLL=end`: the thread scrolled as far down as it goes (for screenshots).
         if self.demo && !self.demo_scrolled && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end") {
             self.demo_scrolled = true;

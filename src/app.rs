@@ -23,6 +23,7 @@ mod processes;
 pub(crate) mod project_list;
 pub(crate) mod projects;
 pub(crate) mod agents;
+pub(crate) mod sidebar_items;
 mod send;
 mod sessions;
 mod telegram;
@@ -108,6 +109,10 @@ pub struct BenchApp {
     pub agents: HashMap<String, agents::AgentLink>,
     /// The agent whose models and voice the gear shows ("" = this Mac's).
     pub gear_agent: String,
+    /// A thread or project being renamed in the sidebar (`sidebar_items.rs`).
+    pub renaming: Option<sidebar_items::Renaming>,
+    /// The sidebar's keys (↑ ↓ ⌫) while it has the focus, after a click on a thread.
+    pub sidebar_focus: FocusHandle,
     /// Each server agent's own projects (beside its Host), as it last listed them.
     pub server_projects: HashMap<String, Vec<crate::model::ProjectEntry>>,
     /// BENCH_SUBJECT was opened (once).
@@ -617,6 +622,8 @@ impl BenchApp {
             prompts_for: None,
             agents: HashMap::new(),
             gear_agent: String::new(),
+            renaming: None,
+            sidebar_focus: cx.focus_handle(),
             server_projects: HashMap::new(),
             subject_opened: false,
             sites: Default::default(),

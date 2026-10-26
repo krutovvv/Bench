@@ -44,8 +44,8 @@ impl BenchApp {
                 self.open_task_list(crate::inserts::tasks::model::List::Today, window, cx)
             }
             ("\\", false) => self.toggle_sidebar(cx),
-            // ⌘⌫ / ⌘⌦: delete the open thread (the first press arms it in the sidebar, the
-            // second deletes), as Move to Trash in Finder; a bare ⌫ stays the composer's.
+            // ⌘⌫ / ⌘⌦: delete the open thread, as Move to Trash in Finder; a bare ⌫ deletes it
+            // while the sidebar has the focus (`sidebar_items.rs`), else it is the composer's.
             ("backspace" | "delete", false)
                 if self.panel == Panel::Chat && self.session.is_some() =>
             {
@@ -74,6 +74,10 @@ impl BenchApp {
     /// Esc: cancel a recording (nothing is transcribed), close the quick-open list, the server
     /// form or the settings. Otherwise it belongs to whatever has focus.
     fn escape(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.renaming.is_some() {
+            self.cancel_rename(cx);
+            return true;
+        }
         if self.recorder.take().is_some() {
             self.wave_ticker = None;
             self.send_after_transcribe = false;

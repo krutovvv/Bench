@@ -73,6 +73,14 @@ impl BenchApp {
 
     /// The project goes from the list; its threads stay, without a project.
     pub fn delete_project(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
+        // The first time asks (its head shows Remove · Cancel): its environment goes with it.
+        let key = format!("p:{id}");
+        if self.confirm_delete.as_deref() != Some(key.as_str()) {
+            self.confirm_delete = Some(key);
+            cx.notify();
+            return;
+        }
+        self.confirm_delete = None;
         // A server's own project goes from its agent; anything else (a server's Host too: the
         // server leaves the list) from this Mac's.
         let (host, rid) = self.project_place(&id);

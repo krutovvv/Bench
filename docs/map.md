@@ -18,7 +18,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change a project's environment (soul, MCP, skills, prompts, accesses, Telegram, schedule) | `src/env/<section>.rs` (`mcp.rs`, `skills.rs`, `schedule.rs`…); a new section: `src/env/mod.rs` header |
 | change what happens on an agent event | `src/app/events.rs` |
 | open, delete or search threads | `src/app/sessions.rs` |
-| change the sidebar | `src/ui/sidebar.rs` (projects: `src/app/project_list.rs`) |
+| change the sidebar | `src/ui/sidebar.rs` (projects: `src/app/project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/app/sidebar_items.rs`, marks in `src/app/marks.rs` |
 | change the status bar | `src/ui/statusbar.rs` |
 | change the gear (providers, look) | `src/ui/providers.rs`, `src/app/providers.rs`, `src/ui/panels.rs` |
 | change a keyboard shortcut | `src/app/keys.rs` |

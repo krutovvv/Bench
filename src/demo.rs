@@ -712,6 +712,15 @@ fewer form fields. Then check what it did to signups and give me a short summary
         }
         .into();
     }
+    // The demo's own marks, not the person's: two projects in colors, a thread in one.
+    app.marks = [
+        ("p:p-blog", 4),
+        ("p:p-audit", 1),
+        ("d-api", 2),
+    ]
+    .into_iter()
+    .map(|(k, c)| (k.to_string(), crate::app::marks::Mark { color: Some(c), pinned: false }))
+    .collect();
     // The demo's own folds, not the person's: every group open but the long Tools.
     app.ssh.collapsed = ["s:Tools".to_string()].into_iter().collect();
     // `BENCH_DEMO=tasks|server|browser|tool`: that thread open instead.

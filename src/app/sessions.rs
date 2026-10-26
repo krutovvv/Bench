@@ -147,13 +147,9 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// First click arms, second click deletes.
+    /// A thread goes at once: it is cheap, and asking each time was the slow part of tidying up
+    /// (a project asks: its environment goes with it).
     pub fn delete_session(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.confirm_delete.as_deref() != Some(&id) {
-            self.confirm_delete = Some(id);
-            cx.notify();
-            return;
-        }
         self.confirm_delete = None;
         let Some(profile) = self.profile.clone() else {
             return;

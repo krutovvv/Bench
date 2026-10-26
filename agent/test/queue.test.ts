@@ -87,6 +87,12 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	assert.deepEqual(told.at(-1), ["second", "third"]);
 	assert.ok(told.some((q) => q.join() === "third,second"));
 
+	// The person's name for the thread holds; a made-up one never replaces it.
+	rt.rename(id, "  Spring   landing ");
+	assert.equal(rt.store.get(id)?.title, "Spring landing");
+	(rt as any).nameIfUnnamed(id, "Made up");
+	assert.equal(rt.store.get(id)?.title, "Spring landing");
+
 	// A stalled run never ends on its own: stop it, or closing waits for it forever.
 	await rt.interrupt(id);
 	stall.closeAllConnections();

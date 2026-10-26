@@ -362,7 +362,9 @@ impl BenchApp {
     pub fn route(&self, cmd: Cmd) {
         let host = match &cmd {
             Cmd::Sessions(_) | Cmd::Catalog { .. } => String::new(),
-            Cmd::Delete { session, .. } => self.host_of_session(session),
+            Cmd::Delete { session, .. } | Cmd::Rename { session, .. } => {
+                self.host_of_session(session)
+            }
             _ => self.thread_host(),
         };
         if let Some(a) = self.agents.get(&host) {

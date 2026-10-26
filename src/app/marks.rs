@@ -1,5 +1,6 @@
-//! Per-session marks kept on this Mac: a color (a quiet stripe at the row's left) and a pin
-//! (the "Pinned" group at the top of the list). Also opening another window.
+//! Marks of the sidebar's items, kept on this Mac (`sidebar_items.rs`): a pin (first in its
+//! group) and a color — a thread's is a quiet stripe and tint on its row, a project's its icon
+//! and name. Keyed by a thread's id, a project's `p:<id>`. Also opening another window.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -9,9 +10,9 @@ use gpui_kit::*;
 use super::BenchApp;
 use crate::connection;
 
-/// Session colors: red, orange, yellow, green, blue, violet, pink (saved by index: new ones go
+/// Mark colors: red, orange, yellow, green, blue, violet, pink (saved by index: new ones go
 /// at the end, so a saved color never changes).
-pub const SESSION_COLORS: [u32; 7] = [
+pub const MARK_COLORS: [u32; 7] = [
     0xD0605A, 0xD99A4E, 0xD6C24A, 0x6DB86A, 0x5C8FD8, 0x9A6AD6, 0xD46A9F,
 ];
 

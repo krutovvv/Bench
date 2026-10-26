@@ -24,6 +24,12 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			return { session_id: live.row.id, stored_session_id: live.row.id, revision: 0, execution_generation: 0 };
 		},
 		// A tool attached to the thread (`/ssh web-1`, `/tasks`…): its block from now on.
+		// The person renames a thread (its "⋯" → Rename).
+		"session.title": ({ session_id, title }) => {
+			rt.rename(String(session_id), String(title ?? ""));
+			broadcast(session_id, "sessions.changed", {});
+			return { ok: true };
+		},
 		"session.subject": async ({ session_id, subject }) => {
 			rt.setSubject(String(session_id), String(subject ?? ""));
 			broadcast(session_id, "sessions.changed", {});

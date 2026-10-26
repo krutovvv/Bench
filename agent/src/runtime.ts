@@ -918,6 +918,20 @@ export class Runtime {
 
 	// ---- titles ----------------------------------------------------------
 
+	/** A made-up title, unless the person named the thread while it was being made. */
+	private nameIfUnnamed(id: string, title: string): void {
+		if (!this.store.get(id)?.title) this.store.update(id, { title });
+	}
+
+	/** The person's name for a thread: it stays (no title is made up over it). */
+	rename(id: string, title: string): void {
+		const t = title.replace(/\s+/g, " ").trim().slice(0, 120);
+		if (!t || !this.store.get(id)) throw new Error(`session not found: ${id}`);
+		this.store.update(id, { title: t });
+		const live = this.live.get(id);
+		if (live) live.row = this.store.get(id)!;
+	}
+
 	private async title(live: Live, message: string): Promise<void> {
 		const fallback = message.replace(/\s+/g, " ").trim().slice(0, 60);
 		try {
@@ -932,9 +946,9 @@ export class Runtime {
 			const out = (res?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
 			const m = out.match(/"title"\s*:\s*"([^"]+)"/);
 			const title = (m?.[1] ?? out.replace(/<think>[\s\S]*?<\/think>/g, "")).trim().replace(/^["']|["'.]$/g, "").slice(0, 80);
-			this.store.update(live.row.id, { title: title || fallback });
+			this.nameIfUnnamed(live.row.id, title || fallback);
 		} catch {
-			this.store.update(live.row.id, { title: fallback });
+			this.nameIfUnnamed(live.row.id, fallback);
 		}
 		this.emit(live.row.id, "sessions.changed", {});
 	}
