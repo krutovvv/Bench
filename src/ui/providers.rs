@@ -125,15 +125,19 @@ impl BenchApp {
         // own machine is localhost there) ----
         page.push(self.pv_heading("AGENTS", cx).into_any_element());
         for host in self.agent_hosts() {
-            let a = &self.agents[&host];
             let current = crate::pi_agent::build();
-            let state = match (&a.error, &a.conn) {
-                (Some(e), _) => e.clone(),
-                (None, None) => "connecting…".into(),
-                (None, Some(_)) => match (&a.build, &current) {
-                    (Some(b), Some(c)) if b == c => "connected · up to date".into(),
-                    (Some(_), Some(_)) => "connected · an older version: updated when idle".into(),
-                    _ => "connected".into(),
+            // A server's agent is linked once this Mac's lists it; until then (and in the demo,
+            // which links none) it is not started.
+            let state = match self.agents.get(&host) {
+                None => "not started".into(),
+                Some(a) => match (&a.error, &a.conn) {
+                    (Some(e), _) => e.clone(),
+                    (None, None) => "connecting…".into(),
+                    (None, Some(_)) => match (&a.build, &current) {
+                        (Some(b), Some(c)) if b == c => "connected · up to date".into(),
+                        (Some(_), Some(_)) => "connected · an older version: updated when idle".into(),
+                        _ => "connected".into(),
+                    },
                 },
             };
             let shown = host == self.gear_agent;
