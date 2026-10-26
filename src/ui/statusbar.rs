@@ -522,7 +522,9 @@ fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, c
                 ),
             ))
             .child(row("Min – max", format!("{min:.0} – {max:.0} tok/s")))
-            .child(row("Seconds", samples.len().to_string()));
+            // One sample is a second the model was writing; waits for tools and prefill are left
+            // out of every figure here, so this row counts writing, not the turn's wall time.
+            .child(row("Writing", format!("{} s", samples.len())));
     }
     if let Some(p) = prefill {
         panel = panel.child(row("Prefill (last call)", format!("{p:.0} tok/s")));
