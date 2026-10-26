@@ -122,19 +122,19 @@ impl Section for Name {
                 .update(cx, |s, cx| s.set_value(name, window, cx));
         }
     }
-    /// The name is the project's own row, on this Mac.
+    /// The name is the project's own row where the project lives (a server's Host: on this Mac).
     fn save(
         &self,
         app: &mut BenchApp,
-        id: &str,
-        _eid: &str,
+        _id: &str,
+        eid: &str,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<Request> {
         let e = app.project_env.as_ref()?;
         Some((
             "PUT",
-            format!("/api/projects/{id}"),
+            format!("/api/projects/{eid}"),
             json!({"name": e.name.field.read(cx).value().trim()}),
         ))
     }

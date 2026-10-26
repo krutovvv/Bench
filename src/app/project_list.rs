@@ -37,9 +37,16 @@ impl BenchApp {
                                 .as_str()
                                 .filter(|h| !h.is_empty())
                                 .map(str::to_string),
+                            remote_id: None,
                             browser: p["browser"].as_bool().unwrap_or(false),
                         })
                         .collect();
+                    // The servers' own projects, as their agents last listed them.
+                    let kept = std::mem::take(&mut this.server_projects);
+                    for (host, list) in &kept {
+                        this.place_server_projects(host, list.clone());
+                    }
+                    this.server_projects = kept;
                     this.host_browser = v["host_browser"].as_bool().unwrap_or(false);
                     // The remote projects' agents, connected beside this Mac's.
                     this.connect_remotes(window, cx);
@@ -62,11 +69,18 @@ impl BenchApp {
 
     /// The project goes from the list; its threads stay, without a project.
     pub fn delete_project(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(conn) = self.local_conn() else {
+        // A server's own project goes from its agent; anything else (a server's Host too: the
+        // server leaves the list) from this Mac's.
+        let (host, rid) = self.project_place(&id);
+        let (conn, path) = if rid == "general" || host.is_empty() {
+            (self.local_conn(), format!("/api/projects/{id}"))
+        } else {
+            (self.conn_of(&host), format!("/api/projects/{rid}"))
+        };
+        let Some(conn) = conn else {
             return;
         };
         let profile = self.current_profile();
-        let path = format!("/api/projects/{id}");
         self.background(
             window,
             cx,

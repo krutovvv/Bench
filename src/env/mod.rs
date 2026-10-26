@@ -236,7 +236,13 @@ impl BenchApp {
         let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
             return;
         };
-        let Some((conn, eid)) = self.env_target(&id) else {
+        // A server's Host is named by its row on this Mac; the rest is where the project lives.
+        let target = if what == "name" && self.project_place(&id).1 == "general" {
+            self.local_conn().map(|c| (c, id.clone()))
+        } else {
+            self.env_target(&id)
+        };
+        let Some((conn, eid)) = target else {
             return;
         };
         let Some((method, path, body)) = section.save(self, &id, &eid, window, cx) else {

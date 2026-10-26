@@ -83,8 +83,12 @@ pub struct ProjectEntry {
     pub id: String,
     pub name: String,
     pub folder: Option<String>,
-    /// A server whose agent the project is (its threads, environment and files live there).
+    /// The server whose agent keeps the project (its threads, environment and files live there);
+    /// None: this Mac's agent.
     pub host: Option<String>,
+    /// Its id on that server's agent; None: the agent's own environment ("general", its Host —
+    /// a row on this Mac that names the server). Unused for this Mac's projects.
+    pub remote_id: Option<String>,
     /// Has the watchable server browser among its own MCP servers: /browser is offered there.
     pub browser: bool,
 }

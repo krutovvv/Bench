@@ -54,16 +54,14 @@ impl BenchApp {
             let mut projects = self.projects.clone();
             projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
             for (g, p) in projects.into_iter().enumerate() {
-                // A remote project's threads are its server agent's; a local one's, its own.
+                // A project's threads: of its agent, in it (a server's are placed by `agents.rs`).
+                let host = p.host.clone().unwrap_or_default();
                 let mut rows: Vec<usize> = visible
                     .iter()
                     .copied()
                     .filter(|&i| {
                         let s = &self.sessions[i];
-                        match &p.host {
-                            Some(h) => &s.host == h,
-                            None => s.host.is_empty() && s.project == p.id,
-                        }
+                        s.host == host && s.project == p.id
                     })
                     .collect();
                 rows.sort_by_key(|&i| !self.mark_of(&self.sessions[i].id).pinned);
@@ -118,7 +116,9 @@ impl BenchApp {
         let collapsed = self.ssh.collapsed.contains(&key);
         let group: SharedString = format!("phead{g}").into();
         let icon = match (&p.host, &p.folder) {
-            (Some(_), _) => Ico::Server,
+            // A server's Host is the server; a project on it is a folder there, or none.
+            (Some(_), _) if p.remote_id.is_none() => Ico::Server,
+            (Some(_), Some(_)) => Ico::Folder,
             (_, Some(f)) if std::path::Path::new(f).join(".git").exists() => Ico::FolderGit,
             (_, Some(_)) => Ico::Folder,
             _ => Ico::Layers,

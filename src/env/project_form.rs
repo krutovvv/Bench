@@ -1,6 +1,8 @@
 //! The new project's page (the sidebar's "+"): its name, where its agent runs (this Mac or a
-//! server), and on this Mac a folder if it has one. Creating it starts its first thread; its
-//! environment is set up in its environment thread once it exists.
+//! server), and a folder if it has one (on this Mac, or on the server). On a server that has an
+//! agent already the project is made there, beside the server's Host; on a new server Bench
+//! installs the agent and the project is that server's Host (`docs/remote-projects.md`).
+//! Creating it starts its first thread; its environment is set up in its environment thread.
 
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
@@ -24,6 +26,8 @@ pub struct ProjectForm {
     pub new_user: Entity<InputState>,
     pub new_port: Entity<InputState>,
     pub new_key: Entity<InputState>,
+    /// A folder on the chosen server, typed (there is no picker for a server's disk).
+    pub server_folder: Entity<InputState>,
 }
 
 impl BenchApp {
@@ -39,6 +43,7 @@ impl BenchApp {
             cx.new(|cx| InputState::new(window, cx).placeholder(hint))
         };
         let new_host = field("Address or domain", window, cx);
+        let server_folder = field("/var/www/site — empty: none", window, cx);
         let new_user = field("Login", window, cx);
         let new_port = field("22", window, cx);
         let new_key = field("Private key file (empty = ssh-agent)", window, cx);
@@ -47,6 +52,7 @@ impl BenchApp {
             folder: None,
             host: None,
             new_host,
+            server_folder,
             new_user,
             new_port,
             new_key,
@@ -144,6 +150,51 @@ impl BenchApp {
                 return;
             }
             host = Some(alias);
+        }
+        // A server with an agent already: the project is made there, its folder on that disk.
+        if let Some(alias) = host.clone().filter(|a| self.has_agent_on(a)) {
+            let folder = form.server_folder.read(cx).value().trim().to_string();
+            let Some(conn) = self.conn_of(&alias) else {
+                self.toast(
+                    NotificationType::Error,
+                    format!("{alias}: its agent is not connected"),
+                    window,
+                    cx,
+                );
+                return;
+            };
+            let body = json!({"name": name, "folder": (!folder.is_empty()).then_some(folder)});
+            let profile = self.current_profile();
+            self.background(
+                window,
+                cx,
+                move || rest::send_json(&conn, "POST", "/api/projects", &profile, body),
+                move |this, r, window, cx| match r {
+                    Ok(v) => {
+                        this.project_form = None;
+                        this.panel = crate::app::Panel::Chat;
+                        if let Some(rid) = v["project"]["id"].as_str() {
+                            let id = format!("{alias}:{rid}");
+                            let entry = crate::model::ProjectEntry {
+                                id: id.clone(),
+                                name: v["project"]["name"].as_str().unwrap_or_default().into(),
+                                folder: v["project"]["folder"].as_str().map(str::to_string),
+                                host: Some(alias.clone()),
+                                remote_id: Some(rid.to_string()),
+                                browser: false,
+                            };
+                            let mut list = this.server_projects.remove(&alias).unwrap_or_default();
+                            list.push(entry);
+                            this.server_projects.insert(alias.clone(), list.clone());
+                            this.place_server_projects(&alias, list);
+                            this.new_thread_in(id, cx);
+                        }
+                        this.load_server_projects(alias, window, cx);
+                    }
+                    Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+                },
+            );
+            return;
         }
         let body = json!({"name": name, "folder": form.folder, "host": host});
         self.reload_servers(cx);
@@ -263,6 +314,20 @@ impl BenchApp {
                 )
                 .into_any_element(),
             );
+            if !chosen.is_empty() && self.has_agent_on(&chosen) {
+                let server_folder = self.project_form.as_ref().map(|f| f.server_folder.clone());
+                if let Some(input) = server_folder {
+                    page.push(
+                        self.pv_row(
+                            "Folder",
+                            format!("Optional: where on {chosen} its threads work"),
+                            self.pv_input(&input),
+                            cx,
+                        )
+                        .into_any_element(),
+                    );
+                }
+            }
             if chosen.is_empty() {
                 page.push(
                     self.pv_row("Address", "Its IP or domain", self.pv_input(&new_host), cx)
@@ -286,7 +351,11 @@ impl BenchApp {
                     .pt_2()
                     .text_sm()
                     .text_color(muted)
-                    .child("Bench installs and starts the agent there over SSH (it needs Node.js 22.18+). The project's threads, skills and MCP servers live on that server.")
+                    .child(if !chosen.is_empty() && self.has_agent_on(&chosen) {
+                        format!("Made on {chosen}'s agent, beside its Host: the project's threads, skills and MCP servers live there, and its models are {chosen}'s (the gear).")
+                    } else {
+                        "Bench installs and starts the agent there over SSH (it needs Node.js 22.18+); the project is that server's Host: its threads, skills and MCP servers live there.".to_string()
+                    })
                     .into_any_element(),
             );
         } else {

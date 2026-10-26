@@ -108,6 +108,8 @@ pub struct BenchApp {
     pub agents: HashMap<String, agents::AgentLink>,
     /// The agent whose models and voice the gear shows ("" = this Mac's).
     pub gear_agent: String,
+    /// Each server agent's own projects (beside its Host), as it last listed them.
+    pub server_projects: HashMap<String, Vec<crate::model::ProjectEntry>>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -615,6 +617,7 @@ impl BenchApp {
             prompts_for: None,
             agents: HashMap::new(),
             gear_agent: String::new(),
+            server_projects: HashMap::new(),
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,

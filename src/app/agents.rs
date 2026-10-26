@@ -10,7 +10,7 @@ use gpui_kit::*;
 use super::BenchApp;
 use crate::connection::Connection;
 use crate::gateway::{Cmd, Evt, Gateway};
-use crate::model::Target;
+use crate::model::{ProjectEntry, Target};
 
 /// One agent: its command channel, its REST connection once up, why it is not up.
 pub struct AgentLink {
@@ -77,12 +77,88 @@ impl BenchApp {
         }
     }
 
-    /// An agent came up: what waited for it is asked now — the gear showing it.
+    /// An agent came up: what waited for it is asked now — the gear showing it, a server's
+    /// own projects.
     pub fn agent_up(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
         if self.panel == super::Panel::Providers && self.gear_agent == host && !self.pv.loaded {
             self.load_providers(window, cx);
         }
+        if !host.is_empty() {
+            self.load_server_projects(host.clone(), window, cx);
+        }
         self.ask_build(host, cx);
+    }
+
+    /// A server agent's own projects (its Host is the row on this Mac that names the server):
+    /// in the sidebar right after its Host, with ids `<host>:<id>`.
+    pub fn load_server_projects(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(conn) = self.conn_of(&host) else {
+            return;
+        };
+        self.background(
+            window,
+            cx,
+            move || crate::rest::get_json(&conn, "/api/projects"),
+            move |this, r, _window, cx| {
+                let Ok(v) = r else {
+                    return;
+                };
+                let list: Vec<ProjectEntry> = v["projects"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|p| {
+                        let rid = p["id"].as_str().filter(|id| !id.is_empty() && *id != "general")?;
+                        Some(ProjectEntry {
+                            id: format!("{host}:{rid}"),
+                            name: p["name"].as_str().unwrap_or_default().into(),
+                            folder: p["folder"].as_str().filter(|f| !f.is_empty()).map(str::to_string),
+                            host: Some(host.clone()),
+                            remote_id: Some(rid.to_string()),
+                            browser: p["browser"].as_bool().unwrap_or(false),
+                        })
+                    })
+                    .collect();
+                this.server_projects.insert(host.clone(), list.clone());
+                this.place_server_projects(&host, list);
+                // Its threads were placed before its projects were known: again.
+                if let Some(a) = this.agents.get(&host) {
+                    a.gateway.send(Cmd::Sessions("default".into()));
+                }
+                cx.notify();
+            },
+        );
+    }
+
+    /// A server's own projects into the list, after its Host row (replacing what was there).
+    pub fn place_server_projects(&mut self, host: &str, list: Vec<ProjectEntry>) {
+        self.projects
+            .retain(|p| !(p.host.as_deref() == Some(host) && p.remote_id.is_some()));
+        let at = self
+            .projects
+            .iter()
+            .position(|p| p.host.as_deref() == Some(host))
+            .map_or(self.projects.len(), |i| i + 1);
+        self.projects.splice(at..at, list);
+    }
+
+    /// The server has an agent Bench knows (a Host row names it): new projects go there.
+    pub fn has_agent_on(&self, host: &str) -> bool {
+        self.projects
+            .iter()
+            .any(|p| p.host.as_deref() == Some(host) && p.remote_id.is_none())
+    }
+
+    /// Where a project is: its agent's host ("" = this Mac) and its id there ("general" for a
+    /// server's Host).
+    pub fn project_place(&self, project: &str) -> (String, String) {
+        match self.projects.iter().find(|p| p.id == project) {
+            Some(p) => match &p.host {
+                Some(h) => (h.clone(), p.remote_id.clone().unwrap_or_else(|| "general".into())),
+                None => (String::new(), p.id.clone()),
+            },
+            None => (String::new(), project.to_string()),
+        }
     }
 
     /// Ask a newly connected agent which sources it runs (for the gear).
@@ -191,12 +267,19 @@ impl BenchApp {
             // The server's agent has no profiles to pick: its threads are the project's.
             Evt::Profiles(_) | Evt::Catalog(_) => {}
             Evt::Sessions(_, rows) => {
-                let project = self
+                // A thread of the server's own project is that project's; the rest are its Host's.
+                let home = self
                     .projects
                     .iter()
-                    .find(|p| p.host.as_deref() == Some(host))
+                    .find(|p| p.host.as_deref() == Some(host) && p.remote_id.is_none())
                     .map(|p| p.id.clone())
                     .unwrap_or_default();
+                let known: Vec<String> = self
+                    .projects
+                    .iter()
+                    .filter(|p| p.host.as_deref() == Some(host))
+                    .map(|p| p.id.clone())
+                    .collect();
                 self.sessions.retain(|s| s.host != host);
                 self.sessions
                     .extend(
@@ -204,7 +287,12 @@ impl BenchApp {
                             .filter(|s| s.source != "subagent")
                             .map(|mut s| {
                                 s.host = host.to_string();
-                                s.project = project.clone();
+                                let own = format!("{host}:{}", s.project);
+                                s.project = if !s.project.is_empty() && known.contains(&own) {
+                                    own
+                                } else {
+                                    home.clone()
+                                };
                                 s
                             }),
                     );
@@ -262,33 +350,26 @@ impl BenchApp {
         }
     }
 
-    /// A new thread's creation, for the agent that will keep it: a remote project's thread is
-    /// its server agent's own (its general environment, no project there).
+    /// A new thread's creation, for the agent that will keep it, in the project as that agent
+    /// knows it: a server's Host is its own environment (no project there).
     pub fn create_cmd(&self, profile: String, cwd: Option<String>) -> Cmd {
-        let remote = !self.thread_host().is_empty();
+        let (host, id) = self.project_place(&self.thread_project);
+        let remote = !host.is_empty();
         Cmd::Create {
             profile: if remote { "default".into() } else { profile },
             cwd,
             subject: self.new_subject.clone(),
-            project: if remote {
-                String::new()
-            } else {
-                self.thread_project.clone()
+            project: match (remote, id.as_str()) {
+                (true, "general") => String::new(),
+                (true, _) => id,
+                (false, _) => self.thread_project.clone(),
             },
         }
     }
 
-    /// The connection a project's environment is read through, and its id there: a remote
-    /// project is its server agent's general environment.
+    /// The connection a project's environment is read through, and its id there.
     pub fn env_target(&self, project: &str) -> Option<(Arc<Connection>, String)> {
-        match self
-            .projects
-            .iter()
-            .find(|p| p.id == project)
-            .and_then(|p| p.host.clone())
-        {
-            Some(host) => self.conn_of(&host).map(|c| (c, "general".to_string())),
-            None => self.local_conn().map(|c| (c, project.to_string())),
-        }
+        let (host, id) = self.project_place(project);
+        self.conn_of(&host).map(|c| (c, id))
     }
 }
