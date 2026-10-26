@@ -28,7 +28,7 @@ writing code:
 4. **Verify visually by measuring**, not by eyeballing: launch the dev build, capture *its*
    window by PID, measure gaps in pixels (`references/build-verification.md`). Never click or type in
    the user's live window; pre-fill state via env vars or a temporary hook instead.
-5. **Commit, then build the commit's app** after every change the user will look at:
+5. **Commit every change; build the app only when the user asks** (usually once, after a batch):
    `ship.sh` (`build-change-loop.md`, step 9). The user tests the bundle, not `target/debug` —
    "I see no changes" happened when only the dev build was rebuilt.
    **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in

@@ -93,7 +93,7 @@ numpy rather than guessing coordinates; crops of a full-screen shot catch other 
 - `cargo build` with zero warnings, `cargo test`, `cargo fmt`.
 - Protocol/API behaviour confirmed with the headless `--probe` mode, read-only where the data is
   the user's (create-and-delete only throwaway items, and say so).
-- Bundle rebuilt, commit made.
+- Commit made; the bundle is rebuilt only if the person asked for a build.
 - Report: what was measured/seen, what only compiles, what needs the user's click.
 
 ## Editing code safely

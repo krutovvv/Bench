@@ -116,8 +116,9 @@
 - "Don't hack": prefer supported APIs; if something isn't supported (e.g. downgrading the
   backend), say so and offer the safe alternative instead of a fragile workaround.
 - Commit freely once the user is happy ("делай смело коммит"); keep the repo clean of junk files.
-- Always build the commit into Bench Dev before saying a change is ready (`ship.sh`); never quit
-  their Bench (they develop Bench from inside Bench). They ask for a release when Dev is good.
+- Rebuild only when they ask (2026-10-26): commit each change and keep going; they ask for one
+  `ship.sh` at the end of a batch. A rebuild per step costs them a restart each time and gains
+  nothing. Never quit their Bench outside `ship.sh` (they develop Bench from inside Bench).
 - One app per commit (`Bench.<hash>.app`) filled System Settings → Privacy with dead entries;
   hence two apps on fixed paths, signed with the Apple Development certificate.
 - When an approach turns out heavier than expected (a browser engine, a big runtime), stop and

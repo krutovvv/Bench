@@ -31,7 +31,8 @@ insert kind, in its one look.
 
 This kit lives in Bench's own repository, `~/Projects/bench/.agents/skills/bench-kit`. Most
 often the person talks to you **through Bench itself** while you change Bench. So:
-- **One app, rebuilt in place.** Commit, then `scripts/ship.sh`: it quits Bench
+- **One app, rebuilt in place, only when the person asks.** Commit every change; don't rebuild
+  after it. When the person asks for a build (usually once, after a batch), `scripts/ship.sh`: it quits Bench
   (`/Applications/Bench.app`) with `osascript … quit`, rebuilds it and opens it again — the app is
   a client, the work lives in the agent process and `~/.bench`, so the person loses a few seconds
   and their unfinished run comes back with the window. Uncommitted changes stop the build; the
@@ -96,8 +97,8 @@ often the person talks to you **through Bench itself** while you change Bench. S
    calls without a running app: stop, go back to the last version that ran, say what is hard.
 7. **Every change goes through the loop** (`references/build-change-loop.md`): the target in
    numbers → the code and the reference → shot and numbers before → one exact edit → build with
-   zero warnings → shot and numbers after (`scripts/rules.py`, `textx.py`) → commit → `scripts/ship.sh`
-   (quits Bench, rebuilds it, opens it) → report with before/after.
+   zero warnings → shot and numbers after (`scripts/rules.py`, `textx.py`) → commit → report with before/after.
+   `scripts/ship.sh` (quits Bench, rebuilds it, opens it) runs only when the person asks for a build.
    "Looks fine" is not a check.
 8. **Where a thing goes, how to move it**: `references/ui-areas.md`.
 

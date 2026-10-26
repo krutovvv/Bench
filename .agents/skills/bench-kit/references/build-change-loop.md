@@ -152,7 +152,10 @@ cargo fmt && cargo build --release 2>&1 | grep -E '^(warning|error)'; cargo test
 Hooks: none left. Warnings: none. Tests: all pass. Delete the test files you made outside
 `/tmp` and the scratch folders.
 
-## 9. Ship it to the person
+## 9. Ship it to the person — only when they ask
+
+Commit every change, but don't rebuild after each one: the person asks for a build when a batch
+of changes is ready ("пересобери", "обнови", "ship"). Until then say "committed, not built yet".
 
 ```bash
 git add -A && git commit -m "<what changed, in the person's words>"   # a build is one commit
@@ -201,5 +204,5 @@ was rebuilt. Tell them to try it in Bench Dev.
 6. build, zero warnings
 7. shot + numbers after = target; other threads
 8. hooks out, fmt, build, test
-9. `ship.sh`
+9. `ship.sh` — only when the person asks for a build
 10. report with numbers

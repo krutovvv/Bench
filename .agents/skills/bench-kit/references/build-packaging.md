@@ -46,8 +46,8 @@ an already running copy), read the log.
   `.DS_Store`, `._*`, editor junk — Finder files once blocked a merge).
   Never ignore `Icon?`: git on macOS matches case-insensitively, so it hides every new file in
   `assets/icons/`; the folder-icon file is `Icon\r` — write the pattern with literal CRs.
-- After each change: `cargo fmt`, build, commit, then `ship.sh` (rebuilds `dist/Bench Dev.app` and opens
-  it — never quit the release one). Grants follow the signature: with the Apple Development
+- After each change: `cargo fmt`, build, commit. `ship.sh` (rebuilds `/Applications/Bench.app` and
+  opens it) only when the person asks for a build. Grants follow the signature: with the Apple Development
   certificate they belong to team + bundle id and survive rebuilds; ad-hoc signing ties them to
   one build's hash, and every build becomes a new entry in Privacy & Security.
 - A running copy keeps running if its bundle is replaced — replacing the bundle alone changes

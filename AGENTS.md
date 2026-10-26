@@ -98,7 +98,9 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
   to you through it. It is only a client: threads, the queue and the agent live in the agent
   process and in `~/.bench`, so rebuilding and reopening it costs a few seconds and loses
   nothing — an unfinished run goes on in the agent and the window comes back to it.
-- **One change, one commit, one build.** Commit, then run
+- **One change, one commit; a build only when the person asks.** Commit every change, then go on
+  to the next one: the app is not rebuilt per commit. When the person asks for a build ("пересобери",
+  "обнови", "ship") — usually once, at the end of a batch of changes — run
   `.agents/skills/bench-kit/scripts/ship.sh`: it quits Bench the honest way (`osascript … quit`,
   never a kill), rebuilds `/Applications/Bench.app` in place and opens it again. Uncommitted
   changes stop it. The way back from a bad change is an earlier commit, rebuilt — there is no

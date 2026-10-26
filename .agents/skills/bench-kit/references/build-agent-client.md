@@ -135,7 +135,7 @@ reaches them with `ssh_run` and `remote_files`, Bench with the agent's REST (`/a
 
 **Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
 **Bench** (`/Applications/Bench.app`, `local.bench.app`) and tries every commit in **Bench Dev**
-**One app, rebuilt in place**: `ship.sh` quits the running Bench with `osascript … quit`, rebuilds
+**One app, rebuilt in place, when the person asks for it** (not after every commit): `ship.sh` quits the running Bench with `osascript … quit`, rebuilds
 `/Applications/Bench.app` and opens it again. `--dev` builds the side copy
 (`dist/Bench Dev.app`, `local.bench.dev`) only to compare two states of the interface. Bench is
 a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
