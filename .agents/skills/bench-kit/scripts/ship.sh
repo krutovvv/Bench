@@ -34,14 +34,14 @@ fi
 # Is it running? pgrep cannot be trusted from the agent's shell (it does not see the app at
 # all, so a quit was once skipped and the person kept running the previous build), so ask ps.
 running() {
+    # Only a process whose program is the app's: awk's own arguments hold the same path, and a
+    # match anywhere on the line found awk itself, so a Bench that had quit read as still running.
     ps -ww -eo pid=,args= 2>/dev/null | awk -v pat="$RUNNING" \
-        'index($0, pat) { found = 1 } END { exit !found }'
+        'index($2, pat) == 1 { found = 1 } END { exit !found }'
 }
 if running; then
     osascript -e "tell application id \"$ID\" to quit" >/dev/null 2>&1 || true
-    # A minute, not twenty seconds: a Bench busy painting a long thread was still on its way out
-    # after twenty, ship.sh gave up, and the app was left half-quit — the agent it started loses
-    # the local network then, so every model call failed until the person quit it by hand.
+    # Up to a minute: a Bench busy painting a long thread can take more than twenty seconds.
     for _ in $(seq 120); do
         running || break
         sleep 0.5
