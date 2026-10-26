@@ -158,14 +158,25 @@ impl BenchApp {
         let Some(profile) = self.profile.clone() else {
             return;
         };
+        // Whose thread it is, read before it leaves the list: a server's thread is its agent's to
+        // delete (asked after, it looked like this Mac's — this Mac's agent said done, and the
+        // server's list brought it back).
+        let host = self.host_of_session(&id);
+        if !host.is_empty() && self.conn_of(&host).is_none() {
+            self.toast(
+                NotificationType::Error,
+                format!("Could not delete: {host}'s agent is not connected"),
+                window,
+                cx,
+            );
+            return;
+        }
         if self.session.as_deref() == Some(&id) {
             self.reset_chat(cx);
         }
         self.sessions.retain(|s| s.id != id);
         let runtime = self.opened.remove(&id);
         let rid = id.clone();
-        // A remote project's thread is its server agent's to delete.
-        let host = self.host_of_session(&id);
         let remote = (!host.is_empty())
             .then(|| self.conn_of(&host))
             .flatten();
