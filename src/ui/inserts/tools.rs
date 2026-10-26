@@ -9,8 +9,8 @@ use serde_json::json;
 use super::{InsertKind, Switch, SwitchTo, clip};
 use crate::app::BenchApp;
 use crate::app::subjects::tool_key;
-use crate::devtools::{GROUPS, Tool};
 use crate::model::Insert;
+use devtools::{GROUPS, Tool};
 
 /// The tool's least height in the thread (it grows with its text).
 const MIN_H: f32 = 200.;

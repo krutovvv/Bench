@@ -506,7 +506,7 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
     );
     app.tools
         .inputs
-        .insert(crate::devtools::Tool::Cron, "*/15 9-18 * * 1-5".into());
+        .insert(devtools::Tool::Cron, "*/15 9-18 * * 1-5".into());
 }
 
 /// The landing page thread's dev server, still running.

@@ -296,7 +296,7 @@ pub struct BenchApp {
 
     /// SSH mode: servers of ~/.ssh/config and their terminals.
     pub ssh: servers::Ssh,
-    /// Tools mode (⌘3): the utilities of `crate::devtools`.
+    /// Tools mode (⌘3): the utilities of `devtools`.
     pub tools: tools::Tools,
     /// The tasks the /tasks insert shows, and its card.
     pub tasks: tasks::TasksMode,

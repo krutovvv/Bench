@@ -1,4 +1,4 @@
-//! Tools mode (⌘3, the wrench in the status bar): the utilities of `crate::devtools` in the window,
+//! Tools mode (⌘3, the wrench in the status bar): the utilities of `devtools` in the window,
 //! listed in the sidebar like servers, each with its input and output on the right. Every tool
 //! keeps its own input while another one is open; output follows the input as you type.
 
@@ -9,7 +9,7 @@ use gpui_kit::component::input::{EditorState, InputEvent, InputState};
 use gpui_kit::*;
 
 use super::BenchApp;
-use crate::devtools::{self, Kind, RegexFlags, Tool};
+use devtools::{self, Kind, RegexFlags, Tool};
 
 pub struct Tools {
     pub tool: Tool,

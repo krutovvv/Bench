@@ -10,7 +10,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::devtools::{Kind, Tool};
+use devtools::{Kind, Tool};
 
 impl BenchApp {
     /// Rich Text to Markdown's input: the paste rendered as it looked on the page (tables,

@@ -1,5 +1,7 @@
-//! Tools mode: small text and data utilities that are always at hand (⌘3). Each tool is a pure
-//! function of its input and options, so the views stay thin and everything here is testable.
+//! The /tools utilities: small text and data tools always at hand. Each is a pure function of
+//! its input and options, so the view stays thin and everything here is tested.
+//!
+//! Gives: `Tool` (the list, its names and groups) and `run`. Takes: nothing from Bench.
 
 mod convert;
 mod encode;

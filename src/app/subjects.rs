@@ -5,7 +5,7 @@
 use gpui_kit::*;
 
 use super::BenchApp;
-use crate::devtools::{GROUPS, Tool};
+use devtools::{GROUPS, Tool};
 
 impl BenchApp {
     /// The latest thread about `key` (or the one `subject_target` names), or a new chat that
