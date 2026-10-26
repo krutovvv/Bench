@@ -151,19 +151,20 @@ Hooks: none left. Warnings: none. Tests: all pass. Delete the test files you mad
 
 ## 9. Ship it to the person — only when they ask
 
-Commit every change, but don't rebuild after each one: the person asks for a build when a batch
-of changes is ready ("пересобери", "обнови", "ship"). Until then say "committed, not built yet".
+Commit the change, then build the app at once — no need to ask — and ask the person to restart
+Bench. As Bench's own agent never quit it yourself: your run would be cut off.
 
 ```bash
 git add -A && git commit -m "<what changed, in the person's words>"   # a build is one commit
-$K/ship.sh            # quits Bench, rebuilds /Applications/Bench.app, opens it
+scripts/bundle-macos.sh   # rebuilds /Applications/Bench.app in place, quits nothing
+# then: "собрано — перезапусти Bench"   (from outside Bench: $K/ship.sh quits, rebuilds, opens)
 ```
 **One app** (Bench is developed from inside Bench): the person works in
-**Bench** (`/Applications/Bench.app`, `local.bench.app`), and `ship.sh` rebuilds it in place;
+**Bench** (`/Applications/Bench.app`, `local.bench.app`), rebuilt in place;
 there is no other build. Bench is
 a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
 and reopening it costs the person a few seconds and an unfinished run comes back with the window.
-Never kill it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit —
+Never kill it or quit it (only `ship.sh`, from outside). Rolling back means rebuilding an earlier commit —
 nothing is parked beside `/Applications/Bench.app`. Signed with the Apple Development
 certificate, so macOS grants are given once. Uncommitted changes stop the build.
 
@@ -179,7 +180,7 @@ notifications). The person confirms them once, and it works. That is how the rel
 went from `local.bench` to `local.bench.app` (2026-10-25). `bundle-macos.sh` also gives each app
 its own Mach-O UUID, so Dev and release built from one commit are never twins. Keep that.
 The person tests the bundle, not `target/`. "I see no changes" happened when only `target/`
-was rebuilt. Tell them to try it in Bench, after `ship.sh`.
+was rebuilt. Build the app, then ask them to restart Bench and try it.
 
 ## 10. Report
 
@@ -200,5 +201,5 @@ was rebuilt. Tell them to try it in Bench, after `ship.sh`.
 6. build, zero warnings
 7. shot + numbers after = target; other threads
 8. hooks out, fmt, build, test
-9. `ship.sh` — only when the person asks for a build
+9. `scripts/bundle-macos.sh`, then ask the person to restart Bench
 10. report with numbers

@@ -127,22 +127,28 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
   to you through it. It is only a client: threads, the queue and the agent live in the agent
   process and in `~/.bench`, so rebuilding and reopening it costs a few seconds and loses
   nothing — an unfinished run goes on in the agent and the window comes back to it.
-- **One change, one commit; a build only when the person asks.** Commit every change, then go on
-  to the next one: the app is not rebuilt per commit. When the person asks for a build ("пересобери",
-  "обнови", "ship") — usually once, at the end of a batch of changes:
-  - **you are Bench's own agent** (this thread is in Bench): run `scripts/bundle-macos.sh`. It
-    rebuilds `/Applications/Bench.app` in place and quits nothing; then tell the person it is
-    built and that they quit and reopen Bench to see it. Never quit Bench yourself: your own
-    run would be cut off when the new Bench restarts the agent;
-  - **you work from outside Bench** (a terminal, another app): run
-    `.agents/skills/bench-kit/scripts/ship.sh`. It quits Bench the honest way
-    (`osascript … quit`, never a kill), rebuilds it in place and opens it again.
+- **The change loop** (the same for every change, `.agents/skills/bench-kit/SKILL.md`):
+  1. **Change and look, on your own copy.** `cargo build`, then
+     `.agents/skills/bench-kit/scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=…`:
+     a separate copy of the debug binary on made-up data (no app, no permissions), shot and
+     quit. Read the picture; again until it is right. Never rebuild the app to see a change.
+     (It needs Bench allowed in Privacy & Security → Screen & System Audio Recording; without a
+     picture, ask the person to allow it.)
+  2. **Check and commit.** Tests (below), one change one commit.
+  3. **Build the app** — at once, no need to ask: `scripts/bundle-macos.sh` rebuilds
+     `/Applications/Bench.app` in place and quits nothing; the running Bench goes on from its
+     old copy. Uncommitted changes stop it.
+  4. **Ask the person to restart Bench** ("собрано — перезапусти Bench"): they quit it and open
+     it again, and the new build starts. Never quit, restart or open Bench yourself: you run
+     inside it, and your own run would be cut off.
 
-  Uncommitted changes stop both. The way back from a bad change is an earlier commit, rebuilt — there is no
-  second app parked beside it and no second build: Bench is one app. It is signed with the
-  Apple Development certificate, so macOS asks for each permission once.
-- **Never kill Bench or quit it outside `ship.sh`** (`pkill`, deleting its `.app`, an ad-hoc
-  quit): it is the window the person works in.
+  From outside Bench (a terminal, another app), `.agents/skills/bench-kit/scripts/ship.sh` does
+  3 and 4 itself: quits Bench the honest way (`osascript … quit`), rebuilds it, opens it. The way
+  back from a bad change is an earlier commit, rebuilt — there is no second app and no second
+  build: Bench is one app, signed with the Apple Development certificate, so macOS asks for
+  each permission once.
+- **Never kill Bench or quit it** (`pkill`, deleting its `.app`, an ad-hoc quit; only `ship.sh`
+  from outside): it is the window the person works in.
 - **Don't push without asking.** The repository is public: no private names, tokens or the
   person's data in commits.
 - **Back up before deleting data** (`~/.bench/backups/`).

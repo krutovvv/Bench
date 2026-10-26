@@ -120,9 +120,10 @@ Dated where it changed. The person's later decisions win over earlier ones: a ru
 - "Don't hack": prefer supported APIs; if something isn't supported (e.g. downgrading the
   backend), say so and offer the safe alternative instead of a fragile workaround.
 - Commit freely once the user is happy ("делай смело коммит"); keep the repo clean of junk files.
-- Rebuild only when they ask (2026-10-26): commit each change and keep going; they ask for one
-  `ship.sh` at the end of a batch. A rebuild per step costs them a restart each time and gains
-  nothing. Never quit their Bench outside `ship.sh` (they develop Bench from inside Bench).
+- The loop (2026-10-27, superseding "rebuild only when asked"): see each change on a copy of the
+  debug binary with `shot.sh` and demo data, never by rebuilding the app; commit; build the app
+  at once with `scripts/bundle-macos.sh` (it quits nothing); then ask them to restart Bench —
+  they quit and reopen it themselves. Never quit their Bench from inside it.
 - One app: `/Applications/Bench.app`, rebuilt in place by `ship.sh`, signed with the Apple
   Development certificate so permissions are asked once. (An app per commit filled System
   Settings → Privacy with dead entries; a parked second app and the Dev build were dropped too: one app, and a bad change is fixed

@@ -26,12 +26,8 @@ the same on every side and in every place that shares it.
 4. **Verify visually by measuring**, not by eyeballing: launch your own copy (`BENCH_DEMO=…` or
    `BENCH_HOME=<a copy>`), capture *its* window, measure gaps (`build-verification.md`). Never
    click or type in the person's window.
-5. **Commit every change; build the app only when the person asks** (usually once, after a
-   batch): `ship.sh` (`build-change-loop.md`, step 9). **One app** (Bench is developed from
-   inside Bench): the person works in `/Applications/Bench.app`; `ship.sh` quits it with
-   `osascript … quit`, rebuilds it in place and opens it again. The person tests that bundle,
-   not `target/` — "I see no changes" happened when only `target/` was rebuilt. Bench is a
-   client: threads, the queue and the agent live in the agent process and `~/.bench`, so
-   reopening it costs a few seconds and an unfinished run comes back with the window. Never kill
-   it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit.
+5. **Commit, build the app, ask for a restart.** After the change looks right on your own copy:
+   commit, then `scripts/bundle-macos.sh` at once (it rebuilds `/Applications/Bench.app` in
+   place and quits nothing), then ask the person to restart Bench. They test that bundle, not
+   `target/`. Never quit Bench yourself (from outside Bench, `ship.sh` does build and restart).
 6. **Report honestly** what was verified and what was only built (anything that needs a click).

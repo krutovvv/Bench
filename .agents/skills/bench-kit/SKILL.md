@@ -63,17 +63,28 @@ gpui itself is `vendor/gpui-base` (patched). Go there directly, with one grep.
 
 ## Working on Bench from inside Bench
 
-- **Commit every change; build only when asked.** As Bench's own agent: `scripts/bundle-macos.sh`
-  (builds `/Applications/Bench.app` in place, quits nothing), then the person quits and reopens
-  Bench. From outside Bench: `scripts/ship.sh` (quits Bench the honest way, rebuilds, opens it).
-  Never `pkill` Bench. A Bench opened while the bundle is being written starts on half of it:
-  build again.
-- **See every UI change before you report it — on your own copy, not the person's Bench.**
-  `cargo build`, then `scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=landing`:
-  it starts a separate copy of the debug binary (no app, no Dock icon, no permissions asked) on
-  made-up data, takes the picture, quits the copy. Read the picture; change, build, shoot again
-  until it is right. No `.app` build and no restart of Bench is needed for this. The demo's
-  threads and every hook (`BENCH_PANEL=providers`, `BENCH_DEMO=env`…): `references/build-verification.md`.
+**The loop, for every change:**
+
+1. **Change → `cargo build` → look at your own copy.**
+   `scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=landing` starts a separate
+   copy of the debug binary (no app, a plain Dock icon, no permissions asked) on made-up data,
+   takes the picture and quits it. Read the picture; change, build, shoot again until it is
+   right. The demo's threads and every hook (`BENCH_DEMO=env`, `BENCH_PANEL=providers`…):
+   `references/build-verification.md`. Never rebuild the app to see a change.
+   The picture is taken by macOS's `screencapture`, which asks for the app you run under: as
+   Bench's agent, Bench needs Privacy & Security → Screen & System Audio Recording. No picture
+   while the copy started ("no window for pid", nothing in its log)? Ask the person to allow
+   Bench there, once.
+2. **Checks, then commit** — one change, one commit.
+3. **Build the app at once** (no need to ask): `scripts/bundle-macos.sh` rebuilds
+   `/Applications/Bench.app` in place and quits nothing — the running Bench is a binary already
+   loaded and goes on from its old copy.
+4. **Ask the person to restart Bench** ("собрано — перезапусти Bench"). Never quit, restart or
+   open it yourself: you run inside it, and your run would be cut off. (From outside Bench,
+   `scripts/ship.sh` does 3 and 4: quits Bench the honest way, rebuilds, opens it.)
+
+Never `pkill` Bench. A Bench opened while the bundle is being written starts on half of it:
+build again.
 - **Checks**: `cargo build` (zero warnings), `cargo test --workspace`,
   `cd agent && node --test test/*.test.ts`.
 - **Back up before a migration or a deletion** of the person's data (`~/.bench/backups/`).
