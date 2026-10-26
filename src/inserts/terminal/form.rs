@@ -1,5 +1,5 @@
-//! SSH mode views: the mode switch beside the window buttons, the server list (folders from
-//! `~/.ssh/config`), the header with the server's agent state, the server form.
+//! The header's right end (a new window) and the server form shown in a thread (a new or edited
+//! host of `~/.ssh/config`).
 
 use gpui_kit::component::h_flex;
 use gpui_kit::component::input::{Input, InputState};

@@ -32,14 +32,14 @@ build time: check with `grep -A1 '^name = "<crate>"' Cargo.lock` first.
 | URLs | `url = "2"`, `percent-encoding = "2"` | parse, query pairs; RFC 3986 encoding |
 | Random | `rand = "0.8"` | `rand::rngs::OsRng` for passwords |
 | String cases | `heck = "0.5"` | `ToSnakeCase`, `ToLowerCamelCase`, … |
-| HTML → Markdown | `htmd = "0.5"` | tables included; `HtmlToMarkdown::builder().options(..).skip_tags(vec!["script","style"]).build().convert(html)`; it pads table columns to the longest cell — compact the rows after (`devtools/markdown.rs`) |
+| HTML → Markdown | `htmd = "0.5"` | tables included; `HtmlToMarkdown::builder().options(..).skip_tags(vec!["script","style"]).build().convert(html)`; it pads table columns to the longest cell — compact the rows after (`crates/devtools/src/markdown.rs`) |
 
-Bench's `crates/devtools/src/` (copy: `templates/examples/devtools/`) uses most of the last block,
-with tests — read it for working calls.
+Bench's `crates/devtools/src/` uses most of the last block, with tests — read it for working
+calls; those crates are its own dependencies (`crates/devtools/Cargo.toml`), not the app's.
 
 ## Recipe: crop to a size (e.g. a 1200×630 cover)
 
-A tool as a pure function with a test (put it in `crates/devtools/src/`, `templates/examples/devtools/`):
+A tool as a pure function with a test (put it in `crates/devtools/src/`):
 ```rust
 use image::imageops::FilterType;
 
@@ -66,8 +66,9 @@ fn crops_to_1200x630() {
     assert_eq!(image::open(&b).unwrap().dimensions(), (1200, 630));
 }
 ```
-(`use image::GenericImageView as _;` for `.dimensions()`.) Its UI is a tool in the Tools group: drop or
-paste an image in, the cropped preview out, Save as… (`build-insert.md`).
+(`use image::GenericImageView as _;` for `.dimensions()`.) Its UI is a utility in the `/tools` insert
+(`src/inserts/tools/`): drop or paste an image in, the cropped preview out, Save as…
+(`build-insert.md`).
 
 ## macOS without crates
 
@@ -76,7 +77,7 @@ Some jobs need no crate — the system already does them (rung 3 of the engineer
 - **The clipboard's HTML / RTF** (rich text copied from a browser, Word, Notes):
   `osascript -e 'the clipboard as «class HTML»'` prints `«data HTML3C68…»` (hex); for RTF use
   `«class RTF »` and convert with `/usr/bin/textutil -stdin -format rtf -convert html -stdout`.
-  (gpui's clipboard gives plain text only.) Code: `devtools/markdown.rs`.
+  (gpui's clipboard gives plain text only.) Code: `crates/devtools/src/markdown.rs`.
 - Open a file or URL with its app: `cx.open_with_system(path)` / `/usr/bin/open`.
 - File pickers: `cx.prompt_for_paths(..)`, `cx.prompt_for_new_path(dir, Some(name))`.
 - SSH: `/usr/bin/ssh` with the user's config and a ControlMaster socket (Bench `src/ssh.rs`).

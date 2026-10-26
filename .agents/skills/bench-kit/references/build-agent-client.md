@@ -2,7 +2,8 @@
 
 Bench talks only to its own agent (`agent/`, `references/build-pi-backend.md`): JSON-RPC over a
 WebSocket plus REST, with a session token. The source of truth for each
-method and route is the agent's `agent/src/server.ts`. Answer protocol questions with the app's
+method and route is the agent's module that declares it, `agent/src/modules/<area>.ts`
+(collected by `server.ts`). Answer protocol questions with the app's
 `--probe` mode or `node agent/scripts/probe.ts`, not by clicking.
 
 ## Authentication
@@ -15,23 +16,37 @@ call is about (the Host's `default`, or a project's environment `project:<id>`) 
 argument (`?profile=`, `rest::url` adds it) — a wire name only; the UI has no profiles. A host's port and token are
 saved in `state_dir()/ssh-<host>.json` to reattach next launch.
 
+## Which agent a command goes to (`src/app/agents.rs`)
+
+Bench keeps a link to every agent (`AgentLink`: its gateway and REST connection), keyed `""` for
+this Mac's and by the ~/.ssh/config alias for a server's. `route(cmd)` sends a command to the
+agent it concerns — the open thread's (`thread_host()`), a session's own for delete and rename,
+this Mac's for the sessions list; `conn_of(host)` and `thread_conn()` give the REST connection.
+Never send to "the" agent: there are several.
+
+## The thread (`thread.open`, `thread.*`)
+
+- **Open**: `thread.open {session_id, since}` (`agent/src/modules/threads.ts`, `rt.thread`) →
+  the journal's items after `since`, the queue, the inserts' state. `since` = the head Bench
+  already has (a cached `Thread`, `thread_cache`), 0 for all of it.
+- **Events**, from Pi's commits (`runtime.ts`): `thread.append {items}` (new journal items),
+  `thread.stream {kind, delta}` (the answer or thinking being written; its entry's append
+  replaces it), `thread.queue {items}` and `thread.inserts {items}` (whole, after every change),
+  `thread.run {running}`. Parsed in `crates/protocol` (`ThreadEvent::parse`), applied by
+  `crates/thread/src/state.rs` (`Thread::open`, `apply`). The rest: `build-thread.md`.
+
 ## Sessions over JSON-RPC (`gateway.rs`)
 
-- Every event frame's `params` carries the execution stamp, incl. `execution_generation` of the
-  turn; `session.info` payloads carry `revision` + `execution_generation`. Keep them per session
-  (`Rpc::fences`).
-- **Stop** = `session.interrupt {session_id, profile, execution_generation}`; without the current
-  generation the gateway answers `4001 stale_generation` and the agent keeps running. Where the
-  number comes from: every incoming frame — `if let Some(g) = msg["params"]["execution_generation"]
-  .as_i64() { fences.entry(sid).or_insert((0,0)).1 = g; }` (Bench `gateway.rs`, the reader loop),
-  plus `session.info`'s `revision`/`execution_generation` when a chat is opened.
-- **The turn's clock** counts from the turn's real start, not from when you looked: a stored
-  turn's start is its user message's timestamp (`history.rs`, `turn.started = meta.started`), a
-  new one's is `now_secs()` at send; `live_since(started)` turns it into an `Instant`. So switching
-  chats and coming back keeps the time running ("время хода не должно сбрасываться").
-- Model, reasoning and retry are token-mode calls (`slash.exec` `/model …`, `config.set`
-  `reasoning`, `session.undo` + `prompt.submit`); Stop and answers name the turn's
-  `execution_generation` (`Rpc::fences`).
+- Frames and `session.info` carry the run's `execution_generation`; the gateway keeps the last
+  per session (`Rpc::fences: HashMap<String, i64>`, set by `note_fence`). **Stop** =
+  `session.interrupt {session_id, profile, execution_generation}`; questions and approvals are
+  answered with it too.
+- **The work's clock** counts from its real start, not from when you looked: a `Row::Work` has
+  `from`, `to` and `live` (`crates/thread`), drawn by `src/ui/thread/work.rs` — a live one counts
+  on, a finished one keeps the time its steps took. Switching threads and coming back keeps the
+  time running.
+- Model, reasoning and retry: `slash.exec` `/model …`, `config.set` `reasoning`,
+  `session.undo` + `prompt.submit`.
 - Errors of fire-and-forget calls go to `~/.bench/ui/gateway-errors.log`
   — read it first when a button "does nothing".
 
@@ -40,16 +55,16 @@ saved in `state_dir()/ssh-<host>.json` to reattach next launch.
 - **Questions** (the `clarify` tool): event `clarify.request` {prompt_id, execution_generation,
   question, choices[], multi_select}; answer `clarify.respond` {session_id, execution_generation,
   prompt_id, answer} (multi-select: choices joined with ", "; empty answer = declined);
-  `clarify.settled` closes it. The gateway times a question out (~10 min) — unanswered ones
+  `clarify.settled` closes it. The agent times a question out (`clarify_timeout`, 600 s, `runtime.ts`) — unanswered ones
   used to vanish into the step list; the app shows a card (choices, own answer, Decline).
 - **Plan** (the `todo` tool): `todo.updated` {todos: [{id, content, status, parent?}], revision},
   also merged into the todo tool's `tool.complete`; statuses pending / in_progress / completed /
   cancelled. Shown as a foldable strip over the input ("PLAN · 2/5 · current step").
-- **Reopening a chat**: `session.resume` returns `prompts` (open approvals and questions) and
-  `todo_state`; the app replays them as events after the history (`Pending::Meta.replay`),
-  otherwise a pending approval/question is lost when you switch chats.
+- **Reopening a thread**: `session.resume` returns `prompts` (open approvals and questions) and
+  `todo_state`; the gateway replays them as events once the thread is open
+  (`Pending::Thread {replay}`), otherwise a pending approval/question is lost when you switch threads.
 
-## Gateway lifecycle
+## The agent's lifecycle
 
 Restart (status bar) restarts the agent (`connection::restart_gateway` → `pi_agent::restart()`
 on this Mac, the server's pid from `~/.bench/server.json` over SSH). Its runs are durable: an
@@ -58,14 +73,14 @@ backend that would refuse). Still, don't restart the user's agent yourself witho
 
 ## Background processes (`process.list`, `process.kill`)
 
-The agent starts long jobs in the background (servers, downloads, scripts). While a chat is
+The agent starts long jobs in the background (servers, downloads, scripts). While a thread is
 open, poll every 3 s: `process.list {session_id, profile}` → `{processes: [{session_id (the
 process id!), command, status ("exited" or running), exit_code, started_epoch, exited_at,
-completion_reason, output_tail | output_preview}]}`. Show them as a card under the last answer,
-the same frame as Changed files: a folded line "PROCESSES · 2 running", rows with the command
+completion_reason, output_tail | output_preview}]}`. Shown as a row of its own at the thread's tail,
+beside Changed files: a folded line "PROCESSES · 2 running", rows with the command
 (mono, truncated), a live clock or the exit code, **Stop** (`process.kill {session_id, process_id,
 profile}`, then poll again), and a click that unfolds the output tail. Running first, then newest.
-Bench `src/app/processes.rs`, `gateway.rs` `processes()`, `ui/chat.rs` `render_processes`.
+Bench `src/app/processes.rs`, `gateway.rs` `processes()`, `src/ui/thread/extras.rs` `render_processes`.
 
 ## Voice: dictation and reading aloud
 
@@ -73,7 +88,7 @@ Bench `src/app/processes.rs`, `gateway.rs` `processes()`, `ui/chat.rs` `render_p
   feeds the waveform; Stop → WAV bytes → `POST /api/audio/transcribe` `{data_url:
   "data:audio/wav;base64,…", mime_type: "audio/wav"}` (180 s timeout) → `{transcript}`, appended
   to the composer (`rest.rs` `transcribe`). The STT engine is the agent's (`stt.openai.base_url /
-  model / language` in the agent's settings — editable in Bench's Providers).
+  model / language` in the agent's settings — editable in the gear's Agents tab, per agent).
 - **Send while recording** = stop + transcribe + send in one press: `send()` sets
   `send_after_transcribe = true` and stops the mic; the transcription's callback sends. Esc
   cancels a recording.
@@ -84,64 +99,69 @@ Bench `src/app/processes.rs`, `gateway.rs` `processes()`, `ui/chat.rs` `render_p
 Turns run for minutes to hours while the person is elsewhere. Bench `src/notify.rs`
 (UserNotifications through `objc2-user-notifications`): `notify::request()` once at start (macOS
 asks the person once), `notify::post(id, title, body)` — `id` = the session's id, so a newer
-notification replaces the older one for the same chat.
-- **The open chat** finishes (`Evt::Complete` for the current session) **while the window isn't
-  active** (`!window.is_window_active()`): title = the chat's title, body = the answer's first
+notification replaces the older one for the same thread.
+- **The open thread** finishes (`Evt::Complete` for the current session) **while the window isn't
+  active** (`!window.is_window_active()`): title = the thread's title, body = the answer's first
   line, clipped (`ui::clip`, character-safe).
-- **Another chat** goes from `running` to not in a sessions refresh (`Evt::Sessions`: compare
+- **Another thread** goes from `running` to not in a sessions refresh (`Evt::Sessions`: compare
   the old list with the new before replacing it): body "The agent finished".
-- Only the person's own chats (`source_label == "Bench"`): Telegram, cron and API sessions run
-  all the time and would be noise. Nothing when the finished chat is the one on screen in front.
+- Only the person's own threads (`source_label == "Bench"`): Telegram, cron and API sessions run
+  all the time and would be noise. Nothing when the finished thread is the one on screen in front.
 - **Only inside the .app.** Asking for the notification center from a bare `target/` binary
   aborts the process (no bundle): `notify` checks `current_exe()` contains `.app/Contents/MacOS/`
-  and does nothing otherwise. Test it from the bundle (`shot.sh dist/<App>.app … DEBUG_NOTIFY=1`
-  with a hook that posts one); the permission prompt shows on the person's screen the first time
+  and does nothing otherwise. Test it from a bundle (`ship.sh --dev`, then `shot.sh` on
+  `dist/Bench Dev.app` with a hook that posts one); the permission prompt shows on the person's screen the first time
   — tell them to allow it.
 
 ## Delivered files
 
 - Agents deliver files as `MEDIA:/abs/path` lines (Telegram/Desktop convention). Rendering:
   `references/build-media.md`.
-- Bytes: `GET /api/fs/download?path=…` (raw, streamed; the session token), or `/api/fs/read-data-url` (base64, size-capped). A local gateway's files are read in
-  place.
+- Bytes: `GET /api/fs/download?path=…` (raw, streamed; the session token), or `/api/fs/read-data-url` (base64, size-capped); with `machine` for a
+  project worked on a server (`Location::files_machine()`). This Mac's agent's own files are read in place.
 - Old sessions often point at deleted files (`/tmp/…`, cleaned Desktop): show a quiet error row.
 
 ## Sending files
 
-- Every file (images too) is named in the text as `[attached: <path on the gateway's
-  machine>]`: a local file in place; a temporary one (`/var/folders`, `/tmp`, pasted) copied to
-  `~/.bench/attachments/`; over SSH uploaded there with `POST /api/files/upload
-  {path, data_url}` (after `/api/files/mkdir`). The UI turns those lines back into chips
-  (`attach::split`).
+- Every file (images too) is named in the text as `[attached: <path on the machine the work is
+  on>]` (`attach::prepare`): a local file in place; a temporary one (`/var/folders`, `/tmp`,
+  pasted) copied to `~/.bench/attachments/`; to a server's agent uploaded to its `attachments/`
+  with `POST /api/files/upload {path, data_url}`; for a project worked on a server, to that
+  machine's `/tmp/bench-attachments/` (the upload with `machine`). The UI turns those lines back
+  into chips (`attach::split`).
 - Verified headless: staging and copies, without submitting a turn. Clean up probe files.
 
 ## Agent defaults in the status bar
 
 - The status bar shows approvals / reasoning / model only after the agent's defaults arrived
   (`rest::profile_defaults`, the `profile_ready` flag), never placeholder defaults.
-- A project's soul (SYSTEM.md), MCP servers, skills, prompts, accesses, Telegram bot and schedule
-  are its environment, edited in the block a project's pencil opens (`app/project_env.rs`).
+- A project's soul (SYSTEM.md), MCP and language servers, skills, prompts, accesses, model,
+  Telegram bot and schedule are its environment: the thread `env:<id>` (`open_project_env`,
+  `src/env/mod.rs`), one agent message per section (`src/env/`), data from
+  `/api/projects/<id>/env`.
 
-## Bench: servers and files
+## Agents, machines, projects
 
-The reference app is **Bench** (`/Applications/Bench.app`, bundle id `local.bench.app`; Bench Dev is `local.bench.dev`). Gateways are
-This Mac plus `~/.ssh/config` hosts with Node 22.18+, where Bench installs the agent on connect;
-a project with a remote host runs on that host's agent. Servers, file hosts and the project's
-folder come into a thread as inserts (`/ssh`, `/ftp`, `/files`, `build-insert.md`); the agent
-reaches them with `ssh_run` and `remote_files`, Bench with the agent's REST (`/api/hosts`,
-`/api/fs/…`). A whole project opens in Zed from its ⋯ menu.
+This Mac's agent always; a server's when the person adds it in the gear (Agents tab,
+`src/app/agent_form.rs`). The list of servers' agents is kept by this Mac's agent
+(`agent/src/builtin/servers.ts`, setting `agents`, `/api/agents`); Bench installs and starts each
+over SSH (`pi_agent::ensure_remote`, Node 22.18+ on the server) and links to it
+(`src/app/agents.rs`). A project = its agent + its machine (the agent's own, or a server this Mac's
+agent works on over SSH) + an optional folder; `src/app/places.rs` answers where
+(`build-projects.md`). Servers, file hosts and the project's folder come into a thread as inserts
+(`/ssh`, `/ftp`, `/files`, `build-insert.md`); the agent reaches them with `ssh_run`,
+`remote_files` and its coding tools, Bench with the agent's REST (`/api/hosts`, `/api/fs/…`). A
+project opens in Zed from its ⋯ menu.
 
-## Shipping changes to the user
+## Shipping changes to the person
 
-**Two apps, Dev and release** (Bench is developed from inside Bench): the person works in
-**Bench** (`/Applications/Bench.app`, `local.bench.app`) and tries every commit in **Bench Dev**
-**One app, rebuilt in place, when the person asks for it** (not after every commit): `ship.sh` quits the running Bench with `osascript … quit`, rebuilds
-`/Applications/Bench.app` and opens it again. `--dev` builds the side copy
-(`dist/Bench Dev.app`, `local.bench.dev`) only to compare two states of the interface. Bench is
-a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
-and reopening it costs the person a few seconds and an unfinished run comes back with the window.
-Never kill it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit —
-nothing is parked beside `/Applications/Bench.app`. Signed with the Apple Development
-certificate, so macOS grants are given once per app. Uncommitted changes stop the build
-(`BENCH_DIRTY=1` for a throwaway one). Saying "done" without
-building the app got "I see no changes".
+**One app, rebuilt in place, when the person asks for it** (not after every commit): `ship.sh`
+quits the running Bench with `osascript … quit`, rebuilds `/Applications/Bench.app`
+(`local.bench.app`) and opens it again. `--dev` builds the side copy (`dist/Bench Dev.app`,
+`local.bench.dev`) only to compare two states of the interface. Bench is a client: threads, the
+queue and the agent live in the agent process and `~/.bench`, so quitting and reopening it costs
+the person a few seconds and an unfinished run comes back with the window. Never kill it or quit
+it outside `ship.sh`. Rolling back means rebuilding an earlier commit — nothing is parked beside
+`/Applications/Bench.app`. Signed with the Apple Development certificate, so macOS grants are
+given once per app. Uncommitted changes stop the build (`BENCH_DIRTY=1` for a throwaway one).
+Saying "done" without building the app got "I see no changes".

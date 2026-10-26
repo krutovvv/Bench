@@ -316,9 +316,9 @@ pub struct BenchApp {
     /// Markdown files shown in full rather than their first lines.
     pub media_open: HashSet<String>,
 
-    /// SSH mode: servers of ~/.ssh/config and their terminals.
+    /// /terminal and /ssh: servers of ~/.ssh/config and their terminals.
     pub ssh: crate::inserts::terminal::servers::Ssh,
-    /// Tools mode (⌘3): the utilities of `devtools`.
+    /// /tools: the utilities of `devtools`.
     pub tools: crate::inserts::tools::state::Tools,
     /// The tasks the /tasks insert shows, and its card.
     pub tasks: crate::inserts::tasks::state::TasksMode,

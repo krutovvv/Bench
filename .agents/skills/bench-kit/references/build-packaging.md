@@ -1,19 +1,24 @@
 # macOS packaging, permissions, logs
 
-Working script: `templates/app/scripts/bundle-macos.sh` (release build → `dist/<App>.app`).
+Working script: `scripts/bundle-macos.sh` — `release` builds `/Applications/Bench.app` (id
+`local.bench.app`, what `ship.sh` runs); without it `dist/Bench Dev.app` (`local.bench.dev`).
 
 ## What the bundle needs
 
 1. `cargo build --release`, copy the binary to `Contents/MacOS/`.
-2. App icon: render `assets/logo.svg` with `qlmanage -t -s 1024`, resize with `sips` to every
-   iconset size, `iconutil -c icns` → `Contents/Resources/AppIcon.icns`.
-3. `Info.plist`: `CFBundleIdentifier` (stable, e.g. `local.<app>`), `CFBundleExecutable`,
+2. App icon: render `assets/logo.svg` with `magick` at 1024, resize to every iconset size,
+   `iconutil -c icns` → `Contents/Resources/AppIcon.icns`.
+3. `Info.plist`: `CFBundleIdentifier` (stable: `local.bench.app`, `local.bench.dev`), `CFBundleExecutable`,
    `CFBundleIconFile`, `NSHighResolutionCapable`, `LSMinimumSystemVersion`, and a usage string
    for **every** protected resource the app touches:
    - `NSMicrophoneUsageDescription` (dictation),
    - `NSLocalNetworkUsageDescription` (anything on 192.168.x.x / *.local, including SSH spawned
      by the app).
-4. **Sign with a stable identifier**: `codesign --force --sign - --identifier local.<app> "$APP"`.
+4. **Sign** with the Apple Development identity from the keychain (`BENCH_SIGN=<identity>`
+   picks another): `codesign --force --sign "$SIGN" --identifier "$ID"`; without one, ad-hoc
+   (`--sign -`) with the same stable identifier — grants are then asked again after every build.
+5. **Its own Mach-O UUID per app** (from the linker's and the bundle id), so Dev and release
+   built from one binary are not twins to local network privacy.
 
 ## Why the identifier matters (the LAN bug)
 
@@ -26,7 +31,7 @@ Fix: the stable `--identifier` plus `NSLocalNetworkUsageDescription`. After that
 appears once and the grant survives rebuilds.
 
 Diagnose like this: make the app append each host check result to a log file in its state dir,
-launch the bundle with `open -n "dist/<App>.app"` (a second instance — `open` alone just focuses
+launch the bundle with `open -n "dist/Bench Dev.app"` (a second instance — `open` alone just focuses
 an already running copy), read the log.
 
 ## Finder-launched process environment
@@ -42,7 +47,7 @@ an already running copy), read the log.
 
 ## Shipping to the user
 
-- Keep the project in `~/Projects/<app>` (git repo; `.gitignore` covers `target/`, `dist/`,
+- The project is `~/Projects/bench` (git repo; `.gitignore` covers `target/`, `dist/`,
   `.DS_Store`, `._*`, editor junk — Finder files once blocked a merge).
   Never ignore `Icon?`: git on macOS matches case-insensitively, so it hides every new file in
   `assets/icons/`; the folder-icon file is `Icon\r` — write the pattern with literal CRs.

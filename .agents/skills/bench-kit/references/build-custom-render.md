@@ -8,8 +8,10 @@
 When component widgets can't do the job (canvas-like surfaces, a terminal grid), you drop to the
 raw GPUI API. gpui-kit pins a PRE-RELEASE GPUI fork
 (`gpui-pre` / `gpui-base`), whose API differs from Zed-head and from every tutorial. Verified
-against gpui-pre-0.3.9 / gpui-base-0.8.0 / gpui-component-0.8.0 — grep
-`~/.cargo/registry/src/*/gpui-{pre,base}-*/src` for anything not listed here; never guess.
+against gpui-pre-0.3.9 / gpui-base-0.8.0 / gpui-component-0.8.0. `gpui-base`, `gpui-pre-web` and
+`gpui-pre-platform` are vendored and patched (`vendor/`, `[patch.crates-io]` in `Cargo.toml`):
+grep `vendor/gpui-base/src` first, `~/.cargo/registry` only for the crates not vendored (gpui-pre,
+gpui-component); never guess.
 
 ## Crate map
 

@@ -1,10 +1,9 @@
-//! What this Bench has. Every Bench starts as a copy of the user's with everything on; hide the
-//! built-in tools its person doesn't use: the sidebar group and the shortcut go, the code stays and
-//! still builds, so bringing one back is one word.
+//! Shortcuts to built-in inserts. Off, the shortcut goes; the insert, its `/` word and its code
+//! stay, so bringing one back is one word (`src/app/keys.rs`).
 
-/// Servers: `~/.ssh/config` hosts and this Mac's terminal as threads (⌘2).
+/// ⌘2: a new thread with a terminal on this Mac.
 pub const SSH: bool = true;
-/// Tools: everyday utilities, one thread per tool (⌘3).
+/// ⌘3: a new thread with the /tools insert (the last utility used).
 pub const TOOLS: bool = true;
-/// Tasks: the task lists as threads, kept in `~/.bench/bench.sqlite` (⌘4).
+/// ⌘4: a new thread with the /tasks insert on Today (`~/.bench/bench.sqlite`).
 pub const TASKS: bool = true;

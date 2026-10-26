@@ -1,7 +1,6 @@
-//! Tasks mode's views, after Things: the lists (Today, Upcoming, Anytime, Logbook) in the
-//! sidebar; the open list in the middle with its tags as a filter strip, Today with "This
-//! Evening", Upcoming as the next seven days then months, the Logbook by day then month; the open
-//! task's card on the right.
+//! The /tasks insert's views, after Things: the lists (Today, Upcoming, Anytime, Logbook); the
+//! open one with its tags as a filter strip, Today with "This Evening", Upcoming as the next seven
+//! days then months, the Logbook by day then month; the open task's card.
 
 use gpui_kit::component::input::{Input, Textarea};
 use gpui_kit::component::tooltip::Tooltip;
@@ -151,7 +150,7 @@ impl BenchApp {
         } else {
             None
         };
-        // The list's tags, the most used first: "All · skorozvon · client-b…". A project's thread
+        // The list's tags, the most used first: "All · work · client-b…". A project's thread
         // opens on its project's tag (`sync_task_project`); "All" drops it.
         let mut tags = if self.tasks.query.is_empty() {
             self.tasks.tags_in(&list)

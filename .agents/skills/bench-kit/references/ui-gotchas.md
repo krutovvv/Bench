@@ -1,8 +1,9 @@
 # Gotchas: what went wrong before, and the fix
 
 Read when something behaves oddly or doesn't compile. Paths: widgets `gpui_kit::component::*`,
-core `gpui_kit::*`. One exact name you can't find: hover it with the `rust_lsp` tools
-(an MCP server in the agent's `~/.bench/agents/<agent>/mcp.json`) — don't read the framework's sources to learn it.
+core `gpui_kit::*`. One exact name you can't find: the agent's `diagnostics` tool and the
+errors after each edit come from the project's language servers (rust-analyzer in its
+`lsp.json`, `agent/src/lsp.ts`) — read them before reading the framework's sources.
 
 ## Compile errors that already happened (and the fix)
 
@@ -11,8 +12,8 @@ core `gpui_kit::*`. One exact name you can't find: hover it with the `rust_lsp` 
   ```rust
   for (k, t) in self.tools.iter().enumerate() {
       let id = t.id;                       // a Copy value, or .clone() a String
-      rows.push(bench_ui::list_row(format!("t-{k}"), t.name.clone(), None, self.sel == id, None,
-          None, cx, Box::new(cx.listener(move |this, _, _, cx| { this.sel = id; cx.notify(); })))
+      rows.push(bench_ui::list_row(format!("t-{k}"), t.name.clone(), None, self.sel == id, None, None, cx)
+          .on_click(cx.listener(move |this, _, _, cx| { this.sel = id; cx.notify(); }))
           .into_any_element());
   }
   ```
@@ -30,25 +31,29 @@ core `gpui_kit::*`. One exact name you can't find: hover it with the `rust_lsp` 
 - `div().truncate()` = one line + ellipsis; needs a width constraint: put it in a
   `flex_1().min_w_0()` (or `flex_shrink(1.)`) child of an `h_flex`.
 - `div().absolute().bottom_full()` on a child of a `.relative()` parent places it right above
-  the parent (popups over the composer). Padding on the absolute wrapper = side margins.
+  the parent; `.top(px(…))` under it (the `/` list, `ui-overlays.md`).
 - Hover reveal: parent `.group(name)`, child `.opacity(0.).group_hover(name, |s| s.opacity(1.))`.
   **Group names must be unique per row** (`SharedString::from(format!("row-{i}"))`).
 - `.when(cond, |d| …)`, `.when_some(opt, |d, v| …)`, `.map(|d| …)`, `.children(option)`.
 
 ## Scrolling
 
+- **Only the thread scrolls.** It is a `gpui::list` (`ListState`, `src/ui/thread/mod.rs`), not
+  a scrolling `v_flex`: rows that changed are `remeasure_items`d in place; the count changes
+  by `splice` at the end only — splicing a range in the middle resets the offset inside it (the
+  jitter). Never ask the list (`viewport_bounds`, `bounds_for_item`) inside `render_item`: it is
+  borrowed; work it out before layout. Nothing scrolls it but the person
+  (`build-thread.md`). An editor or a list inside it is as tall as its content.
 - **A scrolling `v_flex` squeezes its children** once they're taller than it: rows and headers
   shrink, text overlaps its rules, the steps between sections turn uneven. Every child of a
   long list (row, section header, spacer) needs `.flex_none()`. Short lists hide the bug; it
   shows only when the data grows (Tasks → Upcoming).
 
-- Scroll column: `v_flex().id("x").overflow_y_scroll().track_scroll(&handle)`.
-- `ScrollHandle`: `offset()`, `max_offset()`, `scroll_to_bottom()`, `scroll_to_item(ix)`,
-  `scroll_to_top_of_item(ix)`, `top_item()`. Follow-the-tail chat: remember `max_offset` each
-  render; if the user scrolled up (not at bottom and max unchanged) stop following; show a
-  "Jump to latest" chip.
+- A scroll column elsewhere (the sidebar, a popover's list):
+  `v_flex().id("x").overflow_y_scroll().track_scroll(&handle)`; `ScrollHandle`: `offset()`,
+  `max_offset()`, `scroll_to_item(ix)`, `top_item()`.
 - **A scroll container ignores the last child's margin** → append a real spacer
-  (`div().h_3().flex_none()`) when trailing cards end the content.
+  (`div().h_3().flex_none()`).
 - Don't add visible scrollbars by design; use a rail/minimap if navigation is needed.
 
 ## Keyboard
@@ -99,11 +104,11 @@ already recognizes `$…$` (`Node::InlineMath`) and `$$…$$` (`Node::Math`). md
 
 - **A periodic re-read replaced the whole list** and dropped a new, not-yet-saved item: its card
   closed by itself a few seconds after "New task". Keep local-only items across re-reads
-  (`build-insert.md`, "Patterns for a block").
-- **A bar sized by its contents**: 30px round buttons made the composer 44 tall next to a 36
-  header — the user saw it "bulge". Size the contents to the bar.
-- **A 1px step between facing bars**: the composer drew its top rule *on top of* `bar_h` while the
-  sidebar's bottom bar was exactly `bar_h`. Count the rules in the heights (`bar_h + 1`).
+  (`build-insert.md`, "Patterns for a body").
+- **A bar sized by its contents**: round buttons made a bar taller than the header next to it —
+  the person saw it "bulge". Size the contents to the bar.
+- **A 1px step between facing bars**: one drew its rule *on top of* `bar_h`, its neighbour was
+  exactly `bar_h`. Count the rules in the heights (`bar_h + 1`).
 - **A wider padding broke a fixed width**: raising the task card's padding 16 → 24 pushed its
   segmented control into the edge. When an inset grows, widen fixed-width boxes by the same.
 
@@ -112,9 +117,10 @@ already recognizes `$…$` (`Node::InlineMath`) and `$$…$$` (`Node::Math`). md
 - Changing an element's size on hover/selection (rail ticks grew) — change color only.
 - Letting a selected-state color override a user-chosen color.
 - Showing an empty dropdown before data arrives.
-- Loading content sizes in the background so the chat jumped after opening.
+- Loading content sizes in the background so the thread jumped after opening.
 - Rendering diagrams/formulas through headless Chrome (rejected: too heavy) — see `references/build-media.md`.
-- Telling the user it's done after building only `target/debug` (they run `dist/*.app`).
+- Telling the person it's done after building only `target/debug`: they run
+  `/Applications/Bench.app`, rebuilt by `ship.sh` when they ask.
 - Hard-coded `px()` heights next to rem-based controls (they drift apart at other font sizes).
 
 ## Inputs

@@ -23,6 +23,8 @@ export interface Skill {
 	category: string;
 	dir: string;
 	scope: SkillScope;
+	/** A skill of a project's folder on its server (`repo.ts`): read there. */
+	machine?: string;
 }
 
 export function frontMatter(text: string): Record<string, any> {
@@ -60,7 +62,7 @@ export function repoSkillDirs(folder: string): string[] {
 	return dirs;
 }
 
-function skillsIn(root: string, scope: SkillScope): Skill[] {
+export function skillsIn(root: string, scope: SkillScope): Skill[] {
 	const out: Skill[] = [];
 	const walk = (d: string, category: string, depth: number) => {
 		if (depth > 3 || !fs.existsSync(d)) return;

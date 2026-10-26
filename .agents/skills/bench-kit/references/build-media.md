@@ -27,11 +27,13 @@ Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()`, `ui/me
 
 ## Getting the bytes
 
-- Files may live on another machine (an SSH backend). Read them through the backend's API into
-  `state_dir()/media/<hash>/<name>` (keep the file name: `open` and players use it). A file on
-  this Mac is used in place — no copy.
+- Files may live on another machine (a server's agent, or a project's machine this Mac's agent
+  works on over SSH). Read them through the agent's `/api/fs/…` — with `machine` for a project's
+  machine (`media::fetch(…, machine, …)`, `rest.rs` `on(machine)`; the thread's is
+  `files_machine()`) — into the state dir's media cache (keep the file name: `open` and players
+  use it). A file on this Mac is used in place — no copy.
 - **Lay out at the final size in the first frame** or the view jumps (the user notices every
-  jump, especially "jump to the end" on opening a chat). For local files compute everything
+  jump; the thread never moves by itself, `build-thread.md`). For local files compute everything
   synchronously in render (image size via the `imagesize` crate reads only the header;
   Markdown capped at 256 KB; a cached thumbnail): `fetch_now()`. Only remote downloads and the
   first Quick Look run go to the background; reserve their box meanwhile (a 16:9 frame for a
@@ -86,7 +88,7 @@ frames: ffmpeg -v error -i FILE -an -vf fps=25,scale=W:H -f rawvideo -pix_fmt bg
   (outside a window update), or `cx.drop_image(old, Some(window))` inside one. Otherwise each
   frame leaks a texture.
 - Decode at the box size × the window's scale factor (≤ 2): cheap and sharp.
-- Kill the ffmpeg child on drop; stop the video when the chat changes.
+- Kill the ffmpeg child on drop; stop the video when the thread changes.
 
 ## Mermaid without a browser
 
@@ -135,15 +137,16 @@ has a quiet ↗ "Open" icon; for kinds shown only as a row the whole row opens t
 Reference: `src/app/attachments.rs`, `src/attach.rs`, chips in `src/ui/media.rs`
 (`attachment_chip`), composer in `src/ui/composer.rs`.
 
-- **Paperclip**: a round quiet button next to Dictate/Send →
+- **Paperclip**: a button in the status bar (`src/ui/statusbar.rs`; the composer has no
+  buttons) →
   `cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: true, prompt: Some("Attach".into()) })`,
   await the receiver in `cx.spawn`, then add the paths.
-- **Drop**: on the whole chat column (messages + composer):
+- **Drop**: on the whole thread column (messages + composer, `src/ui/mod.rs`):
   `.drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active)).on_drop(cx.listener(|this, p: &ExternalPaths, _, cx| this.add(p.paths().to_vec(), cx)))`.
   Screenshot thumbnails dragged from the macOS corner preview arrive as files in
   `/var/folders/…` that vanish — copy those before using them.
-- **⌘V**: in the composer's `capture_key_down`, on `v` + `modifiers.platform`, read
-  `cx.read_from_clipboard()`; `ClipboardEntry::Image(img)` (⌃⇧⌘4 screenshot: `img.format`,
+- **⌘V**: in the composer (`composer.rs`), on `v` + `modifiers.platform`, read
+  `cx.read_from_clipboard()` (`attachments.rs`); `ClipboardEntry::Image(img)` (⌃⇧⌘4 screenshot: `img.format`,
   `img.bytes`) → save to `state_dir()/pasted/…png`; `ClipboardEntry::ExternalPaths` (files copied
   in Finder) → attach; then `cx.stop_propagation()`. Only text → let the field paste it.
 - **Chips** over the text field (one wrapping row at the text's inset, `pt_2`): 24px picture
@@ -151,6 +154,10 @@ Reference: `src/app/attachments.rs`, `src/attach.rs`, chips in `src/ui/media.rs`
   truncated, × to remove. After sending, the same chips (without ×, click opens) sit under the
   user's message. Send is enabled with files and no text.
 - Don't restrict types: the agent can handle anything (ffmpeg for video, etc.).
+- **Where they go** (`attach::prepare`, named in the message as `[attached: <path>]`): a file on
+  this Mac with this Mac's agent stays in place; for a server's agent it is uploaded
+  (`/api/files/upload`) to its `attachments/`; for a project worked on a server, `machine`
+  (`files_machine()`) sends it to that machine's `/tmp/bench-attachments/` over SSH.
 
 ## Splitting content
 

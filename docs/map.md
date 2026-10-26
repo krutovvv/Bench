@@ -20,7 +20,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | open, delete or search threads | `src/app/sessions.rs` |
 | change the sidebar | `src/ui/sidebar.rs` (projects: `src/app/project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/app/sidebar_items.rs`, marks in `src/app/marks.rs` |
 | change the status bar | `src/ui/statusbar.rs` |
-| change the gear (providers, look) | `src/ui/providers.rs`, `src/app/providers.rs`, `src/ui/panels.rs` |
+| change the gear (tabs Agents, Presets, Appearance) | `src/ui/providers.rs` (the tabs), `src/app/providers.rs`, `src/app/agent_form.rs` (add/remove a server's agent), `src/app/presets.rs`, `src/ui/panels.rs` (Appearance) |
 | change a keyboard shortcut | `src/app/keys.rs` |
 | change a /tools utility | `crates/devtools/src/` (pure functions with tests) |
 | change what Bench sends or receives | `src/gateway.rs` (WebSocket), `src/rest.rs` (REST); types shared with the agent in `crates/protocol` |
@@ -57,7 +57,7 @@ src/
   connection.rs, pi_agent.rs   where the agent runs, starting it (here or over SSH)
 agent/src/
   server.ts      starts the agent, collects modules/
-  modules/       threads, commands, projects (environment), hosts, tasks, cron, files, audio, settings
+  modules/       threads, commands, projects (environment), agents, presets, hosts, tasks, cron, files, audio, settings
   runtime.ts     Pi conversations, the queue, inserts
   thread.ts      Pi's journal → the items Bench shows
   builtin/       the agent's tools

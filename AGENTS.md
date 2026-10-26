@@ -155,7 +155,7 @@ from `bench_ui` (`crates/ui`, shown by the storybook). A size or a gap is a `ben
 `Gap` step, never a `px(…)` written in a screen; a missing piece is added to `crates/ui` first.
 
 - **Blocks.** Every bordered block is rounded (`rounded_md`, theme radius). Every block head is
-  `block_head` (32 px). Fields are `FIELD_H` (32 px). Buttons are rounded and consistent.
+  `block_head` (32 px). Fields are `FIELD_H` (28 px). Buttons are rounded and consistent.
 - **Scrolling.** Only the thread scrolls. There is no scroll inside a scroll, except the
   terminal. Editors are as tall as their text (`editor_height`). Lists are as long as they are.
   Empty states take one line.

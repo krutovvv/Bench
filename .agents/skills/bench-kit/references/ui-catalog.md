@@ -10,7 +10,11 @@ takes them again).
 
 | Need | Call (`bench_ui::…`) | File |
 |---|---|---|
-| Any size, spacing step | `FIELD_H`, `BLOCK_HEAD_H`, `CHAT_*`, `TURN_Y`, `Gap::{Xs,S,M,L,Xl}` (2/4/8/12/16 px), `bar_h`, `editor_height` | `metrics.rs` |
+| A spacing step | `Gap::{Xs,S,M,L,Xl}` (2/4/8/12/16 px) | `metrics.rs` |
+| A height | `FIELD_H` (28, buttons and pickers of a form match it), `BLOCK_HEAD_H` (32), `CHIP_H` (thread chips), `STATUS_H` (29), `bar_h(cx)`, `RING_CLEAR` (air under a focused field) | `metrics.rs` |
+| The thread's columns and leading | `CHAT_LEFT`, `AVATAR`, `CHAT_TEXT`, `CHAT_RIGHT`, `TURN_Y`, `LEAD` | `metrics.rs` |
+| An editor, a picture, a filled control | `editor_line(cx)`, `editor_height(lines, cx)` (as tall as its text), `THUMB`, `BAR_CONTROL_REMS` | `metrics.rs` |
+| A row under a group header | `nest_pl(cx)` | `metrics.rs` |
 | Text | `body`, `title`, `muted`, `small`, `mono`, `error` | `text.rs` |
 | A row, a column, ends apart | `row(Gap::M)`, `stack(Gap::S)`, `spread(Gap::M)`, `spacer()` | `layout.rs` |
 | The main action | `primary_button(id, "Save")` | `button.rs` |
@@ -24,12 +28,23 @@ takes them again).
 | A block (insert, card, pane) | `block(title, actions, body, cx)`, `block_head`, `block_body` | `block.rs` |
 | Who speaks | `avatar(agent, theme)` | `block.rs` |
 | One line saying nothing is there | `empty_state` | `block.rs` |
-| A list row, a group | `list_row`, `pick_row`, `group_chevron`, `nest_guide`, `head_icon` | `list.rs` |
+| A list row, a group | `list_row(id, title, meta, selected, nested, actions, cx)`, `pick_row(id, icon, label, detail, cx)`, `group_chevron`, `nest_guide` | `list.rs` |
+| A head's icon, its "+" room | `head_icon`, `head_icon_in(icon, color, cx)` (a marked project's colour), `head_plus_slot()` | `list.rs` |
 | A file's icon | `file_icon(name, dir, theme)` | `list.rs` |
 | Bars | `header_bar`, `pane_bar`, `status_text`, `status_button`, `search_band` | `bars.rs` |
 | Icons | `Ico::…` (Lucide, `assets/icons/`) | `icons.rs` |
 | Theme | `theme::apply`, `Appearance` | `theme.rs` |
 | Numbers as text | `plural`, `clock`, `compact`, `clip` | `fmt.rs` |
+
+## Local helpers (one area's, built from the above)
+
+- **Inserts** — `src/inserts/mod.rs`: `icon_button` (an insert head's small icon), `pick_row`,
+  `pick_row_removable` (a server or host to pick, trash on hover), `card` (a block an insert
+  opened: a file, a task), `file_form` (naming a new file or folder), `row_trash` (a file row's
+  two-click delete). Use them inside an insert; never copy them into one.
+- **Environment sections** — `src/env/section.rs`: `row` / `row_with` (a section's row, lit when
+  its card is open), `add` ("+ Add"), `save`, `revert`, `remove` (two clicks), `new_card` (a new
+  MCP server, skill, prompt), `code` (an editor as tall as its text). Every `Section` uses these.
 
 A piece that is not here: add it to `crates/ui` (and to the storybook), then use it — not in the
 screen that needs it. Ask the person before inventing a new kind of control.

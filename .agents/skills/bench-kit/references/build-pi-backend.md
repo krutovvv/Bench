@@ -3,7 +3,7 @@
 Bench talks to one agent: `agent/` in the repo, a Node server on
 [Pi Durable](https://github.com/earendil-works/pi). The person's rule for it: **build on Pi as its authors describe it, extend with
 their packages or popular community ones, write as little of our own as possible.** `agent/README.md`
-lists what is Pi's, what is a package and what is ours (~3k lines).
+lists what is Pi's, what is a package and what is ours.
 
 ## Shape
 
@@ -16,12 +16,17 @@ lists what is Pi's, what is a package and what is ours (~3k lines).
   `npm ci` when `package-lock.json` changed, starts `node src/server.ts`, reads `~/.bench/server.json`.
   Over SSH `ensure_remote(host)` ships the sources as a tar over ssh, installs, starts, and Bench
   tunnels to the port (`connection.rs`). A server built from other sources is restarted when idle.
-- **Home** `~/.bench`: `bench.sqlite` (settings, keys, providers, the session index, cron jobs,
-  tasks, hosts, projects), `pi.sqlite` (Pi's durable store), `agents/default/` — the Host
-  project's agent, the machine's own (Pi's agent directory: settings.json, mcp.json, SYSTEM.md,
-  AGENTS.md, skills/, prompts/, extensions/; plus memories/) — and `projects/<id>/`, a project's
-  environment (wire name `project:<id>`, `agentDir` in `config.ts`: its SYSTEM.md, mcp.json,
-  skills/, prompts/ on top of the default agent's memory, model and settings), `ui/` (Bench's own state).
+- **Home** `~/.bench` (`config.ts`):
+  - `bench.sqlite` — settings (among them `agents`, the servers' agents, and `presets`), keys,
+    providers, the session index, cron jobs, tasks, hosts, projects; `pi.sqlite` — Pi's durable store;
+  - `agents/default/` — the Host project's agent, the machine's own (Pi's agent directory:
+    settings.json, mcp.json, SYSTEM.md, AGENTS.md, skills/, prompts/, extensions/; plus memories/);
+  - `projects/<id>/` — a project's environment (wire name `project:<id>`, `agentDir` in
+    `config.ts`: SYSTEM.md, mcp.json, lsp.json, skills/, prompts/ on top of the default agent's
+    memory and settings);
+  - `ssh/` (the ControlMaster sockets, `ssh-env.ts`), `lsp/` (language servers installed here,
+    `lsp.ts`), `mcp-oauth/` (MCP tokens), `backups/` (before a migration), `ui/` (Bench's own state),
+    `attachments/`, `server.json`, `app/` (the installed server).
 - **Extensions** are the unit of behaviour (Pi's term; not "harness" — in Pi that word is the
   whole runtime). Built in: `assistant`, `mcp`, `tool-search`; each agent's own in
   `agents/<agent>/extensions/*.ts` (installed as `<agent>:<name>`), hot-reloaded. An agent picks
@@ -31,8 +36,8 @@ lists what is Pi's, what is a package and what is ours (~3k lines).
 ## Rules that came from the person
 
 - **Lean prompt, no "discipline" blocks.** A local Qwen at 60–150 tok/s pays for every line and
-  for every extra verification round. The assistant's prompt is five sections (SOUL, environment,
-  project AGENTS.md, skills list, notes), ~6k tokens with 60 skills.
+  for every extra verification round. The assistant's prompt is seven short sections (below),
+  ~6k tokens with 60 skills.
 - **No automatic memory.** `memory` and `skill_manage` write only when asked; no nudges, no
   background review.
 - **Telegram: two messages per turn.** A silent status message with the steps, edited in place,
@@ -77,14 +82,14 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
 - **Inserts** (`agent/src/inserts.ts`, `build-insert.md`): an entry `bench.insert` {id, key}
   written into the transcript where the person put it (a write, not a turn: never queued, lands
   mid-run), and the conversation's document `bench.inserts` ({items: {id: {key, state, folded,
-  removed}}}) changed in commits (`session.insert`, `session.insert.patch` in `server.ts`, broadcast
+  removed, after?}}}) changed in commits (`session.insert`, `session.insert.patch` in `modules/threads.ts`, broadcast
   as `session.inserts`). The model learns them from the `inserts` prompt section, which reads the
   document with `input.read.snapshot(Inserts, conversationId)` (`extensions/assistant.ts`), and
   what each shows now from the `<block-state>` Bench appends to each message (stripped from the
   history, `runtime.ts` `stripBlock`). Old threads' `subject` is mapped to an insert
   (`legacyInsert`); the one subject left is `env:<id>`, a project's environment at a thread's top.
-- **Prompt sections** (`prompt.ts`, Pi's `section()`): soul, environment, subject, inserts,
-  project, skills, notes. Pi resends a section only when its text changed, so the provider's
+- **Prompt sections** (`prompt.ts`, listed in `extensions/assistant.ts`, Pi's `section()`): soul,
+  environment, subject, inserts, project, skills, notes. Pi resends a section only when its text changed, so the provider's
   prompt cache stays warm: keep sections stable (no clocks, no counters) and put what changes
   every message into `<block-state>`.
 - **The message queue** is Pi's inbox: a message sent while the agent works is submitted with
@@ -120,6 +125,25 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   threads — the same Pi conversations and runtime as Bench's threads (source `telegram`).
   `syncTelegram` starts and stops bots as settings change. Where Telegram is reachable only
   through a proxy: `TELEGRAM_PROXY`, else `HTTPS_PROXY`, in the agent's env.
+- **Where tools work** (`runtime.ts` `envFor`): Pi's `ExecutionEnv` per conversation —
+  `NodeExecutionEnv` here, `SshExecutionEnv` (`ssh-env.ts`, one OpenSSH ControlMaster connection
+  per server) on a project's machine, wrapped by `confined-env.ts` when the project is kept in its
+  folder (paths outside refused; commands run in a sandbox that writes only there and in the temp
+  folders: `sandbox-exec` on macOS, bubblewrap on Linux when installed). Pi's read/write/edit/bash and ours work through it unchanged.
+- **grep, glob, ls** (`builtin/search.ts`): code search without bash, through `api.env`.
+- **Diagnostics** (`lsp.ts`): the project's `lsp.json` names its language servers (presets in
+  `lsp-presets.ts`); a `ToolTask` `afterTool` hook (`extensions/assistant.ts`) adds the edited
+  file's errors to `edit` and `write` results; a `diagnostics` tool asks for them.
+- **Approvals**: with approvals set to manual, a `beforeTool` hook asks the person
+  (`host().approve`) before a dangerous `bash` command; "deny" blocks it.
+- **Compaction**: Pi's policy; a project's share of the window becomes a per-model override
+  (`config.ts` `compactionPolicy`, read by Pi at every use through `runtime.ts`
+  `compactionOverrides`); `builtin/compaction.ts` (`beforeCompact`) summarizes with the same model,
+  reasoning off.
+- **Presets and servers' agents**: `builtin/presets.ts` (setting `presets`: MCP and language
+  servers, compaction shares, reasoning levels; `/api/presets`), `builtin/servers.ts` (setting
+  `agents`: the servers' agents this Mac knows; `/api/agents`). Kept by this Mac's agent; a
+  project on a server gets its presets from here.
 - **Storage**: `pi.sqlite` is Pi's durable store (`openNodeSqliteStorage`: transcripts, documents,
   tasks, inbox); `bench.sqlite` (`config.ts` `db`) is ours: settings, keys, providers, the session
   index (`store.ts`), cron jobs, tasks, hosts, projects.

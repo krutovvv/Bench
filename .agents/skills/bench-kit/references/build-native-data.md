@@ -9,15 +9,20 @@ Bench's view state. Two places, in this order:
    a service's records behind its API or MCP server. Bench shows them there; the agent reaches
    them with its own tool or MCP server.
 2. **`~/.bench/bench.sqlite`**, Bench's one home, owned by the agent: tasks, hosts (SSH and
-   FTP/SFTP accesses), settings, providers, sessions, cron jobs. Bench reads and writes it
-   **through the agent's REST API** (`/api/tasks`, `/api/hosts`, routes in
-   `agent/src/server.ts`), never by opening the file; the agent through its tool
-   (`agent/src/builtin/tasks.ts`, `hosts.ts`). One store, two clients.
+   FTP/SFTP accesses), projects, cron jobs, providers, settings (among them `agents`, the
+   servers' agents, `servers.ts`; `presets`, the person's own, `presets.ts`). Bench reads and
+   writes it **through the agent's REST API** (`/api/tasks`, `/api/hosts`, `/api/projects`,
+   `/api/agents`; routes in `agent/src/modules/<area>.ts`, e.g. `tasks.ts`, `hosts.ts`), never
+   by opening the file; the agent through its tool (`agent/src/builtin/tasks.ts`, `hosts.ts`).
+   One store, two clients.
+3. **`~/.bench/projects/<id>/`**, a project's environment as files (an agent directory in Pi's
+   terms): `SYSTEM.md`, `mcp.json`, `lsp.json`, `skills/`, `prompts/`, and `files/`, where a
+   project without a folder works (`projects.dir`, `agent/src/builtin/projects.ts`).
 
 Not: a JSON or SQLite file of Bench's own, a third-party app as the store, a database inside
 Bench. Passwords for hosts are kept in `bench.sqlite` as the person chose (plain text is fine for
 them); a "from Keychain" button can fill one in (`security find-internet-password`,
-`src/app/remote_files.rs`).
+`src/inserts/ftp/state.rs`).
 
 ## Who else writes there
 
@@ -29,19 +34,16 @@ list re-read from its source": keep unsaved new items, don't overwrite a card be
 
 - **The data**: `Task` in `agent/src/builtin/tasks.ts` (title, notes, tags, day, evening,
   someday, important, completed, spent seconds, a running timer) in `bench.sqlite`. The same
-  shape in Rust: `src/tasks.rs` (lists: Today, Upcoming, Anytime, Logbook — someday tasks show in Anytime; pure
-  functions, tested).
-- **Bench's side**: `src/task_store.rs` — a worker thread that sends `Cmd::Load / Save / Delete`
-  as REST calls and returns `Evt::Loaded / Created / Error` over an `async_channel`; the `/tasks`
-  insert shows them (`src/inserts/tasks.rs`, `src/inserts/tasks/state.rs`, `src/ui/tasks.rs`).
+  shape in Rust: `src/inserts/tasks/model.rs` (lists: Today, Upcoming, Anytime, Logbook —
+  someday tasks show in Anytime; pure functions, tested).
+- **Bench's side**: `src/inserts/tasks/store.rs` — a worker thread that sends `Cmd::Load / Save /
+  Delete` as REST calls and returns `Evt::Loaded / Created / Error` over an `async_channel`; the
+  `/tasks` insert shows them (`mod.rs`, `state.rs`, `view.rs` beside it).
 - **The agent's side**: the `tasks` tool (list with status, tag, `done_since` / `done_until`,
   sums `spent_minutes_total`; add; update; complete; delete). Its line in the `inserts` prompt
-  section says
-  "the only place they live, never look for them in files".
-- **How they got there**: years in Things, then Apple Reminders (1318 tasks), then
-  `bench.sqlite` (2026-10-24): Bench read every reminder once over EventKit
-  (`move_from_reminders`, `src/task_store.rs`), wrote a backup to `~/.bench/ui`, imported them
-  through `POST /api/tasks/import`, and left Reminders untouched. A marker file makes it one-off.
+  section says "the only place they live, never look for them in files".
+- **How they got there**: years in Things, then Apple Reminders, then `bench.sqlite`
+  (2026-10-24), imported once; the import is gone from the code.
 
 ## Moving data in, and everything that used the old place
 
@@ -66,6 +68,5 @@ ask before dropping them for someone who uses them.
 ## Projects without a folder
 
 The sidebar holds only projects. A project's folder (a codebase) is optional: without one its
-threads work in a folder Bench keeps for it (`src/app/project_list.rs`). An "audit" or a
-"research" of a few deep threads is such a project. (`connection::group_dir`, which makes
-`~/Research/<name>` from "Name a group", is the older way and still in the code.)
+threads work in `~/.bench/projects/<id>/files` (`projects.dir`). An "audit" or a "research" of a
+few deep threads is such a project.

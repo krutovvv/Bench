@@ -13,14 +13,14 @@ read it first; the others are simpler cases of the same shape.
 |---|---|---|---|---|
 | `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`src/inserts/browser/`: `mod.rs` the kind, `state.rs` a tab per thread, `gateway.rs` the stream) | the browser MCP (Playwright on the server: browser-server-mcp, its own project) | the tab's address and title, and "work only in it" |
 | `tasks` {list} | `/tasks` | every list a click apart; in a project its tasks only (`src/inserts/tasks/`) | `tasks` (`agent/src/builtin/tasks.ts`) | which list is shown |
-| `ssh:<alias>` (`ssh:local` this Mac; `ssh` alone: pick one) | `/terminal`, `/ssh` | the terminal, as tall as its text (`src/inserts/terminal/`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
-| `dir` {path, file} | `/files` | the project's own folder (this Mac, or a remote project's server via `/api/fs/…`): folders open in place, a file opens under the insert, Save writes it back (`src/inserts/files/`; one live browser for the app, `InsertKind::shared`) | Pi's `read`/`write`/`edit`/`bash` in the thread's folder | the folder and the open file |
-| `files` {host, path, file} | `/ftp` | the hosts (and a new one), the folder, the open file in an editor (`src/inserts/ftp/`) | `remote_files` (`builtin/remote.ts`) | the folder, its entries, the open file |
+| `ssh:<alias>` (`ssh:local` the thread's machine, `thread_machine()`: this Mac or the project's server; `ssh` alone: pick one) | `/terminal`, `/ssh` | the terminal, as tall as its text (`src/inserts/terminal/`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
+| `dir` {path, file} | `/files` | the project's folder on its machine (through its agent's `/api/fs/…` with `machine`): folders open in place, a file opens under the insert, Save writes it back (`src/inserts/files/`; shared as `dir`) | Pi's `read`/`write`/`edit`/`bash` + `grep`/`glob`/`ls` (`builtin/search.ts`), diagnostics after each edit (`lsp.ts`) — on the project's machine (`ssh-env.ts`), refused outside the folder when it is kept in it (`confined-env.ts`) | the folder and the open file |
+| `files` {host, path, file} | `/ftp` | the hosts (and a new one), the folder, the open file in an editor (`src/inserts/ftp/`; shared as `files`) | `remote_files` (`builtin/remote.ts`) | the folder, its entries, the open file |
 | `tools` {tool} | `/tools` | every utility in its title's menu, the tool's input → output (`src/inserts/tools/`, the utilities themselves in `crates/devtools`) | none: `read`/`bash` on what it is sent | the tool's input and output |
 
 What belongs to a **project** rather than to a thread (its soul, MCP servers, skills, prompts,
 accesses, Telegram bot, scheduled jobs) is not an insert: it is the project's environment, the
-block a project's pencil opens (`src/env/`, one file per section).
+thread `env:<id>` (`src/env/`, one file per section).
 
 ## How it is kept: Pi's terms
 
@@ -29,7 +29,7 @@ the same:
 - an **entry** `bench.insert` {id, key} in the conversation's transcript, written where it was
   put (a Pi *write*: the model doesn't see it, it is never queued, it lands at once even mid-run);
 - its state in the conversation's **document** `bench.inserts` ({items: {id: {key, state, folded,
-  removed}}}), changed in commits. A removed insert keeps its entry and is marked removed.
+  removed, after?}}}), changed in commits. A removed insert keeps its entry and is marked removed.
 
 RPC: `session.insert` {id, key, state}, `session.insert.patch` {id, patch}; every change is
 broadcast as `session.inserts` and `thread.inserts`. Where an insert sits in the thread is its
@@ -46,9 +46,9 @@ row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "files:<id>
 
 **2. An `InsertKind`** — a folder `src/inserts/<kind>/`: `mod.rs` holds the unit struct, a line in
 `KINDS` (`src/inserts/mod.rs`) registers it:
-- `owns(key)`; `shared` — a name when its live state is one for the whole app (the task list,
-  the tool, the file browser): of several such inserts one is live (the last clicked, else the
-  newest), the others offer to show it there;
+- `owns(key)`; `shared` — a name when its live state is one for the whole app (`tasks`,
+  `tools`, `dir`, `files`): of several such inserts one is live (the last clicked, else the
+  newest), the others say "click to show it here". The browser has none: its tab is the thread's;
 - `title`; `switches` — the title's menu (another server, host, tool; "New …" runs a form);
 - `controls` — the head's own buttons; the frame adds fold and remove;
 - `body` — what it shows, under the head (None: the head alone). Its height fits what it shows
@@ -61,8 +61,8 @@ row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "files:<id>
 - `opened` (put in, or brought back: start a terminal, load the hosts), `removed`.
 The frame is the same for every kind (`render_insert`): the person's avatar, a light ground, a
 thin border, round corners, `block_head` on top (one height and look for every block's head).
-State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs` (a field
-`self.<kind>` on `BenchApp`); a long body goes to `view.rs` beside it. Build it from `bench_ui`
+State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`, a field on
+`BenchApp` (`ssh`, `tools`, `tasks`, `files_remote`, `local_files`, `sites` for the browser); a long body goes to `view.rs` beside it. Build it from `bench_ui`
 elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`.
 
 **3. Its `/` word.** A line in `words()` (`src/inserts/mod.rs`); rows for `/word <query>` in

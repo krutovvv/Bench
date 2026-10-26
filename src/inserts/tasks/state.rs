@@ -195,9 +195,9 @@ impl TasksMode {
 }
 
 impl BenchApp {
-    /// The Reminders thread, started the first time Tasks opens (macOS asks for access once).
+    /// The store's thread (`store.rs`, the agent's `/api/tasks`), started the first time /tasks opens.
     pub(crate) fn start_task_store(&mut self, cx: &mut Context<Self>) {
-        // The demo's tasks are made up; Reminders stays untouched.
+        // The demo's tasks are made up; the store stays untouched.
         if self.tasks.store.is_some() || self.demo {
             return;
         }
@@ -230,7 +230,7 @@ impl BenchApp {
                     .is_some()
                     .then(|| self.tasks.selected_task().cloned())
                     .flatten();
-                // A new task not yet in Reminders (nothing typed, or its save still on the way)
+                // A new task not yet in the store (nothing typed, or its save still on the way)
                 // only exists here: a re-read must not drop it, or its open card closes.
                 let pending: Vec<Task> = self
                     .tasks
@@ -270,7 +270,7 @@ impl BenchApp {
         self.tasks.send(Cmd::Load { done_since: since });
     }
 
-    /// From the window's ticker: save a card whose typing stopped, re-read Reminders now and
+    /// From the window's ticker: save a card whose typing stopped, re-read the store now and
     /// then (another device, the agent), keep a running timer's figure moving.
     pub fn tick_tasks(&mut self, cx: &mut Context<Self>) {
         if self
@@ -319,7 +319,7 @@ impl BenchApp {
         self.tasks.last_load = Some(Instant::now());
     }
 
-    /// Change one task (in place, then in Reminders).
+    /// Change one task (in place, then in the store).
     fn change_task(&mut self, id: &str, f: impl FnOnce(&mut Task), cx: &mut Context<Self>) {
         let Some(t) = self.tasks.items.iter_mut().find(|t| t.id == id) else {
             return;
@@ -626,7 +626,7 @@ impl BenchApp {
         }
     }
 
-    /// First press arms, the second removes the task from Reminders.
+    /// First press arms, the second removes the task from the store.
     pub fn delete_task(&mut self, id: String, cx: &mut Context<Self>) {
         if self.tasks.delete_armed.as_deref() != Some(id.as_str()) {
             self.tasks.delete_armed = Some(id);

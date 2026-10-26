@@ -15,9 +15,11 @@
   the same file (that silently reverted a whole feature once). Re-read, or use exact edits.
 - gpui-kit pins a pre-release GPUI fork (`gpui-pre`, `gpui-base`): Zed-head and tutorial snippets
   use a diverged API. Take code from `references/ui-content.md` and from Bench first. When
-  one exact name is missing there, grep the registry for that one name
-  (`grep -rn "pub fn cursor_position" ~/.cargo/registry/src/*/gpui-base-0.8.0/src`) — don't read
-  the sources to learn the framework.
+  one exact name is missing there, grep the vendored copy for that one name
+  (`grep -rn "pub fn cursor_position" vendor/gpui-base/src`) — don't read the sources to learn
+  the framework. `gpui-base`, `gpui-pre-web` and `gpui-pre-platform` are vendored and patched
+  (`vendor/`, `[patch.crates-io]` in `Cargo.toml`): what is built is there, not in
+  `~/.cargo/registry`; a fix to them goes there, with a comment in `Cargo.toml`.
 - Don't fake data the backend doesn't send: compute it yourself transparently (e.g. tokens/s from
   streamed text + calibration) and say it is an estimate (`~`).
 - A button that "doesn't work" usually got an error nobody showed: read the app's error log,

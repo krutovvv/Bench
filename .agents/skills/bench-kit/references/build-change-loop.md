@@ -15,8 +15,8 @@ cd ~/Projects/bench
 ## 1. Turn the request into a target you can measure
 
 Write one line for yourself before touching code, with numbers where the request has none:
-- "The composer's border is 1px higher than New session" → *the composer's top rule and the
-  bottom button's top edge at the same y*.
+- "The status bar's rule is 1px off under the sidebar" → *the status bar's top rule at the same
+  y across the sidebar and the thread*.
 - "Paddings a bit bigger" → *24 → 28 on every side of the question, the answer and the composer
   text* (one 4pt step, `build-workflow.md`).
 - "Put the folder button next to +" → *Open folder then + in the top strip, on every sidebar;
@@ -28,9 +28,7 @@ Which area and which procedure: `ui-areas.md` (put / move / fit).
 
 - Grep a unique visible string: a label, a tooltip, a placeholder:
   `grep -rn '"Search sessions' src/`, `grep -rn 'Hide sidebar  ⌘' src/`.
-- Find the same piece in the reference Bench, `~/Projects/bench/src` (same paths). If the
-  person's code differs from the reference, the reference is usually the fix
-  (`build-workflow.md`).
+- Or open the row for it in `docs/map.md`.
 - Read the whole function before editing. The value you need often has a comment saying why
   (`// 22 + the 2px selection stripe = the 24 of the headers`).
 
@@ -43,12 +41,15 @@ app keeps running untouched.
 cargo build --release 2>&1 | grep -E '^(warning|error)|Finished'
 $K/shot.sh target/release/bench /tmp/before.png 8          # prints the size in px and pt
 ```
-- The copy opens where the person left off: their last thread. To show another state
-  (a thread with an insert, a list, a dialog, a new task), add a temporary hook (step 5) first.
-- The data sits behind a macOS permission (Calendar, Contacts, the microphone)? A bare binary
-  is refused. Bundle and shoot the app instead: `scripts/bundle-macos.sh`, then
-  `$K/shot.sh "dist/Bench Dev.app" /tmp/before.png 8 DEBUG_X=1`. The script starts a separate copy
-  with `open -n` and leaves the person's copy alone.
+- Pick the state first: `BENCH_DEMO=…` (made-up threads: `1`, `landing`, `top`, `long`, `new`,
+  `tasks`, `server`, `tool`, `env`, `env-open`…) or `BENCH_HOME=<a copy of ~/.bench>` (real
+  data, never the person's own folder): `$K/shot.sh target/release/bench /tmp/before.png 8
+  BENCH_DEMO=landing`. Every demo state and hook: `build-verification.md`. Only when neither
+  reaches the state, a temporary hook (step 5).
+- The data sits behind a macOS permission (the microphone, notifications)? A bare binary
+  is refused. Bundle and shoot the app instead: `scripts/bundle-macos.sh` (`dist/Bench Dev.app`),
+  then `$K/shot.sh "dist/Bench Dev.app" /tmp/before.png 8 BENCH_DEMO=1`. The script starts a
+  separate copy with `open -n` and leaves the person's copy alone.
 - Wait longer when the app connects over SSH: 25–40 s.
 
 Then read the numbers:
@@ -93,7 +94,9 @@ state, each with its own hook.
 
 ## 5. A temporary hook to reach the state (when needed)
 
-One line, marked, at the end of the app's `new()` (or where the data arrives):
+First try `BENCH_DEMO=…` / `BENCH_HOME=<copy>` (step 3); a state they lack is better added to
+`src/demo.rs` for good. Otherwise one line, marked, at the end of the app's `new()` (or where the
+data arrives):
 ```rust
 if std::env::var("DEBUG_UPCOMING").is_ok() { app.open_task_list(List::Upcoming, window, cx); } // DEBUG-TMP
 ```
@@ -101,14 +104,10 @@ Call the same methods the buttons call: never post clicks.
 
 **Where the hook goes matters.** At the end of `new()` it runs before anything has loaded; data
 that arrives later (the sessions list, a chat's history, the tasks) **overwrites** what the hook
-did. Then put it where that data arrives (right after `self.sessions = rows;`), or for fake
-content at the top of the view's render, guarded so it runs once:
-```rust
-// top of render_chat: one fake answer with a code block and a changed file, to measure cards
-if std::env::var("DEBUG_CHAT").is_ok() && self.turns.is_empty() { self.turns.push(Turn { user: "test".into(), answer: "Run:\n```bash\nls -la\n```\n".into(), ..Default::default() }); } // DEBUG-TMP
-```
-(`Turn` has `Default`; add what the card needs — a Changed files card: `files:
-vec![FileEdit { path: "/tmp/x.rs".into(), diff: None }]`; both in `src/model.rs`.)
+did. Then put it where that data arrives (right after `self.sessions = rows;`). Fake content in
+the thread is a demo thread, not a hook: a `Journal` in `src/demo.rs` (`j.turn(user, thought,
+calls, answer, at, secs)` with `tool("bash", "ls -la")` or `edit(path, diff)` calls), shown with
+`thread(app, id, title, subject, j)` under its own `BENCH_DEMO=<name>`.
 
 Hooks that worked:
 - open a thread with an insert in it (`open_subject_key` with the insert's key, e.g. `ssh:local`) or a list;
@@ -124,8 +123,8 @@ cargo build --release 2>&1 | grep -E '^(warning|error)' -A7 | head -40
 - Zero warnings, not "it built". An unused import is a leftover of the old code; delete it.
 - The first build of a new project takes minutes. Run it in the background or with a long
   timeout; later builds take 20–30 s.
-- An error you don't understand: read the whole message (the `-A7` lines). Then look up the
-  API in the reference Bench (`grep -rn 'fn_name' ~/Projects/bench/src`) or the gpui-kit
+- An error you don't understand: read the whole message (the `-A7` lines). Then look up how
+  the code already calls it (`grep -rn 'fn_name' src crates`) or the gpui-kit
   pages (`gpui-kit-usage.md`). Don't guess method names: `ui-gotchas.md` lists those that
   already went wrong.
 
@@ -162,8 +161,9 @@ git add -A && git commit -m "<what changed, in the person's words>"   # a build 
 $K/ship.sh            # quits Bench, rebuilds /Applications/Bench.app, opens it (--dev: the side copy)
 ```
 **One app** (Bench is developed from inside Bench): the person works in
-**Bench** (`/Applications/Bench.app`, `local.bench.app`), and `ship.sh` rebuilds it in place.
-(`dist/Bench Dev.app`, `local.bench.dev`) only to compare two states of the interface. Bench is
+**Bench** (`/Applications/Bench.app`, `local.bench.app`), and `ship.sh` rebuilds it in place;
+`ship.sh --dev` builds `dist/Bench Dev.app` (`local.bench.dev`) only to compare two states of the
+interface. Bench is
 a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
 and reopening it costs the person a few seconds and an unfinished run comes back with the window.
 Never kill it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit —
@@ -179,11 +179,11 @@ Its local network list can't be cleaned. `tccutil` doesn't cover it, and
 only reset is deleting it from Recovery, which also wipes every VPN). Don't fight it. **Give the
 app a new bundle id** (`ID=` in `scripts/bundle-macos.sh`, then fix the id in this skill and in
 `src/main.rs`): macOS sees a new app and asks for every grant again (network, microphone,
-notifications, reminders). The person confirms them once, and it works. That is how the release
+notifications). The person confirms them once, and it works. That is how the release
 went from `local.bench` to `local.bench.app` (2026-10-25). `bundle-macos.sh` also gives each app
 its own Mach-O UUID, so Dev and release built from one commit are never twins. Keep that.
-The person tests the bundle, not `target/`. "I see no changes" happened when only the dev build
-was rebuilt. Tell them to try it in Bench Dev.
+The person tests the bundle, not `target/`. "I see no changes" happened when only `target/`
+was rebuilt. Tell them to try it in Bench, after `ship.sh`.
 
 ## 10. Report
 
@@ -197,7 +197,7 @@ was rebuilt. Tell them to try it in Bench Dev.
 ## The loop, as a checklist
 
 1. target in numbers
-2. find the code + the reference
+2. find the code (`docs/map.md`)
 3. shot + numbers before
 4. one exact edit
 5. hook if needed

@@ -1,15 +1,15 @@
 # Design system (Zed style)
 
-Reference: the Zed editor's look — flat, square, dense, quiet chrome, content first.
-Working copy of everything below: Bench's `crates/ui/src/theme.rs`, `assets/themes/one-light.json`,
-`assets/themes/one-dark.json`.
+Reference: the Zed editor's look — flat, dense, quiet chrome, content first, slightly rounded.
+Working copy of everything below: `crates/ui/src/theme.rs` (palettes, `apply`),
+`crates/ui/src/metrics.rs` (every size), `assets/themes/one-light.json`, `one-dark.json`.
 
-## Base switches
+## Base switches (`theme.rs`)
 
 ```rust
 Theme::update(cx, |t| {
-    t.radius = px(0.);          // no rounded corners anywhere
-    t.radius_lg = px(0.);
+    t.radius = px(4.);          // buttons, fields, menus
+    t.radius_lg = px(6.);       // blocks use rounded_md
     t.shadow = false;           // no drop shadows (popovers keep only the OS shadow)
     t.font_size = px(14.);      // UI font = rem: every rems()/px_4()/h_8() scales with it
     t.mono_font_size = px(12.); // code, editors, diffs, line numbers
@@ -26,13 +26,13 @@ not propagate to already-built windows; `Theme::update` does.
 |---|---|---|
 | background | `#FAFAFA` | content (chat, editors) |
 | foreground | `#242529` | text |
-| sidebar | `#EFEFF0` | left panel, lists in settings |
-| sidebar_accent / list_hover | `#E2E2E4` / `#E6E6E8` | hover, selected row |
-| title_bar, status_bar, tab_bar | `#E9E9EA` | chrome one step darker than content |
+| sidebar | `#EAEAEC` | left panel (no rule against the thread) |
+| sidebar_accent / list_hover | `#DEDEE1` / `#E6E6E8` | hover in the sidebar / elsewhere |
+| title_bar, status_bar, tab_bar | `#E4E4E6` | chrome a step darker than content |
 | border, sidebar_border | `#D9D9DA` | all 1px rules |
 | input, window_border | `#C9C9CB` | input outlines |
 | muted / muted_foreground | `#EBEBEC` / `#6E6F75` | secondary text, meta lines |
-| secondary | `#EDEDEE` | user-message blocks, code boxes |
+| secondary | `#EDEDEE` | quiet fills (secondary buttons) |
 | primary (accent) | `#4F6FD8` | selection stripe, primary button, focus, live values |
 | danger / success / warning | `#C9503F` / `#4F8A3F` / `#B7791F` | errors only / ok / caution |
 | list_active | accent at 14% | selected row background |
@@ -41,7 +41,7 @@ not propagate to already-built windows; `Theme::update` does.
 
 Dark (One Dark): content `#282C33`, panels `#2F343E`, chrome `#3B414D`, borders `#464B57`,
 text `#DCE0E5`, muted `#A9AFBC`; accent lightened (blue `#74A5F2`), primary_foreground dark
-`#1E2127`. Full list in Bench's `crates/ui/src/theme.rs` → `dark_palette`.
+`#1E2127`. Full list: `crates/ui/src/theme.rs` → `dark_palette`.
 
 Accent presets (light, dark): Blue `#4F6FD8/#74A5F2`, Violet `#7A5BD0/#A98BF0`, Green
 `#3F8A50/#86C08A`, Teal `#16848A/#5FC0C4`, Amber `#B7700F/#E2B05A`, Coral `#CF5A3C/#EE8C6C`,
@@ -63,47 +63,47 @@ Key colors (light): keyword `#A626A4`, function `#4078F2`, string `#50A14F`, num
 
 ## Typography
 
-- UI: system font, 14px base. `text_sm` for body/lists (≈12.25) — including chat answers and the
-  user's messages —, `text_xs` for meta lines, status bar, labels (≈10.5). Medium weight only for
-  titles and the header.
-- Code: Menlo (`font_family("Menlo")`), `mono_font_size` 12 — editors, diffs, command names,
-  cron schedules, version strings.
-- Size presets (⌘+ / ⌘−; no longer in Settings): Small 13/11, Normal 14/12, Large 15/13. Because the UI
-  font is the rem, rem-based spacing scales with it; fixed `px()` sizes don't — use rems for
-  anything that must keep proportions (bars, controls).
-- Line height: default GPUI ≈1.6 is too loose for wrapped titles → `line_height(relative(1.25))`
-  for list titles; body text keeps the default.
+- UI: system font, 14px base. The thread is **one size**, `text_base` — messages, answers,
+  steps, cards' heads, the composer; secondary things are muted, never smaller. Chrome (sidebar
+  titles at `SESSION_TITLE` 14, header, status bar, block heads) is `text_sm`. Medium weight
+  only for titles and the header.
+- Code: Menlo, `mono_font_size` 12 — editors, diffs, command names, cron schedules.
+- Size presets (⌘+ / ⌘−; no setting): Small 13/11, Normal 14/12, Large 15/13. Rem-based
+  spacing scales with the font; fixed sizes don't — rems for what must keep proportions.
+- Leading: the thread's is `LEAD` (1.5rem), shared by messages and the composer; wrapped list
+  titles `line_height(relative(1.25))`.
 
-## Spacing scale
+## Sizes and gaps (`crates/ui/src/metrics.rs`)
 
-GPUI helpers are rem-based: `p_1` = 0.25rem (≈4px), `p_2` ≈8, `p_3` ≈12, `p_4` ≈16 (at 16px
-rem; at 14px rem they are ~12% smaller — that is fine, keep using the scale consistently).
+Never a `px(…)` in a screen: name one of these, or add it there first.
 
-| Thing | Value |
-|---|---|
-| Horizontal inset of content from any panel edge | 16 (`px_4`) in the sidebar and lists; 24 (`px_6`) in the main reading area (chat, task list, task card) |
-| List row | `pl(14) + border_l_2` (text at 16), `pr_3`, `py_2` |
-| Group header in a sidebar | icon of the group's kind + name `text_sm` medium muted, chevron and "+" on the right; no counts, no rules (`design-layout.md`) |
-| Section header in a list (Tasks: "October", "This Evening") | `flex_none px_6 pt_4 pb_1 text_xs` muted, a rule under it |
-| Every bar (search band, bottom button, composer, tag strip) | the header's 36: `bar_h = font_size × 2.5` (35) + its 1px rule |
-| Header strip | 36px, `pl_4 pr_2`, title `text_sm` medium, truncate |
-| Status bar | 28px, `text_xs`, items `px_2`, pickers with icon inside the button |
-| Chat turn | question band `px_6 py_4` edge to edge; the agent's side `px_6 py_6 gap_3`; `text_sm`; the composer's text at the same 24 |
-| Composer buttons | 26px circles, 13px bold-cut icons, `gap_2`; quiet = 1px border, filled = accent (Send with text) / foreground (Stop turn) / danger (Stop recording) |
-| Cards under an answer (Changed files, code block, audio, video) | 1px frame, no fill; header line `px_2 py_1 text_xs` muted (code: `pl_4`, language left, Copy right) |
-| Settings list column | 300px wide, right border |
-| Sidebar | 280px (resizable 200–480); no right panel |
-| Popover panels | 260–300px wide, rows `px_3 py_0p5 text_xs`, key muted left / value right |
+| Name | Value | What |
+|---|---|---|
+| `Gap::Xs/S/M/L/Xl` | 2 / 4 / 8 / 12 / 16 | every gap between elements; `Xl` the inset from a panel's edge |
+| `FIELD_H` | 28 | a field; buttons, pickers, chips of a form match it |
+| `BLOCK_HEAD_H` | 32 | the head of every block (`block_head`) |
+| `CHIP_H` | = `FIELD_H` | attachment, queued message, a plan's head |
+| `RING_CLEAR` | 4 | air under a focused field (the ring is drawn outside) |
+| `STATUS_H` | 29 | the status bar with its rule |
+| `bar_h(cx)` | font × 2.5 (35) | every bar without its rule; + 1 = the header's 36 |
+| `TURN_Y` | 14 | every thread row pads top and bottom by it: rows 28 apart |
+| `CHAT_LEFT` | 28 (2 × `TURN_Y`) | the avatar's x |
+| `AVATAR` | 24 | the avatar disc |
+| `CHAT_TEXT` | 66 (`CHAT_LEFT + AVATAR + 14`) | where the thread's text starts |
+| `CHAT_RIGHT` | = `CHAT_TEXT` | as much free on the right |
+| `LEAD`, `THUMB`, `BAR_CONTROL_REMS` | 1.5 / 64 / 2 | leading; a picture's square; a filled control outside a bar |
+| `nest_pl`, `editor_line`, `editor_height(lines)` | fns | a row under a group header; an editor as tall as its text |
+
+Other fixed sizes: header 36, sidebar 280 (resizable 200–480), popovers 260–300 wide.
 
 ## Color usage rules
 
 - Muted text for everything secondary (meta, counters, timestamps, hints).
-- Accent only for "active/selected/live/primary". Never decorative.
-- Red only for errors (error counts, failed steps, destructive confirm button).
-- Live states: calm accent + motion (spinning loader, shimmer). Recording shows a round filled
-  Stop button (■) — the one place a solid danger-colored control is fine.
-- Status bar: every label and icon `muted_foreground` (pickers too: `Button…text_color(muted)`);
-  only live speed (accent) and context thresholds (amber/red) differ.
-- Radius stays 0 everywhere; circles (`rounded_full`) only for the floating composer buttons and
-  overlay badges (a ▶ on a video frame).
-- Status thresholds: context > 60% amber, > 85% red.
+- Accent only for "active/selected/live/primary". Never decorative. Primary buttons in the accent
+  (`button_primary = primary`).
+- Red only for errors (error counts, failed steps, destructive confirm, the fallback model).
+- Live states: calm accent + motion (spinning loader, shimmer).
+- Status bar: every label and icon `muted_foreground`; only live speed (accent) and context
+  thresholds (amber/red) differ. Context > 60% amber, > 85% red.
+- Corners: `rounded_md` on every bordered block (`bench_ui::block`), the theme radius on
+  controls; `rounded_full` only for avatars and overlay badges (a ▶ on a video frame).

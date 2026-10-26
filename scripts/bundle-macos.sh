@@ -7,8 +7,8 @@
 # (/System/Applications is macOS's own read-only volume, for Apple's apps only.)
 #
 # Bench is developed from inside Bench: the person works in the release app (and talks to the
-# agent through it); every commit is tried in Bench Dev, which is rebuilt in place. When Dev is
-# good, the person asks for a release. Both share ~/.bench, so the threads are the same.
+# agent through it), rebuilt by ship.sh when they ask. Bench Dev (ship.sh --dev) is built only to
+# compare two states of the interface; it shares ~/.bench, so the threads are the same.
 #
 # Each app keeps one path and one bundle id, and both are signed with the Apple Development
 # certificate from the keychain: macOS then knows Bench by team and bundle id, not by the
