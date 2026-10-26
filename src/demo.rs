@@ -715,12 +715,31 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Ok("server") => Some("d-web1"),
         Ok("tool") => Some("d-tool"),
         Ok("env") | Ok("env-open") => Some("d-env"),
-        Ok("landing") | Ok("top") | Ok("new") => None,
+        Ok("landing") | Ok("top") | Ok("new") | Ok("long") => None,
         _ => Some("d-site"),
     };
     if let Some(id) = open {
         app.session = Some(id.into());
         app.thread = app.demo_threads.get(id).cloned().unwrap_or_default();
+    }
+    // `BENCH_DEMO=long`: a thread of sixty exchanges, opened at its top.
+    if std::env::var("BENCH_DEMO").as_deref() == Ok("long") {
+        let mut journal = Journal::default();
+        for k in 0..60 {
+            let answer = format!("Answer {k}. ") + &"The numbers held steady through the week. ".repeat(8 + k % 5 * 6);
+            journal.turn(&format!("Question {k}?"), None, vec![], &answer, now - 7200. + k as f64 * 100., 30.);
+        }
+        app.session = Some("d-landing".into());
+        app.thread = journal.thread();
+        app.processes.clear();
+    }
+    // `BENCH_DEMO_JUMP=1`: "Jump to latest" pressed two seconds after opening.
+    if std::env::var("BENCH_DEMO_JUMP").is_ok() {
+        cx.spawn(async move |this, cx| {
+            cx.background_executor().timer(std::time::Duration::from_secs(2)).await;
+            this.update(cx, |app, cx| app.jump_to_latest(cx)).ok();
+        })
+        .detach();
     }
     // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {

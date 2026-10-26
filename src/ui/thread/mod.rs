@@ -44,6 +44,8 @@ pub struct View {
     room: Pixels,
     /// The composer is below the viewport ("Jump to latest" shows), as last known.
     below: bool,
+    /// `to_end` asked for this frame to lay out without the room past the end.
+    jump: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -66,6 +68,7 @@ impl Default for View {
             reveal: Reveal::Off,
             room: px(0.),
             below: false,
+            jump: false,
         }
     }
 }
@@ -110,8 +113,21 @@ impl View {
             .bounds_for_item(self.tail())
             .is_none_or(|b| b.bottom() > self.list.viewport_bounds().bottom() + px(1.));
         if pushed {
-            self.list.scroll_to_reveal_item(self.tail());
+            self.to_end();
         }
+    }
+
+    /// Scroll so the composer's bottom is at the viewport's bottom. The list's own reveal adds up
+    /// the heights of the rows before it, and rows never on screen count as nothing: in a long
+    /// thread just opened it stops a message or two down. Scrolled to its end, the list lays out
+    /// from the last item up, measuring as it goes — so for that frame the room past the end is
+    /// nothing, and it comes back below the viewport the frame after.
+    fn to_end(&mut self) {
+        self.jump = true;
+        self.room = px(0.);
+        let end = self.tail() + 1;
+        self.list.remeasure_items(end..end + 1);
+        self.list.scroll_to_end();
     }
 
     /// Give the list `rows` and answer the first row that changed. Unchanged rows keep their
@@ -172,7 +188,10 @@ impl BenchApp {
         // The list keeps an item's first measured height: the room is measured again when it
         // changes (the composer shrank after sending, the window was resized).
         let room = self.tv.room_past_end(self.viewport_h);
-        if (room - self.tv.room).abs() > px(0.5) {
+        if std::mem::take(&mut self.tv.jump) {
+            // `to_end`: this frame lays out without the room.
+            window.request_animation_frame();
+        } else if (room - self.tv.room).abs() > px(0.5) {
             self.tv.room = room;
             let end = self.tv.tail() + 1;
             self.tv.list.remeasure_items(end..end + 1);
@@ -252,8 +271,10 @@ impl BenchApp {
                 .map(|i| self.tv.list.bounds_for_item(i).map_or(-1, |b| f32::from(b.size.height) as i32))
                 .collect();
             eprintln!(
-                "scroll: item {} offset {:?} first-top {:?} rows {} room {:?} heights {:?}",
-                top.item_ix, top.offset_in_item, first, self.tv.rows.len(), self.tv.room, heights
+                "scroll: item {} offset {:?} first-top {:?} rows {} room {:?} composer-bottom {:?} viewport-bottom {:?} heights {:?}",
+                top.item_ix, top.offset_in_item, first, self.tv.rows.len(), self.tv.room,
+                self.tv.list.bounds_for_item(self.tv.tail()).map(|b| b.bottom()),
+                self.tv.list.viewport_bounds().bottom(), heights
             );
         }
         let theme = cx.theme().clone();
@@ -326,7 +347,7 @@ impl BenchApp {
     }
 
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
-        self.tv.list.scroll_to_reveal_item(self.tv.tail());
+        self.tv.to_end();
         cx.notify();
     }
 
