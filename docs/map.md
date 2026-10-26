@@ -27,7 +27,10 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change the agent's answer to an RPC or a REST route | `agent/src/modules/<area>.ts` |
 | change how the agent runs a thread | `agent/src/runtime.ts`; what Bench reads of it: `agent/src/thread.ts` |
 | change how work is done on a server (a project's machine over SSH) | `agent/src/ssh-env.ts` (Pi's `ExecutionEnv`; its tests are Pi's conformance suite, `test/ssh-env.test.ts`) |
-| change the agents Bench talks to (this Mac's, servers') | `src/app/agents.rs`; the gear's list in `src/ui/providers.rs` |
+| change the agents Bench talks to (this Mac's, servers') | `src/app/agents.rs` (links), the list of servers' agents in `agent/src/builtin/servers.ts`; adding/removing in `src/app/agent_form.rs` |
+| change where a project lives (agent, machine, folder) or how the sidebar's projects are put together | `src/app/places.rs` (`ProjectKey`, `Location` in `src/model.rs`); its rows in `src/env/place.rs` |
+| keep a project's agent in its folder | `agent/src/confined-env.ts` |
+| change the presets (MCP, LSP, compaction, reasoning levels) | defaults in `agent/src/builtin/presets.ts`; Bench's side `src/app/presets.rs`, the gear's tab in `src/ui/providers.rs` |
 | change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts`; grep, glob, ls: `agent/src/builtin/search.ts` |
 | change a project's language servers (diagnostics after every edit) | `agent/src/lsp.ts`, the presets in `agent/src/lsp-presets.ts`; the section `src/env/lsp.rs` |
 | change when a project's conversations are compacted | `compactionPolicy` in `agent/src/config.ts`; the row in `src/env/run.rs` |
