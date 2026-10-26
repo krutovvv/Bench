@@ -416,12 +416,28 @@ fn reasoning_streams_as_one_line_not_as_text() {
         ["user:go", "work:0+"],
         "thinking is a live line of work"
     );
+    let Row::Work { steps, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(
+        steps,
+        &[Step::Thought("Let me check".into())],
+        "folded in it, there when opened"
+    );
     t.apply(ThreadEvent::Append(vec![tool(2, 0, "a")]));
     t.apply(ThreadEvent::Stream(StreamKind::Thought, "more".into()));
     assert_eq!(
         kinds(&t.rows()),
         ["user:go", "work:1+"],
         "and stays that line while tools run"
+    );
+    let Row::Work { steps, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(
+        steps.last(),
+        Some(&Step::Thought("more".into())),
+        "the thinking now, after the steps"
     );
     t.apply(ThreadEvent::Stream(StreamKind::Text, "Here".into()));
     assert_eq!(

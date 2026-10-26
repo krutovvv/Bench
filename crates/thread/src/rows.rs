@@ -254,24 +254,35 @@ pub(crate) fn rows_of(
             }
         }
     }
+    // What the model is thinking now: a step of the work in progress, folded with it like the
+    // thinking already in the journal; the thread shows only the work's one line until opened.
+    let thinking = (running && !stream.0.is_empty()).then(|| Step::Thought(stream.0.clone()));
     // The work in progress is live while the run is: a view counts its time on from `from`.
-    if let Some(Row::Work { live, .. }) = work.as_mut() {
+    let had_work = work.is_some();
+    if let Some(Row::Work { live, steps, .. }) = work.as_mut() {
         *live = running;
+        steps.extend(thinking.clone());
     }
     close(&mut rows, &mut work);
     rows.extend(moved.into_iter().map(|(_, r)| r));
-    if running && !stream.1.is_empty() {
-        rows.push(Row::Writing {
-            text: stream.1.clone(),
-        });
-    } else if running && matches!(rows.last(), Some(Row::User { .. })) {
-        // The model thinks before its first step on the person's message: one line says so.
+    // Thinking with no work row to hold it yet (before the first step on a message, or after an
+    // answer): a live work row of its own; right after a message it shows "Thinking…" even empty.
+    if running
+        && !had_work
+        && (thinking.is_some()
+            || (stream.1.is_empty() && matches!(rows.last(), Some(Row::User { .. }))))
+    {
         rows.push(Row::Work {
             key: "thinking".into(),
-            steps: vec![],
+            steps: thinking.into_iter().collect(),
             from: None,
             to: None,
             live: true,
+        });
+    }
+    if running && !stream.1.is_empty() {
+        rows.push(Row::Writing {
+            text: stream.1.clone(),
         });
     }
     rows.extend(sent.iter().enumerate().map(|(k, t)| Row::User {
