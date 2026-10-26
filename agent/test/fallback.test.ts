@@ -137,7 +137,8 @@ test("a thread's turn goes on with the fallback when the main endpoint is dead",
 		await rest("POST", "/api/providers/custom-endpoints", { name: "spare", base_url: spare.base, api_key: "k", model: "m" });
 		const listed = (await rest("GET", "/api/providers/custom-endpoints")).endpoints;
 		const id = (name: string) => listed.find((e: any) => e.name === name).id;
-		await rest("PUT", "/api/config", { config: { model: { provider: id("dead"), default: "m", fallback_provider: id("spare"), fallback: "m" } } });
+		// The gear writes both: the main model, and the fallback as `fallback_providers`.
+		await rest("PUT", "/api/config", { config: { model: { provider: id("dead"), default: "m" }, fallback_providers: [{ provider: id("spare"), model: "m" }] } });
 
 		const ws = new WebSocket(`ws://127.0.0.1:${port}/api/ws?token=${token}`);
 		await new Promise((res, rej) => (ws.on("open", res), ws.on("error", rej)));

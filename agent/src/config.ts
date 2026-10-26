@@ -110,9 +110,6 @@ export function deleteProvider(id: string): void {
 export interface AgentSettings {
 	defaultProvider: string;
 	defaultModel: string;
-	/** Bench's: the model that answers when the main one fails (fallback.ts); the general agent's only. */
-	fallbackProvider?: string;
-	fallbackModel?: string;
 	defaultThinkingLevel?: string;
 	/** Extensions by name: this agent's extensions/<name>.ts or the built-in ones; default ["assistant"]. */
 	extensions?: string[];
@@ -124,7 +121,7 @@ export interface AgentSettings {
 export const isProject = (agent: string): boolean => agent.startsWith("project:");
 
 /** The keys only the general agent has: the model is one for every thread (the gear). */
-const GLOBAL_KEYS = ["defaultProvider", "defaultModel", "fallbackProvider", "fallbackModel"] as const;
+const GLOBAL_KEYS = ["defaultProvider", "defaultModel"] as const;
 
 /** What a project's threads share with every other thread: the general agent's memory, model, settings. */
 export const homeAgent = (agent: string): string => (isProject(agent) ? "default" : agent);
@@ -247,7 +244,7 @@ export function readConfig(profile: string): any {
 	const provs = providers();
 	return {
 		...s,
-		model: { provider: p.defaultProvider, default: p.defaultModel, fallback_provider: p.fallbackProvider ?? "", fallback: p.fallbackModel ?? "" },
+		model: { provider: p.defaultProvider, default: p.defaultModel },
 		mcp_servers: agentMcp(profile),
 		providers: Object.fromEntries(provs.map((x) => [x.id, { name: x.name, base_url: x.base_url, api_key: x.api_key, api_mode: x.api_mode, models: x.models, context_length: x.context_length }])),
 		custom_providers: provs.map((x) => ({ name: x.id, base_url: x.base_url, model: Object.keys(x.models)[0] })),
@@ -281,11 +278,11 @@ export function resolveModel(_profile?: string): ModelChoice {
 	return choiceOf(p.defaultProvider, p.defaultModel);
 }
 
-/** The model that answers when the main one fails, if one is set. */
+/** The model that answers when the main one fails, if one is set: the gear's `fallback_providers`, first one. */
 export function resolveFallback(): ModelChoice | undefined {
-	const p = readAgent("default");
-	if (!p.fallbackModel || !providers().some((x) => x.id === p.fallbackProvider)) return undefined;
-	return choiceOf(p.fallbackProvider!, p.fallbackModel);
+	const f = (getSetting<any[]>("fallback_providers", []) ?? [])[0];
+	if (!f?.model || !providers().some((x) => x.id === f.provider)) return undefined;
+	return choiceOf(String(f.provider), String(f.model));
 }
 
 function choiceOf(providerId: string, model: string): ModelChoice {

@@ -257,20 +257,15 @@ import { BACKGROUND_CONTEXT as BACKGROUND } from "@earendil-works/chord/context"
  * back from the agent's own folder — the reasoning level, approvals — is written there too, so
  * a project's setting is its own and not the machine's: a thread of a project runs with
  * `project:<id>` and reads exactly these. The model and its fallback are one for every thread:
- * they go to the general agent whoever writes them.
+ * the model goes to the general agent whoever writes it, the fallback (`fallback_providers`) is a
+ * setting like the rest.
  */
 function patchConfig(profile: string, patch: any): void {
 	for (const [k, v] of Object.entries(patch ?? {})) {
 		const m = v as any;
 		if (k === "model" && m && typeof m === "object") {
 			const p = readAgent("default");
-			writeAgent("default", {
-				...p,
-				defaultProvider: m.provider ?? p.defaultProvider,
-				defaultModel: m.default ?? m.name ?? p.defaultModel,
-				fallbackProvider: m.fallback_provider ?? p.fallbackProvider,
-				fallbackModel: m.fallback ?? p.fallbackModel,
-			});
+			writeAgent("default", { ...p, defaultProvider: m.provider ?? p.defaultProvider, defaultModel: m.default ?? m.name ?? p.defaultModel });
 		} else if (k === "agent" && m && typeof m === "object" && m.reasoning_effort) {
 			writeAgent(profile, { ...readAgent(profile), defaultThinkingLevel: String(m.reasoning_effort) });
 		} else if (k === "approvals" && m && typeof m === "object" && m.mode !== undefined) {
