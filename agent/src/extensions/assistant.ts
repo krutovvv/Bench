@@ -9,6 +9,7 @@ import path from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool, hook, section, ToolTask } from "@earendil-works/pi-durable";
+import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
 import { clarify, sessionSearch, todo } from "../builtin/ask.ts";
@@ -81,7 +82,10 @@ const diagnosticsTool = defineTool({
 	},
 });
 
-const Coding = createCodingTools();
+// Pictures the read tool shrinks to the model's limits: a shot of a Retina window (2480×1600) is
+// over them, and without a processor Pi refuses the file instead of resizing it.
+export const images = await createNodePhotonImages();
+const Coding = createCodingTools({ images });
 
 export const assistant = defineExtension({
 	name: "assistant",

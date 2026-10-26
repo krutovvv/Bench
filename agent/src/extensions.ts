@@ -29,7 +29,7 @@ import * as skills from "./builtin/skills.ts";
 import * as subagent from "./builtin/subagent.ts";
 import * as taskStore from "./builtin/tasks.ts";
 import { agentDir, agents } from "./config.ts";
-import { assistant } from "./extensions/assistant.ts";
+import { assistant, images } from "./extensions/assistant.ts";
 import { host } from "./host.ts";
 import { mcpTools } from "./mcp.ts";
 import * as prompt from "./prompt.ts";
@@ -37,7 +37,7 @@ import * as prompt from "./prompt.ts";
 
 /** What a user extension's default export receives. */
 export const blocks = () => {
-	const coding = piTools.createCodingTools();
+	const coding = piTools.createCodingTools({ images });
 	const byName = Object.fromEntries((coding.tools ?? []).map((t: any) => [t.name, t]));
 	return {
 		pi,
