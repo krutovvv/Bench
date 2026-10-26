@@ -129,10 +129,16 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
   nothing — an unfinished run goes on in the agent and the window comes back to it.
 - **One change, one commit; a build only when the person asks.** Commit every change, then go on
   to the next one: the app is not rebuilt per commit. When the person asks for a build ("пересобери",
-  "обнови", "ship") — usually once, at the end of a batch of changes — run
-  `.agents/skills/bench-kit/scripts/ship.sh`: it quits Bench the honest way (`osascript … quit`,
-  never a kill), rebuilds `/Applications/Bench.app` in place and opens it again. Uncommitted
-  changes stop it. The way back from a bad change is an earlier commit, rebuilt — there is no
+  "обнови", "ship") — usually once, at the end of a batch of changes:
+  - **you are Bench's own agent** (this thread is in Bench): run `scripts/bundle-macos.sh`. It
+    rebuilds `/Applications/Bench.app` in place and quits nothing; then tell the person it is
+    built and that they quit and reopen Bench to see it. Never quit Bench yourself: your own
+    run would be cut off when the new Bench restarts the agent;
+  - **you work from outside Bench** (a terminal, another app): run
+    `.agents/skills/bench-kit/scripts/ship.sh`. It quits Bench the honest way
+    (`osascript … quit`, never a kill), rebuilds it in place and opens it again.
+
+  Uncommitted changes stop both. The way back from a bad change is an earlier commit, rebuilt — there is no
   second app parked beside it and no second build: Bench is one app. It is signed with the
   Apple Development certificate, so macOS asks for each permission once.
 - **Never kill Bench or quit it outside `ship.sh`** (`pkill`, deleting its `.app`, an ad-hoc

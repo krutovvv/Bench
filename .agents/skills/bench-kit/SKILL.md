@@ -63,9 +63,11 @@ gpui itself is `vendor/gpui-base` (patched). Go there directly, with one grep.
 
 ## Working on Bench from inside Bench
 
-- **Commit every change; build only when asked.** `scripts/ship.sh` quits Bench the honest way,
-  rebuilds `/Applications/Bench.app` and opens it. Never `pkill` Bench. A Bench opened while the
-  bundle is being written starts on half of it: ship again.
+- **Commit every change; build only when asked.** As Bench's own agent: `scripts/bundle-macos.sh`
+  (builds `/Applications/Bench.app` in place, quits nothing), then the person quits and reopens
+  Bench. From outside Bench: `scripts/ship.sh` (quits Bench the honest way, rebuilds, opens it).
+  Never `pkill` Bench. A Bench opened while the bundle is being written starts on half of it:
+  build again.
 - **Screenshots only of your own copy**: `scripts/shot.sh target/debug/bench out.png 8 BENCH_DEMO=…`;
   the demo's threads and every hook: `references/build-verification.md`.
 - **Checks**: `cargo build` (zero warnings), `cargo test --workspace`,
