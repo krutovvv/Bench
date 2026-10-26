@@ -86,13 +86,13 @@ impl View {
     fn room_past_end(&self, window_h: Pixels) -> Pixels {
         let viewport = match self.list.viewport_bounds().size.height {
             h if h > px(0.) => h,
-            _ => window_h - px(crate::ui::STATUS_H + 36. + crate::ui::CHAT_LEFT - crate::ui::TURN_Y),
+            _ => window_h - px(crate::ui::STATUS_H + 36.),
         };
         let tail = self
             .list
             .bounds_for_item(self.tail())
             .map_or(px(0.), |b| b.size.height);
-        (viewport - tail).max(px(0.))
+        (viewport - px(crate::ui::TURN_Y) - tail).max(px(0.))
     }
 
     /// After a send, the rows laid out: the composer's bottom past the viewport's is brought up
@@ -247,9 +247,6 @@ impl BenchApp {
                 v_flex()
                     .id("chat")
                     .size_full()
-                    // The air above the thread stays put and the rows scroll under its edge: scrolled
-                    // to the end, nothing of the last message shows above the composer.
-                    .pt(px(crate::ui::CHAT_LEFT - crate::ui::TURN_Y))
                     // A click anywhere in the thread means "I'm about to type": the composer takes
                     // the focus, unless the click went into something that types itself, or the
                     // mouse moved (a drag selects text).
@@ -339,7 +336,12 @@ impl BenchApp {
     ) -> AnyElement {
         let n = self.tv.rows.len();
         if ix == 0 {
-            self.render_head(window, cx)
+            // The air above the first row: with the row's own, as much as between two rows.
+            // Scrolled to the end, the row above the composer shows exactly its own air here.
+            div()
+                .pt(px(crate::ui::TURN_Y))
+                .child(self.render_head(window, cx))
+                .into_any_element()
         } else if ix <= n {
             self.render_row(ix - 1, window, cx)
         } else if ix == n + 1 {

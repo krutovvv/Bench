@@ -47,9 +47,9 @@ pub const THUMB: f32 = 64.;
 /// A filled control outside a bar ("Add server"), in rems.
 pub const BAR_CONTROL_REMS: f32 = 2.;
 
-/// The thread's columns: the avatar at `CHAT_LEFT`, the text at `CHAT_TEXT`, and as much free on
+/// The thread's columns: the avatar at `CHAT_LEFT` (as far from the edge as two rows are apart), the text at `CHAT_TEXT`, and as much free on
 /// the right of the text as on its left (`CHAT_RIGHT`).
-pub const CHAT_LEFT: f32 = 38.;
+pub const CHAT_LEFT: f32 = 2. * TURN_Y;
 pub const AVATAR: f32 = 24.;
 pub const CHAT_TEXT: f32 = CHAT_LEFT + AVATAR + 14.;
 pub const CHAT_RIGHT: f32 = CHAT_TEXT;
