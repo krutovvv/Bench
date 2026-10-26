@@ -58,6 +58,14 @@ test("the server starts and answers /api/projects", async () => {
 		await call("DELETE", `/api/cron/jobs/${job.id}`);
 		listed = (await call("GET", `/api/projects/${made.project.id}/env`)).cron;
 		assert.deepEqual(listed, []);
+		// A file host made in /ftp can be deleted there: the row and its password go.
+		const host = (await call("POST", "/api/hosts", { name: "Site FTP", kind: "ftp", host: "ftp.example.com", user: "vlad", password: "pw" })).host;
+		assert.ok(host.id);
+		await call("DELETE", `/api/hosts/${host.id}`);
+		const left = (await call("GET", "/api/hosts")).hosts;
+		assert.ok(!left.some((h: any) => h.id === host.id));
+		const gone = await call("DELETE", `/api/hosts/${host.id}`);
+		assert.match(String(gone.detail ?? ""), /no such host/);
 		// A project's reasoning level and approvals are its own: they go into its agent's folder (a
 		// thread of the project runs with it), not into the machine's settings. The model and its
 		// fallback are one for every thread: they go to the general agent, from wherever they come.

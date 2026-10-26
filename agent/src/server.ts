@@ -554,6 +554,14 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		if (!prev) throw new HttpError(404, "no such host");
 		return { host: hosts.save({ ...prev, ...req.body, id: prev.id }) };
 	}],
+	// A file host the person deletes in /ftp: the row goes, its password with it (it is a column
+	// of that row). Bench reloads the list after, so the row is gone from the picker at once.
+	["DELETE", /^\/api\/hosts\/([^/]+)$/, (_req, m) => {
+		const id = decodeURIComponent(m[1]);
+		if (!hosts.get(id)) throw new HttpError(404, "no such host");
+		hosts.remove(id);
+		return { ok: true };
+	}],
 	["PUT", /^\/api\/projects\/([^/]+)$/, (req, m) => {
 		const prev = projects.get(decodeURIComponent(m[1]));
 		if (!prev) throw new HttpError(404, "no such project");
