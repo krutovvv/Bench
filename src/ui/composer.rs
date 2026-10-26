@@ -183,15 +183,18 @@ impl BenchApp {
                                     // by exactly that, so its first line sits where a
                                     // message's does. Large = the messages' size; it grows
                                     // with the text (no scroll of its own: the thread
-                                    // scrolls). The leading is set on the field itself: the
-                                    // library's input pins its own line height (1.25rem)
-                                    // inside, and only a style refined after it wins — so a
-                                    // typed line reads exactly as a sent one.
+                                    // scrolls). The leading is set on the field itself — the
+                                    // library's input pins a line height inside — and it must
+                                    // be given in REM: the widget builds its rows from an
+                                    // absolute leading and lets a relative one fall through to
+                                    // the font's own 1.41 em, which set typed lines 3 px
+                                    // tighter than the thread's. 1.5rem is the thread's leading
+                                    // exactly, since the thread's prose is 1rem.
                                     div().ml(px(-12.)).my(px(-10.)).child(
                                         Textarea::new(&self.composer)
                                             .appearance(false)
                                             .large()
-                                            .line_height(relative(super::LEAD)),
+                                            .line_height(rems(super::LEAD)),
                                     ),
                                 ),
                             )

@@ -729,10 +729,13 @@ impl BenchApp {
                             }),
                         )
                         .child(
+                            // `rems`, not `relative` — see the composer's field: the widget's
+                            // rows only honour an absolute leading, and this must equal the
+                            // prose line it becomes once sent.
                             Textarea::new(&st)
                                 .appearance(false)
                                 .large()
-                                .line_height(relative(super::LEAD)),
+                                .line_height(rems(super::LEAD)),
                         )
                         .into_any_element()
                 });
