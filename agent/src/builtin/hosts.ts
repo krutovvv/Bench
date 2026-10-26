@@ -133,8 +133,8 @@ const shown = (h: Host) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host
 export const hostsTool = defineTool({
 	name: "hosts",
 	description:
-		"The person's server accesses (SSH servers, FTP/FTPS/SFTP hosts) and the project each belongs to. list: all, or with `query` (name or address). " +
-		"assign / unassign: add the hosts in `ids` to this thread's project (or take them out). In a project's thread only its own accesses are offered to the person.",
+		"The person's server accesses (SSH servers, FTP/FTPS/SFTP hosts). Each lives in one project — the one that made it: a file host is not shared between projects, to use the same server elsewhere it is made again there. list: all, with each one's `project`, or with `query` (name or address). " +
+		"assign: take the accesses that belong to no project into this thread's project; unassign: take them out of it — a file host is deleted with it, an SSH one only loses the tag (its entry lives in ~/.ssh/config). In a project's thread only its own accesses are offered to the person.",
 	parameters: Type.Object({
 		action: Type.Union([Type.Literal("list"), Type.Literal("assign"), Type.Literal("unassign")]),
 		query: Type.Optional(Type.String()),
@@ -149,12 +149,32 @@ export const hostsTool = defineTool({
 		const project = sessionOf(api.conversationId).project ?? "";
 		if (!project) throw new Error("this thread is not in a project");
 		const done: string[] = [];
+		// Not this project's: touching it would spend another project's credentials.
+		const elsewhere: string[] = [];
 		for (const id of args.ids ?? []) {
 			const h = hosts.get(id);
 			if (!h) continue;
-			hosts.save({ ...h, project: args.action === "assign" ? project : "" });
+			if (args.action === "assign") {
+				if (h.project && h.project !== project) {
+					elewhere.push(h.name);
+					continue;
+				}
+				hosts.save({ ...h, project });
+			} else if (h.project !== project) {
+				elewhere.push(h.name);
+				continue;
+			} else if (h.kind === "ssh") {
+				// Mirrors an entry of ~/.ssh/config: only the tag goes.
+				hosts.save({ ...h, project: "" });
+			} else {
+				hosts.remove(h.id);
+			}
 			done.push(h.name);
 		}
-		return text({ success: true, [args.action === "assign" ? "added" : "removed"]: done });
+		return text({
+			success: true,
+			[args.action === "assign" ? "added" : "removed"]: done,
+			...(elsewhere.length ? { other_project: elsewhere } : {}),
+		});
 	},
 });

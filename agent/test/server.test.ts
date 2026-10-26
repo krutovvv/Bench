@@ -66,6 +66,17 @@ test("the server starts and answers /api/projects", async () => {
 		assert.ok(!left.some((h: any) => h.id === host.id));
 		const gone = await call("DELETE", `/api/hosts/${host.id}`);
 		assert.match(String(gone.detail ?? ""), /no such host/);
+		// A file host is the project's own: taking it out of the project deletes it, it does not
+		// drift into a shared pool.
+		const ph = (await call("POST", "/api/hosts", { name: "Site SFTP", kind: "sftp", host: "sftp.example.com", user: "vlad", project: made.project.id })).host;
+		assert.equal(ph.project, made.project.id);
+		await call("DELETE", `/api/projects/${made.project.id}/hosts/${ph.id}`);
+		assert.ok(!(await call("GET", "/api/hosts")).hosts.some((h: any) => h.id === ph.id));
+		// An SSH access mirrors ~/.ssh/config, which is the machine's: it only loses the tag.
+		const sh = (await call("POST", "/api/hosts", { name: "Box", kind: "ssh", host: "box.example.com", user: "v", source: "ssh_config:box", project: made.project.id })).host;
+		await call("DELETE", `/api/projects/${made.project.id}/hosts/${sh.id}`);
+		const kept = (await call("GET", "/api/hosts")).hosts.find((h: any) => h.id === sh.id);
+		assert.equal(kept.project, "");
 		// A project's reasoning level and approvals are its own: they go into its agent's folder (a
 		// thread of the project runs with it), not into the machine's settings. The model and its
 		// fallback are one for every thread: they go to the general agent, from wherever they come.

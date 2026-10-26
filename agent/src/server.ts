@@ -663,7 +663,16 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 	// An access taken out of the project (it stays in the store).
 	["DELETE", /^\/api\/projects\/([^/]+)\/hosts\/([^/]+)$/, (_req, m) => {
 		const h = hosts.get(decodeURIComponent(m[2]));
-		if (h && h.project === decodeURIComponent(m[1])) hosts.save({ ...h, project: "" });
+		// The Host project's env is "general"; its accesses are the ones with no project tag.
+		const want = decodeURIComponent(m[1]) === "general" ? "" : decodeURIComponent(m[1]);
+		// A file host belongs to the project that made it: there is no shared pool to unlink it
+		// from, so taking it out of the project deletes the row, its password with it (to use the
+		// same server elsewhere, the person adds it there). An SSH row only mirrors ~/.ssh/config,
+		// which is the machine's and is edited or removed there, so it just loses the tag.
+		if (h && h.project === want) {
+			if (h.kind === "ssh") hosts.save({ ...h, project: "" });
+			else hosts.remove(h.id);
+		}
 		return { ok: true };
 	}],
 	// Prompts a thread can insert (@ in the composer): the general ones and the project's own.
