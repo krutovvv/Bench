@@ -112,7 +112,7 @@ mod tail_tests {
 
 #[cfg(test)]
 mod past_end_tests {
-    use super::{LINE, past_end};
+    use super::{LINE, past_end, AIR};
     #[test]
     fn the_last_row_reaches_the_top_and_never_past_it() {
         // A 900-px window, a composer of one line (48): the room is what the window has left.
@@ -125,10 +125,12 @@ mod past_end_tests {
             LINE,
             "no room: still a line to scroll"
         );
-        // Pulled to the top, the last row stops with the fixed air under the edge, not flush on it.
+        // Pulled to the top, the last row stops with its own line and the fixed air under the
+        // edge (24 + 22), not flush on it.
         assert_eq!(
             900. - past_end(900., 48.) - 48. - super::super::STATUS_H,
-            40.
+            LINE + AIR,
+            "the breath kept under the deepest scroll"
         );
     }
 }
