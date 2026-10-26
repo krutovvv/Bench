@@ -177,11 +177,6 @@ impl BenchApp {
                             .flex_1()
                             .min_w_0()
                             .gap(px(10.))
-                            // Files waiting to go, over the text — a little more air than before,
-                            // so a picture's square never reads as part of the first line.
-                            .when(!chips.is_empty(), |d| {
-                                d.child(h_flex().flex_wrap().gap_2().pt(px(6.)).children(chips))
-                            })
                             .child(
                                 div().w_full().relative().child(
                                     // A Large textarea pads its text 12 left and 10 above
@@ -189,12 +184,23 @@ impl BenchApp {
                                     // by exactly that, so its first line sits where a
                                     // message's does. Large = the messages' size; it grows
                                     // with the text (no scroll of its own: the thread
-                                    // scrolls).
-                                    div().ml(px(-12.)).my(px(-10.)).line_height(relative(super::LEAD)).child(
-                                        Textarea::new(&self.composer).appearance(false).large(),
+                                    // scrolls). The leading is set on the field itself: the
+                                    // library's input pins its own line height (1.25rem)
+                                    // inside, and only a style refined after it wins — so a
+                                    // typed line reads exactly as a sent one.
+                                    div().ml(px(-12.)).my(px(-10.)).child(
+                                        Textarea::new(&self.composer)
+                                            .appearance(false)
+                                            .large()
+                                            .line_height(relative(super::LEAD)),
                                     ),
                                 ),
-                            ),
+                            )
+                            // Files waiting to go, under the text — where they sit once sent,
+                            // so the same message never flips while it is being written.
+                            .when(!chips.is_empty(), |d| {
+                                d.child(h_flex().flex_wrap().gap_2().pb(px(6.)).children(chips))
+                            }),
                     ),
             )
             // Last and deferred: painted over the rows under it.
