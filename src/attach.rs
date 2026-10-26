@@ -2,7 +2,8 @@
 //! (staged in the profile's image cache, which `prompt.submit` requires); every file is also
 //! named in the message as `[attached: <path>]`, a path on the gateway's machine the agent can
 //! read. A local file is used in place unless it lives in a temporary folder (a dragged
-//! screenshot), which is copied to the profile's `attachments/`; over SSH files are uploaded.
+//! screenshot) or its path has Unicode spaces (`plain`): then it is copied to the profile's
+//! `attachments/`; over SSH files are uploaded.
 
 use std::path::{Path, PathBuf};
 
@@ -62,6 +63,18 @@ fn is_temporary(path: &Path) -> bool {
         || p.starts_with(&state_dir().join("pasted").to_string_lossy().to_string())
 }
 
+/// `name` with plain spaces for Unicode ones. Pi's tools make them plain in every path they are
+/// given and then miss the file (a Russian macOS screenshot is "Снимок экрана — … в 00.32.36"
+/// with U+00A0 twice), so such a file is copied under this name rather than named in place.
+fn plain(name: &str) -> String {
+    name.chars()
+        .map(|c| match c {
+            '\u{00A0}' | '\u{2000}'..='\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{3000}' => ' ',
+            c => c,
+        })
+        .collect()
+}
+
 /// Blocking: call off the UI thread.
 /// `machine`: the project's work is on that machine, not the agent's (this Mac's agent working on
 /// a server): the files go to its temp folder, where the agent's tools look — one-off, gone with
@@ -81,14 +94,17 @@ pub fn prepare(
     for file in files {
         let name = file
             .file_name()
-            .map(|n| n.to_string_lossy().to_string())
+            .map(|n| plain(&n.to_string_lossy()))
             .unwrap_or_else(|| "file".into());
         let bytes = std::fs::read(file).with_context(|| format!("read {name}"))?;
         let path = if let Some(m) = machine {
             let dest = format!("/tmp/bench-attachments/{stamp}-{name}");
             rest::upload_file_to(conn, profile, Some(m), &dest, &bytes)?;
             dest
-        } else if *target == Target::Local && !is_temporary(file) {
+        } else if *target == Target::Local
+            && !is_temporary(file)
+            && plain(&file.to_string_lossy()) == file.to_string_lossy()
+        {
             file.to_string_lossy().to_string()
         } else {
             if home.is_none() {
@@ -122,4 +138,16 @@ pub fn save_pasted(bytes: &[u8], ext: &str) -> Result<PathBuf> {
     let path = dir.join(format!("Screenshot-{stamp}.{ext}"));
     std::fs::write(&path, bytes)?;
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_screenshot_name_gets_plain_spaces() {
+        let name = "Снимок\u{00A0}экрана\u{00A0}— 2026-10-27 в\u{00A0}00.32.36.png";
+        assert_eq!(plain(name), "Снимок экрана — 2026-10-27 в 00.32.36.png");
+        assert_eq!(plain("shot 1.png"), "shot 1.png");
+    }
 }
