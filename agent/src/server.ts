@@ -567,7 +567,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 				const s = status.find((x) => x.name === name);
 				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null, needs_auth: !!s?.needsAuth, spec: JSON.stringify(spec, null, 2) };
 			}),
-			// Every skill its threads can use, with where it lives: its own, its folder's (.agents/skills), the general ones.
+			// Every skill its threads can use, with where it lives: its own, its folder's (.agents/skills, .claude/skills), the general ones.
 			skills: skillsOf(agent).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
 			prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",

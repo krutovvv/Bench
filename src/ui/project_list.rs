@@ -498,7 +498,7 @@ impl BenchApp {
         }
         let groups: [(&str, &str); 3] = [
             ("project", "This project"),
-            ("repo", "Its folder · .agents/skills"),
+            ("repo", "Its folder · .agents/skills, .claude/skills"),
             ("general", if general { "This Mac" } else { "General" }),
         ];
         for (scope, label) in groups {

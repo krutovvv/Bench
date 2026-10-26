@@ -1,6 +1,6 @@
 // Skills: folders with a SKILL.md (YAML front matter: name, description), from three places: the
-// project's own skills/ (beside its mcp.json), the folder it works in (.agents/skills, a
-// repository's skills, from the folder up to the repository's root), and the general agent's
+// project's own skills/ (beside its mcp.json), the folder it works in (.agents/skills and
+// .claude/skills, a repository's skills, from the folder up to the repository's root), and the general agent's
 // skills/ (optionally grouped in category folders). Only their names and descriptions are in the
 // prompt; `skill_view` loads one when it applies, `skill_manage` writes them when asked.
 
@@ -14,7 +14,7 @@ import { agentDir, homeAgent, isProject } from "../config.ts";
 import { sessionOf } from "../host.ts";
 import { projects } from "./projects.ts";
 
-/** Where a skill lives: the project's own, the working folder's (.agents/skills), the general agent's. */
+/** Where a skill lives: the project's own, the working folder's (.agents/skills, .claude/skills), the general agent's. */
 export type SkillScope = "project" | "repo" | "general";
 
 export interface Skill {
@@ -48,13 +48,12 @@ export function listSkills(profile: string, folder?: string): Skill[] {
 	return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-/** `.agents/skills` in the folder and in each folder above it, up to its repository's root (nearest first). */
+/** `.agents/skills` and `.claude/skills` in the folder and in each folder above it, up to its repository's root (nearest first). */
 export function repoSkillDirs(folder: string): string[] {
 	if (!folder || !fs.existsSync(folder)) return [];
 	const dirs: string[] = [];
 	for (let d = path.resolve(folder); ; d = path.dirname(d)) {
-		const s = path.join(d, ".agents", "skills");
-		if (fs.existsSync(s) && !dirs.includes(s)) dirs.push(s);
+		for (const s of [path.join(d, ".agents", "skills"), path.join(d, ".claude", "skills")]) if (fs.existsSync(s) && !dirs.includes(s)) dirs.push(s);
 		if (fs.existsSync(path.join(d, ".git")) || d === os.homedir() || d === path.dirname(d)) break;
 	}
 	return dirs;
