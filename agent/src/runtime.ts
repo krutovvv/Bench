@@ -44,6 +44,9 @@ interface Live {
 	/** Text of the in-flight assistant message per content block, to turn snapshots into deltas. */
 	blocks: Map<number, { type: string; text: string }>;
 	answer: string;
+	/** Why this run died, if it did: said at once and kept with the answer, so a dead turn is
+	 * never just silence. */
+	fail?: string;
 	prompts: Map<string, Pending>;
 	stop?: () => Promise<unknown>;
 	usage: Totals & { started: number };
@@ -89,6 +92,8 @@ function legacyInsert(subject: string): { key: string; state: JsonObject } | und
 
 const BLOCK_OPEN = "<block-state>";
 const BLOCK_CLOSE = "</block-state>";
+/** How a stopped run says so in the history: one quoted line, the same live and after a restart. */
+const RUN_STOPPED = "> The run stopped: ";
 
 /** A user message without the block state Bench sent with it. */
 export function stripBlock(text: string): string {
@@ -707,7 +712,7 @@ export class Runtime {
 						live.usage.output += msg.usage.output ?? 0;
 						live.usage.cached = msg.usage.cacheRead ?? 0;
 					}
-					if (msg.stopReason === "error" && msg.errorMessage) live.answer = live.answer || `Error: ${msg.errorMessage}`;
+					if (msg.stopReason === "error") this.failTurn(live, msg.errorMessage ?? "the model stopped with an error");
 				}
 				live.blocks.clear();
 				break;
@@ -752,6 +757,9 @@ export class Runtime {
 				break;
 			case "task_failed":
 				console.error("[pi] task failed", e.kind, e.message);
+				// The generation task is the run itself: its failure is the reason the turn went
+				// quiet, and run_end follows without carrying it.
+				if (e.kind === "pi.generation") this.failTurn(live, e.message);
 				break;
 		}
 	}
@@ -795,6 +803,20 @@ export class Runtime {
 		if (!live.busy) this.store.update(live.row.id, { usage: { ...live.usage } });
 	}
 
+	/** The reason a run stopped, as one line. Said at once, kept in the history: without it a
+	 * failed turn looks like an answer that had nothing to say, and after a restart there is
+	 * nothing left to explain the emptiness. */
+	private failTurn(live: Live, why: unknown): void {
+		const text = String(why ?? "")
+			.replace(/^error:?\s*/i, "")
+			.replace(/\s+/g, " ")
+			.trim()
+			.slice(0, 400);
+		if (!text || live.fail?.includes(text)) return;
+		live.fail = live.fail ? `${live.fail}; ${text}` : text;
+		this.emit(live.row.id, "message.fail", { text: RUN_STOPPED + text });
+	}
+
 	private finish(live: Live): void {
 		if (!live.busy) return;
 		live.busy = false;
@@ -802,7 +824,9 @@ export class Runtime {
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);
 		if (live.usage.output) live.usage.tps = Math.round((live.usage.output / turnSecs) * 10) / 10;
 		const id = live.row.id;
-		const text = live.answer;
+		// The failure travels with the answer: half an answer plus the reason it stopped is the
+		// truth of the turn, and it is what a reopened thread has to show.
+		const text = live.answer + (live.fail ? `${live.answer ? "\n\n" : ""}${RUN_STOPPED}${live.fail}` : "");
 		if (text) this.store.addMessage(id, { role: "assistant", text });
 		this.store.touch(id);
 		this.emitUsage(live);

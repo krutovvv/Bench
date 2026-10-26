@@ -1162,6 +1162,22 @@ impl BenchApp {
                 }
                 self.remeasure_last(cx);
             }
+            Evt::RunStopped(sid, line) if self.is_current(&sid) => {
+                // The reason the run died joins what was already written: half an answer plus the
+                // reason beats a turn that simply stops, and beats it again after a restart.
+                if let Some(turn) = self.turns.last_mut() {
+                    if !turn.answer.ends_with(line.trim()) {
+                        if !turn.answer.trim().is_empty() {
+                            turn.answer.push_str("\n\n");
+                        }
+                        turn.answer.push_str(&line);
+                    }
+                }
+                if let Some(live) = self.live.as_mut() {
+                    live.label = "Stopped".into();
+                }
+                self.remeasure_last(cx);
+            }
             Evt::Reasoning(sid, text) if self.is_current(&sid) => {
                 self.speed.token(text.chars().count());
                 if let Some(turn) = self.turns.last_mut() {

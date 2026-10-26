@@ -191,6 +191,9 @@ pub enum Evt {
     Queue(String, Vec<(String, String, String)>),
     /// A waiting message the agent took up: it is the thread's next turn.
     UserPlaced(String, String, String),
+    /// The run died: the quoted line says why. Kept with the answer, so a dead turn is never
+    /// plain silence — and the reason survives a restart, not just the live thread.
+    RunStopped(String, String),
     /// A thread's inserts as the agent keeps them (the whole list, in order).
     Inserts(String, Vec<crate::model::Insert>),
     /// The agent refused an insert's change: the thread's list is read again.
@@ -799,6 +802,7 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             }
         }
         "message.delta" => emit(Evt::Delta(sid, text())),
+        "message.fail" => emit(Evt::RunStopped(sid, text())),
         "reasoning.delta" => emit(Evt::Reasoning(sid, text())),
         "tool.start" => emit(Evt::ToolStart {
             call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
