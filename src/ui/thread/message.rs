@@ -168,21 +168,12 @@ impl BenchApp {
     /// The answer being written: its reasoning so far, muted, then its text.
     pub(crate) fn render_writing(
         &mut self,
-        thought: &str,
         text: &str,
         after_work: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let theme = cx.theme().clone();
         let body = v_flex()
             .gap_3()
-            .when(text.is_empty() && !thought.is_empty(), |d| {
-                d.child(
-                    div()
-                        .text_color(theme.muted_foreground)
-                        .child(crate::ui::clip(thought, 400)),
-                )
-            })
             .children(self.render_answer("writing", text, cx));
         speaker_row(if after_work { None } else { Some(true) }, body, cx)
             .when(after_work, |d| d.pt_0())

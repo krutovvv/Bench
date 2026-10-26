@@ -14,8 +14,6 @@ mod queued;
 mod rail;
 mod work;
 
-use std::cell::Cell;
-use std::rc::Rc;
 use std::time::Duration;
 
 use ::thread::Row;
@@ -38,29 +36,23 @@ pub struct View {
     /// While a run is live, a timer repaints once a second (its clock).
     ticker: Option<Task<()>>,
     /// Keep the composer in view as the thread grows. On after a send or "Jump to latest"; off
-    /// as soon as the person scrolls up; on again when they scroll down to the composer.
+    /// the moment the wheel turns up (`wheel`); on again when the person scrolls down to the
+    /// composer.
     following: bool,
-    /// The person scrolled since the last frame (set by the list's scroll handler).
-    scrolled: Rc<Cell<bool>>,
-    /// Where the list's top was last frame: a scroll that lowered it went up.
-    last_top: (usize, Pixels),
+    /// The wheel turned down since the last frame: following may start again.
+    scrolled_down: bool,
 }
 
 impl Default for View {
     fn default() -> Self {
-        let list = ListState::new(3, ListAlignment::Top, px(800.));
-        let scrolled = Rc::new(Cell::new(false));
-        let seen = scrolled.clone();
-        list.set_scroll_handler(move |_, _, _| seen.set(true));
         Self {
-            list,
+            list: ListState::new(3, ListAlignment::Top, px(800.)),
             rows: vec![],
             version: u64::MAX,
             owner: None,
             ticker: None,
             following: false,
-            scrolled,
-            last_top: (0, px(0.)),
+            scrolled_down: false,
         }
     }
 }
@@ -76,19 +68,22 @@ impl View {
         self.rows.len() + 1
     }
 
-    /// The person's scroll since the last frame: up stops following, down to the composer
-    /// starts it again.
-    fn watch(&mut self) {
-        let top = self.list.logical_scroll_top();
-        let now = (top.item_ix, top.offset_in_item);
-        if self.scrolled.replace(false) {
-            if now < self.last_top {
-                self.following = false;
-            } else if self.composer_seen() {
-                self.following = true;
-            }
+    /// A turn of the wheel in the thread. Up stops following at once — before the frame that
+    /// would bring the composer back, so the person's scroll is never fought; down lets it start
+    /// again once the composer is in view.
+    fn wheel(&mut self, up: bool) {
+        if up {
+            self.following = false;
+        } else {
+            self.scrolled_down = true;
         }
-        self.last_top = now;
+    }
+
+    /// After the person scrolled down: following starts again when the composer is in view.
+    fn watch(&mut self) {
+        if std::mem::take(&mut self.scrolled_down) && self.composer_seen() {
+            self.following = true;
+        }
     }
 
     /// The composer's bottom edge is inside the viewport.
@@ -221,6 +216,12 @@ impl BenchApp {
                         this.click_claimed = false;
                         this.click_at = Some(ev.position);
                     }))
+                    .on_scroll_wheel(cx.listener(|this, ev: &ScrollWheelEvent, _, _| {
+                        let dy = ev.delta.pixel_delta(px(20.)).y;
+                        if dy != px(0.) {
+                            this.tv.wheel(dy > px(0.));
+                        }
+                    }))
                     .on_mouse_up(
                         MouseButton::Left,
                         cx.listener(|this, ev: &MouseUpEvent, window, cx| {
@@ -340,7 +341,7 @@ impl BenchApp {
             Row::Answer { key, text, error } => {
                 self.render_agent_answer(k, &key, &text, error.as_deref(), after_work, cx)
             }
-            Row::Writing { thought, text } => self.render_writing(&thought, &text, after_work, cx),
+            Row::Writing { text } => self.render_writing(&text, after_work, cx),
             Row::Fail { text, .. } => self.render_fail(&text, cx),
             Row::Insert { id, .. } => {
                 let els = self.render_insert_by_id(&id, window, cx);

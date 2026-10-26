@@ -154,7 +154,7 @@ fn rule_2_queue_in_the_agents_order() {
     ]));
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "queued:second", "queued:first"],
+        ["user:go", "work:0+", "queued:second", "queued:first"],
         "send now: it shows first"
     );
 }
@@ -177,7 +177,13 @@ fn rule_3_a_taken_message_keeps_its_place() {
     let rows = t.rows();
     assert_eq!(
         kinds(&rows),
-        ["user:go", "answer:ok", "user:next", "queued:after"],
+        [
+            "user:go",
+            "answer:ok",
+            "user:next",
+            "work:0+",
+            "queued:after"
+        ],
         "never shown twice"
     );
     assert_eq!(
@@ -188,7 +194,13 @@ fn rule_3_a_taken_message_keeps_its_place() {
     t.apply(ThreadEvent::Queue(vec![queued(11, "after")]));
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "answer:ok", "user:next", "queued:after"]
+        [
+            "user:go",
+            "answer:ok",
+            "user:next",
+            "work:0+",
+            "queued:after"
+        ]
     );
 }
 
@@ -386,4 +398,35 @@ fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
         ..Default::default()
     });
     assert_eq!(kinds(&t.rows()), ["user:a", "insert:i1"]);
+}
+
+#[test]
+fn reasoning_streams_as_one_line_not_as_text() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go")],
+        running: true,
+        ..Default::default()
+    });
+    t.apply(ThreadEvent::Stream(
+        StreamKind::Thought,
+        "Let me check".into(),
+    ));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:0+"],
+        "thinking is a live line of work"
+    );
+    t.apply(ThreadEvent::Append(vec![tool(2, 0, "a")]));
+    t.apply(ThreadEvent::Stream(StreamKind::Thought, "more".into()));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:1+"],
+        "and stays that line while tools run"
+    );
+    t.apply(ThreadEvent::Stream(StreamKind::Text, "Here".into()));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:1+", "writing:Here"],
+        "only the answer is written out"
+    );
 }

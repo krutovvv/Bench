@@ -35,8 +35,8 @@ pub enum Row {
     },
     /// Why a run stopped.
     Fail { key: String, text: String },
-    /// The answer being written now.
-    Writing { thought: String, text: String },
+    /// The answer being written now (its text; the model's reasoning is not shown while it streams).
+    Writing { text: String },
     /// A message waiting for the agent.
     Queued {
         key: String,
@@ -260,10 +260,18 @@ pub(crate) fn rows_of(
     }
     close(&mut rows, &mut work);
     rows.extend(moved.into_iter().map(|(_, r)| r));
-    if running && (!stream.0.is_empty() || !stream.1.is_empty()) {
+    if running && !stream.1.is_empty() {
         rows.push(Row::Writing {
-            thought: stream.0.clone(),
             text: stream.1.clone(),
+        });
+    } else if running && matches!(rows.last(), Some(Row::User { .. })) {
+        // The model thinks before its first step on the person's message: one line says so.
+        rows.push(Row::Work {
+            key: "thinking".into(),
+            steps: vec![],
+            from: None,
+            to: None,
+            live: true,
         });
     }
     rows.extend(sent.iter().enumerate().map(|(k, t)| Row::User {
