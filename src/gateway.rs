@@ -805,7 +805,10 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             }
             if let Some(f) = payload.get("fallback") {
                 let note = f["model"].as_str().map(|m| {
-                    (m.to_string(), f["reason"].as_str().unwrap_or_default().to_string())
+                    (
+                        m.to_string(),
+                        f["reason"].as_str().unwrap_or_default().to_string(),
+                    )
                 });
                 emit(Evt::Fallback(sid, note));
             }
