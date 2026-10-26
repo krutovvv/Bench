@@ -56,13 +56,19 @@ impl BenchApp {
         )>| {
             let items = std::rc::Rc::new(items);
             let view = view.clone();
-            // The icon sits inside the button, so hover lights up both.
-            h_flex().h_full().items_center().pl_1().child(
-                Button::new(id)
-                    .ghost()
-                    .small()
-                    .icon(icon.icon())
-                    .label(label)
+            // Icon-only (an empty label): the icon sits alone in a square button, and the wrapper's
+            // px_1 makes the inset 4+4 px a side — the same as the neighbouring items' px_2.
+            // With a label: the icon sits inside the button, so hover lights up both.
+            let icon_only = label.is_empty();
+            let button = Button::new(id).ghost().small().icon(icon.icon());
+            let button = if icon_only { button } else { button.label(label) };
+            let wrap = if icon_only {
+                h_flex().h_full().items_center().px_1()
+            } else {
+                h_flex().h_full().items_center().pl_1()
+            };
+            wrap.child(
+                button
                     // One tone across the bar, like the model and the icon buttons.
                     .text_color(muted)
                     .dropdown_menu(move |menu, _, _| {
