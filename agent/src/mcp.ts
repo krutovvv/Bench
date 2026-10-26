@@ -120,7 +120,7 @@ async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 					);
 			} catch (e) {
 				server.needsAuth = Boolean(spec.url) && needsAuth(e);
-				server.error = server.needsAuth ? "needs signing in" : String((e as Error)?.message ?? e);
+				server.error = server.needsAuth ? "needs signing in" : explain(String((e as Error)?.message ?? e));
 				console.error(`[mcp] ${agent}/${name}: ${server.error}`);
 			}
 		}),
@@ -188,4 +188,12 @@ function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> 
 export async function closeMcp(): Promise<void> {
 	await Promise.all([...servers.values()].map((s) => s.client?.close().catch(() => {})));
 	servers.clear();
+}
+
+/** A server's error as the person can act on it. */
+export function explain(error: string): string {
+	// Some services (Figma) let no client register itself for OAuth: one made by hand is needed.
+	if (/dynamic client registration failed/i.test(error))
+		return `${error} — this service does not let Bench register itself for sign-in: make an OAuth app in the service and put its id and secret in the server's config as "oauth": {"client_id": "…", "client_secret": "…"}`;
+	return error;
 }

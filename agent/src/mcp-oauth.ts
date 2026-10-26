@@ -77,12 +77,23 @@ export async function authorize(agent: string, name: string, serverUrl: string, 
 	if (!url) throw new Error("the server asked for authentication but gave no sign-in page");
 	if (!callback) callback = await OAuthCallbackServer.listen({ port: CALLBACK_PORT, redirectHost: "localhost", timeoutMs: 10 * 60_000 });
 	const state = await provider.state();
-	void callback
-		.waitForCallback(state)
-		.then(async ({ code }) => {
-			await authorizeMcp(provider, { serverUrl, authorizationCode: code });
-			await reconnect();
-		})
-		.catch((e) => console.error(`[mcp] ${agent}/${name} sign-in: ${(e as Error)?.message ?? e}`));
+	// Authorize pressed again while the browser has not come back: the same sign-in goes on, the
+	// page is given again (a second wait for the same state is refused by the callback server).
+	if (!waiting.has(state)) {
+		const wait = callback
+			.waitForCallback(state)
+			// `iss` is the authorization server's own name (RFC 9207): a server that sends it
+			// (Recraft) is refused without it.
+			.then(async ({ code, iss }) => {
+				await authorizeMcp(provider, { serverUrl, authorizationCode: code, ...(iss ? { iss } : {}) });
+				await reconnect();
+			})
+			.catch((e) => console.error(`[mcp] ${agent}/${name} sign-in: ${(e as Error)?.message ?? e}`))
+			.finally(() => waiting.delete(state));
+		waiting.set(state, wait);
+	}
 	return url.toString();
 }
+
+/** Sign-ins waiting for the browser to come back, by their OAuth state. */
+const waiting = new Map<string, Promise<void>>();
