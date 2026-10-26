@@ -432,7 +432,10 @@ impl BenchApp {
             };
             window.request_animation_frame();
         }
-        let hidden = self.settle > 0;
+        // Invisible only while there is nothing to show: a thread whose turns are already on
+        // screen (seen before, so `settle_ready`) is worth reading while its extras arrive, and
+        // blanking it read as the thread being thrown away.
+        let hidden = self.settle > 0 && !self.settle_ready;
         self.last_max = max;
 
         // The turns, and after each the inserts the person put there.
