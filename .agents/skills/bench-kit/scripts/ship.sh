@@ -39,7 +39,10 @@ running() {
 }
 if running; then
     osascript -e "tell application id \"$ID\" to quit" >/dev/null 2>&1 || true
-    for _ in $(seq 40); do
+    # A minute, not twenty seconds: a Bench busy painting a long thread was still on its way out
+    # after twenty, ship.sh gave up, and the app was left half-quit — the agent it started loses
+    # the local network then, so every model call failed until the person quit it by hand.
+    for _ in $(seq 120); do
         running || break
         sleep 0.5
     done
