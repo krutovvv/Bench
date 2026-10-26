@@ -94,12 +94,38 @@ test("skills: a project's own, its folder's .agents/skills and .claude/skills up
 });
 
 test("a title asks a thinking-by-default server not to think; OpenRouter, OpenAI and Anthropic are left to Pi", async () => {
-	const { noThinking } = await import("../src/runtime.ts");
+	const { noThinking } = await import("../src/thinking.ts");
 	const local = { api: "openai-completions", baseUrl: "http://192.168.1.10:8000/v1" };
 	assert.deepEqual(noThinking({ model: "q", max_tokens: 400 }, local), { model: "q", max_tokens: 400, chat_template_kwargs: { enable_thinking: false } });
 	assert.equal(noThinking({}, { api: "openai-completions", baseUrl: "https://openrouter.ai/api/v1" }), undefined);
 	assert.equal(noThinking({}, { api: "openai-completions", baseUrl: "https://api.openai.com/v1" }), undefined);
 	assert.equal(noThinking({}, { api: "anthropic-messages", baseUrl: "https://api.anthropic.com" }), undefined);
+});
+
+test("compaction: the summary is made without reasoning, kept across a restart, left to Pi on a failure", async () => {
+	const { compactWithoutReasoning, transcript } = await import("../src/builtin/compaction.ts");
+	const before = (compactWithoutReasoning as any).handlers.beforeCompact;
+	const model = { api: "openai-completions", baseUrl: "http://10.0.0.2:8000/v1", maxTokens: 32000 };
+	let asked: any;
+	const answer = { stopReason: "stop", content: [{ type: "text", text: "## Goal\nShip it" }] };
+	const memo = new Map<string, string>();
+	const api = (reply: any) => ({
+		conversationId: 1,
+		snapshot: async () => ({ model: { provider: "p", modelId: "m" } }),
+		memo: async (k: string, v?: any) => (typeof v === "string" ? (memo.has(k) || memo.set(k, v), memo.get(k)) : memo.get(k)),
+		models: { getModel: () => model, complete: async (_m: any, c: any, o: any) => ((asked = { c, payload: o.onPayload({ model: "m" }, model) }), reply) },
+	});
+	const messages = [{ role: "user", content: "Deploy" }, { role: "assistant", content: [{ type: "text", text: "On it" }, { type: "toolCall", name: "bash", arguments: { command: "ls" } }] }];
+	assert.equal(transcript(messages), '[User]: Deploy\n\n[Assistant]: On it\n\n[Assistant tool calls]: bash(command="ls")');
+	assert.deepEqual(await before({ reason: "manual", messages, entries: [], firstKept: 1 }, api(answer), {}), { summary: "## Goal\nShip it" });
+	assert.deepEqual(asked.payload.chat_template_kwargs, { enable_thinking: false });
+	assert.match(asked.c.messages[0].content, /<conversation>\n\[User\]: Deploy/);
+	// After a restart the memo answers; a failed call leaves the summary to Pi.
+	asked = undefined;
+	assert.deepEqual(await before({ reason: "manual", messages, entries: [], firstKept: 1 }, api(answer), {}), { summary: "## Goal\nShip it" });
+	assert.equal(asked, undefined);
+	memo.clear();
+	assert.equal(await before({ reason: "manual", messages, entries: [], firstKept: 1 }, api({ stopReason: "error", content: [] }), {}), undefined);
 });
 
 test("telegram: markdown to HTML, splitting, MEDIA files", () => {

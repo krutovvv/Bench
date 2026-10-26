@@ -12,6 +12,7 @@ import { CronTask, cronTool } from "../builtin/cron.ts";
 import { memoryTool } from "../builtin/memory.ts";
 import { skillManage, skillView } from "../builtin/skills.ts";
 import { delegate } from "../builtin/subagent.ts";
+import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { remoteFiles } from "../builtin/remote.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { hostsTool } from "../builtin/hosts.ts";
@@ -60,6 +61,7 @@ export const assistant = defineExtension({
 		section("notes", s(notes), { tag: false }),
 	],
 	hooks: [
+		compactWithoutReasoning,
 		hook(ToolTask, {
 			beforeTool: async (call: any) => {
 				if (call.name !== "bash") return undefined;

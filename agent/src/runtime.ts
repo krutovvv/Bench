@@ -20,6 +20,7 @@ import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
+import { noThinking } from "./thinking.ts";
 import { setHost, type Host, type SessionInfo } from "./host.ts";
 import { projects } from "./builtin/projects.ts";
 import { Store, type SessionRow, type Todo } from "./store.ts";
@@ -1006,18 +1007,6 @@ export function defaultCwd(profile: string): string {
 }
 
 /** The one-line detail Bench shows on a tool step (its `context`). */
-/**
- * A request with no reasoning asked for, made so on an OpenAI-compatible server that thinks by
- * default (vLLM, SGLang, llama.cpp serving Qwen and the like): Pi sends nothing there unless the
- * model maps "off", so the template's switch goes in (`chat_template_kwargs.enable_thinking`).
- * OpenRouter and OpenAI get Pi's own "off", Anthropic's API thinks only when asked.
- */
-export function noThinking(payload: any, model: { api?: string; baseUrl?: string; provider?: string }): any {
-	const url = model.baseUrl ?? "";
-	if (model.api !== "openai-completions" || /openrouter\.ai|api\.openai\.com/.test(url) || payload?.reasoning_effort) return undefined;
-	return { ...payload, chat_template_kwargs: { ...payload?.chat_template_kwargs, enable_thinking: false } };
-}
-
 export function preview(name: string, args: any): string {
 	if (!args || typeof args !== "object") return "";
 	const pick = args.command ?? args.path ?? args.query ?? args.url ?? args.urls?.[0] ?? args.name ?? args.goal ?? args.pattern ?? args.action;
