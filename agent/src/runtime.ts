@@ -848,11 +848,12 @@ export class Runtime {
 			const choice = resolveModel(live.row.profile, { model: live.row.model, provider: live.row.provider });
 			const ref = this.modelRef(live.row.profile, choice);
 			const model = this.models.getModel(ref.provider, ref.modelId)!;
-			const res: any = await (this.models as any).complete(
-				model,
-				{ systemPrompt: TITLE_PROMPT, messages: [{ role: "user", content: message.slice(0, 2000), timestamp: Date.now() }] },
-				{ reasoningEffort: undefined, maxTokens: 400 },
-			);
+			const context = { systemPrompt: TITLE_PROMPT, messages: [{ role: "user", content: message.slice(0, 2000), timestamp: Date.now() }] };
+			// A title needs no reasoning: off, also on a server that thinks unless told not to.
+			const ask = (onPayload?: (p: any, m: any) => any) => (this.models as any).complete(model, context, { reasoningEffort: undefined, maxTokens: 400, onPayload });
+			// A server that refuses the switch answers with an error: asked again without it.
+			let res: any = await ask(noThinking).catch(() => undefined);
+			if (!res || res.stopReason === "error") res = await ask();
 			const out = (res?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
 			const m = out.match(/"title"\s*:\s*"([^"]+)"/);
 			const title = (m?.[1] ?? out.replace(/<think>[\s\S]*?<\/think>/g, "")).trim().replace(/^["']|["'.]$/g, "").slice(0, 80);
@@ -968,6 +969,18 @@ export function defaultCwd(profile: string): string {
 }
 
 /** The one-line detail Bench shows on a tool step (its `context`). */
+/**
+ * A request with no reasoning asked for, made so on an OpenAI-compatible server that thinks by
+ * default (vLLM, SGLang, llama.cpp serving Qwen and the like): Pi sends nothing there unless the
+ * model maps "off", so the template's switch goes in (`chat_template_kwargs.enable_thinking`).
+ * OpenRouter and OpenAI get Pi's own "off", Anthropic's API thinks only when asked.
+ */
+export function noThinking(payload: any, model: { api?: string; baseUrl?: string; provider?: string }): any {
+	const url = model.baseUrl ?? "";
+	if (model.api !== "openai-completions" || /openrouter\.ai|api\.openai\.com/.test(url) || payload?.reasoning_effort) return undefined;
+	return { ...payload, chat_template_kwargs: { ...payload?.chat_template_kwargs, enable_thinking: false } };
+}
+
 export function preview(name: string, args: any): string {
 	if (!args || typeof args !== "object") return "";
 	const pick = args.command ?? args.path ?? args.query ?? args.url ?? args.urls?.[0] ?? args.name ?? args.goal ?? args.pattern ?? args.action;

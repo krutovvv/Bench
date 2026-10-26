@@ -92,6 +92,15 @@ test("skills: a project's own, its folder's .agents/skills up to the repository,
 	}
 });
 
+test("a title asks a thinking-by-default server not to think; OpenRouter, OpenAI and Anthropic are left to Pi", async () => {
+	const { noThinking } = await import("../src/runtime.ts");
+	const local = { api: "openai-completions", baseUrl: "http://192.168.1.10:8000/v1" };
+	assert.deepEqual(noThinking({ model: "q", max_tokens: 400 }, local), { model: "q", max_tokens: 400, chat_template_kwargs: { enable_thinking: false } });
+	assert.equal(noThinking({}, { api: "openai-completions", baseUrl: "https://openrouter.ai/api/v1" }), undefined);
+	assert.equal(noThinking({}, { api: "openai-completions", baseUrl: "https://api.openai.com/v1" }), undefined);
+	assert.equal(noThinking({}, { api: "anthropic-messages", baseUrl: "https://api.anthropic.com" }), undefined);
+});
+
 test("telegram: markdown to HTML, splitting, MEDIA files", () => {
 	assert.equal(toHtml("**a** `b<c` _d_ [e](https://x.y)"), '<b>a</b> <code>b&lt;c</code> <i>d</i> <a href="https://x.y">e</a>');
 	assert.equal(toHtml("| A | B |\n|---|---|\n| 1 | 2 |"), "• <b>A:</b> 1\n  <b>B:</b> 2");
