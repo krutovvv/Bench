@@ -156,7 +156,7 @@ impl BenchApp {
                 })
         });
 
-        // Speed: our own split (prefill / generation) when measured, else the agent's blended average.
+        // Speed: how fast the model writes, in the bar's own muted colour.
         let rate = |v: f64| {
             if v >= 1000. {
                 format!("{:.1}k", v / 1000.)
@@ -164,13 +164,12 @@ impl BenchApp {
                 format!("{v:.0}")
             }
         };
-        // Speed: live (last second) while text streams; else the last call's measured prefill /
-        // generation; else the agent's blended average. Click: the chart of this answer.
-        let label = match (self.speed.live, self.speed.prefill, self.speed.generation) {
-            (Some(l), _, _) => Some(format!("{} t/s", rate(l))),
-            (None, Some(p), Some(g)) => Some(format!("{} · {} t/s", rate(p), rate(g))),
-            (None, None, Some(g)) => Some(format!("{} t/s", rate(g))),
-            (None, Some(p), None) => Some(format!("{} t/s prefill", rate(p))),
+        // Speed: how fast the model writes — the live reading (the last second) while text
+        // streams, else the last call's measured generation, else the agent's blended average.
+        // Prefill is not shown here: it is in the panel this opens. Click: the chart of this answer.
+        let label = match (self.speed.live, self.speed.generation) {
+            (Some(l), _) => Some(format!("{} t/s", rate(l))),
+            (None, Some(g)) => Some(format!("{} t/s", rate(g))),
             _ => self
                 .usage
                 .as_ref()
@@ -179,7 +178,6 @@ impl BenchApp {
         };
         let samples = self.speed.samples.clone();
         let (prefill, generation) = (self.speed.prefill, self.speed.generation);
-        let live = self.speed.live.is_some();
         let speed = label.map(|label| {
             gpui_kit::component::popover::Popover::new("speed-pop")
                 .anchor(gpui_kit::Anchor::BottomRight)
@@ -189,7 +187,7 @@ impl BenchApp {
                         .small()
                         .icon(Ico::Gauge.icon())
                         .label(label)
-                        .text_color(if live { theme.primary } else { muted }),
+                        .text_color(muted),
                 )
                 .content(move |_, _, cx| speed_panel(&samples, prefill, generation, cx))
         });
