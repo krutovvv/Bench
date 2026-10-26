@@ -11,7 +11,7 @@ use crate::app::BenchApp;
 use crate::icons::Ico;
 
 impl BenchApp {
-    pub(super) fn render_queued(
+    pub(crate) fn render_queued(
         &mut self,
         key: &str,
         sub: &str,

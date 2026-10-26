@@ -2,13 +2,16 @@
 //! switches between them (Base64, JSON, regex, cron…), its head has the tool's modes, the tool
 //! under it. Its state: {tool}.
 
+pub mod state;
+pub mod view;
+
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 use serde_json::json;
 
-use super::{InsertKind, Switch, SwitchTo, clip};
 use crate::app::BenchApp;
 use crate::app::subjects::tool_key;
+use crate::inserts::{InsertKind, Switch, SwitchTo, clip};
 use crate::model::Insert;
 use devtools::{GROUPS, Tool};
 
@@ -72,7 +75,7 @@ impl InsertKind for Tools {
                 .into_any_element(),
         ];
         if !modes.is_empty() {
-            out.push(super::super::tools::segmented(
+            out.push(crate::inserts::tools::view::segmented(
                 "insert-tool-mode",
                 modes,
                 app.tools.mode(tool),
@@ -99,8 +102,7 @@ impl InsertKind for Tools {
             e.read(cx).value().lines().count()
         };
         let n = lines(&app.tools.input).max(lines(&app.tools.output)) + 2;
-        let h = (n as f32 * super::super::editor_line(cx) + super::super::BLOCK_HEAD_H + 24.)
-            .max(MIN_H);
+        let h = (n as f32 * crate::ui::editor_line(cx) + crate::ui::BLOCK_HEAD_H + 24.).max(MIN_H);
         Some(
             div()
                 .h(px(h))

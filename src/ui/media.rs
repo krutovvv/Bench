@@ -105,7 +105,7 @@ impl MarkdownPlugin for BlockMath {
 
 /// Text exactly as written (the user's own message), selectable and copyable like an answer:
 /// Markdown's characters are escaped, line breaks kept, leading spaces made non-breaking.
-pub(super) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
+pub(crate) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
     let lines: Vec<String> = text
         .lines()
         .map(|line| {
@@ -136,7 +136,7 @@ pub(super) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
 
 /// Markdown as answers show it: with formulas. Code blocks keep the monospace font (trees and
 /// columns stay aligned) at the chat text's size, not the theme's larger code size.
-pub(super) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
+pub(crate) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
     TextView::markdown(ElementId::Name(id.into()), text)
         .plugin(InlineMath)
         .plugin(BlockMath)
@@ -214,7 +214,7 @@ fn render_code(i: &str, k: usize, lang: String, code: String, cx: &App) -> AnyEl
 impl BenchApp {
     /// An answer's text as it shows: prose, delivered files, diagrams, code. `key` names its
     /// row (ids of its parts are made from it).
-    pub(super) fn render_answer(
+    pub(crate) fn render_answer(
         &mut self,
         key: &str,
         text: &str,
@@ -768,7 +768,7 @@ impl BenchApp {
 
     /// A file going with a message: a small picture for an image, else its icon, and the name.
     /// `remove`: its index in the composer (shows ×); otherwise a click opens it.
-    pub(super) fn attachment_chip(
+    pub(crate) fn attachment_chip(
         &self,
         id: SharedString,
         path: &str,
@@ -868,7 +868,7 @@ impl BenchApp {
                 )
                 .child(div().min_w_0().truncate().child(
                     // A server file's local copy names the server file it stands for.
-                    match crate::remote::origin(path) {
+                    match crate::inserts::ftp::remote::origin(path) {
                         Some((alias, remote)) => format!("{alias}: {remote}"),
                         None => name,
                     },

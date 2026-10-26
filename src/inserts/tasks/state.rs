@@ -1,4 +1,4 @@
-//! The tasks a /tasks insert shows: loaded from the agent's store (`crate::task_store`), the
+//! The tasks a /tasks insert shows: loaded from the agent's store (`crate::inserts::tasks::store`), the
 //! open list, the task being edited, its timer.
 
 use web_time::Instant;
@@ -6,10 +6,10 @@ use web_time::Instant;
 use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
 use gpui_kit::*;
 
-use super::BenchApp;
-use crate::task_store::TaskStore;
-use crate::task_store::{Cmd, Evt};
-use crate::tasks::{self, List, Task, today};
+use crate::app::BenchApp;
+use crate::inserts::tasks::model::{self as tasks, List, Task, today};
+use crate::inserts::tasks::store::TaskStore;
+use crate::inserts::tasks::store::{Cmd, Evt};
 
 /// How far back the Logbook (and a tag's done tasks) reaches.
 pub const RANGES: [(&str, i64); 5] = [

@@ -198,13 +198,18 @@ fn server(alias: &str, hostname: &str, folder: &str) -> crate::sshconfig::Server
     }
 }
 
-fn task(id: &str, title: &str, tags: &[&str], day: Option<i64>) -> crate::tasks::Task {
-    crate::tasks::Task {
+fn task(
+    id: &str,
+    title: &str,
+    tags: &[&str],
+    day: Option<i64>,
+) -> crate::inserts::tasks::model::Task {
+    crate::inserts::tasks::model::Task {
         id: id.into(),
         title: title.into(),
         tags: tags.iter().map(|t| t.to_string()).collect(),
-        day: day.map(|d| crate::tasks::today() + chrono::Duration::days(d)),
-        created: crate::tasks::now(),
+        day: day.map(|d| crate::inserts::tasks::model::today() + chrono::Duration::days(d)),
+        created: crate::inserts::tasks::model::now(),
         project: "p-me".into(),
         ..Default::default()
     }
@@ -220,7 +225,7 @@ fn other_modes(app: &mut BenchApp) {
         server("ci-runner", "198.51.100.9", "Staging"),
         server("homelab", "192.168.1.50", ""),
     ];
-    let today = crate::tasks::today();
+    let today = crate::inserts::tasks::model::today();
     let mut done = task("t-done", "Renew the TLS certificates", &["ops"], Some(-1));
     done.completed = Some(today - chrono::Duration::days(1));
     done.spent = 25 * 60;
@@ -477,7 +482,7 @@ is published.\n\nThe page is right here — click and type in it if something ne
         ),
     );
     app.sites.demo_frame =
-        crate::remote_browser::image_of(include_bytes!("../assets/demo/site.jpg"));
+        crate::inserts::browser::gateway::image_of(include_bytes!("../assets/demo/site.jpg"));
     thread(
         app,
         "d-env",

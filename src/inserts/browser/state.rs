@@ -1,4 +1,4 @@
-//! The server's browser (`crate::remote_browser`): one Chrome shared by every thread, a tab per
+//! The server's browser (`crate::inserts::browser::gateway`): one Chrome shared by every thread, a tab per
 //! thread. A thread's `/browser` insert keeps its tab ({tab, url}): the tab the agent works in
 //! while it answers in that thread becomes the thread's, the insert streams it live, and a tab
 //! that went away is opened again at its address (or the agent opens a new one).
@@ -9,8 +9,8 @@ use std::sync::Arc;
 use gpui_kit::*;
 use serde_json::json;
 
-use super::BenchApp;
-use crate::remote_browser::Browser;
+use crate::app::BenchApp;
+use crate::inserts::browser::gateway::Browser;
 
 /// Where a new thread's tab starts.
 const START_PAGE: &str = "https://www.google.com/";
@@ -70,7 +70,7 @@ impl BenchApp {
         let Some(b) = self.sites.browser.clone() else {
             return;
         };
-        let open = self.panel == super::Panel::Chat && self.thread_has_browser();
+        let open = self.panel == crate::app::Panel::Chat && self.thread_has_browser();
         let recent = self.sites.touched.is_some_and(|t| t.elapsed() < IDLE);
         b.set_paused(!(open && (self.live.is_some() || recent)));
         if let Some(tab) = self.thread_tab() {

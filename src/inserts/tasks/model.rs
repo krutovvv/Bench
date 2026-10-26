@@ -1,6 +1,6 @@
 //! A task as Bench shows it (after Things): title, notes, tags, a day, "this evening" or
 //! "someday", the red flag, completion, time spent and a running timer. Kept by the agent in
-//! bench.sqlite (`crate::task_store`).
+//! bench.sqlite (`crate::inserts::tasks::store`).
 
 use chrono::{Datelike, Duration, Local, NaiveDate, Weekday};
 

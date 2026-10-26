@@ -5,14 +5,14 @@ use gpui_kit::component::{ActiveTheme as _, Theme};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::term::Palette;
+use crate::inserts::terminal::session::Palette;
 
 pub fn palette(_theme: &Theme) -> Palette {
     Palette
 }
 
 impl BenchApp {
-    pub(super) fn render_terminal(
+    pub(crate) fn render_terminal(
         &mut self,
         _ix: usize,
         _window: &mut Window,

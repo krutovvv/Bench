@@ -29,7 +29,7 @@ impl BenchApp {
     }
 
     /// Load what the agent knows about each session's folder, plus our own inferences.
-    pub(super) fn load_places(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn load_places(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.inferred = std::fs::read(self.projects_path())
             .ok()
             .and_then(|b| serde_json::from_slice::<HashMap<String, String>>(&b).ok())
@@ -82,7 +82,7 @@ impl BenchApp {
 
     /// Work out the open session's project (and its live branch); infer it from edited files
     /// when the agent has none.
-    pub(super) fn resolve_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn resolve_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(session) = self.session.clone() else {
             self.project = None;
             return;
@@ -143,7 +143,7 @@ impl BenchApp {
     }
 
     /// Off-thread work that does not need the gateway connection (git over SSH, etc.).
-    pub(super) fn background<T: Send + 'static>(
+    pub(crate) fn background<T: Send + 'static>(
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -202,7 +202,9 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         let at = line.map(|l| format!(":{l}")).unwrap_or_default();
-        let url = match host.filter(|h| !h.is_empty() && *h != crate::term::LOCAL) {
+        let url = match host
+            .filter(|h| !h.is_empty() && *h != crate::inserts::terminal::session::LOCAL)
+        {
             Some(h) => format!("zed://ssh/{h}{path}{at}"),
             None => format!("zed://file{path}{at}"),
         };

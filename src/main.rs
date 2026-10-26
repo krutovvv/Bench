@@ -17,6 +17,7 @@ mod demo;
 mod diff;
 mod gateway;
 mod icons;
+mod inserts;
 mod lang;
 mod media;
 mod model;
@@ -26,19 +27,10 @@ mod notify;
 #[path = "notify_other.rs"]
 mod notify;
 mod pi_agent;
-mod remote;
-mod remote_browser;
 mod rest;
 mod speed;
 mod ssh;
 mod sshconfig;
-mod task_store;
-mod tasks;
-#[cfg(not(target_family = "wasm"))]
-mod term;
-#[cfg(target_family = "wasm")]
-#[path = "term_web.rs"]
-mod term;
 mod theme;
 mod ui;
 mod video;

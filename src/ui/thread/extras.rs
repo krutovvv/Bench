@@ -16,7 +16,7 @@ use crate::ui::{clock, plural};
 
 impl BenchApp {
     /// The agent waits: what it wants to run, and the answers it accepts.
-    pub(super) fn render_approval(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_approval(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let req = self.approval.clone()?;
         let theme = cx.theme().clone();
         let label = |c: &str| match c {
@@ -79,7 +79,7 @@ impl BenchApp {
     /// The background processes the agent started in this session, as a row of its own where the
     /// work began: running or finished, each with Stop (while it runs) and its latest output a
     /// click away.
-    pub(super) fn render_processes(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_processes(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.processes.is_empty() {
             return None;
         }
@@ -308,7 +308,7 @@ impl BenchApp {
     }
 
     /// After the last turn: every file this session edited, with +/- counts.
-    pub(super) fn render_session_files(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_session_files(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let files = self.session_files();
         if files.is_empty() || self.thread.running() {
             return None;
@@ -447,7 +447,7 @@ impl BenchApp {
     }
 
     /// The pages the work right above answer `k` touched: one chip per site.
-    pub(super) fn render_sources(&self, k: usize, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_sources(&self, k: usize, cx: &mut Context<Self>) -> Option<AnyElement> {
         let Some(Row::Work { key, steps, .. }) = k.checked_sub(1).map(|j| &self.tv.rows[j]) else {
             return None;
         };
@@ -589,7 +589,7 @@ impl BenchApp {
     }
 
     /// A form opened from the thread (a new server or file host) that is not under an insert.
-    pub(super) fn render_tail_form(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_tail_form(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let under_insert = self
             .form_after
             .as_ref()

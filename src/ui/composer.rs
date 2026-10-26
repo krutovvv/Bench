@@ -91,7 +91,7 @@ impl BenchApp {
         )
     }
 
-    pub(super) fn render_composer(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_composer(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         // No buttons here: ⌘Enter sends, ⌘⇧D (or the status bar's mic) dictates, files are
         // dropped or pasted. Stopping the agent is the status bar's control, by the paperclip.

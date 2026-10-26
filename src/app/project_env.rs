@@ -181,7 +181,7 @@ pub struct CronJob {
 /// The agent a project's threads run with: its own (`project:<id>`), or this machine's for the
 /// Host project. Its model, reasoning level and approvals live in that agent's folder, so a
 /// project thinks and asks as it was set to, not as the machine was.
-pub(super) fn env_agent(id: &str) -> String {
+pub(crate) fn env_agent(id: &str) -> String {
     if id == "general" {
         "default".into()
     } else {

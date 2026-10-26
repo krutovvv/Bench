@@ -1,14 +1,19 @@
 //! `/tasks`: the task lists in the thread, every list a click away (Today, Upcoming, Anytime,
 //! Logbook…). In a project's thread the list opens filtered by the project's tag. Its state: {list}.
 
+pub mod model;
+pub mod state;
+pub mod store;
+pub mod view;
+
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 use serde_json::json;
 
-use super::InsertKind;
 use crate::app::BenchApp;
+use crate::inserts::InsertKind;
+use crate::inserts::tasks::model::{LISTS, List};
 use crate::model::Insert;
-use crate::tasks::{LISTS, List};
 
 pub struct Tasks;
 
@@ -67,7 +72,7 @@ impl InsertKind for Tasks {
         let picks = lists.clone();
         vec![
             add,
-            super::super::tools::segmented_owned(
+            crate::inserts::tools::view::segmented_owned(
                 "insert-task-lists",
                 lists.iter().map(|l| l.name()).collect(),
                 chosen,
@@ -115,10 +120,10 @@ impl InsertKind for Tasks {
         } else {
             task.title.clone()
         };
-        let head = super::super::block_head(&theme, true)
+        let head = crate::ui::block_head(&theme, true)
             .child(div().flex_1().min_w_0().truncate().child(title))
             .child(
-                super::icon_button(
+                crate::inserts::icon_button(
                     &format!("{}-task-close", ins.id),
                     crate::icons::Ico::X,
                     "Close",
@@ -130,7 +135,7 @@ impl InsertKind for Tasks {
                 })),
             );
         let body = app.render_task_card(&task, cx);
-        Some(super::card(head, body, &theme))
+        Some(crate::inserts::card(head, body, &theme))
     }
 
     fn context(&self, _app: &BenchApp, ins: &Insert, _cx: &App) -> String {

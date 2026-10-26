@@ -15,7 +15,7 @@ use crate::app::BenchApp;
 const MAX_H: f32 = 620.;
 
 impl BenchApp {
-    pub(super) fn render_tab(&mut self, tab: String, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_tab(&mut self, tab: String, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some((frame, w, h, live)) = self.tab_frame(&tab) else {
@@ -191,7 +191,11 @@ impl BenchApp {
 }
 
 /// A key to the page: text as typed, the special keys by name, ⌘V pastes. Whether it was sent.
-fn send_key(b: &Arc<crate::remote_browser::Browser>, ks: &Keystroke, cx: &mut App) -> bool {
+fn send_key(
+    b: &Arc<crate::inserts::browser::gateway::Browser>,
+    ks: &Keystroke,
+    cx: &mut App,
+) -> bool {
     let m = &ks.modifiers;
     let mods = (m.alt as u32)
         | ((m.control as u32) << 1)

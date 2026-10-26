@@ -117,7 +117,7 @@ impl BenchApp {
     pub fn thread_machine(&self) -> String {
         let host = self.thread_host();
         if host.is_empty() {
-            crate::term::LOCAL.to_string()
+            crate::inserts::terminal::session::LOCAL.to_string()
         } else {
             host
         }

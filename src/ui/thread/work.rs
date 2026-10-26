@@ -15,7 +15,7 @@ use crate::ui::media::plain_text;
 use crate::ui::{clip, clock, plural};
 
 impl BenchApp {
-    pub(super) fn render_work(
+    pub(crate) fn render_work(
         &mut self,
         key: &str,
         steps: &[Step],

@@ -3,15 +3,15 @@
 //! an insert is the person's, sits where it was put, and stays live. The agent keeps them (a Pi
 //! entry where each was put, a document of their state: agent/src/inserts.ts); Bench shows its
 //! list, changes it through the agent, and takes the agent's answer as the truth. Each kind's
-//! look and behaviour: `crate::ui::inserts`.
+//! look and behaviour: `crate::inserts`.
 
 use gpui_kit::*;
 use serde_json::{Map, Value, json};
 
-use super::BenchApp;
+use crate::app::BenchApp;
 use crate::gateway::Cmd;
+use crate::inserts::kind_of;
 use crate::model::Insert;
-use crate::ui::inserts::kind_of;
 
 /// A new chat's inserts until its session exists.
 const DRAFT: &str = "draft";

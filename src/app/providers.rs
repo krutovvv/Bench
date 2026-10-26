@@ -124,7 +124,7 @@ impl BenchApp {
 
     /// After the profile's own models: the OpenRouter models picked here, then
     /// each provider's models kept together (the main model's group first).
-    pub(super) fn add_picker_models(&mut self) {
+    pub(crate) fn add_picker_models(&mut self) {
         self.pv.prefs = std::fs::read_to_string(self.picker_prefs_path())
             .ok()
             .and_then(|t| serde_json::from_str(&t).ok())
@@ -164,7 +164,7 @@ impl BenchApp {
     // ---- loading ----------------------------------------------------------------------
 
     /// Fill both tabs from the agent.
-    pub(super) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.pv.or_search.is_none() {
             let search =
                 cx.new(|cx| InputState::new(window, cx).placeholder("Search OpenRouter models"));

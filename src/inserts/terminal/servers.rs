@@ -11,11 +11,11 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::BenchApp;
+use crate::app::BenchApp;
 use crate::connection::{self, HostCheck};
+use crate::inserts::terminal::session::Session;
 use crate::model::Target;
 use crate::sshconfig::{self, Server};
-use crate::term::Session;
 
 /// An open terminal: one ssh connection.
 pub struct Tab {
@@ -271,7 +271,7 @@ impl BenchApp {
     pub fn open_terminal_link(
         &mut self,
         alias: String,
-        link: crate::term::TermLink,
+        link: crate::inserts::terminal::session::TermLink,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -291,7 +291,7 @@ impl BenchApp {
             }
         };
         let line = link.line;
-        if alias == crate::term::LOCAL {
+        if alias == crate::inserts::terminal::session::LOCAL {
             self.open_local_link(&path, line, window, cx);
             return;
         }

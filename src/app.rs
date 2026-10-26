@@ -15,9 +15,7 @@ use gpui_kit::*;
 
 mod asks;
 mod attachments;
-pub(crate) mod inserts;
 mod keys;
-pub(crate) mod local_files;
 pub mod marks;
 pub(crate) mod mcp_status;
 mod processes;
@@ -29,13 +27,8 @@ pub use project_env::ProjectEnv;
 pub use project_list::ProjectForm;
 mod prompts;
 pub(crate) mod providers;
-pub(crate) mod remote_files;
-pub(crate) mod servers;
-pub(crate) mod sites;
 mod slash;
 pub(crate) mod subjects;
-pub(crate) mod tasks;
-pub(crate) mod tools;
 
 use crate::attach;
 use crate::audio::{Playback, Recorder};
@@ -115,7 +108,7 @@ pub struct BenchApp {
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
-    pub sites: sites::Sites,
+    pub sites: crate::inserts::browser::state::Sites,
     pub sites_error: Option<String>,
     /// A step's tab being reopened: (thread, turn, url, the tabs before).
     /// A click in the thread landed in something that types (a terminal, an editor): it keeps the focus.
@@ -295,15 +288,15 @@ pub struct BenchApp {
     pub media_open: HashSet<String>,
 
     /// SSH mode: servers of ~/.ssh/config and their terminals.
-    pub ssh: servers::Ssh,
+    pub ssh: crate::inserts::terminal::servers::Ssh,
     /// Tools mode (⌘3): the utilities of `devtools`.
-    pub tools: tools::Tools,
+    pub tools: crate::inserts::tools::state::Tools,
     /// The tasks the /tasks insert shows, and its card.
-    pub tasks: tasks::TasksMode,
+    pub tasks: crate::inserts::tasks::state::TasksMode,
     /// The files of an FTP / SFTP host, shown in its thread.
-    pub files_remote: remote_files::RemoteFiles,
+    pub files_remote: crate::inserts::ftp::state::RemoteFiles,
     /// The project's own folder in a thread (`/files`).
-    pub local_files: local_files::LocalFiles,
+    pub local_files: crate::inserts::files::state::LocalFiles,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
     /// width, kept by the app across the two layouts that show it (`ui/mod.rs`).
     pub sidebar_w: Pixels,
@@ -569,11 +562,11 @@ impl BenchApp {
         let mut tasks = vec![events, ticker, processes, backend];
 
         // The gateway list keeps the SSH hosts that can run the agent (asked again when the menu opens).
-        let ssh = servers::Ssh::new(window, cx);
-        let tools = tools::Tools::new(window, cx);
-        let tasks_mode = tasks::TasksMode::new(window, cx);
-        let files_remote = remote_files::RemoteFiles::new(window, cx);
-        let local_files = local_files::LocalFiles::new(window, cx);
+        let ssh = crate::inserts::terminal::servers::Ssh::new(window, cx);
+        let tools = crate::inserts::tools::state::Tools::new(window, cx);
+        let tasks_mode = crate::inserts::tasks::state::TasksMode::new(window, cx);
+        let files_remote = crate::inserts::ftp::state::RemoteFiles::new(window, cx);
+        let local_files = crate::inserts::files::state::LocalFiles::new(window, cx);
         for host in targets.iter().filter_map(|t| match t {
             Target::Ssh(h) => Some(h.clone()),
             Target::Local => None,
@@ -777,7 +770,7 @@ impl BenchApp {
     }
 
     /// To the agent the command concerns (`remotes.rs`): this Mac's, or a remote project's.
-    fn cmd(&self, cmd: Cmd) {
+    pub(crate) fn cmd(&self, cmd: Cmd) {
         self.route(cmd);
     }
 

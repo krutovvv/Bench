@@ -2,15 +2,17 @@
 //! file manager — folders open in place, a file opens under the insert at its full height with
 //! its highlighting, Save writes it back. Its state: {path, file}.
 
+pub mod state;
+
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Map, json};
 
-use super::{InsertKind, clip, icon_button};
 use crate::app::BenchApp;
 use crate::icons::Ico;
+use crate::inserts::{InsertKind, clip, icon_button};
 use crate::model::Insert;
 
 pub struct Dir;
@@ -65,7 +67,7 @@ impl InsertKind for Dir {
                 .child(path)
                 .into_any_element(),
         ];
-        v.extend(super::file_buttons(&ins.id, false, cx));
+        v.extend(crate::inserts::file_buttons(&ins.id, false, cx));
         v
     }
 
@@ -137,7 +139,7 @@ impl InsertKind for Dir {
                 let group = SharedString::from(format!("{}-g{k}", ins.id));
                 // Every entry but ".." can be removed.
                 let trash = (!(has_up && k == 0)).then(|| {
-                    super::row_trash(
+                    crate::inserts::row_trash(
                         app,
                         format!("{}-rm{k}", ins.id).into(),
                         group.clone(),
@@ -161,7 +163,7 @@ impl InsertKind for Dir {
                     .when(chosen, |d| d.bg(theme.list_active))
                     .hover(|s| s.bg(theme.list_hover))
                     .child({
-                        let (ico, color) = super::super::file_icon(&name, is_dir, &theme);
+                        let (ico, color) = crate::ui::file_icon(&name, is_dir, &theme);
                         ico.icon().small().text_color(color)
                     })
                     .child(div().flex_1().min_w_0().truncate().child(name))
@@ -194,7 +196,7 @@ impl InsertKind for Dir {
             return None;
         }
         // A new file or folder being named, then the open file.
-        let form = super::file_form(app, &ins.id, cx);
+        let form = crate::inserts::file_form(app, &ins.id, cx);
         let file = self.open_file(app, ins, cx);
         match (form, file) {
             (None, None) => None,
@@ -259,7 +261,7 @@ impl Dir {
         let theme = cx.theme().clone();
         let dirty = f.dirty(cx);
         let lines = f.editor.read(cx).value().lines().count().max(1);
-        let head = super::super::block_head(&theme, true)
+        let head = crate::ui::block_head(&theme, true)
             .child(Ico::File.icon().small())
             .child(
                 div()
@@ -307,13 +309,13 @@ impl Dir {
                 })),
             );
         let body = div()
-            .h(px(super::super::editor_height(lines, cx)))
+            .h(px(crate::ui::editor_height(lines, cx)))
             .child(
                 gpui_kit::component::input::Editor::new(&app.local_files.editor)
                     .appearance(false)
                     .h_full(),
             )
             .into_any_element();
-        Some(super::card(head, body, &theme))
+        Some(crate::inserts::card(head, body, &theme))
     }
 }

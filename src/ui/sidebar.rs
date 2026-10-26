@@ -13,10 +13,10 @@ use crate::app::{BenchApp, Panel};
 use crate::icons::Ico;
 
 /// A session title: the sidebar's 14px.
-pub(super) const SESSION_TITLE: f32 = 14.;
+pub(crate) const SESSION_TITLE: f32 = 14.;
 
 impl BenchApp {
-    pub(super) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let mut list: Vec<AnyElement> = vec![];

@@ -11,12 +11,12 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::icons::Ico;
-use crate::tasks::{self, List, Task, today};
+use crate::inserts::tasks::model::{self as tasks, List, Task, today};
 
 impl BenchApp {
     /// A task list as a thread's live block: the same rows, no scroll of its own (the thread
     /// scrolls), the open task's card right under the list, the text at the thread's column.
-    pub(super) fn render_tasks_block(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_tasks_block(&mut self, cx: &mut Context<Self>) -> AnyElement {
         self.tasks_view(true, cx)
     }
 
@@ -405,7 +405,7 @@ impl BenchApp {
 
     /// The open task: title, when, important, tags, time (with the timer), the day it was done
     /// (back-dating), notes; Delete at the bottom.
-    pub(super) fn render_task_card(&mut self, t: &Task, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_task_card(&mut self, t: &Task, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let day = today();
@@ -474,7 +474,7 @@ impl BenchApp {
             )
             .child(field(
                 "When",
-                super::tools::segmented_tall(
+                crate::inserts::tools::view::segmented_tall(
                     "task-when",
                     &["Today", "Evening", "Tomorrow", "Anytime"],
                     when,
@@ -497,7 +497,7 @@ impl BenchApp {
                         div()
                             .id(("task-project", k))
                             .flex_none()
-                            .h(px(super::FIELD_H))
+                            .h(px(crate::ui::FIELD_H))
                             .px_2()
                             .flex()
                             .items_center()
@@ -549,7 +549,7 @@ impl BenchApp {
                             .id("task-timer")
                             .flex_none()
                             // As tall as the fields beside it.
-                            .h(px(super::FIELD_H))
+                            .h(px(crate::ui::FIELD_H))
                             .px_3()
                             .gap_1()
                             .flex()

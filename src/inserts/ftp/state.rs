@@ -8,7 +8,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::BenchApp;
+use crate::app::BenchApp;
 use crate::rest;
 
 #[derive(Clone, Debug, Default)]
@@ -110,7 +110,7 @@ fn host_of(v: &Value) -> RemoteHost {
     }
 }
 
-pub(super) fn enc(s: &str) -> String {
+pub(crate) fn enc(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
@@ -194,7 +194,7 @@ impl BenchApp {
 
     /// The Files group's "+": the new host's form takes the chat area.
     pub fn new_host_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.panel = super::Panel::Chat;
+        self.panel = crate::app::Panel::Chat;
         self.ssh.form = None;
         let f = &self.files_remote;
         for e in [

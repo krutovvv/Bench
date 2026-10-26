@@ -14,7 +14,7 @@ use crate::icons::Ico;
 use ::thread::{Row, Step};
 
 impl BenchApp {
-    pub(super) fn render_statusbar(
+    pub(crate) fn render_statusbar(
         &mut self,
         _window: &mut Window,
         cx: &mut Context<Self>,

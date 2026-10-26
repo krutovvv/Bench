@@ -12,7 +12,7 @@ use crate::ui::media::plain_text;
 use crate::ui::{AVATAR, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, TURN_Y, avatar};
 
 /// The row frame: the avatar (or its empty place) in the gutter, `body` at the text column.
-pub(super) fn speaker_row(agent: Option<bool>, body: impl IntoElement, cx: &App) -> Div {
+pub(crate) fn speaker_row(agent: Option<bool>, body: impl IntoElement, cx: &App) -> Div {
     let theme = cx.theme();
     h_flex()
         .w_full()
@@ -30,7 +30,7 @@ pub(super) fn speaker_row(agent: Option<bool>, body: impl IntoElement, cx: &App)
 }
 
 impl BenchApp {
-    pub(super) fn render_user(
+    pub(crate) fn render_user(
         &mut self,
         key: &str,
         text: &str,
@@ -42,7 +42,7 @@ impl BenchApp {
 
     /// The person's own row: their text, the files that went with it. `muted`: not gone out yet
     /// (queued); `actions` sit at its right; `field` replaces the text while it is being fixed.
-    pub(super) fn user_row(
+    pub(crate) fn user_row(
         &self,
         key: String,
         text: &str,
@@ -82,7 +82,7 @@ impl BenchApp {
 
     /// What the agent said. `k` is the row's place (the last answer gets Regenerate);
     /// `after_work`: it continues the work row above it, so no avatar of its own.
-    pub(super) fn render_agent_answer(
+    pub(crate) fn render_agent_answer(
         &mut self,
         k: usize,
         key: &str,
@@ -168,7 +168,7 @@ impl BenchApp {
     }
 
     /// The answer being written: its reasoning so far, muted, then its text.
-    pub(super) fn render_writing(
+    pub(crate) fn render_writing(
         &mut self,
         thought: &str,
         text: &str,
@@ -192,7 +192,7 @@ impl BenchApp {
     }
 
     /// Why a run stopped, kept in the journal.
-    pub(super) fn render_fail(&mut self, text: &str, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_fail(&mut self, text: &str, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         speaker_row(
             Some(true),
@@ -205,7 +205,7 @@ impl BenchApp {
     }
 }
 
-pub(super) fn icon_button(
+pub(crate) fn icon_button(
     id: impl Into<ElementId>,
     icon: Ico,
     tip: &'static str,

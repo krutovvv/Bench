@@ -14,7 +14,7 @@ use crate::icons::Ico;
 impl BenchApp {
     /// The question card: choices (one click answers; with multi-select, tick then Send), an
     /// answer of your own, or Decline.
-    pub(super) fn render_clarify(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_clarify(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let req = self.clarify.clone()?;
         let theme = cx.theme().clone();
         let picked = self.clarify_picked.clone();
@@ -139,7 +139,7 @@ impl BenchApp {
     /// `block_head`) with the chevron, "PLAN · 3/7" and, folded, the step in progress; the steps
     /// under the head when open. It goes when no step is left to do (`Evt::Todos`), so an ended
     /// plan never lingers.
-    pub(super) fn render_plan(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_plan(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.todos.is_empty() {
             return None;
         }

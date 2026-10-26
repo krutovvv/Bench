@@ -22,7 +22,7 @@ fn size_label(n: u64) -> String {
 }
 
 impl BenchApp {
-    pub(super) fn render_files_block(
+    pub(crate) fn render_files_block(
         &mut self,
         id: &str,
         titled: bool,
@@ -173,7 +173,7 @@ impl BenchApp {
                         .border_color(theme.border)
                         .overflow_hidden()
                         .child(
-                            super::block_head(&theme, true)
+                            crate::ui::block_head(&theme, true)
                                 .child(Ico::File.icon().small().text_color(muted))
                                 .child(
                                     div()
@@ -210,7 +210,7 @@ impl BenchApp {
 
     /// The open file as a block of its own, under the insert: its path, Save and Close on top,
     /// the editor at the file's full height (the thread scrolls, not the editor).
-    pub(super) fn render_open_file(
+    pub(crate) fn render_open_file(
         &mut self,
         close_id: String,
         cx: &mut Context<Self>,
@@ -227,7 +227,7 @@ impl BenchApp {
             .lines()
             .count()
             .max(1);
-        let head = super::block_head(&theme, true)
+        let head = crate::ui::block_head(&theme, true)
             .child(Ico::File.icon().small().text_color(muted))
             .child(
                 div()
@@ -248,7 +248,7 @@ impl BenchApp {
                     .on_click(cx.listener(|this, _, window, cx| this.save_host_file(window, cx))),
             )
             .child(
-                super::inserts::icon_button(&close_id, Ico::X, "Close the file", &theme).on_click(
+                crate::inserts::icon_button(&close_id, Ico::X, "Close the file", &theme).on_click(
                     cx.listener(|this, _, _, cx| {
                         this.click_claimed = true;
                         if !this.files_remote.dirty {
@@ -259,14 +259,14 @@ impl BenchApp {
                 ),
             );
         let body = div()
-            .h(px(super::editor_height(lines, cx)))
+            .h(px(crate::ui::editor_height(lines, cx)))
             .child(
                 Editor::new(&self.files_remote.editor)
                     .appearance(false)
                     .h_full(),
             )
             .into_any_element();
-        Some(super::inserts::card(head, body, &theme))
+        Some(crate::inserts::card(head, body, &theme))
     }
 
     fn file_row(
@@ -284,7 +284,7 @@ impl BenchApp {
         let group = SharedString::from(format!("remote-g{k}"));
         let trash = (name != "..").then(|| {
             let path = format!("{}/{name}", self.files_remote.path.trim_end_matches('/'));
-            super::inserts::row_trash(
+            crate::inserts::row_trash(
                 self,
                 format!("remote-rm{k}").into(),
                 group.clone(),
@@ -304,7 +304,7 @@ impl BenchApp {
             .cursor_pointer()
             .hover(|s| s.bg(theme.list_hover))
             .child({
-                let (ico, color) = super::file_icon(&name, dir, &theme);
+                let (ico, color) = crate::ui::file_icon(&name, dir, &theme);
                 ico.icon().small().text_color(color)
             })
             .child(div().flex_1().min_w_0().truncate().child(name))
@@ -327,9 +327,9 @@ impl BenchApp {
 
 impl BenchApp {
     /// A new file host, inside the thread: into the agent's store (this project's), then attached.
-    pub(super) fn render_host_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_host_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let f = &self.files_remote;
-        let kind = super::tools::segmented(
+        let kind = crate::inserts::tools::view::segmented(
             "host-kind",
             &["FTP", "FTPS", "SFTP"],
             f.f_kind,
@@ -351,16 +351,16 @@ impl BenchApp {
             ("Folder", field(&f.f_path)),
         ];
         let actions = vec![
-            super::form_action("host-save", "Add and open", true, cx)
+            crate::ui::form_action("host-save", "Add and open", true, cx)
                 .on_click(cx.listener(|this, _, window, cx| this.save_host(window, cx)))
                 .into_any_element(),
-            super::form_action("host-cancel", "Cancel", false, cx)
+            crate::ui::form_action("host-cancel", "Cancel", false, cx)
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.files_remote.form = false;
                     cx.notify();
                 }))
                 .into_any_element(),
         ];
-        super::inline_form("New file host", rows, Some("Empty name = the address; empty port = 21 (FTP, FTPS) or 22 (SFTP). The password is kept in the agent's store.".into()), actions, cx)
+        crate::ui::inline_form("New file host", rows, Some("Empty name = the address; empty port = 21 (FTP, FTPS) or 22 (SFTP). The password is kept in the agent's store.".into()), actions, cx)
     }
 }

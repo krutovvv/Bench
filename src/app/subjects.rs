@@ -134,7 +134,7 @@ impl BenchApp {
                 "the server's browser: its tab, live".into(),
                 "browser".into(),
             )],
-            "tasks" => crate::tasks::LISTS
+            "tasks" => crate::inserts::tasks::model::LISTS
                 .iter()
                 .map(|l| {
                     row(
@@ -167,7 +167,7 @@ impl BenchApp {
 
     /// The words that put an insert in, for the list of a bare `/word`.
     pub fn tool_words() -> Vec<crate::model::SlashCommand> {
-        crate::ui::inserts::words()
+        crate::inserts::words()
     }
 
     /// A row picked from the `/` list: a form (a new server or host), or an insert.

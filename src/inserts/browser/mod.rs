@@ -4,13 +4,17 @@
 //! works in while it answers here becomes the thread's (`app::sites`); a tab that went away is
 //! opened again at its address, or the agent opens a new one.
 
+pub mod gateway;
+pub mod state;
+pub mod view;
+
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
 
-use super::InsertKind;
 use crate::app::BenchApp;
+use crate::inserts::InsertKind;
 use crate::model::Insert;
 
 pub struct Browser;

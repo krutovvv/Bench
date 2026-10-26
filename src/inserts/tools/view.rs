@@ -71,7 +71,7 @@ impl BenchApp {
             .into_any_element()
     }
 
-    pub(super) fn render_tools_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_tools_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let tool = self.tools.tool;
         let input_bar = |extra: Vec<AnyElement>, cx: &mut Context<Self>| {
@@ -161,7 +161,7 @@ impl BenchApp {
                             .px_4()
                             .py_3()
                             .text_base()
-                            .child(super::media::markdown(
+                            .child(crate::ui::media::markdown(
                                 "tool-md",
                                 self.tools.preview.clone(),
                             )),
@@ -344,14 +344,14 @@ impl BenchApp {
 }
 
 /// The strip above a pane: its name (or an error in red), then its buttons.
-pub(super) fn pane_bar(
+pub(crate) fn pane_bar(
     title: &str,
     error: Option<String>,
     buttons: Vec<AnyElement>,
     cx: &mut Context<BenchApp>,
 ) -> AnyElement {
     let theme = cx.theme();
-    super::block_head(theme, true)
+    crate::ui::block_head(theme, true)
         .child(div().flex_1().min_w_0().truncate().map(|d| {
             match &error {
                 Some(e) => d.text_color(theme.danger).child(e.clone()),
@@ -365,7 +365,7 @@ pub(super) fn pane_bar(
 }
 
 /// A small square text button in a pane's strip.
-pub(super) fn small_button(
+pub(crate) fn small_button(
     id: &'static str,
     label: &'static str,
     cx: &mut Context<BenchApp>,
@@ -389,7 +389,7 @@ pub(super) fn small_button(
 }
 
 /// Pick one: square cells sharing borders, the chosen one in the accent.
-pub(super) fn segmented(
+pub(crate) fn segmented(
     id: &'static str,
     labels: &[&'static str],
     chosen: usize,
@@ -405,7 +405,7 @@ pub(super) fn segmented(
     )
 }
 
-pub(super) fn segmented_owned(
+pub(crate) fn segmented_owned(
     id: &'static str,
     labels: Vec<String>,
     chosen: usize,
@@ -439,7 +439,7 @@ pub(super) fn segmented_owned(
 }
 
 /// `segmented` as tall as a text field, for a form's row beside fields.
-pub(super) fn segmented_tall(
+pub(crate) fn segmented_tall(
     id: &'static str,
     labels: &[&'static str],
     chosen: usize,
@@ -456,7 +456,7 @@ pub(super) fn segmented_tall(
 }
 
 /// `segmented_tall` with labels made at run time (a form's list of servers).
-pub(super) fn segmented_tall_owned(
+pub(crate) fn segmented_tall_owned(
     id: &'static str,
     labels: Vec<String>,
     chosen: usize,
@@ -466,7 +466,7 @@ pub(super) fn segmented_tall_owned(
     let theme = cx.theme().clone();
     h_flex()
         .flex_none()
-        .h(px(super::FIELD_H))
+        .h(px(crate::ui::FIELD_H))
         .border_1()
         .rounded_md()
         .overflow_hidden()

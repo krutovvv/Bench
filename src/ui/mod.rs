@@ -2,27 +2,18 @@
 
 mod asks;
 mod composer;
-pub(crate) mod inserts;
 pub(crate) mod media;
 mod panels;
 mod project_list;
 mod providers;
-mod remote_files;
-mod servers;
 mod sidebar;
-mod sites;
 mod statusbar;
-mod tasks;
-#[cfg(not(target_family = "wasm"))]
-mod terminal;
-#[cfg(target_family = "wasm")]
-#[path = "terminal_web.rs"]
-mod terminal;
 pub(crate) mod thread;
-mod tools;
 
-pub fn terminal_palette(theme: &gpui_kit::component::Theme) -> crate::term::Palette {
-    terminal::palette(theme)
+pub fn terminal_palette(
+    theme: &gpui_kit::component::Theme,
+) -> crate::inserts::terminal::session::Palette {
+    crate::inserts::terminal::view::palette(theme)
 }
 
 use gpui_kit::component::resizable::{h_resizable, resizable_panel};
@@ -42,7 +33,7 @@ pub use bench_ui::{
 impl BenchApp {
     /// The strip beside the window buttons over the sidebar: "+" (a new project) and the fold.
     /// 35 + the search band's top rule = the header's 36: the two rules are one line.
-    pub(super) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
         h_flex()
             .h(px(35.))
             .flex_none()

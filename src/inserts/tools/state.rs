@@ -8,7 +8,7 @@ use std::path::PathBuf;
 use gpui_kit::component::input::{EditorState, InputEvent, InputState};
 use gpui_kit::*;
 
-use super::BenchApp;
+use crate::app::BenchApp;
 use devtools::{self, Kind, RegexFlags, Tool};
 
 pub struct Tools {

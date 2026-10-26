@@ -10,7 +10,7 @@ use crate::app::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 impl BenchApp {
     /// The new project's page (the sidebar's "+"), laid out like Settings: what it is called,
     /// where its agent runs (this Mac or a server), and on this Mac a folder if it has one.
-    pub(super) fn render_project_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_project_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(form) = self.project_form.as_ref() else {
@@ -35,7 +35,7 @@ impl BenchApp {
         ];
         // Where it runs: this Mac, or a server (its agent there keeps the threads, skills, MCP).
         let on_server = host.is_some();
-        let place = super::tools::segmented_tall(
+        let place = crate::inserts::tools::view::segmented_tall(
             "project-place",
             &["This Mac", "A server"],
             on_server as usize,
@@ -76,7 +76,7 @@ impl BenchApp {
                 .unwrap_or(labels.len());
             labels.push("New server…".into());
             let aliases = labels.clone();
-            let pick = super::tools::segmented_tall_owned(
+            let pick = crate::inserts::tools::view::segmented_tall_owned(
                 "project-server",
                 labels,
                 at,
@@ -212,7 +212,7 @@ impl BenchApp {
     /// A project's environment as rows in blocks (the task list's look: a line between rows, a
     /// row lit under the pointer); a row's click opens its card under the block, as the agent's
     /// answer (`render_env_card`), where it is edited, saved or removed.
-    pub(super) fn render_env_sections(
+    pub(crate) fn render_env_sections(
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
@@ -596,7 +596,7 @@ impl BenchApp {
             for k in skills {
                 let finder = (!remote).then(|| {
                     let dir = k.dir.clone();
-                    super::inserts::icon_button(
+                    crate::inserts::icon_button(
                         &format!("env-skill-finder-{}", k.name),
                         crate::icons::Ico::FolderOpen,
                         "Show in Finder",
@@ -712,7 +712,7 @@ impl BenchApp {
     }
 
     /// The environment's section a card belongs to (it shows under it).
-    pub(super) fn env_card_section(&self) -> Option<&'static str> {
+    pub(crate) fn env_card_section(&self) -> Option<&'static str> {
         let e = self.project_env.as_ref()?;
         let general = e.id == "general";
         Some(match e.card.as_ref()?.0 {
@@ -735,7 +735,7 @@ impl BenchApp {
     /// The open row's card, under the environment block as the agent's answer: its fields, and in
     /// its head Save (live once something changed), Revert, its own actions, Remove (twice) and
     /// Close.
-    pub(super) fn render_env_card(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_env_card(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let e = self.project_env.as_ref()?;
@@ -916,7 +916,7 @@ impl BenchApp {
                 ] {
                     let folder = folder.clone();
                     actions.push(
-                        super::inserts::icon_button(
+                        crate::inserts::icon_button(
                             &format!("env-skill-new-{what}"),
                             ico,
                             tip,
@@ -932,7 +932,7 @@ impl BenchApp {
                 if !remote {
                     let dir = k.dir.clone();
                     actions.push(
-                        super::inserts::icon_button(
+                        crate::inserts::icon_button(
                             "env-skill-finder",
                             crate::icons::Ico::FolderOpen,
                             "Show in Finder",
@@ -1160,7 +1160,7 @@ impl BenchApp {
             _ => return None,
         };
         let close =
-            super::inserts::icon_button("env-card-close", crate::icons::Ico::X, "Close", &theme)
+            crate::inserts::icon_button("env-card-close", crate::icons::Ico::X, "Close", &theme)
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
                     this.env_card(kind, name.clone(), window, cx)
@@ -1177,7 +1177,7 @@ impl BenchApp {
             )
             .children(actions)
             .child(close);
-        let card = super::inserts::card(head, body, &theme);
+        let card = crate::inserts::card(head, body, &theme);
         if follow.is_empty() {
             return Some(card);
         }
@@ -1239,7 +1239,7 @@ impl BenchApp {
                 crate::icons::Ico::ChevronRight
             };
             let (r1, r2) = (rel.clone(), rel.clone());
-            let rename = super::inserts::icon_button(
+            let rename = crate::inserts::icon_button(
                 &format!("env-skill-mv{n}"),
                 crate::icons::Ico::Pencil,
                 "Rename",
@@ -1402,7 +1402,7 @@ impl BenchApp {
                         this.env_revert("skill", window, cx)
                     }))
             });
-            let close = super::inserts::icon_button(
+            let close = crate::inserts::icon_button(
                 "env-skill-file-close",
                 crate::icons::Ico::X,
                 "Close the file",
@@ -1429,7 +1429,7 @@ impl BenchApp {
                 .child(save)
                 .children(revert)
                 .child(close);
-            super::inserts::card(head, code(&e.skill_text, cx), &theme)
+            crate::inserts::card(head, code(&e.skill_text, cx), &theme)
         });
         (tree, form, file)
     }

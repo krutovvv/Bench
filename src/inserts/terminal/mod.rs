@@ -2,13 +2,26 @@
 //! ("ssh:<alias>"); "ssh" alone lists the servers to pick from. As tall as its text (its program
 //! still sees a whole screen); "to the background" leaves its head, and the status bar lists it.
 
+pub mod form;
+pub mod servers;
+#[cfg(not(target_family = "wasm"))]
+pub mod session;
+#[cfg(target_family = "wasm")]
+#[path = "session_web.rs"]
+pub mod session;
+#[cfg(not(target_family = "wasm"))]
+pub mod view;
+#[cfg(target_family = "wasm")]
+#[path = "view_web.rs"]
+pub mod view;
+
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::*;
 use serde_json::json;
 
-use super::{InsertKind, Switch, SwitchTo, icon_button, pick_row};
 use crate::app::BenchApp;
 use crate::icons::Ico;
+use crate::inserts::{InsertKind, Switch, SwitchTo, icon_button, pick_row};
 use crate::model::Insert;
 
 /// The tallest a terminal gets in a thread; its program's screen is this many rows.
@@ -178,7 +191,7 @@ impl InsertKind for Terminal {
                 let armed =
                     app.confirm_delete.as_deref() == Some(format!("server:{alias}").as_str());
                 let gone = alias.clone();
-                rows.push(super::pick_row_removable(
+                rows.push(crate::inserts::pick_row_removable(
                     format!("{id}-s{k}"),
                     Ico::Server,
                     alias.clone(),
@@ -285,7 +298,7 @@ impl InsertKind for Terminal {
 }
 
 /// A terminal as tall as the lines it shows (the cursor's included), with its 16 px padding.
-fn terminal_height(session: &crate::term::Session) -> f32 {
+fn terminal_height(session: &crate::inserts::terminal::session::Session) -> f32 {
     let line = match session.layout().line_h {
         h if h > 1. => h,
         _ => 20.,

@@ -13,7 +13,7 @@ use gpui_kit::component::{ActiveTheme as _, Theme};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::term::{Layout, Palette, Session, Size};
+use crate::inserts::terminal::session::{Layout, Palette, Session, Size};
 
 /// One Light / One Dark ANSI colors (0–15).
 const LIGHT_ANSI: [u32; 16] = [
@@ -348,7 +348,7 @@ fn grid(session: Arc<Session>, focused: bool, theme: &Theme) -> impl IntoElement
 }
 
 impl BenchApp {
-    pub(super) fn render_terminal(
+    pub(crate) fn render_terminal(
         &mut self,
         ix: usize,
         window: &mut Window,
@@ -391,7 +391,10 @@ impl BenchApp {
                         }
                         "v" => {
                             if let Some(text) = cx.read_from_clipboard().and_then(|c| c.text()) {
-                                s_key.input(&crate::term::paste_bytes(&text, s_key.mode()));
+                                s_key.input(&crate::inserts::terminal::session::paste_bytes(
+                                    &text,
+                                    s_key.mode(),
+                                ));
                             }
                         }
                         _ => return,
@@ -399,7 +402,8 @@ impl BenchApp {
                     cx.stop_propagation();
                     return;
                 }
-                if let Some(bytes) = crate::term::key_bytes(ks, s_key.mode()) {
+                if let Some(bytes) = crate::inserts::terminal::session::key_bytes(ks, s_key.mode())
+                {
                     s_key.input(&bytes);
                     cx.stop_propagation();
                     cx.notify();

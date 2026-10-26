@@ -9,7 +9,7 @@ use gpui_kit::component::input::{EditorState, InputState, TextareaState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::BenchApp;
+use crate::app::BenchApp;
 use crate::connection::Connection;
 use crate::rest;
 use serde_json::{Value, json};
@@ -360,7 +360,10 @@ impl BenchApp {
                     rest::send_json(
                         &conn,
                         "DELETE",
-                        &format!("/api/hosts/{id}/file?path={}", super::remote_files::enc(&q)),
+                        &format!(
+                            "/api/hosts/{id}/file?path={}",
+                            crate::inserts::ftp::state::enc(&q)
+                        ),
                         &profile,
                         Value::Null,
                     )

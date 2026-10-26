@@ -1,19 +1,25 @@
-//! Inserts as the thread draws them (the model: `crate::app::inserts`). Every kind is one
-//! `InsertKind` in `KINDS`: what it shows, what its title switches between, its controls, and
-//! what it tells the agent. The frame is the same for all,: a tinted
-//! ground, the title on top (a menu when there is something to switch to), the kind's controls
-//! and "remove" on the right, a click on the chevron folds it. It sits in the person's row (their
-//! avatar): it is part of what they say.
+//! Inserts: the live tools a person puts into a thread with "/". Each kind is a folder here:
 //!
-//! A new kind: a file here with a unit struct implementing `InsertKind`, a line in `KINDS`, its
-//! word in `words()`, and a line in the agent's `inserted()` prompt (agent/src/prompt.ts).
+//! ```text
+//! inserts/<kind>/mod.rs    the kind: a unit struct implementing `InsertKind` (title, body, …)
+//! inserts/<kind>/state.rs  what it keeps and does (methods on BenchApp)
+//! inserts/<kind>/view.rs   how its body is drawn, when it is more than a few lines
+//! ```
+//!
+//! This file has the trait, `KINDS`, the words of the "/" list and the block every insert sits
+//! in (title, its menu, controls, fold, remove). `state.rs` here keeps the thread's inserts in
+//! step with the agent (agent/src/inserts.ts).
+//!
+//! A new kind: a folder like `tools/`, a line in `KINDS`, its word in `words()`, and a line in
+//! the agent's `inserted()` prompt (agent/src/prompt.ts).
 
-mod browser;
-mod dir;
-mod files;
-mod tasks;
-mod terminal;
-mod tools;
+pub mod browser;
+pub mod files;
+pub mod ftp;
+pub mod state;
+pub mod tasks;
+pub mod terminal;
+pub mod tools;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -100,8 +106,8 @@ pub trait InsertKind: Sync {
 
 static KINDS: &[&dyn InsertKind] = &[
     &terminal::Terminal,
-    &dir::Dir,
-    &files::Files,
+    &files::Dir,
+    &ftp::Files,
     &tasks::Tasks,
     &tools::Tools,
     &browser::Browser,
@@ -156,7 +162,7 @@ impl BenchApp {
     }
 
     /// One insert where the journal puts it: its block, what it opened, a form it opened.
-    pub(in crate::ui) fn render_insert_by_id(
+    pub(crate) fn render_insert_by_id(
         &mut self,
         id: &str,
         window: &mut Window,
@@ -190,20 +196,18 @@ impl BenchApp {
     }
 
     /// A block in the agent's row (its avatar), at the thread's column: what an insert opened.
-    pub(in crate::ui) fn agent_row(
-        &mut self,
-        content: AnyElement,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
+    pub(crate) fn agent_row(&mut self, content: AnyElement, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         h_flex()
             .w_full()
-            .pl(px(super::CHAT_LEFT))
-            .pr(px(super::CHAT_RIGHT))
-            .py(px(super::TURN_Y))
-            .gap(px(super::CHAT_TEXT - super::CHAT_LEFT - super::AVATAR))
+            .pl(px(crate::ui::CHAT_LEFT))
+            .pr(px(crate::ui::CHAT_RIGHT))
+            .py(px(crate::ui::TURN_Y))
+            .gap(px(crate::ui::CHAT_TEXT
+                - crate::ui::CHAT_LEFT
+                - crate::ui::AVATAR))
             .items_start()
-            .child(super::avatar(true, &theme))
+            .child(crate::ui::avatar(true, &theme))
             .child(
                 div()
                     .flex_1()
@@ -337,7 +341,7 @@ impl BenchApp {
                 })
                 .into_any_element()
         };
-        let head = super::block_head(&theme, body.is_some())
+        let head = crate::ui::block_head(&theme, body.is_some())
             .gap_1()
             .child(fold)
             .child(title_el)
@@ -369,12 +373,14 @@ impl BenchApp {
             .children(body.map(|b| div().px_3().py_2().child(b)));
         h_flex()
             .w_full()
-            .pl(px(super::CHAT_LEFT))
-            .pr(px(super::CHAT_RIGHT))
-            .py(px(super::TURN_Y))
-            .gap(px(super::CHAT_TEXT - super::CHAT_LEFT - super::AVATAR))
+            .pl(px(crate::ui::CHAT_LEFT))
+            .pr(px(crate::ui::CHAT_RIGHT))
+            .py(px(crate::ui::TURN_Y))
+            .gap(px(crate::ui::CHAT_TEXT
+                - crate::ui::CHAT_LEFT
+                - crate::ui::AVATAR))
             .items_start()
-            .child(super::avatar(false, &theme))
+            .child(crate::ui::avatar(false, &theme))
             .child(
                 div()
                     .flex_1()
@@ -395,7 +401,7 @@ impl BenchApp {
 }
 
 /// A small icon in an insert's head.
-pub(super) fn icon_button(
+pub(crate) fn icon_button(
     id: &str,
     ico: Ico,
     tip: &'static str,
@@ -412,7 +418,7 @@ pub(super) fn icon_button(
 }
 
 /// A row of a picker inside an insert (a server, a host): a click picks it.
-pub(super) fn pick_row(
+pub(crate) fn pick_row(
     id: String,
     ico: Ico,
     label: String,
@@ -450,7 +456,7 @@ pub(super) fn pick_row(
 
 /// `pick_row` with a trash on hover: the first click arms it ("Delete?"), the second removes
 /// the server or host (`remove`).
-pub(super) fn pick_row_removable(
+pub(crate) fn pick_row_removable(
     id: String,
     ico: Ico,
     label: String,
@@ -511,7 +517,7 @@ pub(super) fn pick_row_removable(
 }
 
 /// Shorten text for the agent.
-pub(super) fn clip(s: &str, n: usize) -> String {
+pub(crate) fn clip(s: &str, n: usize) -> String {
     if s.chars().count() <= n {
         s.to_string()
     } else {
@@ -521,7 +527,7 @@ pub(super) fn clip(s: &str, n: usize) -> String {
 
 /// A block an insert opened (a file, a task): a border, round corners, `block_head` on top with
 /// its title and buttons, the content under it at its full height.
-pub(super) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::Theme) -> AnyElement {
+pub(crate) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::Theme) -> AnyElement {
     v_flex()
         .w_full()
         .min_w_0()
@@ -537,7 +543,7 @@ pub(super) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::The
 
 /// "New file" and "New folder" on the head of a files insert (`/files`, `/ftp`): a card under it
 /// names the new one.
-pub(super) fn file_buttons(
+pub(crate) fn file_buttons(
     ins_id: &str,
     remote: bool,
     cx: &mut Context<BenchApp>,
@@ -561,7 +567,7 @@ pub(super) fn file_buttons(
 }
 
 /// The card naming a new file or folder, under the insert that asked for it.
-pub(super) fn file_form(
+pub(crate) fn file_form(
     app: &BenchApp,
     ins_id: &str,
     cx: &mut Context<BenchApp>,
@@ -582,13 +588,13 @@ pub(super) fn file_form(
         ));
     }
     let actions = vec![
-        super::form_action("file-form-create", "Create", true, cx)
+        crate::ui::form_action("file-form-create", "Create", true, cx)
             .on_click(cx.listener(|this, _, window, cx| {
                 this.click_claimed = true;
                 this.create_from_form(window, cx)
             }))
             .into_any_element(),
-        super::form_action("file-form-cancel", "Cancel", false, cx)
+        crate::ui::form_action("file-form-cancel", "Cancel", false, cx)
             .on_click(cx.listener(|this, _, _, cx| {
                 this.click_claimed = true;
                 this.local_files.form = None;
@@ -596,7 +602,7 @@ pub(super) fn file_form(
             }))
             .into_any_element(),
     ];
-    Some(super::inline_form(
+    Some(crate::ui::inline_form(
         if f.folder { "New folder" } else { "New file" },
         rows,
         None,
@@ -607,7 +613,7 @@ pub(super) fn file_form(
 
 /// A file row's trash, on the row's hover; the first click arms it ("Delete?" stays shown), the
 /// second removes the file or folder.
-pub(in crate::ui) fn row_trash(
+pub(crate) fn row_trash(
     app: &BenchApp,
     id: SharedString,
     group: SharedString,

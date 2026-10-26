@@ -31,15 +31,17 @@ impl BenchApp {
                 self.composer.update(cx, |s, cx| s.focus(window, cx));
             }
             ("n", true) => self.open_new_window(cx),
-            ("2", false) if crate::bench::SSH => {
-                self.open_server_thread(crate::term::LOCAL.to_string(), window, cx)
-            }
+            ("2", false) if crate::bench::SSH => self.open_server_thread(
+                crate::inserts::terminal::session::LOCAL.to_string(),
+                window,
+                cx,
+            ),
             ("3", false) if crate::bench::TOOLS => {
                 let tool = self.tools.tool;
                 self.open_tool_thread(tool, window, cx)
             }
             ("4", false) if crate::bench::TASKS => {
-                self.open_task_list(crate::tasks::List::Today, window, cx)
+                self.open_task_list(crate::inserts::tasks::model::List::Today, window, cx)
             }
             ("\\", false) => self.toggle_sidebar(cx),
             // ⌘⌫ / ⌘⌦: delete the open thread (the first press arms it in the sidebar, the

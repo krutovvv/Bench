@@ -2,13 +2,17 @@
 //! then the host's folders and files, a file open in an editor with its highlighting. Its state:
 //! {host, path, file}; the thread shows them again when it is reopened.
 
+pub mod remote;
+pub mod state;
+pub mod view;
+
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 use serde_json::{Map, json};
 
-use super::{InsertKind, Switch, SwitchTo, clip, pick_row};
 use crate::app::BenchApp;
 use crate::icons::Ico;
+use crate::inserts::{InsertKind, Switch, SwitchTo, clip, pick_row};
 use crate::model::Insert;
 
 pub struct Files;
@@ -94,7 +98,7 @@ impl InsertKind for Files {
                 .child(f.path.clone())
                 .into_any_element(),
         ];
-        v.extend(super::file_buttons(&ins.id, true, cx));
+        v.extend(crate::inserts::file_buttons(&ins.id, true, cx));
         v
     }
 
@@ -113,7 +117,7 @@ impl InsertKind for Files {
                 let id = id.clone();
                 let armed = app.confirm_delete.as_deref() == Some(format!("host:{hid}").as_str());
                 let gone = hid.clone();
-                rows.push(super::pick_row_removable(
+                rows.push(crate::inserts::pick_row_removable(
                     format!("{id}-h{k}"),
                     Ico::Server,
                     name,
@@ -192,7 +196,7 @@ impl InsertKind for Files {
             return None;
         }
         // A new file or folder being named, then the open file.
-        let form = super::file_form(app, &ins.id, cx);
+        let form = crate::inserts::file_form(app, &ins.id, cx);
         let file = app.render_open_file(format!("{}-file-close", ins.id), cx);
         match (form, file) {
             (None, None) => None,

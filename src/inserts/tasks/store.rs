@@ -9,7 +9,7 @@ use chrono::NaiveDate;
 use serde_json::{Value, json};
 
 use crate::connection::Connection;
-use crate::tasks::Task;
+use crate::inserts::tasks::model::Task;
 
 /// What the window asks of the store.
 pub enum Cmd {

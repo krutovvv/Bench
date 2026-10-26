@@ -30,7 +30,7 @@ fn path() -> std::path::PathBuf {
     connection::state_dir().join("session-marks.json")
 }
 
-pub(super) fn load() -> HashMap<String, Mark> {
+pub(crate) fn load() -> HashMap<String, Mark> {
     std::fs::read(path())
         .ok()
         .and_then(|b| serde_json::from_slice(&b).ok())

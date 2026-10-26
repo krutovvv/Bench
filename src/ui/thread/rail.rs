@@ -11,7 +11,7 @@ use crate::app::BenchApp;
 use crate::ui::clip;
 
 impl BenchApp {
-    pub(super) fn render_rail(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    pub(crate) fn render_rail(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let users: Vec<(usize, String)> = self
             .tv
             .rows

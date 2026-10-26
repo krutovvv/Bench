@@ -124,7 +124,7 @@ impl BenchApp {
         }
     }
 
-    pub(super) fn render_chat(
+    pub(crate) fn render_chat(
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,

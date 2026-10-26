@@ -8,7 +8,7 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 
 impl BenchApp {
-    pub(super) fn render_appearance(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(crate) fn render_appearance(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
         use crate::theme::{ACCENTS, Mode};
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
