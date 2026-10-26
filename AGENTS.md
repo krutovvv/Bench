@@ -1,6 +1,7 @@
 # AGENTS.md: Bench
 
-Read this first. Read the skill `.agents/skills/bench-kit/SKILL.md` before any UI or insert work.
+Read this first. Then `docs/map.md` to find the file for your change — open that file, not its
+neighbours. Read the skill `.agents/skills/bench-kit/SKILL.md` before any UI or insert work.
 
 ## What Bench is
 
@@ -49,19 +50,24 @@ person: there are projects.
 
 ## The code map
 
+**Where is X: `docs/map.md`** (one table of common changes and the file for each). Why it is
+built this way: `docs/architecture.md`. In short:
+
 | Where | What |
 |---|---|
-| `src/main.rs`, `src/bench.rs`, `src/theme.rs`, `src/icons.rs` | Start, flags, theme (radius 4 / 6), Lucide icons (`assets/icons/`) |
-| `src/app.rs`, `src/app/*.rs` | The app state (`BenchApp`) and its logic, one file per area |
-| `src/ui/*.rs` | Rendering: `mod.rs` (shared pieces: `block_head`, `FIELD_H`, `editor_height`, `file_icon`, `form_action`), `sidebar.rs`, `chat.rs` (the thread), `composer.rs`, `statusbar.rs`, `project_list.rs` (environment sections) |
-| `src/ui/inserts/` | **The insert registry**: `mod.rs` (the `InsertKind` trait, `KINDS`, `words()`, `card`), one file per kind: `terminal`, `dir` (/files), `files` (/ftp), `tasks`, `tools`, `browser` |
-| `src/app/inserts.rs` | Putting, patching, removing inserts; their state sync; the context sent with a message |
+| `crates/ui` (`bench_ui`) | Every element and size: theme (radius 4 / 6), Lucide icons, `Gap`, text, buttons, fields, blocks, rows, forms, lists, bars. The only place with pixel values |
+| `crates/storybook` | All elements on one page (`cargo run -p storybook`); `reference/` has the pictures |
+| `crates/protocol` | `thread.open` and `thread.*` types; `cargo test -p protocol` writes `agent/src/protocol.gen.ts` |
+| `crates/thread` | The thread as rows from Pi's journal; the rules of order are tests |
+| `crates/devtools` | The /tools utilities as tested pure functions |
+| `src/main.rs`, `src/app.rs`, `src/app/*.rs` | Start; `BenchApp` and its actions, one file per area (`events`, `sessions`, `send`, `keys`, `voice`…) |
+| `src/ui/` | The frame: `mod.rs` (layout, header), `sidebar.rs`, `statusbar.rs`, `composer.rs`, `media.rs`; `ui/thread/` the open thread on `gpui::list` |
+| `src/inserts/` | **The insert registry** (`mod.rs`: `InsertKind`, `KINDS`, `words()`) and one folder per kind: `terminal`, `files` (/files), `ftp`, `tasks`, `tools`, `browser` — each `mod.rs` + `state.rs` (+ `view.rs`) |
+| `src/env/` | A project's environment: `Section` + `SECTIONS`, one file per section |
 | `src/gateway.rs`, `src/rest.rs`, `src/connection.rs`, `src/pi_agent.rs` | The protocol to the agent (WebSocket JSON-RPC + REST), installing/starting it locally or over SSH |
-| `src/app/subjects.rs`, `src/app/slash.rs` | The `/` words and what they put in |
-| `src/tasks.rs`, `src/task_store.rs`, `src/ssh*.rs`, `src/term.rs`, `src/remote_browser.rs`, `src/devtools/` | The tools' own engines: tasks, SSH config and terminals, the browser gateway client, 19 utilities as tested pure functions |
-| `src/demo.rs` | A made-up session for screenshots and the web demo (`BENCH_DEMO=1\|tasks\|server\|tool\|env`) |
-| `agent/src/server.ts` | The agent's server: RPC and REST routes |
-| `agent/src/runtime.ts` | Pi conversations to Bench's events; the queue; inserts |
+| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|tasks\|server\|tool\|env\|env-open`) |
+| `agent/src/server.ts`, `agent/src/modules/` | The agent's server: starts, collects the modules (each declares its RPC and REST routes) |
+| `agent/src/runtime.ts`, `agent/src/thread.ts` | Pi conversations, the queue, inserts; the journal as the items Bench shows |
 | `agent/src/inserts.ts` | The insert entry and document |
 | `agent/src/prompt.ts`, `agent/src/extensions/assistant.ts` | The prompt sections and the default extension (tools, sections, hooks) |
 | `agent/src/builtin/` | The agent's own tools: `tasks`, `ssh`, `remote`, `hosts`, `cron`, `subagent`, `memory`, `skills`, `ask`, `projects` |
@@ -73,8 +79,8 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 
 | Piece | In Pi's terms |
 |---|---|
-| Thread | a Pi conversation in `~/.bench/pi.sqlite`; every step durable, a turn survives a restart |
-| Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `session.insert`, `session.insert.patch`; `session.resume` returns them |
+| Thread | a Pi conversation in `~/.bench/pi.sqlite`; every step durable, a turn survives a restart. Bench shows its journal: `thread.open` (items after a head, the queue, the inserts' state) and the `thread.*` events from Pi's commits (`agent/src/thread.ts`) |
+| Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `session.insert`, `session.insert.patch` |
 | What the agent knows of inserts | the `inserts` prompt section, read with `input.read.snapshot(Inserts, conversationId)`, one line per kind (`prompt.ts` `inserted()`), plus `<block-state>` with each message |
 | Prompt | Pi sections (soul, environment, inserts, project, skills, notes), resent only when changed |
 | Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Pi 1.4 leaves an aborted item in the inbox, so `dropFromInbox` removes it in a commit |
@@ -117,13 +123,16 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 - **Screenshots only of your own copy** (`.agents/skills/bench-kit/scripts/shot.sh`, with
   `BENCH_DEMO=…` or `BENCH_HOME=<a copy>`), never the person's window.
 - **Disk space is tight.** Clean `target/` (`cargo clean --profile dev`) before it fills.
-- **Checks.** Run `cargo build` (and `cargo test` for logic), and
+- **Checks.** `cargo build` with zero warnings, `cargo test --workspace`, and
   `cd agent && node --test test/*.test.ts` for agent changes.
+- **One task, one thread.** A long thread is compacted and the agent loses what it read; start a
+  new thread for a new task.
 
 ## The look, in short
 
 The look is Zed's: flat and precise, with one accent. Never invent a look or a control; assemble
-from the pieces in the skill's UI catalog.
+from `bench_ui` (`crates/ui`, shown by the storybook). A size or a gap is a `bench_ui` constant or
+`Gap` step, never a `px(…)` written in a screen; a missing piece is added to `crates/ui` first.
 
 - **Blocks.** Every bordered block is rounded (`rounded_md`, theme radius). Every block head is
   `block_head` (32 px). Fields are `FIELD_H` (32 px). Buttons are rounded and consistent.
