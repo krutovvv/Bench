@@ -3,7 +3,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { agentDir, agentMcp, getSetting, setSetting, writeAgentMcp } from "../config.ts";
+import { agentDir, agentMcp, compactionAt, getSetting, resolveModel, setSetting, writeAgentMcp } from "../config.ts";
 import { arm, jobs, newJob, type Job } from "../builtin/cron.ts";
 import { hosts } from "../builtin/hosts.ts";
 import { projects } from "../builtin/projects.ts";
@@ -76,6 +76,10 @@ export default ({ rt }: Ctx): Module => ({
 				const { agent, dir, project: p } = envOf(id);
 				const soulFile = path.join(dir, "SYSTEM.md");
 				return {
+					// When its conversations are summarized (the Model section), and the window it is
+					// a share of.
+					compaction: compactionAt(agent) ?? null,
+					window: resolveModel().contextLength,
 					project: p,
 					dir,
 					soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",

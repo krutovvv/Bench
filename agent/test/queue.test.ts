@@ -93,6 +93,17 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	(rt as any).nameIfUnnamed(id, "Made up");
 	assert.equal(rt.store.get(id)?.title, "Spring landing");
 
+	// Compaction: one share of the window per profile, as Pi's policy under its own provider.
+	const { compactionPolicy } = await import("../src/config.ts");
+	assert.deepEqual(rt.compactionOverrides(), {}, "nothing set: Pi's own policy");
+	writeAgent("default", { defaultProvider: "stub", defaultModel: "m", compaction: 0.9 } as any);
+	const over = rt.compactionOverrides();
+	const key = Object.keys(over)[0]!;
+	assert.match(key, /^default\.stub.*\/m$/);
+	assert.deepEqual(over[key], compactionPolicy(0.9, 131072));
+	assert.deepEqual(compactionPolicy(0.9, 100000), { reserveTokens: 10000, backgroundTokens: 5000, keepRecentTokens: 36000 });
+	writeAgent("default", { defaultProvider: "stub", defaultModel: "m" } as any);
+
 	// A stalled run never ends on its own: stop it, or closing waits for it forever.
 	await rt.interrupt(id);
 	stall.closeAllConnections();

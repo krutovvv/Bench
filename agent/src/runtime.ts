@@ -17,7 +17,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
-import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort, resolveFallback, resolveModel, setSetting, type ModelChoice } from "./config.ts";
+import { AGENT_HOME, agents, compactionAt, compactionPolicy, getSetting, readConfig, readAgent, reasoningEffort, resolveFallback, resolveModel, setSetting, type ModelChoice } from "./config.ts";
 import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
@@ -139,6 +139,7 @@ export class Runtime {
 
 	async open(): Promise<void> {
 		fs.mkdirSync(AGENT_HOME, { recursive: true });
+		const rt = this;
 		const registry = (this.registry = createRegistry());
 		setHost(this.host());
 		await loadExtensions(registry, () => this.reconfigureAll());
@@ -155,6 +156,11 @@ export class Runtime {
 				// model_busy when a bot and a thread write at once) and a restart of the agent.
 				retry: { maxRetries: Number(readConfig("default")?.agent?.api_max_retries ?? 6) },
 				toolExecution: "parallel",
+				// Each project's compaction (its Model section), read anew at every use: a change
+				// holds from the next step, and a new model's window reshapes it.
+				get compaction() {
+					return { modelOverrides: rt.compactionOverrides() };
+				},
 				// No `afterFailedRun`: after a run the model failed, the queue behind it waits for the
 				// person's next message. "continue" fed every waiting message to a model that could not
 				// be reached, and a whole queue was spent on "Connection error." in a minute.
@@ -223,6 +229,25 @@ export class Runtime {
 			this.models.setProvider(fallbackProvider(id, this.models, get(main), get(spare), undefined, (why) => (this.fallbackWhy = why)));
 		}
 		return { provider: id, modelId: main.modelId };
+	}
+
+	/**
+	 * Pi's compaction per model reference: each project that set a share gets its own policy under
+	 * its own provider (`project_<id>.<provider>`), so projects differ on one Harness.
+	 */
+	compactionOverrides(): Record<string, ReturnType<typeof compactionPolicy>> {
+		const out: Record<string, ReturnType<typeof compactionPolicy>> = {};
+		const choice = resolveModel();
+		const profiles = [...agents(), ...projects.list().map((p) => `project:${p.id}`)];
+		for (const profile of profiles) {
+			const at = compactionAt(profile);
+			if (at === undefined) continue;
+			try {
+				const ref = this.modelRef(profile, choice);
+				out[`${ref.provider}/${ref.modelId}`] = compactionPolicy(at, choice.contextLength);
+			} catch {}
+		}
+		return out;
 	}
 
 	/** Why the main model last failed over to the fallback (the status bar says it). */

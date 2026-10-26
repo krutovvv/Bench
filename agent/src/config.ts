@@ -116,6 +116,11 @@ export interface AgentSettings {
 	defaultProvider: string;
 	defaultModel: string;
 	defaultThinkingLevel?: string;
+	/**
+	 * When its conversations are summarized, as a share of the model's window (0.6: at 60%); unset:
+	 * Pi's own policy. One number; the rest follows from it (`compactionPolicy`).
+	 */
+	compaction?: number;
 	/** Extensions by name: this agent's extensions/<name>.ts or the built-in ones; default ["assistant"]. */
 	extensions?: string[];
 	/** "off" | "manual": ask before dangerous commands. */
@@ -305,6 +310,27 @@ function choiceOf(providerId: string, model: string): ModelChoice {
 
 export function reasoningEffort(profile: string): string {
 	return readAgent(profile).defaultThinkingLevel ?? getSetting("agent", {})?.reasoning_effort ?? "medium";
+}
+
+/** A profile's compaction share, if it set one that makes sense. */
+export function compactionAt(profile: string): number | undefined {
+	const v = readAgent(profile).compaction;
+	return typeof v === "number" && v >= 0.4 && v <= 0.95 ? v : undefined;
+}
+
+/**
+ * Pi's compaction policy from one share of the model's window, so it holds when the model (and
+ * its window) changes: the summary is made at `at` of the window (a background one starts 5% of the
+ * window earlier), and 40% of what was there stays word for word — a code project's files are
+ * still in front of the model after it.
+ */
+export function compactionPolicy(at: number, window: number): { reserveTokens: number; backgroundTokens: number; keepRecentTokens: number } {
+	const threshold = Math.floor(window * at);
+	return {
+		reserveTokens: Math.max(4096, window - threshold),
+		backgroundTokens: Math.floor(window * 0.05),
+		keepRecentTokens: Math.floor(threshold * 0.4),
+	};
 }
 
 export function approvalsMode(profile: string): string {
