@@ -93,6 +93,14 @@ impl View {
             .is_some_and(|b| b.bottom() <= self.list.viewport_bounds().bottom() + px(2.))
     }
 
+    /// The composer reaches the viewport's bottom edge, or is past it (or is not laid out). Above
+    /// the edge, in the room the thread scrolls on past its end, it is left where the person put it.
+    fn composer_at_bottom(&self) -> bool {
+        self.list
+            .bounds_for_item(self.tail())
+            .is_none_or(|b| b.bottom() >= self.list.viewport_bounds().bottom() - px(4.))
+    }
+
     /// Give the list `rows` and answer the first row that changed. Unchanged rows keep their
     /// measured heights; a thread of another owner starts at the top, not following.
     fn sync(&mut self, owner: Option<&str>, rows: Vec<Row>, follow: bool) -> usize {
@@ -125,7 +133,9 @@ impl View {
             self.list
                 .splice(Self::item_of(r.start)..Self::item_of(r.end), count);
         }
-        if self.following && first < self.rows.len() {
+        // The list's reveal always puts the composer's bottom at the viewport's bottom, which would
+        // pull the person back out of the room past the end: only when the text pushed it there.
+        if self.following && first < self.rows.len() && self.composer_at_bottom() {
             self.list.scroll_to_reveal_item(self.tail());
         }
         first
