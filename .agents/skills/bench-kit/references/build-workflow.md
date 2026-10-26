@@ -19,7 +19,7 @@ writing code:
 
 
 1. **Read the reference app's code for the piece you build** before writing new code
-   (`src/ui/*.rs` for views, `src/theme.rs`, `src/icons.rs`). Copy its idioms.
+   (`src/ui/*.rs` for views, `crates/ui/src/theme.rs`, `crates/ui/src/icons.rs`). Copy its idioms.
 2. **Only for apps that talk to a server or an API: probe it headless first.** Give the binary a
    `--probe` mode that connects, calls the APIs and prints results; verify protocols there, not
    by clicking. An app that only shows local files needs no probe.

@@ -1,7 +1,7 @@
 # Design system (Zed style)
 
 Reference: the Zed editor's look — flat, square, dense, quiet chrome, content first.
-Working copy of everything below: Bench's `src/theme.rs`, `assets/themes/one-light.json`,
+Working copy of everything below: Bench's `crates/ui/src/theme.rs`, `assets/themes/one-light.json`,
 `assets/themes/one-dark.json`.
 
 ## Base switches
@@ -41,7 +41,7 @@ not propagate to already-built windows; `Theme::update` does.
 
 Dark (One Dark): content `#282C33`, panels `#2F343E`, chrome `#3B414D`, borders `#464B57`,
 text `#DCE0E5`, muted `#A9AFBC`; accent lightened (blue `#74A5F2`), primary_foreground dark
-`#1E2127`. Full list in Bench's `src/theme.rs` → `dark_palette`.
+`#1E2127`. Full list in Bench's `crates/ui/src/theme.rs` → `dark_palette`.
 
 Accent presets (light, dark): Blue `#4F6FD8/#74A5F2`, Violet `#7A5BD0/#A98BF0`, Green
 `#3F8A50/#86C08A`, Teal `#16848A/#5FC0C4`, Amber `#B7700F/#E2B05A`, Coral `#CF5A3C/#EE8C6C`,

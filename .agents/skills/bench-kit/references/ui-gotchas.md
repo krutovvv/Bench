@@ -11,7 +11,7 @@ core `gpui_kit::*`. One exact name you can't find: hover it with the `rust_lsp` 
   ```rust
   for (k, t) in self.tools.iter().enumerate() {
       let id = t.id;                       // a Copy value, or .clone() a String
-      rows.push(kit::list_row(format!("t-{k}"), t.name.clone(), None, self.sel == id, None,
+      rows.push(bench_ui::list_row(format!("t-{k}"), t.name.clone(), None, self.sel == id, None,
           None, cx, Box::new(cx.listener(move |this, _, _, cx| { this.sel = id; cx.notify(); })))
           .into_any_element());
   }
@@ -23,7 +23,6 @@ core `gpui_kit::*`. One exact name you can't find: hover it with the `rust_lsp` 
 - **A `ui/` module named like a crate module** (E0255/E0425): `src/tools.rs` and
   `src/ui/tools.rs` clash once both are imported. Name views after what they show:
   `src/ui/tool_view.rs`.
-- **`kit::` not found** (E0433): every `src/ui/*.rs` that uses it needs `use super::kit;`.
 
 ## Layout helpers
 

@@ -11,8 +11,8 @@ A thread's block (at its top, `build-insert.md`) or the body shows the thing bei
 | Plain text that can be selected and copied (a message, a log) | Markdown of the escaped text | "Text views" |
 | An image | `img(path)` | "Images" |
 | Changes to a file | gpui-kit `Diff` | "Diff" |
-| A terminal | Bench `src/term.rs` + `src/ui/terminal.rs`, whole | "Terminal" |
-| Nothing selected yet | `kit::empty_state` | "Empty state" |
+| A terminal | Bench `src/inserts/terminal/session.rs` + `src/ui/terminal.rs`, whole | "Terminal" |
+| Nothing selected yet | `bench_ui::empty_state` | "Empty state" |
 | Images, video, audio, Mermaid, LaTeX, attachments, drag and drop | `build-media.md` | — |
 
 Never write your own text rendering, text buffer or highlighter: a session that did spent
@@ -22,28 +22,28 @@ Never write your own text rendering, text buffer or highlighter: a session that 
 
 ![](../assets/ui/empty-state.png)
 
-**`kit::empty_state(text, cx)`** — centered, muted: what to do to start ("Open a file to
+**`bench_ui::empty_state(text, cx)`** — centered, muted: what to do to start ("Open a file to
 start", "Copy part of a web page, then press ⌘V"). Never a blank body, never placeholder data.
 
 ## Two panes (input → output)
 
 ![](../assets/ui/tools-mode.png)
 
-Each pane: a 36px strip (**`kit::pane_bar(title, error, buttons, cx)`** — a muted title, or the
+Each pane: a 36px strip (**`bench_ui::pane_bar(title, error, buttons, cx)`** — a muted title, or the
 error in red in its place; small buttons on the right) over the content. Between panes a 1px
 line. `h_flex` centers its children vertically: give it `.items_stretch()` or the panes shrink
 to their content.
 
 ```rust
 let left = v_flex().flex_1().min_w_0()
-    .child(kit::pane_bar("Input", None, vec![
-        kit::small_button("paste", "Paste", cx, Box::new(cx.listener(|this, _, w, cx| this.paste(w, cx)))).into_any_element(),
-        kit::small_button("clear", "Clear", cx, Box::new(cx.listener(|this, _, w, cx| this.clear(w, cx)))).into_any_element(),
+    .child(bench_ui::pane_bar("Input", None, vec![
+        bench_ui::compact_button("paste", "Paste", cx, Box::new(cx.listener(|this, _, w, cx| this.paste(w, cx)))).into_any_element(),
+        bench_ui::compact_button("clear", "Clear", cx, Box::new(cx.listener(|this, _, w, cx| this.clear(w, cx)))).into_any_element(),
     ], cx))
     .child(div().flex_1().min_h_0().child(Editor::new(&self.input).appearance(false).h_full()));
 let right = v_flex().flex_1().min_w_0()
-    .child(kit::pane_bar("Output", self.error.clone(), vec![
-        kit::small_button("copy", "Copy", cx, Box::new(cx.listener(|this, _, _, cx| this.copy(cx)))).into_any_element(),
+    .child(bench_ui::pane_bar("Output", self.error.clone(), vec![
+        bench_ui::compact_button("copy", "Copy", cx, Box::new(cx.listener(|this, _, _, cx| this.copy(cx)))).into_any_element(),
     ], cx))
     .child(div().flex_1().min_h_0().child(Editor::new(&self.output).appearance(false).h_full()));
 h_flex().size_full().items_stretch()
@@ -54,7 +54,7 @@ h_flex().size_full().items_stretch()
 
 The output follows the input as it is typed: subscribe to the input's `InputEvent::Change` and
 recompute (`ui-forms.md`). Wrong input → the error in the output strip, the output empty — no
-toast. The full working example: Bench's Tools block (`src/app/tools.rs`, `src/ui/tools.rs`, the tools in `src/devtools/`).
+toast. The full working example: Bench's Tools block (`src/inserts/tools/state.rs`, `src/ui/tools.rs`, the tools in `crates/devtools/src/`).
 
 ## Text views
 
@@ -118,7 +118,7 @@ Bench `src/diff.rs`, `src/ui/files.rs`.
 
 ## Terminal
 
-Copy Bench `src/term.rs` (a PTY with `portable-pty` + the VT parser `alacritty_terminal`) and
+Copy Bench `src/inserts/terminal/session.rs` (a PTY with `portable-pty` + the VT parser `alacritty_terminal`) and
 `src/ui/terminal.rs` (the grid drawn by a custom element) whole; don't write one.
 
 **Paths in a terminal open in Zed** (as Warp does, without Warp): ⌘-hover underlines a link
@@ -153,8 +153,8 @@ the editor is smooth up to a few MB of text. For bigger files open the first 2 M
 does this) and say that the rest is not shown. A 100+ MB editor is a big project of its own:
 ask the user before starting anything like that.
 
-The finished editors in Bench are the file inserts (`src/ui/inserts/dir.rs` with
-`src/app/local_files.rs`, `src/ui/inserts/files.rs` with `src/app/remote_files.rs`): a file opens
+The finished editors in Bench are the file inserts (`src/inserts/dir.rs` with
+`src/app/local_files.rs`, `src/inserts/files.rs` with `src/app/remote_files.rs`): a file opens
 under the insert at its full height, Save writes it back. Copy from them rather than assembling
 the recipes by hand; anything heavier opens in Zed (the project's ⋯ menu).
 

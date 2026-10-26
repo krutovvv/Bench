@@ -68,7 +68,7 @@ composer before the text field gets them (`ui-gotchas.md`, "Keyboard"). Bench `s
 ## Loading
 
 - A spinning loader icon (one that doesn't spin reads as "broken"): `Ico::Loader.live(true)`
-  — Bench's `src/icons.rs` animates it (`true` = small, `false` = extra small).
+  — Bench's `crates/ui/src/icons.rs` animates it (`true` = small, `false` = extra small).
 - A live label: `ShimmerText::new(label)` (the agent is working).
 - A breathing dot: `.with_animation("breathe", Animation::new(Duration::from_millis(1400)).repeat().with_easing(pulsating_between(0.45, 1.)), |d, t| d.opacity(t))`.
 
@@ -76,7 +76,7 @@ composer before the text field gets them (`ui-gotchas.md`, "Keyboard"). Bench `s
 
 A small bordered block under a chat answer for things the answer produced: changed files,
 sources, background processes (status, output, Stop). Same indent as the answer, actions on
-the right of each line. Bench `render_processes` / files in `src/ui/chat.rs`.
+the right of each line. Bench `render_processes` / files in `src/ui/thread/`.
 
 ## No dialogs for simple choices
 

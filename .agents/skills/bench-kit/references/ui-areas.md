@@ -34,7 +34,7 @@ y ┌─────────────────────────
 | Top strip (over the sidebar) | 35 | icon buttons, right-aligned: + (New project), Hide sidebar | right 16 (`pr 12` + the toggle's `p_1`) | `render_sidebar_top`, `ui/mod.rs` |
 | Search band | 36 incl. 2 rules (`bar_h + 1`) | the search input, no frame | magnifier over the group icons (`pl 3.5`, measured) | `search_band`, `ui/mod.rs` |
 | Sidebar list | rest | projects (Host first) and their threads | 16; nested rows `nest_pl` | `ui/sidebar.rs` (`render_project`, `render_session_row`) |
-| Bottom bar | 36 (`bar_h + 1`) | the one primary button, filling it (Bench's chat list has none: "+" instead) | — | `kit::bottom_bar`; Bench settings `ui/panels.rs` |
+| Bottom bar | 36 (`bar_h + 1`) | the one primary button, filling it (Bench's chat list has none: "+" instead) | — | Bench settings `ui/panels.rs` |
 | Header | 36 incl. its rule | title, a muted hint, choices (segmented), icon toggles on the right | left 16 (`pl_4`), right 8 (`pr_2`) | `render_header`, `ui/mod.rs`; its right end `render_header_tail`, `ui/servers.rs` |
 | Strip under the header | 35 (`min_h(bar_h)`), its rule meets the search band's | tag pills, tabs | 24 (`px_6`) in content, 16 for tabs | `ui/tasks.rs` (tags) |
 | Body | rest | the thread: a project's environment block (when opened), the conversation, inserts in the person's rows | 24 (`px_6`) around reading content | `render_chat`, `ui/chat.rs`; inserts `render_inserts_at`, `ui/inserts/mod.rs` |
@@ -86,8 +86,8 @@ holds + (New project) and Hide sidebar; the steps are the same for any icon.
    bar button (full bar height, `xsmall` icon) becomes a strip toggle (24pt square, `small`
    icon, `p_1`, accent on `list_active` while on, its tooltip naming the shortcut). Where the
    piece is: in a Bench, the `toggle` closure inside `render_sidebar_top` (`src/ui/mod.rs`) and
-   `button` inside `render_statusbar`; in the piece library, `kit::mode_toggle` /
-   `kit::status_button` / `kit::icon_button` (`templates/app/src/ui/kit.rs`). A button that opens
+   `button` inside `render_statusbar`; in the piece library, `bench_ui::icon_button` /
+   `bench_ui::status_button` / `bench_ui::icon_button` (`templates/app/src/ui/kit.rs`). A button that opens
    rather than switches (New window, +) uses the same square with `on` always false, so it never
    lights up and its tooltip never says "Back".
 4. **Order and spacing in the target**: as asked ("Tools, then Tasks"), the area's own gap

@@ -14,7 +14,7 @@ build time: check with `grep -A1 '^name = "<crate>"' Cargo.lock` first.
 | WebSocket | `tungstenite = "0.30"` | the agent gateway's JSON-RPC |
 | Async channels | `async-channel = "2"` | thread → UI events |
 | Errors | `anyhow = "1"` | `Result<T>` in I/O code |
-| Terminal | `portable-pty = "0.9"` + `alacritty_terminal = "0.26"` | a PTY and a VT parser (Bench `src/term.rs`) |
+| Terminal | `portable-pty = "0.9"` + `alacritty_terminal = "0.26"` | a PTY and a VT parser (Bench `src/inserts/terminal/session.rs`) |
 | Text diff | `similar = "2"` | changed files' +/- (Bench `src/diff.rs`) |
 | IDs | `uuid = { version = "1", features = ["v4"] }` | `Uuid::new_v4()` |
 | Base64 | `base64 = "0.22"` | `STANDARD.encode(bytes)` / `.decode(s)` |
@@ -34,12 +34,12 @@ build time: check with `grep -A1 '^name = "<crate>"' Cargo.lock` first.
 | String cases | `heck = "0.5"` | `ToSnakeCase`, `ToLowerCamelCase`, … |
 | HTML → Markdown | `htmd = "0.5"` | tables included; `HtmlToMarkdown::builder().options(..).skip_tags(vec!["script","style"]).build().convert(html)`; it pads table columns to the longest cell — compact the rows after (`devtools/markdown.rs`) |
 
-Bench's `src/devtools/` (copy: `templates/examples/devtools/`) uses most of the last block,
+Bench's `crates/devtools/src/` (copy: `templates/examples/devtools/`) uses most of the last block,
 with tests — read it for working calls.
 
 ## Recipe: crop to a size (e.g. a 1200×630 cover)
 
-A tool as a pure function with a test (put it in `src/devtools/`, `templates/examples/devtools/`):
+A tool as a pure function with a test (put it in `crates/devtools/src/`, `templates/examples/devtools/`):
 ```rust
 use image::imageops::FilterType;
 

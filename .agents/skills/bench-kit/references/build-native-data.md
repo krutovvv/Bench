@@ -33,7 +33,7 @@ list re-read from its source": keep unsaved new items, don't overwrite a card be
   functions, tested).
 - **Bench's side**: `src/task_store.rs` — a worker thread that sends `Cmd::Load / Save / Delete`
   as REST calls and returns `Evt::Loaded / Created / Error` over an `async_channel`; the `/tasks`
-  insert shows them (`src/ui/inserts/tasks.rs`, `src/app/tasks.rs`, `src/ui/tasks.rs`).
+  insert shows them (`src/inserts/tasks.rs`, `src/inserts/tasks/state.rs`, `src/ui/tasks.rs`).
 - **The agent's side**: the `tasks` tool (list with status, tag, `done_since` / `done_until`,
   sums `spent_minutes_total`; add; update; complete; delete). Its line in the `inserts` prompt
   section says

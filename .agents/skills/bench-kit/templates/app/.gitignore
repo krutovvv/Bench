@@ -1,9 +1,0 @@
-/target
-/dist
-.DS_Store
-._*
-.idea/
-.vscode/
-*.swp
-# A folder's custom icon ("Icon\r"); never "Icon?", which also hides assets/icons/.
-Icon

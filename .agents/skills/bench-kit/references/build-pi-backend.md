@@ -109,7 +109,7 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   `mcp.json` (`url` + `Authorization: ${BROWSER_MCP_AUTH}`, browser-server-mcp's README), connected
   through `@earendil-works/pi-mcp`. One tab per thread: the prompt line says to work only in the
   thread's tab (its address comes in `<block-state>`), and Bench gives the tab a turn opened to
-  that thread (`src/app/sites.rs`).
+  that thread (`src/inserts/browser/state.rs`).
 - **MCP** (`mcp.ts`): per agent dir, `mcp.json` in Pi's format, via `@earendil-works/pi-mcp`
   (stdio or streamable HTTP); tools named `mcp__<server>__<tool>`; `exposure` direct / deferred
   (behind `tool_search`) / hidden, big servers deferred by default. OAuth for HTTP servers that
@@ -137,7 +137,7 @@ passes a narrow set of operations (tabs, watch, wake, open, close, mouse, wheel,
 never raw CDP, which would expose cookies and code execution — and logs them
 (`/data/live-audit.log`). The agent drives the browser through the existing MCP (key
 `BROWSER_MCP_AUTH`) in the thread's own tab, and the tab the agent opens or moves while it answers
-becomes that thread's (`src/app/sites.rs`).
+becomes that thread's (`src/inserts/browser/state.rs`).
 
 **Kept light** (the person: the view is to show and let them step in, not to browse):
 - ≤ 2 fps: the gateway acknowledges a screencast frame only after 500 ms; JPEG q55 ≤ 1100 px.

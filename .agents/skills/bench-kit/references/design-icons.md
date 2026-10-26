@@ -7,7 +7,7 @@ The user explicitly liked this set; do not mix in other icon families or emoji a
 
 Each icon is the original Lucide SVG file in `assets/icons/<name>.svg` (24×24 viewBox,
 `stroke="currentColor"`, stroke-width 2), compiled into the binary by a macro that generates an
-`Ico` enum (Bench's `src/icons.rs`):
+`Ico` enum (Bench's `crates/ui/src/icons.rs`):
 
 ```rust
 icons! {

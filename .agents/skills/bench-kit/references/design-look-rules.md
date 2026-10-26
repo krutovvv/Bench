@@ -6,7 +6,7 @@
    one exception: buttons that float inside a field (composer Dictate / Send) are circles.
 2. **Light One Light by default** (dark One Dark and "System" optional): content `#FAFAFA`,
    sidebar `#EFEFF0`, title/status bars `#E9E9EA`, borders `#D9D9DA`, text `#242529`, muted
-   `#6E6F75`, one accent (blue `#4F6FD8`). Exact palettes in Bench's `src/theme.rs`.
+   `#6E6F75`, one accent (blue `#4F6FD8`). Exact palettes in Bench's `crates/ui/src/theme.rs`.
 3. **One accent, only errors red.** Accent marks the active thing (selected row stripe, primary
    button, focus, live values). Red is for errors only — counts, failed steps. Warnings amber.
 4. **Fonts:** UI 14px (it is also the rem, so spacing scales with it), code/mono 12px.
