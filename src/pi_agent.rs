@@ -124,6 +124,11 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// The build of the agent this app carries (what `ensure_remote` installs on a server).
+pub fn build() -> Option<String> {
+    source().ok().map(|(_, hash)| hash)
+}
+
 fn source() -> Result<(PathBuf, String)> {
     let src = bundled_source().ok_or_else(|| anyhow!("this build carries no agent sources"))?;
     let hash = source_hash(&src);

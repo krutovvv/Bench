@@ -103,7 +103,7 @@ impl Section for Skills {
         let groups: [(&str, &str); 3] = [
             ("project", "This project"),
             ("repo", "Its folder · .agents/skills, .claude/skills"),
-            ("general", "This Mac"),
+            ("general", if remote { "The server's" } else { "This Mac" }),
         ];
         for (scope, label) in groups {
             let skills: Vec<_> = e

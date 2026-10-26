@@ -2,6 +2,7 @@
 
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{ActiveTheme as _, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
@@ -44,7 +45,7 @@ impl Section for Name {
             return vec![];
         };
         let name = e.name.field.read(cx).value().to_string();
-        vec![row(
+        let mut rows = vec![row(
             e,
             "name",
             String::new(),
@@ -53,11 +54,43 @@ impl Section for Name {
             false,
             true,
             cx,
-        )]
+        )];
+        // A project on a server: which one, and whether its agent there answers.
+        if let Some(server) = server_of(app, &e.id) {
+            rows.push(row(
+                e,
+                "name",
+                "server".into(),
+                "Server".into(),
+                server.summary(),
+                server.error.is_some(),
+                false,
+                cx,
+            ));
+        }
+        rows
     }
-    fn card(&self, app: &BenchApp, _name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
+    fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
         let e = app.project_env.as_ref()?;
         let muted = cx.theme().muted_foreground;
+        if name == "server" {
+            let server = server_of(app, &e.id)?;
+            let lines = [
+                format!("ssh {} — {}", server.alias, server.address),
+                server.state(),
+                "Its agent runs there and keeps the project's threads, skills, MCP servers and \
+                 schedule; /terminal and /files work on that machine. The connection is the \
+                 alias's block in ~/.ssh/config."
+                    .to_string(),
+            ];
+            return Some(Card::new(
+                "Server",
+                pad(v_flex().gap_1().children(lines.into_iter().enumerate().map(|(k, l)| {
+                    div().when(k > 0, |d| d.text_color(muted)).child(l)
+                }))),
+                vec![],
+            ));
+        }
         let mut actions = vec![save("name", e.name.dirty, cx)];
         actions.extend(revert("name", e.name.dirty, cx));
         actions.push(remove(
@@ -118,4 +151,49 @@ impl Section for Name {
         }
         false
     }
+}
+
+/// The server a project lives on, as the environment shows it.
+struct ServerInfo {
+    alias: String,
+    /// `user@hostname:port`, as `~/.ssh/config` gives it.
+    address: String,
+    connected: bool,
+    error: Option<String>,
+}
+
+impl ServerInfo {
+    fn state(&self) -> String {
+        match (&self.error, self.connected) {
+            (Some(e), _) => format!("Its agent: {e}"),
+            (None, true) => "Its agent: connected".into(),
+            (None, false) => "Its agent: connecting…".into(),
+        }
+    }
+
+    fn summary(&self) -> String {
+        format!("{} — {} · {}", self.alias, self.address, self.state().trim_start_matches("Its agent: "))
+    }
+}
+
+fn server_of(app: &BenchApp, project: &str) -> Option<ServerInfo> {
+    let alias = app.projects.iter().find(|p| p.id == project)?.host.clone()?;
+    let address = app
+        .ssh
+        .servers
+        .iter()
+        .find(|s| s.alias == alias)
+        .map(|s| {
+            let user = if s.user.is_empty() { String::new() } else { format!("{}@", s.user) };
+            let port = if s.port.is_empty() || s.port == "22" { String::new() } else { format!(":{}", s.port) };
+            format!("{user}{}{port}", if s.hostname.is_empty() { &alias } else { &s.hostname })
+        })
+        .unwrap_or_else(|| "not in ~/.ssh/config".into());
+    let remote = app.remotes.get(&alias);
+    Some(ServerInfo {
+        alias,
+        address,
+        connected: remote.is_some_and(|r| r.conn.is_some()),
+        error: remote.and_then(|r| r.error.clone()),
+    })
 }

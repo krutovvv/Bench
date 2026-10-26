@@ -66,6 +66,17 @@ impl Connection {
         Ok(ws)
     }
 
+    /// The agent is running a turn now (or cannot say).
+    fn busy(&self) -> bool {
+        ureq::get(&format!("{}/api/status", self.base))
+            .set("X-Hermes-Session-Token", &self.token)
+            .timeout(Duration::from_secs(5))
+            .call()
+            .ok()
+            .and_then(|r| r.into_json::<Value>().ok())
+            .is_none_or(|st| st["active_agents"].as_u64().unwrap_or(0) > 0)
+    }
+
     /// Auth header for one REST call (the profile and purpose no longer matter).
     pub fn rest_auth(&self, _profile: &str, _purpose: &str) -> Result<(&'static str, String)> {
         Ok(("X-Hermes-Session-Token", self.token.clone()))
@@ -82,7 +93,10 @@ impl Connection {
             HostCheck::NoNode => bail!("{host}: Bench's agent needs Node.js 22.18 or newer there"),
         }
         let state_path = state_dir().join(format!("ssh-{host}.json"));
-        // Reattach to the agent we started last time, if it still answers.
+        let build = crate::pi_agent::build();
+        // Reattach to the agent we started last time, if it still answers and is of this app's
+        // build — or of an older one but busy (its run goes on; it is updated when idle, as the
+        // agent on this Mac is). An idle older one is updated and restarted by `ensure_remote`.
         if let Ok(saved) = std::fs::read(&state_path)
             .map_err(anyhow::Error::from)
             .and_then(|b| Ok(serde_json::from_slice::<Value>(&b)?))
@@ -90,7 +104,8 @@ impl Connection {
             if let (Some(port), Some(token)) = (saved["port"].as_u64(), saved["token"].as_str()) {
                 // The saved token must still open the WebSocket (a restarted agent rejects it).
                 if let Ok(conn) = Self::attach_ssh(host, port as u16, token) {
-                    if conn.websocket().is_ok() {
+                    let current = build.is_none() || saved["build"].as_str() == build.as_deref();
+                    if conn.websocket().is_ok() && (current || conn.busy()) {
                         return Ok(conn);
                     }
                 }
@@ -100,7 +115,7 @@ impl Connection {
         std::fs::create_dir_all(state_dir())?;
         write_private(
             &state_path,
-            &json!({"port": port, "token": token}).to_string(),
+            &json!({"port": port, "token": token, "build": build}).to_string(),
         )?;
         Self::attach_ssh(host, port, &token)
     }
