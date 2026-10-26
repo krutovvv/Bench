@@ -118,11 +118,12 @@ impl BenchApp {
         );
         for i in 0..self.pv.endpoints.len() {
             let e = &self.pv.endpoints[i];
-            let (name, url, model, context, key) = (
+            let (name, url, model, context, parallel, key) = (
                 e.name.clone(),
                 e.url.clone(),
                 e.model.clone(),
                 e.context.clone(),
+                e.parallel.clone(),
                 e.key.clone(),
             );
             let current = e.current;
@@ -205,6 +206,12 @@ impl BenchApp {
                         cx,
                     ))
                     .child(self.pv_row("Context length", "Tokens", self.pv_input(&context), cx))
+                    .child(self.pv_row(
+                        "Parallel requests",
+                        "How many its server answers at once; subagents keep to it",
+                        self.pv_input(&parallel),
+                        cx,
+                    ))
                     .child(self.pv_row("API key", key_hint, self.pv_input(&key), cx))
                     .child(
                         h_flex()

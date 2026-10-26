@@ -38,6 +38,8 @@ pub struct EndpointForm {
     pub url: Entity<InputState>,
     pub model: Entity<InputState>,
     pub context: Entity<InputState>,
+    /// How many requests its server answers at once ("" = as many as asked): subagents keep to it.
+    pub parallel: Entity<InputState>,
     pub key: Entity<InputState>,
     /// The last check: (ok, what it said).
     pub check: Option<(bool, String)>,
@@ -239,6 +241,10 @@ impl BenchApp {
                     .as_u64()
                     .map(|n| n.to_string())
                     .unwrap_or_default();
+                let parallel = e["parallel"]
+                    .as_u64()
+                    .map(|n| n.to_string())
+                    .unwrap_or_default();
                 // `${NAME}`: the key lives in .env under NAME.
                 let preview = s("api_key_preview");
                 let key_env = preview
@@ -257,6 +263,7 @@ impl BenchApp {
                     url: field(window, cx, &s("base_url"), "http://host:port/v1"),
                     model: field(window, cx, &s("model"), "Default model"),
                     context: field(window, cx, &context, "e.g. 131072"),
+                    parallel: field(window, cx, &parallel, "e.g. 2; empty: no limit"),
                     key: field(window, cx, &key_value, "If the server asks for one"),
                     key_value,
                     key_env,
@@ -355,6 +362,7 @@ impl BenchApp {
             url: field(window, cx, "", "http://host:port/v1"),
             model: field(window, cx, "", "Default model"),
             context: field(window, cx, "", "e.g. 131072"),
+            parallel: field(window, cx, "", "e.g. 2; empty: no limit"),
             key: field(window, cx, "", "If the server asks for one"),
             check: None,
         });
@@ -373,6 +381,8 @@ impl BenchApp {
         if let Ok(n) = text(&e.context, cx).parse::<u64>() {
             body["context_length"] = json!(n);
         }
+        // Empty clears the limit (0 on the wire).
+        body["parallel"] = json!(text(&e.parallel, cx).parse::<u64>().unwrap_or(0));
         // Only a changed key: an unchanged one stays where it is (often a .env reference).
         let key = text(&e.key, cx);
         if !key.is_empty() && key != e.key_value {
