@@ -106,6 +106,16 @@ impl Thread {
         self.version += 1;
     }
 
+    /// A sent message's text became what is actually sent (its files' places once uploaded): the
+    /// journal's entry then matches it and takes its place.
+    pub fn resent(&mut self, from: &str, to: String) {
+        match self.sent.iter_mut().find(|s| *s == from) {
+            Some(s) => *s = to,
+            None => self.sent.push(to),
+        }
+        self.version += 1;
+    }
+
     /// Every sent message the journal has not shown: the send failed.
     pub fn clear_sent(&mut self) {
         self.sent.clear();

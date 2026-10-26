@@ -241,7 +241,8 @@ impl BenchApp {
             .iter()
             .map(|f| format!("{}{}]", attach::PREFIX, f.display()))
             .collect();
-        self.thread.sent(with_attachments(&text, &shown));
+        let shown = with_attachments(&text, &shown);
+        self.thread.sent(shown.clone());
         // Inserts put while this message was in the composer sit after it, not before.
         let after = self.thread.messages();
         self.anchor_draft_inserts(after, cx);
@@ -279,10 +280,13 @@ impl BenchApp {
                         live.label = "Sending…".into();
                     }
                     let full = with_attachments(&text, &prep.lines);
+                    // Shown with the files where they were; sent with where they are now.
+                    this.thread.resent(&shown, full.clone());
                     this.submit(profile, full, window, cx);
                 }
                 Err(e) => {
                     this.live = None;
+                    this.thread.unsent(&shown);
                     // His files come back: the message stays his to send again.
                     this.attachments = keep;
                     this.toast(

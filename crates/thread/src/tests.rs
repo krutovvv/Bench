@@ -354,6 +354,22 @@ fn rule_6_a_sent_message_shows_at_once_and_is_never_doubled() {
 }
 
 #[test]
+fn rule_6_a_message_with_files_is_one_message_once_they_are_uploaded() {
+    // Shown with the file where it was; the journal has it where it was put for the agent.
+    let mut t = Thread::open(ThreadOpen::default());
+    t.sent("look\n[attachment:/Users/me/shot.png]".into());
+    t.resent(
+        "look\n[attachment:/Users/me/shot.png]",
+        "look\n[attachment:/tmp/bench-attachments/1-shot.png]".into(),
+    );
+    t.apply(ThreadEvent::Append(vec![user(
+        1,
+        "look\n[attachment:/tmp/bench-attachments/1-shot.png]",
+    )]));
+    assert_eq!(t.rows().len(), 1, "{:?}", kinds(&t.rows()));
+}
+
+#[test]
 fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
     let ins = |seq: u64, id: &str| ThreadItem::Insert {
         key: seq.to_string(),
