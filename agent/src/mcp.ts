@@ -41,8 +41,10 @@ interface Server {
 const servers = new Map<string, Server>();
 
 export const mcpTools = (agent: string): ToolRegistration[] => [...servers.values()].filter((s) => s.agent === agent).flatMap((s) => s.tools);
+// `connected` is the client being alive after a try; `error` is why the try failed. A server with
+// no entry at all was never tried — nobody called it yet — which is NOT the same as working.
 export const mcpStatus = (agent?: string) =>
-	[...servers.values()].filter((s) => !agent || s.agent === agent).map((s) => ({ agent: s.agent, name: s.name, tools: s.tools.length, error: s.error, needsAuth: !!s.needsAuth }));
+	[...servers.values()].filter((s) => !agent || s.agent === agent).map((s) => ({ agent: s.agent, name: s.name, tools: s.tools.length, error: s.error, connected: Boolean(s.client) && !s.error, needsAuth: !!s.needsAuth }));
 
 function exposureOf(spec: any, tool: string, count: number): string {
 	const rules: Record<string, string> = spec.toolExposure ?? {};

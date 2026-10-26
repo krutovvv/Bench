@@ -27,8 +27,10 @@ pub struct ProjectEnv {
     /// The project's name, editable at the block's top.
     pub name: Entity<InputState>,
     pub name_dirty: bool,
-    /// MCP servers: (name, "http"/"stdio", enabled, connected, tools, error, its config as JSON).
-    pub mcp: Vec<(String, String, bool, bool, u64, Option<String>, String)>,
+    /// MCP servers: what each is, and what the agent knows of it (`McpInfo`).
+    pub mcp: Vec<McpInfo>,
+    /// A check of them is in flight (the agent is shaking hands with each).
+    pub mcp_checking: bool,
     /// MCP servers that asked for OAuth: "Authorize" signs in.
     pub mcp_auth: std::collections::HashSet<String>,
     /// The server opened under its row, and its config being edited.
@@ -102,6 +104,27 @@ pub struct SkillInfo {
     pub description: String,
     pub scope: String,
     pub dir: String,
+}
+
+/// One MCP server of the project. `checked` is the field that matters most: the agent only knows
+/// a server once something has asked for its tools, so without it "no answer yet" and "answers
+/// fine" look the same in the block.
+#[derive(Clone, Debug)]
+pub struct McpInfo {
+    pub name: String,
+    /// "http" or "stdio".
+    pub kind: String,
+    pub enabled: bool,
+    /// The agent tried it at least once (a thread called it, or the person pressed Check).
+    pub checked: bool,
+    /// Its handshake is live now.
+    pub connected: bool,
+    pub tools: u64,
+    pub error: Option<String>,
+    /// It asks to sign in (OAuth) before it answers.
+    pub needs_auth: bool,
+    /// Its entry in mcp.json, as JSON text.
+    pub spec: String,
 }
 
 impl SkillInfo {
@@ -290,6 +313,7 @@ impl BenchApp {
             name,
             name_dirty: false,
             mcp: vec![],
+            mcp_checking: false,
             mcp_open: None,
             mcp_json,
             mcp_dirty: false,
@@ -759,8 +783,8 @@ impl BenchApp {
             let spec = e
                 .mcp
                 .iter()
-                .find(|m| m.0 == name)
-                .map(|m| m.6.clone())
+                .find(|m| m.name == name)
+                .map(|m| m.spec.clone())
                 .unwrap_or_default();
             editor.update(cx, |s, cx| s.set_value(spec, window, cx));
             cx.notify();
@@ -1317,6 +1341,56 @@ impl BenchApp {
         );
     }
 
+    /// Ask the project's MCP servers now: the agent shakes hands with every one of them and the
+    /// rows say what came back. A server only tells you what it is when you ask it, so this is
+    /// the difference between "unknown" and "working"; the agent answers when the slowest has had
+    /// its say, so this is the one environment job allowed to take a minute.
+    pub fn env_check_mcp(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
+            return;
+        };
+        let Some((conn, eid)) = self.env_target(&id) else {
+            return;
+        };
+        if let Some(e) = self.project_env.as_mut() {
+            e.mcp_checking = true;
+        }
+        cx.notify();
+        let path = format!("/api/projects/{eid}/mcp/check");
+        let profile = self.current_profile();
+        self.background(
+            window,
+            cx,
+            move || rest::send_json_secs(&conn, "POST", &path, &profile, Value::Null, 90),
+            move |this, r, window, cx| {
+                let mut note = None;
+                if let Some(e) = this.project_env.as_mut().filter(|e| e.id == id) {
+                    e.mcp_checking = false;
+                    match &r {
+                        Ok(v) => {
+                            apply_mcp(e, v);
+                            note = Some(crate::app::mcp_status::mcp_tally(&e.mcp, false).1);
+                        }
+                        Err(err) => note = Some(format!("{err:#}")),
+                    }
+                }
+                if let Some(text) = note {
+                    this.toast(
+                        if r.is_ok() {
+                            NotificationType::Info
+                        } else {
+                            NotificationType::Error
+                        },
+                        text,
+                        window,
+                        cx,
+                    );
+                }
+                cx.notify();
+            },
+        );
+    }
+
     /// Sign in to an MCP server (OAuth): its page opens in the browser; the agent connects it once
     /// the browser comes back, and the block reads the environment again until it shows connected.
     pub fn env_authorize(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
@@ -1395,32 +1469,37 @@ fn parent_rel(rel: &str) -> String {
         .unwrap_or_default()
 }
 
-/// The agent's answer into the block; fields being typed in keep their text.
-pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
-    e.dir = v["dir"].as_str().unwrap_or_default().to_string();
+/// The MCP part of the agent's answer: the whole environment read and a Check both carry the same
+/// `mcp` array, so one parser serves them.
+pub fn apply_mcp(e: &mut ProjectEnv, v: &Value) {
     e.mcp = v["mcp"]
         .as_array()
         .into_iter()
         .flatten()
-        .map(|m| {
-            (
-                m["name"].as_str().unwrap_or_default().to_string(),
-                m["kind"].as_str().unwrap_or_default().to_string(),
-                m["enabled"].as_bool().unwrap_or(true),
-                m["connected"].as_bool().unwrap_or(false),
-                m["tools"].as_u64().unwrap_or(0),
-                m["error"].as_str().map(str::to_string),
-                m["spec"].as_str().unwrap_or("{}").to_string(),
-            )
+        .map(|m| McpInfo {
+            name: m["name"].as_str().unwrap_or_default().to_string(),
+            kind: m["kind"].as_str().unwrap_or_default().to_string(),
+            enabled: m["enabled"].as_bool().unwrap_or(true),
+            checked: m["checked"].as_bool().unwrap_or(false),
+            connected: m["connected"].as_bool().unwrap_or(false),
+            tools: m["tools"].as_u64().unwrap_or(0),
+            error: m["error"].as_str().map(str::to_string),
+            needs_auth: m["needs_auth"].as_bool().unwrap_or(false),
+            spec: m["spec"].as_str().unwrap_or("{}").to_string(),
         })
         .collect();
-    e.mcp_auth = v["mcp"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|m| m["needs_auth"].as_bool() == Some(true))
-        .filter_map(|m| m["name"].as_str().map(str::to_string))
+    e.mcp_auth = e
+        .mcp
+        .iter()
+        .filter(|m| m.needs_auth)
+        .map(|m| m.name.clone())
         .collect();
+}
+
+/// The agent's answer into the block; fields being typed in keep their text.
+pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
+    e.dir = v["dir"].as_str().unwrap_or_default().to_string();
+    apply_mcp(e, v);
     e.skills = v["skills"]
         .as_array()
         .into_iter()

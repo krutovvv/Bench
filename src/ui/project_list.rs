@@ -4,6 +4,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use crate::app::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 use crate::app::BenchApp;
 
 impl BenchApp {
@@ -256,8 +257,10 @@ impl BenchApp {
                 }))
             };
         // A row: its name, a one-line note, its actions on hover; lit when its card is open.
+        // `mark` is a status sign before the name (MCP servers have one; the rest pass None).
         let row_with = |kind: &'static str,
                         name: String,
+                        mark: Option<AnyElement>,
                         label: String,
                         note: String,
                         bad: bool,
@@ -279,6 +282,7 @@ impl BenchApp {
                 })
                 .when(on, |d| d.bg(theme.list_active))
                 .hover(|s| s.bg(theme.list_hover))
+                .children(mark.into_iter())
                 .child(div().flex_none().child(label))
                 .child(
                     div()
@@ -308,7 +312,7 @@ impl BenchApp {
                    bad: bool,
                    first: bool,
                    cx: &mut Context<Self>| {
-            row_with(kind, name, label, note, bad, first, vec![], cx)
+            row_with(kind, name, None, label, note, bad, first, vec![], cx)
         };
         let empty = |text: &'static str| {
             div()
@@ -455,31 +459,109 @@ impl BenchApp {
             blocks.push(("Model", section("Model", None, rows, cx)));
         }
 
-        // MCP servers.
+        // MCP servers: each row carries a sign of what the agent knows of it, and a Check that
+        // asks the server directly. A server says nothing until something asks it for its tools,
+        // so "not tried yet" is its own state and says so out loud — it is not a working server.
+        let checking = e.mcp_checking;
         let mut rows = vec![];
         if e.mcp.is_empty() {
             rows.push(empty("None of its own: the general ones work here too."));
         }
-        for (k, (name, kind, enabled, connected, tools, error, _)) in
-            e.mcp.clone().into_iter().enumerate()
-        {
-            let note = match (enabled, &error, connected) {
-                (false, _, _) => format!("{kind} · off"),
-                (_, Some(err), _) => format!("{kind} · {err}"),
-                (_, _, true) => format!("{kind} · {tools} tools"),
-                _ => format!("{kind} · connects with the project's first thread"),
+        for (k, m) in e.mcp.clone().into_iter().enumerate() {
+            let tone = mcp_tone(&m);
+            let name = m.name.clone();
+            let bad = matches!(tone, McpTone::Error | McpTone::Dead);
+            let mark = {
+                let (ico, color) = match tone {
+                    McpTone::Live => (crate::icons::Ico::CircleCheck, theme.success),
+                    McpTone::Error => (crate::icons::Ico::CircleAlert, theme.danger),
+                    McpTone::Dead => (crate::icons::Ico::CircleHelp, theme.danger),
+                    McpTone::Auth => (crate::icons::Ico::CircleAlert, theme.warning),
+                    McpTone::Off | McpTone::Untested => (crate::icons::Ico::CircleEmpty, muted),
+                };
+                div()
+                    .flex_none()
+                    .flex()
+                    .items_center()
+                    .child(ico.icon().small().text_color(color))
+                    .into_any_element()
             };
-            rows.push(row(
+            let mut actions: Vec<AnyElement> = Vec::new();
+            if m.enabled {
+                if m.needs_auth {
+                    let who = name.clone();
+                    actions.push(
+                        act(format!("env-mcp-auth-{name}").into(), "Authorize")
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.click_claimed = true;
+                                cx.stop_propagation();
+                                this.env_authorize(who.clone(), window, cx)
+                            }))
+                            .into_any_element(),
+                    );
+                }
+                actions.push(
+                    act(
+                        format!("env-mcp-check-{name}").into(),
+                        if m.checked { "Recheck" } else { "Check" },
+                    )
+                    .when(checking, |d| d.opacity(0.5))
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        cx.stop_propagation();
+                        this.env_check_mcp(window, cx)
+                    }))
+                    .into_any_element(),
+                );
+            }
+            rows.push(row_with(
                 "mcp",
-                name.clone(),
+                m.name.clone(),
+                Some(mark),
                 name,
-                note,
-                error.is_some() && enabled,
+                mcp_note(&m),
+                bad,
                 k == 0,
+                actions,
                 cx,
             ));
         }
-        let extra = add("env-mcp-add", "mcp", "", cx).into_any_element();
+        // The head says how the set stands, so a block of unchecked servers cannot read as calm.
+        let mut head: Vec<AnyElement> = Vec::new();
+        if !e.mcp.is_empty() {
+            let (state, text) = mcp_tally(&e.mcp, checking);
+            let (ico, color) = match state {
+                McpSet::Checking => (crate::icons::Ico::Loader, muted),
+                McpSet::Trouble => (crate::icons::Ico::CircleAlert, theme.danger),
+                McpSet::Untested => (crate::icons::Ico::CircleEmpty, muted),
+                McpSet::AllOff => (crate::icons::Ico::CircleEmpty, muted),
+                McpSet::Answering => (crate::icons::Ico::CircleCheck, theme.success),
+            };
+            let sign = if state == McpSet::Checking {
+                crate::icons::Ico::Loader.live(true)
+            } else {
+                div()
+                    .flex()
+                    .items_center()
+                    .child(ico.icon().small().text_color(color))
+                    .into_any_element()
+            };
+            head.push(
+                h_flex()
+                    .gap_1()
+                    .items_center()
+                    .text_color(muted)
+                    .child(sign)
+                    .child(text)
+                    .into_any_element(),
+            );
+        }
+        head.push(add("env-mcp-add", "mcp", "", cx).into_any_element());
+        let extra = h_flex()
+            .gap_3()
+            .items_center()
+            .children(head)
+            .into_any_element();
         blocks.push(("MCP servers", section("MCP servers", Some(extra), rows, cx)));
 
         // Skills: every one its threads can use, by where it lives; Finder on a row's hover.
@@ -534,6 +616,7 @@ impl BenchApp {
                 rows.push(row_with(
                     "skill",
                     k.name.clone(),
+                    None,
                     k.name,
                     k.description,
                     false,
@@ -799,7 +882,7 @@ impl BenchApp {
                 (title.to_string(), body)
             }
             "mcp" => {
-                if !e.mcp.iter().any(|m| m.0 == name) {
+                if !e.mcp.iter().any(|m| m.name == name) {
                     return None;
                 }
                 if e.mcp_auth.contains(&name) {
@@ -1385,3 +1468,4 @@ fn when(iso: &str) -> String {
         _ => t.format("%a %-d %b %H:%M").to_string(),
     }
 }
+

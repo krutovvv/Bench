@@ -70,6 +70,20 @@ pub fn send_json(
     send(conn, method, path, profile, body, 30)
 }
 
+/// A JSON request that waits `secs`. Asking the MCP servers to answer is the one job that can
+/// legitimately take longer than 30 s: the agent gives each server 30 s to shake hands, then 30 s
+/// to list its tools, so the answer must not be cut off before his.
+pub fn send_json_secs(
+    conn: &Connection,
+    method: &str,
+    path: &str,
+    profile: &str,
+    body: Value,
+    secs: u64,
+) -> Result<Value> {
+    send(conn, method, path, profile, body, secs)
+}
+
 fn send(
     conn: &Connection,
     method: &str,

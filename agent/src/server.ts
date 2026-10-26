@@ -67,6 +67,18 @@ function envOf(id: string): { agent: string; dir: string; project: { id: string;
 	return { agent: `project:${id}`, dir: projects.env(id), project: p };
 }
 
+/// The project's MCP servers as the block shows them: what each is, and what the agent knows of
+/// it. `checked` says the server was tried at all (a session asked for its tools, or the person
+/// pressed Check); `connected`, that its handshake is live now. Shown without `checked` the two
+/// look alike, and "nothing known yet" reads as "works" — which is the lie this field stops.
+function mcpView(agent: string) {
+	const status = mcpStatus(agent);
+	return Object.entries(agentMcp(agent)).map(([name, spec]: [string, any]) => {
+		const s = status.find((x) => x.name === name);
+		return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, checked: !!s, connected: !!s?.connected, tools: s?.tools ?? 0, error: s?.error ?? null, needs_auth: !!s?.needsAuth, spec: JSON.stringify(spec, null, 2) };
+	});
+}
+
 const methods: Record<string, (p: any) => Promise<any> | any> = {
 	"profiles.list": () => ({
 		profiles: agents().map((name) => ({ name, display_name: name, model: resolveModel(name).model })),
@@ -564,15 +576,11 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		const id = decodeURIComponent(m[1]);
 		const { agent, dir, project: p } = envOf(id);
 		const soulFile = path.join(dir, "SYSTEM.md");
-		const status = mcpStatus(agent);
 		return {
 			project: p,
 			dir,
 			soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
-			mcp: Object.entries(agentMcp(agent)).map(([name, spec]: [string, any]) => {
-				const s = status.find((x) => x.name === name);
-				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null, needs_auth: !!s?.needsAuth, spec: JSON.stringify(spec, null, 2) };
-			}),
+			mcp: mcpView(agent),
 			// Every skill its threads can use, with where it lives: its own, its folder's (.agents/skills, .claude/skills), the general ones.
 			skills: skillsOf(agent).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
 			prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
@@ -611,6 +619,20 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		delete servers[decodeURIComponent(m[2])];
 		writeAgentMcp(agent, servers);
 		return { ok: true };
+	}],
+	// Ask the project's MCP servers the honest question: try them now and report. Until something
+	// calls a server its entry does not exist, so the block shows "not tried yet"; Check turns that
+	// into a fact without waiting for a thread. One reconnect answers them all — it replaces every
+	// entry of the agent, so there is no half-handshake that leaves stale tools behind.
+	["POST", /^\/api\/projects\/([^/]+)\/mcp\/check$/, async (_req, m) => {
+		const { agent } = envOf(decodeURIComponent(m[1]));
+		try {
+			await connectMcp(agent);
+			rt.reloadMcp(agent);
+		} catch (e) {
+			console.error(`[mcp] check ${agent}: ${(e as Error)?.message ?? e}`);
+		}
+		return { ok: true, mcp: mcpView(agent) };
 	}],
 	// A skill of the project's threads (its own or a general one), to read.
 	["GET", /^\/api\/projects\/([^/]+)\/skills\/([^/]+)$/, (_req, m) => {

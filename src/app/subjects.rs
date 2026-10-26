@@ -322,7 +322,7 @@ impl BenchApp {
         let Some(e) = &self.project_env else {
             return String::new();
         };
-        let mcp: Vec<&str> = e.mcp.iter().map(|m| m.0.as_str()).collect();
+        let mcp: Vec<&str> = e.mcp.iter().map(|m| m.name.as_str()).collect();
         let skills: Vec<&str> = e.skills.iter().map(|k| k.name.as_str()).collect();
         format!(
             "The environment block shows the folder {}, MCP servers: {}, skills: {}.",
