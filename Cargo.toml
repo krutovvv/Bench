@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+bench_ui = { path = "crates/ui" }
 similar = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -39,6 +40,9 @@ percent-encoding = "2"
 rand = "0.8"
 heck = "0.5"
 htmd = "0.5"
+
+[workspace]
+members = [".", "crates/*"]
 
 [profile.dev]
 opt-level = 1

@@ -19,8 +19,8 @@ pub(crate) mod inserts;
 mod keys;
 pub(crate) mod local_files;
 pub mod marks;
-mod processes;
 pub(crate) mod mcp_status;
+mod processes;
 pub mod project_env;
 pub(crate) mod project_list;
 pub(crate) mod projects;
@@ -720,7 +720,7 @@ impl BenchApp {
             path_entry: false,
             project_path,
             group_name,
-            appearance: crate::theme::Appearance::load(),
+            appearance: crate::theme::load(),
             speed: crate::speed::Meter::fresh(),
             search,
             search_query: String::new(),
@@ -2326,7 +2326,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         self.appearance = a;
-        a.save();
+        crate::theme::save(&a);
         crate::theme::apply(a, Some(window), cx);
         self.repaint_terminals(cx);
         cx.notify();

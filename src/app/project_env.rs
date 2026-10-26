@@ -529,12 +529,7 @@ impl BenchApp {
                 };
                 let addr = e.h_host.read(cx).value().trim().to_string();
                 if addr.is_empty() {
-                    self.toast(
-                        NotificationType::Error,
-                        "The address is empty",
-                        window,
-                        cx,
-                    );
+                    self.toast(NotificationType::Error, "The address is empty", window, cx);
                     return;
                 }
                 let empty = |s: &Entity<InputState>, cx: &mut Context<Self>| {
@@ -1289,15 +1284,23 @@ impl BenchApp {
             cx.notify();
             return;
         }
-        let h = e.hosts.iter().find(|h| h.id == id).cloned().unwrap_or_default();
+        let h = e
+            .hosts
+            .iter()
+            .find(|h| h.id == id)
+            .cloned()
+            .unwrap_or_default();
         e.h_name.update(cx, |s, cx| s.set_value(h.name, window, cx));
         e.h_host.update(cx, |s, cx| s.set_value(h.host, window, cx));
         e.h_port.update(cx, |s, cx| {
-            s.set_value(h.port.map(|p| p.to_string()).unwrap_or_default(), window, cx)
+            s.set_value(
+                h.port.map(|p| p.to_string()).unwrap_or_default(),
+                window,
+                cx,
+            )
         });
         e.h_user.update(cx, |s, cx| s.set_value(h.user, window, cx));
-        e.h_password
-            .update(cx, |s, cx| s.set_value("", window, cx));
+        e.h_password.update(cx, |s, cx| s.set_value("", window, cx));
         e.h_path.update(cx, |s, cx| s.set_value(h.path, window, cx));
         e.host_open = Some(id);
         e.host_dirty = false;

@@ -4,8 +4,8 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 use crate::app::BenchApp;
+use crate::app::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 
 impl BenchApp {
     /// The new project's page (the sidebar's "+"), laid out like Settings: what it is called,
@@ -1467,4 +1467,3 @@ fn when(iso: &str) -> String {
         _ => t.format("%a %-d %b %H:%M").to_string(),
     }
 }
-

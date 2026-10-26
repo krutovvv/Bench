@@ -122,7 +122,14 @@ pub fn mcp_tally(mcp: &[McpInfo], checking: bool) -> (McpSet, String) {
 mod mcp_status_tests {
     use super::*;
 
-    fn m(enabled: bool, checked: bool, connected: bool, tools: u64, error: Option<&str>, needs_auth: bool) -> McpInfo {
+    fn m(
+        enabled: bool,
+        checked: bool,
+        connected: bool,
+        tools: u64,
+        error: Option<&str>,
+        needs_auth: bool,
+    ) -> McpInfo {
         McpInfo {
             name: "s".into(),
             kind: "http".into(),
@@ -153,14 +160,29 @@ mod mcp_status_tests {
     #[test]
     fn the_worse_fact_wins() {
         // Off beats everything: its tools go to nobody, whatever the last handshake said.
-        assert_eq!(mcp_tone(&m(false, true, true, 3, Some("boom"), false)), McpTone::Off);
+        assert_eq!(
+            mcp_tone(&m(false, true, true, 3, Some("boom"), false)),
+            McpTone::Off
+        );
         // A refusal beats a live client: a server that died mid-session must not show as fine.
-        assert_eq!(mcp_tone(&m(true, true, true, 3, Some("connect timed out"), false)), McpTone::Error);
-        assert!(mcp_note(&m(true, true, true, 3, Some("connect timed out"), false)).contains("connect timed out"));
+        assert_eq!(
+            mcp_tone(&m(true, true, true, 3, Some("connect timed out"), false)),
+            McpTone::Error
+        );
+        assert!(
+            mcp_note(&m(true, true, true, 3, Some("connect timed out"), false))
+                .contains("connect timed out")
+        );
         // Signing in outranks both, since it is the one thing the person can do.
-        assert_eq!(mcp_tone(&m(true, true, false, 0, None, true)), McpTone::Auth);
+        assert_eq!(
+            mcp_tone(&m(true, true, false, 0, None, true)),
+            McpTone::Auth
+        );
         // Tried, silent, no stated reason.
-        assert_eq!(mcp_tone(&m(true, true, false, 0, None, false)), McpTone::Dead);
+        assert_eq!(
+            mcp_tone(&m(true, true, false, 0, None, false)),
+            McpTone::Dead
+        );
     }
 
     #[test]
@@ -170,17 +192,36 @@ mod mcp_status_tests {
         let new = m(true, false, false, 0, None, false);
         let off = m(false, false, false, 0, None, false);
         // A broken server is what the head must say first, even among healthy ones.
-        assert_eq!(mcp_tally(&[good.clone(), bad.clone()], false).0, McpSet::Trouble);
+        assert_eq!(
+            mcp_tally(&[good.clone(), bad.clone()], false).0,
+            McpSet::Trouble
+        );
         // Nothing broken, something untried: not "all answer".
-        assert_eq!(mcp_tally(&[good.clone(), new.clone()], false).0, McpSet::Untested);
+        assert_eq!(
+            mcp_tally(&[good.clone(), new.clone()], false).0,
+            McpSet::Untested
+        );
         // All healthy, or all deliberately off, are the two calm states.
-        assert_eq!(mcp_tally(&[good.clone(), good.clone()], false).0, McpSet::Answering);
-        assert_eq!(mcp_tally(&[off.clone(), off.clone()], false).0, McpSet::AllOff);
+        assert_eq!(
+            mcp_tally(&[good.clone(), good.clone()], false).0,
+            McpSet::Answering
+        );
+        assert_eq!(
+            mcp_tally(&[off.clone(), off.clone()], false).0,
+            McpSet::AllOff
+        );
         // While the agent is shaking hands, the head says so rather than quoting stale facts.
-        assert_eq!(mcp_tally(&[new.clone()], true), (McpSet::Checking, "asking…".to_string()));
+        assert_eq!(
+            mcp_tally(&[new.clone()], true),
+            (McpSet::Checking, "asking…".to_string())
+        );
         // The counts read as one plain line.
         assert_eq!(
-            mcp_tally(&[good.clone(), bad.clone(), new.clone(), off.clone()], false).1,
+            mcp_tally(
+                &[good.clone(), bad.clone(), new.clone(), off.clone()],
+                false
+            )
+            .1,
             "1 answer, 1 with trouble, 1 not tried, 1 off"
         );
         // An empty set is nothing to ask, not an error.

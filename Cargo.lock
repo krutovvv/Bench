@@ -606,6 +606,7 @@ dependencies = [
  "anyhow",
  "async-channel",
  "base64 0.22.1",
+ "bench_ui",
  "block2 0.6.2",
  "chrono",
  "chrono-tz",
@@ -646,6 +647,15 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "web-time",
+]
+
+[[package]]
+name = "bench_ui"
+version = "0.1.0"
+dependencies = [
+ "gpui-kit",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

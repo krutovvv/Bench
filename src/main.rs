@@ -304,7 +304,7 @@ fn main() {
         .with_assets(gpui_kit::assets::Assets)
         .run(|cx| {
             gpui_kit::init(cx);
-            theme::apply(theme::Appearance::load(), None, cx);
+            theme::apply(theme::load(), None, cx);
 
             open_main_window(cx);
             cx.activate(true);
@@ -337,7 +337,7 @@ fn main() {
             if let Err(e) = cx.text_system().add_fonts(fonts) {
                 log_error(&format!("fonts: {e:#}"));
             }
-            theme::apply(theme::Appearance::load(), None, cx);
+            theme::apply(theme::load(), None, cx);
             open_main_window(cx);
         });
 }

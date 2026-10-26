@@ -1,0 +1,10 @@
+[package]
+name = "bench_ui"
+version = "0.1.0"
+edition = "2024"
+description = "Bench's elements: theme, icons, sizes, text, buttons, fields, blocks, rows, forms, lists, bars"
+
+[dependencies]
+gpui-kit = "0.8.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

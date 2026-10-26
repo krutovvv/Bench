@@ -1,0 +1,112 @@
+//! Forms: label + field rows, settings rows, a segmented pick.
+
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::*;
+
+use crate::OnPick;
+use crate::metrics::RING_CLEAR;
+
+/// A form in the thread: a title, rows of a muted label and its field, a note, the actions.
+pub fn inline_form<L: Into<SharedString>>(
+    title: impl Into<SharedString>,
+    rows: Vec<(L, AnyElement)>,
+    note: Option<SharedString>,
+    actions: Vec<AnyElement>,
+    cx: &App,
+) -> AnyElement {
+    let theme = cx.theme();
+    v_flex()
+        .w_full()
+        .gap(px(RING_CLEAR))
+        .child(
+            div()
+                .pb_1()
+                .font_weight(FontWeight::MEDIUM)
+                .child(title.into()),
+        )
+        .children(
+            rows.into_iter()
+                .map(|(label, field)| field_row(label, field, cx)),
+        )
+        .children(note.map(|n| div().pt_1().text_color(theme.muted_foreground).child(n)))
+        .child(h_flex().pt_2().gap_3().children(actions))
+        .into_any_element()
+}
+
+/// One row of a form: the muted label in a fixed column, the field after it.
+pub fn field_row(label: impl Into<SharedString>, field: impl IntoElement, cx: &App) -> Div {
+    h_flex()
+        .gap_3()
+        .items_center()
+        .child(
+            div()
+                .w(px(110.))
+                .flex_none()
+                .text_color(cx.theme().muted_foreground)
+                .child(label.into()),
+        )
+        .child(div().flex_1().max_w(px(560.)).child(field))
+}
+
+/// A setting: title and a muted hint on the left, the control on the right, a rule below.
+pub fn settings_row(
+    title: impl Into<SharedString>,
+    hint: impl Into<SharedString>,
+    control: AnyElement,
+    cx: &App,
+) -> Div {
+    let theme = cx.theme();
+    h_flex()
+        .gap_4()
+        .py_3()
+        .items_center()
+        .border_b_1()
+        .border_color(theme.border)
+        .child(
+            v_flex()
+                .flex_1()
+                .gap_0p5()
+                .child(div().text_sm().child(title.into()))
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(theme.muted_foreground)
+                        .child(hint.into()),
+                ),
+        )
+        .child(control)
+}
+
+/// Pick one of a few: cells sharing borders, the chosen one in the accent.
+pub fn segmented(
+    id: &'static str,
+    labels: &[&'static str],
+    chosen: usize,
+    cx: &App,
+    on_pick: OnPick,
+) -> Div {
+    let theme = cx.theme().clone();
+    h_flex()
+        .rounded_md()
+        .overflow_hidden()
+        .border_1()
+        .border_color(theme.border)
+        .children(labels.iter().enumerate().map(|(k, label)| {
+            let on = k == chosen;
+            let pick = on_pick.clone();
+            div()
+                .id((id, k))
+                .px_3()
+                .py_1()
+                .text_sm()
+                .cursor_pointer()
+                .when(k > 0, |d| d.border_l_1().border_color(theme.border))
+                .when(on, |d| {
+                    d.bg(theme.primary).text_color(theme.primary_foreground)
+                })
+                .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
+                .child(*label)
+                .on_click(move |_, window, cx| pick(k, window, cx))
+        }))
+}

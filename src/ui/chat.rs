@@ -136,7 +136,7 @@ mod tail_tests {
 
 #[cfg(test)]
 mod past_end_tests {
-    use super::{LINE, past_end, AIR};
+    use super::{AIR, LINE, past_end};
     #[test]
     fn the_last_row_reaches_the_top_and_never_past_it() {
         // A 900-px window, a composer of one line (48): the room is what the window has left.
@@ -1147,7 +1147,10 @@ impl BenchApp {
                             let h = f32::from(b.size.height);
                             if let Some(delta) = this.rows.set_measured(idx, h) {
                                 this.rows_shift = crate::ui::rows::bank_shift(
-                                    this.rows_shift, delta, seen_start, off,
+                                    this.rows_shift,
+                                    delta,
+                                    seen_start,
+                                    off,
                                 );
                             }
                         });

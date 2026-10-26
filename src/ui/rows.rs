@@ -86,7 +86,10 @@ impl Rows {
             self.guess.retain(|k, _| keep.contains(k));
             // A row nobody has seen yet stands at the mean of what this thread has measured —
             // taken once, here, for THIS row. Rows already guessed keep their number.
-            let mean = match self.measured.values().fold((0f32, 0usize), |(s, n), h| (s + h, n + 1))
+            let mean = match self
+                .measured
+                .values()
+                .fold((0f32, 0usize), |(s, n), h| (s + h, n + 1))
             {
                 (_, 0) => UNKNOWN,
                 (s, n) => (s / n as f32).max(1.),
@@ -299,7 +302,7 @@ mod tests {
 /// still be at the top afterwards — otherwise the thread moved by itself, which is the jerk.
 #[cfg(test)]
 mod hold_tests {
-    use super::{bank_shift, RowKey, Rows, UNKNOWN};
+    use super::{RowKey, Rows, UNKNOWN, bank_shift};
 
     fn turns(n: usize) -> Vec<RowKey> {
         (0..n).map(RowKey::Turn).collect()
