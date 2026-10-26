@@ -484,7 +484,7 @@ impl BenchApp {
         let mut keys: Vec<crate::ui::rows::RowKey> = vec![crate::ui::rows::RowKey::Block("head")];
         keys.extend((0..n).map(crate::ui::rows::RowKey::Turn));
         keys.push(crate::ui::rows::RowKey::Block("tail"));
-        self.rows.sync(&keys);
+        self.rows.sync(self.session.as_deref(), &keys);
         // The room the thread scrolls in, as the band's size: the window less the chrome over and
         // under it. The band itself is twice this tall, so being off a little costs nothing.
         let vh = f32::from(window.bounds().size.height) - 140.;
@@ -1133,6 +1133,10 @@ impl BenchApp {
         view: Entity<Self>,
         _cx: &mut Context<Self>,
     ) -> AnyElement {
+        // Where the row begins in the layout the person is looking at, taken NOW: one frame
+        // measures a whole band of rows, and each is judged above or below the top of the
+        // viewport by the place it had before any of them moved.
+        let seen_start = self.rows.start(idx);
         div()
             .relative()
             .child(el)
@@ -1142,9 +1146,9 @@ impl BenchApp {
                         view.update(cx, |this, _| {
                             let h = f32::from(b.size.height);
                             if let Some(delta) = this.rows.set_measured(idx, h) {
-                                if delta != 0. && this.rows.start(idx) + h <= off + 1. {
-                                    this.rows_shift += delta;
-                                }
+                                this.rows_shift = crate::ui::rows::bank_shift(
+                                    this.rows_shift, delta, seen_start, off,
+                                );
                             }
                         });
                     },
