@@ -1415,9 +1415,11 @@ impl BenchApp {
     }
 
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
-        // The next frame scrolls to the composer (render_chat follows the tail).
+        // The next frame scrolls to the composer (render_chat follows the tail). The pin starts
+        // fresh, or the frame would read the far-away offset as the person's own scroll and let
+        // go of it again at once.
         self.follow = true;
-        self.last_max = px(-1.);
+        self.pinned = px(0.);
         cx.notify();
     }
 

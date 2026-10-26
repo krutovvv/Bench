@@ -48,6 +48,78 @@ fn strip_offset(at: f32, strip_h: f32, max_offset: f32) -> f32 {
     (at / strip_h).clamp(0., 1.) * max_offset
 }
 
+/// One frame of following the tail. `off` is how much was scrolled from the top (so going UP
+/// the thread makes it smaller), `max` is the bottom with the room under the composer trimmed
+/// away, `pinned` is where we last pinned the view. Returns (follow, pinned, offset to jump to).
+/// Growing content never lets go — it leaves `off` where it was — while a wheel, a drag or a
+/// click moves `off` and is the person's own. Written with the sign reversed, every wheel was
+/// undone by the next frame: the thread jerked and would not go up.
+pub fn tail_step(off: f32, max: f32, follow: bool, pinned: f32) -> (bool, f32, Option<f32>) {
+    const SLACK: f32 = 4.;
+    let at_bottom = off >= max - SLACK;
+    let mut follow = follow && off >= pinned - SLACK;
+    if at_bottom {
+        follow = true;
+    }
+    if follow && !at_bottom {
+        (true, max, Some(max))
+    } else {
+        (follow, off, None)
+    }
+}
+
+#[cfg(test)]
+mod tail_tests {
+    use super::tail_step;
+
+    #[test]
+    fn an_answer_that_grows_keeps_the_view_at_the_tail() {
+        // Streaming adds height: the offset stays where we pinned it, so it must jump, not let go.
+        let (follow, pinned, jump) = tail_step(1000., 1200., true, 1000.);
+        assert!(follow);
+        assert_eq!(jump, Some(1200.));
+        assert_eq!(pinned, 1200.);
+    }
+
+    #[test]
+    fn a_move_up_is_the_persons_own() {
+        // The wheel went up the thread: smaller offset, and nothing may pull it back.
+        let (follow, _, jump) = tail_step(900., 1200., true, 1200.);
+        assert!(!follow);
+        assert_eq!(jump, None);
+    }
+
+    #[test]
+    fn a_hair_of_coasting_is_not_a_move() {
+        let (follow, _, jump) = tail_step(1197., 1200., true, 1200.);
+        assert!(follow);
+        assert_eq!(jump, None);
+    }
+
+    #[test]
+    fn coming_back_to_the_tail_follows_again() {
+        let (follow, _, jump) = tail_step(1200., 1200., false, 900.);
+        assert!(follow);
+        assert_eq!(jump, None);
+    }
+
+    #[test]
+    fn content_that_shrinks_clamps_and_does_not_release() {
+        // The pinned mark is above what is now scrollable: the clamp brought the view here.
+        let (follow, _, jump) = tail_step(1000., 1000., true, 1200.);
+        assert!(follow);
+        assert_eq!(jump, None);
+    }
+
+    #[test]
+    fn a_short_thread_never_jumps() {
+        let (follow, pinned, jump) = tail_step(0., 0., true, 0.);
+        assert!(follow);
+        assert_eq!(jump, None);
+        assert_eq!(pinned, 0.);
+    }
+}
+
 #[cfg(test)]
 mod strip_tests {
     use super::strip_offset;
@@ -343,24 +415,15 @@ impl BenchApp {
         // short thread stays put and nothing calls for "Jump to latest".
         let max = (self.chat_scroll.max_offset().y - px(past)).max(px(0.));
         let off = -self.chat_scroll.offset().y;
-        let at_bottom = off >= max - px(4.);
-        // While pinned, only a move UP the thread is the person's: the pin itself leaves the
-        // thread at the bottom, and content that shrinks clamps it down, never up. Compared with
-        // where WE pinned it, not with the last frame's height — an answer that streams changes
-        // that height every frame, and then a wheel, a drag or a click on the scrollbar was
-        // undone before anyone saw it, so nothing moved at all.
-        if self.follow && !at_bottom && off > self.pinned + px(1.) {
-            self.follow = false; // the user scrolled away
+        // Follow the tail: stay pinned to the composer until the person scrolls up (the rules are
+        // `tail_step`, tested against streaming, a wheel, a return and a short thread).
+        let (follow, pinned, jump) = tail_step(f32::from(off), f32::from(max), self.follow, f32::from(self.pinned));
+        self.follow = follow;
+        self.pinned = px(pinned);
+        if let Some(m) = jump {
+            self.chat_scroll.set_offset(point(px(0.), -px(m)));
         }
-        if at_bottom {
-            self.follow = true;
-        }
-        if self.follow && !at_bottom {
-            self.pinned = max;
-            self.chat_scroll.set_offset(point(px(0.), -max));
-        } else if at_bottom {
-            self.pinned = off;
-        }
+        let at_bottom = f32::from(off) >= f32::from(max) - 4.;
         // An opening thread stays invisible until its content is in and its height held for a
         // few frames (inserts placed, the offset pinned to the bottom), at most `settle` frames.
         if self.settle > 0 {
