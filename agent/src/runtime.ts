@@ -223,14 +223,28 @@ export class Runtime {
 		if (!this.registered.has(key)) {
 			this.registered.add(key);
 			const get = (r: { provider: string; modelId: string }) => this.models.getModel(r.provider, r.modelId)!;
-			this.models.setProvider(fallbackProvider(id, this.models, get(main), get(spare)));
+			this.models.setProvider(fallbackProvider(id, this.models, get(main), get(spare), undefined, (why) => (this.fallbackWhy = why)));
 		}
 		return { provider: id, modelId: main.modelId };
 	}
 
+	/** Why the main model last failed over to the fallback (the status bar says it). */
+	private fallbackWhy = "";
+
+	private providerId(profile: string, choice: ModelChoice): string {
+		return `${profile}.${choice.provider}`.replace(/[^a-zA-Z0-9._-]/g, "_");
+	}
+
+	/** Whether this answer came from the fallback: the bar shows it in red, with why, until the main model answers again. */
+	private fallbackNote(live: Live, msg: any): { model: string; reason: string } | null {
+		const spare = resolveFallback();
+		if (!spare || msg.provider !== this.providerId(live.row.profile, spare) || msg.model !== spare.model) return null;
+		return { model: spare.model, reason: this.fallbackWhy };
+	}
+
 	/** Registers one model's provider with pi-ai. */
 	private register(profile: string, choice: ModelChoice): { provider: string; modelId: string } {
-		const id = `${profile}.${choice.provider}`.replace(/[^a-zA-Z0-9._-]/g, "_");
+		const id = this.providerId(profile, choice);
 		const key = `${id}|${choice.model}|${choice.baseUrl}|${choice.contextLength}|${choice.apiKey ? "k" : ""}`;
 		if (!this.registered.has(key)) {
 			this.registered.add(key);
@@ -740,6 +754,7 @@ export class Runtime {
 						live.usage.cached = msg.usage.cacheRead ?? 0;
 					}
 					if (msg.stopReason === "error") this.failTurn(live, msg.errorMessage ?? "the model stopped with an error");
+					else this.emit(id, "session.info", { fallback: this.fallbackNote(live, msg) });
 				}
 				live.blocks.clear();
 				break;

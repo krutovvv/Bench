@@ -174,6 +174,9 @@ pub enum Evt {
     Error(String),
     /// A session's reasoning effort as the gateway has it ("" = the provider's default).
     Effort(String, String),
+    /// The fallback model answered the session's last call: (its model, why the main one failed);
+    /// None once the main model answers.
+    Fallback(String, Option<(String, String)>),
     Profiles(Vec<Profile>),
     Sessions(String, Vec<SessionRow>),
     /// `session` is the stored id (session list); `runtime` the id prompts and events use.
@@ -798,7 +801,13 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         // The session's current settings: on resume, after a change, at turn boundaries.
         "session.info" => {
             if let Some(effort) = payload["reasoning_effort"].as_str() {
-                emit(Evt::Effort(sid, effort.to_string()));
+                emit(Evt::Effort(sid.clone(), effort.to_string()));
+            }
+            if let Some(f) = payload.get("fallback") {
+                let note = f["model"].as_str().map(|m| {
+                    (m.to_string(), f["reason"].as_str().unwrap_or_default().to_string())
+                });
+                emit(Evt::Fallback(sid, note));
             }
         }
         "message.delta" => emit(Evt::Delta(sid, text())),

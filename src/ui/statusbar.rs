@@ -246,6 +246,21 @@ impl BenchApp {
             .children(self.render_backend(cx))
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
+            // The fallback answering, in red: the main model failed, and why, until it answers again.
+            .children(self.fallback_on.clone().map(|(model, why)| {
+                let tip = if why.is_empty() {
+                    "The main model is unavailable: the fallback answers until it is back.".to_string()
+                } else {
+                    format!("The main model is unavailable ({why}): the fallback answers until it is back.")
+                };
+                h_flex().h_full().items_center().pl_1().child(
+                    item("fallback")
+                        .text_color(theme.danger)
+                        .child(Ico::CircleAlert.icon().small())
+                        .child(format!("Main model down · on fallback {model}"))
+                        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx)),
+                )
+            }))
             .child(div().flex_1())
             // Right: icons only — the terminals in the background (if any), attach, dictate,
             // settings, and Stop at the very edge.

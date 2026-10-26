@@ -183,6 +183,8 @@ pub struct BenchApp {
     /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
     pub sidebar_hidden: bool,
     pub usage: Option<Usage>,
+    /// The fallback model is answering the open thread: (its model, why the main one failed).
+    pub fallback_on: Option<(String, String)>,
     pub effort: usize,
     /// The open session's effort when it is none of EFFORTS (set elsewhere, e.g. `high`; "" is the
     /// provider's default): shown as it is, nothing checked.
@@ -684,6 +686,7 @@ impl BenchApp {
             process_open: None,
             send_after_transcribe: false,
             usage: None,
+            fallback_on: None,
             effort: EFFORTS.len() - 1,
             effort_other: None,
             profile_effort: EFFORTS.len() - 1,
@@ -1039,6 +1042,10 @@ impl BenchApp {
                     self.reset_scroller(cx);
                     self.resolve_project(window, cx);
                 }
+            }
+            Evt::Fallback(sid, note) if self.is_current(&sid) => {
+                self.fallback_on = note;
+                cx.notify();
             }
             Evt::Effort(sid, value) if self.is_current(&sid) => {
                 // The session's own level replaces whatever the bar showed (the profile's default
@@ -1501,6 +1508,7 @@ impl BenchApp {
         self.live = None;
         self.queued = None;
         self.usage = None;
+        self.fallback_on = None;
         self.playing = None;
         self.media_playing = None;
         self.stop_video(None, cx);

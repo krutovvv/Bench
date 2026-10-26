@@ -144,11 +144,13 @@ test("a thread's turn goes on with the fallback when the main endpoint is dead",
 		await new Promise((res, rej) => (ws.on("open", res), ws.on("error", rej)));
 		let n = 0;
 		const wait = new Map<number, (v: any) => void>();
+		const notes: any[] = [];
 		let finish: (v: any) => void = () => {};
 		const done = new Promise<any>((res) => (finish = res));
 		ws.on("message", (d) => {
 			const m = JSON.parse(String(d));
 			if (m.id && wait.has(m.id)) (wait.get(m.id) as any)(m);
+			if (m.method === "event" && m.params.type === "session.info" && "fallback" in m.params.payload) notes.push(m.params.payload.fallback);
 			if (m.method === "event" && m.params.type === "message.complete") finish(m.params.payload);
 		});
 		const call = (method: string, params: any = {}) =>
@@ -164,6 +166,9 @@ test("a thread's turn goes on with the fallback when the main endpoint is dead",
 		const finished = await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error(`no turn ended:\n${err}`)), 60000))]);
 		assert.match(String(finished.text), /answered by the fallback/);
 		assert.match(err, /answering with/);
+		// The bar is told: the fallback answered, and why.
+		assert.equal(notes.at(-1)?.model, "m");
+		assert.match(String(notes.at(-1)?.reason), /Connection error|ECONNREFUSED|fetch failed/i);
 		ws.close();
 	} finally {
 		child.kill();

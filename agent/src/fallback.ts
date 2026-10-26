@@ -14,7 +14,7 @@ import { isContextOverflow } from "@earendil-works/pi-ai/utils/overflow";
 export const WATCH = { firstMs: 120_000, idleMs: 60_000 };
 
 /** A provider whose model `main.id` answers with `main`, or with `fallback` when `main` fails. */
-export function fallbackProvider(id: string, models: Models, main: Model<any>, fallback: Model<any>, watch = WATCH): Provider {
+export function fallbackProvider(id: string, models: Models, main: Model<any>, fallback: Model<any>, watch = WATCH, onFallback: (why: string) => void = () => {}): Provider {
 	const model: Model<any> = { ...main, provider: id };
 	const both = (_m: Model<any>, context: any, options: any = {}) => {
 		const out = createAssistantMessageEventStream();
@@ -24,6 +24,7 @@ export function fallbackProvider(id: string, models: Models, main: Model<any>, f
 			const first = await attempt(models, main, context, rest, watch, out);
 			if (first === undefined) return;
 			console.error(`[model] ${main.provider}/${main.id} failed (${first}); answering with ${fallback.provider}/${fallback.id}`);
+			onFallback(first);
 			const second = models.streamSimple(fallback, context, rest);
 			for await (const e of second) out.push(e);
 			out.end(await second.result());
