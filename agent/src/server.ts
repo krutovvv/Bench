@@ -12,8 +12,10 @@ import path from "node:path";
 import { WebSocketServer, type WebSocket } from "ws";
 import pkg from "../package.json" with { type: "json" };
 import { AGENT_HOME, migrateProfiles, migrateProjectModels } from "./config.ts";
+import { migrateServerRows } from "./builtin/servers.ts";
 import { expand, HttpError, readBody, type Dynamic, type Module, type Req, type Route, type Rpc } from "./http.ts";
 import { connectMcp, mcpStatus } from "./mcp.ts";
+import agents from "./modules/agents.ts";
 import audio from "./modules/audio.ts";
 import commands from "./modules/commands.ts";
 import cron from "./modules/cron.ts";
@@ -47,6 +49,7 @@ function broadcast(sessionId: string, type: string, payload: Record<string, unkn
 }
 
 for (const name of migrateProfiles()) console.log(`[migrate] profile ${name} → agents/${name}`);
+for (const row of migrateServerRows()) console.log(`[migrate] ${row} is a server's agent now, not a project row`);
 for (const id of migrateProjectModels()) console.log(`[migrate] project ${id} follows the general model now (its settings.json in backups/)`);
 const rt = new Runtime(broadcast);
 await rt.open();
@@ -56,7 +59,7 @@ await rt.open();
 
 // Each module declares its RPC methods and REST routes (src/modules/*.ts); the server only
 // collects them. A new area of the agent is a new module and a line here.
-const modules: Module[] = [threads, commands, projects, hosts, tasks, cron, files, audio, settings].map((m) => m({ rt, broadcast }));
+const modules: Module[] = [threads, commands, projects, agents, hosts, tasks, cron, files, audio, settings].map((m) => m({ rt, broadcast }));
 const methods: Record<string, Rpc> = Object.assign({}, ...modules.map((m) => m.rpc ?? {}));
 const routes: Record<string, Route> = Object.assign({}, ...modules.map((m) => m.routes ?? {}));
 const dynamic: Dynamic[] = modules.flatMap((m) => m.dynamic ?? []);

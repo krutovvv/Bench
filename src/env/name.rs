@@ -4,9 +4,9 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use serde_json::{Value, json};
+use serde_json::Value;
 
-use super::section::{Card, Request, Section, pad, project_block, remove, revert, row, save};
+use super::section::{Card, Section, pad, project_block, remove, revert, row, save};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 
@@ -159,21 +159,8 @@ impl Section for Name {
         }
     }
     /// The name is the project's own row where the project lives (a server's Host: on this Mac).
-    fn save(
-        &self,
-        app: &mut BenchApp,
-        _id: &str,
-        eid: &str,
-        _window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
-        let e = app.project_env.as_ref()?;
-        Some((
-            "PUT",
-            format!("/api/projects/{eid}"),
-            json!({"name": e.name.field.read(cx).value().trim()}),
-        ))
-    }
+    // Saving a name goes through `BenchApp::rename_project` (`env_save`): a project is renamed
+    // where it lives, a server's Host in this Mac's list of agents.
     fn saved(&self, e: &mut ProjectEnv) {
         e.name.dirty = false;
     }
@@ -229,13 +216,14 @@ fn address_of(app: &BenchApp, alias: &str) -> String {
 /// The machine this Mac's agent works on for the project, and its address.
 fn machine_of(app: &BenchApp, project: &str) -> Option<(String, String)> {
     let p = app.projects.iter().find(|p| p.id == project)?;
-    let alias = p.machine.clone().filter(|_| p.host.is_none())?;
+    let alias = p.machine.clone()?;
     let address = address_of(app, &alias);
     Some((alias, address))
 }
 
 fn server_of(app: &BenchApp, project: &str) -> Option<ServerInfo> {
-    let alias = app.projects.iter().find(|p| p.id == project)?.host.clone()?;
+    let alias = Some(app.projects.iter().find(|p| p.id == project)?.agent.clone())
+        .filter(|a| !a.is_empty())?;
     let address = address_of(app, &alias);
     let remote = app.agents.get(&alias);
     Some(ServerInfo {

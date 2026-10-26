@@ -24,6 +24,7 @@ pub(crate) mod project_list;
 pub(crate) mod projects;
 pub(crate) mod agent_form;
 pub(crate) mod agents;
+pub(crate) mod places;
 pub(crate) mod sidebar_items;
 mod send;
 mod sessions;
@@ -116,7 +117,10 @@ pub struct BenchApp {
     pub renaming: Option<sidebar_items::Renaming>,
     /// The sidebar's keys (↑ ↓ ⌫) while it has the focus, after a click on a thread.
     pub sidebar_focus: FocusHandle,
-    /// Each server agent's own projects (beside its Host), as it last listed them.
+    /// The sources of `projects` (`places.rs`): this Mac's agent's projects, the servers' agents
+    /// this Mac knows, and each server's own projects as its agent last listed them.
+    pub local_projects: Vec<crate::model::ProjectEntry>,
+    pub server_agents: Vec<places::ServerAgent>,
     pub server_projects: HashMap<String, Vec<crate::model::ProjectEntry>>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
@@ -628,6 +632,8 @@ impl BenchApp {
             renaming: None,
             agent_form: None,
             sidebar_focus: cx.focus_handle(),
+            local_projects: vec![],
+            server_agents: vec![],
             server_projects: HashMap::new(),
             subject_opened: false,
             sites: Default::default(),

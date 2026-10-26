@@ -250,3 +250,21 @@ test("history keeps the fixed words of a message taken back from the queue", asy
 	assert.deepEqual(texts, ["send the log", "ok", "send the ERROR log"], "the newest one with those words is theirs");
 	st.delete("q1");
 });
+
+test("server agents: a list of their own; the old project rows with a host move into it once", async () => {
+	const { projects } = await import("../src/builtin/projects.ts");
+	const { servers, migrateServerRows } = await import("../src/builtin/servers.ts");
+	const keep = projects.save({ name: "Plain" });
+	projects.save({ name: "Dev", host: "dev" } as any);
+	projects.save({ name: "RPi", host: "rpi" } as any);
+	assert.deepEqual(migrateServerRows(), ["Dev (dev)", "RPi (rpi)"]);
+	assert.deepEqual(servers.list(), [{ host: "dev", name: "Dev" }, { host: "rpi", name: "RPi" }]);
+	assert.ok(projects.list().every((p) => !p.host), "no project stands for a server any more");
+	assert.ok(projects.get(keep.id), "other projects stay");
+	assert.deepEqual(migrateServerRows(), [], "once");
+	servers.save({ host: "dev", name: "Dev box" });
+	assert.deepEqual(servers.list().map((s) => s.name), ["Dev box", "RPi"], "renamed in place");
+	servers.remove("rpi");
+	assert.deepEqual(servers.list().map((s) => s.host), ["dev"]);
+	servers.remove("dev");
+});

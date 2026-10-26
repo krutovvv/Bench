@@ -134,8 +134,8 @@ pub(crate) fn on_change<T: EventEmitter<InputEvent>>(
 }
 
 /// Whether the project lives on a server (its agent runs there).
-pub(crate) fn is_remote(app: &BenchApp, id: &str) -> bool {
-    app.projects.iter().any(|p| p.id == id && p.host.is_some())
+pub(crate) fn is_remote(_app: &BenchApp, id: &str) -> bool {
+    !crate::model::ProjectKey::parse(id).agent.is_empty()
 }
 
 impl BenchApp {
@@ -218,12 +218,18 @@ impl BenchApp {
             cx,
             move || rest::get_raw(&conn, &profile, &path),
             move |this, r, window, cx| {
+                // The name is the sidebar's: a server's Host is named in this Mac's list of agents,
+                // not by the server (`places.rs`).
+                let name = this.projects.iter().find(|p| p.id == asked).map(|p| p.name.clone());
                 let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked) else {
                     return;
                 };
                 match r {
-                    Ok(v) => {
+                    Ok(mut v) => {
                         e.error = None;
+                        if let Some(name) = name {
+                            v["project"]["name"] = Value::String(name);
+                        }
                         apply(e, &v, window, cx);
                     }
                     Err(err) => e.error = Some(format!("{err:#}")),
@@ -241,13 +247,18 @@ impl BenchApp {
         let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
             return;
         };
-        // A server's Host is named by its row on this Mac; the rest is where the project lives.
-        let target = if what == "name" && self.project_place(&id).1 == "general" {
-            self.local_conn().map(|c| (c, id.clone()))
-        } else {
-            self.env_target(&id)
-        };
-        let Some((conn, eid)) = target else {
+        // A name is the project's, wherever it lives (`places.rs` knows where).
+        if what == "name" {
+            if let Some(e) = self.project_env.as_mut() {
+                let name = e.name.field.read(cx).value().trim().to_string();
+                e.name.dirty = false;
+                if !name.is_empty() {
+                    self.rename_project(id, name, window, cx);
+                }
+            }
+            return;
+        }
+        let Some((conn, eid)) = self.env_target(&id) else {
             return;
         };
         let Some((method, path, body)) = section.save(self, &id, &eid, window, cx) else {

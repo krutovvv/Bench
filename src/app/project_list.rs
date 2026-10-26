@@ -7,7 +7,6 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use super::BenchApp;
-use crate::model::ProjectEntry;
 use crate::rest;
 
 impl BenchApp {
@@ -20,40 +19,16 @@ impl BenchApp {
             window,
             cx,
             move || rest::get_raw(&conn, &profile, "/api/projects"),
-            |this, r, window, cx| {
+            |this, r, _window, cx| {
                 if let Ok(v) = r {
-                    this.projects = v["projects"]
+                    this.local_projects = v["projects"]
                         .as_array()
                         .into_iter()
                         .flatten()
-                        .map(|p| ProjectEntry {
-                            id: p["id"].as_str().unwrap_or_default().into(),
-                            name: p["name"].as_str().unwrap_or_default().into(),
-                            folder: p["folder"]
-                                .as_str()
-                                .filter(|f| !f.is_empty())
-                                .map(str::to_string),
-                            host: p["host"]
-                                .as_str()
-                                .filter(|h| !h.is_empty())
-                                .map(str::to_string),
-                            remote_id: None,
-                            machine: p["machine"]
-                                .as_str()
-                                .filter(|m| !m.is_empty())
-                                .map(str::to_string),
-                            browser: p["browser"].as_bool().unwrap_or(false),
-                        })
+                        .filter_map(|p| super::places::entry_of("", p))
                         .collect();
-                    // The servers' own projects, as their agents last listed them.
-                    let kept = std::mem::take(&mut this.server_projects);
-                    for (host, list) in &kept {
-                        this.place_server_projects(host, list.clone());
-                    }
-                    this.server_projects = kept;
                     this.host_browser = v["host_browser"].as_bool().unwrap_or(false);
-                    // The remote projects' agents, connected beside this Mac's.
-                    this.connect_remotes(window, cx);
+                    this.compose_projects();
                 }
                 cx.notify();
             },
@@ -81,17 +56,16 @@ impl BenchApp {
             return;
         }
         self.confirm_delete = None;
-        // A server's own project goes from its agent; anything else (a server's Host too: the
-        // server leaves the list) from this Mac's.
-        let (host, rid) = self.project_place(&id);
-        let (conn, path) = if rid == "general" || host.is_empty() {
-            (self.local_conn(), format!("/api/projects/{id}"))
-        } else {
-            (self.conn_of(&host), format!("/api/projects/{rid}"))
-        };
-        let Some(conn) = conn else {
+        // It goes from the agent that keeps it. An agent's Host is not removed (a server's agent
+        // leaves Bench in the gear).
+        let key = crate::model::ProjectKey::parse(&id);
+        if key.is_host() {
+            return;
+        }
+        let Some(conn) = self.conn_of(&key.agent) else {
             return;
         };
+        let path = format!("/api/projects/{}", key.id);
         let profile = self.current_profile();
         self.background(
             window,
@@ -99,7 +73,11 @@ impl BenchApp {
             move || rest::send_json(&conn, "DELETE", &path, &profile, serde_json::Value::Null),
             move |this, r, window, cx| match r {
                 Ok(_) => {
-                    this.projects.retain(|p| p.id != id);
+                    this.local_projects.retain(|p| p.id != id);
+                    for list in this.server_projects.values_mut() {
+                        list.retain(|p| p.id != id);
+                    }
+                    this.compose_projects();
                     for s in this.sessions.iter_mut().filter(|s| s.project == id) {
                         s.project.clear();
                     }

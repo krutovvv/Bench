@@ -13,7 +13,8 @@ export interface Project {
 	/** A folder on disk the project works in (a codebase), or null for a virtual project. */
 	folder: string | null;
 	created: number;
-	/** A server whose agent the project is (an ~/.ssh/config alias of the Mac Bench runs on). */
+	/** Formerly: a row standing for a server's agent. Those are `servers.ts` entries now
+	 * (`migrateServerRows`); the column stays only for that move. */
 	host?: string | null;
 	/**
 	 * The machine its work is done on, when not this agent's own: an ~/.ssh/config alias here. Its

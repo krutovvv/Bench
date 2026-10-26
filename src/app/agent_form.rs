@@ -1,8 +1,8 @@
-//! Adding and removing a server's agent, in the gear (`docs/remote-projects.md`). A server's
-//! agent is known to this Mac by a row in its projects naming the server (its Host); adding one
-//! picks a host from ~/.ssh/config (or writes a new one there), and Bench installs and starts the
-//! agent there on connecting. Removing it only forgets it here: the agent on the server runs on,
-//! its Telegram bot and schedule with it.
+//! Adding and removing a server's agent, in the gear (`docs/remote-projects.md`). The servers'
+//! agents this Mac knows are a list this Mac's agent keeps (`/api/agents`, `places.rs`); adding
+//! one picks a host from ~/.ssh/config (or writes a new one there), and Bench installs and starts
+//! the agent there on connecting. Removing it only forgets it here: the agent on the server runs
+//! on, its Telegram bot and schedule with it.
 
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
@@ -101,13 +101,13 @@ impl BenchApp {
             window,
             cx,
             move || {
-                rest::send_json(&conn, "POST", "/api/projects", &profile, json!({"name": name, "host": alias}))
+                rest::send_json(&conn, "POST", "/api/agents", &profile, json!({"name": name, "host": alias}))
             },
             |this, r, window, cx| match r {
                 Ok(_) => {
                     this.agent_form = None;
-                    // Its row is a project here: loading them connects its agent (installing it).
-                    this.load_projects(window, cx);
+                    // Listed: it is connected (its agent installed there first).
+                    this.load_server_agents(window, cx);
                 }
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
             },
@@ -127,36 +127,23 @@ impl BenchApp {
         let Some(conn) = self.local_conn() else {
             return;
         };
-        let rows: Vec<String> = self
-            .projects
-            .iter()
-            .filter(|p| p.host.as_deref() == Some(host.as_str()) && p.remote_id.is_none())
-            .map(|p| p.id.clone())
-            .collect();
-        self.agents.remove(&host);
-        self.server_projects.remove(&host);
-        self.sessions.retain(|s| s.host != host);
-        self.projects.retain(|p| p.host.as_deref() != Some(host.as_str()));
         if self.gear_agent == host {
             self.gear_agent.clear();
             self.pv = Default::default();
             self.load_providers(window, cx);
         }
         let profile = self.current_profile();
+        let path = format!("/api/agents/{host}");
         self.background(
             window,
             cx,
-            move || {
-                for id in rows {
-                    rest::send_json(&conn, "DELETE", &format!("/api/projects/{id}"), &profile, json!(null))?;
-                }
-                Ok(())
-            },
-            |this, r: anyhow::Result<()>, window, cx| {
+            move || rest::send_json(&conn, "DELETE", &path, &profile, json!(null)),
+            |this, r, window, cx| {
                 if let Err(e) = r {
                     this.toast(NotificationType::Error, format!("{e:#}"), window, cx);
                 }
-                this.load_projects(window, cx);
+                // Not listed any more: its link, threads and projects go (`load_server_agents`).
+                this.load_server_agents(window, cx);
             },
         );
         cx.notify();

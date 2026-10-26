@@ -98,16 +98,17 @@ impl BenchApp {
         let key = format!("p:{}", p.id);
         let collapsed = self.ssh.collapsed.contains(&key);
         let group: SharedString = format!("phead{g}").into();
-        let icon = match (&p.host, &p.folder) {
+        let remote = !p.agent.is_empty();
+        let icon = match (remote, &p.folder) {
             // A server's Host is the server; a project on it is a folder there, or none.
-            (Some(_), _) if p.remote_id.is_none() => Ico::Server,
-            (Some(_), Some(_)) => Ico::Folder,
+            (true, _) if p.is_host() => Ico::Server,
+            (true, Some(_)) => Ico::Folder,
             (_, Some(f)) if std::path::Path::new(f).join(".git").exists() => Ico::FolderGit,
             (_, Some(_)) => Ico::Folder,
             _ => Ico::Layers,
         };
         // A remote project's agent: connecting, or why it is not there.
-        let remote_note = p.host.as_ref().and_then(|h| match self.agents.get(h) {
+        let remote_note = Some(&p.agent).filter(|_| remote).and_then(|h| match self.agents.get(h) {
             Some(r) if r.conn.is_some() => None,
             Some(r) => Some(
                 r.error
@@ -131,7 +132,8 @@ impl BenchApp {
             .folder
             .clone()
             .filter(|f| !f.is_empty())
-            .map(|f| (f, p.host.clone()));
+            // Zed opens it where its files are: this Mac, or that machine over SSH.
+            .map(|f| (f, Some(p.location().machine_here()).filter(|m| !m.is_empty())));
         let mut out = vec![
             h_flex()
                 .id(("phead", g))

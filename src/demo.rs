@@ -705,8 +705,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         id: id.into(),
         name: name.into(),
         folder: folder.map(str::to_string),
-        host: None,
-        remote_id: None,
+        agent: String::new(),
         machine: None,
         browser: true,
     };

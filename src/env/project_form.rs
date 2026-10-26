@@ -128,20 +128,10 @@ impl BenchApp {
                         this.new_thread_in(id, cx);
                     } else {
                         // A server's project: in the sidebar at once, after its Host.
-                        let bench_id = format!("{agent}:{id}");
-                        let entry = crate::model::ProjectEntry {
-                            id: bench_id.clone(),
-                            name: v["project"]["name"].as_str().unwrap_or_default().into(),
-                            folder: v["project"]["folder"].as_str().map(str::to_string),
-                            host: Some(agent.clone()),
-                            remote_id: Some(id),
-                            machine: None,
-                            browser: false,
-                        };
-                        let mut list = this.server_projects.remove(&agent).unwrap_or_default();
-                        list.push(entry);
-                        this.server_projects.insert(agent.clone(), list.clone());
-                        this.place_server_projects(&agent, list);
+                        let bench_id = crate::model::ProjectKey::new(&agent, &id).to_string();
+                        if let Some(entry) = crate::app::places::entry_of(&agent, &v["project"]) {
+                            this.add_server_project(entry);
+                        }
                         this.new_thread_in(bench_id, cx);
                         this.load_server_projects(agent, window, cx);
                     }

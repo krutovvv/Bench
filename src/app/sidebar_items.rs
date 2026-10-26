@@ -4,14 +4,11 @@
 //! environment). The order the sidebar draws (`sidebar_groups`) is the order ↑ ↓ walk.
 
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
-use serde_json::json;
 
 use super::BenchApp;
 use crate::gateway::Cmd;
 use crate::model::ProjectEntry;
-use crate::rest;
 
 /// A row of the sidebar that can be pinned, colored, renamed and deleted.
 #[derive(Clone, Debug, PartialEq)]
@@ -57,7 +54,7 @@ impl BenchApp {
             .into_iter()
             .map(|p| {
                 // A project's threads: of its agent, in it (a server's are placed by `agents.rs`).
-                let host = p.host.clone().unwrap_or_default();
+                let host = p.agent.clone();
                 let mut rows: Vec<usize> = visible
                     .iter()
                     .copied()
@@ -164,46 +161,6 @@ impl BenchApp {
             }
             Item::Project(id) => self.rename_project(id, name, window, cx),
         }
-    }
-
-    /// A project is renamed where it lives: this Mac's row (a server's Host too), or its server
-    /// agent's.
-    pub fn rename_project(
-        &mut self,
-        id: String,
-        name: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let (host, rid) = self.project_place(&id);
-        let (conn, path) = if rid == "general" || host.is_empty() {
-            (self.local_conn(), format!("/api/projects/{id}"))
-        } else {
-            (self.conn_of(&host), format!("/api/projects/{rid}"))
-        };
-        let Some(conn) = conn else {
-            return;
-        };
-        let profile = self.current_profile();
-        for p in self.projects.iter_mut().filter(|p| p.id == id) {
-            p.name = name.clone();
-        }
-        for list in self.server_projects.values_mut() {
-            for p in list.iter_mut().filter(|p| p.id == id) {
-                p.name = name.clone();
-            }
-        }
-        self.background(
-            window,
-            cx,
-            move || rest::send_json(&conn, "PUT", &path, &profile, json!({"name": name})),
-            |this, r, window, cx| {
-                if let Err(e) = r {
-                    this.toast(NotificationType::Error, format!("{e:#}"), window, cx);
-                    this.load_projects(window, cx);
-                }
-            },
-        );
     }
 
     /// Keys the sidebar takes while it has the focus (after a click on a thread): ↑ ↓ open the
