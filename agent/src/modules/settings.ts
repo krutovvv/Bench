@@ -101,8 +101,10 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 		},
 		"POST /api/providers/custom-endpoints/validate": async (req) => {
 			const b = req.body ?? {};
+			// Bench sends the key only when it was changed: an unchanged one is the saved one.
+			const key = b.api_key || providers().find((p) => p.id === b.id)?.api_key;
 			try {
-				const r = await fetch(`${String(b.base_url).replace(/\/$/, "")}/models`, { headers: b.api_key ? { Authorization: `Bearer ${b.api_key}` } : {}, signal: AbortSignal.timeout(10000) });
+				const r = await fetch(`${String(b.base_url).replace(/\/$/, "")}/models`, { headers: key ? { Authorization: `Bearer ${key}` } : {}, signal: AbortSignal.timeout(10000) });
 				if (!r.ok) return { ok: false, message: `HTTP ${r.status}`, models: [] };
 				const j: any = await r.json();
 				const models = (j.data ?? j.models ?? []).map((m: any) => m.id ?? m.name).filter(Boolean);

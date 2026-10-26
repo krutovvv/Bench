@@ -99,3 +99,33 @@ test("the server starts and answers /api/projects", async () => {
 		child.kill();
 	}
 });
+
+test("Check uses the saved key when the form did not change it", async () => {
+	const http = await import("node:http");
+	// A model server that wants its key.
+	const models = http.createServer((req, res) => {
+		const ok = req.headers.authorization === "Bearer sk-saved";
+		res.writeHead(ok ? 200 : 401, { "content-type": "application/json" });
+		res.end(ok ? JSON.stringify({ data: [{ id: "m" }] }) : "{}");
+	});
+	await new Promise<void>((r) => models.listen(0, "127.0.0.1", r));
+	const base = `http://127.0.0.1:${(models.address() as any).port}/v1`;
+	const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-check-"));
+	const child = spawn(process.execPath, ["--no-warnings", "src/server.ts"], { env: { ...process.env, BENCH_HOME: home, BENCH_AGENT_NO_MCP: "1" }, stdio: ["ignore", "ignore", "pipe"] });
+	try {
+		const file = path.join(home, "server.json");
+		for (let i = 0; i < 100 && !fs.existsSync(file); i++) await new Promise((r) => setTimeout(r, 200));
+		const { port, token } = JSON.parse(fs.readFileSync(file, "utf8"));
+		const call = (p: string, body: unknown) =>
+			fetch(`http://127.0.0.1:${port}${p}`, { method: "POST", headers: { "X-Hermes-Session-Token": token, "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+		await call("/api/providers/custom-endpoints", { id: "dev", name: "dev", base_url: base, api_key: "sk-saved" });
+		const r = await call("/api/providers/custom-endpoints/validate", { id: "dev", base_url: base });
+		assert.equal(r.ok, true, r.message);
+		const wrong = await call("/api/providers/custom-endpoints/validate", { id: "dev", base_url: base, api_key: "sk-typed-wrong" });
+		assert.equal(wrong.message, "HTTP 401", "a key typed in the form is the one checked");
+	} finally {
+		child.kill();
+		models.close();
+		fs.rmSync(home, { recursive: true, force: true });
+	}
+});
