@@ -1,7 +1,9 @@
-//! The new project's page (the sidebar's "+"): its name, where its agent runs (this Mac or a
-//! server), and a folder if it has one (on this Mac, or on the server). On a server that has an
-//! agent already the project is made there, beside the server's Host; on a new server Bench
-//! installs the agent and the project is that server's Host (`docs/remote-projects.md`).
+//! The new project's page (the sidebar's "+"), `docs/remote-projects.md`: its name, its agent —
+//! this Mac's or a server's (servers' agents are added in the gear) — and where its work is:
+//! - this Mac's agent: on this Mac (a folder, if any), or on a server over SSH (a folder there;
+//!   nothing installed on it);
+//! - a server's agent: on that server (a folder there, if any).
+//!
 //! Creating it starts its first thread; its environment is set up in its environment thread.
 
 use gpui_kit::component::input::InputState;
@@ -17,20 +19,14 @@ use crate::rest;
 /// The new project's form (the sidebar's "+").
 pub struct ProjectForm {
     pub name: Entity<InputState>,
-    /// A codebase on disk, if it has one.
-    pub folder: Option<String>,
-    /// A server whose agent the project is (an ~/.ssh/config host); None = this Mac, Some("") =
-    /// another server, typed in below (it goes into ~/.ssh/config too).
-    pub host: Option<String>,
-    pub new_host: Entity<InputState>,
-    pub new_user: Entity<InputState>,
-    pub new_port: Entity<InputState>,
-    pub new_key: Entity<InputState>,
-    /// A folder on the chosen server, typed (there is no picker for a server's disk).
-    pub server_folder: Entity<InputState>,
-    /// With this Mac's agent: the machine its work is done on (an ~/.ssh/config host), None =
-    /// this Mac. Nothing is installed there: the agent works on it over SSH.
+    /// The agent that keeps it: "" = this Mac's, else a server's (its ~/.ssh/config alias).
+    pub agent: String,
+    /// With this Mac's agent: the machine its work is on, None = this Mac.
     pub machine: Option<String>,
+    /// On this Mac: a codebase on disk, if it has one (picked).
+    pub folder: Option<String>,
+    /// On a server: its folder there, typed (there is no picker for a server's disk).
+    pub server_folder: Entity<InputState>,
 }
 
 impl BenchApp {
@@ -41,25 +37,14 @@ impl BenchApp {
         self.files_remote.form = false;
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
         name.update(cx, |s, cx| s.focus(window, cx));
-        let field = |hint: &str, window: &mut Window, cx: &mut Context<Self>| {
-            let hint = hint.to_string();
-            cx.new(|cx| InputState::new(window, cx).placeholder(hint))
-        };
-        let new_host = field("Address or domain", window, cx);
-        let server_folder = field("/var/www/site — empty: none", window, cx);
-        let new_user = field("Login", window, cx);
-        let new_port = field("22", window, cx);
-        let new_key = field("Private key file (empty = ssh-agent)", window, cx);
+        let server_folder =
+            cx.new(|cx| InputState::new(window, cx).placeholder("/var/www/site — empty: its home"));
         self.project_form = Some(ProjectForm {
             name,
-            folder: None,
-            host: None,
-            new_host,
-            server_folder,
+            agent: String::new(),
             machine: None,
-            new_user,
-            new_port,
-            new_key,
+            folder: None,
+            server_folder,
         });
         cx.notify();
     }
@@ -95,138 +80,70 @@ impl BenchApp {
         .detach();
     }
 
-    /// Create the form's project and start its first thread.
+    /// Create the form's project on its agent and start its first thread.
     pub fn save_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(form)) = (self.local_conn(), self.project_form.as_ref()) else {
+        let Some(form) = self.project_form.as_ref() else {
             return;
         };
         let name = form.name.read(cx).value().trim().to_string();
         if name.is_empty() {
+            self.toast(NotificationType::Error, "The project needs a name", window, cx);
+            return;
+        }
+        let agent = form.agent.clone();
+        let typed = form.server_folder.read(cx).value().trim().to_string();
+        let typed = (!typed.is_empty()).then_some(typed);
+        let body = match (agent.as_str(), &form.machine) {
+            // A server's agent: the folder is its own disk's.
+            (a, _) if !a.is_empty() => json!({"name": name, "folder": typed}),
+            // This Mac's agent working on a server.
+            (_, Some(m)) => json!({"name": name, "folder": typed, "machine": m}),
+            // This Mac's agent on this Mac.
+            _ => json!({"name": name, "folder": form.folder}),
+        };
+        let Some(conn) = self.conn_of(&agent) else {
+            let who = Self::agent_name(&agent);
             self.toast(
                 NotificationType::Error,
-                "The project needs a name".to_string(),
+                format!("{who}: its agent is not connected"),
                 window,
                 cx,
             );
             return;
-        }
-        // Another server: into ~/.ssh/config first, named after the project.
-        let mut host = form.host.clone();
-        if host.as_deref() == Some("") {
-            let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
-            let address = v(&form.new_host);
-            if address.is_empty() {
-                self.toast(
-                    NotificationType::Error,
-                    "The server's address is empty".to_string(),
-                    window,
-                    cx,
-                );
-                return;
-            }
-            let alias: String = name
-                .to_lowercase()
-                .chars()
-                .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
-                .collect::<String>()
-                .trim_matches('-')
-                .to_string();
-            let alias = if alias.is_empty() {
-                address.clone()
-            } else {
-                alias
-            };
-            let server = crate::sshconfig::Server {
-                alias: alias.clone(),
-                hostname: address,
-                user: v(&form.new_user),
-                port: v(&form.new_port),
-                identity: v(&form.new_key),
-                ..Default::default()
-            };
-            if let Err(e) = crate::sshconfig::save(None, &server) {
-                self.toast(
-                    NotificationType::Error,
-                    format!("~/.ssh/config: {e:#}"),
-                    window,
-                    cx,
-                );
-                return;
-            }
-            host = Some(alias);
-        }
-        // A server with an agent already: the project is made there, its folder on that disk.
-        if let Some(alias) = host.clone().filter(|a| self.has_agent_on(a)) {
-            let folder = form.server_folder.read(cx).value().trim().to_string();
-            let Some(conn) = self.conn_of(&alias) else {
-                self.toast(
-                    NotificationType::Error,
-                    format!("{alias}: its agent is not connected"),
-                    window,
-                    cx,
-                );
-                return;
-            };
-            let body = json!({"name": name, "folder": (!folder.is_empty()).then_some(folder)});
-            let profile = self.current_profile();
-            self.background(
-                window,
-                cx,
-                move || rest::send_json(&conn, "POST", "/api/projects", &profile, body),
-                move |this, r, window, cx| match r {
-                    Ok(v) => {
-                        this.project_form = None;
-                        this.panel = crate::app::Panel::Chat;
-                        if let Some(rid) = v["project"]["id"].as_str() {
-                            let id = format!("{alias}:{rid}");
-                            let entry = crate::model::ProjectEntry {
-                                id: id.clone(),
-                                name: v["project"]["name"].as_str().unwrap_or_default().into(),
-                                folder: v["project"]["folder"].as_str().map(str::to_string),
-                                host: Some(alias.clone()),
-                                remote_id: Some(rid.to_string()),
-                                machine: None,
-                                browser: false,
-                            };
-                            let mut list = this.server_projects.remove(&alias).unwrap_or_default();
-                            list.push(entry);
-                            this.server_projects.insert(alias.clone(), list.clone());
-                            this.place_server_projects(&alias, list);
-                            this.new_thread_in(id, cx);
-                        }
-                        this.load_server_projects(alias, window, cx);
-                    }
-                    Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
-                },
-            );
-            return;
-        }
-        // This Mac's agent working on a server: its folder is a path there.
-        let (machine, folder) = match (&host, &form.machine) {
-            (None, Some(m)) => {
-                let f = form.server_folder.read(cx).value().trim().to_string();
-                (Some(m.clone()), (!f.is_empty()).then_some(f))
-            }
-            _ => (None, form.folder.clone()),
         };
-        let body = json!({"name": name, "folder": folder, "host": host, "machine": machine});
-        self.reload_servers(cx);
         let profile = self.current_profile();
         self.background(
             window,
             cx,
             move || rest::send_json(&conn, "POST", "/api/projects", &profile, body),
-            |this, r, window, cx| match r {
+            move |this, r, window, cx| match r {
                 Ok(v) => {
                     this.project_form = None;
                     this.panel = crate::app::Panel::Chat;
-                    this.load_projects(window, cx);
-                    // A local project starts with its first thread; a remote one with its
-                    // server agent's threads (they show once it is connected).
-                    if let (Some(id), None) =
-                        (v["project"]["id"].as_str(), v["project"]["host"].as_str())
-                    {
-                        this.new_thread_in(id.to_string(), cx);
+                    let Some(id) = v["project"]["id"].as_str().map(str::to_string) else {
+                        return;
+                    };
+                    if agent.is_empty() {
+                        this.load_projects(window, cx);
+                        this.new_thread_in(id, cx);
+                    } else {
+                        // A server's project: in the sidebar at once, after its Host.
+                        let bench_id = format!("{agent}:{id}");
+                        let entry = crate::model::ProjectEntry {
+                            id: bench_id.clone(),
+                            name: v["project"]["name"].as_str().unwrap_or_default().into(),
+                            folder: v["project"]["folder"].as_str().map(str::to_string),
+                            host: Some(agent.clone()),
+                            remote_id: Some(id),
+                            machine: None,
+                            browser: false,
+                        };
+                        let mut list = this.server_projects.remove(&agent).unwrap_or_default();
+                        list.push(entry);
+                        this.server_projects.insert(agent.clone(), list.clone());
+                        this.place_server_projects(&agent, list);
+                        this.new_thread_in(bench_id, cx);
+                        this.load_server_projects(agent, window, cx);
                     }
                 }
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
@@ -234,21 +151,28 @@ impl BenchApp {
         );
     }
 
-    /// The new project's page (the sidebar's "+"), laid out like Settings: what it is called,
-    /// where its agent runs (this Mac or a server), and on this Mac a folder if it has one.
+    /// The new project's page, laid out like Settings: name, agent, where its work is.
     pub(crate) fn render_project_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(form) = self.project_form.as_ref() else {
             return div().into_any_element();
         };
-        let (name, host, folder) = (form.name.clone(), form.host.clone(), form.folder.clone());
-        let (new_host, new_user, new_port, new_key) = (
-            form.new_host.clone(),
-            form.new_user.clone(),
-            form.new_port.clone(),
-            form.new_key.clone(),
+        let (name, agent, machine, folder, server_folder) = (
+            form.name.clone(),
+            form.agent.clone(),
+            form.machine.clone(),
+            form.folder.clone(),
+            form.server_folder.clone(),
         );
+        let note = |text: String| {
+            div()
+                .pt_2()
+                .text_sm()
+                .text_color(muted)
+                .child(text)
+                .into_any_element()
+        };
         let mut page: Vec<AnyElement> = vec![
             div()
                 .pt_6()
@@ -259,122 +183,50 @@ impl BenchApp {
             self.pv_heading("PROJECT", cx).into_any_element(),
             self.pv_row("Name", "How it shows in the sidebar", self.pv_input(&name), cx).into_any_element(),
         ];
-        // Where it runs: this Mac, or a server (its agent there keeps the threads, skills, MCP).
-        let on_server = host.is_some();
-        let place = crate::inserts::tools::view::segmented_tall(
-            "project-place",
-            &["This Mac", "A server"],
-            on_server as usize,
+
+        // The agent: this Mac's, or one of the servers' the gear lists.
+        let hosts = self.agent_hosts();
+        let labels: Vec<String> = hosts.iter().map(|h| Self::agent_name(h)).collect();
+        let at = hosts.iter().position(|h| *h == agent).unwrap_or(0);
+        let pick = crate::inserts::tools::view::segmented_tall_owned(
+            "project-agent",
+            labels,
+            at,
             cx,
-            |this, k, _, cx| {
+            move |this, k, _, cx| {
                 if let Some(f) = this.project_form.as_mut() {
-                    f.host = if k == 0 {
-                        None
-                    } else {
-                        Some(
-                            this.ssh
-                                .servers
-                                .first()
-                                .map(|s| s.alias.clone())
-                                .unwrap_or_default(),
-                        )
-                    };
+                    f.agent = hosts[k].clone();
+                    f.machine = None;
                 }
                 cx.notify();
             },
         );
         page.push(
             self.pv_row(
-                "Runs on",
-                "Where its agent works and keeps its threads",
-                h_flex().child(place).into_any_element(),
+                "Agent",
+                "Who runs its threads (servers' agents are added in the gear)",
+                h_flex().flex_wrap().child(pick).into_any_element(),
                 cx,
             )
             .into_any_element(),
         );
-        if let Some(chosen) = host.clone() {
-            // The servers from ~/.ssh/config, and a new one typed in.
-            let mut labels: Vec<String> =
-                self.ssh.servers.iter().map(|s| s.alias.clone()).collect();
-            let at = labels
-                .iter()
-                .position(|a| *a == chosen)
-                .unwrap_or(labels.len());
-            labels.push("New server…".into());
-            let aliases = labels.clone();
-            let pick = crate::inserts::tools::view::segmented_tall_owned(
-                "project-server",
-                labels,
-                at,
-                cx,
-                move |this, k, _, cx| {
-                    if let Some(f) = this.project_form.as_mut() {
-                        f.host = Some(if k + 1 == aliases.len() {
-                            String::new()
-                        } else {
-                            aliases[k].clone()
-                        });
-                    }
-                    cx.notify();
-                },
-            );
+
+        if !agent.is_empty() {
+            // A server's agent: the server is the machine; only its folder there.
             page.push(
                 self.pv_row(
-                    "Server",
-                    "A host from ~/.ssh/config, or a new one",
-                    h_flex().flex_wrap().child(pick).into_any_element(),
+                    "Folder",
+                    format!("Optional: where on {agent} its threads work"),
+                    self.pv_input(&server_folder),
                     cx,
                 )
                 .into_any_element(),
             );
-            if !chosen.is_empty() && self.has_agent_on(&chosen) {
-                let server_folder = self.project_form.as_ref().map(|f| f.server_folder.clone());
-                if let Some(input) = server_folder {
-                    page.push(
-                        self.pv_row(
-                            "Folder",
-                            format!("Optional: where on {chosen} its threads work"),
-                            self.pv_input(&input),
-                            cx,
-                        )
-                        .into_any_element(),
-                    );
-                }
-            }
-            if chosen.is_empty() {
-                page.push(
-                    self.pv_row("Address", "Its IP or domain", self.pv_input(&new_host), cx)
-                        .into_any_element(),
-                );
-                page.push(
-                    self.pv_row("Login", "The user on it", self.pv_input(&new_user), cx)
-                        .into_any_element(),
-                );
-                page.push(
-                    self.pv_row("Port", "Empty: 22", self.pv_input(&new_port), cx)
-                        .into_any_element(),
-                );
-                page.push(
-                    self.pv_row("Key file", "Empty: ssh-agent", self.pv_input(&new_key), cx)
-                        .into_any_element(),
-                );
-            }
-            page.push(
-                div()
-                    .pt_2()
-                    .text_sm()
-                    .text_color(muted)
-                    .child(if !chosen.is_empty() && self.has_agent_on(&chosen) {
-                        format!("Made on {chosen}'s agent, beside its Host: the project's threads, skills and MCP servers live there, and its models are {chosen}'s (the gear).")
-                    } else {
-                        "Bench installs and starts the agent there over SSH (it needs Node.js 22.18+); the project is that server's Host: its threads, skills and MCP servers live there.".to_string()
-                    })
-                    .into_any_element(),
-            );
+            page.push(note(format!(
+                "Made on {agent}'s agent: its threads, skills and MCP servers live there, its models are {agent}'s (the gear), and it works without this Mac — its Telegram bot too."
+            )));
         } else {
-            // This Mac's agent, its work on this Mac or on a server over SSH (like an agent in a
-            // terminal: nothing is installed there, the models are this Mac's).
-            let machine = self.project_form.as_ref().and_then(|f| f.machine.clone());
+            // This Mac's agent: its work on this Mac, or on a server over SSH.
             let mut labels = vec!["This Mac".to_string()];
             labels.extend(self.ssh.servers.iter().map(|s| s.alias.clone()));
             let at = machine
@@ -403,76 +255,68 @@ impl BenchApp {
                 )
                 .into_any_element(),
             );
-        }
-        if let (None, Some(m)) = (
-            host.clone(),
-            self.project_form.as_ref().and_then(|f| f.machine.clone()),
-        ) {
-            let input = self.project_form.as_ref().map(|f| f.server_folder.clone());
-            if let Some(input) = input {
-                page.push(
-                    self.pv_row(
-                        "Folder",
-                        format!("Optional: where on {m} its threads work"),
-                        self.pv_input(&input),
-                        cx,
-                    )
-                    .into_any_element(),
-                );
-            }
-            page.push(
-                div()
-                    .pt_2()
-                    .text_sm()
-                    .text_color(muted)
-                    .child(format!("This Mac's agent works on {m} over SSH: nothing is installed there, its models and settings are this Mac's, and it answers while this Mac is on."))
-                    .into_any_element(),
-            );
-        } else if host.is_none() {
-            let has = folder.is_some();
-            let control = h_flex()
-                .gap_2()
-                .items_center()
-                .child(
-                    div()
-                        .min_w_0()
-                        .truncate()
-                        .text_base()
-                        .text_color(if has { theme.foreground } else { muted })
-                        .child(folder.clone().unwrap_or_else(|| "None".into())),
-                )
-                .child(
-                    crate::ui::form_action(
-                        "project-folder",
-                        if has { "Change…" } else { "Choose…" },
-                        false,
-                        cx,
-                    )
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.pick_project_codebase(window, cx)),
-                    ),
-                )
-                .when(has, |d| {
-                    d.child(
-                        crate::ui::form_action("project-folder-clear", "Clear", false, cx)
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                if let Some(f) = this.project_form.as_mut() {
-                                    f.folder = None;
-                                }
-                                cx.notify();
+            match machine {
+                Some(m) => {
+                    page.push(
+                        self.pv_row(
+                            "Folder",
+                            format!("Optional: where on {m} its threads work"),
+                            self.pv_input(&server_folder),
+                            cx,
+                        )
+                        .into_any_element(),
+                    );
+                    page.push(note(format!(
+                        "This Mac's agent works on {m} over SSH: nothing is installed there, its models and settings are this Mac's, and it answers while this Mac is on."
+                    )));
+                }
+                None => {
+                    let has = folder.is_some();
+                    let control = h_flex()
+                        .gap_2()
+                        .items_center()
+                        .child(
+                            div()
+                                .min_w_0()
+                                .truncate()
+                                .text_base()
+                                .text_color(if has { theme.foreground } else { muted })
+                                .child(folder.clone().unwrap_or_else(|| "None".into())),
+                        )
+                        .child(
+                            crate::ui::form_action(
+                                "project-folder",
+                                if has { "Change…" } else { "Choose…" },
+                                false,
+                                cx,
+                            )
+                            .on_click(cx.listener(|this, _, window, cx| {
+                                this.pick_project_codebase(window, cx)
                             })),
-                    )
-                })
-                .into_any_element();
-            page.push(
-                self.pv_row(
-                    "Folder",
-                    "Optional: a codebase its threads work in (opens in Zed)",
-                    control,
-                    cx,
-                )
-                .into_any_element(),
-            );
+                        )
+                        .when(has, |d| {
+                            d.child(
+                                crate::ui::form_action("project-folder-clear", "Clear", false, cx)
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        if let Some(f) = this.project_form.as_mut() {
+                                            f.folder = None;
+                                        }
+                                        cx.notify();
+                                    })),
+                            )
+                        })
+                        .into_any_element();
+                    page.push(
+                        self.pv_row(
+                            "Folder",
+                            "Optional: a codebase its threads work in (opens in Zed)",
+                            control,
+                            cx,
+                        )
+                        .into_any_element(),
+                    );
+                }
+            }
         }
         page.push(
             h_flex()

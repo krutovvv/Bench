@@ -117,12 +117,30 @@ impl BenchApp {
             };
             let shown = host == self.gear_agent;
             let pick = host.clone();
+            // A server's agent can be forgotten here (asked once); this Mac's is always there.
+            let armed = self.confirm_delete.as_deref() == Some(format!("agent:{host}").as_str());
+            let remove = (!host.is_empty()).then(|| {
+                let (gone, label) = (host.clone(), if armed { "Remove from Bench" } else { "Remove" });
+                self.pv_button(
+                    SharedString::from(format!("gear-agent-rm-{host}")),
+                    label,
+                    false,
+                    cx,
+                    Box::new(move |this, w, cx| this.remove_agent(gone.clone(), w, cx)),
+                )
+            });
             page.push(
                 self.pv_row(
                     Self::agent_name(&host),
-                    state,
+                    if armed {
+                        "Bench forgets it; the agent on the server runs on, its Telegram and schedule too".to_string()
+                    } else {
+                        state
+                    },
                     h_flex()
                         .justify_end()
+                        .gap_2()
+                        .children(remove)
                         .child(self.pv_button(
                             SharedString::from(format!("gear-agent-{host}")),
                             if shown { "Shown below" } else { "Show" },
@@ -136,6 +154,7 @@ impl BenchApp {
                 .into_any_element(),
             );
         }
+        page.extend(self.render_agent_form(cx));
 
         // The shown agent's settings, once read.
         if !self.pv.loaded {
@@ -441,5 +460,104 @@ impl BenchApp {
             .pb_6()
             .child(v_flex().max_w(px(820.)).children(page))
             .into_any_element()
+    }
+}
+
+impl BenchApp {
+    /// "+ Agent on a server", or its form: a host of ~/.ssh/config (or a new one), its name.
+    fn render_agent_form(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let muted = cx.theme().muted_foreground;
+        let Some(form) = self.agent_form.as_ref() else {
+            return vec![h_flex()
+                .py_2()
+                .child(self.pv_button(
+                    "gear-agent-add",
+                    "+ Agent on a server",
+                    false,
+                    cx,
+                    Box::new(|this, w, cx| this.open_agent_form(w, cx)),
+                ))
+                .into_any_element()];
+        };
+        let (host, name, address, user, port, key) = (
+            form.host.clone(),
+            form.name.clone(),
+            form.address.clone(),
+            form.user.clone(),
+            form.port.clone(),
+            form.key.clone(),
+        );
+        let mut labels = self.hosts_without_agent();
+        let at = host
+            .as_ref()
+            .and_then(|h| labels.iter().position(|l| l == h))
+            .unwrap_or(labels.len());
+        labels.push("New server…".into());
+        let names = labels.clone();
+        let pick = crate::inserts::tools::view::segmented_tall_owned(
+            "agent-server",
+            labels,
+            at,
+            cx,
+            move |this, k, _, cx| {
+                if let Some(f) = this.agent_form.as_mut() {
+                    f.host = (k + 1 < names.len()).then(|| names[k].clone());
+                }
+                cx.notify();
+            },
+        );
+        let mut out = vec![
+            self.pv_row(
+                "Server",
+                "A host from ~/.ssh/config, or a new one",
+                h_flex().flex_wrap().child(pick).into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        ];
+        if host.is_none() {
+            for (title, hint, input) in [
+                ("Address", "Its IP or domain", &address),
+                ("Login", "The user on it", &user),
+                ("Port", "Empty: 22", &port),
+                ("Key file", "Empty: ssh-agent", &key),
+            ] {
+                out.push(self.pv_row(title, hint, self.pv_input(input), cx).into_any_element());
+            }
+        }
+        out.push(self.pv_row("Name", "Its project in the sidebar", self.pv_input(&name), cx).into_any_element());
+        out.push(
+            div()
+                .pt_2()
+                .text_sm()
+                .text_color(muted)
+                .child("Bench installs its agent there over SSH (it needs Node.js 22.18+) and starts it. It keeps its own threads, models, skills and Telegram there and works without this Mac; its models are set here once it answers.")
+                .into_any_element(),
+        );
+        out.push(
+            h_flex()
+                .pt_3()
+                .pb_2()
+                .gap_2()
+                .child(self.pv_button(
+                    "gear-agent-save",
+                    "Add agent",
+                    true,
+                    cx,
+                    Box::new(|this, w, cx| this.add_agent(w, cx)),
+                ))
+                .child(self.pv_button(
+                    "gear-agent-cancel",
+                    "Cancel",
+                    false,
+                    cx,
+                    Box::new(|this, _, cx| {
+                        this.agent_form = None;
+                        cx.notify();
+                    }),
+                ))
+                .into_any_element(),
+        );
+        out
     }
 }

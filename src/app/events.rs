@@ -91,6 +91,10 @@ impl BenchApp {
                     // `BENCH_GEAR_AGENT=<host>`: that agent's settings shown.
                     self.gear_agent = std::env::var("BENCH_GEAR_AGENT").unwrap_or_default();
                     self.open_panel(Panel::Providers, window, cx);
+                    // `BENCH_AGENT_FORM=1`: with "+ Agent on a server" open.
+                    if std::env::var("BENCH_AGENT_FORM").is_ok() {
+                        self.open_agent_form(window, cx);
+                    }
                 }
                 if let Some(key) = subject_at_start {
                     self.subject_opened = true;
