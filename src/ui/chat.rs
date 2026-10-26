@@ -48,7 +48,10 @@ pub fn tail_step(off: f32, max: f32, follow: bool, pinned: f32) -> (bool, f32, O
     const SLACK: f32 = 4.;
     let at_bottom = off >= max - SLACK;
     let mut follow = follow && off >= pinned - SLACK;
-    if at_bottom {
+    // Being at the bottom means the person wants the tail — but only where there IS a bottom to
+    // be at. A thread that fits the window has max 0, and calling that "at the tail" would arm
+    // following before its history had grown, yanking the opened thread down on the next frame.
+    if at_bottom && max > 0. {
         follow = true;
     }
     if follow && !at_bottom {
@@ -107,6 +110,27 @@ mod tail_tests {
         assert!(follow);
         assert_eq!(jump, None);
         assert_eq!(pinned, 0.);
+    }
+
+    #[test]
+    fn an_opened_thread_stays_at_its_top() {
+        // The app hands a newly opened thread over with following off and the view at the top;
+        // nothing may pull it to the tail.
+        let (follow, _, jump) = tail_step(0., 5000., false, 0.);
+        assert!(!follow);
+        assert_eq!(jump, None);
+    }
+
+    #[test]
+    fn a_thread_that_fits_does_not_arm_following_while_it_grows() {
+        // Opening reads as empty for a frame: the history is not measured yet, so max is 0 and
+        // the top IS the bottom. That must not arm following, or the frame that brings the real
+        // height throws the person to the tail.
+        let (follow, pinned, _) = tail_step(0., 0., false, 0.);
+        assert!(!follow);
+        let (follow, _, jump) = tail_step(0., 5000., follow, pinned);
+        assert!(!follow);
+        assert_eq!(jump, None);
     }
 }
 
@@ -420,7 +444,7 @@ impl BenchApp {
         }
         let at_bottom = f32::from(off) >= f32::from(max) - 4.;
         // An opening thread stays invisible until its content is in and its height held for a
-        // few frames (inserts placed, the offset pinned to the bottom), at most `settle` frames.
+        // few frames (inserts placed, the rows measured), at most `settle` frames.
         if self.settle > 0 {
             if self.settle_ready && max == self.last_max {
                 self.settle_stable += 1;
@@ -580,7 +604,9 @@ impl BenchApp {
                     .child(v_flex().w_full().children(rows)),
             )
             .children(rail)
-            .when(!self.follow, |d| {
+            // The way back to the tail, and only where the tail is actually off the screen: a
+            // thread that fits has no tail to jump to.
+            .when(!self.follow && !at_bottom, |d| {
                 d.child(
                     h_flex()
                         .id("jump")

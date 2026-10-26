@@ -1524,11 +1524,19 @@ impl BenchApp {
     }
 
     fn reset_scroller(&mut self, cx: &mut Context<Self>) {
-        self.follow = true;
+        // A thread opens at its TOP. Following the tail from the first frame jumped the view to
+        // the room under the last line (the editor's past-end) the moment the history arrived,
+        // so a long thread opened as an empty screen. Following starts when it is asked for:
+        // sending a message, putting an insert, or the thread's own "latest" button.
+        self.follow = false;
         self.pinned = px(0.);
         self.rows_shift = 0.;
         self.open_steps.clear();
         self.open_source = None;
+        // The handle still carries where the thread being left was scrolled; this one starts
+        // from the top.
+        self.chat_scroll
+            .set_offset(gpui_kit::Point::new(px(0.), px(0.)));
         cx.notify();
     }
 
