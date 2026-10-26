@@ -950,7 +950,7 @@ impl BenchApp {
             .top_0()
             .bottom_0()
             .right_0()
-            .w(px(14.))
+            .w(px(18.))
             .cursor_pointer()
             .child(
                 canvas(
@@ -976,8 +976,8 @@ impl BenchApp {
                     .absolute()
                     .top_0()
                     .bottom_0()
-                    .right(px(4.))
-                    .w(px(6.))
+                    .right(px(2.))
+                    .w(px(8.))
                     .when(max > 0., |d| {
                         d.child(
                             div()
