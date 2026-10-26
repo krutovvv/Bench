@@ -966,55 +966,6 @@ export class Runtime {
 		};
 	}
 
-	// ---- history (session.resume) -------------------------------------------
-
-	/** The transcript as Bench reads it: `messages[]`. */
-	async history(id: string): Promise<any[]> {
-		const live = await this.session(id);
-		if (!live) return [];
-		// Every entry, not the model's view: after a compaction the view starts at the summary, and
-		// the person keeps seeing the whole thread. The summary itself is the model's, not shown.
-		const entries: any[] = [];
-		let cursor: any;
-		do {
-			const page = await this.storage.scanEntries({ conversationId: live.conversation.id, order: "ascending" }, 500, cursor, ctx);
-			entries.push(...page.items);
-			cursor = page.next;
-		} while (cursor);
-		const out: any[] = [];
-		let row = 0;
-		for (const entry of entries) {
-			if (entry.kind === "pi.compaction") continue;
-			for (const m of entry.model ?? []) {
-				row++;
-				if (m.role === "user") {
-					const text = typeof m.content === "string" ? m.content : (m.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-					out.push({ role: "user", content: stripBlock(text), row_id: row });
-				} else if (m.role === "assistant") {
-					const text = m.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-					const reasoning = m.content.filter((b: any) => b.type === "thinking").map((b: any) => b.thinking).join("");
-					const calls = m.content.filter((b: any) => b.type === "toolCall");
-					out.push({
-						role: "assistant",
-						content: text,
-						reasoning,
-						row_id: row,
-						tool_calls: calls.map((c: any) => ({ id: c.id, type: "function", function: { name: c.name, arguments: JSON.stringify(c.arguments) } })),
-					});
-					for (const c of calls) out.push({ role: "tool_call", tool_name: c.name, name: c.name, tool_call_id: c.id, args: c.arguments, context: preview(c.name, c.arguments) });
-				} else if (m.role === "toolResult") {
-					const text = (m.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-					out.push({ role: "tool", content: text, tool_name: m.toolName, name: m.toolName, tool_call_id: m.toolCallId });
-				}
-			}
-		}
-		// Bench reads tool rows' args from the tool row itself.
-		const args = new Map(out.filter((m) => m.role === "tool_call").map((m) => [m.tool_call_id, m]));
-		return out
-			.filter((m) => m.role !== "tool_call")
-			.map((m) => (m.role === "tool" && args.has(m.tool_call_id) ? { ...m, args: args.get(m.tool_call_id).args, context: args.get(m.tool_call_id).context } : m));
-	}
-
 	pendingPrompts(id: string): any[] {
 		const live = this.live.get(id);
 		return live ? [...live.prompts.values()].map((p) => ({ kind: p.kind, ...p.payload })) : [];

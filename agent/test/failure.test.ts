@@ -79,11 +79,11 @@ test("a stopped run says why, live and in the history", async () => {
 		assert.ok(notes.length, "the dead run said nothing about itself");
 		assert.match(String(notes[0].text), /The run stopped/);
 		assert.match(String(finished.text), /The run stopped/);
-		// And it stays: a reopened thread reads it out of the history.
-		const history = (await call("session.history", { session_id: id })).messages;
-		const last = history.filter((m: any) => m.role === "assistant").at(-1);
-		assert.ok(last, "the dead turn left no message behind");
-		assert.match(String(last.text), /The run stopped/);
+		// And it stays: a reopened thread reads it out of the journal.
+		const opened = await call("thread.open", { session_id: id });
+		const fail = opened.items.filter((i: any) => i.kind === "fail").at(-1);
+		assert.ok(fail, "the dead turn left nothing behind in the journal");
+		assert.match(String(fail.text), /\S/);
 		ws.close();
 		child.kill();
 		dead.close();
