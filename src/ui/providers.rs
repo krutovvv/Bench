@@ -96,6 +96,10 @@ impl BenchApp {
         let muted = theme.muted_foreground;
         let mut page: Vec<AnyElement> = vec![];
 
+        // ---- the look: Bench's own, first, so it stays put whichever agent is shown below ----
+        page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
+        page.push(self.render_appearance(cx).into_any_element());
+
         // ---- agents: each has its own models and voice (its own network: a model on its
         // own machine is localhost there) ----
         page.push(self.pv_heading("AGENTS", cx).into_any_element());
@@ -147,9 +151,6 @@ impl BenchApp {
                     })
                     .into_any_element(),
             );
-            // The look is Bench's, not an agent's: there whichever agent is shown.
-            page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
-            page.push(self.render_appearance(cx).into_any_element());
             return Self::providers_page(page);
         }
 
@@ -428,8 +429,6 @@ impl BenchApp {
         }
 
         // No list of keys here: each key is set on the card or MCP server that reads it.
-        page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
-        page.push(self.render_appearance(cx).into_any_element());
         Self::providers_page(page)
     }
 
