@@ -867,9 +867,12 @@ impl BenchApp {
                 let body = v_flex()
                     .when(named, |d| {
                         d.child(
+                            // The ring's clearance under the name, or its 3 px slide under the
+                            // editor's first line (the ring is drawn outside the box).
                             div()
                                 .px_3()
                                 .pt_2()
+                                .pb(px(super::RING_CLEAR))
                                 .child(gpui_kit::component::input::Input::new(&e.new_name)),
                         )
                     })

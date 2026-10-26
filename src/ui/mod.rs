@@ -308,6 +308,12 @@ pub fn file_icon(
 /// switches, pickers, its buttons — match it, so nothing in a form changes size.
 pub const FIELD_H: f32 = 28.;
 
+/// The air a focused field needs below itself: gpui-component paints its focus ring 3 px wide and
+/// **outside** the box, so with no clearance the ring of the field in focus slides under whatever
+/// follows — an editor's first line, the next row. 4 px: the ring's 3 plus a pixel of air, so it
+/// reads as the field's own halo rather than as something bleeding into its neighbour.
+pub const RING_CLEAR: f32 = 4.;
+
 /// The status bar's height with the rule over it: the window's height is the thread's viewport
 /// plus this.
 pub const STATUS_H: f32 = 29.;
@@ -669,7 +675,8 @@ pub fn inline_form(
     let theme = cx.theme();
     v_flex()
         .w_full()
-        .gap_1()
+        // Rows of fields sit RING_CLEAR apart: the ring a focused one draws is outside its box.
+        .gap(px(RING_CLEAR))
         .child(div().pb_1().font_weight(FontWeight::MEDIUM).child(title))
         .children(rows.into_iter().map(|(label, field)| {
             h_flex()
