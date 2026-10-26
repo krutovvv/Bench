@@ -156,6 +156,10 @@ class LspClient {
 	private diags = new Map<string, Diagnostic[]>();
 	private waiters = new Map<string, () => void>();
 	failed: string | undefined;
+	/** What the agent asked of it since it started: files checked, how many it answered, the last. */
+	private asked = 0;
+	private answered = 0;
+	private last: { at: number; file: string; answered: boolean } | undefined;
 
 	constructor(spec: LspSpec, root: string, machine: string | undefined) {
 		this.ready = this.start(spec, root, machine).catch((e) => {
@@ -163,8 +167,15 @@ class LspClient {
 		});
 	}
 
+	/** How it is doing, as the project's environment shows it: is it up, and does it answer. */
 	state(): string {
-		return this.failed ? `failed: ${this.failed}` : this.started ? "running" : "starting (installing on first use)";
+		if (this.failed) return `failed: ${this.failed}`;
+		if (!this.started) return "starting (installing on first use)";
+		if (!this.last) return "running, not asked yet";
+		const d = new Date(this.last.at);
+		const at = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+		const silent = this.asked - this.answered;
+		return `running · ${this.asked} ${this.asked === 1 ? "file" : "files"} checked, ${silent ? `${silent} without an answer` : "all answered"} · last ${at}, ${path.basename(this.last.file)}${this.last.answered ? "" : " (no answer)"}`;
 	}
 
 	private async start(raw: LspSpec, root: string, machine: string | undefined): Promise<void> {
@@ -217,10 +228,13 @@ class LspClient {
 		if (version === 1) await this.conn.sendNotification("textDocument/didOpen", { textDocument: { uri, languageId: LANGUAGE[ext] ?? ext, version, text } });
 		else await this.conn.sendNotification("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text }] });
 		await this.conn.sendNotification("textDocument/didSave", { textDocument: { uri }, text });
-		await Promise.race([seen, sleep(ms)]);
+		const answered = await Promise.race([seen.then(() => true), sleep(ms).then(() => false)]);
 		// Servers publish more than once (syntax, then types): a moment for the later one.
 		await sleep(400);
 		this.waiters.delete(uri);
+		this.asked++;
+		if (answered) this.answered++;
+		this.last = { at: Date.now(), file, answered };
 		return this.diags.get(uri);
 	}
 

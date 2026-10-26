@@ -11,7 +11,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-lsp-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_SSH = path.join(import.meta.dirname, "fake-ssh.sh");
-const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds } = await import("../src/lsp.ts");
+const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates } = await import("../src/lsp.ts");
 after(() => {
 	writeLsp("project:p1", {});
 	fs.rmSync(home, { recursive: true, force: true });
@@ -30,6 +30,8 @@ test("errors of a file come back; fixed, it says none; an unknown kind says noth
 	assert.equal(await diagnosticsFor("project:p1", root, undefined, file, "let x = 1;\n"), "Diagnostics for a.ts: none.");
 	assert.equal(await diagnosticsFor("project:p1", root, undefined, path.join(root, "b.md"), "ERROR"), undefined);
 	assert.match(knownDiagnostics("project:p1"), /none|No errors/i);
+	// The environment shows that it is up and answers, and what it was last asked.
+	assert.match(lspStates("project:p1").fake!, /^running · 2 files checked, all answered · last \d\d:\d\d, a\.ts$/);
 });
 
 test("a project on a server: its server runs there, through the SSH connection", async () => {
