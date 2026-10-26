@@ -57,8 +57,18 @@ pub struct ProjectEnv {
     /// folder it goes into or the entry renamed), and the name.
     pub skill_form: Option<(&'static str, String)>,
     pub skill_form_name: Entity<InputState>,
-    /// Its accesses: (id, name, kind, address).
-    pub hosts: Vec<(String, String, String, String)>,
+    /// Its accesses: SSH (a mirror of ~/.ssh/config) and file hosts (its own).
+    pub hosts: Vec<Access>,
+    /// The access opened under its row (its id), and the fields being edited. The password is
+    /// never read back: an empty field keeps the one that is saved.
+    pub host_open: Option<String>,
+    pub h_name: Entity<InputState>,
+    pub h_host: Entity<InputState>,
+    pub h_port: Entity<InputState>,
+    pub h_user: Entity<InputState>,
+    pub h_password: Entity<InputState>,
+    pub h_path: Entity<InputState>,
+    pub host_dirty: bool,
     /// Its scheduled jobs; the one opened under its row ("new": a new one's form) and its fields.
     pub cron: Vec<CronJob>,
     pub cron_open: Option<String>,
@@ -101,6 +111,30 @@ impl SkillInfo {
             self.dir.clone()
         } else {
             format!("{}/{rel}", self.dir.trim_end_matches('/'))
+        }
+    }
+}
+
+/// One access of the project, as its row shows it and its card edits it. A file host is the
+/// project's own; an SSH one mirrors ~/.ssh/config.
+#[derive(Clone, Debug, Default)]
+pub struct Access {
+    pub id: String,
+    pub name: String,
+    pub kind: String,
+    pub host: String,
+    pub user: String,
+    pub port: Option<u16>,
+    pub path: String,
+}
+
+impl Access {
+    /// What its row says after the kind: "user@host", or the address alone.
+    pub fn at(&self) -> String {
+        if self.user.is_empty() {
+            self.host.clone()
+        } else {
+            format!("{}@{}", self.user, self.host)
         }
     }
 }
@@ -185,6 +219,19 @@ impl BenchApp {
             InputState::new(window, cx)
                 .placeholder("Telegram user ids who may write to it, comma-separated")
         });
+        // An access's fields, filled from its row when its card opens.
+        let h_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name"));
+        let h_host = cx.new(|cx| InputState::new(window, cx).placeholder("example.com"));
+        let h_port = cx.new(|cx| InputState::new(window, cx).placeholder("the usual port"));
+        let h_user = cx.new(|cx| InputState::new(window, cx).placeholder("its user"));
+        let h_password = cx.new(|cx| {
+            InputState::new(window, cx)
+                .masked(true)
+                .placeholder("empty keeps the saved one")
+        });
+        let h_path = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("the folder to open in it, /var/www")
+        });
         // A part typed in: its Save shows.
         fn dirty(this: &mut BenchApp, which: &str, ev: &InputEvent, cx: &mut Context<BenchApp>) {
             if let (InputEvent::Change, Some(e)) = (ev, this.project_env.as_mut()) {
@@ -195,6 +242,7 @@ impl BenchApp {
                     "prompt" => e.prompt_dirty = true,
                     "name" => e.name_dirty = true,
                     "cron" => e.cron_dirty = true,
+                    "host" => e.host_dirty = true,
                     _ => e.mcp_dirty = true,
                 }
                 cx.notify();
@@ -224,6 +272,10 @@ impl BenchApp {
             dirty(this, "cron", ev, cx)
         })
         .detach();
+        for f in [&h_name, &h_host, &h_port, &h_user, &h_password, &h_path] {
+            cx.subscribe(f, |this, _, ev, cx| dirty(this, "host", ev, cx))
+                .detach();
+        }
         ProjectEnv {
             id: id.to_string(),
             dir: String::new(),
@@ -256,6 +308,14 @@ impl BenchApp {
             skill_form: None,
             skill_form_name,
             hosts: vec![],
+            host_open: None,
+            h_name,
+            h_host,
+            h_port,
+            h_user,
+            h_password,
+            h_path,
+            host_dirty: false,
             cron: vec![],
             cron_open: None,
             cron_name,
@@ -437,6 +497,39 @@ impl BenchApp {
                     )
                 }
             }
+            // An access: PUT /api/hosts/<id>. The kind is not edited (change it by re-adding);
+            // an empty password keeps the saved one, which is never read back to the client.
+            "host" => {
+                let Some(hid) = e.host_open.clone() else {
+                    return;
+                };
+                let addr = e.h_host.read(cx).value().trim().to_string();
+                if addr.is_empty() {
+                    self.toast(
+                        NotificationType::Error,
+                        "The address is empty",
+                        window,
+                        cx,
+                    );
+                    return;
+                }
+                let empty = |s: &Entity<InputState>, cx: &mut Context<Self>| {
+                    let v = s.read(cx).value().trim().to_string();
+                    if v.is_empty() { None } else { Some(v) }
+                };
+                let mut body = json!({
+                    "name": e.h_name.read(cx).value().trim(),
+                    "kind": e.hosts.iter().find(|h| h.id == hid).map(|h| h.kind.clone()).unwrap_or_else(|| "ftp".into()),
+                    "host": addr,
+                    "port": empty(&e.h_port, cx).and_then(|p| p.parse::<u16>().ok()),
+                    "user": e.h_user.read(cx).value().trim(),
+                    "path": empty(&e.h_path, cx),
+                });
+                if let Some(pw) = empty(&e.h_password, cx) {
+                    body["password"] = json!(pw);
+                }
+                ("PUT", format!("/api/hosts/{}", enc(&hid)), body)
+            }
             // The name is the project's own row, on this Mac.
             "name" => (
                 "PUT",
@@ -515,12 +608,22 @@ impl BenchApp {
                                     e.card = None;
                                 }
                             }
+                            "host" => {
+                                e.host_dirty = false;
+                                // Its card closes: the row shows the new name and address.
+                                e.host_open = None;
+                                e.card = None;
+                            }
                             _ => e.skill_dirty = false,
                         }
                     }
                     this.load_env(&id, window, cx);
                     if what == "name" {
                         this.load_projects(window, cx);
+                    }
+                    // An access's name and address are shown in /ftp and in its card too.
+                    if what == "host" {
+                        this.load_remote_hosts(window, cx);
                     }
                     if what == "prompt" {
                         this.load_prompts(window, cx);
@@ -553,6 +656,12 @@ impl BenchApp {
                     if job != "new" {
                         return self.env_open_cron(job, window, cx);
                     }
+                }
+            }
+            "host" => {
+                e.host_dirty = false;
+                if let Some(hid) = e.host_open.take() {
+                    return self.env_open_host(hid, window, cx);
                 }
             }
             _ => {
@@ -1076,6 +1185,7 @@ impl BenchApp {
         e.skill_form = None;
         e.prompt_open = None;
         e.cron_open = None;
+        e.host_open = None;
         e.armed = None;
         if again {
             e.card = None;
@@ -1107,6 +1217,7 @@ impl BenchApp {
             "mcp" | "prompt" => self.env_open(kind, name, window, cx),
             "skill" => self.env_open_skill(name, window, cx),
             "cron" => self.env_open_cron(name, window, cx),
+            "host" => self.env_open_host(name, window, cx),
             _ => {}
         }
         cx.notify();
@@ -1140,6 +1251,32 @@ impl BenchApp {
         if job == "new" {
             e.cron_name.update(cx, |s, cx| s.focus(window, cx));
         }
+        cx.notify();
+    }
+
+    /// An access's row: its fields open under it to edit (again: closes). The saved password is
+    /// never read back, so its field starts empty and empty means "keep it".
+    pub fn env_open_host(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        if e.host_open.as_deref() == Some(&id) && !e.host_dirty {
+            e.host_open = None;
+            cx.notify();
+            return;
+        }
+        let h = e.hosts.iter().find(|h| h.id == id).cloned().unwrap_or_default();
+        e.h_name.update(cx, |s, cx| s.set_value(h.name, window, cx));
+        e.h_host.update(cx, |s, cx| s.set_value(h.host, window, cx));
+        e.h_port.update(cx, |s, cx| {
+            s.set_value(h.port.map(|p| p.to_string()).unwrap_or_default(), window, cx)
+        });
+        e.h_user.update(cx, |s, cx| s.set_value(h.user, window, cx));
+        e.h_password
+            .update(cx, |s, cx| s.set_value("", window, cx));
+        e.h_path.update(cx, |s, cx| s.set_value(h.path, window, cx));
+        e.host_open = Some(id);
+        e.host_dirty = false;
         cx.notify();
     }
 
@@ -1304,12 +1441,15 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         .flatten()
         .map(|h| {
             let s = |k: &str| h[k].as_str().unwrap_or_default().to_string();
-            let at = if s("user").is_empty() {
-                s("host")
-            } else {
-                format!("{}@{}", s("user"), s("host"))
-            };
-            (s("id"), s("name"), s("kind"), at)
+            Access {
+                id: s("id"),
+                name: s("name"),
+                kind: s("kind"),
+                host: s("host"),
+                user: s("user"),
+                port: h["port"].as_u64().map(|p| p as u16),
+                path: s("path"),
+            }
         })
         .collect();
     e.telegram = v["telegram"].as_object().map(|t| {

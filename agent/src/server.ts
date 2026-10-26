@@ -577,7 +577,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 			skills: skillsOf(agent).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
 			prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
-			hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
+			hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user, port: h.port, path: h.path })),
 			// Its scheduled jobs: what runs when, and how the last run went.
 			cron: jobs.list(agent).map(cronView),
 			// The bot's token is shown whole (the person's own machine and bot).

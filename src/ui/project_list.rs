@@ -614,16 +614,9 @@ impl BenchApp {
                     "No servers or file hosts yet: /ssh and /ftp in its threads offer only these.",
                 ));
             }
-            for (k, (hid, name, kind, at)) in e.hosts.clone().into_iter().enumerate() {
-                rows.push(row(
-                    "host",
-                    hid,
-                    name,
-                    format!("{kind} · {at}"),
-                    false,
-                    k == 0,
-                    cx,
-                ));
+            for (k, a) in e.hosts.iter().cloned().enumerate() {
+                let note = format!("{} · {}", a.kind, a.at());
+                rows.push(row("host", a.id, a.name, note, false, k == 0, cx));
             }
             let extra =
                 add("env-host-add", "", "Add to this project the access: ", cx).into_any_element();
@@ -959,23 +952,65 @@ impl BenchApp {
                 )
             }
             "host" => {
-                let (hid, hname, hkind, at) = e.hosts.iter().find(|h| h.0 == name).cloned()?;
-                // A file host is this project's own: the row and its password go with it. Only an
-                // SSH access is the machine's (~/.ssh/config) and is just taken out of the project.
-                actions.push(remove(
-                    "host",
-                    hid,
-                    if hkind == "ssh" {
-                        "Take out of the project"
-                    } else {
-                        "Delete the access"
-                    },
-                    cx,
-                ));
-                (
-                    format!("Access · {hname}"),
-                    pad(v_flex().child(div().text_color(muted).child(format!("{hkind} · {at}")))),
-                )
+                let a = e.hosts.iter().find(|h| h.id == name).cloned()?;
+                let at = a.at();
+                if a.kind == "ssh" {
+                    // An SSH access is the machine's (~/.ssh/config): Bench shows it, but changes
+                    // to it go in the config, so the card only takes it out of the project.
+                    actions.push(remove("host", a.id.clone(), "Take out of the project", cx));
+                    (
+                        format!("ssh · {}", a.name),
+                        pad(v_flex()
+                            .child(div().child(at))
+                            .child(div().text_color(muted).child(
+                                "Its address, user and keys live in ~/.ssh/config on this Mac.",
+                            ))),
+                    )
+                } else {
+                    // A file host is this project's own: its fields edit it here, and Remove
+                    // deletes it, its row and its password with it.
+                    let field = |label: &'static str, f: &Entity<gpui_kit::component::input::InputState>| {
+                        h_flex()
+                            .gap_4()
+                            .items_center()
+                            .py_1()
+                            .child(
+                                div()
+                                    .w(px(110.))
+                                    .flex_none()
+                                    .text_color(muted)
+                                    .child(label),
+                            )
+                            .child(
+                                div()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .child(gpui_kit::component::input::Input::new(f)),
+                            )
+                            .into_any_element()
+                    };
+                    actions.push(save("host", e.host_dirty, cx));
+                    actions.extend(revert("host", e.host_dirty, cx));
+                    actions.push(remove("host", a.id.clone(), "Remove", cx));
+                    (
+                        format!("{} · {}", a.kind, a.name),
+                        pad(v_flex()
+                            .child(field("Name", &e.h_name))
+                            .child(field("Address", &e.h_host))
+                            .child(field("Port", &e.h_port))
+                            .child(field("User", &e.h_user))
+                            .child(field("Password", &e.h_password))
+                            .child(field("Folder", &e.h_path))
+                            .child(
+                                div()
+                                    .pt_2()
+                                    .text_color(muted)
+                                    .child(
+                                        "This project's own access: its password is saved on its agent; an empty field keeps it.",
+                                    ),
+                            )),
+                    )
+                }
             }
             // A choice, not a text: what it can be, the current one marked; a click sets it for
             // the project at once (a choice has no draft to save).
