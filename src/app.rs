@@ -281,6 +281,12 @@ pub struct BenchApp {
     /// Where the tail was pinned last frame: an upward move past this number is the person's own
     /// scroll, whatever else changed (see the follow in ui/chat.rs).
     pub pinned: Pixels,
+    /// The last streamed frame painted (milliseconds since `stream_clock`), and whether the
+    /// frame that was turned down already has its timer. See [`stream_frame`].
+    stream_painted: Option<u64>,
+    stream_waiting: bool,
+    /// The timer that paints the frame the budget turned down (kept: dropping a Task cancels it).
+    stream_task: Option<gpui_kit::Task<()>>,
     /// Where each turn's row was painted last frame (window space, its top edge), written by the
     /// rows themselves as they paint: the right-hand rail reads it to say which turn is on screen
     /// and to jump to the one it was clicked on. A row that has not painted holds a big negative.
@@ -732,6 +738,9 @@ impl BenchApp {
             follow: true,
             last_max: px(0.),
             pinned: px(0.),
+            stream_painted: None,
+            stream_waiting: false,
+            stream_task: None,
             turn_tops: Vec::new(),
             _slash_keys: None,
             strip_top: px(0.),
@@ -1467,8 +1476,33 @@ impl BenchApp {
         cx.notify();
     }
 
+    /// Paint a streamed frame at most about 30 times a second. Chunks arrive faster than the eye
+    /// reads, and every paint lays the whole thread out again — in a long thread that is what
+    /// costs a core. The frame that was turned down is not dropped: its timer paints the tail as
+    /// soon as the budget opens, so the newest text is never left unpainted.
     fn remeasure_last(&mut self, cx: &mut Context<Self>) {
-        cx.notify();
+        let now = stream_clock().elapsed().as_millis() as u64;
+        let (paint, wait) = stream_frame(now, self.stream_painted);
+        if paint {
+            self.stream_painted = Some(now);
+            cx.notify();
+            return;
+        }
+        if self.stream_waiting {
+            return;
+        }
+        self.stream_waiting = true;
+        self.stream_task = Some(cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(Duration::from_millis(wait))
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.stream_waiting = false;
+                this.stream_task = None;
+                this.stream_painted = Some(stream_clock().elapsed().as_millis() as u64);
+                cx.notify();
+            });
+        }));
     }
 
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
@@ -2618,6 +2652,41 @@ mod proc_moment_tests {
             Some(300.),
             "the order the agent lists them in means nothing"
         );
+    }
+}
+
+/// The clock streamed frames are measured against (it starts with the app).
+fn stream_clock() -> &'static std::time::Instant {
+    static ZERO: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    ZERO.get_or_init(std::time::Instant::now)
+}
+
+/// A streamed frame is due after this many milliseconds.
+const STREAM_FRAME_MS: u64 = 33;
+
+/// Whether a streamed frame is due to paint now, and how long to wait when it is not. Pure, so
+/// the pace is checked without a window.
+pub fn stream_frame(now: u64, last: Option<u64>) -> (bool, u64) {
+    match last {
+        Some(t) if now.saturating_sub(t) < STREAM_FRAME_MS => {
+            (false, STREAM_FRAME_MS - now.saturating_sub(t))
+        }
+        _ => (true, 0),
+    }
+}
+
+#[cfg(test)]
+mod stream_tests {
+    #[test]
+    fn streamed_frames_are_painted_about_thirty_times_a_second() {
+        // The first chunk paints at once.
+        assert_eq!(super::stream_frame(100, None), (true, 0));
+        // Chunks arriving faster than the budget do not each cost a paint; the wait left over is
+        // when the tail gets painted instead.
+        assert_eq!(super::stream_frame(110, Some(100)), (false, 23));
+        assert_eq!(super::stream_frame(133, Some(100)), (true, 0));
+        // The timer paints and the next chunk paints again right after it.
+        assert_eq!(super::stream_frame(140, Some(133)), (false, 26));
     }
 }
 
