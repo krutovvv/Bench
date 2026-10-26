@@ -1608,6 +1608,18 @@ impl BenchApp {
             return;
         };
         self.panel = Panel::Chat;
+        // Asking again for the thread already on screen (its inserts fell out of step, a retry):
+        // keep what the person has — the turns they are reading, the draft, the messages waiting
+        // in the queue — and only fetch the history afresh. Resetting it first was felt as the
+        // thread changing under them: the queue and their own unwritten message vanished with it.
+        if self.session.as_deref() == Some(id.as_str()) {
+            self.cmd(Cmd::Open {
+                profile,
+                session: id,
+            });
+            cx.notify();
+            return;
+        }
         self.confirm_delete = None;
         self.ssh.form = None;
         self.files_remote.form = false;
