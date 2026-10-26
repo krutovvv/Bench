@@ -303,10 +303,14 @@ pub fn pad(d: Div) -> AnyElement {
 
 /// A text: a code editor as tall as its wrapped text (the thread scrolls, not it).
 pub fn code(state: &Entity<EditorState>, cx: &App) -> AnyElement {
-    let text = state.read(cx).value().to_string();
+    // As tall as the lines it shows: a folded block's lines do not count.
+    let s = state.read(cx);
+    let text = s.value().to_string();
     let lines: usize = text
         .lines()
-        .map(|l| l.chars().count() / 100 + 1)
+        .enumerate()
+        .filter(|(k, _)| !s.is_line_folded(*k))
+        .map(|(_, l)| l.chars().count() / 100 + 1)
         .sum::<usize>()
         .max(1);
     div()

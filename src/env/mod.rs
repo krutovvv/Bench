@@ -118,6 +118,8 @@ pub(crate) fn editor(
             .scroll_beyond_last_line(Some(0))
     });
     e.update(cx, |s, cx| s.set_highlighter(language, cx));
+    // A fold opened or closed changes how tall it is: the view around it is drawn again.
+    cx.observe(&e, |_, _, cx| cx.notify()).detach();
     e
 }
 

@@ -3311,6 +3311,12 @@ impl<M: InputModeKind> InputBaseState<M> {
         active.reversed = false;
     }
 
+    /// Whether a line of the text is hidden in a fold (Bench: an editor as tall as what it shows
+    /// counts only the lines that are not).
+    pub fn is_line_folded(&self, line: usize) -> bool {
+        self.display_map.is_buffer_line_hidden(line)
+    }
+
     /// Visible row range in the last laid-out viewport, `None` before first layout.
     pub fn visible_row_range(&self) -> Option<std::ops::Range<usize>> {
         self.last_layout.as_ref().map(|l| l.visible_range.clone())
