@@ -58,7 +58,22 @@ impl BenchApp {
     }
 
     pub fn thread_target(&self) -> Target {
-        self.target_of(&self.thread_host())
+        match self.files_machine() {
+            Some(m) => Target::Ssh(m),
+            None => self.target_of(&self.thread_host()),
+        }
+    }
+
+    /// The machine the open thread's files are on when its agent works on another one (a project
+    /// of this Mac's agent worked on a server): its agent is asked for them with this machine.
+    pub fn files_machine(&self) -> Option<String> {
+        if !self.thread_host().is_empty() {
+            return None;
+        }
+        self.projects
+            .iter()
+            .find(|p| p.id == self.thread_project)
+            .and_then(|p| p.machine.clone())
     }
 
     /// The agents in the order the gear lists them: this Mac's, then the servers' by name.

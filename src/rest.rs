@@ -429,10 +429,20 @@ pub struct TextFile {
     pub binary: bool,
 }
 
-pub fn read_text(conn: &Connection, profile: &str, path: &str) -> Result<TextFile> {
+/// `&machine=<alias>` for a file on the project's machine rather than the agent's own.
+fn on(machine: Option<&str>) -> String {
+    machine.map_or(String::new(), |m| format!("&machine={}", enc(m)))
+}
+
+pub fn read_text(
+    conn: &Connection,
+    profile: &str,
+    machine: Option<&str>,
+    path: &str,
+) -> Result<TextFile> {
     let v = get(
         conn,
-        &format!("/api/fs/read-text?path={}", enc(path)),
+        &format!("/api/fs/read-text?path={}{}", enc(path), on(machine)),
         profile,
     )?;
     Ok(TextFile {
@@ -442,13 +452,19 @@ pub fn read_text(conn: &Connection, profile: &str, path: &str) -> Result<TextFil
     })
 }
 
-pub fn write_text(conn: &Connection, profile: &str, path: &str, content: &str) -> Result<()> {
+pub fn write_text(
+    conn: &Connection,
+    profile: &str,
+    machine: Option<&str>,
+    path: &str,
+    content: &str,
+) -> Result<()> {
     send(
         conn,
         "POST",
         "/api/fs/write-text",
         profile,
-        json!({"path": path, "content": content}),
+        json!({"path": path, "content": content, "machine": machine}),
         30,
     )?;
     Ok(())
@@ -458,9 +474,14 @@ pub fn write_text(conn: &Connection, profile: &str, path: &str, content: &str) -
 pub fn list_dir(
     conn: &Connection,
     profile: &str,
+    machine: Option<&str>,
     path: &str,
 ) -> Result<Vec<(String, String, bool)>> {
-    let v = get(conn, &format!("/api/fs/list?path={}", enc(path)), profile)?;
+    let v = get(
+        conn,
+        &format!("/api/fs/list?path={}{}", enc(path), on(machine)),
+        profile,
+    )?;
     if let Some(err) = v["error"].as_str() {
         return Err(anyhow!("{err}"));
     }
@@ -479,9 +500,15 @@ pub fn list_dir(
 }
 
 /// A file's bytes as the gateway's machine has them (at most `cap`).
-pub fn download(conn: &Connection, profile: &str, path: &str, cap: u64) -> Result<Vec<u8>> {
+pub fn download(
+    conn: &Connection,
+    profile: &str,
+    machine: Option<&str>,
+    path: &str,
+    cap: u64,
+) -> Result<Vec<u8>> {
     use std::io::Read as _;
-    let route = format!("/api/fs/download?path={}", enc(path));
+    let route = format!("/api/fs/download?path={}{}", enc(path), on(machine));
     let (h, v) = conn.rest_auth(profile, "native-http")?;
     let resp = match ureq::get(&url(conn, &route, profile))
         .set(h, &v)

@@ -71,3 +71,26 @@ test("the prompt says where a machine project's work is", async () => {
 	const text = soul({ id: "s", profile: `project:${p.id}`, source: "local" } as any);
 	assert.match(text, /server `wp-prod`, in \/var\/www\/shop/);
 });
+
+test("/api/fs with a machine: read, write, list, rename and remove there", async () => {
+	const files = (await import("../src/modules/files.ts")).default({} as any);
+	const r = files.routes!;
+	const machine = real ?? "fake";
+	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bench-fs-machine-"));
+	const q = (o: Record<string, string>) => ({ query: new URLSearchParams(o), body: {} }) as any;
+	const b = (o: any) => ({ query: new URLSearchParams(), body: o }) as any;
+	try {
+		if (real) return; // a real server has no such folder; the stand-in shares this disk
+		await r["POST /api/fs/write-text"]!(b({ machine, path: `${dir}/a/one.txt`, content: "hello" }));
+		assert.strictEqual(((await r["GET /api/fs/read-text"]!(q({ machine, path: `${dir}/a/one.txt` }))) as any).text, "hello");
+		const listed = (await r["GET /api/fs/list"]!(q({ machine, path: dir }))) as any;
+		assert.deepStrictEqual(listed.entries.map((e: any) => [e.name, e.isDirectory]), [["a", true]]);
+		await r["POST /api/fs/rename"]!(b({ machine, from: `${dir}/a/one.txt`, to: `${dir}/a/two.txt` }));
+		assert.ok(fs.existsSync(`${dir}/a/two.txt`));
+		await r["POST /api/fs/delete"]!(b({ machine, path: `${dir}/a` }));
+		assert.ok(!fs.existsSync(`${dir}/a`));
+		await assert.rejects(r["GET /api/fs/read-text"]!(q({ machine, path: `${dir}/missing` })) as Promise<unknown>, /No such|not/i);
+	} finally {
+		fs.rmSync(dir, { recursive: true, force: true });
+	}
+});

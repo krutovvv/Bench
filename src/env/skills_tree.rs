@@ -73,7 +73,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::read_text(&conn, &profile, &path),
+            move || rest::read_text(&conn, &profile, None, &path),
             move |this, r, window, cx| {
                 match r {
                     Ok(t) if t.binary => this.toast(
@@ -222,7 +222,7 @@ impl BenchApp {
                     json!({"path": path}),
                 )
                 .map(|_| ()),
-                "file" => rest::write_text(&conn, &profile, &path, ""),
+                "file" => rest::write_text(&conn, &profile, None, &path, ""),
                 _ => rest::send_json(
                     &conn,
                     "POST",

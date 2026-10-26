@@ -268,10 +268,17 @@ pub fn fetch_now(target: &Target, path: &str) -> Option<Fetched> {
 
 /// Bring a delivered file here (a local gateway's files are read in place) and prepare its
 /// preview. Blocking: call off the UI thread.
-pub fn fetch(conn: &Connection, target: &Target, profile: &str, path: &str) -> Result<Fetched> {
+/// `machine`: the file is on that machine, not the agent's own (a project worked over SSH).
+pub fn fetch(
+    conn: &Connection,
+    target: &Target,
+    machine: Option<&str>,
+    profile: &str,
+    path: &str,
+) -> Result<Fetched> {
     let local = match on_this_mac(target, path) {
         Some(p) => p,
-        None => download(conn, target, profile, path)?,
+        None => download(conn, target, machine, profile, path)?,
     };
     prepare(local, path)
 }
@@ -308,8 +315,14 @@ fn prepare(local: PathBuf, path: &str) -> Result<Fetched> {
     Ok(out)
 }
 
-fn download(conn: &Connection, target: &Target, profile: &str, path: &str) -> Result<PathBuf> {
-    let bytes = rest::download(conn, profile, path, MAX_DOWNLOAD)?;
+fn download(
+    conn: &Connection,
+    target: &Target,
+    machine: Option<&str>,
+    profile: &str,
+    path: &str,
+) -> Result<PathBuf> {
+    let bytes = rest::download(conn, profile, machine, path, MAX_DOWNLOAD)?;
     let dir = state_dir()
         .join("media")
         .join(hash_of(&[&target.label(), profile, path]));

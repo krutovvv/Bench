@@ -331,9 +331,10 @@ impl BenchApp {
         };
         self.media.insert(key.clone(), Loaded::Pending);
         let (target, profile) = (self.thread_target(), self.current_profile());
+        let machine = self.files_machine();
         cx.spawn(async move |this, cx| {
             let r = cx
-                .background_spawn(async move { media::fetch(&conn, &target, &profile, &path) })
+                .background_spawn(async move { media::fetch(&conn, &target, machine.as_deref(), &profile, &path) })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.media.insert(key, r.into());

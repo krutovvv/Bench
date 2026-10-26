@@ -3,6 +3,8 @@
 // so older agents on servers keep answering). Started by Bench (or `node src/server.ts`); writes its port and
 // token to ~/.bench-agent/server.json.
 
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { onMachine } from "./modules/files.ts";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
@@ -72,8 +74,15 @@ const server = http.createServer(async (req, res) => {
 		r.path = url.pathname;
 		r.body = await readBody(req);
 		if (req.method === "GET" && url.pathname === "/api/fs/download") {
-			const p = expand(url.searchParams.get("path") ?? "");
-			const buf = fs.readFileSync(p).subarray(0, 50_000_000);
+			// A file of this machine, or of the project's machine over SSH (`files.ts`).
+			const m = await onMachine(url.searchParams.get("machine"), url.searchParams.get("path") ?? "");
+			const p = m?.path ?? expand(url.searchParams.get("path") ?? "");
+			let buf: Buffer;
+			if (m) {
+				const r = await m.env.readBinaryFile(p, BACKGROUND_CONTEXT);
+				if (!r.ok) return send(r.error.code === "not_found" ? 404 : 400, { detail: r.error.message });
+				buf = Buffer.from(r.value).subarray(0, 50_000_000);
+			} else buf = fs.readFileSync(p).subarray(0, 50_000_000);
 			res.writeHead(200, { "Content-Type": "application/octet-stream" });
 			return res.end(buf);
 		}

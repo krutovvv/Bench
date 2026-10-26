@@ -72,13 +72,15 @@ impl LocalFiles {
 }
 
 impl BenchApp {
-    /// The agent the open thread's project lives with (a remote project's server's).
-    fn files_conn(&self) -> Option<(Arc<Connection>, String)> {
+    /// The agent the open thread's project lives with (a remote project's server's), and the
+    /// machine its files are on when that agent works on another one (`files_machine`).
+    fn files_conn(&self) -> Option<(Arc<Connection>, String, Option<String>)> {
         let project = self.thread_project.clone();
-        match self.env_target(&project) {
-            Some((conn, _)) => Some((conn, self.current_profile())),
-            None => self.thread_conn().map(|c| (c, self.current_profile())),
-        }
+        let conn = match self.env_target(&project) {
+            Some((conn, _)) => conn,
+            None => self.thread_conn()?,
+        };
+        Some((conn, self.current_profile(), self.files_machine()))
     }
 
     /// The thread's project's folder ("" when it has none: the agent's home).
@@ -98,7 +100,7 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some((conn, profile)) = self.files_conn() else {
+        let Some((conn, profile, machine)) = self.files_conn() else {
             return;
         };
         let f = &mut self.local_files;
@@ -109,7 +111,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::list_dir(&conn, &profile, &path),
+            move || rest::list_dir(&conn, &profile, machine.as_deref(), &path),
             move |this, r, _, cx| {
                 let f = &mut this.local_files;
                 if f.path != asked {
@@ -151,14 +153,14 @@ impl BenchApp {
     }
 
     pub fn open_local_file(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((conn, profile)) = self.files_conn() else {
+        let Some((conn, profile, machine)) = self.files_conn() else {
             return;
         };
         let p = path.clone();
         self.background(
             window,
             cx,
-            move || rest::read_text(&conn, &profile, &p),
+            move || rest::read_text(&conn, &profile, machine.as_deref(), &p),
             move |this, r, window, cx| {
                 match r {
                     Ok(t) if t.binary => this.toast(
@@ -186,7 +188,7 @@ impl BenchApp {
     }
 
     pub fn save_local_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some((conn, profile)), Some(path)) =
+        let (Some((conn, profile, machine)), Some(path)) =
             (self.files_conn(), self.local_files.file.clone())
         else {
             return;
@@ -205,7 +207,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::write_text(&conn, &profile, &path, &text),
+            move || rest::write_text(&conn, &profile, machine.as_deref(), &path, &text),
             move |this, r, window, cx| {
                 match r {
                     Ok(()) => this.local_files.saved = sent,
@@ -298,7 +300,7 @@ impl BenchApp {
                 },
             );
         } else {
-            let Some((conn, profile)) = self.files_conn() else {
+            let Some((conn, profile, machine)) = self.files_conn() else {
                 return;
             };
             let path = format!("{}/{name}", self.local_files.path.trim_end_matches('/'));
@@ -312,11 +314,11 @@ impl BenchApp {
                             "POST",
                             "/api/fs/mkdir",
                             &profile,
-                            json!({"path": path}),
+                            json!({"path": path, "machine": machine}),
                         )
                         .map(|_| ())
                     } else {
-                        rest::write_text(&conn, &profile, &path, &text)
+                        rest::write_text(&conn, &profile, machine.as_deref(), &path, &text)
                     }
                 },
                 |this, r, window, cx| match r {
@@ -380,7 +382,7 @@ impl BenchApp {
                 },
             );
         } else {
-            let Some((conn, profile)) = self.files_conn() else {
+            let Some((conn, profile, machine)) = self.files_conn() else {
                 return;
             };
             let q = path.clone();
@@ -393,7 +395,7 @@ impl BenchApp {
                         "POST",
                         "/api/fs/delete",
                         &profile,
-                        json!({"path": q}),
+                        json!({"path": q, "machine": machine}),
                     )
                 },
                 move |this, r, window, cx| match r {

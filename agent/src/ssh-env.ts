@@ -162,7 +162,8 @@ export class SshExecutionEnv implements ExecutionEnv {
 		if (context.abortSignal?.aborted) return err(new FileError("aborted", "aborted", p));
 		if (r.code === 0) return ok(r.stdout);
 		const code = CODES[r.code] ?? (/permission denied/i.test(r.stderr) ? "permission_denied" : /no such file/i.test(r.stderr) ? "not_found" : "unknown");
-		return err(new FileError(code, r.stderr.trim() || `${this.host}: failed (${r.code})`, p));
+		const said = code === "unknown" ? `failed (${r.code})` : code.replace("_", " ");
+		return err(new FileError(code, r.stderr.trim() || `${this.host}: ${said}: ${p}`, p));
 	}
 
 	private resolve(p: string): string {
