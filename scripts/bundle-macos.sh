@@ -33,7 +33,9 @@ cd "$(dirname "$0")/.."
 KIND=${1:-dev}
 
 HASH=$(git rev-parse --short=7 HEAD)
-if [[ -n "$(git status --porcelain --untracked-files=normal -- . ':!dist')" ]]; then
+# `.agents/` (the agents' skills) never goes into the app, so skills being written there don't
+# stop a build.
+if [[ -n "$(git status --porcelain --untracked-files=normal -- . ':!dist' ':!.agents')" ]]; then
     if [[ "${BENCH_DIRTY:-}" == 1 && "$KIND" == dev ]]; then
         HASH="$HASH-dirty"
     else
