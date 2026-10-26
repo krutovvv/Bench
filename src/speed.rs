@@ -113,11 +113,7 @@ const STALL: Duration = Duration::from_millis(250);
 /// the window against wall time instead charges the wait to the model, and the chart dips to 1 tok/s
 /// every time a tool runs.
 pub fn active_added(gap: Duration) -> f64 {
-    if gap > STALL {
-        0.
-    } else {
-        gap.as_secs_f64()
-    }
+    if gap > STALL { 0. } else { gap.as_secs_f64() }
 }
 
 /// Tokens per second over a window: its characters with the learned ratio, over the seconds the
@@ -380,7 +376,10 @@ mod tests {
         let rate = window_rate(chars, active, 3.2).unwrap();
         // Against the wall time the same second would read 200/3.2/3.95 = 16 tok/s, and a window
         // holding a single chunk would read nothing at all instead of 1 tok/s.
-        assert!((rate - 65.8).abs() < 0.5, "the rate is of the writing: {rate}");
+        assert!(
+            (rate - 65.8).abs() < 0.5,
+            "the rate is of the writing: {rate}"
+        );
         assert_eq!(window_rate(10, 0., 3.2), None);
         assert_eq!(window_rate(0, 0.5, 3.2), None);
         // Jitter still counts, so a genuinely slow model is not flattered.

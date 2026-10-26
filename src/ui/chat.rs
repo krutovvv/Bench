@@ -2,8 +2,8 @@
 //! (each unfoldable), the answer, sources and hover actions; under the last answer, the
 //! files this session changed.
 
-use gpui_kit::component::input::Textarea;
 use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::input::Textarea;
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -126,7 +126,10 @@ mod past_end_tests {
             "no room: still a line to scroll"
         );
         // Pulled to the top, the last row stops with the fixed air under the edge, not flush on it.
-        assert_eq!(900. - past_end(900., 48.) - 48. - super::super::STATUS_H, 40.);
+        assert_eq!(
+            900. - past_end(900., 48.) - 48. - super::super::STATUS_H,
+            40.
+        );
     }
 }
 
@@ -402,7 +405,12 @@ impl BenchApp {
         let off = -self.chat_scroll.offset().y;
         // Follow the tail: stay pinned to the composer until the person scrolls up (the rules are
         // `tail_step`, tested against streaming, a wheel, a return and a short thread).
-        let (follow, pinned, jump) = tail_step(f32::from(off), f32::from(max), self.follow, f32::from(self.pinned));
+        let (follow, pinned, jump) = tail_step(
+            f32::from(off),
+            f32::from(max),
+            self.follow,
+            f32::from(self.pinned),
+        );
         self.follow = follow;
         self.pinned = px(pinned);
         if let Some(m) = jump {
@@ -444,8 +452,7 @@ impl BenchApp {
         // needs, plus a band around it, are built and laid out; the rest of the thread stands in
         // for by two spacers carrying their heights. A frame therefore costs the screen, not the
         // thread, and a long thread stops being slower than a short one.
-        let mut keys: Vec<crate::ui::rows::RowKey> =
-            vec![crate::ui::rows::RowKey::Block("head")];
+        let mut keys: Vec<crate::ui::rows::RowKey> = vec![crate::ui::rows::RowKey::Block("head")];
         keys.extend((0..n).map(crate::ui::rows::RowKey::Turn));
         keys.push(crate::ui::rows::RowKey::Block("tail"));
         self.rows.sync(&keys);
@@ -519,7 +526,9 @@ impl BenchApp {
             rows.push(self.measured_row(tail_idx, tail, f32::from(off), view.clone(), cx));
         }
         if band.end < self.rows.lens() {
-            rows.push(Self::spacer(self.rows.content() - self.rows.start(band.end)));
+            rows.push(Self::spacer(
+                self.rows.content() - self.rows.start(band.end),
+            ));
         }
 
         div()
@@ -629,11 +638,18 @@ impl BenchApp {
                     })
                     .when(field.is_some(), |d| {
                         d.child(
-                            icon_button(("queued-save", k), Ico::Check, "Keep these words (⌘Enter)", cx)
-                                .on_click(cx.listener(move |this, _, window, cx| {
+                            icon_button(
+                                ("queued-save", k),
+                                Ico::Check,
+                                "Keep these words (⌘Enter)",
+                                cx,
+                            )
+                            .on_click(cx.listener(
+                                move |this, _, window, cx| {
                                     this.click_claimed = true;
                                     this.queue_edit_save(window, cx);
-                                })),
+                                },
+                            )),
                         )
                     })
                     .when(field.is_none(), |d| {
@@ -644,10 +660,17 @@ impl BenchApp {
                                 "Fix the words before it goes out",
                                 cx,
                             )
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                this.queue_edit_open(edit_id.clone(), edit_text.clone(), window, cx);
-                            })),
+                            .on_click(cx.listener(
+                                move |this, _, window, cx| {
+                                    this.click_claimed = true;
+                                    this.queue_edit_open(
+                                        edit_id.clone(),
+                                        edit_text.clone(),
+                                        window,
+                                        cx,
+                                    );
+                                },
+                            )),
                         )
                         .when(!steer, |d| {
                             d.child(
@@ -657,10 +680,12 @@ impl BenchApp {
                                     "Send now: into the running work",
                                     cx,
                                 )
-                                .on_click(cx.listener(move |this, _, _, cx| {
-                                    this.click_claimed = true;
-                                    this.queued(send_id.clone(), true, cx);
-                                })),
+                                .on_click(cx.listener(
+                                    move |this, _, _, cx| {
+                                        this.click_claimed = true;
+                                        this.queued(send_id.clone(), true, cx);
+                                    },
+                                )),
                             )
                         })
                     })
@@ -1015,7 +1040,15 @@ impl BenchApp {
             .w_full()
             // The conversation is what the window is for: a size up from the sidebar's lists.
             .text_base()
-            .child(self.user_row(format!("user-{i}"), &user, &attached_paths, None, false, None, cx))
+            .child(self.user_row(
+                format!("user-{i}"),
+                &user,
+                &attached_paths,
+                None,
+                false,
+                None,
+                cx,
+            ))
             .child(
                 div()
                     .relative()
@@ -1052,7 +1085,11 @@ impl BenchApp {
 
     /// A row of the thread that is not on screen: its height, and nothing else.
     fn spacer(h: f32) -> AnyElement {
-        div().flex_none().w_full().h(px(h.max(0.))).into_any_element()
+        div()
+            .flex_none()
+            .w_full()
+            .h(px(h.max(0.)))
+            .into_any_element()
     }
 
     /// Wrap a row so it says how tall it came out, while it is being laid out and without asking

@@ -842,9 +842,15 @@ impl BenchApp {
             return;
         };
         self.cmd(if send_now {
-            Cmd::QueueSend { session: session.clone(), id: id.clone() }
+            Cmd::QueueSend {
+                session: session.clone(),
+                id: id.clone(),
+            }
         } else {
-            Cmd::QueueWithdraw { session, id: id.clone() }
+            Cmd::QueueWithdraw {
+                session,
+                id: id.clone(),
+            }
         });
         // Sent now: it is the next thing the agent answers, so its row rises to the head of the
         // list at once, without waiting for the agent's next snapshot of the queue.
@@ -878,7 +884,13 @@ impl BenchApp {
         field.update(cx, |s, cx| s.set_value(text, window, cx));
         cx.subscribe_in(&field, window, |this, _, ev: &InputEvent, window, cx| {
             // Enter is a new line, as in the composer; ⌘Enter keeps the change.
-            if matches!(ev, InputEvent::PressEnter { secondary: true, .. }) {
+            if matches!(
+                ev,
+                InputEvent::PressEnter {
+                    secondary: true,
+                    ..
+                }
+            ) {
                 this.queue_edit_save(window, cx);
             }
         })

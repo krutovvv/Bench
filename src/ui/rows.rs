@@ -142,7 +142,10 @@ impl Rows {
             }
             low
         };
-        ends_before(from)..ends_before(to).max(ends_before(from) + 1).min(self.keys.len())
+        ends_before(from)
+            ..ends_before(to)
+                .max(ends_before(from) + 1)
+                .min(self.keys.len())
     }
 }
 

@@ -9,7 +9,6 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 
-
 /// Rows the command list shows before it scrolls, and their height.
 const SLASH_ROWS: f32 = 8.;
 const SLASH_ROW: f32 = 30.;
