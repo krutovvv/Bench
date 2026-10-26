@@ -740,5 +740,59 @@ fewer form fields. Then check what it did to signups and give me a short summary
         output: 9_800,
         ..Default::default()
     });
+    if std::env::var("BENCH_DEMO_RUN").is_ok() {
+        run(cx);
+    }
     cx.notify();
+}
+
+/// `BENCH_DEMO_RUN=1`: a run plays in the open thread as the agent sends it — a message, the
+/// model thinking, a tool, the answer streamed, its entry, the run's end — for watching the
+/// thread hold still while it is written.
+fn run(cx: &mut Context<BenchApp>) {
+    use protocol::{StreamKind, ThreadEvent};
+    cx.spawn(async move |this, cx| {
+        let now = crate::app::now_secs() * 1000.;
+        let mut events = vec![
+            (1500, ThreadEvent::Append(vec![ThreadItem::User {
+                key: "900.0".into(),
+                seq: 900,
+                text: "And the bounce rate?".into(),
+                at: Some(now),
+            }])),
+            (100, ThreadEvent::Run(true)),
+        ];
+        for _ in 0..10 {
+            events.push((80, ThreadEvent::Stream(StreamKind::Thought, "Looking at the numbers. ".into())));
+        }
+        events.push((300, ThreadEvent::Append(vec![
+            ThreadItem::Thought { key: "901.0".into(), seq: 901, text: "Looking at the numbers. ".repeat(10), at: Some(now) },
+            ThreadItem::Tool { key: "901.1".into(), seq: 901, call_id: "c901".into(), name: "web_fetch".into(), args: json!({}), preview: "analytics".into(), at: Some(now) },
+        ])));
+        events.push((600, ThreadEvent::Append(vec![ThreadItem::Result {
+            key: "902.0".into(), seq: 902, call_id: "c901".into(), name: "web_fetch".into(),
+            output: "ok".into(), failed: false, diff: None, at: Some(now),
+        }])));
+        let line = "The bounce rate fell from 61% to 48% in the three weeks since the launch. ";
+        for k in 0..60 {
+            let delta = if k % 6 == 5 { format!("{line}\n\n") } else { line.to_string() };
+            events.push((60, ThreadEvent::Stream(StreamKind::Text, delta)));
+        }
+        let text = (0..10).map(|_| line.repeat(6)).collect::<Vec<_>>().join("\n\n");
+        events.push((300, ThreadEvent::Append(vec![ThreadItem::Text {
+            key: "903.0".into(), seq: 903, text, at: Some(now), error: None,
+        }])));
+        events.push((100, ThreadEvent::Run(false)));
+        for (ms, e) in events {
+            cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
+            eprintln!("demo-run: {}", match &e {
+                ThreadEvent::Append(_) => "append", ThreadEvent::Stream(..) => "stream",
+                ThreadEvent::Run(true) => "run start", ThreadEvent::Run(false) => "run end", _ => "other",
+            });
+            if this.update(cx, |app, cx| { app.thread.apply(e); cx.notify(); }).is_err() {
+                return;
+            }
+        }
+    })
+    .detach();
 }

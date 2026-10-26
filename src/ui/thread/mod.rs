@@ -42,6 +42,8 @@ pub struct View {
     /// The room past the end, worked out before the list lays out (`room_past_end`): the list
     /// cannot be asked while it renders its items.
     room: Pixels,
+    /// The composer is below the viewport ("Jump to latest" shows), as last known.
+    below: bool,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -63,6 +65,7 @@ impl Default for View {
             ticker: None,
             reveal: Reveal::Off,
             room: px(0.),
+            below: false,
         }
     }
 }
@@ -159,6 +162,7 @@ impl BenchApp {
         if version != self.tv.version || owner != self.tv.owner {
             self.tv.version = version;
             let rows = self.thread.rows();
+            self.carry_over(&rows);
             let follow = std::mem::take(&mut self.follow);
             let changed = self.tv.sync(owner.as_deref(), rows, follow);
             self.parse_ahead(changed, cx);
@@ -230,9 +234,35 @@ impl BenchApp {
             self.demo_scrolled = true;
             self.tv.list.scroll_to_end();
         }
+        // `BENCH_DEMO_SCROLL=<item>:<px>`: the thread scrolled to there (a reader in the middle).
+        if self.demo && !self.demo_scrolled {
+            if let Some((i, o)) = std::env::var("BENCH_DEMO_SCROLL").ok().and_then(|v| {
+                let (i, o) = v.split_once(':')?;
+                Some((i.parse::<usize>().ok()?, o.parse::<f32>().ok()?))
+            }) {
+                self.demo_scrolled = true;
+                self.tv.list.scroll_to(ListOffset { item_ix: i, offset_in_item: px(o) });
+            }
+        }
+        // `BENCH_TRACE_SCROLL=1`: where the thread's content stands each frame (a jerk shows).
+        if std::env::var("BENCH_TRACE_SCROLL").is_ok() {
+            let top = self.tv.list.logical_scroll_top();
+            let first = self.tv.list.bounds_for_item(top.item_ix).map(|b| b.top());
+            let heights: Vec<i32> = (1..=self.tv.tail())
+                .map(|i| self.tv.list.bounds_for_item(i).map_or(-1, |b| f32::from(b.size.height) as i32))
+                .collect();
+            eprintln!(
+                "scroll: item {} offset {:?} first-top {:?} rows {} room {:?} heights {:?}",
+                top.item_ix, top.offset_in_item, first, self.tv.rows.len(), self.tv.room, heights
+            );
+        }
         let theme = cx.theme().clone();
         let tail = self.tv.tail();
-        let below = self.tv.list.item_is_below_viewport(tail) == Some(true);
+        // Unknown for the frame after rows were remeasured: the button stays as it was.
+        if let Some(b) = self.tv.list.item_is_below_viewport(tail) {
+            self.tv.below = b;
+        }
+        let below = self.tv.below;
         let rail = self.render_rail(cx);
         let list = list(
             self.tv.list.clone(),
@@ -298,6 +328,26 @@ impl BenchApp {
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
         self.tv.list.scroll_to_reveal_item(self.tv.tail());
         cx.notify();
+    }
+
+    /// What the live rows had becomes their entries': the answer being written passes its parsed
+    /// texts to the answer that replaces it, the live thinking its fold to its piece of work.
+    /// Made anew, either would change on screen at the run's end.
+    fn carry_over(&mut self, rows: &[Row]) {
+        for (k, old) in self.tv.rows.iter().enumerate() {
+            match (old, rows.get(k)) {
+                (Row::Writing { .. }, Some(Row::Answer { key, .. })) => {
+                    self.texts.rename("answer-writing-", &format!("answer-{key}-"));
+                    self.texts.rename("code-writing-", &format!("code-{key}-"));
+                }
+                (Row::Work { key: was, .. }, Some(Row::Work { key, .. }))
+                    if was != key && self.open_work.remove(was) =>
+                {
+                    self.open_work.insert(key.clone());
+                }
+                _ => {}
+            }
+        }
     }
 
     /// Start parsing the texts of the rows from `from` on, before they are on screen: a row

@@ -130,6 +130,18 @@ impl Texts {
         self.0.clear();
     }
 
+    /// The states under ids starting `from` move to the same ids starting `to`: the answer that
+    /// was being written keeps its parsed text when it becomes the journal's entry, instead of
+    /// being parsed again (a long one in the background, blank meanwhile — the thread flickers).
+    pub fn rename(&mut self, from: &str, to: &str) {
+        let ids: Vec<String> = self.0.keys().filter(|id| id.starts_with(from)).cloned().collect();
+        for id in ids {
+            if let Some(v) = self.0.remove(&id) {
+                self.0.insert(format!("{to}{}", &id[from.len()..]), v);
+            }
+        }
+    }
+
     /// The state for `id` holding `markdown`: made (its parse starts) or brought up to date.
     pub fn state(&mut self, id: &str, markdown: &str, cx: &mut App) -> Entity<TextViewState> {
         if let Some((state, had)) = self.0.get_mut(id) {
