@@ -44,6 +44,12 @@ often the person talks to you **through Bench itself** while you change Bench. S
   `BENCH_HOME=<a copy> BENCH_SUBJECT=tasks:upcoming` runs a real agent on a copy of the data and
   opens a new thread with that insert.
 - The code every page points to is this repository's `src/` (Bench) and `agent/` (the agent).
+- **Search with `rg`, and never recurse over caches.** `target/` is 31 GB of build output, but it
+  is in `.gitignore`, so ripgrep skips it and a search over the repository costs a hundredth of a
+  second. Plain `grep -r` knows no ignores and walks it; and `~/.cargo/registry/src` (2.8 GB,
+  93 thousand files) and `~/.cargo/git/checkouts/` are other people's gigabytes — name the crate's
+  folder or the file instead of recursing over a cache. Minutes of 100% CPU come from exactly
+  that. Symbols go through the `rust_lsp` tools, not a text search.
 
 ## The five things that never change
 
