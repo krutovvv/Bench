@@ -13,6 +13,10 @@ import WebSocket from "ws";
 
 test("a stopped run says why, live and in the history", async () => {
 	const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-fail-"));
+	// No retries: the default backs off for about a minute, and this run is meant to fail.
+	process.env.BENCH_HOME = home;
+	const { setSetting } = await import("../src/config.ts");
+	setSetting("agent", { api_max_retries: 0 });
 	const child = spawn(process.execPath, ["--no-warnings", "src/server.ts"], {
 		env: { ...process.env, BENCH_HOME: home, BENCH_AGENT_NO_MCP: "1" },
 		cwd: path.join(import.meta.dirname, ".."),

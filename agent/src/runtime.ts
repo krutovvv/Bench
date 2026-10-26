@@ -154,7 +154,9 @@ export class Runtime {
 			env: ({ cwd }: any) => new NodeExecutionEnv({ cwd: cwd ?? process.env.HOME ?? "/" }),
 			identity: { attribution: { name: "bench-agent", url: "https://github.com/krutovvv/bench" } },
 			settings: {
-				retry: { maxRetries: Number(readConfig("default")?.agent?.api_max_retries ?? 3) },
+				// Six tries back off over about a minute: long enough to ride out a busy model (503
+				// model_busy when a bot and a thread write at once) and a restart of the agent.
+				retry: { maxRetries: Number(readConfig("default")?.agent?.api_max_retries ?? 6) },
 				toolExecution: "parallel",
 				// No `afterFailedRun`: after a run the model failed, the queue behind it waits for the
 				// person's next message. "continue" fed every waiting message to a model that could not
