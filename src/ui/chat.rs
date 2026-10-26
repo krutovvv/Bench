@@ -461,11 +461,16 @@ impl BenchApp {
         let vh = f32::from(window.bounds().size.height) - 140.;
         let band = self.rows.visible(f32::from(off), vh.max(240.));
         let view = cx.entity();
+        // The inserts before the first message (a thread started with `/tools`, `/terminal`…,
+        // or one put before anything was said) belong at the head: they are part of the thread,
+        // and a row nobody builds cannot be measured or scrolled to.
+        let head_inserts = self.render_inserts_at(0, n == 0, window, cx);
         let head: AnyElement = v_flex()
             .w_full()
             .children(env_rows)
             .when(block_on_top, |d| d.children(subject_block.take()))
             .children(placeholder)
+            .children(head_inserts)
             .into_any_element();
         let mut rows: Vec<AnyElement> = Vec::new();
         if band.start > 0 {
