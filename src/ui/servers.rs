@@ -1,177 +1,20 @@
 //! SSH mode views: the mode switch beside the window buttons, the server list (folders from
 //! `~/.ssh/config`), the header with the server's agent state, the server form.
 
-use std::sync::atomic::Ordering;
-
+use gpui_kit::component::h_flex;
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::icons::Ico;
 
 impl BenchApp {
-    /// The header's right end in both modes: the SSH switch (pressed = SSH mode: servers and
-    /// their terminals; released = sessions) and a new window. The IDE keeps its own close
-    /// button at the far right of its panel.
+    /// The header's right end: a new window.
     pub(super) fn render_header_tail(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let ssh = self.ssh.on;
-        let toggle = |id: &'static str, icon: Ico, on: bool, tip: &'static str| {
-            div()
-                .id(id)
-                .p_1()
-                .cursor_pointer()
-                .text_color(if on {
-                    theme.primary
-                } else {
-                    theme.muted_foreground
-                })
-                .when(on, |d| d.bg(theme.list_active))
-                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(icon.icon().small())
-                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
-        };
-        let _ = ssh;
-        h_flex()
-            .flex_none()
-            .gap_1()
-            .items_center()
-            // A window of its own, in the window's top-right corner.
-            .child(
-                toggle("new-window", Ico::AppWindow, false, "New window  ⌘⇧N")
-                    .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),
-            )
-    }
-
-    pub(super) fn render_ssh_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let toggle = |id: &'static str, icon: Ico, tip: &'static str| {
-            div()
-                .id(id)
-                .p_1()
-                .cursor_pointer()
-                .text_color(muted)
-                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(icon.icon().small())
-                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
-        };
-        let bar = h_flex()
-            .h(px(36.))
-            .flex_none()
-            .bg(theme.title_bar)
-            .border_b_1()
-            .border_color(theme.border)
-            .pl_4()
-            .pr_2()
-            .gap_2()
-            .items_center()
-            .text_sm();
-        if let Some(form) = &self.ssh.form {
-            return bar
-                .child(
-                    div()
-                        .font_weight(FontWeight::MEDIUM)
-                        .flex_1()
-                        .child(if form.is_some() {
-                            "Edit server"
-                        } else {
-                            "New server"
-                        }),
-                )
-                .child(self.render_header_tail(cx))
-                .into_any_element();
-        }
-        let Some(tab) = self.ssh.active_tab() else {
-            return bar
-                .child(div().flex_1())
-                .child(self.render_header_tail(cx))
-                .into_any_element();
-        };
-        let local = tab.alias == crate::term::LOCAL;
-        let alias = if local {
-            "This Mac".to_string()
-        } else {
-            tab.alias.clone()
-        };
-        let title = tab.session.title();
-        let exited = tab.session.exited.load(Ordering::SeqCst).then(|| {
-            tab.session
-                .exit_note
-                .lock()
-                .unwrap()
-                .clone()
-                .unwrap_or_default()
-        });
-        bar.child(
-            div()
-                .flex_none()
-                .font_weight(FontWeight::MEDIUM)
-                .child(alias),
+        h_flex().flex_none().gap_1().items_center().child(
+            bench_ui::icon_button("new-window", Ico::AppWindow, "New window  ⌘⇧N", false, cx)
+                .on_click(cx.listener(|this, _, _, cx| this.open_new_window(cx))),
         )
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .text_color(muted)
-                .children(title),
-        )
-        .when_some(exited.clone(), |d, note| {
-            d.child(div().text_xs().text_color(muted).child(note))
-        })
-        // Every button on the right in one group, 4px apart like the header's own (the bar's
-        // 8px gap had pushed the × away from its neighbours).
-        .child(
-            h_flex()
-                .flex_none()
-                .gap_1()
-                .items_center()
-                .when(exited.is_some(), |d| {
-                    d.child(toggle("reconnect", Ico::RotateCcw, "Reconnect").on_click(
-                        cx.listener(|this, _, window, cx| this.reconnect_server(window, cx)),
-                    ))
-                })
-                .child(
-                    toggle(
-                        "disconnect",
-                        Ico::X,
-                        if local { "Close" } else { "Disconnect" },
-                    )
-                    .on_click(cx.listener(|this, _, window, cx| this.close_server_tab(window, cx))),
-                )
-                .child(self.render_header_tail(cx)),
-        )
-        .into_any_element()
-    }
-
-    pub(super) fn render_ssh_body(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        if self.ssh.form.is_some() {
-            return self.render_server_form(cx);
-        }
-        match self.ssh.active {
-            Some(ix) if ix < self.ssh.tabs.len() => self.render_terminal(ix, window, cx),
-            _ => div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_sm()
-                .text_color(cx.theme().muted_foreground)
-                .child(if self.ssh.servers.is_empty() {
-                    "Add a server with “New server” below"
-                } else {
-                    "Pick a server on the left to connect"
-                })
-                .into_any_element(),
-        }
     }
 
     /// A new (or edited) server, inside the thread: saved in ~/.ssh/config, then attached to it.

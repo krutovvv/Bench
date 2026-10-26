@@ -298,7 +298,7 @@ pub struct BenchApp {
     pub ssh: servers::Ssh,
     /// Tools mode (⌘3): the utilities of `crate::devtools`.
     pub tools: tools::Tools,
-    /// Tasks mode (⌘4): Apple Reminders as a task list.
+    /// The tasks the /tasks insert shows, and its card.
     pub tasks: tasks::TasksMode,
     /// The files of an FTP / SFTP host, shown in its thread.
     pub files_remote: remote_files::RemoteFiles,
@@ -732,21 +732,6 @@ impl BenchApp {
             crate::demo::load(&mut app, cx);
         } else {
             app.connect(initial, window, cx);
-        }
-        // A new window opened from SSH mode starts in SSH mode.
-        if let Some(alias) = servers::NEXT_SSH.lock().unwrap().take() {
-            cx.spawn_in(window, async move |this, cx| {
-                let _ = this.update_in(cx, |this, window, cx| {
-                    // The server's thread (this machine's terminal when none was named).
-                    let alias = if alias.is_empty() {
-                        crate::term::LOCAL.to_string()
-                    } else {
-                        alias
-                    };
-                    this.open_server_thread(alias, window, cx);
-                });
-            })
-            .detach();
         }
         app
     }

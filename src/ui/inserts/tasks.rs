@@ -144,7 +144,7 @@ impl InsertKind for Tasks {
         window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) {
-        app.start_reminders(cx);
+        app.start_task_store(cx);
         app.load_tasks();
         app.select_task_list(list_of(ins), window, cx);
     }

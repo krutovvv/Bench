@@ -12,10 +12,7 @@ use super::BenchApp;
 use crate::devtools::{self, Kind, RegexFlags, Tool};
 
 pub struct Tools {
-    pub on: bool,
     pub tool: Tool,
-    pub search: Entity<InputState>,
-    pub query: String,
     /// One input and one output editor, shared: each tool's input is parked in `inputs`.
     pub input: Entity<EditorState>,
     pub output: Entity<EditorState>,
@@ -42,7 +39,6 @@ pub struct Tools {
 
 impl Tools {
     pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
-        let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search tools"));
         let input = cx.new(|cx| {
             EditorState::new(window, cx)
                 .scroll_beyond_last_line(Some(1))
@@ -58,12 +54,6 @@ impl Tools {
         let pattern =
             cx.new(|cx| InputState::new(window, cx).placeholder(r"Regex, e.g. (\w+)@(\w+)\.com"));
         let subscriptions = vec![
-            cx.subscribe_in(&search, window, |this, state, ev: &InputEvent, _, cx| {
-                if let InputEvent::Change = ev {
-                    this.tools.query = state.read(cx).value().trim().to_lowercase();
-                    cx.notify();
-                }
-            }),
             cx.subscribe_in(&input, window, |this, _, ev: &InputEvent, window, cx| {
                 if let InputEvent::Change = ev {
                     this.run_tool(window, cx);
@@ -76,10 +66,7 @@ impl Tools {
             }),
         ];
         Self {
-            on: false,
             tool: Tool::HtmlToMarkdown,
-            search,
-            query: String::new(),
             input,
             output,
             pattern,

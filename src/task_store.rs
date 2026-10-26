@@ -1,11 +1,5 @@
-//! Where the Tasks mode keeps its tasks: the agent's `bench.sqlite`, through its REST API
-//! (`/api/tasks`), so the agent's `tasks` tool sees the same list. The same commands and events
-//! as the old Apple Reminders bridge (`crate::reminders::{Cmd, Evt}`).
-//!
-//! The first time, the tasks move from Reminders (macOS only): all of them, open and done, are
-//! read, written to `reminders-backup.json` in Bench's state folder, imported (each carries its
-//! reminder's id, so a repeat never doubles), checked to be all there, and only then removed
-//! from Reminders. `reminders-moved` marks it done.
+//! Where tasks live: the agent's `bench.sqlite`, through its REST API (`/api/tasks`), so the
+//! agent's `tasks` tool sees the same list. Calls run on a thread of their own.
 
 use std::sync::Arc;
 use std::sync::mpsc;
@@ -14,9 +8,28 @@ use anyhow::{Result, anyhow};
 use chrono::NaiveDate;
 use serde_json::{Value, json};
 
-use crate::connection::{Connection, state_dir};
-use crate::reminders::{Cmd, Evt};
+use crate::connection::Connection;
 use crate::tasks::Task;
+
+/// What the window asks of the store.
+pub enum Cmd {
+    /// All open tasks and those completed since that day.
+    Load {
+        done_since: NaiveDate,
+    },
+    /// Create (no id) or change a task; `token` comes back with a new task's id.
+    Save {
+        task: Task,
+        token: u64,
+    },
+    Delete(String),
+}
+
+pub enum Evt {
+    Loaded(Vec<Task>),
+    Created { token: u64, id: String },
+    Error(String),
+}
 
 pub struct TaskStore {
     tx: mpsc::Sender<Cmd>,
@@ -26,9 +39,6 @@ impl TaskStore {
     pub fn start(conn: Arc<Connection>, profile: String, evt: async_channel::Sender<Evt>) -> Self {
         let (tx, rx) = mpsc::channel::<Cmd>();
         std::thread::spawn(move || {
-            if let Err(e) = move_from_reminders(&conn, &profile) {
-                let _ = evt.try_send(Evt::Error(format!("Moving tasks from Reminders: {e:#}")));
-            }
             for cmd in rx {
                 let r = match cmd {
                     Cmd::Load { done_since } => {
@@ -137,67 +147,4 @@ fn save(conn: &Connection, profile: &str, t: &Task) -> Result<String> {
         .as_str()
         .map(str::to_string)
         .ok_or_else(|| anyhow!("the agent returned no task id"))
-}
-
-#[cfg(target_os = "macos")]
-fn move_from_reminders(conn: &Connection, profile: &str) -> Result<()> {
-    let marker = state_dir().join("reminders-moved");
-    if marker.exists() {
-        return Ok(());
-    }
-    let store = crate::reminders::open()?;
-    let all = crate::reminders::load_all(&store)?;
-    std::fs::create_dir_all(state_dir())?;
-    let backup: Vec<Value> = all
-        .iter()
-        .map(|t| {
-            let mut v = to_json(t);
-            v["source_id"] = json!(format!("reminder:{}", t.id));
-            v
-        })
-        .collect();
-    std::fs::write(
-        state_dir().join("reminders-backup.json"),
-        serde_json::to_string_pretty(&backup)?,
-    )?;
-    crate::rest::send_json(
-        conn,
-        "POST",
-        "/api/tasks/import",
-        profile,
-        json!({ "tasks": backup }),
-    )?;
-    // Every reminder must be in the agent's store before any is removed.
-    let have: std::collections::HashSet<String> =
-        crate::rest::get_raw(conn, profile, "/api/tasks?done_since=1970-01-01")?["tasks"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .filter_map(|t| t["source_id"].as_str().map(str::to_string))
-            .collect();
-    let missing = all
-        .iter()
-        .filter(|t| !have.contains(&format!("reminder:{}", t.id)))
-        .count();
-    if missing > 0 {
-        return Err(anyhow!(
-            "{missing} tasks did not arrive; Reminders left as they are"
-        ));
-    }
-    let mut removed = 0;
-    for t in &all {
-        if crate::reminders::remove(&store, &t.id).is_ok() {
-            removed += 1;
-        }
-    }
-    std::fs::write(
-        &marker,
-        format!("{} moved, {removed} removed from Reminders\n", all.len()),
-    )?;
-    Ok(())
-}
-
-#[cfg(not(target_os = "macos"))]
-fn move_from_reminders(_: &Connection, _: &str) -> Result<()> {
-    Ok(())
 }

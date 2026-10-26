@@ -3,7 +3,7 @@
 //! thread; `BENCH_DEMO=landing` the landing-page chat at the end of its answer, `BENCH_DEMO=top`
 //! at its beginning with the agent's steps unfolded.
 //!
-//! No gateway, no Reminders, nothing of the person's: invented chats in the sidebar and one
+//! No gateway, nothing of the person's: invented chats in the sidebar and one
 //! open session that shows what the agent's client can do — steps and a subagent, an answer with
 //! a code block, a chart, a diagram, a formula, a video and a voice reply, its sources, the
 //! files it changed, a process still running. The media live in `assets/demo/`.

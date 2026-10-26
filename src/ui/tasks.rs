@@ -9,99 +9,15 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::tools::segmented;
 use crate::app::BenchApp;
-use crate::app::tasks::RANGES;
 use crate::icons::Ico;
 use crate::tasks::{self, List, Task, today};
 
-fn list_icon(list: &List) -> Ico {
-    match list {
-        List::Today => Ico::Star,
-        List::Upcoming => Ico::CalendarDays,
-        List::Anytime => Ico::Layers,
-        List::Logbook => Ico::BookCheck,
-    }
-}
-
 impl BenchApp {
-    pub(super) fn render_tasks_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let list = self.tasks.list.clone();
-        let searching = !self.tasks.query.is_empty();
-        let title = if searching {
-            "Search".to_string()
-        } else {
-            list.name()
-        };
-        let hint = if searching {
-            format!("“{}” in all tasks", self.tasks.query)
-        } else {
-            match &list {
-                List::Today => "Planned for today and earlier".into(),
-                List::Upcoming => "Planned for later days".into(),
-                List::Anytime => "No day yet".into(),
-                List::Logbook => "Done, newest first".into(),
-            }
-        };
-        let ranged = list == List::Logbook && !searching;
-        let labels: Vec<&'static str> = RANGES.iter().map(|(l, _)| *l).collect();
-        h_flex()
-            .id("header")
-            .h(px(36.))
-            .flex_none()
-            .bg(theme.title_bar)
-            .border_b_1()
-            .border_color(theme.border)
-            .pl_4()
-            .pr_2()
-            .gap_3()
-            .items_center()
-            .child(
-                h_flex()
-                    .flex_none()
-                    .gap_1p5()
-                    .items_center()
-                    .text_base()
-                    .font_weight(FontWeight::MEDIUM)
-                    .child(
-                        list_icon(&list)
-                            .icon()
-                            .small()
-                            .text_color(theme.muted_foreground),
-                    )
-                    .child(title),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .text_sm()
-                    .text_color(theme.muted_foreground)
-                    .child(hint),
-            )
-            .when(ranged, |d| {
-                d.child(segmented(
-                    "task-range",
-                    &labels,
-                    self.tasks.range,
-                    cx,
-                    |this, k, _, cx| this.set_task_range(k, cx),
-                ))
-            })
-            .child(self.render_header_tail(cx))
-            .into_any_element()
-    }
-
     /// A task list as a thread's live block: the same rows, no scroll of its own (the thread
     /// scrolls), the open task's card right under the list, the text at the thread's column.
     pub(super) fn render_tasks_block(&mut self, cx: &mut Context<Self>) -> AnyElement {
         self.tasks_view(true, cx)
-    }
-
-    pub(super) fn render_tasks_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        self.tasks_view(false, cx)
     }
 
     fn tasks_view(&mut self, inline: bool, cx: &mut Context<Self>) -> AnyElement {

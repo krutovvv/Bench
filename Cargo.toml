@@ -51,14 +51,12 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 2
 
-# macOS only: tasks live in Apple Reminders (EventKit) and "the agent finished" is a system
-# notification (src/reminders.rs, src/notify.rs). Elsewhere src/reminders_other.rs and
-# src/notify_other.rs stand in.
+# macOS only: "the agent finished" is a system notification (src/notify.rs); elsewhere
+# src/notify_other.rs stands in.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSString", "NSArray", "NSDate", "NSError", "NSPredicate", "NSCalendar", "NSObject", "NSURL", "NSTimeZone"] }
-objc2-event-kit = { version = "0.3", default-features = false, features = ["std", "block2", "EKCalendar", "EKCalendarItem", "EKError", "EKEventStore", "EKObject", "EKReminder", "EKSource", "EKTypes"] }
 objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSettings", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }
 
 # Desktop only: the syntax grammars (C code), HTTP with TLS, the terminal (a PTY and a VT parser).

@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::input::{InputEvent, InputState};
@@ -17,9 +16,6 @@ use crate::connection::{self, HostCheck};
 use crate::model::Target;
 use crate::sshconfig::{self, Server};
 use crate::term::Session;
-
-/// The next window starts in SSH mode (on this server, unless empty).
-pub static NEXT_SSH: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
 
 /// An open terminal: one ssh connection.
 pub struct Tab {
@@ -38,18 +34,13 @@ pub struct Tab {
 }
 
 pub struct Ssh {
-    /// The sidebar shows servers and the main area their terminals.
-    pub on: bool,
     pub servers: Vec<Server>,
     /// alias -> `user@hostname` (`ssh -G`).
     pub resolved: HashMap<String, String>,
     /// alias -> whether the agent can run there (for the gateway list only); None while checking.
     pub status: HashMap<String, Option<HostCheck>>,
     pub tabs: Vec<Tab>,
-    pub active: Option<usize>,
     next_tab: usize,
-    pub search: Entity<InputState>,
-    pub query: String,
     /// The server form: Some(None) = new, Some(Some(alias)) = editing.
     pub form: Option<Option<String>>,
     pub f_alias: Entity<InputState>,
@@ -73,7 +64,6 @@ impl Ssh {
         let input = |ph: &'static str, window: &mut Window, cx: &mut Context<BenchApp>| {
             cx.new(|cx| InputState::new(window, cx).placeholder(ph))
         };
-        let search = input("Search servers", window, cx);
         let f_alias = input("prod-web-1", window, cx);
         let f_host = input("203.0.113.10 or host.example.com", window, cx);
         let f_user = input("root", window, cx);
@@ -81,15 +71,7 @@ impl Ssh {
         let f_folder = input("Production", window, cx);
         let f_path = input("/var/www", window, cx);
         let f_key = input("~/.ssh/id_ed25519", window, cx);
-        let mut subscriptions =
-            vec![
-                cx.subscribe_in(&search, window, |this, state, ev: &InputEvent, _, cx| {
-                    if let InputEvent::Change = ev {
-                        this.ssh.query = state.read(cx).value().trim().to_lowercase();
-                        cx.notify();
-                    }
-                }),
-            ];
+        let mut subscriptions = vec![];
         for field in [
             &f_alias, &f_host, &f_user, &f_port, &f_key, &f_folder, &f_path,
         ] {
@@ -104,15 +86,11 @@ impl Ssh {
             ));
         }
         Self {
-            on: false,
             servers: sshconfig::load(),
             resolved: HashMap::new(),
             status: HashMap::new(),
             tabs: vec![],
-            active: None,
             next_tab: 0,
-            search,
-            query: String::new(),
             form: None,
             f_alias,
             f_host,
@@ -129,10 +107,6 @@ impl Ssh {
             scroll_acc: 0.,
             _subscriptions: subscriptions,
         }
-    }
-
-    pub fn active_tab(&self) -> Option<&Tab> {
-        self.active.and_then(|i| self.tabs.get(i))
     }
 
     pub fn tab_for(&self, alias: &str) -> Option<usize> {
@@ -167,25 +141,6 @@ impl BenchApp {
             collapsed_path(),
             serde_json::to_vec(&self.ssh.collapsed).unwrap_or_default(),
         );
-        cx.notify();
-    }
-
-    pub fn set_ssh_mode(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
-        self.ssh.on = on;
-        // Sessions or servers: either leaves Tools.
-        self.tools.on = false;
-        self.tasks.on = false;
-        self.panel = super::Panel::Chat;
-        if on {
-            self.reload_servers(cx);
-            // With nothing open, the terminal of this machine.
-            if self.ssh.tabs.is_empty() {
-                self.open_server(crate::term::LOCAL.to_string(), window, cx);
-            }
-            if let Some(t) = self.ssh.active_tab() {
-                t.focus.focus(window, cx);
-            }
-        }
         cx.notify();
     }
 
@@ -262,22 +217,6 @@ impl BenchApp {
         self.targets = targets;
     }
 
-    /// One click: open the server's terminal (or bring back the one already open).
-    pub fn open_server(&mut self, alias: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.ssh.form = None;
-        self.ssh.armed_delete = None;
-        if let Some(t) = self.ssh.tab_for(&alias) {
-            if !self.ssh.tabs[t].session.exited.load(Ordering::SeqCst) {
-                self.activate_tab(t, window, cx);
-                return;
-            }
-            self.ssh.tabs.remove(t);
-        }
-        if let Some(t) = self.spawn_terminal_tab(&alias, window, cx) {
-            self.activate_tab(t, window, cx);
-        }
-    }
-
     /// A new terminal tab (ssh to `alias`, or a local shell for `term::LOCAL`); its index.
     pub fn spawn_terminal_tab(
         &mut self,
@@ -323,33 +262,6 @@ impl BenchApp {
                 None
             }
         }
-    }
-
-    fn activate_tab(&mut self, t: usize, window: &mut Window, cx: &mut Context<Self>) {
-        self.ssh.active = Some(t);
-        self.ssh.tabs[t].focus.focus(window, cx);
-        cx.notify();
-    }
-
-    pub fn reconnect_server(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(alias) = self.ssh.active_tab().map(|t| t.alias.clone()) {
-            self.open_server(alias, window, cx);
-        }
-    }
-
-    pub fn close_server_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(t) = self.ssh.active else { return };
-        let tab = self.ssh.tabs.remove(t);
-        tab.session.kill();
-        self.ssh.active = None;
-        if !self.ssh.tabs.is_empty() {
-            self.activate_tab(t.min(self.ssh.tabs.len() - 1), window, cx);
-        } else if tab.alias != crate::term::LOCAL {
-            // The last server closed: back to this machine's terminal (closing that one leaves
-            // the window empty).
-            self.open_server(crate::term::LOCAL.to_string(), window, cx);
-        }
-        cx.notify();
     }
 
     /// ⌘-click in a terminal: a URL opens in the browser; a path — absolute, `~/…`, or relative
@@ -441,11 +353,8 @@ impl BenchApp {
         }
     }
 
-    /// A new window in the same mode: SSH mode opens there too (no server picked yet).
+    /// Another window of Bench.
     pub fn open_new_window(&mut self, cx: &mut Context<Self>) {
-        if self.ssh.on {
-            *NEXT_SSH.lock().unwrap() = Some(String::new());
-        }
         self.open_window(None, cx);
     }
 

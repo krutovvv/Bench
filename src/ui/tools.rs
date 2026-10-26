@@ -13,51 +13,6 @@ use crate::app::BenchApp;
 use crate::devtools::{Kind, Tool};
 
 impl BenchApp {
-    pub(super) fn render_tools_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let tool = self.tools.tool;
-        let mode = self.tools.mode(tool);
-        let modes = tool.modes();
-        h_flex()
-            .id("header")
-            .h(px(36.))
-            .flex_none()
-            .bg(theme.title_bar)
-            .border_b_1()
-            .border_color(theme.border)
-            .pl_4()
-            .pr_2()
-            .gap_3()
-            .items_center()
-            .child(
-                div()
-                    .flex_none()
-                    .text_base()
-                    .font_weight(FontWeight::MEDIUM)
-                    .child(tool.name()),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .text_sm()
-                    .text_color(theme.muted_foreground)
-                    .child(tool.hint()),
-            )
-            .when(!modes.is_empty(), |d| {
-                d.child(segmented(
-                    "tool-mode",
-                    modes,
-                    mode,
-                    cx,
-                    |this, k, window, cx| this.set_tool_mode(k, window, cx),
-                ))
-            })
-            .child(self.render_header_tail(cx))
-            .into_any_element()
-    }
-
     /// Rich Text to Markdown's input: the paste rendered as it looked on the page (tables,
     /// headings, links, images), or its HTML code to edit.
     fn render_rich_input(

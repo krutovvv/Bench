@@ -1,36 +1,22 @@
-//! Tasks as Bench shows them (the Tasks mode, after Things), kept in Apple Reminders
-//! (`crate::reminders`). A reminder carries what Reminders has fields for — title, notes, a
-//! day, completion and its date, priority (here: "important", the red flag) — and Bench keeps
-//! the rest as plain lines at the end of the notes, readable anywhere:
-//!
-//! ```text
-//! Whatever the notes say.
-//!
-//! Tags: client-a, Дом
-//! When: evening
-//! Spent: 1h 30m
-//! ```
-//!
-//! Tags are names as they are (spaces, any language), comma-separated; a line made only of
-//! `#words` counts as tags too (typed on the phone). `When: evening` puts a task in Today's
-//! "This Evening", `When: someday` in Someday; `Timer: <unix>` keeps a running timer across
-//! restarts. An agent writes and reads the same lines.
+//! A task as Bench shows it (after Things): title, notes, tags, a day, "this evening" or
+//! "someday", the red flag, completion, time spent and a running timer. Kept by the agent in
+//! bench.sqlite (`crate::task_store`).
 
 use chrono::{Datelike, Duration, Local, NaiveDate, Weekday};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Task {
-    /// The reminder's identifier ("" for one not saved yet).
+    /// The store's identifier ("" for one not saved yet).
     pub id: String,
     pub title: String,
     /// The notes without Bench's lines.
     pub notes: String,
     pub tags: Vec<String>,
-    /// The day it is planned for (the reminder's date): in Today from then on.
+    /// The day it is planned for: in Today from then on.
     pub day: Option<NaiveDate>,
     pub evening: bool,
     pub someday: bool,
-    /// The red flag (Reminders' high priority).
+    /// The red flag.
     pub important: bool,
     pub completed: Option<NaiveDate>,
     /// Seconds spent, a running timer not counted.
@@ -121,80 +107,6 @@ impl Task {
             List::Anytime => !self.done() && self.day.is_none_or(|d| d <= day),
             List::Logbook => self.done(),
         }
-    }
-
-    /// The notes as stored: the person's text, then Bench's lines.
-    #[cfg(test)]
-    pub fn stored_notes(&self) -> String {
-        let mut lines: Vec<String> = vec![];
-        if !self.tags.is_empty() {
-            lines.push(format!("Tags: {}", self.tags.join(", ")));
-        }
-        if self.evening {
-            lines.push("When: evening".into());
-        } else if self.someday {
-            lines.push("When: someday".into());
-        }
-        if self.spent > 0 {
-            lines.push(format!("Spent: {}", show_spent(self.spent)));
-        }
-        if let Some(t) = self.timer {
-            lines.push(format!("Timer: {t}"));
-        }
-        let text = self.notes.trim_end();
-        match (text.is_empty(), lines.is_empty()) {
-            (_, true) => text.to_string(),
-            (true, false) => lines.join("\n"),
-            (false, false) => format!("{text}\n\n{}", lines.join("\n")),
-        }
-    }
-
-    /// Read Bench's lines back out of stored notes (any line made only of #tags counts,
-    /// wherever it is, so tags typed on the phone are picked up too).
-    pub fn read_notes(&mut self, stored: &str) {
-        let mut keep: Vec<&str> = vec![];
-        self.tags.clear();
-        self.evening = false;
-        self.someday = false;
-        self.spent = 0;
-        self.timer = None;
-        for line in stored.lines() {
-            let t = line.trim();
-            let words: Vec<&str> = t.split_whitespace().collect();
-            if let Some(v) = t.strip_prefix("Tags:") {
-                for tag in parse_tags(v) {
-                    if !self.tags.iter().any(|x| x.eq_ignore_ascii_case(&tag)) {
-                        self.tags.push(tag);
-                    }
-                }
-            } else if let Some(v) = t.strip_prefix("When:") {
-                match v.trim().to_lowercase().as_str() {
-                    "evening" => self.evening = true,
-                    "someday" => self.someday = true,
-                    _ => keep.push(line),
-                }
-            } else if !words.is_empty() && words.iter().all(|w| w.len() > 1 && w.starts_with('#')) {
-                for w in words {
-                    let tag = &w[1..];
-                    match tag.to_lowercase().as_str() {
-                        "evening" => self.evening = true,
-                        "someday" => self.someday = true,
-                        _ => {
-                            if !self.tags.iter().any(|x| x.eq_ignore_ascii_case(tag)) {
-                                self.tags.push(tag.to_string());
-                            }
-                        }
-                    }
-                }
-            } else if let Some(v) = t.strip_prefix("Spent:") {
-                self.spent = parse_spent(v).unwrap_or(0);
-            } else if let Some(v) = t.strip_prefix("Timer:") {
-                self.timer = v.trim().parse().ok();
-            } else {
-                keep.push(line);
-            }
-        }
-        self.notes = keep.join("\n").trim().to_string();
     }
 }
 
@@ -390,36 +302,6 @@ mod tests {
         assert_eq!(show_spent(5400), "1h 30m");
         assert_eq!(show_spent(600), "10m");
         assert_eq!(show_spent(7200), "2h");
-    }
-
-    #[test]
-    fn notes_keep_benchs_lines() {
-        let mut t = Task {
-            title: "Report".into(),
-            notes: "Call first.\nThen write.".into(),
-            tags: vec!["work".into(), "Client X".into()],
-            evening: true,
-            spent: 5400,
-            ..Default::default()
-        };
-        let stored = t.stored_notes();
-        assert_eq!(
-            stored,
-            "Call first.\nThen write.\n\nTags: work, Client X\nWhen: evening\nSpent: 1h 30m"
-        );
-        let mut back = Task::default();
-        back.read_notes(&stored);
-        assert_eq!(back.notes, t.notes);
-        assert_eq!(back.tags, vec!["work", "Client X"]);
-        assert!(back.evening && back.spent == 5400);
-        // Tags typed as a line anywhere count; ordinary text with a # stays text.
-        back.read_notes("#home\nBuy milk #2 today\nTags: Домашние дела, home\n");
-        assert_eq!(back.tags, vec!["home", "Домашние дела"]);
-        assert_eq!(back.notes, "Buy milk #2 today");
-        t.tags.clear();
-        t.evening = false;
-        t.spent = 0;
-        assert_eq!(t.stored_notes(), "Call first.\nThen write.");
     }
 
     #[test]

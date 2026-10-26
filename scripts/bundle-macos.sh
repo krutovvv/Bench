@@ -135,8 +135,6 @@ cat > "$NEW/Contents/Info.plist" <<PLIST
   <key>NSHighResolutionCapable</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Dictating messages to the agent</string>
   <key>NSLocalNetworkUsageDescription</key><string>Connecting to the agent on machines on your local network over SSH</string>
-  <key>NSRemindersUsageDescription</key><string>Your tasks live in Reminders: Bench shows and edits them</string>
-  <key>NSRemindersFullAccessUsageDescription</key><string>Your tasks live in Reminders: Bench shows and edits them</string>
 </dict>
 </plist>
 PLIST

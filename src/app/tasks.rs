@@ -1,7 +1,5 @@
-//! Tasks mode (⌘4, the list icon in the sidebar's top-right corner): tasks in Bench's own store (`crate::task_store`, the agent's bench.sqlite; moved once from Apple Reminders) shown the way Things shows
-//! to-dos — Today (with This Evening), Upcoming, Anytime, Logbook and tags in the
-//! sidebar, the tasks in the middle, the open task's card on the right. Every change goes to
-//! Reminders (`crate::reminders`); what another device or the agent changes there shows up here.
+//! The tasks a /tasks insert shows: loaded from the agent's store (`crate::task_store`), the
+//! open list, the task being edited, its timer.
 
 use web_time::Instant;
 
@@ -9,8 +7,8 @@ use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
 use gpui_kit::*;
 
 use super::BenchApp;
-use crate::reminders::{Cmd, Evt};
 use crate::task_store::TaskStore;
+use crate::task_store::{Cmd, Evt};
 use crate::tasks::{self, List, Task, today};
 
 /// How far back the Logbook (and a tag's done tasks) reaches.
@@ -23,7 +21,6 @@ pub const RANGES: [(&str, i64); 5] = [
 ];
 
 pub struct TasksMode {
-    pub on: bool,
     pub list: List,
     /// The open thread's project ("": Host). Its tag (`tasks::slug` of its name) is the list's
     /// filter when the thread opens, one click to drop; new tasks get the filter's tag.
@@ -50,7 +47,7 @@ pub struct TasksMode {
     dirty: Option<Instant>,
     /// Delete was pressed once for this task.
     pub delete_armed: Option<String>,
-    pub(crate) reminders: Option<TaskStore>,
+    pub(crate) store: Option<TaskStore>,
     last_load: Option<Instant>,
     next_token: u64,
     _subscriptions: Vec<Subscription>,
@@ -101,7 +98,6 @@ impl TasksMode {
             }),
         );
         Self {
-            on: false,
             list: List::Today,
             items: vec![],
             loaded: false,
@@ -121,7 +117,7 @@ impl TasksMode {
             field_error: None,
             dirty: None,
             delete_armed: None,
-            reminders: None,
+            store: None,
             last_load: None,
             next_token: 1,
             _subscriptions: subscriptions,
@@ -192,7 +188,7 @@ impl TasksMode {
     }
 
     fn send(&self, cmd: Cmd) {
-        if let Some(r) = &self.reminders {
+        if let Some(r) = &self.store {
             r.send(cmd);
         }
     }
@@ -200,9 +196,9 @@ impl TasksMode {
 
 impl BenchApp {
     /// The Reminders thread, started the first time Tasks opens (macOS asks for access once).
-    pub(crate) fn start_reminders(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn start_task_store(&mut self, cx: &mut Context<Self>) {
         // The demo's tasks are made up; Reminders stays untouched.
-        if self.tasks.reminders.is_some() || self.demo {
+        if self.tasks.store.is_some() || self.demo {
             return;
         }
         // The tasks live in the agent's store: wait for the connection.
@@ -210,11 +206,11 @@ impl BenchApp {
             return;
         };
         let (tx, rx) = async_channel::unbounded();
-        self.tasks.reminders = Some(TaskStore::start(conn, self.current_profile(), tx));
+        self.tasks.store = Some(TaskStore::start(conn, self.current_profile(), tx));
         cx.spawn(async move |this, cx| {
             while let Ok(evt) = rx.recv().await {
                 if this
-                    .update(cx, |this, cx| this.on_reminders(evt, cx))
+                    .update(cx, |this, cx| this.on_task_store(evt, cx))
                     .is_err()
                 {
                     break;
@@ -224,7 +220,7 @@ impl BenchApp {
         .detach();
     }
 
-    fn on_reminders(&mut self, evt: Evt, cx: &mut Context<Self>) {
+    fn on_task_store(&mut self, evt: Evt, cx: &mut Context<Self>) {
         match evt {
             Evt::Loaded(items) => {
                 // A card being typed into keeps its own copy until it is saved.
@@ -285,7 +281,9 @@ impl BenchApp {
             self.tasks.dirty = None;
             self.save_selected();
         }
-        if !self.tasks.on || self.tasks.reminders.is_none() {
+        // The list is read again while a /tasks insert shows it.
+        let shown = self.thread_inserts().iter().any(|i| i.key == "tasks");
+        if !shown || self.tasks.store.is_none() {
             return;
         }
         if self.tasks.dirty.is_none()
@@ -337,10 +335,10 @@ impl BenchApp {
 
     /// A new connection (another machine, or the agent restarted): read its tasks.
     pub fn restart_tasks(&mut self, cx: &mut Context<Self>) {
-        self.tasks.reminders = None;
+        self.tasks.store = None;
         self.tasks.items.clear();
         self.tasks.loaded = false;
-        self.start_reminders(cx);
+        self.start_task_store(cx);
         self.load_tasks();
     }
 
@@ -372,12 +370,6 @@ impl BenchApp {
             .search
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.tasks.query.clear();
-        cx.notify();
-    }
-
-    pub fn set_task_range(&mut self, k: usize, cx: &mut Context<Self>) {
-        self.tasks.range = k.min(RANGES.len() - 1);
-        self.load_tasks();
         cx.notify();
     }
 

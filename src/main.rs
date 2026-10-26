@@ -27,11 +27,6 @@ mod notify;
 #[path = "notify_other.rs"]
 mod notify;
 mod pi_agent;
-#[cfg(target_os = "macos")]
-mod reminders;
-#[cfg(not(target_os = "macos"))]
-#[path = "reminders_other.rs"]
-mod reminders;
 mod remote;
 mod remote_browser;
 mod rest;
@@ -231,18 +226,6 @@ fn probe(target: &str) -> anyhow::Result<()> {
 fn main() {
     connection::migrate_state();
     let args: Vec<String> = std::env::args().collect();
-    // Run inside the .app (`open -n dist/Bench.app --args --probe-reminders`): macOS asks for
-    // Reminders access on behalf of the bundle. The result goes to a log file.
-    if args.get(1).map(String::as_str) == Some("--probe-reminders") {
-        let text = match reminders::probe() {
-            Ok(t) => t,
-            Err(e) => format!("probe failed: {e:#}\n"),
-        };
-        let _ = std::fs::create_dir_all(connection::state_dir());
-        let _ = std::fs::write(connection::state_dir().join("reminders-probe.log"), &text);
-        print!("{text}");
-        return;
-    }
     if args.get(1).map(String::as_str) == Some("--probe") {
         if let Err(e) = probe(args.get(2).map(String::as_str).unwrap_or("local")) {
             eprintln!("probe failed: {e:#}");

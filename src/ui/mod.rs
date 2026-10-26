@@ -40,89 +40,38 @@ pub use bench_ui::{
 };
 
 impl BenchApp {
-    /// The strip beside the window buttons at the top of every sidebar, with the mode toggles
-    /// (Tools, then Tasks) in its top-right corner (the sidebar's own corner, as SSH has the
-    /// window's).
+    /// The strip beside the window buttons over the sidebar: "+" (a new project) and the fold.
+    /// 35 + the search band's top rule = the header's 36: the two rules are one line.
     pub(super) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        // A mode's toggle: its icon, lit while it is on; the tooltip says how to get back.
-        let toggle = |id: &'static str, icon: crate::icons::Ico, name: &'static str, on: bool| {
-            div()
-                .id(id)
-                .p_1()
-                .cursor_pointer()
-                .text_color(if on {
-                    theme.primary
-                } else {
-                    theme.muted_foreground
-                })
-                .when(on, |d| d.bg(theme.list_active))
-                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                .child(icon.icon().small())
-                .tooltip(move |window, cx| {
-                    let tip = toggle_tip(name, on);
-                    gpui_kit::component::tooltip::Tooltip::new(tip).build(window, cx)
-                })
-        };
-        // 35 + the search band's top rule = the header's 36 with its bottom rule: the two rules
-        // are one line across the window.
         h_flex()
             .h(px(35.))
             .flex_none()
             .justify_end()
             .items_center()
             .gap_1()
-            // The icon's 4px box padding + 12 = the sidebar's 16px inset.
+            // The icon's 4 px box padding + 12 = the sidebar's 16 px inset.
             .pr(px(12.))
-            // "+": a new item of the mode (a chat, a server, a task), then folding the sidebar
-            // away (⌘\\), then the two utilities. One style everywhere: no big buttons.
-            .when(!self.tools.on, |d| {
-                let tip = if self.tasks.on {
-                    "New task  ⌘N"
-                } else if self.ssh.on {
-                    "New server"
-                } else {
-                    "New session  ⌘N"
-                };
-                let _ = tip;
-                // "+": a new project (the sidebar holds projects only).
-                d.child(
-                    toggle("new-item", crate::icons::Ico::Plus, "New project", false).on_click(
-                        cx.listener(|this, _, window, cx| this.new_project_form(window, cx)),
-                    ),
-                )
-            })
             .child(
-                toggle(
+                bench_ui::icon_button(
+                    "new-item",
+                    crate::icons::Ico::Plus,
+                    "New project",
+                    false,
+                    cx,
+                )
+                .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx))),
+            )
+            .child(
+                bench_ui::icon_button(
                     "sidebar-hide",
                     crate::icons::Ico::PanelLeft,
                     "Hide sidebar  ⌘\\",
                     false,
+                    cx,
                 )
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
             )
             .into_any_element()
-    }
-}
-
-/// A mode toggle's tooltip: its name and shortcut, or "Back" and the shortcut while it is on.
-/// Split at the double space, never by bytes: ⌘ is 3 bytes, and a byte slice through it panics,
-/// which aborts the app (it did, on hovering the lit-up Tools toggle).
-fn toggle_tip(name: &str, on: bool) -> String {
-    match (on, name.rsplit_once("  ")) {
-        (true, Some((_, keys))) => format!("Back  {keys}"),
-        _ => name.to_string(),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn toggle_tip_keeps_the_shortcut_whole() {
-        assert_eq!(super::toggle_tip("Tools  ⌘3", false), "Tools  ⌘3");
-        assert_eq!(super::toggle_tip("Tools  ⌘3", true), "Back  ⌘3");
-        assert_eq!(super::toggle_tip("Tasks  ⌘4", true), "Back  ⌘4");
-        assert_eq!(super::toggle_tip("New window", true), "New window");
     }
 }
 
@@ -175,15 +124,6 @@ impl BenchApp {
 
     /// Header strip: the session title, or the settings tabs.
     fn render_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        if self.tasks.on && self.panel == Panel::Chat {
-            return self.render_tasks_header(cx);
-        }
-        if self.tools.on && self.panel == Panel::Chat {
-            return self.render_tools_header(cx);
-        }
-        if self.ssh.on && self.panel == Panel::Chat {
-            return self.render_ssh_header(cx);
-        }
         let theme = cx.theme().clone();
         let bar = h_flex()
             .id("header")
@@ -274,12 +214,7 @@ impl Render for BenchApp {
         #[cfg(not(target_family = "wasm"))]
         self.update_browser_stream();
         let theme = cx.theme().clone();
-        // The server form (new or edited server) takes the chat area while open.
-        let ssh = self.ssh.on && self.panel == Panel::Chat;
         let body = match self.panel {
-            Panel::Chat if self.tasks.on => self.render_tasks_body(cx),
-            Panel::Chat if self.tools.on => self.render_tools_body(cx),
-            Panel::Chat if ssh => self.render_ssh_body(window, cx),
             // Files dropped anywhere on the chat or the input are attached.
             Panel::Chat => v_flex()
                 .id("chat-drop")
