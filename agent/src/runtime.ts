@@ -646,6 +646,7 @@ export class Runtime {
 				return row ? this.sessionInfo(row) : undefined;
 			},
 			adopt: (conversationId, sessionId) => void this.adopted.set(String(conversationId), sessionId),
+			busyElsewhere: (sessionId) => [...this.live.values()].filter((l) => l.busy && l.row.id !== sessionId).length,
 			ask: async (sessionId, question, choices, multiSelect, signal) => {
 				const live = await this.session(sessionId);
 				if (!live) return "";

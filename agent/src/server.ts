@@ -475,7 +475,7 @@ const routes: Record<string, Route> = {
 		if (!id || !b.base_url) throw new HttpError(400, "id and base_url are required");
 		const prev = providers().find((p) => p.id === id);
 		const models = { ...(prev?.models ?? {}), ...(b.model ? { [b.model]: b.context_length ? { context_length: Number(b.context_length) } : {} } : {}) };
-		saveProvider({ id, name: b.name ?? id, base_url: b.base_url, api_key: b.api_key || prev?.api_key, api_mode: prev?.api_mode ?? "chat_completions", models, context_length: b.context_length ? Number(b.context_length) : prev?.context_length });
+		saveProvider({ id, name: b.name ?? id, base_url: b.base_url, api_key: b.api_key || prev?.api_key, api_mode: prev?.api_mode ?? "chat_completions", models, context_length: b.context_length ? Number(b.context_length) : prev?.context_length, parallel: b.parallel === undefined ? prev?.parallel : Number(b.parallel) > 0 ? Math.floor(Number(b.parallel)) : undefined });
 		return { ok: true, id };
 	},
 	"POST /api/providers/custom-endpoints/validate": async (req) => {
@@ -511,6 +511,7 @@ const routes: Record<string, Route> = {
 			model: Object.keys(p.models)[0] ?? "",
 			models: Object.keys(p.models),
 			context_length: p.context_length ?? null,
+			parallel: p.parallel ?? null,
 			has_api_key: Boolean(p.api_key),
 			// Shown whole: this is the person's own machine and keys (a masked one saved back would break it).
 			api_key_preview: p.api_key ?? "",

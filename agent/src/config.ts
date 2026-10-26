@@ -32,6 +32,9 @@ export function db(): DatabaseSync {
 			models TEXT DEFAULT '{}', context_length INTEGER
 		);
 	`);
+	try {
+		database.exec("ALTER TABLE providers ADD COLUMN parallel INTEGER");
+	} catch {}
 	return database;
 }
 
@@ -78,20 +81,22 @@ export interface Provider {
 	/** model id -> { context_length? } */
 	models: Record<string, { context_length?: number }>;
 	context_length?: number;
+	/** How many requests its server answers at once (a local model's slots); unset: as many as asked. */
+	parallel?: number;
 }
 
 export function providers(): Provider[] {
-	return (db().prepare("SELECT * FROM providers ORDER BY id").all() as any[]).map((r) => ({ ...r, models: JSON.parse(r.models || "{}"), api_key: r.api_key ?? undefined, context_length: r.context_length ?? undefined }));
+	return (db().prepare("SELECT * FROM providers ORDER BY id").all() as any[]).map((r) => ({ ...r, models: JSON.parse(r.models || "{}"), api_key: r.api_key ?? undefined, context_length: r.context_length ?? undefined, parallel: r.parallel ?? undefined }));
 }
 
 export function saveProvider(p: Provider): void {
 	db()
 		.prepare(
-			`INSERT INTO providers (id, name, base_url, api_key, api_mode, models, context_length) VALUES (?,?,?,?,?,?,?)
+			`INSERT INTO providers (id, name, base_url, api_key, api_mode, models, context_length, parallel) VALUES (?,?,?,?,?,?,?,?)
 			 ON CONFLICT(id) DO UPDATE SET name=excluded.name, base_url=excluded.base_url, api_key=excluded.api_key,
-			 api_mode=excluded.api_mode, models=excluded.models, context_length=excluded.context_length`,
+			 api_mode=excluded.api_mode, models=excluded.models, context_length=excluded.context_length, parallel=excluded.parallel`,
 		)
-		.run(p.id, p.name ?? p.id, p.base_url, p.api_key ?? null, p.api_mode ?? "chat_completions", JSON.stringify(p.models ?? {}), p.context_length ?? null);
+		.run(p.id, p.name ?? p.id, p.base_url, p.api_key ?? null, p.api_mode ?? "chat_completions", JSON.stringify(p.models ?? {}), p.context_length ?? null, p.parallel ?? null);
 }
 
 export function deleteProvider(id: string): void {

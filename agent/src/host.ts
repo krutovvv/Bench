@@ -23,6 +23,8 @@ export interface Host {
 	session(conversationId: string | number): SessionInfo | undefined;
 	/** A subagent's conversation acts for its parent's session. */
 	adopt(conversationId: string | number, sessionId: string): void;
+	/** How many threads other than `sessionId` are running a turn now (each holds one of the model server's slots). */
+	busyElsewhere(sessionId: string): number;
 	/** The answer, or "" when declined or timed out. */
 	ask(sessionId: string, question: string, choices: string[], multiSelect: boolean, signal?: AbortSignal): Promise<string>;
 	/** "once" | "session" | "always" | "deny". */

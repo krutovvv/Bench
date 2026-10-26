@@ -1,19 +1,48 @@
 // `delegate`: hands self-contained tasks to subagents, Pi Durable's way (README "Abort and
 // Subagents"): each task gets a child conversation owned by this tool call, started as a copy of
 // this conversation's agent minus `delegate`, and the call returns their answers. Replay-safe: a
-// rerun after a crash finds the same children and the same submissions. Several tasks run at once.
+// rerun after a crash finds the same children and the same submissions. Several tasks run at once,
+// as many as the model server has slots free: a local model answers few requests at a time, and
+// requests run side by side share its speed, so subagents beyond its slots only slow everyone.
 
 import { Type } from "@earendil-works/pi-ai";
 import { AssistantEntry, defineTool } from "@earendil-works/pi-durable";
+import { providers, resolveModel } from "../config.ts";
 import { host, sessionOf } from "../host.ts";
+
+/**
+ * How many subagents may run at once: the main model's provider's slots (`parallel`) less the
+ * threads running a turn elsewhere; at least one, since the waiting parent frees its own slot.
+ * No slots set: all at once.
+ */
+export function subagentSlots(tasks: number, parallel: number | undefined, busyElsewhere: number): number {
+	if (!parallel) return tasks;
+	return Math.max(1, Math.min(tasks, parallel - busyElsewhere));
+}
+
+/** Runs `jobs` with at most `limit` at once, results in order. */
+async function pool<T>(limit: number, jobs: (() => Promise<T>)[]): Promise<T[]> {
+	const out: T[] = new Array(jobs.length);
+	let next = 0;
+	const worker = async () => {
+		while (next < jobs.length) {
+			const i = next++;
+			out[i] = await jobs[i]();
+		}
+	};
+	await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, worker));
+	return out;
+}
 
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
 
 export const delegate = defineTool({
 	name: "delegate",
 	description:
-		"Give independent, self-contained tasks to subagents that work in parallel with the same tools and return their answers. " +
-		"Each knows nothing of this conversation: put everything it needs (paths, facts, constraints) in its task. Up to 4 tasks per call.",
+		"Give independent, self-contained tasks to subagents that work with the same tools and return their answers. " +
+		"Each knows nothing of this conversation: put everything it needs (paths, facts, constraints) in its task. Up to 4 tasks per call. " +
+		"They share the model server with every thread: when it answers few requests at once, they run one or two at a time and slow the others, " +
+		"so delegate only large, truly independent work; small steps are faster done yourself.",
 	parameters: Type.Object({
 		tasks: Type.Array(Type.Object({ goal: Type.String(), context: Type.Optional(Type.String()) }), { minItems: 1, maxItems: 4 }),
 	}),
@@ -31,8 +60,11 @@ export const delegate = defineTool({
 		}, context);
 		for (const c of children) host().adopt(c, parent.id);
 		await api.details({ subagents: children } as any, context);
-		const results = await Promise.all(
-			args.tasks.map(async (t, i) => {
+		const parallel = providers().find((p) => p.id === resolveModel().provider)?.parallel;
+		const limit = subagentSlots(args.tasks.length, parallel, host().busyElsewhere(parent.id));
+		const results = await pool(
+			limit,
+			args.tasks.map((t, i) => async () => {
 				const id = `${api.callId}:${i}`;
 				host().emit(parent.id, "subagent.start", { subagent_id: id, goal: t.goal, task_index: i });
 				const child = await api.conversation(children[i], context);

@@ -128,6 +128,18 @@ test("compaction: the summary is made without reasoning, kept across a restart, 
 	assert.equal(await before({ reason: "manual", messages, entries: [], firstKept: 1 }, api({ stopReason: "error", content: [] }), {}), undefined);
 });
 
+test("subagents: as many at once as the model server has slots free, at least one", async () => {
+	const { subagentSlots } = await import("../src/builtin/subagent.ts");
+	const { saveProvider, providers } = await import("../src/config.ts");
+	assert.equal(subagentSlots(4, undefined, 3), 4); // no slots set: all at once
+	assert.equal(subagentSlots(4, 2, 0), 2); // the waiting parent frees its slot
+	assert.equal(subagentSlots(4, 2, 1), 1); // another thread is running a turn
+	assert.equal(subagentSlots(4, 2, 5), 1); // never none: one at a time
+	assert.equal(subagentSlots(1, 8, 0), 1);
+	saveProvider({ id: "local", name: "local", base_url: "http://10.0.0.2/v1", api_mode: "chat_completions", models: {}, parallel: 2 });
+	assert.equal(providers().find((p: any) => p.id === "local")!.parallel, 2);
+});
+
 test("telegram: markdown to HTML, splitting, MEDIA files", () => {
 	assert.equal(toHtml("**a** `b<c` _d_ [e](https://x.y)"), '<b>a</b> <code>b&lt;c</code> <i>d</i> <a href="https://x.y">e</a>');
 	assert.equal(toHtml("| A | B |\n|---|---|\n| 1 | 2 |"), "• <b>A:</b> 1\n  <b>B:</b> 2");
