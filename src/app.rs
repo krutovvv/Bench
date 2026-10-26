@@ -283,6 +283,12 @@ pub struct BenchApp {
     /// rows themselves as they paint: the right-hand rail reads it to say which turn is on screen
     /// and to jump to the one it was clicked on. A row that has not painted holds a big negative.
     pub turn_tops: Vec<Pixels>,
+    /// The thread's scroll strip (drawn by Bench, see ui/chat.rs): its top edge and height,
+    /// measured as it paints. A click on it is turned into an offset with `strip_offset`.
+    /// Keeps the `/`-list keystroke interceptor alive (main.rs).
+    pub _slash_keys: Option<gpui_kit::Subscription>,
+    pub strip_top: Pixels,
+    pub strip_h: f32,
     /// Where the composer is in the window, and the window's height (last frame): the `/` list
     /// opens above the line when there is no room under it.
     pub composer_y: Pixels,
@@ -724,6 +730,9 @@ impl BenchApp {
             last_max: px(0.),
             pinned: px(0.),
             turn_tops: Vec::new(),
+            _slash_keys: None,
+            strip_top: px(0.),
+            strip_h: 0.,
             composer_y: px(0.),
             composer_h: 0.,
             viewport_h: px(0.),

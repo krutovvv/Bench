@@ -363,7 +363,34 @@ pub fn open_main_window(cx: &mut App) {
         ..Default::default()
     };
     if let Err(e) = gpui_kit::open_window(options, cx, |window, cx| {
-        cx.new(|cx| app::BenchApp::new(window, cx))
+        let app = cx.new(|cx| app::BenchApp::new(window, cx));
+        // The `/` list answers ↑ ↓ Tab Enter. It has to be an interceptor: gpui matches key
+        // bindings BEFORE any key listener (Window::dispatch_key_event runs the bindings, and
+        // only after that the capture and bubble key listeners), and the composer is a text
+        // input that binds ↑ ↓ to moving the caret — so a handler on the root or on the
+        // composer's own element sees those arrows only after the caret already moved.
+        let watch = app.downgrade();
+        let keystrokes = cx.intercept_keystrokes(move |ev, window, cx| {
+            let ks = &ev.keystroke;
+            if ks.modifiers.modified() {
+                return;
+            }
+            let used = match ks.key.as_str() {
+                "up" | "down" | "tab" | "enter" => watch
+                    .upgrade()
+                    .map(|app| {
+                        app.update(cx, |this, cx| this.slash_key(ks.key.as_str(), window, cx))
+                    })
+                    .unwrap_or(false),
+                _ => false,
+            };
+            if used {
+                cx.stop_propagation();
+            }
+        });
+        // The interceptor lives as long as the app.
+        app.update(cx, |this, _| this._slash_keys = Some(keystrokes));
+        app
     }) {
         eprintln!("open window: {e:#}");
     }
