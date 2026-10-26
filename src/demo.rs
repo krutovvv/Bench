@@ -371,7 +371,10 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
             {"name": "ghost-theme", "description": "How the blog's Ghost theme is built and changed.", "scope": "repo", "dir": "~/Projects/blog/.agents/skills/ghost-theme"},
             {"name": "humanizer", "description": "Make a text read as written by a person.", "scope": "general", "dir": "~/.bench/agents/default/skills/humanizer"}
         ],
-        "hosts": [{"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"}],
+        "hosts": [
+            {"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"},
+            {"id": "h-web1", "name": "web1", "kind": "ssh", "user": "deploy", "host": "203.0.113.21"}
+        ],
         "cron": [
             {"id": "c-digest", "name": "Weekly digest", "prompt": "Draft the weekly digest from this week's posts and comments; save it as a draft.", "schedule": {"expr": "0 9 * * 1"}, "schedule_display": "0 9 * * 1", "enabled": true, "next_run_at": "2026-10-26T09:00:00+03:00", "last_run_at": "2026-10-19T09:00:00+03:00", "last_status": "ok", "last_output": "The digest draft is saved: 4 posts, 2 top comments."},
             {"id": "c-links", "name": "Broken links", "prompt": "Check every post's links; list the broken ones with the post.", "schedule": {"expr": "every 1d"}, "schedule_display": "every 1d", "enabled": false, "next_run_at": null, "last_status": null}

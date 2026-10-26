@@ -73,6 +73,7 @@ pub static SECTIONS: &[&dyn Section] = &[
     &skills::Skills,
     &prompts::Prompts,
     &schedule::Schedule,
+    &accesses::Machines,
     &accesses::Accesses,
 ];
 

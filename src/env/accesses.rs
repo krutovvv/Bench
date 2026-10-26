@@ -1,6 +1,7 @@
-//! The project's accesses: SSH hosts (a mirror of ~/.ssh/config) and file hosts (its own). A row
-//! each; a file host's card edits it, an SSH one's only takes it out of the project. A remote
-//! project has none here: its accesses are its server's own.
+//! The project's accesses, two blocks: Machines — SSH hosts, a mirror of ~/.ssh/config, shared by
+//! this Mac (their card only takes one out of the project) — and File hosts — SFTP and FTP, the
+//! project's own (their card edits them; /ftp works with them). A remote project has neither
+//! here: its accesses are its server's own.
 
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::component::notification::NotificationType;
@@ -89,7 +90,7 @@ impl Section for Accesses {
         "host"
     }
     fn block(&self, _general: bool) -> &'static str {
-        "Accesses"
+        "File hosts"
     }
     fn shown(&self, app: &BenchApp) -> bool {
         app.project_env
@@ -98,20 +99,18 @@ impl Section for Accesses {
     }
     /// Accesses are the agent's to add: "+ Add" starts the request in the composer.
     fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-        Some(add("env-host-add", "", "Add to this project the access: ", cx).into_any_element())
+        Some(add("env-host-add", "", "Add to this project the file host (SFTP or FTP): ", cx).into_any_element())
     }
     fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let Some(e) = app.project_env.as_ref() else {
             return vec![];
         };
         let mut rows = vec![];
-        if e.hosts.list.is_empty() {
-            rows.push(empty(
-                "No servers or file hosts yet: /ssh and /ftp in its threads offer only these.",
-                cx,
-            ));
+        let list: Vec<Access> = e.hosts.list.iter().filter(|a| a.kind != "ssh").cloned().collect();
+        if list.is_empty() {
+            rows.push(empty("No file hosts yet: /ftp in its threads offers only these.", cx));
         }
-        for (k, a) in e.hosts.list.iter().cloned().enumerate() {
+        for (k, a) in list.into_iter().enumerate() {
             let note = format!("{} · {}", a.kind, a.at());
             rows.push(row(e, "host", a.id, a.name, note, false, k == 0, cx));
         }
@@ -295,5 +294,40 @@ impl BenchApp {
         h.open = Some(id);
         h.dirty = false;
         cx.notify();
+    }
+}
+
+/// The machines (SSH hosts of ~/.ssh/config) the project's threads may reach (`/ssh`, `ssh_run`).
+pub struct Machines;
+
+impl Section for Machines {
+    fn key(&self) -> &'static str {
+        "ssh-host"
+    }
+    fn block(&self, _general: bool) -> &'static str {
+        "Machines"
+    }
+    fn shown(&self, app: &BenchApp) -> bool {
+        Accesses.shown(app)
+    }
+    fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+        Some(add("env-ssh-add", "", "Add to this project the server (SSH): ", cx).into_any_element())
+    }
+    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+        let Some(e) = app.project_env.as_ref() else {
+            return vec![];
+        };
+        let list: Vec<Access> = e.hosts.list.iter().filter(|a| a.kind == "ssh").cloned().collect();
+        if list.is_empty() {
+            return vec![empty("No servers yet: /ssh in its threads offers only these.", cx)];
+        }
+        list.into_iter()
+            .enumerate()
+            .map(|(k, a)| row(e, "ssh-host", a.id.clone(), a.name.clone(), format!("ssh · {}", a.at()), false, k == 0, cx))
+            .collect()
+    }
+    /// The same card as in the accesses: the machine's, shown, taken out of the project.
+    fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
+        Accesses.card(app, name, cx)
     }
 }
