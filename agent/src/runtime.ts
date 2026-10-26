@@ -54,8 +54,8 @@ interface Live {
 	inserts: InsertView[];
 	/** The messages waiting in Pi's inbox, as last told to Bench. */
 	queue: QueuedMessage[];
-	/** Follow-ups Pi placed while the run was ending: told to Bench after its answer, so each answer stays with its message. */
-	placed: string[];
+	/** Follow-ups Pi placed while the run was ending: told to Bench after its answer, so each answer stays with its message. The id lets Bench retire its row in the queue. */
+	placed: { id: string; text: string }[];
 	/** Messages this agent queued, by Pi submission id, until placed or taken back. */
 	pending: Map<string, { text: string; mode: string }>;
 	/** Queue checks, one at a time. */
@@ -670,9 +670,9 @@ export class Runtime {
 					if (live.answer) this.store.addMessage(id, { role: "assistant", text: live.answer });
 					live.answer = "";
 					live.blocks.clear();
-					this.emit(id, "message.user", { text: item.text, queued: true });
-				} else if (live.busy) live.placed.push(item.text);
-				else this.emit(id, "message.user", { text: item.text, queued: true });
+					this.emit(id, "message.user", { text: item.text, queued: true, id: String(rec.id) });
+				} else if (live.busy) live.placed.push({ id: String(rec.id), text: item.text });
+				else this.emit(id, "message.user", { text: item.text, queued: true, id: String(rec.id) });
 				this.queueChanged(live);
 				break;
 			}
@@ -808,7 +808,8 @@ export class Runtime {
 		this.emitUsage(live);
 		this.emit(id, "message.complete", { text });
 		this.emit(id, "sessions.changed", {});
-		for (const t of live.placed.splice(0)) this.emit(id, "message.user", { text: t, queued: true });
+		for (const p of live.placed.splice(0))
+			this.emit(id, "message.user", { text: p.text, queued: true, id: p.id });
 	}
 
 	// ---- titles ----------------------------------------------------------

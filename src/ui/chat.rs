@@ -679,12 +679,26 @@ impl BenchApp {
                     .into_any_element();
                 let editor = field.map(|st| {
                     // The same field as the composer's, at the same size and leading; the row is
-                    // as tall as the text (no scroll of its own).
+                    // as tall as the text (no scroll of its own). The click belongs to this field:
+                    // the thread takes the focus to the composer on any bare click, and here that
+                    // steal meant typing went somewhere else.
                     div()
+                        .id(("queued-field", k))
                         .ml(px(-12.))
                         .my(px(-10.))
-                        .line_height(relative(super::LEAD))
-                        .child(Textarea::new(&st).appearance(false).large())
+                        .cursor_text()
+                        .on_mouse_down(
+                            MouseButton::Left,
+                            cx.listener(|this, _: &MouseDownEvent, _, _| {
+                                this.click_claimed = true;
+                            }),
+                        )
+                        .child(
+                            Textarea::new(&st)
+                                .appearance(false)
+                                .large()
+                                .line_height(relative(super::LEAD)),
+                        )
                         .into_any_element()
                 });
                 self.user_row(

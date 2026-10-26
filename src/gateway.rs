@@ -190,7 +190,7 @@ pub enum Evt {
     /// A thread's waiting messages: (id, "followUp"/"steer", text).
     Queue(String, Vec<(String, String, String)>),
     /// A waiting message the agent took up: it is the thread's next turn.
-    UserPlaced(String, String),
+    UserPlaced(String, String, String),
     /// A thread's inserts as the agent keeps them (the whole list, in order).
     Inserts(String, Vec<crate::model::Insert>),
     /// The agent refused an insert's change: the thread's list is read again.
@@ -957,7 +957,11 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
                 })
                 .unwrap_or_default(),
         )),
-        "message.user" => emit(Evt::UserPlaced(sid, text())),
+        "message.user" => emit(Evt::UserPlaced(
+            sid,
+            text(),
+            payload["id"].as_str().unwrap_or_default().to_string(),
+        )),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
         "session.speed" => emit(Evt::Speed(
             sid,

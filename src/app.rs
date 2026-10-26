@@ -842,10 +842,18 @@ impl BenchApp {
             return;
         };
         self.cmd(if send_now {
-            Cmd::QueueSend { session, id }
+            Cmd::QueueSend { session: session.clone(), id: id.clone() }
         } else {
-            Cmd::QueueWithdraw { session, id }
+            Cmd::QueueWithdraw { session, id: id.clone() }
         });
+        // Sent now: it is the next thing the agent answers, so its row rises to the head of the
+        // list at once, without waiting for the agent's next snapshot of the queue.
+        if send_now && self.queue.len() > 1 {
+            if let Some(k) = self.queue.iter().position(|(i, ..)| i == &id) {
+                let it = self.queue.remove(k);
+                self.queue.insert(0, it);
+            }
+        }
         cx.notify();
     }
 
@@ -876,6 +884,9 @@ impl BenchApp {
         })
         .detach();
         self.queue_edit = Some((id, field.clone()));
+        // The click that opened this field is its own: the thread's bare-click rule (the composer
+        // takes the focus) must not undo the focus this field just took.
+        self.click_claimed = true;
         field.update(cx, |s, cx| s.focus(window, cx));
         cx.notify();
     }
@@ -1099,8 +1110,20 @@ impl BenchApp {
                 self.queue = items;
                 cx.notify();
             }
-            // A waiting message the agent took up: the thread's next turn.
-            Evt::UserPlaced(sid, text) if self.is_current(&sid) => {
+            // A waiting message the agent took up: the thread's next turn. Its row in the queue is
+            // this same message, and the inbox snapshot lags behind the run — so the row gives way
+            // here, by its id (or by its words, from an agent that sends none). Otherwise it stayed
+            // on the screen saying "Queued" while the agent was already at work on it.
+            Evt::UserPlaced(sid, text, sub) if self.is_current(&sid) => {
+                let gone = |id: &str, t: &str| id == sub || (sub.is_empty() && t == text);
+                self.queue.retain(|(id, _, t)| !gone(id, t));
+                if self
+                    .queue_edit
+                    .as_ref()
+                    .is_some_and(|(e, _)| e == &sub && !sub.is_empty())
+                {
+                    self.queue_edit = None;
+                }
                 self.turns.push(Turn {
                     user: text,
                     started: Some(now_secs()),
