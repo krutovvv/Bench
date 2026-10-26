@@ -116,7 +116,13 @@ impl BenchApp {
             cx,
             pick,
         );
-        page.push(h_flex().pt_4().child(tabs).into_any_element());
+        page.push(
+            h_flex()
+                // the same air over the tabs as the page's inset everywhere
+                .pt(px(crate::ui::CHAT_LEFT))
+                .child(tabs)
+                .into_any_element(),
+        );
         match self.gear_tab {
             1 => {
                 page.extend(self.render_presets(cx));
@@ -490,9 +496,11 @@ impl BenchApp {
             .id("providers")
             .size_full()
             .overflow_y_scroll()
-            .px_4()
-            .pb_6()
-            .child(v_flex().max_w(px(820.)).children(page))
+            // the thread's inset all around: as far from the edge as its avatar
+            .pl(px(crate::ui::CHAT_LEFT))
+            .pr(px(crate::ui::CHAT_LEFT))
+            .pb(px(crate::ui::CHAT_LEFT))
+            .child(v_flex().flex_1().children(page))
             .into_any_element()
     }
 }

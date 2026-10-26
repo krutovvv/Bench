@@ -40,7 +40,9 @@ y ┌─────────────────────────
 | Status bar | `STATUS_H` (29) incl. its top rule | left: the agent's state, model, context, speed, effort, approvals; right: background terminals, paperclip, mic, Settings gear, Stop last | items `px_2` | `src/ui/statusbar.rs` |
 
 `bar_h` = `font_size × 2.5` (35). Every rule that crosses the window is one pixel row. The
-status bar is the only shorter bar.
+status bar is the only shorter bar. The Settings panel (the gear) and the new project's page take
+the thread's inset all around — `CHAT_LEFT` (28) from the divider, the window's right edge and the
+bottom, and the same air over their tabs; their content fills that width, no max-width.
 
 ## Which area a thing belongs to
 

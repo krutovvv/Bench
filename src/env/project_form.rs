@@ -331,9 +331,11 @@ impl BenchApp {
             .id("new-project")
             .size_full()
             .overflow_y_scroll()
-            .px_4()
-            .pb_6()
-            .child(v_flex().max_w(px(820.)).children(page))
+            // the thread's inset all around, like the gear's page
+            .pl(px(crate::ui::CHAT_LEFT))
+            .pr(px(crate::ui::CHAT_LEFT))
+            .pb(px(crate::ui::CHAT_LEFT))
+            .child(v_flex().flex_1().children(page))
             .into_any_element()
     }
 }
