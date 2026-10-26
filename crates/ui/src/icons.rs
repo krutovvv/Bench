@@ -7,10 +7,13 @@ use gpui_kit::*;
 
 macro_rules! icons {
     ($($name:ident => $file:literal),* $(,)?) => {
-        #[derive(Clone, Copy)]
+        #[derive(Clone, Copy, Debug)]
         pub enum Ico { $($name),* }
 
         impl Ico {
+            /// Every icon, for the storybook.
+            pub const ALL: &[Ico] = &[$(Ico::$name),*];
+
             fn bytes(self) -> &'static [u8] {
                 match self { $(Ico::$name => include_bytes!(concat!("../../../assets/icons/", $file, ".svg"))),* }
             }

@@ -16,7 +16,12 @@ pub fn bare_field(state: &Entity<InputState>) -> Input {
     Input::new(state).appearance(false)
 }
 
-/// A password: masked, with the eye to show it.
+/// The state of a password field: masked from the start.
+pub fn secret_state(window: &mut Window, cx: &mut Context<InputState>) -> InputState {
+    InputState::new(window, cx).masked(true)
+}
+
+/// A password: masked (its state made by `secret_state`), with the eye to show it.
 pub fn secret_field(state: &Entity<InputState>) -> Input {
     Input::new(state).mask_toggle()
 }

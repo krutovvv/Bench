@@ -1,0 +1,9 @@
+[package]
+name = "storybook"
+version = "0.1.0"
+edition = "2024"
+description = "Every bench_ui element in every state, in one window: the catalog and the reference for screenshots"
+
+[dependencies]
+bench_ui = { path = "../ui" }
+gpui-kit = "0.8.0"

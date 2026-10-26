@@ -21,6 +21,6 @@ pub fn spread(gap: Gap) -> Div {
 }
 
 /// Space that takes what is left in a row: what follows goes to the right end.
-pub fn fill() -> Div {
+pub fn spacer() -> Div {
     div().flex_1()
 }
