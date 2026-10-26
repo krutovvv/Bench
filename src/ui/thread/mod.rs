@@ -165,9 +165,8 @@ impl View {
 
 impl BenchApp {
     /// The rows of the open thread into the list, if the thread changed since the last frame.
-    fn sync_rows(&mut self, cx: &mut Context<Self>) {
+    fn sync_rows(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.tv.watch();
-        self.tv.room = self.tv.room_past_end(self.viewport_h);
         let version = self.thread.version();
         let owner = self.session.clone();
         if version != self.tv.version || owner != self.tv.owner {
@@ -176,6 +175,17 @@ impl BenchApp {
             let follow = std::mem::take(&mut self.follow);
             let changed = self.tv.sync(owner.as_deref(), rows, follow);
             self.parse_ahead(changed, cx);
+            // The tail's new height is known only after this frame's layout: look again then.
+            window.request_animation_frame();
+        }
+        // The list keeps an item's first measured height: the room is measured again when it
+        // changes (the composer shrank after sending, the window was resized).
+        let room = self.tv.room_past_end(self.viewport_h);
+        if (room - self.tv.room).abs() > px(0.5) {
+            self.tv.room = room;
+            let end = self.tv.tail() + 1;
+            self.tv.list.remeasure_items(end..end + 1);
+            window.request_animation_frame();
         }
         // A live run's clock moves once a second.
         if self.thread.running() && self.tv.ticker.is_none() {
@@ -227,7 +237,7 @@ impl BenchApp {
             self.subject_opened = true;
             self.new_project_form(window, cx);
         }
-        self.sync_rows(cx);
+        self.sync_rows(window, cx);
         // `BENCH_DEMO_SCROLL=end`: the thread scrolled as far down as it goes (for screenshots).
         if self.demo && !self.demo_scrolled && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end") {
             self.demo_scrolled = true;
