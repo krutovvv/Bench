@@ -38,10 +38,6 @@ fn work_pos(turns: &[Turn], at: Option<f64>) -> usize {
         .unwrap_or(turns.len())
 }
 
-/// Where the thread goes when its scroll strip is clicked `at` pixels below the strip's top:
-/// the same fraction of the way through the content as the click is down the strip. Click the
-/// top for the start, the bottom for the end, the middle for the middle — what a scrollbar is
-/// for. Past the ends it clamps; an empty strip (no height, nothing to scroll) stays put.
 /// One frame of following the tail. `off` is how much was scrolled from the top (so going UP
 /// the thread makes it smaller), `max` is the bottom with the room under the composer trimmed
 /// away, `pinned` is where we last pinned the view. Returns (follow, pinned, offset to jump to).
@@ -388,6 +384,17 @@ impl BenchApp {
             None
         };
 
+        // A row measured above what is being read changed the height the thread is counted at:
+        // move the view by the same amount, so the words under the eyes stay under the eyes. At
+        // the tail this does not matter — the frame pins to the bottom anyway.
+        if self.rows_shift.abs() > 0.5 {
+            if !self.follow {
+                let o = -self.chat_scroll.offset().y + px(self.rows_shift);
+                self.chat_scroll.set_offset(point(px(0.), -o));
+                self.pinned = o;
+            }
+            self.rows_shift = 0.;
+        }
         // Follow the tail: stay pinned to the composer until the user scrolls up. "The bottom" is
         // the composer's, not the room the thread scrolls on past it (past_end), so a
         // short thread stays put and nothing calls for "Jump to latest".
@@ -431,43 +438,56 @@ impl BenchApp {
         let procs_after = work_pos(&self.turns, self.proc_moment());
         let mut procs = self.render_processes(cx);
 
-        let mut rows: Vec<AnyElement> = self.render_inserts_at(0, n == 0, window, cx);
-        // Slots for where each row will paint; the rail reads them, so a thread that lost turns
-        // keeps its numbering straight.
-        self.turn_tops.resize(n, px(-1_000_000.));
+        // The thread as rows the model knows the heights of: the head (the environment's open
+        // rows and the placeholder), one row per turn with its inserts and its work rows under
+        // it, and the tail (the forms, the queue, the composer). Only the rows the viewport
+        // needs, plus a band around it, are built and laid out; the rest of the thread stands in
+        // for by two spacers carrying their heights. A frame therefore costs the screen, not the
+        // thread, and a long thread stops being slower than a short one.
+        let mut keys: Vec<crate::ui::rows::RowKey> =
+            vec![crate::ui::rows::RowKey::Block("head")];
+        keys.extend((0..n).map(crate::ui::rows::RowKey::Turn));
+        keys.push(crate::ui::rows::RowKey::Block("tail"));
+        self.rows.sync(&keys);
+        // The room the thread scrolls in, as the band's size: the window less the chrome over and
+        // under it. The band itself is twice this tall, so being off a little costs nothing.
+        let vh = f32::from(window.bounds().size.height) - 140.;
+        let band = self.rows.visible(f32::from(off), vh.max(240.));
         let view = cx.entity();
+        let head: AnyElement = v_flex()
+            .w_full()
+            .children(env_rows)
+            .when(block_on_top, |d| d.children(subject_block.take()))
+            .children(placeholder)
+            .into_any_element();
+        let mut rows: Vec<AnyElement> = Vec::new();
+        if band.start > 0 {
+            rows.push(Self::spacer(self.rows.start(band.start)));
+        }
+        if band.contains(&0) {
+            rows.push(self.measured_row(0, head, f32::from(off), view.clone(), cx));
+        }
         for i in 0..n {
-            let view = view.clone();
-            // Each row says where it was painted: the rail needs it to tell which turn is on
-            // screen and to jump to the one clicked. Written while painting, without a notify —
-            // a notify there would paint forever; the rail reads the numbers a frame later.
-            rows.push(
-                div()
-                    .relative()
-                    .child(self.render_turn(i, cx))
-                    .child(
-                        canvas(
-                            move |bounds, _, cx| {
-                                view.update(cx, |this, _| {
-                                    if let Some(slot) = this.turn_tops.get_mut(i) {
-                                        *slot = bounds.origin.y;
-                                    }
-                                });
-                            },
-                            |_, _, _, _| {},
-                        )
-                        .absolute()
-                        .size_full(),
-                    )
-                    .into_any_element(),
-            );
-            rows.extend(self.render_inserts_at(i + 1, i + 1 == n, window, cx));
+            if !band.contains(&(i + 1)) {
+                continue;
+            }
+            // The turn's row carries what belongs under it: its inserts, and the plan and the
+            // processes when their moment is here.
+            let mut row = v_flex().w_full().child(self.render_turn(i, cx));
+            row.extend(self.render_inserts_at(i + 1, i + 1 == n, window, cx));
             if plan_after == i + 1 {
-                rows.extend(plan.take());
+                row.extend(plan.take());
             }
             if procs_after == i + 1 {
-                rows.extend(procs.take());
+                row.extend(procs.take());
             }
+            rows.push(self.measured_row(
+                i + 1,
+                row.into_any_element(),
+                f32::from(off),
+                view.clone(),
+                cx,
+            ));
         }
         if n == 0 && plan_after == 0 {
             rows.extend(plan.take());
@@ -481,10 +501,26 @@ impl BenchApp {
         rows.extend(procs.take());
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
-        let rail = self.render_turn_rail(at_bottom, cx);
+        let rail = self.render_turn_rail(at_bottom, f32::from(off), cx);
         // The environment's open row, as the agent's answer under it.
         let queue = self.render_queue(cx);
         let composer = self.render_composer(cx);
+        // The thread's last row: the forms, what waits in the queue, and the composer.
+        let tail_idx = n + 1;
+        let tail: AnyElement = v_flex()
+            .w_full()
+            .children(approval)
+            .children(clarify)
+            .children(subject_block)
+            .children(queue)
+            .child(composer)
+            .into_any_element();
+        if band.contains(&tail_idx) {
+            rows.push(self.measured_row(tail_idx, tail, f32::from(off), view.clone(), cx));
+        }
+        if band.end < self.rows.lens() {
+            rows.push(Self::spacer(self.rows.content() - self.rows.start(band.end)));
+        }
 
         div()
             .relative()
@@ -522,22 +558,7 @@ impl BenchApp {
                     .pb(px(past))
                     // The window's whole width from its left edge, as an editor's text (no cap,
                     // no centering).
-                    .child(
-                        v_flex()
-                            .w_full()
-                            .children(env_rows)
-                            .when(block_on_top, |d| d.children(subject_block.take()))
-                            .children(placeholder)
-                            .children(rows)
-                            .children(approval)
-                            .children(clarify)
-                            .children(subject_block)
-                            // What the person has written and has not yet gone out.
-                            .children(queue)
-                            // The next message is the thread's last row: it scrolls
-                            // away with the thread, "Jump to latest" brings it back.
-                            .child(composer),
-                    ),
+                    .child(v_flex().w_full().children(rows)),
             )
             .children(rail)
             .when(!self.follow, |d| {
@@ -1015,26 +1036,71 @@ impl BenchApp {
             .into_any_element()
     }
 
+    /// A row of the thread that is not on screen: its height, and nothing else.
+    fn spacer(h: f32) -> AnyElement {
+        div().flex_none().w_full().h(px(h.max(0.))).into_any_element()
+    }
+
+    /// Wrap a row so it says how tall it came out, while it is being laid out and without asking
+    /// for another frame. `off` is how far the thread was scrolled when the band was picked; a
+    /// row that ends above that grew the thread over what is being read, and the difference is
+    /// banked in `rows_shift`, to be paid back at the start of the next frame.
+    fn measured_row(
+        &self,
+        idx: usize,
+        el: AnyElement,
+        off: f32,
+        view: Entity<Self>,
+        _cx: &mut Context<Self>,
+    ) -> AnyElement {
+        div()
+            .relative()
+            .child(el)
+            .child(
+                canvas(
+                    move |b, _, cx| {
+                        view.update(cx, |this, _| {
+                            let h = f32::from(b.size.height);
+                            if let Some(delta) = this.rows.set_measured(idx, h) {
+                                if delta != 0. && this.rows.start(idx) + h <= off + 1. {
+                                    this.rows_shift += delta;
+                                }
+                            }
+                        });
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_full(),
+            )
+            .into_any_element()
+    }
+
     /// The turns as ticks along the right edge: this is the thread's navigator, not an addition
     /// to a scrollbar — there is no scrollbar, Bench never draws a thumb. The tick of the turn
     /// being read is lit, hover shows the question, a click jumps to that turn. Only with two
     /// turns or more, since with one there is nothing to move between.
-    fn render_turn_rail(&mut self, at_bottom: bool, cx: &mut Context<Self>) -> Option<AnyElement> {
+    fn render_turn_rail(
+        &mut self,
+        at_bottom: bool,
+        off: f32,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
         let n = self.turns.len();
         if n < 2 {
             return None;
         }
         let theme = cx.theme().clone();
-        // The viewport's top edge, window space: a row at or under it is the one being read.
-        let view_y = self.chat_scroll.bounds().origin.y;
+        // The turn being read: the last one that begins at or above the top of the viewport. The
+        // model answers this for every turn, painted or not, since its height is known or counted
+        // at the average of the measured ones.
         let current = if at_bottom {
             n - 1
         } else {
-            self.turn_tops
-                .iter()
-                .position(|y| f32::from(*y) >= f32::from(view_y) - 2.)
-                .unwrap_or(n - 1)
-                .min(n - 1)
+            (0..n)
+                .filter(|i| self.rows.start(i + 1) <= off + 2.)
+                .last()
+                .unwrap_or(0)
         };
         // Ticks pack tighter as turns add up, so the rail stays a modest column.
         let pitch = (240. / n as f32).clamp(3., 8.);
@@ -1065,24 +1131,16 @@ impl BenchApp {
                 )
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    // Bring that row's top just under the window's edge: the thread scrolls on
-                    // past its last line, so any row can be read from the top, as in an editor.
-                    if let Some(y) = this
-                        .turn_tops
-                        .get(i)
-                        .copied()
-                        .filter(|y| f32::from(*y) > -1_000.)
-                    {
-                        let off = -f32::from(this.chat_scroll.offset().y)
-                            + f32::from(y)
-                            - f32::from(view_y)
-                            - 8.;
-                        let max = f32::from(this.chat_scroll.max_offset().y);
-                        this.follow = false;
-                        this.click_claimed = true;
-                        this.chat_scroll
-                            .set_offset(point(px(0.), px(-off.clamp(0., max))));
-                    }
+                    // Bring that row's top just under the top of the viewport: the thread scrolls
+                    // on past its last line, so any row can be read from the top, as in an editor.
+                    // The model's numbers answer for rows never painted; when such a row arrives
+                    // and is measured, the frame holds the place it lands on.
+                    let off = this.rows.start(i + 1) - 8.;
+                    let max = f32::from(this.chat_scroll.max_offset().y);
+                    this.follow = false;
+                    this.click_claimed = true;
+                    this.chat_scroll
+                        .set_offset(point(px(0.), px(-off.clamp(0., max))));
                     cx.notify();
                 }))
         });

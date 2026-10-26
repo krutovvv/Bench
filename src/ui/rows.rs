@@ -11,20 +11,12 @@ use std::collections::HashMap;
 /// not to the index it happened to have then.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub enum RowKey {
-    /// The turn's own row (its message, its steps, its answer).
+    /// A turn's row: its message, its steps, its answer, and whatever belongs under it (its
+    /// inserts, the plan and the processes when their moment is there).
     Turn(usize),
-    /// An insert, at its place among the turns.
-    Insert(String),
-    /// The agent's plan row.
-    Plan,
-    /// The row of the agent's background processes.
-    Procs,
-    /// What the person typed and has not yet sent.
-    Queue,
-    /// The composer, the thread's last row.
-    Composer,
-    /// Any other block that hangs under a turn (an approval, a form, an open file).
-    Block(String),
+    /// A row that is not a turn: the head of the thread (the environment's open rows, the
+    /// placeholder) or its tail (the forms, the queue, the composer).
+    Block(&'static str),
 }
 
 /// A row that has never been laid out is counted at this height until it is seen.
@@ -127,12 +119,6 @@ impl Rows {
         self.measured.insert(key, h);
         self.rebuild();
         Some(if before.is_some() { delta } else { 0. })
-    }
-
-    /// Whether the row was measured at all: an unmeasured row is counted at a guess, so the sums
-    /// around it are not yet to be trusted.
-    pub fn is_measured(&self, i: usize) -> bool {
-        self.keys.get(i).is_some_and(|k| self.measured.contains_key(k))
     }
 
     /// The rows the viewport shows, plus the overscan on both sides, as a range of indices.
@@ -242,16 +228,15 @@ mod tests {
     #[test]
     fn rows_keep_their_height_when_the_shape_changes() {
         let mut r = ten();
-        // An insert arrives after the third turn: the turns shift by one place and keep heights.
+        // A row appears after the third turn: the ones after it shift by one place and keep the
+        // heights they were measured at, while the new one is counted at their average.
         let mut keys = turns(10);
-        keys.insert(3, RowKey::Insert("a".into()));
+        keys.insert(3, RowKey::Block("a"));
         r.sync(&keys);
         assert_eq!(r.lens(), 11);
         assert_eq!(r.start(1), 100.);
-        // The new row itself is a guess until it is laid out.
-        assert!(!r.is_measured(3));
-        assert!(r.is_measured(4));
-        // Rows that went away are forgotten, so a reopened thread measures afresh.
+        assert_eq!(r.content(), 11f32 * 100.);
+        // Rows that went away are forgotten, so the bank holds only what a thread shows.
         r.sync(&turns(2));
         assert_eq!(r.lens(), 2);
     }

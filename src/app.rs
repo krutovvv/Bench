@@ -287,10 +287,12 @@ pub struct BenchApp {
     stream_waiting: bool,
     /// The timer that paints the frame the budget turned down (kept: dropping a Task cancels it).
     stream_task: Option<gpui_kit::Task<()>>,
-    /// Where each turn's row was painted last frame (window space, its top edge), written by the
-    /// rows themselves as they paint: the right-hand rail reads it to say which turn is on screen
-    /// and to jump to the one it was clicked on. A row that has not painted holds a big negative.
-    pub turn_tops: Vec<Pixels>,
+    /// The thread's rows as numbers — heights, starts, the visible band (ui/rows.rs) — so a
+    /// frame lays out what is on screen and not what the thread has ever said.
+    pub rows: crate::ui::rows::Rows,
+    /// Height learned since the last frame in the rows above the viewport; the frame pays it
+    /// back by moving the view the same way, which is what keeps the reading place still.
+    pub rows_shift: f32,
     /// Keeps the `/`-list keystroke interceptor alive (main.rs).
     pub _slash_keys: Option<gpui_kit::Subscription>,
     /// Where the composer is in the window, and the window's height (last frame): the `/` list
@@ -737,7 +739,8 @@ impl BenchApp {
             stream_painted: None,
             stream_waiting: false,
             stream_task: None,
-            turn_tops: Vec::new(),
+            rows: Default::default(),
+            rows_shift: 0.,
             _slash_keys: None,
             composer_y: px(0.),
             composer_h: 0.,
@@ -1464,7 +1467,7 @@ impl BenchApp {
     fn reset_scroller(&mut self, cx: &mut Context<Self>) {
         self.follow = true;
         self.pinned = px(0.);
-        self.turn_tops.clear();
+        self.rows_shift = 0.;
         self.open_steps.clear();
         self.open_source = None;
         cx.notify();
