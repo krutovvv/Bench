@@ -42,13 +42,6 @@ fn work_pos(turns: &[Turn], at: Option<f64>) -> usize {
 /// the same fraction of the way through the content as the click is down the strip. Click the
 /// top for the start, the bottom for the end, the middle for the middle — what a scrollbar is
 /// for. Past the ends it clamps; an empty strip (no height, nothing to scroll) stays put.
-fn strip_offset(at: f32, strip_h: f32, max_offset: f32) -> f32 {
-    if strip_h <= 0. || max_offset <= 0. {
-        return 0.;
-    }
-    (at / strip_h).clamp(0., 1.) * max_offset
-}
-
 /// One frame of following the tail. `off` is how much was scrolled from the top (so going UP
 /// the thread makes it smaller), `max` is the bottom with the room under the composer trimmed
 /// away, `pinned` is where we last pinned the view. Returns (follow, pinned, offset to jump to).
@@ -118,22 +111,6 @@ mod tail_tests {
         assert!(follow);
         assert_eq!(jump, None);
         assert_eq!(pinned, 0.);
-    }
-}
-
-#[cfg(test)]
-mod strip_tests {
-    use super::strip_offset;
-    #[test]
-    fn a_click_on_the_strip_moves_the_thread_the_same_way() {
-        assert_eq!(strip_offset(0., 500., 2000.), 0.);
-        assert_eq!(strip_offset(500., 500., 2000.), 2000.);
-        assert_eq!(strip_offset(250., 500., 2000.), 1000.);
-        // Past the ends it stops at them; nothing to scroll means nowhere to go.
-        assert_eq!(strip_offset(-40., 500., 2000.), 0.);
-        assert_eq!(strip_offset(900., 500., 2000.), 2000.);
-        assert_eq!(strip_offset(120., 0., 2000.), 0.);
-        assert_eq!(strip_offset(120., 500., 0.), 0.);
     }
 }
 
@@ -505,7 +482,6 @@ impl BenchApp {
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
         let rail = self.render_turn_rail(at_bottom, cx);
-        let strip = self.render_scroll_strip(cx);
         // The environment's open row, as the agent's answer under it.
         let queue = self.render_queue(cx);
         let composer = self.render_composer(cx);
@@ -563,7 +539,6 @@ impl BenchApp {
                             .child(composer),
                     ),
             )
-            .child(strip)
             .children(rail)
             .when(!self.follow, |d| {
                 d.child(
@@ -1040,93 +1015,10 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// The turns as ticks in the right gutter (no scrollbar): which one is on screen, a peek at
-    /// each question on hover, a click to jump. Only with two turns or more. It stands clear of
-    /// the scrollbar's own strip, so a click there reaches the bar and not the rail.
-    /// The thread's scroll strip. Bench draws it and answers clicks on it, because gpui paints
-    /// no bar of its own for a plain scroll container — there was simply nothing at the right
-    /// edge to click. The thumb shows how much of the thread fits on screen and where it is; a
-    /// click puts the thread at that part of it (`strip_offset`). The turn ticks stand to its
-    /// left and keep their own clicks.
-    fn render_scroll_strip(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let max = f32::from(self.chat_scroll.max_offset().y);
-        let off = (-f32::from(self.chat_scroll.offset().y)).max(0.);
-        let view = cx.entity();
-        let vp = f32::from(self.chat_scroll.bounds().size.height);
-        let content = max + vp;
-        let share = if content > 0. {
-            (vp / content).clamp(0.06, 1.)
-        } else {
-            1.
-        };
-        let h = self.strip_h;
-        let len = (share * h).max(24.);
-        let y = if max > 0. { (off / max) * (h - len) } else { 0. };
-        div()
-            .absolute()
-            .top_0()
-            .bottom_0()
-            .right_0()
-            .w(px(18.))
-            .cursor_pointer()
-            .child(
-                canvas(
-                    move |bounds, _, cx| {
-                        view.update(cx, |this, cx| {
-                            if this.strip_top != bounds.origin.y
-                                || this.strip_h != f32::from(bounds.size.height)
-                            {
-                                this.strip_top = bounds.origin.y;
-                                this.strip_h = f32::from(bounds.size.height);
-                                cx.notify();
-                            }
-                        });
-                    },
-                    |_, _, _, _| {},
-                )
-                .absolute()
-                .inset_0()
-                .size_full(),
-            )
-            .child(
-                div()
-                    .absolute()
-                    .top_0()
-                    .bottom_0()
-                    .right(px(2.))
-                    .w(px(8.))
-                    .when(max > 0., |d| {
-                        d.child(
-                            div()
-                                .absolute()
-                                .left_0()
-                                .right_0()
-                                .top(px(y))
-                                .h(px(len))
-                                .rounded(px(3.))
-                                .bg(theme.scrollbar_thumb),
-                        )
-                    }),
-            )
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(move |this: &mut BenchApp, ev: &MouseDownEvent, _window, cx| {
-                    if this.strip_h <= 0. {
-                        return; // the strip's first frame: nothing measured to judge by yet
-                    }
-                    this.click_claimed = true;
-                    this.follow = false;
-                    let at = f32::from(ev.position.y) - f32::from(this.strip_top);
-                    let max = f32::from(this.chat_scroll.max_offset().y);
-                    let o = strip_offset(at, this.strip_h, max);
-                    this.chat_scroll.set_offset(gpui::point(px(0.), px(-o)));
-                    cx.notify();
-                }),
-            )
-            .into_any_element()
-    }
-
+    /// The turns as ticks along the right edge: this is the thread's navigator, not an addition
+    /// to a scrollbar — there is no scrollbar, Bench never draws a thumb. The tick of the turn
+    /// being read is lit, hover shows the question, a click jumps to that turn. Only with two
+    /// turns or more, since with one there is nothing to move between.
     fn render_turn_rail(&mut self, at_bottom: bool, cx: &mut Context<Self>) -> Option<AnyElement> {
         let n = self.turns.len();
         if n < 2 {
@@ -1161,7 +1053,7 @@ impl BenchApp {
                 .child(
                     div()
                         .h(px(2.))
-                        .w(px(8.))
+                        .w(px(10.))
                         .bg(if on {
                             theme.primary
                         } else {
@@ -1187,6 +1079,7 @@ impl BenchApp {
                             - 8.;
                         let max = f32::from(this.chat_scroll.max_offset().y);
                         this.follow = false;
+                        this.click_claimed = true;
                         this.chat_scroll
                             .set_offset(point(px(0.), px(-off.clamp(0., max))));
                     }
@@ -1198,10 +1091,9 @@ impl BenchApp {
                 .absolute()
                 .top_0()
                 .bottom_0()
-                // Clear of the scrollbar: its strip is 16 px at the very edge, and a rail over it
-                // would take the presses meant for the bar.
-                .right(px(20.))
-                .w(px(12.))
+                // Where a scrollbar would be: the ticks are the navigator, so they own the edge.
+                .right(px(4.))
+                .w(px(14.))
                 .justify_center()
                 .child(v_flex().children(ticks))
                 .into_any_element(),
