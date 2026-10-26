@@ -96,9 +96,30 @@ impl BenchApp {
         let muted = theme.muted_foreground;
         let mut page: Vec<AnyElement> = vec![];
 
-        // ---- the look: Bench's own, first, so it stays put whichever agent is shown below ----
-        page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
-        page.push(self.render_appearance(cx).into_any_element());
+        // ---- tabs: the agents (the main thing), the presets, the look ----
+        let tabs = crate::inserts::tools::view::segmented_tall(
+            "gear-tabs",
+            &["Agents", "Presets", "Appearance"],
+            self.gear_tab,
+            cx,
+            |this, k, _, cx| {
+                this.gear_tab = k;
+                cx.notify();
+            },
+        );
+        page.push(h_flex().pt_4().child(tabs).into_any_element());
+        match self.gear_tab {
+            1 => {
+                page.extend(self.render_presets(cx));
+                return Self::providers_page(page);
+            }
+            2 => {
+                page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
+                page.push(self.render_appearance(cx).into_any_element());
+                return Self::providers_page(page);
+            }
+            _ => {}
+        }
 
         // ---- agents: each has its own models and voice (its own network: a model on its
         // own machine is localhost there) ----
@@ -558,6 +579,94 @@ impl BenchApp {
                 ))
                 .into_any_element(),
         );
+        out
+    }
+}
+
+impl BenchApp {
+    /// The Presets tab: each kind as a few lines, Edit opens its JSON (Save, Built-in, Cancel).
+    fn render_presets(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let muted = cx.theme().muted_foreground;
+        let p = self.presets.clone();
+        let mut out = vec![div()
+            .pt_4()
+            .text_sm()
+            .text_color(muted)
+            .child("What a project takes with one click (+ Add in its environment), and the choices of its Model section. Kept by This Mac's agent; a server's projects take them too. Keys can be written right into a preset.")
+            .into_any_element()];
+        for (kind, title) in crate::app::presets::KINDS {
+            let lines: Vec<(String, String)> = match kind {
+                "mcp" => p.mcp.iter().map(|(n, t, _)| (n.clone(), t.clone())).collect(),
+                "lsp" => p.lsp.iter().map(|(n, t, _)| (n.clone(), t.clone())).collect(),
+                "compaction" => p
+                    .compaction
+                    .iter()
+                    .map(|(at, n)| (format!("{}%", (at * 100.).round()), n.clone()))
+                    .collect(),
+                _ => vec![(p.reasoning.join(", "), "offered in a project's Model section and the composer".into())],
+            };
+            out.push(self.pv_heading(title.to_uppercase(), cx).into_any_element());
+            for (name, note) in lines {
+                out.push(
+                    h_flex()
+                        .gap_2()
+                        .py_1p5()
+                        .border_b_1()
+                        .border_color(cx.theme().border)
+                        .child(div().flex_none().child(name))
+                        .child(div().flex_1().min_w_0().truncate().text_color(muted).child(note))
+                        .into_any_element(),
+                );
+            }
+            let open = self.preset_editor.as_ref().filter(|e| e.kind == kind).map(|e| e.text.clone());
+            match open {
+                Some(text) => {
+                    out.push(div().pt_2().child(crate::env::section::code(&text, cx)).into_any_element());
+                    out.push(
+                        h_flex()
+                            .py_2()
+                            .gap_2()
+                            .child(self.pv_button(
+                                SharedString::from(format!("preset-save-{kind}")),
+                                "Save",
+                                true,
+                                cx,
+                                Box::new(|this, w, cx| this.save_presets(false, w, cx)),
+                            ))
+                            .child(self.pv_button(
+                                SharedString::from(format!("preset-reset-{kind}")),
+                                "Built-in",
+                                false,
+                                cx,
+                                Box::new(|this, w, cx| this.save_presets(true, w, cx)),
+                            ))
+                            .child(self.pv_button(
+                                SharedString::from(format!("preset-cancel-{kind}")),
+                                "Cancel",
+                                false,
+                                cx,
+                                Box::new(|this, _, cx| {
+                                    this.preset_editor = None;
+                                    cx.notify();
+                                }),
+                            ))
+                            .into_any_element(),
+                    );
+                }
+                None => out.push(
+                    h_flex()
+                        .py_2()
+                        .child(self.pv_button(
+                            SharedString::from(format!("preset-edit-{kind}")),
+                            "Edit",
+                            false,
+                            cx,
+                            Box::new(move |this, w, cx| this.edit_presets(kind, w, cx)),
+                        ))
+                        .into_any_element(),
+                ),
+            }
+        }
         out
     }
 }

@@ -6,7 +6,6 @@ use gpui_kit::component::IndexPath;
 use gpui_kit::*;
 
 use crate::connection::{self};
-use crate::model::EFFORTS;
 use crate::rest;
 
 use super::*;
@@ -25,7 +24,7 @@ impl BenchApp {
             this.profile_context = context;
             this.profile_models = models;
             this.add_picker_models();
-            let level = effort.and_then(|v| EFFORTS.iter().position(|e| *e == v));
+            let level = effort.and_then(|v| this.efforts.iter().position(|e| *e == v));
             if let Some(i) = level {
                 this.profile_effort = i;
             }

@@ -268,3 +268,15 @@ test("server agents: a list of their own; the old project rows with a host move 
 	assert.deepEqual(servers.list().map((s) => s.host), ["dev"]);
 	servers.remove("dev");
 });
+
+test("presets: built-in until edited, one kind at a time; checked; back to built-in", async () => {
+	const { presets, savePresets, DEFAULT_PRESETS } = await import("../src/builtin/presets.ts");
+	assert.deepEqual(presets(), DEFAULT_PRESETS);
+	savePresets("reasoning", ["low", "high"]);
+	assert.deepEqual(presets().reasoning, ["low", "high"]);
+	assert.deepEqual(presets().mcp, DEFAULT_PRESETS.mcp, "the other kinds stay built-in");
+	assert.throws(() => savePresets("compaction", [{ at: 2, name: "x" }]));
+	assert.throws(() => savePresets("mcp", { a: { title: "no spec" } }));
+	savePresets("reasoning", null);
+	assert.deepEqual(presets().reasoning, DEFAULT_PRESETS.reasoning);
+});

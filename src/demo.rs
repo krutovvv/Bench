@@ -370,12 +370,7 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
                 "typescript": {"command": "${LSP}/node_modules/.bin/typescript-language-server", "args": ["--stdio"], "extensions": ["ts", "tsx", "js", "jsx"]},
                 "php": {"command": "${LSP}/node_modules/.bin/intelephense", "args": ["--stdio"], "extensions": ["php"]}
             },
-            "states": {"typescript": "running"},
-            "presets": [
-                {"key": "typescript", "title": "TypeScript, JavaScript", "extensions": ["ts", "tsx", "js", "jsx"]},
-                {"key": "php", "title": "PHP and WordPress (ACF, Polylang, WooCommerce stubs)", "extensions": ["php"]},
-                {"key": "css", "title": "CSS, SCSS, Less", "extensions": ["css", "scss", "less"]}
-            ]
+            "states": {"typescript": "running"}
         },
         "compaction": 0.9,
         "window": 131072,

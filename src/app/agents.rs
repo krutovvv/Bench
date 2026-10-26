@@ -103,6 +103,7 @@ impl BenchApp {
         }
         if host.is_empty() {
             self.load_server_agents(window, cx);
+            self.load_presets(window, cx);
         } else {
             self.load_server_projects(host.clone(), window, cx);
         }

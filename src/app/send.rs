@@ -7,7 +7,6 @@ use gpui_kit::*;
 use crate::attach;
 use crate::connection::{self};
 use crate::gateway::Cmd;
-use crate::model::EFFORTS;
 
 use super::*;
 
@@ -87,6 +86,24 @@ impl BenchApp {
 
     /// An open session takes the level at once (its next turn runs on it, the gateway confirms
     /// with session.info); a chat not created yet takes it with its first message.
+    /// The reasoning levels offered anew (the presets'): the composer's choice follows, the
+    /// level kept where it is still offered.
+    pub fn set_efforts(&mut self, levels: Vec<String>, window: &mut Window, cx: &mut Context<Self>) {
+        let current = self.efforts.get(self.effort).cloned();
+        let profile = self.efforts.get(self.profile_effort).cloned();
+        self.efforts = levels;
+        let last = self.efforts.len().saturating_sub(1);
+        let at = |v: Option<String>| v.and_then(|v| self.efforts.iter().position(|e| *e == v));
+        self.effort = at(current).unwrap_or(last);
+        self.profile_effort = at(profile).unwrap_or(last);
+        let labels: Vec<SharedString> = self.efforts.iter().map(|e| SharedString::from(e.clone())).collect();
+        let selected = self.effort;
+        self.effort_choice.update(cx, |s, cx| {
+            s.set_items(labels, window, cx);
+            s.set_selected_index(Some(IndexPath::new(selected)), window, cx)
+        });
+    }
+
     pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
         self.effort = i;
         self.effort_other = None;
@@ -95,7 +112,7 @@ impl BenchApp {
                 self.effort_pending = false;
                 self.cmd(Cmd::SetEffort {
                     session,
-                    effort: EFFORTS[i].to_string(),
+                    effort: self.efforts[i].clone(),
                 });
             }
             None => self.effort_pending = true,
@@ -104,7 +121,9 @@ impl BenchApp {
     }
 
     pub(crate) fn take_effort(&mut self) -> Option<String> {
-        std::mem::take(&mut self.effort_pending).then(|| EFFORTS[self.effort].to_string())
+        std::mem::take(&mut self.effort_pending)
+            .then(|| self.efforts.get(self.effort).cloned())
+            .flatten()
     }
 
     pub fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {

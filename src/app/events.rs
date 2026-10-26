@@ -5,7 +5,6 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::gateway::{Cmd, Evt};
-use crate::model::EFFORTS;
 
 use super::*;
 
@@ -90,6 +89,8 @@ impl BenchApp {
                     self.subject_opened = true;
                     // `BENCH_GEAR_AGENT=<host>`: that agent's settings shown.
                     self.gear_agent = std::env::var("BENCH_GEAR_AGENT").unwrap_or_default();
+                    // `BENCH_GEAR_TAB=<0|1|2>`: that tab (agents, presets, look).
+                    self.gear_tab = std::env::var("BENCH_GEAR_TAB").ok().and_then(|t| t.parse().ok()).unwrap_or(0);
                     self.open_panel(Panel::Providers, window, cx);
                     // `BENCH_AGENT_FORM=1`: with "+ Agent on a server" open.
                     if std::env::var("BENCH_AGENT_FORM").is_ok() {
@@ -156,7 +157,7 @@ impl BenchApp {
                 // The session's own level replaces whatever the bar showed (the profile's default
                 // or the previous chat's).
                 self.effort_pending = false;
-                match EFFORTS.iter().position(|e| *e == value) {
+                match self.efforts.iter().position(|e| *e == value) {
                     Some(i) => {
                         self.effort = i;
                         self.effort_other = None;

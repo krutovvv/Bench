@@ -25,6 +25,7 @@ pub(crate) mod projects;
 pub(crate) mod agent_form;
 pub(crate) mod agents;
 pub(crate) mod places;
+pub(crate) mod presets;
 pub(crate) mod sidebar_items;
 mod send;
 mod sessions;
@@ -111,6 +112,13 @@ pub struct BenchApp {
     pub agents: HashMap<String, agents::AgentLink>,
     /// The agent whose models and voice the gear shows ("" = this Mac's).
     pub gear_agent: String,
+    /// The person's presets (this Mac's agent's) and the kind open to edit in the gear.
+    pub presets: presets::Presets,
+    pub preset_editor: Option<presets::PresetEditor>,
+    /// The reasoning levels offered (the presets'; `EFFORTS` until they are read).
+    pub efforts: Vec<String>,
+    /// The gear's tab: agents, presets, look.
+    pub gear_tab: usize,
     /// The gear's "+ Agent on a server" form, while open (`agent_form.rs`).
     pub agent_form: Option<agent_form::AgentForm>,
     /// A thread or project being renamed in the sidebar (`sidebar_items.rs`).
@@ -451,7 +459,7 @@ impl BenchApp {
                     let SelectEvent::Confirm(Some(label)) = ev else {
                         return;
                     };
-                    if let Some(i) = EFFORTS.iter().position(|e| *e == label.as_ref()) {
+                    if let Some(i) = this.efforts.iter().position(|e| e == label.as_ref()) {
                         this.set_effort(i, cx);
                     }
                 },
@@ -631,6 +639,10 @@ impl BenchApp {
             gear_agent: String::new(),
             renaming: None,
             agent_form: None,
+            presets: Default::default(),
+            preset_editor: None,
+            efforts: EFFORTS.iter().map(|e| e.to_string()).collect(),
+            gear_tab: 0,
             sidebar_focus: cx.focus_handle(),
             local_projects: vec![],
             server_agents: vec![],

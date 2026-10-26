@@ -3,7 +3,7 @@
 
 use gpui_kit::component::input::EditorState;
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
@@ -225,7 +225,7 @@ impl Section for Mcp {
     fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
         let e = app.project_env.as_ref()?;
         if name == "new" {
-            return Some(new_card(
+            let mut card = new_card(
                 e,
                 "mcp",
                 "New MCP server: its name, and its config (Pi's format: {\"url\", \"headers\"} or {\"command\", \"args\", \"env\"})",
@@ -233,7 +233,36 @@ impl Section for Mcp {
                 &e.mcp.json,
                 true,
                 cx,
-            ));
+            );
+            // The person's presets above the form (the gear's Presets tab): one fills it in —
+            // its name and config, keys and all — to look at and Save; or write one by hand.
+            let have: Vec<&str> = e.mcp.servers.iter().map(|m| m.name.as_str()).collect();
+            let theme = cx.theme().clone();
+            let chips = app.presets.mcp.iter().filter(|(n, _, _)| !have.contains(&n.as_str())).map(|(n, title, spec)| {
+                let (n, spec) = (n.clone(), spec.clone());
+                div()
+                    .id(SharedString::from(format!("env-mcp-preset-{n}")))
+                    .px_2()
+                    .py_0p5()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(theme.border)
+                    .cursor_pointer()
+                    .hover(|s| s.bg(theme.list_hover))
+                    .child(title.clone())
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        cx.stop_propagation();
+                        this.env_fill_mcp(n.clone(), &spec, window, cx)
+                    }))
+                    .into_any_element()
+            });
+            let body = std::mem::replace(&mut card.body, div().into_any_element());
+            card.body = v_flex()
+                .child(h_flex().flex_wrap().gap_1p5().px_3().pt_2().children(chips))
+                .child(body)
+                .into_any_element();
+            return Some(card);
         }
         if !e.mcp.servers.iter().any(|m| m.name == name) {
             return None;
@@ -449,5 +478,18 @@ impl BenchApp {
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
             },
         );
+    }
+}
+
+impl BenchApp {
+    /// A preset into the new MCP server's form: its name and its config, to look at and Save.
+    pub fn env_fill_mcp(&mut self, name: String, spec: &Value, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        let text = serde_json::to_string_pretty(spec).unwrap_or_default();
+        e.new_name.update(cx, |s, cx| s.set_value(name, window, cx));
+        e.mcp.json.update(cx, |s, cx| s.set_value(text, window, cx));
+        cx.notify();
     }
 }

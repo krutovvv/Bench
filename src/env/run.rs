@@ -23,18 +23,9 @@ pub struct RunEnv {
     pub window: u64,
 }
 
-/// Compaction presets: (share, name). A code project keeps its files in front of the model; an
-/// assistant's long chats stay light.
-const COMPACTION: [(Option<f64>, &str); 5] = [
-    (None, "Pi's own"),
-    (Some(0.6), "Assistant"),
-    (Some(0.7), ""),
-    (Some(0.8), ""),
-    (Some(0.9), "Code"),
-];
-
 /// What a compaction share means for this window, said in a line.
-fn compaction_note(at: Option<f64>, window: u64) -> String {
+/// `names`: the presets' (share, name), to name a share that has one.
+fn compaction_note(at: Option<f64>, window: u64, names: &[(f64, String)]) -> String {
     let k = |t: f64| format!("{}K", (t / 1000.).round() as u64);
     let w = window as f64;
     match at {
@@ -46,10 +37,10 @@ fn compaction_note(at: Option<f64>, window: u64) -> String {
         ),
         None => "Pi's own".into(),
         Some(at) => {
-            let name = COMPACTION
+            let name = names
                 .iter()
-                .find(|(s, _)| *s == Some(at))
-                .map(|(_, n)| *n)
+                .find(|(s, _)| *s == at)
+                .map(|(_, n)| n.as_str())
                 .filter(|n| !n.is_empty())
                 .map(|n| format!("{n} · "))
                 .unwrap_or_default();
@@ -116,7 +107,7 @@ impl Section for Run {
                 "model",
                 "compaction".into(),
                 "Compaction".into(),
-                compaction_note(e.run.compaction, e.run.window),
+                compaction_note(e.run.compaction, e.run.window, &app.presets.compaction),
                 false,
                 false,
                 cx,
@@ -133,8 +124,13 @@ impl Section for Run {
         let e = app.project_env.as_ref()?;
         let theme = cx.theme().clone();
         if name == "compaction" {
-            let items = COMPACTION.iter().map(|(at, _)| {
-                let (at, on) = (*at, e.run.compaction == *at);
+            // Pi's own first, then the presets' shares (the gear's Presets tab).
+            let names = app.presets.compaction.clone();
+            let choices: Vec<Option<f64>> = std::iter::once(None)
+                .chain(names.iter().map(|(a, _)| Some(*a)))
+                .collect();
+            let items = choices.into_iter().map(|at| {
+                let on = e.run.compaction == at;
                 h_flex()
                     .id(SharedString::from(format!("env-compaction-{at:?}")))
                     .px_3()
@@ -142,7 +138,7 @@ impl Section for Run {
                     .gap_2()
                     .cursor_pointer()
                     .hover(|s| s.bg(theme.list_hover))
-                    .child(div().flex_1().min_w_0().truncate().child(compaction_note(at, e.run.window)))
+                    .child(div().flex_1().min_w_0().truncate().child(compaction_note(at, e.run.window, &names)))
                     .when(on, |d| {
                         d.child(crate::icons::Ico::Check.icon().xsmall().text_color(theme.foreground))
                     })
@@ -176,12 +172,16 @@ impl Section for Run {
             "reasoning" => "reasoning",
             _ => "approvals",
         };
-        let (cur, opts): (String, &[&str]) = match kind {
-            "reasoning" => (e.run.effort.clone(), crate::model::EFFORTS),
-            _ => (e.run.approvals.clone(), crate::model::APPROVAL_MODES),
+        // The reasoning levels are the presets' (the gear's Presets tab).
+        let (cur, opts): (String, Vec<String>) = match kind {
+            "reasoning" => (e.run.effort.clone(), app.efforts.clone()),
+            _ => (
+                e.run.approvals.clone(),
+                crate::model::APPROVAL_MODES.iter().map(|m| m.to_string()).collect(),
+            ),
         };
         let mut items: Vec<AnyElement> = vec![];
-        for value in opts.iter().map(|v| v.to_string()) {
+        for value in opts {
             let on = value == cur;
             let (id, label) = (
                 SharedString::from(format!("env-run-{name}-{value}")),

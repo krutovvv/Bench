@@ -27,8 +27,6 @@ pub struct LspRow {
 
 pub struct LspEnv {
     pub servers: Vec<LspRow>,
-    /// The presets: (key, title, extensions).
-    pub presets: Vec<(String, String, Vec<String>)>,
     /// lsp.json, as its card edits it.
     pub text: Entity<EditorState>,
     pub dirty: bool,
@@ -40,7 +38,6 @@ impl LspEnv {
         on_change(&text, cx, |e| e.lsp.dirty = true);
         Self {
             servers: vec![],
-            presets: vec![],
             text,
             dirty: false,
         }
@@ -98,10 +95,17 @@ impl Section for Lsp {
         let e = app.project_env.as_ref()?;
         let theme = cx.theme().clone();
         if name == "new" {
+            // The person's presets (the gear's Presets tab).
             let have: Vec<&str> = e.lsp.servers.iter().map(|s| s.name.as_str()).collect();
-            let items = e.lsp.presets.iter().map(|(key, title, exts)| {
+            let items = app.presets.lsp.iter().map(|(key, title, spec)| {
                 let added = have.contains(&key.as_str());
-                let key = key.clone();
+                let exts: Vec<String> = spec["extensions"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|x| x.as_str().map(str::to_string))
+                    .collect();
+                let (key, spec) = (key.clone(), spec.clone());
                 h_flex()
                     .id(SharedString::from(format!("env-lsp-preset-{key}")))
                     .px_3()
@@ -121,7 +125,7 @@ impl Section for Lsp {
                         d.on_click(cx.listener(move |this, _, window, cx| {
                             this.click_claimed = true;
                             cx.stop_propagation();
-                            this.env_add_lsp_preset(key.clone(), window, cx)
+                            this.env_add_lsp(key.clone(), spec.clone(), window, cx)
                         }))
                     })
                     .into_any_element()
@@ -138,7 +142,7 @@ impl Section for Lsp {
                             .pt_2()
                             .text_sm()
                             .text_color(theme.muted_foreground)
-                            .child("Each installs itself on first use, into Bench's folder on the machine where the project's files are (~/.bench/lsp): it needs npm there. Another server: open any row and write it into lsp.json."),
+                            .child("Each installs itself on first use, into Bench's folder on the machine where the project's files are (~/.bench/lsp): it needs npm there. The list is the gear's Presets; another server for this project alone: open any row and write it into lsp.json."),
                     )
                     .into_any_element(),
                 vec![],
@@ -176,23 +180,6 @@ impl Section for Lsp {
                     .collect()
             })
             .unwrap_or_default();
-        e.lsp.presets = l["presets"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|p| {
-                (
-                    p["key"].as_str().unwrap_or_default().to_string(),
-                    p["title"].as_str().unwrap_or_default().to_string(),
-                    p["extensions"]
-                        .as_array()
-                        .into_iter()
-                        .flatten()
-                        .filter_map(|x| x.as_str().map(str::to_string))
-                        .collect(),
-                )
-            })
-            .collect();
         if !e.lsp.dirty {
             let text = serde_json::to_string_pretty(&json!({"servers": l["servers"].clone()}))
                 .unwrap_or_default();
@@ -229,8 +216,9 @@ impl Section for Lsp {
 }
 
 impl BenchApp {
-    /// A preset into the project's lsp.json, then the environment read again.
-    pub fn env_add_lsp_preset(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
+    /// A preset's server into the project's lsp.json (wherever the project lives), then the
+    /// environment read again.
+    pub fn env_add_lsp(&mut self, key: String, spec: Value, window: &mut Window, cx: &mut Context<Self>) {
         let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
             return;
         };
@@ -247,7 +235,7 @@ impl BenchApp {
                     "PUT",
                     &format!("/api/projects/{eid}/lsp"),
                     &profile,
-                    json!({"preset": key}),
+                    json!({"name": key, "spec": spec}),
                 )
             },
             move |this, r, window, cx| match r {
