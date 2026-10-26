@@ -8,6 +8,9 @@
 //!   when `package-lock.json` changed. Node 22.18+ is needed.
 //! * The server writes its port and token to `~/.bench/server.json`. A running server is reused;
 //!   one built from other sources is restarted when idle (its conversations are durable).
+//! * On this Mac it runs under Bench Agent.app (`scripts/agent-launcher.c`, carried in
+//!   `Contents/Library`, kept in `~/.bench`), not under Bench: quitting or rebuilding Bench leaves
+//!   it running, with its own local-network grant. A bare `target/` build starts it itself.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -241,6 +244,67 @@ fn orphaned(pid: u32) -> bool {
         .is_some_and(|o| String::from_utf8_lossy(&o.stdout).trim() == "1")
 }
 
+/// Bench Agent.app, the agent's parent: the one this app carries, copied to `~/.bench` when it
+/// changed (its launcher's source, `BenchLauncher` in its Info.plist). Run from there, it never
+/// sits inside a Bench being replaced. None for a build without it (`cargo run`).
+fn agent_app() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let carried = exe.parent()?.parent()?.join("Library/Bench Agent.app");
+    let plist = "Contents/Info.plist";
+    let mark = std::fs::read(carried.join(plist)).ok()?;
+    let installed = agent_home().join("Bench Agent.app");
+    if std::fs::read(installed.join(plist)).ok().as_ref() != Some(&mark) {
+        let _ = std::fs::remove_dir_all(&installed);
+        let copied = Command::new("cp")
+            .arg("-R")
+            .arg(&carried)
+            .arg(&installed)
+            .status()
+            .is_ok_and(|s| s.success());
+        if !copied {
+            return None;
+        }
+    }
+    Some(installed)
+}
+
+/// Start the agent: under Bench Agent.app when this app carries it, else as Bench's own child.
+fn start(node: &Path, app: &Path, hash: &str) -> Result<()> {
+    let log = agent_home().join("server.log");
+    let path = agent_path(node);
+    if let Some(helper) = agent_app() {
+        let mut open = Command::new("open");
+        open.args(["-g", "-n"]).arg(&helper);
+        open.arg("--env").arg(format!("BENCH_AGENT_BUILD={hash}"));
+        open.arg("--env").arg(format!("PATH={path}"));
+        if let Ok(home) = std::env::var("BENCH_HOME") {
+            open.arg("--env").arg(format!("BENCH_HOME={home}"));
+        }
+        open.arg("--args").arg(&log).arg(app).arg(node).arg("src/server.ts");
+        let out = open.output().context("open Bench Agent.app")?;
+        if !out.status.success() {
+            bail!(
+                "Bench Agent.app did not open: {}",
+                String::from_utf8_lossy(&out.stderr).trim()
+            );
+        }
+        return Ok(());
+    }
+    let log = std::fs::File::create(log)?;
+    Command::new("nohup")
+        .arg(node)
+        .arg("src/server.ts")
+        .current_dir(app)
+        .env("BENCH_AGENT_BUILD", hash)
+        .env("PATH", path)
+        .stdin(Stdio::null())
+        .stdout(log.try_clone()?)
+        .stderr(log)
+        .spawn()
+        .context("start the agent")?;
+    Ok(())
+}
+
 fn stop() {
     if let Some(pid) = saved().and_then(|v| v["pid"].as_u64()) {
         let _ = Command::new("kill").arg(pid.to_string()).status();
@@ -276,21 +340,10 @@ pub fn ensure() -> Result<(u16, String)> {
         }
     }
     let node = node()?;
-    let log = std::fs::File::create(agent_home().join("server.log"))?;
     let before = std::fs::metadata(agent_home().join("server.json"))
         .and_then(|m| m.modified())
         .ok();
-    Command::new("nohup")
-        .arg(&node)
-        .arg("src/server.ts")
-        .current_dir(&app)
-        .env("BENCH_AGENT_BUILD", &hash)
-        .env("PATH", agent_path(&node))
-        .stdin(Stdio::null())
-        .stdout(log.try_clone()?)
-        .stderr(log)
-        .spawn()
-        .context("start the agent")?;
+    start(&node, &app, &hash)?;
     let deadline = Instant::now() + Duration::from_secs(60);
     loop {
         let fresh = std::fs::metadata(agent_home().join("server.json"))

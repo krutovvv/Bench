@@ -105,6 +105,31 @@ cat > "$NEW/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
+# Bench Agent.app: the agent's own parent (scripts/agent-launcher.c), so the agent and its
+# local-network grant outlive Bench's restarts. Bench copies it to ~/.bench when it changed.
+# The same source builds the same binary, so its grant stays.
+AGENT_APP="$NEW/Contents/Library/Bench Agent.app"
+mkdir -p "$AGENT_APP/Contents/MacOS"
+clang -O2 -mmacosx-version-min=13.0 -o "$AGENT_APP/Contents/MacOS/bench-agent" scripts/agent-launcher.c
+cat > "$AGENT_APP/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>Bench Agent</string>
+  <key>CFBundleIdentifier</key><string>local.bench.agent</string>
+  <key>CFBundleExecutable</key><string>bench-agent</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>BenchLauncher</key><string>$(shasum -a 256 scripts/agent-launcher.c | cut -c1-16)</string>
+  <key>LSUIElement</key><true/>
+  <key>LSMinimumSystemVersion</key><string>13.0</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Bench's agent reaches models and machines on your local network</string>
+</dict>
+</plist>
+PLIST
+codesign --force --sign "${SIGN:--}" --identifier local.bench.agent "$AGENT_APP"
+
 if [[ -n "$SIGN" ]]; then
     codesign --force --sign "$SIGN" --identifier "$ID" "$NEW"
 else
