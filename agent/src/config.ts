@@ -110,6 +110,9 @@ export function deleteProvider(id: string): void {
 export interface AgentSettings {
 	defaultProvider: string;
 	defaultModel: string;
+	/** Bench's: the model that answers when the main one fails (fallback.ts); the general agent's only. */
+	fallbackProvider?: string;
+	fallbackModel?: string;
 	defaultThinkingLevel?: string;
 	/** Extensions by name: this agent's extensions/<name>.ts or the built-in ones; default ["assistant"]. */
 	extensions?: string[];
@@ -119,6 +122,9 @@ export interface AgentSettings {
 
 /** A project's environment is an agent directory too ("project:<id>"), in projects/<id>/. */
 export const isProject = (agent: string): boolean => agent.startsWith("project:");
+
+/** The keys only the general agent has: the model is one for every thread (the gear). */
+const GLOBAL_KEYS = ["defaultProvider", "defaultModel", "fallbackProvider", "fallbackModel"] as const;
 
 /** What a project's threads share with every other thread: the general agent's memory, model, settings. */
 export const homeAgent = (agent: string): string => (isProject(agent) ? "default" : agent);
@@ -141,6 +147,7 @@ export function readAgent(agent: string): AgentSettings {
 		try {
 			own = JSON.parse(fs.readFileSync(path.join(agentDir(agent), "settings.json"), "utf8"));
 		} catch {}
+		for (const k of GLOBAL_KEYS) delete own[k];
 		return { ...readAgent("default"), ...own };
 	}
 	try {
@@ -153,6 +160,11 @@ export function readAgent(agent: string): AgentSettings {
 
 export function writeAgent(agent: string, settings: AgentSettings): void {
 	const dir = agentDir(agent);
+	// A project's file never keeps the model: readAgent hands it the general one, written back here.
+	if (isProject(agent)) {
+		settings = { ...settings };
+		for (const k of GLOBAL_KEYS) delete settings[k];
+	}
 	fs.mkdirSync(dir, { recursive: true });
 	for (const sub of ["skills", "prompts", "extensions", "memories"]) fs.mkdirSync(path.join(dir, sub), { recursive: true });
 	fs.writeFileSync(path.join(dir, "settings.json"), JSON.stringify(settings, null, 2) + "\n");
@@ -170,6 +182,33 @@ export function agentMcp(agent: string): Record<string, any> {
 export function writeAgentMcp(agent: string, servers: Record<string, any>): void {
 	fs.mkdirSync(agentDir(agent), { recursive: true });
 	fs.writeFileSync(path.join(agentDir(agent), "mcp.json"), JSON.stringify({ mcpServers: servers }, null, 2) + "\n");
+}
+
+/**
+ * A project once had its own model; now every thread runs with the general agent's. The keys
+ * leave the projects' settings.json, each file copied to backups/ first.
+ */
+export function migrateProjectModels(): string[] {
+	const dir = path.join(BENCH_HOME, "projects");
+	const log: string[] = [];
+	if (!fs.existsSync(dir)) return log;
+	for (const id of fs.readdirSync(dir)) {
+		const file = path.join(dir, id, "settings.json");
+		let own: any;
+		try {
+			own = JSON.parse(fs.readFileSync(file, "utf8"));
+		} catch {
+			continue;
+		}
+		if (!GLOBAL_KEYS.some((k) => k in own)) continue;
+		const backup = path.join(BENCH_HOME, "backups", `project-model-${new Date().toISOString().slice(0, 10)}`, id);
+		fs.mkdirSync(backup, { recursive: true });
+		fs.copyFileSync(file, path.join(backup, "settings.json"));
+		for (const k of GLOBAL_KEYS) delete own[k];
+		fs.writeFileSync(file, JSON.stringify(own, null, 2) + "\n");
+		log.push(id);
+	}
+	return log;
 }
 
 /** The first layout (profiles/<name>/profile.json, SOUL.md, a global mcp_servers setting) moves to agents/. */
@@ -208,7 +247,7 @@ export function readConfig(profile: string): any {
 	const provs = providers();
 	return {
 		...s,
-		model: { provider: p.defaultProvider, default: p.defaultModel },
+		model: { provider: p.defaultProvider, default: p.defaultModel, fallback_provider: p.fallbackProvider ?? "", fallback: p.fallbackModel ?? "" },
 		mcp_servers: agentMcp(profile),
 		providers: Object.fromEntries(provs.map((x) => [x.id, { name: x.name, base_url: x.base_url, api_key: x.api_key, api_mode: x.api_mode, models: x.models, context_length: x.context_length }])),
 		custom_providers: provs.map((x) => ({ name: x.id, base_url: x.base_url, model: Object.keys(x.models)[0] })),
@@ -236,11 +275,20 @@ export interface ModelChoice {
 	apiMode: string;
 }
 
-/** The model a profile runs with, or an override from the client. */
-export function resolveModel(profile: string, override?: { model?: string; provider?: string }): ModelChoice {
-	const p = readAgent(profile);
-	const providerId = override?.provider || p.defaultProvider;
-	const model = override?.model || p.defaultModel;
+/** The model every thread runs with: the general agent's (the gear), the same for every project. */
+export function resolveModel(_profile?: string): ModelChoice {
+	const p = readAgent("default");
+	return choiceOf(p.defaultProvider, p.defaultModel);
+}
+
+/** The model that answers when the main one fails, if one is set. */
+export function resolveFallback(): ModelChoice | undefined {
+	const p = readAgent("default");
+	if (!p.fallbackModel || !providers().some((x) => x.id === p.fallbackProvider)) return undefined;
+	return choiceOf(p.fallbackProvider!, p.fallbackModel);
+}
+
+function choiceOf(providerId: string, model: string): ModelChoice {
 	const prov = providers().find((x) => x.id === providerId) ?? providers()[0];
 	const ctx = prov?.models?.[model]?.context_length ?? prov?.context_length ?? 131072;
 	return {

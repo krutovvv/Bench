@@ -13,7 +13,7 @@ import { WebSocketServer, type WebSocket } from "ws";
 import YAML from "yaml";
 import pkg from "../package.json" with { type: "json" };
 import { timezone } from "./config.ts";
-import { agentMcp, AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting, agentDir, agents, providers, readConfig, readEnv, readAgent, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp, migrateProfiles } from "./config.ts";
+import { agentMcp, AGENT_HOME, BENCH_HOME, deepMerge, deleteProvider, getSetting, agentDir, agents, providers, readConfig, readEnv, readAgent, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp, migrateProfiles, migrateProjectModels } from "./config.ts";
 import { speak, transcribe } from "./audio.ts";
 import { Runtime } from "./runtime.ts";
 import { speedOf, usagePayload } from "./usage.ts";
@@ -47,6 +47,7 @@ function broadcast(sessionId: string, type: string, payload: Record<string, unkn
 }
 
 for (const name of migrateProfiles()) console.log(`[migrate] profile ${name} → agents/${name}`);
+for (const id of migrateProjectModels()) console.log(`[migrate] project ${id} follows the general model now (its settings.json in backups/)`);
 const rt = new Runtime(broadcast);
 await rt.open();
 
@@ -127,7 +128,7 @@ const methods: Record<string, (p: any) => Promise<any> | any> = {
 			info: { reasoning_effort: row.effort, model: row.model, cwd: row.cwd, revision: 0, execution_generation: live.generation },
 			todo_state: { todos: row.todos, at: row.todos_at ?? 0 },
 			// The thread's numbers, so the status bar has them before the first answer here.
-			usage: usagePayload(row.model, live.usage, resolveModel(row.profile, { model: row.model, provider: row.provider }).contextLength),
+			usage: usagePayload(row.model, live.usage, resolveModel().contextLength),
 			// …and how fast the model wrote in its last answer here.
 			speed: row.speed ?? speedOf(null),
 		};
@@ -212,10 +213,12 @@ async function slash({ session_id, profile, command }: { session_id: string; pro
 		case "/model": {
 			if (!row) return { type: "info", output: "No session." };
 			const m = arg.match(/^(\S+)(?:\s+--provider\s+(\S+))?/);
-			if (!m) return { type: "info", output: `Model: ${row.model} (${row.provider})` };
-			rt.store.update(session_id, { model: m[1], provider: m[2] ?? row.provider });
+			const now = resolveModel();
+			if (!m) return { type: "info", output: `Model: ${now.model} (${now.provider})` };
+			// The model is one for every thread: /model changes it as the gear does.
+			writeAgent("default", { ...readAgent("default"), defaultModel: m[1], defaultProvider: m[2] ?? now.provider });
 			broadcast(session_id, "session.info", { model: m[1] });
-			return { type: "info", output: `Model set to ${m[1]}${m[2] ? ` (${m[2]})` : ""}` };
+			return { type: "info", output: `Model set to ${m[1]}${m[2] ? ` (${m[2]})` : ""} for every thread` };
 		}
 		case "/reasoning":
 			if (row && arg) rt.store.update(session_id, { effort: arg });
@@ -251,16 +254,23 @@ import { BACKGROUND_CONTEXT as BACKGROUND } from "@earendil-works/chord/context"
 
 /**
  * `PUT /api/config`: each top-level key merges into its setting. What the raw config reads
- * back from the agent's own folder — the model, the reasoning level, approvals — is written
- * there too, so a project's setting is its own and not the machine's: a thread of a project
- * runs with `project:<id>` and reads exactly these.
+ * back from the agent's own folder — the reasoning level, approvals — is written there too, so
+ * a project's setting is its own and not the machine's: a thread of a project runs with
+ * `project:<id>` and reads exactly these. The model and its fallback are one for every thread:
+ * they go to the general agent whoever writes them.
  */
 function patchConfig(profile: string, patch: any): void {
 	for (const [k, v] of Object.entries(patch ?? {})) {
 		const m = v as any;
 		if (k === "model" && m && typeof m === "object") {
-			const p = readAgent(profile);
-			writeAgent(profile, { ...p, defaultProvider: m.provider ?? p.defaultProvider, defaultModel: m.default ?? m.name ?? p.defaultModel });
+			const p = readAgent("default");
+			writeAgent("default", {
+				...p,
+				defaultProvider: m.provider ?? p.defaultProvider,
+				defaultModel: m.default ?? m.name ?? p.defaultModel,
+				fallbackProvider: m.fallback_provider ?? p.fallbackProvider,
+				fallbackModel: m.fallback ?? p.fallbackModel,
+			});
 		} else if (k === "agent" && m && typeof m === "object" && m.reasoning_effort) {
 			writeAgent(profile, { ...readAgent(profile), defaultThinkingLevel: String(m.reasoning_effort) });
 		} else if (k === "approvals" && m && typeof m === "object" && m.mode !== undefined) {
@@ -498,7 +508,7 @@ const routes: Record<string, Route> = {
 		return { name };
 	},
 	"GET /api/providers/custom-endpoints": (req) => {
-		const current = readAgent(profileOf(req)).defaultProvider;
+		const current = readAgent("default").defaultProvider;
 		const endpoints = providers().map((p) => ({
 			id: p.id,
 			name: p.name,
@@ -804,12 +814,12 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		fs.renameSync(from, agentDir(name));
 		return { name };
 	}],
-	["POST", /^\/api\/providers\/custom-endpoints\/([^/]+)\/activate$/, (req, m) => {
+	["POST", /^\/api\/providers\/custom-endpoints\/([^/]+)\/activate$/, (_req, m) => {
 		const id = decodeURIComponent(m[1]);
 		const p = providers().find((x) => x.id === id);
 		if (!p) throw new HttpError(404, `no provider ${id}`);
-		const profile = profileOf(req);
-		writeAgent(profile, { ...readAgent(profile), defaultProvider: id, defaultModel: Object.keys(p.models)[0] ?? readAgent(profile).defaultModel });
+		const g = readAgent("default");
+		writeAgent("default", { ...g, defaultProvider: id, defaultModel: Object.keys(p.models)[0] ?? g.defaultModel });
 		return { ok: true };
 	}],
 	["DELETE", /^\/api\/providers\/custom-endpoints\/([^/]+)$/, (_req, m) => {

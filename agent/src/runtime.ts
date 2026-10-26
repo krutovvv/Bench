@@ -15,7 +15,8 @@ import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
-import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort, resolveModel, setSetting, type ModelChoice } from "./config.ts";
+import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort, resolveFallback, resolveModel, setSetting, type ModelChoice } from "./config.ts";
+import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
@@ -167,7 +168,7 @@ export class Runtime {
 		// Every model a stored session uses must be known before Pi resumes unfinished runs.
 		for (const row of this.store.list({ limit: 10000 })) {
 			try {
-				this.modelRef(row.profile, resolveModel(row.profile, { model: row.model, provider: row.provider }));
+				this.modelRef(row.profile);
 			} catch {}
 		}
 		this.harness.resume();
@@ -209,8 +210,26 @@ export class Runtime {
 
 	// ---- models ----------------------------------------------------------
 
-	/** Registers the profile's provider with pi-ai and returns the model reference for `configure()`. */
-	private modelRef(profile: string, choice: ModelChoice): { provider: string; modelId: string } {
+	/**
+	 * Registers the model every thread runs with (and its fallback, when one is set) with pi-ai
+	 * and returns the reference for `configure()`: the pair's own provider, or the model alone.
+	 */
+	private modelRef(profile: string, choice = resolveModel(), fallback = resolveFallback()): { provider: string; modelId: string } {
+		const main = this.register(profile, choice);
+		if (!fallback || (fallback.provider === choice.provider && fallback.model === choice.model)) return main;
+		const spare = this.register(profile, fallback);
+		const id = `${main.provider}~${spare.provider}.${spare.modelId}`.replace(/[^a-zA-Z0-9._~-]/g, "_");
+		const key = `${id}|${main.modelId}|${choice.baseUrl}|${choice.contextLength}|${fallback.baseUrl}`;
+		if (!this.registered.has(key)) {
+			this.registered.add(key);
+			const get = (r: { provider: string; modelId: string }) => this.models.getModel(r.provider, r.modelId)!;
+			this.models.setProvider(fallbackProvider(id, this.models, get(main), get(spare)));
+		}
+		return { provider: id, modelId: main.modelId };
+	}
+
+	/** Registers one model's provider with pi-ai. */
+	private register(profile: string, choice: ModelChoice): { provider: string; modelId: string } {
 		const id = `${profile}.${choice.provider}`.replace(/[^a-zA-Z0-9._-]/g, "_");
 		const key = `${id}|${choice.model}|${choice.baseUrl}|${choice.contextLength}|${choice.apiKey ? "k" : ""}`;
 		if (!this.registered.has(key)) {
@@ -261,14 +280,14 @@ export class Runtime {
 
 	async create(profile: string, cwd: string | undefined, source = "local", extra: Partial<SessionRow> = {}): Promise<Live> {
 		await this.mcpFor(profile);
-		const choice = resolveModel(profile);
+		const choice = resolveModel();
 		// A session with a project's environment (a thread, a cron run) belongs to the project and
 		// works in its folder.
 		const project = profile.startsWith("project:") ? profile.slice(8) : "";
 		if (project && !extra.project) extra = { ...extra, project };
 		const dir = cwd && fs.existsSync(cwd) ? cwd : project ? projects.dir(project) : defaultCwd(profile);
 		const conversation = await this.harness.createConversation(
-			{ ownership: { kind: "ownerless" }, agent: { model: this.modelRef(profile, choice), thinkingLevel: this.thinking(reasoningEffort(profile)), cwd: dir, extensions: forAgent(readAgent(profile).extensions, profile) } } as any,
+			{ ownership: { kind: "ownerless" }, agent: { model: this.modelRef(profile), thinkingLevel: this.thinking(reasoningEffort(profile)), cwd: dir, extensions: forAgent(readAgent(profile).extensions, profile) } } as any,
 			ctx,
 		);
 		const id = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_${randomBytes(4).toString("hex")}`;
@@ -346,8 +365,12 @@ export class Runtime {
 		const row = this.store.get(id)!;
 		live.row = row;
 		await this.mcpFor(row.profile);
-		// The model, effort and extensions follow the agent at every turn.
-		const choice = resolveModel(row.profile, { model: row.model, provider: row.provider });
+		// The model (one for every thread, the gear's), effort and extensions follow at every turn.
+		const choice = resolveModel();
+		if (row.model !== choice.model || row.provider !== choice.provider) {
+			this.store.update(id, { model: choice.model, provider: choice.provider });
+			live.row = this.store.get(id)!;
+		}
 		await live.conversation.configure({ model: this.modelRef(row.profile, choice), thinkingLevel: this.thinking(row.effort || reasoningEffort(row.profile)), cwd: row.cwd, extensions: forAgent(readAgent(row.profile).extensions, row.profile) } as any, ctx);
 		const images = attachments
 			.filter((a) => a.mime.startsWith("image/") && fs.existsSync(a.path))
@@ -793,7 +816,7 @@ export class Runtime {
 	}
 
 	private usageFrame(live: Live): Record<string, unknown> {
-		const choice = resolveModel(live.row.profile, { model: live.row.model, provider: live.row.provider });
+		const choice = resolveModel();
 		return usagePayload(live.row.model, live.usage, choice.contextLength);
 	}
 
@@ -845,8 +868,7 @@ export class Runtime {
 	private async title(live: Live, message: string): Promise<void> {
 		const fallback = message.replace(/\s+/g, " ").trim().slice(0, 60);
 		try {
-			const choice = resolveModel(live.row.profile, { model: live.row.model, provider: live.row.provider });
-			const ref = this.modelRef(live.row.profile, choice);
+			const ref = this.modelRef(live.row.profile);
 			const model = this.models.getModel(ref.provider, ref.modelId)!;
 			const context = { systemPrompt: TITLE_PROMPT, messages: [{ role: "user", content: message.slice(0, 2000), timestamp: Date.now() }] };
 			// A title needs no reasoning: off, also on a server that thinks unless told not to.

@@ -362,7 +362,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	const sessionCard = (id: string): string => {
 		const row = rt.store.get(id);
 		const agent = row?.profile ?? profile;
-		const m = resolveModel(agent, { model: row?.model, provider: row?.provider });
+		const m = resolveModel();
 		const name = project ? (projects.get(project)?.name ?? project) : "Host";
 		// The exact number, with the familiar short form beside it: 131072 tokens is the same
 		// window people call 128K, and showing one of the two alone reads as a different setting.

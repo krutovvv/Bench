@@ -58,23 +58,25 @@ test("the server starts and answers /api/projects", async () => {
 		await call("DELETE", `/api/cron/jobs/${job.id}`);
 		listed = (await call("GET", `/api/projects/${made.project.id}/env`)).cron;
 		assert.deepEqual(listed, []);
-		// A project's model, reasoning level and approvals are its own: they go into its agent's
-		// folder (a thread of the project runs with it), not into the machine's settings.
+		// A project's reasoning level and approvals are its own: they go into its agent's folder (a
+		// thread of the project runs with it), not into the machine's settings. The model and its
+		// fallback are one for every thread: they go to the general agent, from wherever they come.
 		await call("PUT", `/api/config?profile=${encodeURIComponent(`project:${made.project.id}`)}`, {
-			config: { model: { provider: "p1", default: "m1" }, agent: { reasoning_effort: "low" }, approvals: { mode: "smart" } },
+			config: { model: { provider: "p1", default: "m1", fallback_provider: "p2", fallback: "m2" }, agent: { reasoning_effort: "low" }, approvals: { mode: "smart" } },
 		});
 		const own = JSON.parse(fs.readFileSync(path.join(env.dir, "settings.json"), "utf8"));
-		assert.deepEqual([own.defaultProvider, own.defaultModel, own.defaultThinkingLevel, own.approvals], ["p1", "m1", "low", "smart"]);
+		assert.deepEqual([own.defaultProvider, own.defaultModel, own.defaultThinkingLevel, own.approvals], [undefined, undefined, "low", "smart"]);
 		// A remote project shows the server agent's general environment.
 		const general = await call("GET", "/api/projects/general/env");
 		assert.equal(general.project.name, "Host");
 		assert.ok(Array.isArray(general.skills) && Array.isArray(general.hosts));
-		// The machine's own agent kept what it had: the project's choices did not reach it.
-		const hostOwn = fs.existsSync(path.join(general.dir, "settings.json"))
-			? JSON.parse(fs.readFileSync(path.join(general.dir, "settings.json"), "utf8"))
-			: {};
+		// The machine's own agent kept its approvals, and has the model for everyone.
+		const hostOwn = JSON.parse(fs.readFileSync(path.join(home, "agents", "default", "settings.json"), "utf8"));
 		assert.notEqual(hostOwn.approvals, "smart");
-		assert.notEqual(hostOwn.defaultModel, "m1");
+		assert.deepEqual([hostOwn.defaultProvider, hostOwn.defaultModel, hostOwn.fallbackProvider, hostOwn.fallbackModel], ["p1", "m1", "p2", "m2"]);
+		const raw = await call("GET", `/api/config/raw?profile=${encodeURIComponent(`project:${made.project.id}`)}`);
+		assert.match(raw.yaml, /default: m1/);
+		assert.match(raw.yaml, /fallback: m2/);
 	} finally {
 		child.kill();
 	}
