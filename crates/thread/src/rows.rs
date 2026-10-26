@@ -1,0 +1,258 @@
+//! The journal as rows: messages, pieces of work, answers, inserts, the queue.
+
+use std::collections::HashSet;
+
+use protocol::{QueuedItem, ThreadItem};
+use serde_json::{Map, Value};
+
+/// One line of the thread. `key` is stable: a view keeps a row's state (folded, measured) by it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Row {
+    /// The person's message.
+    User {
+        key: String,
+        text: String,
+        at: Option<f64>,
+    },
+    /// The agent's steps between two messages: folded into "N actions · time".
+    Work {
+        key: String,
+        steps: Vec<Step>,
+        from: Option<f64>,
+        to: Option<f64>,
+        live: bool,
+    },
+    /// What the agent said: an answer, a plan, a question — each its own message.
+    Answer {
+        key: String,
+        text: String,
+        error: Option<String>,
+    },
+    Insert {
+        key: String,
+        id: String,
+        insert_key: String,
+    },
+    /// Why a run stopped.
+    Fail { key: String, text: String },
+    /// The answer being written now.
+    Writing { thought: String, text: String },
+    /// A message waiting for the agent.
+    Queued {
+        key: String,
+        sub: String,
+        mode: String,
+        text: String,
+    },
+}
+
+impl Row {
+    pub fn key(&self) -> &str {
+        match self {
+            Row::User { key, .. }
+            | Row::Work { key, .. }
+            | Row::Answer { key, .. }
+            | Row::Insert { key, .. }
+            | Row::Fail { key, .. }
+            | Row::Queued { key, .. } => key,
+            Row::Writing { .. } => "writing",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum Step {
+    Thought(String),
+    /// Prose the model wrote between tool calls.
+    Note(String),
+    Tool {
+        call_id: String,
+        name: String,
+        args: Value,
+        output: Option<String>,
+        failed: bool,
+    },
+}
+
+impl Step {
+    pub fn is_tool(&self) -> bool {
+        matches!(self, Step::Tool { .. })
+    }
+}
+
+pub(crate) fn rows_of(
+    log: &[ThreadItem],
+    inserts: &Map<String, Value>,
+    running: bool,
+    stream: &(String, String),
+    queue: &[QueuedItem],
+    now_ms: f64,
+) -> Vec<Row> {
+    // An assistant entry with tool calls is work: its text is a note on the way, not an answer.
+    let working: HashSet<u64> = log
+        .iter()
+        .filter(|i| matches!(i, ThreadItem::Tool { .. }))
+        .map(|i| i.seq())
+        .collect();
+    let mut rows = Vec::new();
+    let mut work: Option<Row> = None;
+    let close = |rows: &mut Vec<Row>, work: &mut Option<Row>| {
+        if let Some(w) = work.take() {
+            rows.push(w);
+        }
+    };
+    let step = |work: &mut Option<Row>, key: &str, at: Option<f64>, s: Step| {
+        let w = work.get_or_insert_with(|| Row::Work {
+            key: key.to_string(),
+            steps: vec![],
+            from: at,
+            to: at,
+            live: false,
+        });
+        if let Row::Work {
+            steps, from, to, ..
+        } = w
+        {
+            steps.push(s);
+            if from.is_none() {
+                *from = at;
+            }
+            if at.is_some() {
+                *to = at;
+            }
+        }
+    };
+    for it in log {
+        match it {
+            ThreadItem::User { key, text, at, .. } => {
+                close(&mut rows, &mut work);
+                rows.push(Row::User {
+                    key: key.clone(),
+                    text: text.clone(),
+                    at: *at,
+                });
+            }
+            ThreadItem::Thought { key, text, at, .. } => {
+                step(&mut work, key, *at, Step::Thought(text.clone()))
+            }
+            ThreadItem::Text {
+                key,
+                seq,
+                text,
+                at,
+                error,
+            } => {
+                if error.is_none() && working.contains(seq) {
+                    step(&mut work, key, *at, Step::Note(text.clone()));
+                } else {
+                    close(&mut rows, &mut work);
+                    rows.push(Row::Answer {
+                        key: key.clone(),
+                        text: text.clone(),
+                        error: error.clone(),
+                    });
+                }
+            }
+            ThreadItem::Tool {
+                key,
+                call_id,
+                name,
+                args,
+                at,
+                ..
+            } => step(
+                &mut work,
+                key,
+                *at,
+                Step::Tool {
+                    call_id: call_id.clone(),
+                    name: name.clone(),
+                    args: args.clone(),
+                    output: None,
+                    failed: false,
+                },
+            ),
+            ThreadItem::Result {
+                call_id,
+                output,
+                failed,
+                at,
+                ..
+            } => {
+                if let Some(Row::Work { steps, to, .. }) = work.as_mut() {
+                    for s in steps.iter_mut().rev() {
+                        if let Step::Tool {
+                            call_id: c,
+                            output: o,
+                            failed: f,
+                            ..
+                        } = s
+                        {
+                            if c == call_id {
+                                *o = Some(output.clone());
+                                *f = *failed;
+                                break;
+                            }
+                        }
+                    }
+                    if at.is_some() {
+                        *to = *at;
+                    }
+                }
+            }
+            ThreadItem::Insert {
+                key,
+                id,
+                insert_key,
+                ..
+            } => {
+                let removed = inserts
+                    .get(id)
+                    .and_then(|s| s.get("removed"))
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                if !removed {
+                    close(&mut rows, &mut work);
+                    let insert_key = inserts
+                        .get(id)
+                        .and_then(|s| s.get("key"))
+                        .and_then(Value::as_str)
+                        .unwrap_or(insert_key);
+                    rows.push(Row::Insert {
+                        key: key.clone(),
+                        id: id.clone(),
+                        insert_key: insert_key.to_string(),
+                    });
+                }
+            }
+            ThreadItem::Fail { key, text, .. } => {
+                close(&mut rows, &mut work);
+                rows.push(Row::Fail {
+                    key: key.clone(),
+                    text: text.clone(),
+                });
+            }
+        }
+    }
+    // The work in progress is live while the run is, and its time runs on.
+    if let Some(Row::Work { live, to, .. }) = work.as_mut() {
+        if running {
+            *live = true;
+            *to = Some(now_ms);
+        }
+    }
+    close(&mut rows, &mut work);
+    if running && (!stream.0.is_empty() || !stream.1.is_empty()) {
+        rows.push(Row::Writing {
+            thought: stream.0.clone(),
+            text: stream.1.clone(),
+        });
+    }
+    rows.extend(queue.iter().map(|q| Row::Queued {
+        key: q.key.clone(),
+        sub: q.sub.clone(),
+        mode: q.mode.clone(),
+        text: q.text.clone(),
+    }));
+    rows
+}

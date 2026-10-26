@@ -1,0 +1,228 @@
+//! What Bench and its agent say to each other about a thread (agent/src/thread.ts).
+//!
+//! Gives: `ThreadItem`, `QueuedItem`, `ThreadOpen` (the answer to `thread.open`) and
+//! `ThreadEvent` (the `thread.*` events). Takes: nothing; no GPUI, no I/O.
+
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+
+/// One item of the thread's journal. `key` is unique and stable; `seq` is the Pi entry id.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
+pub enum ThreadItem {
+    User {
+        key: String,
+        seq: u64,
+        text: String,
+        #[serde(default)]
+        at: Option<f64>,
+    },
+    Thought {
+        key: String,
+        seq: u64,
+        text: String,
+        #[serde(default)]
+        at: Option<f64>,
+    },
+    Text {
+        key: String,
+        seq: u64,
+        text: String,
+        #[serde(default)]
+        at: Option<f64>,
+        #[serde(default)]
+        error: Option<String>,
+    },
+    Tool {
+        key: String,
+        seq: u64,
+        call_id: String,
+        name: String,
+        #[serde(default)]
+        args: Value,
+        #[serde(default)]
+        at: Option<f64>,
+    },
+    Result {
+        key: String,
+        seq: u64,
+        call_id: String,
+        name: String,
+        output: String,
+        failed: bool,
+        #[serde(default)]
+        at: Option<f64>,
+    },
+    Insert {
+        key: String,
+        seq: u64,
+        id: String,
+        insert_key: String,
+    },
+    Fail {
+        key: String,
+        seq: u64,
+        text: String,
+    },
+}
+
+impl ThreadItem {
+    pub fn key(&self) -> &str {
+        match self {
+            ThreadItem::User { key, .. }
+            | ThreadItem::Thought { key, .. }
+            | ThreadItem::Text { key, .. }
+            | ThreadItem::Tool { key, .. }
+            | ThreadItem::Result { key, .. }
+            | ThreadItem::Insert { key, .. }
+            | ThreadItem::Fail { key, .. } => key,
+        }
+    }
+
+    pub fn seq(&self) -> u64 {
+        match self {
+            ThreadItem::User { seq, .. }
+            | ThreadItem::Thought { seq, .. }
+            | ThreadItem::Text { seq, .. }
+            | ThreadItem::Tool { seq, .. }
+            | ThreadItem::Result { seq, .. }
+            | ThreadItem::Insert { seq, .. }
+            | ThreadItem::Fail { seq, .. } => *seq,
+        }
+    }
+
+    /// When it happened, Unix milliseconds, if the entry says.
+    pub fn at(&self) -> Option<f64> {
+        match self {
+            ThreadItem::User { at, .. }
+            | ThreadItem::Thought { at, .. }
+            | ThreadItem::Text { at, .. }
+            | ThreadItem::Tool { at, .. }
+            | ThreadItem::Result { at, .. } => *at,
+            ThreadItem::Insert { .. } | ThreadItem::Fail { .. } => None,
+        }
+    }
+
+    /// The order key: (entry id, place inside the entry). "9.2" → (9, 2), "11" → (11, 0).
+    pub fn order(&self) -> (u64, u32) {
+        let sub = self
+            .key()
+            .split_once('.')
+            .and_then(|(_, s)| s.parse().ok())
+            .unwrap_or(0);
+        (self.seq(), sub)
+    }
+}
+
+/// A message waiting in the inbox, in the order the agent will take them.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct QueuedItem {
+    pub key: String,
+    pub sub: String,
+    pub mode: String,
+    pub text: String,
+}
+
+/// The answer to `thread.open {session_id, since}`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ThreadOpen {
+    pub items: Vec<ThreadItem>,
+    #[serde(default)]
+    pub queue: Vec<QueuedItem>,
+    #[serde(default)]
+    pub inserts: Map<String, Value>,
+    #[serde(default)]
+    pub running: bool,
+    #[serde(default)]
+    pub head: u64,
+}
+
+/// Which part of the answer being written a stream delta extends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StreamKind {
+    Text,
+    Thought,
+}
+
+/// A `thread.*` event.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ThreadEvent {
+    /// New journal items, in order.
+    Append(Vec<ThreadItem>),
+    /// The answer being written grew; its entry's `Append` replaces it.
+    Stream(StreamKind, String),
+    /// The whole queue, after every change.
+    Queue(Vec<QueuedItem>),
+    /// The inserts' state document, whole.
+    Inserts(Map<String, Value>),
+    /// A run started or ended.
+    Run(bool),
+}
+
+impl ThreadEvent {
+    /// Read an event from its type and payload; None for other events or a malformed one.
+    pub fn parse(kind: &str, payload: &Value) -> Option<Self> {
+        let items = || payload.get("items").cloned().unwrap_or(Value::Null);
+        Some(match kind {
+            "thread.append" => ThreadEvent::Append(serde_json::from_value(items()).ok()?),
+            "thread.stream" => ThreadEvent::Stream(
+                serde_json::from_value(payload.get("kind")?.clone()).ok()?,
+                payload.get("delta")?.as_str()?.to_string(),
+            ),
+            "thread.queue" => ThreadEvent::Queue(serde_json::from_value(items()).ok()?),
+            "thread.inserts" => ThreadEvent::Inserts(items().as_object()?.clone()),
+            "thread.run" => ThreadEvent::Run(payload.get("running")?.as_bool()?),
+            _ => return None,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn reads_what_the_agent_sends() {
+        let open: ThreadOpen = serde_json::from_value(json!({
+            "items": [
+                {"key": "5.0", "seq": 5, "kind": "user", "text": "fix it", "at": 1005},
+                {"key": "9.2", "seq": 9, "kind": "tool", "call_id": "c1", "name": "bash", "args": {"command": "ls"}},
+                {"key": "10.0", "seq": 10, "kind": "result", "call_id": "c1", "name": "bash", "output": "a", "failed": false},
+                {"key": "11", "seq": 11, "kind": "insert", "id": "i1", "insert_key": "tasks"},
+                {"key": "12", "seq": 12, "kind": "fail", "text": "no model"}
+            ],
+            "queue": [{"key": "q31", "sub": "31", "mode": "followUp", "text": "next"}],
+            "inserts": {"i1": {"key": "tasks"}},
+            "running": true,
+            "head": 12
+        }))
+        .unwrap();
+        assert_eq!(open.items.len(), 5);
+        assert_eq!(open.items[1].order(), (9, 2));
+        assert_eq!(open.items[3].order(), (11, 0));
+        assert_eq!(open.queue[0].text, "next");
+        assert!(open.running);
+    }
+
+    #[test]
+    fn events() {
+        assert_eq!(
+            ThreadEvent::parse("thread.stream", &json!({"kind": "text", "delta": "Hel"})),
+            Some(ThreadEvent::Stream(StreamKind::Text, "Hel".into()))
+        );
+        assert_eq!(
+            ThreadEvent::parse("thread.run", &json!({"running": false})),
+            Some(ThreadEvent::Run(false))
+        );
+        assert_eq!(
+            ThreadEvent::parse("thread.queue", &json!({"items": []})),
+            Some(ThreadEvent::Queue(vec![]))
+        );
+        assert_eq!(ThreadEvent::parse("message.delta", &json!({})), None);
+        assert!(
+            matches!(ThreadEvent::parse("thread.append", &json!({"items": [{"key": "1.0", "seq": 1, "kind": "user", "text": "x"}]})), Some(ThreadEvent::Append(v)) if v.len() == 1)
+        );
+    }
+}

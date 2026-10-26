@@ -1,0 +1,9 @@
+[package]
+name = "thread"
+version = "0.1.0"
+edition = "2024"
+description = "A thread as Bench shows it: the journal, the answer being written and the queue, as ordered rows"
+
+[dependencies]
+protocol = { path = "../protocol" }
+serde_json = "1"
