@@ -13,7 +13,10 @@ impl BenchApp {
     pub(crate) fn on_event(&mut self, evt: Evt, window: &mut Window, cx: &mut Context<Self>) {
         match evt {
             Evt::Connected(conn) => {
-                self.conn = Some(conn);
+                if let Some(a) = self.agents.get_mut("") {
+                    a.conn = Some(conn);
+                    a.error = None;
+                }
                 self.connecting = false;
                 // Tasks live with the agent: another machine, its own tasks.
                 self.restart_tasks(cx);

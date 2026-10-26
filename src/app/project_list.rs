@@ -12,7 +12,7 @@ use crate::rest;
 
 impl BenchApp {
     pub fn load_projects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.local_conn() else {
             return;
         };
         let profile = self.current_profile();
@@ -62,7 +62,7 @@ impl BenchApp {
 
     /// The project goes from the list; its threads stay, without a project.
     pub fn delete_project(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.local_conn() else {
             return;
         };
         let profile = self.current_profile();

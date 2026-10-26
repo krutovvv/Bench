@@ -326,11 +326,11 @@ impl BenchApp {
     }
 
     fn fetch_media(&mut self, key: String, path: String, cx: &mut Context<Self>) {
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.thread_conn() else {
             return; // still connecting: the next frame asks again
         };
         self.media.insert(key.clone(), Loaded::Pending);
-        let (target, profile) = (self.target.clone(), self.current_profile());
+        let (target, profile) = (self.thread_target(), self.current_profile());
         cx.spawn(async move |this, cx| {
             let r = cx
                 .background_spawn(async move { media::fetch(&conn, &target, &profile, &path) })
@@ -454,9 +454,11 @@ impl BenchApp {
         path: String,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let key = format!("{}\0{path}", self.target.label());
+        // A thread's files are where its agent is: this Mac's, or its server's.
+        let target = self.thread_target();
+        let key = format!("{}\0{path}", target.label());
         if !self.media.contains_key(&key) {
-            match media::fetch_now(&self.target, &path) {
+            match media::fetch_now(&target, &path) {
                 Some(f) => {
                     self.media.insert(key.clone(), Loaded::Ready(f));
                 }

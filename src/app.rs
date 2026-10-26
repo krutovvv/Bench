@@ -1,7 +1,6 @@
 //! Application state, gateway events and user actions. Rendering lives in `ui/`.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use std::time::Duration;
 
 use web_time::Instant;
@@ -23,7 +22,7 @@ pub(crate) mod mcp_status;
 mod processes;
 pub(crate) mod project_list;
 pub(crate) mod projects;
-pub(crate) mod remotes;
+pub(crate) mod agents;
 mod send;
 mod sessions;
 mod telegram;
@@ -73,8 +72,6 @@ pub struct BenchApp {
     pub target: Target,
     /// The gateway list as a Select (kept for its subscription; the status bar has its own menu).
     _target_choice: Entity<Choice>,
-    gateway: Option<Gateway>,
-    pub conn: Option<Arc<Connection>>,
     /// The subject of the chat about to be created ("tasks:today"): it goes with session.create.
     pub new_subject: String,
     /// Each thread's inserts (by session id; "draft" for a new chat): `app::inserts`.
@@ -107,8 +104,8 @@ pub struct BenchApp {
     pub ssh_projects: HashMap<String, String>,
     /// The project whose prompts `prompts` holds (they follow the open thread's project).
     pub prompts_for: Option<String>,
-    /// The agents of remote projects, by server.
-    pub remotes: HashMap<String, remotes::RemoteAgent>,
+    /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
+    pub agents: HashMap<String, agents::AgentLink>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -456,7 +453,7 @@ impl BenchApp {
                         .find(|t| t.label() == label.as_ref())
                         .cloned()
                     {
-                        if t != this.target || this.conn.is_none() {
+                        if t != this.target || this.local_conn().is_none() {
                             this.connect(t, window, cx);
                         }
                     }
@@ -536,9 +533,8 @@ impl BenchApp {
         let backend = cx.spawn(async move |this, cx| {
             loop {
                 let Ok(job) = this.update(cx, |this, _| {
-                    this.conn
-                        .clone()
-                        .map(|c| (c, this.current_profile(), this.target.clone()))
+                    this.thread_conn()
+                        .map(|c| (c, this.current_profile(), this.thread_target()))
                 }) else {
                     break;
                 };
@@ -600,8 +596,6 @@ impl BenchApp {
             targets,
             target: initial.clone(),
             _target_choice: target_choice,
-            gateway: None,
-            conn: None,
             new_subject: String::new(),
             inserts: HashMap::new(),
             creating: false,
@@ -617,7 +611,7 @@ impl BenchApp {
             project_env: None,
             ssh_projects: HashMap::new(),
             prompts_for: None,
-            remotes: HashMap::new(),
+            agents: HashMap::new(),
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,
@@ -741,7 +735,7 @@ impl BenchApp {
 
     /// Connected to a gateway — or showing the demo, which looks connected.
     pub fn online(&self) -> bool {
-        self.conn.is_some() || self.demo
+        self.local_conn().is_some() || self.demo
     }
 
     pub fn toast(
@@ -757,8 +751,7 @@ impl BenchApp {
     // ---- connection ------------------------------------------------------
 
     pub fn connect(&mut self, target: Target, _window: &mut Window, cx: &mut Context<Self>) {
-        self.gateway = None; // drops the old thread
-        self.conn = None;
+        self.agents.remove(""); // drops the old thread
         self.target = target.clone();
         self.connecting = true;
         self.profile_ready = false;
@@ -775,11 +768,14 @@ impl BenchApp {
         let dir = connection::state_dir();
         let _ = std::fs::create_dir_all(&dir)
             .and_then(|_| std::fs::write(dir.join("last-target"), target.label()));
-        self.gateway = Some(Gateway::start(target, self.evt_tx.clone()));
+        self.agents.insert(
+            String::new(),
+            agents::AgentLink::new(Gateway::start(target, self.evt_tx.clone())),
+        );
         cx.notify();
     }
 
-    /// To the agent the command concerns (`remotes.rs`): this Mac's, or a remote project's.
+    /// To the agent the command concerns (`agents.rs`): this Mac's, or a remote project's.
     pub(crate) fn cmd(&self, cmd: Cmd) {
         self.route(cmd);
     }
@@ -813,7 +809,7 @@ impl BenchApp {
         job: impl FnOnce(&Connection, &str) -> anyhow::Result<T> + Send + 'static,
         done: impl FnOnce(&mut Self, anyhow::Result<T>, &mut Window, &mut Context<Self>) + 'static,
     ) {
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.local_conn() else {
             return;
         };
         let profile = self.current_profile();

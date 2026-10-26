@@ -167,7 +167,7 @@ impl BenchApp {
         // A remote project's thread is its server agent's to delete.
         let host = self.host_of_session(&id);
         let remote = (!host.is_empty())
-            .then(|| self.remotes.get(&host).and_then(|r| r.conn.clone()))
+            .then(|| self.conn_of(&host))
             .flatten();
         if let Some(conn) = remote {
             let p = profile.clone();

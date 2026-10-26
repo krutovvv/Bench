@@ -428,7 +428,7 @@ impl BenchApp {
         self.reload_servers(cx);
         // Added in a project's thread: the project's server (its row in the agent's store).
         if !self.thread_project.is_empty() {
-            if let Some(conn) = self.conn.clone() {
+            if let Some(conn) = self.local_conn() {
                 let body = serde_json::json!({
                     "name": s.alias, "kind": "ssh", "host": if s.hostname.is_empty() { s.alias.clone() } else { s.hostname.clone() },
                     "user": s.user, "source": format!("ssh_config:{}", s.alias), "project": self.thread_project,

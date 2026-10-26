@@ -41,7 +41,7 @@ crates/
 src/
   main.rs        start, the window
   app.rs         BenchApp: the window's state, its construction, the connection
-  app/           its actions by area: events, sessions, send, keys, slash, voice, projects, providers…
+  app/           its actions by area: agents (this Mac's and servers'), events, sessions, send, keys, slash, voice, projects, providers…
   ui/            the frame: mod.rs (layout, header), sidebar, statusbar, composer, media
   ui/thread/     the open thread on gpui::list: messages, work, queued, rail, extras
   inserts/       one folder per insert kind, the registry in mod.rs

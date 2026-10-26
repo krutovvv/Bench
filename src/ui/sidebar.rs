@@ -124,7 +124,7 @@ impl BenchApp {
             _ => Ico::Layers,
         };
         // A remote project's agent: connecting, or why it is not there.
-        let remote_note = p.host.as_ref().and_then(|h| match self.remotes.get(h) {
+        let remote_note = p.host.as_ref().and_then(|h| match self.agents.get(h) {
             Some(r) if r.conn.is_some() => None,
             Some(r) => Some(
                 r.error

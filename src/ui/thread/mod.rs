@@ -224,7 +224,7 @@ impl BenchApp {
     ) -> AnyElement {
         self.viewport_h = window.viewport_size().height;
         if !self.demo
-            && self.conn.is_some()
+            && self.local_conn().is_some()
             && self.prompts_for.as_deref() != Some(self.thread_project.as_str())
         {
             self.prompts_for = Some(self.thread_project.clone());

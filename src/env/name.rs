@@ -189,7 +189,7 @@ fn server_of(app: &BenchApp, project: &str) -> Option<ServerInfo> {
             format!("{user}{}{port}", if s.hostname.is_empty() { &alias } else { &s.hostname })
         })
         .unwrap_or_else(|| "not in ~/.ssh/config".into());
-    let remote = app.remotes.get(&alias);
+    let remote = app.agents.get(&alias);
     Some(ServerInfo {
         alias,
         address,

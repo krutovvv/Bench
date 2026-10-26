@@ -87,7 +87,7 @@ impl BenchApp {
 
     /// Create the form's project and start its first thread.
     pub fn save_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(form)) = (self.conn.clone(), self.project_form.as_ref()) else {
+        let (Some(conn), Some(form)) = (self.local_conn(), self.project_form.as_ref()) else {
             return;
         };
         let name = form.name.read(cx).value().trim().to_string();

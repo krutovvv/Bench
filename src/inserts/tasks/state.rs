@@ -202,7 +202,7 @@ impl BenchApp {
             return;
         }
         // The tasks live in the agent's store: wait for the connection.
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.local_conn() else {
             return;
         };
         let (tx, rx) = async_channel::unbounded();

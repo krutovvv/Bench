@@ -77,7 +77,7 @@ impl BenchApp {
         let project = self.thread_project.clone();
         match self.env_target(&project) {
             Some((conn, _)) => Some((conn, self.current_profile())),
-            None => self.conn.clone().map(|c| (c, self.current_profile())),
+            None => self.thread_conn().map(|c| (c, self.current_profile())),
         }
     }
 
@@ -262,7 +262,7 @@ impl BenchApp {
         let (folder, remote) = (f.folder, f.remote);
         let profile = self.current_profile();
         if remote {
-            let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
+            let (Some(conn), Some(id)) = (self.local_conn(), self.files_remote.host.clone()) else {
                 return;
             };
             let path = format!("{}/{name}", self.files_remote.path.trim_end_matches('/'));
@@ -349,7 +349,7 @@ impl BenchApp {
         self.confirm_delete = None;
         let profile = self.current_profile();
         if remote {
-            let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
+            let (Some(conn), Some(id)) = (self.local_conn(), self.files_remote.host.clone()) else {
                 return;
             };
             let q = path.clone();

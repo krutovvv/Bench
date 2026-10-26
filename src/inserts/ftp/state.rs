@@ -133,7 +133,7 @@ impl BenchApp {
             return;
         }
         self.confirm_delete = None;
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.local_conn() else {
             return;
         };
         let profile = self.current_profile();
@@ -157,7 +157,7 @@ impl BenchApp {
     }
 
     pub fn load_remote_hosts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.local_conn() else {
             return;
         };
         let profile = self.current_profile();
@@ -217,7 +217,7 @@ impl BenchApp {
 
     /// Save the form's host in the agent's store and open its thread.
     pub fn save_host(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.local_conn() else {
             return;
         };
         let f = &self.files_remote;
@@ -282,7 +282,7 @@ impl BenchApp {
     }
 
     pub fn list_remote(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
+        let (Some(conn), Some(id)) = (self.local_conn(), self.files_remote.host.clone()) else {
             return;
         };
         self.files_remote.loading = true;
@@ -391,7 +391,7 @@ impl BenchApp {
 
     /// A file of the shown host, in the editor.
     pub fn open_remote_path(&mut self, path: String, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
+        let (Some(conn), Some(id)) = (self.local_conn(), self.files_remote.host.clone()) else {
             return;
         };
         let profile = self.current_profile();
@@ -434,7 +434,7 @@ impl BenchApp {
 
     pub fn save_host_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let (Some(conn), Some(id), Some(path)) = (
-            self.conn.clone(),
+            self.local_conn(),
             self.files_remote.host.clone(),
             self.files_remote.file.clone(),
         ) else {
@@ -518,7 +518,7 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let (Some(conn), Some(id)) = (self.conn.clone(), self.files_remote.host.clone()) else {
+        let (Some(conn), Some(id)) = (self.local_conn(), self.files_remote.host.clone()) else {
             return;
         };
         if password.is_empty() {

@@ -575,7 +575,8 @@ impl BenchApp {
             Some(Err(e)) => Some(e.clone()),
             _ => None,
         };
-        let where_ = format!("{} · {}", self.target.label(), self.current_profile());
+        // The open thread's agent: this Mac's, or its project's server's.
+        let where_ = format!("{} · {}", self.thread_target().label(), self.current_profile());
         let view = cx.entity();
         Some(
             h_flex()

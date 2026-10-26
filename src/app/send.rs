@@ -163,10 +163,10 @@ impl BenchApp {
                 cx.notify();
                 return;
             }
-            let Some(conn) = self.conn.clone() else {
+            let Some(conn) = self.thread_conn() else {
                 return;
             };
-            let target = self.target.clone();
+            let target = self.thread_target();
             let profile2 = profile.clone();
             let keep = files.clone();
             cx.spawn_in(window, async move |this, cx| {
@@ -231,10 +231,10 @@ impl BenchApp {
             self.submit(profile, text, window, cx);
             return;
         }
-        let Some(conn) = self.conn.clone() else {
+        let Some(conn) = self.thread_conn() else {
             return;
         };
-        let target = self.target.clone();
+        let target = self.thread_target();
         let keep = files.clone();
         cx.spawn_in(window, async move |this, cx| {
             let p = profile.clone();

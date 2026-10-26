@@ -1,7 +1,7 @@
-//! Remote projects: a project can be the agent on a server (an ~/.ssh/config host), as Hermes'
-//! gateways were. Bench keeps a connection to each such agent beside the local one (installed
-//! and started over SSH, reached through a tunnel: `connection.rs`); the server's threads join
-//! the sidebar under their project, and a thread's commands go to the agent that keeps it.
+//! The agents Bench works with (`docs/remote-projects.md`): this Mac's (key "") and one on each
+//! server a project lives on (key: its ~/.ssh/config alias), installed and started over SSH and
+//! reached through a tunnel (`connection.rs`). One list: a thread's commands, its files, its
+//! media and attachments go to the agent that keeps it, whichever that is.
 
 use std::sync::Arc;
 
@@ -12,14 +12,52 @@ use crate::connection::Connection;
 use crate::gateway::{Cmd, Evt, Gateway};
 use crate::model::Target;
 
-/// The agent on a server a project lives on.
-pub struct RemoteAgent {
+/// One agent: its command channel, its REST connection once up, why it is not up.
+pub struct AgentLink {
     pub gateway: Gateway,
     pub conn: Option<Arc<Connection>>,
     pub error: Option<String>,
 }
 
+impl AgentLink {
+    pub fn new(gateway: Gateway) -> Self {
+        Self {
+            gateway,
+            conn: None,
+            error: None,
+        }
+    }
+}
+
 impl BenchApp {
+    /// The agent kept under `host` ("" = this Mac's): its REST connection, once up.
+    pub fn conn_of(&self, host: &str) -> Option<Arc<Connection>> {
+        self.agents.get(host).and_then(|a| a.conn.clone())
+    }
+
+    /// This Mac's agent.
+    pub fn local_conn(&self) -> Option<Arc<Connection>> {
+        self.conn_of("")
+    }
+
+    /// The agent keeping the open thread (or the new one), and where its files are.
+    pub fn thread_conn(&self) -> Option<Arc<Connection>> {
+        self.conn_of(&self.thread_host())
+    }
+
+    /// Where the agent under `host` runs, as media and attachments reach its files.
+    pub fn target_of(&self, host: &str) -> Target {
+        if host.is_empty() {
+            self.target.clone()
+        } else {
+            Target::Ssh(host.to_string())
+        }
+    }
+
+    pub fn thread_target(&self) -> Target {
+        self.target_of(&self.thread_host())
+    }
+
     /// Connect to the agents of the remote projects (once each).
     pub fn connect_remotes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let hosts: Vec<String> = self
@@ -28,19 +66,12 @@ impl BenchApp {
             .filter_map(|p| p.host.clone())
             .collect();
         for host in hosts {
-            if self.remotes.contains_key(&host) || self.demo {
+            if self.agents.contains_key(&host) || self.demo {
                 continue;
             }
             let (tx, rx) = async_channel::unbounded::<Evt>();
             let gateway = Gateway::start(Target::Ssh(host.clone()), tx);
-            self.remotes.insert(
-                host.clone(),
-                RemoteAgent {
-                    gateway,
-                    conn: None,
-                    error: None,
-                },
-            );
+            self.agents.insert(host.clone(), AgentLink::new(gateway));
             cx.spawn_in(window, async move |this, cx| {
                 while let Ok(evt) = rx.recv().await {
                     if this
@@ -68,7 +99,7 @@ impl BenchApp {
     ) {
         match evt {
             Evt::Connected(conn) => {
-                if let Some(r) = self.remotes.get_mut(host) {
+                if let Some(r) = self.agents.get_mut(host) {
                     r.conn = Some(conn);
                     r.error = None;
                     r.gateway.send(Cmd::Sessions("default".into()));
@@ -76,7 +107,7 @@ impl BenchApp {
                 cx.notify();
             }
             Evt::Error(e) => {
-                if let Some(r) = self.remotes.get_mut(host) {
+                if let Some(r) = self.agents.get_mut(host) {
                     r.error = Some(e);
                 }
                 cx.notify();
@@ -104,7 +135,7 @@ impl BenchApp {
                 cx.notify();
             }
             Evt::SessionsChanged | Evt::Deleted => {
-                if let Some(r) = self.remotes.get(host) {
+                if let Some(r) = self.agents.get(host) {
                     r.gateway.send(Cmd::Sessions("default".into()));
                 }
             }
@@ -150,12 +181,8 @@ impl BenchApp {
             Cmd::Delete { session, .. } => self.host_of_session(session),
             _ => self.thread_host(),
         };
-        if host.is_empty() {
-            if let Some(g) = &self.gateway {
-                g.send(cmd);
-            }
-        } else if let Some(r) = self.remotes.get(&host) {
-            r.gateway.send(cmd);
+        if let Some(a) = self.agents.get(&host) {
+            a.gateway.send(cmd);
         }
     }
 
@@ -184,13 +211,8 @@ impl BenchApp {
             .find(|p| p.id == project)
             .and_then(|p| p.host.clone())
         {
-            Some(host) => self
-                .remotes
-                .get(&host)?
-                .conn
-                .clone()
-                .map(|c| (c, "general".to_string())),
-            None => self.conn.clone().map(|c| (c, project.to_string())),
+            Some(host) => self.conn_of(&host).map(|c| (c, "general".to_string())),
+            None => self.local_conn().map(|c| (c, project.to_string())),
         }
     }
 }
