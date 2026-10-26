@@ -23,7 +23,7 @@ import { authorizeServer, connectMcp, mcpStatus } from "./mcp.ts";
 import { tasks } from "./builtin/tasks.ts";
 import { hosts, importSshConfig, importTransmit, type Host } from "./builtin/hosts.ts";
 import { projects } from "./builtin/projects.ts";
-import { listSkills as skillsOf } from "./builtin/skills.ts";
+import { findSkill as findSkillIn, listSkills as skillsOf } from "./builtin/skills.ts";
 import * as remote from "./builtin/remote.ts";
 
 const STATE = path.join(AGENT_HOME, "server.json");
@@ -204,28 +204,6 @@ const COMMANDS: [string, string][] = [
 	["/compact", "Compress the conversation context"],
 ];
 
-function skillPairs(profile: string): [string, string][] {
-	const dir = path.join(agentDir(profile), "skills");
-	const out: [string, string][] = [];
-	const walk = (d: string, depth: number) => {
-		if (depth > 3 || !fs.existsSync(d)) return;
-		for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-			if (!e.isDirectory() || e.name.startsWith(".")) continue;
-			const skill = path.join(d, e.name, "SKILL.md");
-			if (fs.existsSync(skill)) {
-				const m = fs.readFileSync(skill, "utf8").match(/^---\n([\s\S]*?)\n---/);
-				let desc = "";
-				try {
-					desc = String(YAML.parse(m?.[1] ?? "")?.description ?? "");
-				} catch {}
-				out.push([`/${e.name}`, desc.slice(0, 80)]);
-			} else walk(path.join(d, e.name), depth + 1);
-		}
-	};
-	walk(dir, 0);
-	return out.sort((a, b) => a[0].localeCompare(b[0]));
-}
-
 async function slash({ session_id, profile, command }: { session_id: string; profile?: string; command: string }) {
 	const [name, ...rest] = String(command).trim().split(/\s+/);
 	const arg = rest.join(" ");
@@ -259,9 +237,9 @@ async function slash({ session_id, profile, command }: { session_id: string; pro
 		}
 		default: {
 			// A skill: its body becomes the turn (/skill-name).
-			const skill = findSkill(profile || row?.profile || "default", name.slice(1));
+			const skill = findSkillIn(profile || row?.profile || "default", name.slice(1), row?.cwd || undefined);
 			if (skill) {
-				const body = fs.readFileSync(skill, "utf8");
+				const body = fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8");
 				return { type: "skill", message: `[SYSTEM: The user has invoked the "${name.slice(1)}" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]\n\n${body}${arg ? `\n\nThe user has provided the following instruction alongside the skill invocation: ${arg}` : ""}` };
 			}
 			return { type: "info", output: `Unknown command: ${name}` };
@@ -270,21 +248,6 @@ async function slash({ session_id, profile, command }: { session_id: string; pro
 }
 
 import { BACKGROUND_CONTEXT as BACKGROUND } from "@earendil-works/chord/context";
-
-function findSkill(profile: string, name: string): string | undefined {
-	const dir = path.join(agentDir(profile), "skills");
-	const walk = (d: string, depth: number): string | undefined => {
-		if (depth > 3 || !fs.existsSync(d)) return;
-		for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-			if (!e.isDirectory()) continue;
-			const f = path.join(d, e.name, "SKILL.md");
-			if (e.name === name && fs.existsSync(f)) return f;
-			const deeper = walk(path.join(d, e.name), depth + 1);
-			if (deeper) return deeper;
-		}
-	};
-	return walk(dir, 0);
-}
 
 /**
  * `PUT /api/config`: each top-level key merges into its setting. What the raw config reads
@@ -369,12 +332,14 @@ const routes: Record<string, Route> = {
 	},
 	"GET /api/skills": (req) => listSkills(profileOf(req)),
 	"GET /api/skills/content": (req) => {
-		const f = findSkill(profileOf(req), req.query.get("name") ?? "");
+		const k = findSkillIn(profileOf(req), req.query.get("name") ?? "");
+		const f = k && path.join(k.dir, "SKILL.md");
 		if (!f) throw new HttpError(404, "skill not found");
 		return { content: fs.readFileSync(f, "utf8"), path: f };
 	},
 	"PUT /api/skills/content": (req) => {
-		const f = findSkill(profileOf(req), req.body?.name ?? "") ?? path.join(agentDir(profileOf(req)), "skills", req.body?.name, "SKILL.md");
+		const k = findSkillIn(profileOf(req), req.body?.name ?? "");
+		const f = k ? path.join(k.dir, "SKILL.md") : path.join(agentDir(profileOf(req)), "skills", req.body?.name, "SKILL.md");
 		fs.mkdirSync(path.dirname(f), { recursive: true });
 		fs.writeFileSync(f, String(req.body?.content ?? ""));
 		return { ok: true, path: f };
@@ -418,6 +383,15 @@ const routes: Record<string, Route> = {
 		fs.rmSync(p, { recursive: true });
 		return { ok: true };
 	},
+	"POST /api/fs/rename": (req) => {
+		const from = expand(required(req.body?.from, "from"));
+		const to = expand(required(req.body?.to, "to"));
+		if (fs.existsSync(to)) throw new HttpError(409, `${path.basename(to)} exists`);
+		fs.renameSync(from, to);
+		return { ok: true };
+	},
+	// A folder with everything in it (a skill's tree): paths relative to it, folders first at each level.
+	"GET /api/fs/tree": (req) => ({ entries: tree(expand(required(req.query.get("path"), "path"))) }),
 	"GET /api/fs/list": (req) => {
 		const p = expand(req.query.get("path") ?? os.homedir());
 		try {
@@ -593,7 +567,8 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 				const s = status.find((x) => x.name === name);
 				return { name, kind: spec?.url ? "http" : "stdio", enabled: spec?.enabled !== false, connected: !!s, tools: s?.tools ?? 0, error: s?.error ?? null, needs_auth: !!s?.needsAuth, spec: JSON.stringify(spec, null, 2) };
 			}),
-			skills: skillsOf(agent).filter((k) => k.dir.startsWith(dir)).map((k) => ({ name: k.name, description: k.description })),
+			// Every skill its threads can use, with where it lives: its own, its folder's (.agents/skills), the general ones.
+			skills: skillsOf(agent).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
 			prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 			mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
 			hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user })),
@@ -636,7 +611,7 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 		const id = decodeURIComponent(m[1]);
 		const skill = skillsOf(envOf(id).agent).find((k) => k.name === decodeURIComponent(m[2]));
 		if (!skill) throw new HttpError(404, "no such skill");
-		return { name: skill.name, dir: skill.dir, text: fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8") };
+		return { name: skill.name, dir: skill.dir, scope: skill.scope, text: fs.readFileSync(path.join(skill.dir, "SKILL.md"), "utf8") };
 	}],
 	// A project's skill changed by hand (its SKILL.md as typed).
 	// A new skill of the project, pasted whole: its SKILL.md names it (front matter "name:").
@@ -848,26 +823,25 @@ const dynamic: [string, RegExp, (req: Req, m: RegExpMatchArray) => any][] = [
 	}],
 ];
 
-function listSkills(profile: string) {
-	const dir = path.join(agentDir(profile), "skills");
-	const out: { name: string; category: string; description: string; enabled: boolean }[] = [];
-	const disabled = new Set<string>(readConfig(profile)?.skills?.disabled ?? []);
-	const walk = (d: string, category: string, depth: number) => {
-		if (depth > 3 || !fs.existsSync(d)) return;
-		for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-			if (!e.isDirectory() || e.name.startsWith(".")) continue;
-			const f = path.join(d, e.name, "SKILL.md");
-			if (fs.existsSync(f)) {
-				let desc = "";
-				try {
-					desc = String(YAML.parse(fs.readFileSync(f, "utf8").match(/^---\n([\s\S]*?)\n---/)?.[1] ?? "")?.description ?? "");
-				} catch {}
-				out.push({ name: e.name, category, description: desc, enabled: !disabled.has(e.name) });
-			} else walk(path.join(d, e.name), category ? `${category}/${e.name}` : e.name, depth + 1);
+function tree(root: string): { path: string; dir: boolean }[] {
+	const out: { path: string; dir: boolean }[] = [];
+	const walk = (rel: string, depth: number) => {
+		if (depth > 8 || out.length >= 3000) return;
+		const entries = fs.readdirSync(path.join(root, rel), { withFileTypes: true }).filter((e) => ![".git", "node_modules", "target", ".DS_Store"].includes(e.name));
+		entries.sort((a, b) => Number(b.isDirectory()) - Number(a.isDirectory()) || a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+		for (const e of entries) {
+			const p = rel ? `${rel}/${e.name}` : e.name;
+			out.push({ path: p, dir: e.isDirectory() });
+			if (e.isDirectory()) walk(p, depth + 1);
 		}
 	};
-	walk(dir, "", 0);
+	walk("", 0);
 	return out;
+}
+
+function listSkills(profile: string) {
+	const disabled = new Set<string>(readConfig(profile)?.skills?.disabled ?? []);
+	return skillsOf(profile).map((k) => ({ name: k.name, category: k.category, description: k.description, enabled: !disabled.has(k.name) }));
 }
 
 function setEnv(key: string, value: string | undefined): void {

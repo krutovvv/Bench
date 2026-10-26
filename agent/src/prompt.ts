@@ -75,7 +75,7 @@ export function projectContext(s: SessionInfo): string | undefined {
 }
 
 export function skills(s: SessionInfo): string | undefined {
-	const list = listSkills(s.profile);
+	const list = listSkills(s.profile, s.cwd);
 	if (!list.length) return undefined;
 	const lines = list.map((k) => `- ${k.name}: ${k.description.replace(/\s+/g, " ").slice(0, 120)}`);
 	return `# Skills\nThe person's own procedures. When one fits the task, load it with skill_view first and follow it.\n${lines.join("\n")}`;

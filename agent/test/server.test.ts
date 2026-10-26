@@ -29,6 +29,16 @@ test("the server starts and answers /api/projects", async () => {
 		fs.writeFileSync(path.join(skill, "SKILL.md"), "---\nname: publish\ndescription: d\n---\nSteps.");
 		const read = await call("GET", `/api/projects/${made.project.id}/skills/publish`);
 		assert.match(read.text, /Steps\./);
+		assert.equal(read.scope, "project");
+		// A skill is a folder: its tree, a file renamed in it.
+		fs.mkdirSync(path.join(skill, "references"));
+		fs.writeFileSync(path.join(skill, "references", "a.md"), "A");
+		const tree = await call("GET", `/api/fs/tree?path=${encodeURIComponent(skill)}`);
+		assert.deepEqual(tree.entries, [{ path: "references", dir: true }, { path: "references/a.md", dir: false }, { path: "SKILL.md", dir: false }]);
+		await call("POST", "/api/fs/rename", { from: path.join(skill, "references", "a.md"), to: path.join(skill, "references", "b.md") });
+		assert.ok(fs.existsSync(path.join(skill, "references", "b.md")));
+		const clash = await call("POST", "/api/fs/rename", { from: path.join(skill, "references", "b.md"), to: path.join(skill, "SKILL.md") });
+		assert.match(String(clash.detail ?? ""), /exists/);
 		// A skill pasted whole: its front matter names it; twice is refused.
 		const made2 = await call("POST", `/api/projects/${made.project.id}/skills`, { text: "---\nname: digest\ndescription: d\n---\nSum up." });
 		assert.equal(made2.name, "digest");

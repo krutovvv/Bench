@@ -61,6 +61,37 @@ test("skills: create, list in the prompt, view, patch, delete", async () => {
 	assert.equal(fs.existsSync(path.join(agentDir("default"), "skills", "devops", "deploy")), false);
 });
 
+test("skills: a project's own, its folder's .agents/skills up to the repository, the general ones", async () => {
+	const { projects } = await import("../src/builtin/projects.ts");
+	const repo = path.join(home, "repo");
+	const sub = path.join(repo, "app");
+	const write = (dir: string, name: string, desc: string) => {
+		fs.mkdirSync(path.join(dir, name, "references"), { recursive: true });
+		fs.writeFileSync(path.join(dir, name, "SKILL.md"), `---\nname: ${name}\ndescription: ${desc}\n---\nSteps.`);
+		fs.writeFileSync(path.join(dir, name, "references", "more.md"), "More.");
+	};
+	fs.mkdirSync(path.join(repo, ".git"), { recursive: true });
+	fs.mkdirSync(sub, { recursive: true });
+	write(path.join(repo, ".agents", "skills"), "kit", "the repo's kit");
+	write(path.join(repo, ".agents", "skills"), "shared", "the repo's version");
+	write(path.join(agentDir("default"), "skills"), "shared", "the general version");
+	write(path.join(agentDir("default"), "skills"), "general-only", "a general one");
+	const p = projects.save({ name: "Repo", folder: sub });
+	write(path.join(agentDir(`project:${p.id}`), "skills"), "own", "the project's own");
+	const list = listSkills(`project:${p.id}`);
+	assert.deepEqual(list.map((k: any) => [k.name, k.scope]), [["general-only", "general"], ["kit", "repo"], ["own", "project"], ["shared", "repo"]]);
+	// A thread working in the folder has them in its prompt and loads them, files and all.
+	const thread = { id: "s2", profile: `project:${p.id}`, cwd: sub, source: "local" };
+	setHost({ session: () => thread } as any);
+	try {
+		assert.match(skills(thread)!, /- kit: the repo's kit/);
+		const r = await skillView.execute({ name: "kit" }, { conversationId: 1 } as any, undefined as any);
+		assert.match((r as any).output[0].text, /Steps\.[\s\S]*references\/more\.md/);
+	} finally {
+		setHost({ session: () => session } as any);
+	}
+});
+
 test("telegram: markdown to HTML, splitting, MEDIA files", () => {
 	assert.equal(toHtml("**a** `b<c` _d_ [e](https://x.y)"), '<b>a</b> <code>b&lt;c</code> <i>d</i> <a href="https://x.y">e</a>');
 	assert.equal(toHtml("| A | B |\n|---|---|\n| 1 | 2 |"), "• <b>A:</b> 1\n  <b>B:</b> 2");

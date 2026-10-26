@@ -1,20 +1,28 @@
-// Skills: folders with a SKILL.md (YAML front matter: name, description), in the profile's
+// Skills: folders with a SKILL.md (YAML front matter: name, description), from three places: the
+// project's own skills/ (beside its mcp.json), the folder it works in (.agents/skills, a
+// repository's skills, from the folder up to the repository's root), and the general agent's
 // skills/ (optionally grouped in category folders). Only their names and descriptions are in the
 // prompt; `skill_view` loads one when it applies, `skill_manage` writes them when asked.
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
 import { agentDir, homeAgent, isProject } from "../config.ts";
 import { sessionOf } from "../host.ts";
+import { projects } from "./projects.ts";
+
+/** Where a skill lives: the project's own, the working folder's (.agents/skills), the general agent's. */
+export type SkillScope = "project" | "repo" | "general";
 
 export interface Skill {
 	name: string;
 	description: string;
 	category: string;
 	dir: string;
+	scope: SkillScope;
 }
 
 export function frontMatter(text: string): Record<string, any> {
@@ -26,17 +34,33 @@ export function frontMatter(text: string): Record<string, any> {
 	}
 }
 
-export function listSkills(profile: string): Skill[] {
-	// A project's threads have the general skills and the project's own (its own win by name).
-	if (isProject(profile)) {
-		const own = skillsIn(profile);
-		return [...listSkills(homeAgent(profile)).filter((g) => !own.some((o) => o.name === g.name)), ...own].sort((a, b) => a.name.localeCompare(b.name));
-	}
-	return skillsIn(profile);
+/**
+ * Every skill a thread of `profile` can use, working in `folder` (a project's own folder when not
+ * given). One name, one skill: the project's own win, then the folder's, then the general ones.
+ */
+export function listSkills(profile: string, folder?: string): Skill[] {
+	const own = isProject(profile) ? skillsIn(path.join(agentDir(profile), "skills"), "project") : [];
+	const work = folder ?? (isProject(profile) ? (projects.get(profile.slice(8))?.folder ?? "") : "");
+	const repo = repoSkillDirs(work).flatMap((d) => skillsIn(d, "repo"));
+	const general = skillsIn(path.join(agentDir(homeAgent(profile)), "skills"), "general");
+	const out: Skill[] = [];
+	for (const k of [...own, ...repo, ...general]) if (!out.some((o) => o.name === k.name)) out.push(k);
+	return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function skillsIn(profile: string): Skill[] {
-	const root = path.join(agentDir(profile), "skills");
+/** `.agents/skills` in the folder and in each folder above it, up to its repository's root (nearest first). */
+export function repoSkillDirs(folder: string): string[] {
+	if (!folder || !fs.existsSync(folder)) return [];
+	const dirs: string[] = [];
+	for (let d = path.resolve(folder); ; d = path.dirname(d)) {
+		const s = path.join(d, ".agents", "skills");
+		if (fs.existsSync(s) && !dirs.includes(s)) dirs.push(s);
+		if (fs.existsSync(path.join(d, ".git")) || d === os.homedir() || d === path.dirname(d)) break;
+	}
+	return dirs;
+}
+
+function skillsIn(root: string, scope: SkillScope): Skill[] {
 	const out: Skill[] = [];
 	const walk = (d: string, category: string, depth: number) => {
 		if (depth > 3 || !fs.existsSync(d)) return;
@@ -46,7 +70,7 @@ function skillsIn(profile: string): Skill[] {
 			const file = path.join(dir, "SKILL.md");
 			if (fs.existsSync(file)) {
 				const fm = frontMatter(fs.readFileSync(file, "utf8"));
-				out.push({ name: String(fm.name ?? e.name), description: String(fm.description ?? "").trim(), category, dir });
+				out.push({ name: String(fm.name ?? e.name), description: String(fm.description ?? "").trim(), category, dir, scope });
 			} else walk(dir, category ? `${category}/${e.name}` : e.name, depth + 1);
 		}
 	};
@@ -54,8 +78,8 @@ function skillsIn(profile: string): Skill[] {
 	return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function findSkill(profile: string, name: string): Skill | undefined {
-	return listSkills(profile).find((s) => s.name === name || path.basename(s.dir) === name);
+export function findSkill(profile: string, name: string, folder?: string): Skill | undefined {
+	return listSkills(profile, folder).find((s) => s.name === name || path.basename(s.dir) === name);
 }
 
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
@@ -68,8 +92,8 @@ export const skillView = defineTool({
 		file: Type.Optional(Type.String({ description: "A file inside the skill folder, e.g. references/api.md" })),
 	}),
 	execute: async (args, api) => {
-		const { profile } = sessionOf(api.conversationId);
-		const skill = findSkill(profile, args.name);
+		const { profile, cwd } = sessionOf(api.conversationId);
+		const skill = findSkill(profile, args.name, cwd);
 		if (!skill) throw new Error(`no skill "${args.name}"; see the skills list`);
 		const target = path.resolve(skill.dir, args.file ?? "SKILL.md");
 		if (!target.startsWith(skill.dir + path.sep) && target !== path.join(skill.dir, "SKILL.md")) throw new Error("file is outside the skill folder");
@@ -94,9 +118,9 @@ export const skillManage = defineTool({
 		file: Type.Optional(Type.String({ description: "Path inside the skill (write_file)" })),
 	}),
 	execute: async (args, api) => {
-		const { profile } = sessionOf(api.conversationId);
+		const { profile, cwd } = sessionOf(api.conversationId);
 		if (!/^[a-z0-9][a-z0-9._-]*$/i.test(args.name)) throw new Error("name: letters, digits, '.', '_', '-'");
-		const existing = findSkill(profile, args.name);
+		const existing = findSkill(profile, args.name, cwd);
 		if (args.action === "create") {
 			if (existing) throw new Error(`skill "${args.name}" exists; use edit or patch`);
 			if (!args.content?.startsWith("---")) throw new Error("content must start with front matter (---)");
