@@ -35,15 +35,22 @@ pub struct View {
     owner: Option<String>,
     /// While a run is live, a timer repaints once a second (its clock).
     ticker: Option<Task<()>>,
-    /// Keep the composer in view as the thread grows. On after a send or "Jump to latest"; off
-    /// the moment the wheel turns up (`wheel`); on again when the person scrolls down to the
-    /// composer.
-    following: bool,
-    /// The wheel turned down since the last frame: following may start again.
-    scrolled_down: bool,
+    /// The person sent a message: once the rows have changed and are laid out, the composer is
+    /// brought into view if they pushed it past the bottom edge. Nothing else moves the thread
+    /// but the person (as code in an editor).
+    reveal: Reveal,
     /// The room past the end, worked out before the list lays out (`room_past_end`): the list
     /// cannot be asked while it renders its items.
     room: Pixels,
+}
+
+#[derive(Clone, Copy, PartialEq)]
+enum Reveal {
+    Off,
+    /// Sent; waiting for the rows to change.
+    Armed,
+    /// The rows changed; look after their layout.
+    Check,
 }
 
 impl Default for View {
@@ -54,8 +61,7 @@ impl Default for View {
             version: u64::MAX,
             owner: None,
             ticker: None,
-            following: false,
-            scrolled_down: false,
+            reveal: Reveal::Off,
             room: px(0.),
         }
     }
@@ -70,31 +76,6 @@ impl View {
     /// The tail's item (the composer's).
     pub fn tail(&self) -> usize {
         self.rows.len() + 1
-    }
-
-    /// A turn of the wheel in the thread. Up stops following at once — before the frame that
-    /// would bring the composer back, so the person's scroll is never fought; down lets it start
-    /// again once the composer is in view.
-    fn wheel(&mut self, up: bool) {
-        if up {
-            self.following = false;
-        } else {
-            self.scrolled_down = true;
-        }
-    }
-
-    /// After the person scrolled down: following starts again when the composer is in view.
-    fn watch(&mut self) {
-        if std::mem::take(&mut self.scrolled_down) && self.composer_seen() {
-            self.following = true;
-        }
-    }
-
-    /// The composer's bottom edge is inside the viewport.
-    fn composer_seen(&self) -> bool {
-        self.list
-            .bounds_for_item(self.tail())
-            .is_some_and(|b| b.bottom() <= self.list.viewport_bounds().bottom() + px(2.))
     }
 
     /// The room the thread scrolls on past its end, as an editor past its last line: exactly
@@ -114,26 +95,34 @@ impl View {
         (viewport - tail).max(px(0.))
     }
 
-    /// The composer reaches the viewport's bottom edge, or is past it (or is not laid out). Above
-    /// the edge, in the room the thread scrolls on past its end, it is left where the person put it.
-    fn composer_at_bottom(&self) -> bool {
-        self.list
+    /// After a send, the rows laid out: the composer's bottom past the viewport's is brought up
+    /// to it. A composer still in view (the thread grows into the room past the end) stays put.
+    fn reveal_after_send(&mut self) {
+        if self.reveal != Reveal::Check {
+            return;
+        }
+        self.reveal = Reveal::Off;
+        let pushed = self
+            .list
             .bounds_for_item(self.tail())
-            .is_none_or(|b| b.bottom() >= self.list.viewport_bounds().bottom() - px(4.))
+            .is_none_or(|b| b.bottom() > self.list.viewport_bounds().bottom() + px(1.));
+        if pushed {
+            self.list.scroll_to_reveal_item(self.tail());
+        }
     }
 
     /// Give the list `rows` and answer the first row that changed. Unchanged rows keep their
     /// measured heights; a thread of another owner starts at the top, not following.
     fn sync(&mut self, owner: Option<&str>, rows: Vec<Row>, follow: bool) -> usize {
         if follow {
-            self.following = true;
+            self.reveal = Reveal::Armed;
         }
         if owner != self.owner.as_deref() {
             self.owner = owner.map(str::to_string);
             self.rows = rows;
             self.list.reset(self.rows.len() + 3);
             self.list.scroll_to(ListOffset::default());
-            self.following = follow;
+            self.reveal = Reveal::Off;
             return 0;
         }
         // Rows at their place are measured again (the reader keeps their place, even inside a row
@@ -154,10 +143,8 @@ impl View {
             self.list
                 .splice(Self::item_of(r.start)..Self::item_of(r.end), count);
         }
-        // The list's reveal always puts the composer's bottom at the viewport's bottom, which would
-        // pull the person back out of the room past the end: only when the text pushed it there.
-        if self.following && first < self.rows.len() && self.composer_at_bottom() {
-            self.list.scroll_to_reveal_item(self.tail());
+        if self.reveal == Reveal::Armed && first < self.rows.len() {
+            self.reveal = Reveal::Check;
         }
         first
     }
@@ -166,7 +153,7 @@ impl View {
 impl BenchApp {
     /// The rows of the open thread into the list, if the thread changed since the last frame.
     fn sync_rows(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.tv.watch();
+        self.tv.reveal_after_send();
         let version = self.thread.version();
         let owner = self.session.clone();
         if version != self.tv.version || owner != self.tv.owner {
@@ -270,12 +257,6 @@ impl BenchApp {
                         this.click_claimed = false;
                         this.click_at = Some(ev.position);
                     }))
-                    .on_scroll_wheel(cx.listener(|this, ev: &ScrollWheelEvent, _, _| {
-                        let dy = ev.delta.pixel_delta(px(20.)).y;
-                        if dy != px(0.) {
-                            this.tv.wheel(dy > px(0.));
-                        }
-                    }))
                     .on_mouse_up(
                         MouseButton::Left,
                         cx.listener(|this, ev: &MouseUpEvent, window, cx| {
@@ -318,7 +299,6 @@ impl BenchApp {
     }
 
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
-        self.tv.following = true;
         self.tv.list.scroll_to_reveal_item(self.tv.tail());
         cx.notify();
     }
