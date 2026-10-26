@@ -61,7 +61,7 @@ test("skills: create, list in the prompt, view, patch, delete", async () => {
 	assert.equal(fs.existsSync(path.join(agentDir("default"), "skills", "devops", "deploy")), false);
 });
 
-test("skills: a project's own, its folder's .agents/skills and .claude/skills up to the repository, the general ones", async () => {
+test("skills: a project's own, its folder's .agents/skills and .claude/skills up to the repository; the Host's are Host's alone", async () => {
 	const { projects } = await import("../src/builtin/projects.ts");
 	const repo = path.join(home, "repo");
 	const sub = path.join(repo, "app");
@@ -80,7 +80,8 @@ test("skills: a project's own, its folder's .agents/skills and .claude/skills up
 	const p = projects.save({ name: "Repo", folder: sub });
 	write(path.join(agentDir(`project:${p.id}`), "skills"), "own", "the project's own");
 	const list = listSkills(`project:${p.id}`);
-	assert.deepEqual(list.map((k: any) => [k.name, k.scope]), [["claude-one", "repo"], ["general-only", "general"], ["kit", "repo"], ["own", "project"], ["shared", "repo"]]);
+	assert.deepEqual(list.map((k: any) => [k.name, k.scope]), [["claude-one", "repo"], ["kit", "repo"], ["own", "project"], ["shared", "repo"]]);
+	assert.deepEqual(listSkills("default").map((k: any) => [k.name, k.scope]), [["general-only", "general"], ["shared", "general"]]);
 	// A thread working in the folder has them in its prompt and loads them, files and all.
 	const thread = { id: "s2", profile: `project:${p.id}`, cwd: sub, source: "local" };
 	setHost({ session: () => thread } as any);

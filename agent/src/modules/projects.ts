@@ -80,7 +80,7 @@ export default ({ rt }: Ctx): Module => ({
 					dir,
 					soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
 					mcp: mcpView(agent),
-					// Every skill its threads can use, with where it lives: its own, its folder's, the general ones.
+					// Every skill its threads can use, with where it lives: its own, its folder's (Host: the machine's).
 					skills: skillsOf(agent).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
 					prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 					mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",

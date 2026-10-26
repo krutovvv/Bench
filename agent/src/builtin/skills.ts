@@ -10,7 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
-import { agentDir, homeAgent, isProject } from "../config.ts";
+import { agentDir, isProject } from "../config.ts";
 import { sessionOf } from "../host.ts";
 import { projects } from "./projects.ts";
 
@@ -36,13 +36,14 @@ export function frontMatter(text: string): Record<string, any> {
 
 /**
  * Every skill a thread of `profile` can use, working in `folder` (a project's own folder when not
- * given). One name, one skill: the project's own win, then the folder's, then the general ones.
+ * given). One name, one skill: the project's own win, then the folder's. The Host project's skills
+ * (the machine's: its tools, its builds) are Host's alone; another project does not see them.
  */
 export function listSkills(profile: string, folder?: string): Skill[] {
 	const own = isProject(profile) ? skillsIn(path.join(agentDir(profile), "skills"), "project") : [];
 	const work = folder ?? (isProject(profile) ? (projects.get(profile.slice(8))?.folder ?? "") : "");
 	const repo = repoSkillDirs(work).flatMap((d) => skillsIn(d, "repo"));
-	const general = skillsIn(path.join(agentDir(homeAgent(profile)), "skills"), "general");
+	const general = isProject(profile) ? [] : skillsIn(path.join(agentDir(profile), "skills"), "general");
 	const out: Skill[] = [];
 	for (const k of [...own, ...repo, ...general]) if (!out.some((o) => o.name === k.name)) out.push(k);
 	return out.sort((a, b) => a.name.localeCompare(b.name));

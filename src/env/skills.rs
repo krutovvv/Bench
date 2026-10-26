@@ -12,7 +12,8 @@ use super::{ProjectEnv, editor, enc, is_remote, on_change};
 use crate::app::BenchApp;
 
 /// A skill a project's threads can use: its name, its front matter's description, where it lives
-/// ("project": its own, "repo": the folder's .agents/skills, "general": the general agent's) and
+/// ("project": its own, "repo": the folder's .agents/skills, "general": the Host project's, seen
+/// in Host alone) and
 /// its folder.
 #[derive(Clone, Debug, Default)]
 pub struct SkillInfo {
@@ -91,7 +92,6 @@ impl Section for Skills {
             return vec![];
         };
         let theme = cx.theme().clone();
-        let general = e.id == "general";
         let remote = is_remote(app, &e.id);
         let mut rows = vec![];
         if e.skills.list.is_empty() {
@@ -103,7 +103,7 @@ impl Section for Skills {
         let groups: [(&str, &str); 3] = [
             ("project", "This project"),
             ("repo", "Its folder · .agents/skills, .claude/skills"),
-            ("general", if general { "This Mac" } else { "General" }),
+            ("general", "This Mac"),
         ];
         for (scope, label) in groups {
             let skills: Vec<_> = e
