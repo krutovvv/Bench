@@ -44,13 +44,17 @@ impl BenchApp {
                 self.open_task_list(crate::inserts::tasks::model::List::Today, window, cx)
             }
             ("\\", false) => self.toggle_sidebar(cx),
-            // ⌘⌫ / ⌘⌦: delete the open thread, as Move to Trash in Finder; a bare ⌫ deletes it
-            // while the sidebar has the focus (`sidebar_items.rs`), else it is the composer's.
+            // ⌘⌫ / ⌘⌦: delete the open thread — asked once, as ⌫ ⌫ in the sidebar
+            // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's.
             ("backspace" | "delete", false)
                 if self.panel == Panel::Chat && self.session.is_some() =>
             {
                 let id = self.session.clone().unwrap_or_default();
-                self.delete_session(id, window, cx);
+                if self.confirm_delete.as_deref() == Some(id.as_str()) {
+                    self.delete_session(id, window, cx);
+                } else {
+                    self.arm_delete(id, cx);
+                }
             }
             // Dictation without its button: start, and again to stop and transcribe.
             ("d", true) => self.toggle_mic(window, cx),

@@ -1,7 +1,7 @@
 //! The sidebar's items — a thread or a project — and what the person does to them, the same way
-//! for both: pin and color (`marks.rs`), rename in place, delete, and the keyboard. A thread is
-//! cheap: it goes at once, with a click or ⌫. A project takes its environment with it: it asks
-//! first. The order the sidebar draws (`sidebar_groups`) is the order ↑ ↓ walk.
+//! for both: pin and color (`marks.rs`), delete (asked once: ⌫ ⌫ for a thread, Remove · Cancel
+//! for a project), and the keyboard. A thread is also renamed in place (a project in its
+//! environment). The order the sidebar draws (`sidebar_groups`) is the order ↑ ↓ walk.
 
 use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
@@ -234,6 +234,12 @@ impl BenchApp {
                 let Some(k) = at else {
                     return;
                 };
+                // The first ⌫ asks (the row shows Delete · Cancel), the second deletes: a stray
+                // key never takes a thread.
+                if self.confirm_delete.as_deref() != Some(order[k].as_str()) {
+                    self.arm_delete(order[k].clone(), cx);
+                    return;
+                }
                 // The one after it opens (the one before, at the end): deleting goes on with ⌫.
                 let next = order.get(k + 1).or(k.checked_sub(1).and_then(|p| order.get(p)));
                 let next = next.cloned();
@@ -243,6 +249,7 @@ impl BenchApp {
                 }
                 window.focus(&self.sidebar_focus, cx);
             }
+            "escape" => self.cancel_delete(cx),
             "enter" => self.composer.update(cx, |s, cx| s.focus(window, cx)),
             _ => {}
         }

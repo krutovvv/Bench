@@ -147,8 +147,13 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// A thread goes at once: it is cheap, and asking each time was the slow part of tidying up
-    /// (a project asks: its environment goes with it).
+    /// Deleting a thread asks once: its row shows Delete · Cancel (⌫ again, or Delete, deletes).
+    pub fn arm_delete(&mut self, id: String, cx: &mut Context<Self>) {
+        self.confirm_delete = Some(id);
+        cx.notify();
+    }
+
+    /// The thread goes (after `arm_delete`, or ⌘⌫).
     pub fn delete_session(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         self.confirm_delete = None;
         let Some(profile) = self.profile.clone() else {

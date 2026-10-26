@@ -440,10 +440,46 @@ impl BenchApp {
             Some(p) if !p.branch.is_empty() => format!("{} · {count}", p.branch),
             _ => count,
         };
-        let open_id = s.id.clone();
+        let (open_id, del_id) = (s.id.clone(), s.id.clone());
+        // Deleting asks once (⌫, or the menu): the row shows Delete · Cancel; ⌫ again deletes.
+        let armed = self.confirm_delete.as_deref() == Some(s.id.as_str());
         let compact = self.appearance.compact_sidebar;
 
-        let delete = {
+        let delete = if armed {
+            h_flex()
+                .gap_1()
+                .text_xs()
+                .child(
+                    div()
+                        .id(("del-yes", i))
+                        .px_1p5()
+                        .py_0p5()
+                        .rounded_md()
+                        .bg(theme.danger)
+                        .text_color(theme.danger_foreground)
+                        .cursor_pointer()
+                        .child("Delete")
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            cx.stop_propagation();
+                            this.delete_session(del_id.clone(), window, cx)
+                        })),
+                )
+                .child(
+                    div()
+                        .id(("del-no", i))
+                        .px_1()
+                        .py_0p5()
+                        .cursor_pointer()
+                        .text_color(muted)
+                        .hover(|s| s.text_color(theme.foreground))
+                        .child("Cancel")
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            cx.stop_propagation();
+                            this.cancel_delete(cx)
+                        })),
+                )
+                .into_any_element()
+        } else {
             // "⋯" on hover: pin, color, its files (the mini IDE; Zed is one click from there),
             // delete.
             let view = cx.entity();
@@ -528,12 +564,28 @@ impl BenchApp {
                             })
                             .child(match self.renaming_field(&Item::Thread(s.id.clone())) {
                                 // Renamed in place: the field where the title was.
+                                // Over the title, in its place and size: the title stays (unseen) and
+                                // keeps the row's height, so nothing moves.
                                 Some(field) => div()
+                                    .relative()
                                     .flex_1()
                                     .min_w_0()
                                     .text_size(px(SESSION_TITLE))
-                                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                                    .child(Input::new(&field).small())
+                                    .child(div().truncate().text_color(gpui_kit::transparent_black()).child(s.title.clone()))
+                                    .child(
+                                        div()
+                                            .absolute()
+                                            .inset_0()
+                                            .flex()
+                                            .items_center()
+                                            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                                            .child(
+                                                bench_ui::bare_field(&field)
+                                                    // Input draws at 0.875 of its size: the title's.
+                                                    .with_size(gpui_kit::component::Size::Size(px(SESSION_TITLE / 0.875)))
+                                                    .px_0(),
+                                            ),
+                                    )
                                     .into_any_element(),
                                 None => div()
                                     .min_w_0()
@@ -666,13 +718,16 @@ fn item_menu(
                     this.toggle_pin(pin_key.clone(), cx)
                 }))),
         )
-        .item(
-            PopupMenuItem::new("Rename")
-                .icon(Ico::Pencil.icon())
-                .on_click(act(Box::new(move |this, window, cx| {
-                    this.start_rename(rename.clone(), window, cx)
-                }))),
-        )
+        // A thread is renamed here; a project in its environment (its Name).
+        .when(matches!(rename, Item::Thread(_)), |menu| {
+            menu.item(
+                PopupMenuItem::new("Rename")
+                    .icon(Ico::Pencil.icon())
+                    .on_click(act(Box::new(move |this, window, cx| {
+                        this.start_rename(rename.clone(), window, cx)
+                    }))),
+            )
+        })
         .separator()
         // Reads the color live, so a click shows at once in the open menu.
         .item(PopupMenuItem::element(move |_, cx| {
@@ -682,14 +737,15 @@ fn item_menu(
         .separator()
         .item(
             PopupMenuItem::new(match del {
-                Item::Thread(_) => "Delete",
+                Item::Thread(_) => "Delete…",
                 Item::Project(_) => "Remove project…",
             })
             .icon(Ico::Trash.icon())
             .on_click(act(Box::new(move |this, window, cx| match &del {
-                Item::Thread(id) => this.delete_session(id.clone(), window, cx),
+                Item::Thread(id) => this.arm_delete(id.clone(), cx),
                 Item::Project(id) => this.delete_project(id.clone(), window, cx),
             }))),
         )
     }
 }
+
