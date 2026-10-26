@@ -151,7 +151,7 @@ pub(super) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
 
 /// A code block in an answer, as chat UIs show one: a header with the language on the left and
 /// a copy button on the right, the highlighted code under it (one frame around both).
-fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyElement {
+fn render_code(i: &str, k: usize, lang: String, code: String, cx: &App) -> AnyElement {
     let theme = cx.theme();
     let fence = if code.contains("```") { "~~~~" } else { "```" };
     let body = TextView::markdown(
@@ -212,10 +212,17 @@ fn render_code(i: usize, k: usize, lang: String, code: String, cx: &App) -> AnyE
 }
 
 impl BenchApp {
-    pub(super) fn render_answer(&mut self, i: usize, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    /// An answer's text as it shows: prose, delivered files, diagrams, code. `key` names its
+    /// row (ids of its parts are made from it).
+    pub(super) fn render_answer(
+        &mut self,
+        key: &str,
+        text: &str,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         // Blank lines around a segment (models often start with "\n\n") would show as empty
         // paragraphs: an answer is as tall as its text.
-        media::segments(self.turns[i].answer.trim())
+        media::segments(text.trim())
             .into_iter()
             .filter_map(|s| match s {
                 Segment::Text(t) => {
@@ -226,10 +233,12 @@ impl BenchApp {
             })
             .enumerate()
             .map(|(k, s)| match s {
-                Segment::Text(text) => markdown(format!("answer-{i}-{k}"), text).into_any_element(),
-                Segment::Media(path) => self.render_media(i, k, path, cx),
-                Segment::Mermaid(code) => self.render_diagram(i, k, code, cx),
-                Segment::Code { lang, code } => render_code(i, k, lang, code, cx),
+                Segment::Text(text) => {
+                    markdown(format!("answer-{key}-{k}"), text).into_any_element()
+                }
+                Segment::Media(path) => self.render_media(key, k, path, cx),
+                Segment::Mermaid(code) => self.render_diagram(key, k, code, cx),
+                Segment::Code { lang, code } => render_code(key, k, lang, code, cx),
             })
             .collect()
     }
@@ -358,7 +367,7 @@ impl BenchApp {
 
     fn render_media(
         &mut self,
-        i: usize,
+        i: &str,
         k: usize,
         path: String,
         cx: &mut Context<Self>,
@@ -721,7 +730,7 @@ impl BenchApp {
 
     fn render_diagram(
         &mut self,
-        i: usize,
+        i: &str,
         k: usize,
         code: String,
         cx: &mut Context<Self>,

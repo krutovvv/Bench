@@ -155,44 +155,38 @@ impl BenchApp {
         }
     }
 
-    /// The inserts put after `after` of the person's messages, each in the person's row.
-    pub(super) fn render_inserts_at(
+    /// One insert where the journal puts it: its block, what it opened, a form it opened.
+    pub(in crate::ui) fn render_insert_by_id(
         &mut self,
-        after: usize,
-        last: bool,
+        id: &str,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
-        self.thread_inserts()
-            .into_iter()
-            // Those past the end (a reply not here yet) show at the end.
-            .filter(|i| i.after == after || (last && i.after > after))
-            .flat_map(|ins| {
-                let Some(kind) = kind_of(&ins.key) else {
-                    return vec![];
-                };
-                let mut out = vec![self.render_insert(kind, &ins, window, cx)];
-                if !ins.folded && self.insert_is_live(kind, &ins) {
-                    if let Some(f) = kind.follow(self, &ins, window, cx) {
-                        out.push(self.agent_row(f, cx));
-                    }
-                }
-                // A form it opened (a new server, a new host), as the agent's answer under it.
-                if self.form_after.as_deref() == Some(ins.id.as_str()) {
-                    let form = if self.files_remote.form {
-                        Some(self.render_host_form(cx))
-                    } else if self.ssh.form.is_some() {
-                        Some(self.render_server_form(cx))
-                    } else {
-                        None
-                    };
-                    if let Some(f) = form {
-                        out.push(self.agent_row(f, cx));
-                    }
-                }
-                out
-            })
-            .collect()
+        let Some(ins) = self.thread_inserts().into_iter().find(|i| i.id == id) else {
+            return vec![];
+        };
+        let Some(kind) = kind_of(&ins.key) else {
+            return vec![];
+        };
+        let mut out = vec![self.render_insert(kind, &ins, window, cx)];
+        if !ins.folded && self.insert_is_live(kind, &ins) {
+            if let Some(f) = kind.follow(self, &ins, window, cx) {
+                out.push(self.agent_row(f, cx));
+            }
+        }
+        if self.form_after.as_deref() == Some(ins.id.as_str()) {
+            let form = if self.files_remote.form {
+                Some(self.render_host_form(cx))
+            } else if self.ssh.form.is_some() {
+                Some(self.render_server_form(cx))
+            } else {
+                None
+            };
+            if let Some(f) = form {
+                out.push(self.agent_row(f, cx));
+            }
+        }
+        out
     }
 
     /// A block in the agent's row (its avatar), at the thread's column: what an insert opened.

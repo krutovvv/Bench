@@ -27,6 +27,7 @@ fn tool(seq: u64, sub: u32, call: &str) -> ThreadItem {
         call_id: call.into(),
         name: "bash".into(),
         args: json!({}),
+        preview: String::new(),
         at: Some(seq as f64 * 1000.),
     }
 }
@@ -38,6 +39,7 @@ fn result(seq: u64, call: &str) -> ThreadItem {
         name: "bash".into(),
         output: "ok".into(),
         failed: false,
+        diff: None,
         at: Some(seq as f64 * 1000.),
     }
 }
@@ -81,7 +83,7 @@ fn a_turn_is_message_work_answer() {
         ],
         ..Default::default()
     });
-    let rows = t.rows(0.);
+    let rows = t.rows();
     assert_eq!(kinds(&rows), ["user:go", "work:2", "answer:Done."]);
     let Row::Work {
         steps, from, to, ..
@@ -112,13 +114,13 @@ fn rule_1_journal_then_writing_then_queue() {
     t.apply(ThreadEvent::Stream(StreamKind::Text, "Hal".into()));
     t.apply(ThreadEvent::Stream(StreamKind::Text, "f".into()));
     assert_eq!(
-        kinds(&t.rows(9000.)),
+        kinds(&t.rows()),
         ["user:go", "work:1+", "writing:Half", "queued:later"]
     );
     // The answer's entry replaces what was being written, and still stands before the queue.
     t.apply(ThreadEvent::Append(vec![text(3, 0, "Half done.")]));
     assert_eq!(
-        kinds(&t.rows(9000.)),
+        kinds(&t.rows()),
         ["user:go", "work:1", "answer:Half done.", "queued:later"],
         "the work above an answer is done"
     );
@@ -132,7 +134,7 @@ fn rule_1_items_out_of_order_find_their_place() {
     });
     t.apply(ThreadEvent::Append(vec![text(3, 0, "b"), text(3, 0, "b")]));
     assert_eq!(
-        kinds(&t.rows(0.)),
+        kinds(&t.rows()),
         ["user:a", "answer:b", "answer:c"],
         "in key order, a repeat ignored"
     );
@@ -151,7 +153,7 @@ fn rule_2_queue_in_the_agents_order() {
         queued(10, "first"),
     ]));
     assert_eq!(
-        kinds(&t.rows(0.)),
+        kinds(&t.rows()),
         ["user:go", "queued:second", "queued:first"],
         "send now: it shows first"
     );
@@ -166,13 +168,13 @@ fn rule_3_a_taken_message_keeps_its_place() {
         ..Default::default()
     });
     let before = t
-        .rows(0.)
+        .rows()
         .iter()
         .position(|r| matches!(r, Row::Queued { text, .. } if text == "next"))
         .unwrap();
     // Pi places it: the journal entry arrives first, the queue's event after.
     t.apply(ThreadEvent::Append(vec![user(3, "next")]));
-    let rows = t.rows(0.);
+    let rows = t.rows();
     assert_eq!(
         kinds(&rows),
         ["user:go", "answer:ok", "user:next", "queued:after"],
@@ -185,7 +187,7 @@ fn rule_3_a_taken_message_keeps_its_place() {
     );
     t.apply(ThreadEvent::Queue(vec![queued(11, "after")]));
     assert_eq!(
-        kinds(&t.rows(0.)),
+        kinds(&t.rows()),
         ["user:go", "answer:ok", "user:next", "queued:after"]
     );
 }
@@ -208,7 +210,7 @@ fn rule_4_work_counted_between_messages_not_per_run() {
         ],
         ..Default::default()
     });
-    let rows = t.rows(0.);
+    let rows = t.rows();
     assert_eq!(
         kinds(&rows),
         [
@@ -238,7 +240,7 @@ fn rule_4_a_second_message_of_the_agent_is_its_own() {
         ..Default::default()
     });
     assert_eq!(
-        kinds(&t.rows(0.)),
+        kinds(&t.rows()),
         ["user:a", "answer:Answer.", "work:1", "answer:Plan."]
     );
 }
@@ -256,7 +258,7 @@ fn rule_5_inserts_where_put_removed_ones_gone() {
         ..Default::default()
     });
     assert_eq!(
-        kinds(&t.rows(0.)),
+        kinds(&t.rows()),
         ["insert:i0", "user:a", "insert:i1", "answer:x"]
     );
     t.apply(ThreadEvent::Inserts(
@@ -265,7 +267,7 @@ fn rule_5_inserts_where_put_removed_ones_gone() {
             .unwrap()
             .clone(),
     ));
-    assert_eq!(kinds(&t.rows(0.)), ["insert:i0", "user:a", "answer:x"]);
+    assert_eq!(kinds(&t.rows()), ["insert:i0", "user:a", "answer:x"]);
 }
 
 #[test]
@@ -277,7 +279,7 @@ fn a_run_that_ends_drops_what_was_being_written_and_is_no_longer_live() {
     });
     t.apply(ThreadEvent::Stream(StreamKind::Text, "par".into()));
     t.apply(ThreadEvent::Run(false));
-    assert_eq!(kinds(&t.rows(0.)), ["user:go", "work:1"]);
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:1"]);
 }
 
 #[test]
@@ -293,7 +295,7 @@ fn catch_up_after_a_reconnect_adds_only_what_was_missed() {
         head: 2,
         ..Default::default()
     });
-    assert_eq!(kinds(&t.rows(0.)), ["user:go", "answer:ok"]);
+    assert_eq!(kinds(&t.rows()), ["user:go", "answer:ok"]);
     assert_eq!(t.head(), 2);
     assert!(t.version() > v);
 }
@@ -315,11 +317,73 @@ fn three_thousand_steps_are_cheap() {
         ..Default::default()
     });
     let started = std::time::Instant::now();
-    let rows = t.rows(0.);
+    let rows = t.rows();
     assert_eq!(rows.len(), 3000);
     assert!(
         started.elapsed().as_millis() < 50,
         "rows of 4000 items in {:?}",
         started.elapsed()
     );
+}
+
+#[test]
+fn rule_6_a_sent_message_shows_at_once_and_is_never_doubled() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go"), text(2, 0, "ok")],
+        ..Default::default()
+    });
+    t.sent("next".into());
+    assert_eq!(kinds(&t.rows()), ["user:go", "answer:ok", "user:next"]);
+    t.apply(ThreadEvent::Append(vec![user(3, "next")]));
+    assert_eq!(kinds(&t.rows()), ["user:go", "answer:ok", "user:next"]);
+    t.sent("lost".into());
+    t.unsent("lost");
+    assert_eq!(kinds(&t.rows()), ["user:go", "answer:ok", "user:next"]);
+}
+
+#[test]
+fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
+    let ins = |seq: u64, id: &str| ThreadItem::Insert {
+        key: seq.to_string(),
+        seq,
+        id: id.into(),
+        insert_key: "files".into(),
+    };
+    // Put while "b" was still in the composer: its entry is before "b", its place after it.
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![
+            user(1, "a"),
+            text(2, 0, "A"),
+            ins(3, "i1"),
+            user(4, "b"),
+            text(5, 0, "B"),
+            user(6, "c"),
+        ],
+        inserts: json!({"i1": {"key": "files", "after": 2}})
+            .as_object()
+            .unwrap()
+            .clone(),
+        ..Default::default()
+    });
+    assert_eq!(
+        kinds(&t.rows()),
+        [
+            "user:a",
+            "answer:A",
+            "user:b",
+            "answer:B",
+            "insert:i1",
+            "user:c"
+        ]
+    );
+    // Until "b" is in the journal, it waits at the end.
+    t = Thread::open(ThreadOpen {
+        items: vec![user(1, "a"), ins(3, "i1")],
+        inserts: json!({"i1": {"key": "files", "after": 2}})
+            .as_object()
+            .unwrap()
+            .clone(),
+        ..Default::default()
+    });
+    assert_eq!(kinds(&t.rows()), ["user:a", "insert:i1"]);
 }

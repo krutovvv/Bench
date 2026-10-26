@@ -9,11 +9,13 @@
 //! 3. A queued message the agent takes becomes a journal row in the same place on screen.
 //! 4. Steps and time are counted per piece of work, between two messages — never per run.
 //! 5. An insert sits where its entry is; a removed one is not shown.
+//! 6. A message just sent shows at once, after the journal, until the journal has it.
 
 mod rows;
 mod state;
 #[cfg(test)]
 mod tests;
 
+pub use protocol::ThreadEvent;
 pub use rows::{Row, Step};
 pub use state::Thread;

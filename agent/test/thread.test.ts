@@ -37,6 +37,7 @@ test("an assistant entry: thought, text, tool calls, each with its own key, in t
 		],
 	);
 	assert.equal((items[2] as any).call_id, "c1");
+	assert.equal((items[2] as any).preview, "ls");
 });
 
 test("empty blocks give nothing; a model error is said", () => {
@@ -48,6 +49,8 @@ test("empty blocks give nothing; a model error is said", () => {
 
 test("a tool result, an insert, a fail note; compaction and system entries are not shown", () => {
 	assert.deepEqual(itemsOf(result(10, "c1", "out", true)), [{ key: "10.0", seq: 10, kind: "result", call_id: "c1", name: "bash", output: "out", failed: true, at: undefined }]);
+	const edit = { ...result(15, "c2", "ok"), data: { details: { patch: "--- a\n+++ b" } } };
+	assert.equal((itemsOf(edit)[0] as any).diff, "--- a\n+++ b", "an edit carries its patch");
 	assert.deepEqual(itemsOf({ id: 11, kind: "bench.insert", data: { id: "i1", key: "tasks" } }), [{ key: "11", seq: 11, kind: "insert", id: "i1", insert_key: "tasks" }]);
 	assert.deepEqual(itemsOf({ id: 12, kind: FAIL_KIND, data: { text: "no model" } }), [{ key: "12", seq: 12, kind: "fail", text: "no model" }]);
 	assert.deepEqual(itemsOf({ id: 13, kind: "pi.compaction", data: {} }), []);

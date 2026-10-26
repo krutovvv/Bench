@@ -19,7 +19,7 @@ import { AGENT_HOME, agents, getSetting, readConfig, readAgent, reasoningEffort,
 import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
-import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, FAIL_KIND, itemsOfAll, queueOf, stripBlock, textOf } from "./thread.ts";
+import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, FAIL_KIND, itemsOfAll, preview, queueOf, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { noThinking } from "./thinking.ts";
@@ -93,7 +93,7 @@ function legacyInsert(subject: string): { key: string; state: JsonObject } | und
 /** How a stopped run says so in the history: one quoted line, the same live and after a restart. */
 const RUN_STOPPED = "> The run stopped: ";
 
-export { stripBlock };
+export { preview, stripBlock };
 
 /**
  * A waiting message's content with its words replaced: the block state Bench sent with it stays
@@ -1071,9 +1071,3 @@ export function defaultCwd(profile: string): string {
 }
 
 /** The one-line detail Bench shows on a tool step (its `context`). */
-export function preview(name: string, args: any): string {
-	if (!args || typeof args !== "object") return "";
-	const pick = args.command ?? args.path ?? args.query ?? args.url ?? args.urls?.[0] ?? args.name ?? args.goal ?? args.pattern ?? args.action;
-	const text = typeof pick === "string" ? pick : JSON.stringify(args);
-	return text.length > 160 ? text.slice(0, 157) + "..." : text;
-}

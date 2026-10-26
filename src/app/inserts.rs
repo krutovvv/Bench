@@ -66,7 +66,7 @@ impl BenchApp {
             key,
             state,
             folded: false,
-            after: self.turns.len() + usize::from(draft),
+            after: self.thread.messages() + usize::from(draft),
         };
         if draft {
             self.insert_draft.push(ins.id.clone());

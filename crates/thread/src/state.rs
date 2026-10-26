@@ -19,6 +19,8 @@ pub struct Thread {
     stream: (String, String),
     /// The last entry id seen: `thread.open {since: head}` after a reconnect.
     head: u64,
+    /// Messages the person sent that the journal has not shown yet, in the order sent.
+    sent: Vec<String>,
     /// Grows with every change, so a view knows when to rebuild its rows.
     version: u64,
 }
@@ -87,6 +89,9 @@ impl Thread {
                 if let Some(k) = self.queue.iter().position(|q| &q.text == text) {
                     self.queue.remove(k);
                 }
+                if let Some(k) = self.sent.iter().position(|s| s == text) {
+                    self.sent.remove(k);
+                }
             }
             self.head = self.head.max(it.seq());
             let at = self.log.partition_point(|x| x.order() <= it.order());
@@ -95,16 +100,45 @@ impl Thread {
         self.version += 1;
     }
 
+    /// The person sent `text`: it shows at once, where the journal will put it.
+    pub fn sent(&mut self, text: String) {
+        self.sent.push(text);
+        self.version += 1;
+    }
+
+    /// Every sent message the journal has not shown: the send failed.
+    pub fn clear_sent(&mut self) {
+        self.sent.clear();
+        self.version += 1;
+    }
+
+    /// A sent message that never reached the journal (the send failed): it goes.
+    pub fn unsent(&mut self, text: &str) {
+        self.sent.retain(|s| s != text);
+        self.version += 1;
+    }
+
     /// The thread's lines, in order.
-    pub fn rows(&self, now_ms: f64) -> Vec<Row> {
+    pub fn rows(&self) -> Vec<Row> {
         rows_of(
             &self.log,
             &self.inserts,
             self.running,
             &self.stream,
+            &self.sent,
             &self.queue,
-            now_ms,
         )
+    }
+
+    /// How many of the person's messages the journal has, plus those sent and on their way:
+    /// an insert put now after message n sits there (`after` in its state).
+    pub fn messages(&self) -> usize {
+        self.log
+            .iter()
+            .filter(|i| matches!(i, ThreadItem::User { .. }))
+            .count()
+            + self.sent.len()
+            + self.queue.len()
     }
 
     pub fn running(&self) -> bool {

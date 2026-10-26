@@ -105,35 +105,6 @@ pub fn source_label(source: &str) -> String {
     }
 }
 
-/// One unit of agent work inside a turn.
-#[derive(Clone, Debug)]
-pub enum Step {
-    /// A tool call: name and a short human preview of what it acted on.
-    Tool {
-        name: String,
-        detail: String,
-        failed: bool,
-        call_id: String,
-        /// Full arguments and output, shown when the step is unfolded.
-        args: String,
-        output: String,
-    },
-    /// Interim prose the model wrote between tool calls.
-    Note(String),
-    /// Model reasoning.
-    Thought(String),
-    /// A subagent the model delegated to: its goal, what it did, how it ended.
-    Subagent {
-        id: String,
-        goal: String,
-        /// "running", "completed", "failed", …
-        status: String,
-        /// Its tool calls and notes, one line each.
-        lines: Vec<String>,
-        summary: String,
-    },
-}
-
 /// A background process the agent started in a session (`process.list`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct BgProcess {
@@ -195,41 +166,6 @@ pub struct Todo {
     pub status: String,
     /// Nesting (sub-steps of a step).
     pub depth: usize,
-}
-
-/// One exchange: the user's words, the steps the agent took, the answer.
-#[derive(Clone, Debug, Default)]
-pub struct Turn {
-    pub user: String,
-    /// The agent's background review after the turn ("saved skill X, patched Y"), as it reported.
-    pub reviews: Vec<String>,
-    pub steps: Vec<Step>,
-    pub answer: String,
-    pub expanded: bool,
-    /// Files the agent edited in this turn.
-    pub files: Vec<FileEdit>,
-    /// External pages the agent's tool calls touched, in order, deduplicated.
-    pub sources: Vec<String>,
-    /// Unix seconds: when the user sent it, when the last message of the turn landed.
-    pub started: Option<f64>,
-    pub finished: Option<f64>,
-}
-
-impl Turn {
-    pub fn tool_count(&self) -> usize {
-        self.steps
-            .iter()
-            .filter(|s| matches!(s, Step::Tool { .. }))
-            .count()
-    }
-}
-
-/// One file edit by a tool: the file, and the unified diff when the tool reported one
-/// (`patch` does; `write_file` rewrites the whole file and reports none).
-#[derive(Clone, Debug)]
-pub struct FileEdit {
-    pub path: String,
-    pub diff: Option<String>,
 }
 
 /// Context/usage readout for the status bar.

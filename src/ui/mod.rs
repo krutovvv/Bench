@@ -1,15 +1,13 @@
 //! Rendering. Each file adds `render_*` methods to `BenchApp`.
 
 mod asks;
-mod chat;
 mod composer;
 pub(crate) mod inserts;
-mod media;
+pub(crate) mod media;
 mod panels;
 mod project_list;
 mod providers;
 mod remote_files;
-pub(crate) mod rows;
 mod servers;
 mod sidebar;
 mod sites;
@@ -20,6 +18,7 @@ mod terminal;
 #[cfg(target_family = "wasm")]
 #[path = "terminal_web.rs"]
 mod terminal;
+pub(crate) mod thread;
 mod tools;
 
 pub fn terminal_palette(theme: &gpui_kit::component::Theme) -> crate::term::Palette {
@@ -264,7 +263,7 @@ impl Render for BenchApp {
         self.sync_draft(window, cx);
         // A new chat is a code editor's empty file: the caret alone (no avatars yet), focused.
         // The composer never has a placeholder: it is the thread's next text, not a form field.
-        let fresh = self.turns.is_empty() && self.session.is_none();
+        let fresh = self.thread.is_empty() && self.session.is_none();
         if fresh != self.composer_fresh {
             self.composer_fresh = fresh;
             if fresh && self.panel == Panel::Chat {

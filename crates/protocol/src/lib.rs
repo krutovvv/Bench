@@ -40,6 +40,9 @@ pub enum ThreadItem {
         name: String,
         #[serde(default)]
         args: Value,
+        /// What it acts on, in one line (a command, a path).
+        #[serde(default)]
+        preview: String,
         #[serde(default)]
         at: Option<f64>,
     },
@@ -50,6 +53,9 @@ pub enum ThreadItem {
         name: String,
         output: String,
         failed: bool,
+        /// An edit's unified patch.
+        #[serde(default)]
+        diff: Option<String>,
         #[serde(default)]
         at: Option<f64>,
     },

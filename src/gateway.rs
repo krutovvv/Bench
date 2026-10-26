@@ -10,8 +10,7 @@ use serde_json::{Value, json};
 use tungstenite::{Message, WebSocket};
 
 use crate::connection::Connection;
-use crate::history;
-use crate::model::{Profile, SessionRow, Target, Turn, Usage};
+use crate::model::{Profile, SessionRow, Target, Usage};
 
 pub enum Cmd {
     Sessions(String),
@@ -158,18 +157,8 @@ pub enum Evt {
     Todos(String, Vec<crate::model::Todo>, f64),
     /// What the thread keeps of the speed of its last answer (its chart and its last speeds).
     Speed(String, crate::speed::Stat),
-    /// The background self-improvement review of the last turn: what it saved or patched.
-    Review(String, String),
     /// The pending approval was answered or withdrawn.
     ApprovalDone(String),
-    Subagent {
-        session: String,
-        id: String,
-        /// "start" | "tool" | "text" | "complete"
-        kind: &'static str,
-        text: String,
-        status: String,
-    },
     Connected(Arc<Connection>),
     Error(String),
     /// A session's reasoning effort as the gateway has it ("" = the provider's default).
@@ -183,20 +172,14 @@ pub enum Evt {
     History {
         session: String,
         runtime: String,
-        turns: Vec<Turn>,
-        running: bool,
+        open: protocol::ThreadOpen,
     },
+    /// A change of an open thread: (runtime session, the change).
+    Thread(String, protocol::ThreadEvent),
     Created {
         session: String,
         runtime: String,
     },
-    /// A thread's waiting messages: (id, "followUp"/"steer", text).
-    Queue(String, Vec<(String, String, String)>),
-    /// A waiting message the agent took up: it is the thread's next turn.
-    UserPlaced(String, String, String),
-    /// The run died: the quoted line says why. Kept with the answer, so a dead turn is never
-    /// plain silence — and the reason survives a restart, not just the live thread.
-    RunStopped(String, String),
     /// A thread's inserts as the agent keeps them (the whole list, in order).
     Inserts(String, Vec<crate::model::Insert>),
     /// The agent refused an insert's change: the thread's list is read again.
@@ -210,20 +193,14 @@ pub enum Evt {
     Started(String),
     Delta(String, String),
     Reasoning(String, String),
+    /// A tool started: what the status says the agent is doing (name, what it acts on).
     ToolStart {
         session: String,
         name: String,
         detail: String,
-        urls: Vec<String>,
-        call_id: String,
-        args: String,
     },
     ToolDone {
         session: String,
-        failed: bool,
-        call_id: String,
-        output: String,
-        edit: Option<crate::model::FileEdit>,
     },
     Usage(String, Usage),
     Complete {
@@ -237,12 +214,10 @@ enum Pending {
     Sessions(String),
     /// (stored session id, profile)
     Resume(String, String),
-    /// Resume done; `session.history` fills in sources and timing before the UI gets it.
-    Meta {
+    /// Resume done; `thread.open` brings the thread itself.
+    Thread {
         session: String,
         runtime: String,
-        turns: Vec<Turn>,
-        running: bool,
         /// What was open when the chat was reopened (questions, approvals, the plan), as
         /// event frames to replay once the UI has the session.
         replay: Vec<Value>,
@@ -569,24 +544,8 @@ fn run(
                     Pending::Resume(session, _) => emit(Evt::ResumeFailed(session, text)),
                     // A poll every few seconds: logged above, never a toast.
                     Pending::Processes(_) => {}
-                    // Older gateways may lack the projection: show the turns without extras.
-                    Pending::Meta {
-                        session,
-                        runtime,
-                        turns,
-                        running,
-                        replay,
-                    } => {
-                        emit(Evt::History {
-                            session,
-                            runtime,
-                            turns,
-                            running,
-                        });
-                        for frame in &replay {
-                            on_event(frame, &emit);
-                        }
-                    }
+                    // The thread itself could not be read: said where it would show.
+                    Pending::Thread { session, .. } => emit(Evt::ResumeFailed(session, text)),
                     // A close of a session the gateway already dropped is not worth a toast.
                     // Fire-and-forget calls on a session the gateway no longer (or not yet) knows:
                     // logged above, not worth a toast.
@@ -601,9 +560,7 @@ fn run(
                 let r = &msg["result"];
                 let runtime = r["session_id"].as_str().unwrap_or(&session).to_string();
                 rpc.note_fence(&runtime, r);
-                let turns =
-                    history::turns(r["messages"].as_array().map(Vec::as_slice).unwrap_or(&[]));
-                let running = r["running"].as_bool().unwrap_or(false);
+
                 let mut replay: Vec<Value> = r["prompts"]
                     .as_array()
                     .into_iter()
@@ -634,10 +591,6 @@ fn run(
                     replay.push(json!({"type": "session.speed", "session_id": runtime,
                                        "payload": {"speed": r["speed"]}}));
                 }
-                if r["queue"].is_array() {
-                    replay.push(json!({"type": "session.queue", "session_id": runtime,
-                                       "payload": {"items": r["queue"]}}));
-                }
                 if r["inserts"].is_array() {
                     replay.push(json!({"type": "session.inserts", "session_id": runtime,
                                        "payload": {"inserts": r["inserts"]}}));
@@ -648,13 +601,11 @@ fn run(
                 }
                 let params = json!({"session_id": runtime, "profile": profile});
                 rpc.call(
-                    "session.history",
+                    "thread.open",
                     params,
-                    Pending::Meta {
+                    Pending::Thread {
                         session,
                         runtime,
-                        turns,
-                        running,
                         replay,
                     },
                 )?;
@@ -729,19 +680,16 @@ fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                 .collect(),
         )),
         Pending::Resume(..) => {}
-        Pending::Meta {
+        Pending::Thread {
             session,
             runtime,
-            mut turns,
-            running,
             replay,
         } => {
-            history::attach(&mut turns, history::metas(&list(&r["messages"])));
+            let open = serde_json::from_value(r.clone()).unwrap_or_default();
             emit(Evt::History {
                 session,
                 runtime,
-                turns,
-                running,
+                open,
             });
             for frame in &replay {
                 on_event(frame, emit);
@@ -814,47 +762,23 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             }
         }
         "message.delta" => emit(Evt::Delta(sid, text())),
-        "message.fail" => emit(Evt::RunStopped(sid, text())),
         "reasoning.delta" => emit(Evt::Reasoning(sid, text())),
         "tool.start" => emit(Evt::ToolStart {
-            call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
-            args: history::pretty(&payload["args"]),
             name: payload["name"].as_str().unwrap_or("tool").to_string(),
-            detail: payload["context"]
-                .as_str()
-                .map(str::to_string)
-                .unwrap_or_else(|| history::preview(&payload["args"])),
-            urls: {
-                let mut urls = vec![];
-                history::tool_urls(
-                    payload["name"].as_str().unwrap_or_default(),
-                    &payload["args"],
-                    &mut urls,
-                );
-                urls
-            },
+            detail: payload["context"].as_str().unwrap_or_default().to_string(),
             session: sid,
         }),
-        "tool.complete" if payload["todos"].is_array() => {
-            emit(Evt::Todos(sid.clone(), todos(payload), todo_at(payload)));
-            emit(Evt::ToolDone {
-                failed: history::failed(&payload["result"]),
-                call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
-                output: history::pretty(&payload["result"]),
-                edit: None,
-                session: sid,
-            })
+        "tool.complete" => {
+            if payload["todos"].is_array() {
+                emit(Evt::Todos(sid.clone(), todos(payload), todo_at(payload)));
+            }
+            emit(Evt::ToolDone { session: sid })
         }
-        "tool.complete" => emit(Evt::ToolDone {
-            failed: history::failed(&payload["result"]),
-            call_id: payload["tool_id"].as_str().unwrap_or_default().to_string(),
-            output: history::pretty(&payload["result"]),
-            edit: history::file_edit(
-                payload["name"].as_str().unwrap_or_default(),
-                &payload["result"],
-            ),
-            session: sid,
-        }),
+        kind if kind.starts_with("thread.") => {
+            if let Some(e) = protocol::ThreadEvent::parse(kind, payload) {
+                emit(Evt::Thread(sid, e))
+            }
+        }
         "approval.request" => emit(Evt::Approval(crate::model::ApprovalReq {
             prompt_id: payload["prompt_id"]
                 .as_str()
@@ -912,72 +836,8 @@ fn on_event(p: &Value, emit: &impl Fn(Evt)) {
         }
         "clarify.settled" | "clarify.cancelled" => emit(Evt::ClarifyDone(sid)),
         "todo.updated" => emit(Evt::Todos(sid, todos(payload), todo_at(payload))),
-        kind @ ("subagent.start" | "subagent.tool" | "subagent.text" | "subagent.complete") => {
-            let s = |k: &str| payload[k].as_str().unwrap_or_default().to_string();
-            let id = payload["subagent_id"]
-                .as_str()
-                .map(str::to_string)
-                .unwrap_or_else(|| format!("sa:{}:{}", payload["task_index"], s("goal")));
-            let (kind, text) = match kind {
-                "subagent.start" => ("start", {
-                    let g = s("goal");
-                    if g.is_empty() { s("preview") } else { g }
-                }),
-                "subagent.tool" => ("tool", {
-                    let name = s("tool_name");
-                    let preview = s("tool_preview");
-                    let preview = if preview.is_empty() {
-                        s("text")
-                    } else {
-                        preview
-                    };
-                    crate::app::tool_label(&name, &preview)
-                }),
-                "subagent.text" => ("text", s("text")),
-                _ => ("complete", {
-                    let summary = s("summary");
-                    if summary.is_empty() {
-                        s("text")
-                    } else {
-                        summary
-                    }
-                }),
-            };
-            emit(Evt::Subagent {
-                session: sid,
-                id,
-                kind,
-                text,
-                status: s("status"),
-            })
-        }
-        "review.summary" => {
-            let t = text();
-            if !t.trim().is_empty() {
-                emit(Evt::Review(sid, t.trim().to_string()))
-            }
-        }
         "sessions.changed" => emit(Evt::SessionsChanged),
         "session.inserts" => emit(Evt::Inserts(sid, inserts(&payload["inserts"]))),
-        "session.queue" => emit(Evt::Queue(
-            sid,
-            payload["items"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .map(|i| {
-                            let s = |k: &str| i[k].as_str().unwrap_or_default().to_string();
-                            (s("id"), s("mode"), s("text"))
-                        })
-                        .collect()
-                })
-                .unwrap_or_default(),
-        )),
-        "message.user" => emit(Evt::UserPlaced(
-            sid,
-            text(),
-            payload["id"].as_str().unwrap_or_default().to_string(),
-        )),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
         "session.speed" => emit(Evt::Speed(
             sid,

@@ -69,8 +69,10 @@ pub enum Step {
         call_id: String,
         name: String,
         args: Value,
+        preview: String,
         output: Option<String>,
         failed: bool,
+        diff: Option<String>,
     },
 }
 
@@ -85,8 +87,8 @@ pub(crate) fn rows_of(
     inserts: &Map<String, Value>,
     running: bool,
     stream: &(String, String),
+    sent: &[String],
     queue: &[QueuedItem],
-    now_ms: f64,
 ) -> Vec<Row> {
     // An assistant entry with tool calls is work: its text is a note on the way, not an answer.
     let working: HashSet<u64> = log
@@ -96,6 +98,10 @@ pub(crate) fn rows_of(
         .collect();
     let mut rows = Vec::new();
     let mut work: Option<Row> = None;
+    // An insert moved after the n-th message (put while that message waited in the composer):
+    // (n, its row), shown just before message n + 1.
+    let mut moved: Vec<(usize, Row)> = vec![];
+    let mut users = 0usize;
     let close = |rows: &mut Vec<Row>, work: &mut Option<Row>| {
         if let Some(w) = work.take() {
             rows.push(w);
@@ -126,6 +132,8 @@ pub(crate) fn rows_of(
         match it {
             ThreadItem::User { key, text, at, .. } => {
                 close(&mut rows, &mut work);
+                rows.extend(take_moved(&mut moved, users));
+                users += 1;
                 rows.push(Row::User {
                     key: key.clone(),
                     text: text.clone(),
@@ -158,6 +166,7 @@ pub(crate) fn rows_of(
                 call_id,
                 name,
                 args,
+                preview,
                 at,
                 ..
             } => step(
@@ -168,14 +177,17 @@ pub(crate) fn rows_of(
                     call_id: call_id.clone(),
                     name: name.clone(),
                     args: args.clone(),
+                    preview: preview.clone(),
                     output: None,
                     failed: false,
+                    diff: None,
                 },
             ),
             ThreadItem::Result {
                 call_id,
                 output,
                 failed,
+                diff,
                 at,
                 ..
             } => {
@@ -185,12 +197,14 @@ pub(crate) fn rows_of(
                             call_id: c,
                             output: o,
                             failed: f,
+                            diff: d,
                             ..
                         } = s
                         {
                             if c == call_id {
                                 *o = Some(output.clone());
                                 *f = *failed;
+                                *d = diff.clone();
                                 break;
                             }
                         }
@@ -212,17 +226,23 @@ pub(crate) fn rows_of(
                     .and_then(Value::as_bool)
                     .unwrap_or(false);
                 if !removed {
-                    close(&mut rows, &mut work);
-                    let insert_key = inserts
-                        .get(id)
+                    let state = inserts.get(id);
+                    let insert_key = state
                         .and_then(|s| s.get("key"))
                         .and_then(Value::as_str)
                         .unwrap_or(insert_key);
-                    rows.push(Row::Insert {
+                    let row = Row::Insert {
                         key: key.clone(),
                         id: id.clone(),
                         insert_key: insert_key.to_string(),
-                    });
+                    };
+                    match state.and_then(|s| s.get("after")).and_then(Value::as_u64) {
+                        Some(n) if n as usize > users => moved.push((n as usize, row)),
+                        _ => {
+                            close(&mut rows, &mut work);
+                            rows.push(row);
+                        }
+                    }
                 }
             }
             ThreadItem::Fail { key, text, .. } => {
@@ -234,20 +254,23 @@ pub(crate) fn rows_of(
             }
         }
     }
-    // The work in progress is live while the run is, and its time runs on.
-    if let Some(Row::Work { live, to, .. }) = work.as_mut() {
-        if running {
-            *live = true;
-            *to = Some(now_ms);
-        }
+    // The work in progress is live while the run is: a view counts its time on from `from`.
+    if let Some(Row::Work { live, .. }) = work.as_mut() {
+        *live = running;
     }
     close(&mut rows, &mut work);
+    rows.extend(moved.into_iter().map(|(_, r)| r));
     if running && (!stream.0.is_empty() || !stream.1.is_empty()) {
         rows.push(Row::Writing {
             thought: stream.0.clone(),
             text: stream.1.clone(),
         });
     }
+    rows.extend(sent.iter().enumerate().map(|(k, t)| Row::User {
+        key: format!("sent-{k}"),
+        text: t.clone(),
+        at: None,
+    }));
     rows.extend(queue.iter().map(|q| Row::Queued {
         key: q.key.clone(),
         sub: q.sub.clone(),
@@ -255,4 +278,13 @@ pub(crate) fn rows_of(
         text: q.text.clone(),
     }));
     rows
+}
+
+/// The moved inserts whose place is after message `n`, in the order they were put.
+fn take_moved(moved: &mut Vec<(usize, Row)>, n: usize) -> Vec<Row> {
+    let (now, later): (Vec<_>, Vec<_>) = std::mem::take(moved)
+        .into_iter()
+        .partition(|(at, _)| *at <= n);
+    *moved = later;
+    now.into_iter().map(|(_, r)| r).collect()
 }

@@ -17,7 +17,6 @@ mod demo;
 mod devtools;
 mod diff;
 mod gateway;
-mod history;
 mod icons;
 mod lang;
 mod media;
@@ -171,12 +170,13 @@ fn probe(target: &str) -> anyhow::Result<()> {
             gateway::Evt::History {
                 session,
                 runtime,
-                turns,
-                ..
+                open,
             } => {
+                let thread = ::thread::Thread::open(open);
+                let rows = thread.rows();
                 println!(
-                    "open: stored={session} runtime={runtime} turns={}",
-                    turns.len()
+                    "open: stored={session} runtime={runtime} rows={}",
+                    rows.len()
                 );
                 // PROBE_SEND: one prompt into this session, printing the events Bench reads.
                 if let Ok(text) = std::env::var("PROBE_SEND") {
@@ -193,16 +193,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                             gateway::Evt::ToolStart { name, detail, .. } => {
                                 println!("\n[tool] {name}: {detail}")
                             }
-                            gateway::Evt::ToolDone {
-                                failed,
-                                output,
-                                edit,
-                                ..
-                            } => println!(
-                                "[done] failed={failed} edit={:?} {}",
-                                edit.map(|e| e.path),
-                                output.chars().take(160).collect::<String>()
-                            ),
+                            gateway::Evt::Thread(_, e) => println!("[thread] {e:?}"),
                             gateway::Evt::Usage(_, u) => {
                                 println!("\n[usage] {}/{}", u.context_used, u.context_max)
                             }
@@ -225,49 +216,8 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     });
                     continue;
                 }
-                for t in turns.iter().rev().take(3) {
-                    let took = match (t.started, t.finished) {
-                        (Some(a), Some(b)) => format!("{:.0}s", b - a),
-                        _ => "?".into(),
-                    };
-                    let src: Vec<_> = t.sources.iter().take(3).collect();
-                    println!(
-                        "  turn: steps={} sources={src:?} took={took}",
-                        t.steps.len()
-                    );
-                    for f in &t.files {
-                        let (add, del) = f.diff.as_deref().map(diff::stats).unwrap_or((0, 0));
-                        println!("    file: {} +{add} -{del}", f.path);
-                    }
-                    let detailed = t
-                        .steps
-                        .iter()
-                        .filter(|s| matches!(s, model::Step::Tool { args, output, .. } if !args.is_empty() && !output.is_empty()))
-                        .count();
-                    println!("    tool steps with args+output: {detailed}");
-                    if let (Some(c), Some(f)) = (&conn, t.files.first()) {
-                        let diffs: Vec<String> = t
-                            .files
-                            .iter()
-                            .filter(|x| x.path == f.path)
-                            .filter_map(|x| x.diff.clone())
-                            .collect();
-                        match rest::read_text(
-                            c,
-                            &std::env::var("PROBE_PROFILE").unwrap_or_default(),
-                            &f.path,
-                        ) {
-                            Ok(file) => println!(
-                                "    before: {} (file {} bytes, truncated={})",
-                                diff::before(&file.text, &diffs)
-                                    .map(|b| format!("reconstructed, {} bytes", b.len()))
-                                    .unwrap_or_else(|| "not recoverable".into()),
-                                file.text.len(),
-                                file.truncated
-                            ),
-                            Err(e) => println!("    read: {e:#}"),
-                        }
-                    }
+                for r in rows.iter().rev().take(6) {
+                    println!("  {r:?}");
                 }
                 return Ok(());
             }

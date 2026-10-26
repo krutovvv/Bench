@@ -230,7 +230,7 @@ impl InsertKind for Terminal {
         // Its program sees the whole MAX_H, whatever the view shows.
         tab.session
             .set_min_rows((((MAX_H - 16.) / line).floor() as usize).max(4));
-        let h = super::super::chat::terminal_height(&tab.session).min(MAX_H);
+        let h = terminal_height(&tab.session).min(MAX_H);
         // The view's own 16 inset pulled back: its text starts where the head's does.
         Some(
             div()
@@ -282,4 +282,13 @@ impl InsertKind for Terminal {
             app.ssh.tabs.remove(t);
         }
     }
+}
+
+/// A terminal as tall as the lines it shows (the cursor's included), with its 16 px padding.
+fn terminal_height(session: &crate::term::Session) -> f32 {
+    let line = match session.layout().line_h {
+        h if h > 1. => h,
+        _ => 20.,
+    };
+    session.used_rows().min(1000).max(1) as f32 * line + 16.
 }

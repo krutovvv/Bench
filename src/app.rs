@@ -41,9 +41,8 @@ use crate::attach;
 use crate::audio::{Playback, Recorder};
 use crate::connection::{self, Connection};
 use crate::gateway::{Cmd, Evt, Gateway};
-use crate::history;
 use crate::media::{self, Loaded};
-use crate::model::{EFFORTS, Profile, SessionRow, SkillRow, Step, Target, Turn, Usage};
+use crate::model::{EFFORTS, Profile, SessionRow, SkillRow, Target, Usage};
 use crate::rest;
 
 pub type Choice = SelectState<Vec<SharedString>>;
@@ -67,16 +66,8 @@ impl Panel {
     }
 }
 
-/// The instant a turn began, from its Unix start time (now when unknown or in the future).
-fn live_since(started: Option<f64>) -> Instant {
-    started
-        .map(|t| (now_secs() - t).max(0.))
-        .and_then(|ago| Instant::now().checked_sub(Duration::from_secs_f64(ago)))
-        .unwrap_or_else(Instant::now)
-}
-
+/// The open thread's run, as the status says it: what the agent is doing.
 pub struct Live {
-    pub started: Instant,
     pub label: SharedString,
 }
 
@@ -100,8 +91,6 @@ pub struct BenchApp {
     pub form_after: Option<String>,
     /// Of the inserts whose state is app-wide (tasks, tools, files), the live one per kind.
     pub insert_live: HashMap<String, String>,
-    /// The open thread's messages waiting for the agent: (id, mode, text).
-    pub queue: Vec<(String, String, String)>,
     /// The waiting message whose words the person is fixing, and the field they fix them in.
     pub queue_edit: Option<(String, Entity<TextareaState>)>,
     /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
@@ -154,16 +143,14 @@ pub struct BenchApp {
     pub tg_people: Vec<(String, String)>,
     pub tg_visible: Option<HashSet<String>>,
 
-    pub turns: Vec<Turn>,
-    /// Each thread opened in this run, as last shown: switching back shows it at once while
-    /// its history comes again.
-    pub thread_cache: HashMap<String, Vec<Turn>>,
-    /// Frames left to keep a thread that is opening invisible, and how many in a row its layout
-    /// stayed the same; it shows once settled (`ui::chat`), so it appears whole, not in jumps.
-    pub settle: u8,
-    pub settle_stable: u8,
-    /// The opening thread has content to lay out (cached or its history arrived).
-    pub settle_ready: bool,
+    /// The open thread: its journal, what is being written, its queue (`crates/thread`).
+    pub thread: ::thread::Thread,
+    /// Each thread opened in this run, as last shown: switching back shows it at once.
+    pub thread_cache: HashMap<String, ::thread::Thread>,
+    /// The open thread on screen: its list and rows (`ui::thread`).
+    pub tv: crate::ui::thread::View,
+    /// Opened pieces of work and steps, by the work row's key.
+    pub open_work: HashSet<String>,
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
     pub history_error: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer.
@@ -214,9 +201,6 @@ pub struct BenchApp {
     pub clarify_input: Entity<InputState>,
     /// The agent's plan for this chat, and whether its list is unfolded.
     pub todos: Vec<crate::model::Todo>,
-    /// When the plan above began (unix seconds): the thread's row of the plan sits there
-    /// instead of trailing the newest message. None = no plan shown.
-    pub plan_at: Option<f64>,
     pub plan_open: bool,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
@@ -226,7 +210,7 @@ pub struct BenchApp {
     /// A made-up session for screenshots (`BENCH_DEMO=1`, src/demo.rs): nothing is connected.
     pub demo: bool,
     /// The demo's threads by session id (opening one shows its turns; nothing is fetched).
-    pub demo_threads: HashMap<String, Vec<Turn>>,
+    pub demo_threads: HashMap<String, ::thread::Thread>,
     /// The gateway refused a restart over running work: the next press (within a minute)
     /// restarts anyway.
     pub restart_armed: Option<Instant>,
@@ -276,26 +260,8 @@ pub struct BenchApp {
     /// keeps it. `draft_key` is the chat whose draft the composer shows.
     drafts: std::collections::HashMap<String, String>,
     draft_key: Option<String>,
-    /// The chat column scrolls as one tall list (no virtualization: real heights, real bottom).
-    pub chat_scroll: ScrollHandle,
-    /// Keep the view pinned to the newest content until the user scrolls up.
+    /// The next change of the thread brings the composer into view (a message sent, an insert put).
     pub follow: bool,
-    pub last_max: Pixels,
-    /// Where the tail was pinned last frame: an upward move past this number is the person's own
-    /// scroll, whatever else changed (see the follow in ui/chat.rs).
-    pub pinned: Pixels,
-    /// The last streamed frame painted (milliseconds since `stream_clock`), and whether the
-    /// frame that was turned down already has its timer. See [`stream_frame`].
-    stream_painted: Option<u64>,
-    stream_waiting: bool,
-    /// The timer that paints the frame the budget turned down (kept: dropping a Task cancels it).
-    stream_task: Option<gpui_kit::Task<()>>,
-    /// The thread's rows as numbers — heights, starts, the visible band (ui/rows.rs) — so a
-    /// frame lays out what is on screen and not what the thread has ever said.
-    pub rows: crate::ui::rows::Rows,
-    /// Height learned since the last frame in the rows above the viewport; the frame pays it
-    /// back by moving the view the same way, which is what keeps the reading place still.
-    pub rows_shift: f32,
     /// Keeps the `/`-list keystroke interceptor alive (main.rs).
     pub _slash_keys: Option<gpui_kit::Subscription>,
     /// Where the composer is in the window, and the window's height (last frame): the `/` list
@@ -305,15 +271,16 @@ pub struct BenchApp {
     /// window the thread's last row has to share with it (`past_end`).
     pub composer_h: f32,
     pub viewport_h: Pixels,
-    /// Unfolded steps (turn, step) and the source host whose pages are listed (turn, host).
-    pub open_steps: HashSet<(usize, usize)>,
-    pub open_source: Option<(usize, String)>,
+    /// Unfolded steps (work key, step) and the source host whose pages are listed (work key, host).
+    pub open_steps: HashSet<(String, usize)>,
+    pub open_source: Option<(String, String)>,
     pub recorder: Option<Recorder>,
     /// Repaints the waveform while recording.
     wave_ticker: Option<Task<()>>,
     pub transcribing: bool,
-    pub playing: Option<(usize, Playback)>,
-    pub speaking: Option<usize>,
+    /// The answer read aloud (its row key), and the one whose audio is being made.
+    pub playing: Option<(String, Playback)>,
+    pub speaking: Option<String>,
     /// Files answers delivered, by target and path; diagrams, by source and dark theme.
     pub media: HashMap<String, Loaded<media::Fetched>>,
     pub diagrams: HashMap<(String, bool), Loaded<media::Diagram>>,
@@ -638,7 +605,6 @@ impl BenchApp {
             inserts: HashMap::new(),
             creating: false,
             insert_draft: Vec::new(),
-            queue: Vec::new(),
             queue_edit: None,
             insert_live: HashMap::new(),
             form_after: None,
@@ -670,11 +636,10 @@ impl BenchApp {
             tg_owner: HashMap::new(),
             tg_people: vec![],
             tg_visible: None,
-            turns: vec![],
+            thread: Default::default(),
             thread_cache: HashMap::new(),
-            settle: 0,
-            settle_stable: 0,
-            settle_ready: false,
+            tv: Default::default(),
+            open_work: HashSet::new(),
             history_error: None,
             demo_draft_done: false,
             live: None,
@@ -704,7 +669,6 @@ impl BenchApp {
             clarify_picked: vec![],
             clarify_input,
             todos: vec![],
-            plan_at: None,
             plan_open: false,
             approval_mode: None,
             profile_context: 0,
@@ -736,15 +700,7 @@ impl BenchApp {
             composer,
             drafts: load_drafts(),
             draft_key: None,
-            chat_scroll: ScrollHandle::new(),
-            follow: true,
-            last_max: px(0.),
-            pinned: px(0.),
-            stream_painted: None,
-            stream_waiting: false,
-            stream_task: None,
-            rows: Default::default(),
-            rows_shift: 0.,
+            follow: false,
             _slash_keys: None,
             composer_y: px(0.),
             composer_h: 0.,
@@ -856,14 +812,6 @@ impl BenchApp {
                 id: id.clone(),
             }
         });
-        // Sent now: it is the next thing the agent answers, so its row rises to the head of the
-        // list at once, without waiting for the agent's next snapshot of the queue.
-        if send_now && self.queue.len() > 1 {
-            if let Some(k) = self.queue.iter().position(|(i, ..)| i == &id) {
-                let it = self.queue.remove(k);
-                self.queue.insert(0, it);
-            }
-        }
         cx.notify();
     }
 
@@ -951,8 +899,10 @@ impl BenchApp {
             }
             Evt::Error(e) => {
                 self.connecting = false;
-                if self.live.is_some() && self.turns.last().is_some_and(|t| t.answer.is_empty()) {
+                // A send that failed: no run started, and the message never reached the journal.
+                if self.live.is_some() && !self.thread.running() {
                     self.live = None;
+                    self.thread.clear_sent();
                 }
                 self.toast(NotificationType::Error, e, window, cx);
             }
@@ -1023,26 +973,38 @@ impl BenchApp {
             Evt::History {
                 session,
                 runtime,
-                turns,
-                running,
+                open,
             } => {
                 self.opened.insert(session.clone(), runtime.clone());
-                self.thread_cache.insert(session.clone(), turns.clone());
                 if self.session.as_deref() == Some(&session) {
+                    let running = open.running;
+                    // A thread already on screen keeps what it has and only catches up.
+                    if self.runtime.as_deref() == Some(runtime.as_str()) || !self.thread.is_empty()
+                    {
+                        self.thread.catch_up(open);
+                    } else {
+                        self.thread = ::thread::Thread::open(open);
+                    }
                     self.runtime = Some(runtime);
-                    self.turns = turns;
-                    self.settle_ready = true;
-                    self.settle_stable = 0;
-                    self.restore_reviews();
-                    // The clock runs from the user's message, not from when this chat was opened.
-                    let since = live_since(self.turns.last().and_then(|t| t.started));
+                    self.history_error = None;
                     self.live = running.then(|| Live {
-                        started: since,
                         label: "Working…".into(),
                     });
-                    self.reset_scroller(cx);
                     self.resolve_project(window, cx);
                 }
+            }
+            Evt::Thread(sid, e) if self.is_current(&sid) => {
+                if let ::thread::ThreadEvent::Queue(items) = &e {
+                    // A message that left the queue (sent, taken back) has nothing left to fix.
+                    if self
+                        .queue_edit
+                        .as_ref()
+                        .is_some_and(|(id, _)| !items.iter().any(|q| &q.sub == id))
+                    {
+                        self.queue_edit = None;
+                    }
+                }
+                self.thread.apply(e);
             }
             Evt::Fallback(sid, note) if self.is_current(&sid) => {
                 self.fallback_on = note;
@@ -1115,42 +1077,7 @@ impl BenchApp {
             Evt::ResumeFailed(sid, why) => {
                 if self.session.as_deref() == Some(sid.as_str()) {
                     self.history_error = Some(why);
-                    self.settle = 0;
                 }
-            }
-            Evt::Queue(sid, items) if self.is_current(&sid) => {
-                // A message that left the queue (sent, taken back) has nothing left to fix.
-                if self
-                    .queue_edit
-                    .as_ref()
-                    .is_some_and(|(id, _)| !items.iter().any(|(i, _, _)| i == id))
-                {
-                    self.queue_edit = None;
-                }
-                self.queue = items;
-                cx.notify();
-            }
-            // A waiting message the agent took up: the thread's next turn. Its row in the queue is
-            // this same message, and the inbox snapshot lags behind the run — so the row gives way
-            // here, by its id (or by its words, from an agent that sends none). Otherwise it stayed
-            // on the screen saying "Queued" while the agent was already at work on it.
-            Evt::UserPlaced(sid, text, sub) if self.is_current(&sid) => {
-                let gone = |id: &str, t: &str| id == sub || (sub.is_empty() && t == text);
-                self.queue.retain(|(id, _, t)| !gone(id, t));
-                if self
-                    .queue_edit
-                    .as_ref()
-                    .is_some_and(|(e, _)| e == &sub && !sub.is_empty())
-                {
-                    self.queue_edit = None;
-                }
-                self.turns.push(Turn {
-                    user: text,
-                    started: Some(now_secs()),
-                    ..Default::default()
-                });
-                self.follow = true;
-                cx.notify();
             }
             Evt::InsertFailed(sid, e) => {
                 self.toast(
@@ -1167,92 +1094,33 @@ impl BenchApp {
             Evt::Started(sid) if self.is_current(&sid) => {
                 if self.live.is_none() {
                     self.live = Some(Live {
-                        started: live_since(self.turns.last().and_then(|t| t.started)),
                         label: "Thinking…".into(),
                     });
                 }
             }
             Evt::Delta(sid, text) if self.is_current(&sid) => {
                 self.speed.token(text.chars().count());
-                if let Some(turn) = self.turns.last_mut() {
-                    turn.answer.push_str(&text);
-                }
                 if let Some(live) = self.live.as_mut() {
                     live.label = "Writing…".into();
                 }
-                self.remeasure_last(cx);
-            }
-            Evt::RunStopped(sid, line) if self.is_current(&sid) => {
-                // The reason the run died joins what was already written: half an answer plus the
-                // reason beats a turn that simply stops, and beats it again after a restart.
-                if let Some(turn) = self.turns.last_mut() {
-                    if !turn.answer.ends_with(line.trim()) {
-                        if !turn.answer.trim().is_empty() {
-                            turn.answer.push_str("\n\n");
-                        }
-                        turn.answer.push_str(&line);
-                    }
-                }
-                if let Some(live) = self.live.as_mut() {
-                    live.label = "Stopped".into();
-                }
-                self.remeasure_last(cx);
             }
             Evt::Reasoning(sid, text) if self.is_current(&sid) => {
                 self.speed.token(text.chars().count());
-                if let Some(turn) = self.turns.last_mut() {
-                    match turn.steps.last_mut() {
-                        Some(Step::Thought(t)) => t.push_str(&text),
-                        _ => turn.steps.push(Step::Thought(text)),
-                    }
-                }
                 if let Some(live) = self.live.as_mut() {
                     live.label = "Thinking…".into();
                 }
-                self.remeasure_last(cx);
             }
             Evt::ToolStart {
                 session,
                 name,
                 detail,
-                urls,
-                call_id,
-                args,
             } if self.is_current(&session) => {
                 self.speed.tool_call();
-                if let Some(turn) = self.turns.last_mut() {
-                    for url in urls {
-                        if !turn.sources.contains(&url) {
-                            turn.sources.push(url);
-                        }
-                    }
-                    let narration = last_line(&turn.answer);
-                    history::demote_answer(turn);
-                    if let Some(live) = self.live.as_mut() {
-                        live.label = if narration.is_empty() {
-                            tool_label(&name, &detail).into()
-                        } else {
-                            narration.into()
-                        };
-                    }
-                    turn.steps.push(Step::Tool {
-                        name,
-                        detail,
-                        failed: false,
-                        call_id,
-                        args,
-                        output: String::new(),
-                    });
+                if let Some(live) = self.live.as_mut() {
+                    live.label = tool_label(&name, &detail).into();
                 }
-                self.remeasure_last(cx);
             }
-            Evt::ToolDone {
-                session,
-                failed,
-                call_id,
-                output,
-                edit,
-            } if self.is_current(&session) => {
+            Evt::ToolDone { session } if self.is_current(&session) => {
                 self.speed.request();
                 // The agent may have changed the list this thread is about.
                 let subject = self.current_subject();
@@ -1261,38 +1129,12 @@ impl BenchApp {
                 } else if let Some(id) = subject.strip_prefix("env:") {
                     self.load_env(id, window, cx);
                 }
-                if let Some(turn) = self.turns.last_mut() {
-                    let step = turn.steps.iter_mut().rev().find(|s| match s {
-                        Step::Tool { call_id: id, .. } => call_id.is_empty() || *id == call_id,
-                        _ => false,
-                    });
-                    if let Some(Step::Tool {
-                        failed: f,
-                        output: o,
-                        ..
-                    }) = step
-                    {
-                        *f = failed;
-                        *o = output;
-                    }
-                    if let Some(edit) = edit {
-                        turn.files.push(edit);
-                        if self.project.is_none() {
-                            self.resolve_project(window, cx);
-                        }
-                    }
+                if self.project.is_none() {
+                    self.resolve_project(window, cx);
                 }
-                cx.notify();
             }
             Evt::Catalog(list) => self.catalog = list,
             Evt::Processes(sid, list) if self.is_current(&sid) => self.on_processes(list, cx),
-            Evt::Review(sid, text) if self.is_current(&sid) => {
-                if let Some(i) = self.turns.len().checked_sub(1) {
-                    self.turns[i].reviews.push(text.clone());
-                    self.remember_review(i, text);
-                }
-                self.remeasure_last(cx);
-            }
             Evt::Dispatched {
                 session,
                 output,
@@ -1313,12 +1155,16 @@ impl BenchApp {
                     }
                 }
                 None => {
+                    // A command that printed something: said as a toast, the thread is the agent's.
                     self.live = None;
-                    if let Some(turn) = self.turns.last_mut() {
-                        turn.answer = output.unwrap_or_else(|| "Done.".into());
-                        turn.finished = Some(now_secs());
+                    if let Some(out) = output.filter(|o| !o.trim().is_empty()) {
+                        self.toast(
+                            NotificationType::Info,
+                            crate::ui::clip(&out, 300),
+                            window,
+                            cx,
+                        );
                     }
-                    self.remeasure_last(cx);
                 }
             },
             Evt::Approval(req) if self.is_current(&req.session) => {
@@ -1326,7 +1172,6 @@ impl BenchApp {
                     live.label = "Waiting for your approval…".into();
                 }
                 self.approval = Some(req);
-                self.remeasure_last(cx);
             }
             Evt::ApprovalDone(sid) => {
                 if self.approval.as_ref().is_some_and(|a| a.session == sid) {
@@ -1341,14 +1186,13 @@ impl BenchApp {
                 self.clarify_picked.clear();
                 self.clarify_input
                     .update(cx, |s, cx| s.set_value("", window, cx));
-                self.remeasure_last(cx);
             }
             Evt::ClarifyDone(sid) => {
                 if self.clarify.as_ref().is_some_and(|c| c.session == sid) {
                     self.clarify = None;
                 }
             }
-            Evt::Todos(sid, todos, at) if self.is_current(&sid) => {
+            Evt::Todos(sid, todos, _at) if self.is_current(&sid) => {
                 // The plan block shows work still ahead: once no step is pending or in progress
                 // (the agent finished the plan, or dropped it as wrong), the block goes by itself
                 // — a plan that is over tells nothing the thread does not already say.
@@ -1356,74 +1200,10 @@ impl BenchApp {
                     .iter()
                     .any(|t| t.status == "pending" || t.status == "in_progress");
                 if live {
-                    // It stays where the plan began, not at the newest message: the same steps
-                    // keep the moment they were first seen with, a new plan gets a new one.
-                    self.plan_at = Some(if at > 0. {
-                        at
-                    } else if self.todos.is_empty() {
-                        now_secs()
-                    } else {
-                        self.plan_at.unwrap_or_else(now_secs)
-                    });
                     self.todos = todos;
                 } else {
                     self.todos.clear();
-                    self.plan_at = None;
                 }
-            }
-            Evt::Subagent {
-                session,
-                id,
-                kind,
-                text,
-                status,
-            } if self.is_current(&session) => {
-                if let Some(turn) = self.turns.last_mut() {
-                    let pos = turn
-                        .steps
-                        .iter()
-                        .position(|s| matches!(s, Step::Subagent { id: x, .. } if *x == id));
-                    let k = pos.unwrap_or_else(|| {
-                        turn.steps.push(Step::Subagent {
-                            id: id.clone(),
-                            goal: String::new(),
-                            status: "running".into(),
-                            lines: vec![],
-                            summary: String::new(),
-                        });
-                        turn.steps.len() - 1
-                    });
-                    if let Step::Subagent {
-                        goal,
-                        status: st,
-                        lines,
-                        summary,
-                        ..
-                    } = &mut turn.steps[k]
-                    {
-                        match kind {
-                            "start" => *goal = clip_line(&text),
-                            "tool" => lines.push(text),
-                            "text" if !text.trim().is_empty() => lines.push(clip_line(&text)),
-                            "complete" => {
-                                *st = if status.is_empty() {
-                                    "completed".into()
-                                } else {
-                                    status
-                                };
-                                *summary = text;
-                            }
-                            _ => {}
-                        }
-                        if goal.is_empty() {
-                            *goal = "task".into();
-                        }
-                    }
-                    if let Some(live) = self.live.as_mut() {
-                        live.label = "Subagent working…".into();
-                    }
-                }
-                self.remeasure_last(cx);
             }
             Evt::Usage(sid, usage) if self.is_current(&sid) => {
                 self.speed.usage(&usage);
@@ -1442,12 +1222,6 @@ impl BenchApp {
                 }
                 self.live = None;
                 self.speed.finish();
-                if let Some(turn) = self.turns.last_mut() {
-                    turn.finished = Some(now_secs());
-                    if !text.trim().is_empty() {
-                        turn.answer = text;
-                    }
-                }
                 // The answer is over: its speed is the thread's to keep (Bench measured it, the
                 // agent stores it where the thread lives).
                 let stat = self.speed.stat();
@@ -1457,7 +1231,6 @@ impl BenchApp {
                         speed: stat.to_json(),
                     });
                 }
-                self.remeasure_last(cx);
                 self.refresh_sessions();
             }
             Evt::Speed(session, stat) if self.is_current(&session) => {
@@ -1499,12 +1272,11 @@ impl BenchApp {
         self.runtime = None;
         self.inserts.remove("draft");
         self.creating = false;
-        self.queue.clear();
         self.queue_edit = None;
         // A new chat starts on the profile's level.
         self.effort_other = None;
         self.effort = self.profile_effort;
-        self.turns.clear();
+        self.thread = Default::default();
         self.history_error = None;
         self.live = None;
         self.queued = None;
@@ -1516,7 +1288,6 @@ impl BenchApp {
         self.approval = None;
         self.clarify = None;
         self.todos.clear();
-        self.plan_at = None;
         // Speeds describe the model and server, not the chat: keep them, restart the counters.
         self.speed.restart();
         self.project = None;
@@ -1525,57 +1296,9 @@ impl BenchApp {
     }
 
     fn reset_scroller(&mut self, cx: &mut Context<Self>) {
-        // A thread opens at its TOP. Following the tail from the first frame jumped the view to
-        // the room under the last line (the editor's past-end) the moment the history arrived,
-        // so a long thread opened as an empty screen. Following starts when it is asked for:
-        // sending a message, putting an insert, or the thread's own "latest" button.
-        self.follow = false;
-        self.pinned = px(0.);
-        self.rows_shift = 0.;
         self.open_steps.clear();
+        self.open_work.clear();
         self.open_source = None;
-        // The handle still carries where the thread being left was scrolled; this one starts
-        // from the top.
-        self.chat_scroll
-            .set_offset(gpui_kit::Point::new(px(0.), px(0.)));
-        cx.notify();
-    }
-
-    /// Paint a streamed frame at most about 30 times a second. Chunks arrive faster than the eye
-    /// reads, and every paint lays the whole thread out again — in a long thread that is what
-    /// costs a core. The frame that was turned down is not dropped: its timer paints the tail as
-    /// soon as the budget opens, so the newest text is never left unpainted.
-    fn remeasure_last(&mut self, cx: &mut Context<Self>) {
-        let now = stream_clock().elapsed().as_millis() as u64;
-        let (paint, wait) = stream_frame(now, self.stream_painted);
-        if paint {
-            self.stream_painted = Some(now);
-            cx.notify();
-            return;
-        }
-        if self.stream_waiting {
-            return;
-        }
-        self.stream_waiting = true;
-        self.stream_task = Some(cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(Duration::from_millis(wait))
-                .await;
-            let _ = this.update(cx, |this, cx| {
-                this.stream_waiting = false;
-                this.stream_task = None;
-                this.stream_painted = Some(stream_clock().elapsed().as_millis() as u64);
-                cx.notify();
-            });
-        }));
-    }
-
-    pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
-        // The next frame scrolls to the composer (render_chat follows the tail). The pin starts
-        // fresh, or the frame would read the far-away offset as the person's own scroll and let
-        // go of it again at once.
-        self.follow = true;
-        self.pinned = px(0.);
         cx.notify();
     }
 
@@ -1634,17 +1357,14 @@ impl BenchApp {
         self.files_remote.form = false;
         self.project_form = None;
         if let Some(prev) = self.session.clone() {
-            self.thread_cache.insert(prev, self.turns.clone());
+            self.thread_cache
+                .insert(prev, std::mem::take(&mut self.thread));
         }
         self.reset_chat(cx);
         self.session = Some(id.clone());
-        // Invisible until laid out at its bottom; a thread seen before shows its last state now.
-        self.settle = 30;
-        self.settle_stable = 0;
-        self.settle_ready = false;
-        if let Some(turns) = self.thread_cache.get(&id) {
-            self.turns = turns.clone();
-            self.settle_ready = true;
+        // A thread seen before shows its last state now, and catches up when its journal comes.
+        if let Some(t) = self.thread_cache.remove(&id) {
+            self.thread = t;
         }
         self.thread_project = self
             .sessions
@@ -1653,8 +1373,7 @@ impl BenchApp {
             .map(|s| s.project.clone())
             .unwrap_or_default();
         if self.demo {
-            self.turns = self.demo_threads.get(&id).cloned().unwrap_or_default();
-            self.settle_ready = true;
+            self.thread = self.demo_threads.get(&id).cloned().unwrap_or_default();
             self.processes = if id == "d-landing" {
                 crate::demo::processes(now_secs())
             } else {
@@ -1854,8 +1573,8 @@ impl BenchApp {
             self.note_draft(cx);
             self.attachments.clear();
             let context = self.block_context(cx);
-            // It becomes the thread's next turn: the inserts that waited with it go after it.
-            let after = self.turns.len() + 1;
+            // It becomes the thread's next message: the inserts that waited with it go after it.
+            let after = self.thread.messages() + 1;
             if files.is_empty() {
                 self.cmd(Cmd::Queue {
                     session,
@@ -1915,19 +1634,14 @@ impl BenchApp {
             .iter()
             .map(|f| format!("{}{}]", attach::PREFIX, f.display()))
             .collect();
-        self.turns.push(Turn {
-            user: with_attachments(&text, &shown),
-            started: Some(now_secs()),
-            ..Default::default()
-        });
+        self.thread.sent(with_attachments(&text, &shown));
         // Inserts put while this message was in the composer sit after it, not before.
-        let after = self.turns.len();
+        let after = self.thread.messages();
         self.anchor_draft_inserts(after, cx);
         self.follow = true;
         self.speed.begin_answer();
         self.speed.request();
         self.live = Some(Live {
-            started: Instant::now(),
             label: if files.is_empty() {
                 "Sending…"
             } else {
@@ -2042,23 +1756,19 @@ impl BenchApp {
         let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) else {
             return;
         };
-        if self.live.is_some() {
+        if self.thread.running() {
             return;
         }
-        let Some(turn) = self.turns.last_mut() else {
+        let Some(text) = self.tv.rows.iter().rev().find_map(|r| match r {
+            ::thread::Row::User { text, .. } => Some(text.clone()),
+            _ => None,
+        }) else {
             return;
         };
-        let text = turn.user.clone();
-        *turn = Turn {
-            user: text.clone(),
-            started: Some(now_secs()),
-            ..Default::default()
-        };
         self.live = Some(Live {
-            started: Instant::now(),
             label: "Regenerating…".into(),
         });
-        self.remeasure_last(cx);
+        self.follow = true;
         self.cmd(Cmd::Regenerate {
             profile,
             session,
@@ -2067,11 +1777,19 @@ impl BenchApp {
         cx.notify();
     }
 
-    pub fn copy_answer(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(t) = self.turns.get(i) {
-            cx.write_to_clipboard(ClipboardItem::new_string(t.answer.clone()));
+    /// Copy what the agent said in the row `key`.
+    pub fn copy_answer(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(text) = self.answer_text(key) {
+            cx.write_to_clipboard(ClipboardItem::new_string(text));
             self.toast(NotificationType::Success, "Copied", window, cx);
         }
+    }
+
+    fn answer_text(&self, key: &str) -> Option<String> {
+        self.tv.rows.iter().find_map(|r| match r {
+            ::thread::Row::Answer { key: k, text, .. } if k == key => Some(text.clone()),
+            _ => None,
+        })
     }
 
     /// Restart the agent on the machine we are connected to, then reconnect. Its runs are
@@ -2150,14 +1868,6 @@ impl BenchApp {
             self.cmd(Cmd::Interrupt { profile, session });
         }
         cx.notify();
-    }
-
-    pub fn toggle_turn(&mut self, i: usize, cx: &mut Context<Self>) {
-        if let Some(t) = self.turns.get_mut(i) {
-            t.expanded = !t.expanded;
-            cx.notify();
-            cx.notify();
-        }
     }
 
     // ---- background REST helpers -------------------------------------------
@@ -2293,32 +2003,6 @@ impl BenchApp {
 
     // ---- right panel: changed files, tree, viewer --------------------------
 
-    /// The moment the agent's newest background process began, in unix seconds: where its
-    /// BACKGROUND row hangs in the thread. The newest, not the first: the row follows the work
-    /// the agent is really doing, but does not slide down as new turns arrive — only when it
-    /// starts something new. None while the session has no processes at all.
-    pub fn proc_moment(&self) -> Option<f64> {
-        newest_start(&self.processes)
-    }
-
-    /// Files this session edited, in first-touch order, with their diffs in order.
-    pub fn session_files(&self) -> Vec<(String, Vec<String>)> {
-        let mut out: Vec<(String, Vec<String>)> = vec![];
-        for edit in self.turns.iter().flat_map(|t| &t.files) {
-            let slot = match out.iter_mut().position(|(p, _)| *p == edit.path) {
-                Some(i) => &mut out[i].1,
-                None => {
-                    out.push((edit.path.clone(), vec![]));
-                    &mut out.last_mut().unwrap().1
-                }
-            };
-            if let Some(d) = &edit.diff {
-                slot.push(d.clone());
-            }
-        }
-        out
-    }
-
     pub fn set_appearance(
         &mut self,
         a: crate::theme::Appearance,
@@ -2347,44 +2031,6 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// The agent sends review notes only live; keep them per chat (turn index → notes) to show again.
-    fn reviews_path(&self) -> std::path::PathBuf {
-        connection::state_dir().join("reviews.json")
-    }
-
-    fn remember_review(&self, turn: usize, text: String) {
-        let Some(session) = self.session.clone() else {
-            return;
-        };
-        let path = self.reviews_path();
-        let mut all: HashMap<String, HashMap<usize, Vec<String>>> = std::fs::read(&path)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
-        all.entry(session)
-            .or_default()
-            .entry(turn)
-            .or_default()
-            .push(text);
-        let _ = std::fs::create_dir_all(connection::state_dir());
-        let _ = std::fs::write(path, serde_json::to_vec(&all).unwrap_or_default());
-    }
-
-    fn restore_reviews(&mut self) {
-        let Some(session) = self.session.clone() else {
-            return;
-        };
-        let all: HashMap<String, HashMap<usize, Vec<String>>> = std::fs::read(self.reviews_path())
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
-        for (i, notes) in all.get(&session).cloned().unwrap_or_default() {
-            if let Some(t) = self.turns.get_mut(i) {
-                t.reviews = notes;
-            }
-        }
-    }
-
     /// Where this target was last: (profile, open session).
     fn last_place(&self) -> (Option<String>, Option<String>) {
         let all: HashMap<String, (Option<String>, Option<String>)> =
@@ -2411,21 +2057,6 @@ impl BenchApp {
         );
         let _ = std::fs::create_dir_all(connection::state_dir());
         let _ = std::fs::write(path, serde_json::to_vec(&all).unwrap_or_default());
-    }
-
-    pub fn toggle_step(&mut self, turn: usize, step: usize, cx: &mut Context<Self>) {
-        if !self.open_steps.remove(&(turn, step)) {
-            self.open_steps.insert((turn, step));
-        }
-        cx.notify();
-    }
-
-    pub fn toggle_source(&mut self, turn: usize, host: String, cx: &mut Context<Self>) {
-        self.open_source = match &self.open_source {
-            Some((t, h)) if *t == turn && *h == host => None,
-            _ => Some((turn, host)),
-        };
-        cx.notify();
     }
 
     // ---- panels ----------------------------------------------------------
@@ -2527,18 +2158,19 @@ impl BenchApp {
         cx.notify();
     }
 
-    pub fn toggle_speak(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if self.playing.as_ref().is_some_and(|(j, _)| *j == i) {
+    pub fn toggle_speak(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if self.playing.as_ref().is_some_and(|(j, _)| j == key) {
             self.playing = None;
             cx.notify();
             return;
         }
         self.playing = None;
         self.media_playing = None;
-        let Some(text) = self.turns.get(i).map(|t| t.answer.clone()) else {
+        let Some(text) = self.answer_text(key) else {
             return;
         };
-        self.speaking = Some(i);
+        let key = key.to_string();
+        self.speaking = Some(key.clone());
         self.rest(
             window,
             cx,
@@ -2546,7 +2178,7 @@ impl BenchApp {
             move |this, r, window, cx| {
                 this.speaking = None;
                 match r {
-                    Ok(bytes) => this.playing = Some((i, Playback::start(bytes))),
+                    Ok(bytes) => this.playing = Some((key, Playback::start(bytes))),
                     Err(e) => this.toast(
                         NotificationType::Error,
                         format!("Text-to-speech: {e:#}"),
@@ -2565,17 +2197,6 @@ pub fn now_secs() -> f64 {
         .duration_since(web_time::UNIX_EPOCH)
         .map(|d| d.as_secs_f64())
         .unwrap_or_default()
-}
-
-pub fn last_line(text: &str) -> String {
-    text.lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-        .last()
-        .unwrap_or_default()
-        .chars()
-        .take(160)
-        .collect()
 }
 
 /// The message's text with the files' `[attached: …]` lines under it.
@@ -2685,86 +2306,6 @@ fn save_drafts(drafts: &std::collections::HashMap<String, String>) {
         drafts_path(),
         serde_json::to_vec(drafts).unwrap_or_default(),
     );
-}
-
-/// The newest start among the session's background processes (see `BenchApp::proc_moment`).
-fn newest_start(ps: &[crate::model::BgProcess]) -> Option<f64> {
-    ps.iter()
-        .filter_map(|p| p.started)
-        .fold(None, |a: Option<f64>, t| Some(a.map_or(t, |x| x.max(t))))
-}
-
-#[cfg(test)]
-mod proc_moment_tests {
-    use super::newest_start;
-    use crate::model::BgProcess;
-
-    fn proc(started: Option<f64>) -> BgProcess {
-        BgProcess {
-            id: "p".into(),
-            command: "cargo build".into(),
-            running: started.is_some(),
-            exit_code: None,
-            started,
-            exited: None,
-            reason: None,
-            tail: String::new(),
-        }
-    }
-
-    #[test]
-    fn the_row_follows_the_newest_process() {
-        assert_eq!(newest_start(&[]), None, "no processes: no row");
-        assert_eq!(
-            newest_start(&[proc(None)]),
-            None,
-            "a start the agent never gave"
-        );
-        assert_eq!(
-            newest_start(&[proc(Some(100.)), proc(Some(300.))]),
-            Some(300.)
-        );
-        assert_eq!(
-            newest_start(&[proc(Some(300.)), proc(Some(100.))]),
-            Some(300.),
-            "the order the agent lists them in means nothing"
-        );
-    }
-}
-
-/// The clock streamed frames are measured against (it starts with the app).
-fn stream_clock() -> &'static std::time::Instant {
-    static ZERO: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    ZERO.get_or_init(std::time::Instant::now)
-}
-
-/// A streamed frame is due after this many milliseconds.
-const STREAM_FRAME_MS: u64 = 33;
-
-/// Whether a streamed frame is due to paint now, and how long to wait when it is not. Pure, so
-/// the pace is checked without a window.
-pub fn stream_frame(now: u64, last: Option<u64>) -> (bool, u64) {
-    match last {
-        Some(t) if now.saturating_sub(t) < STREAM_FRAME_MS => {
-            (false, STREAM_FRAME_MS - now.saturating_sub(t))
-        }
-        _ => (true, 0),
-    }
-}
-
-#[cfg(test)]
-mod stream_tests {
-    #[test]
-    fn streamed_frames_are_painted_about_thirty_times_a_second() {
-        // The first chunk paints at once.
-        assert_eq!(super::stream_frame(100, None), (true, 0));
-        // Chunks arriving faster than the budget do not each cost a paint; the wait left over is
-        // when the tail gets painted instead.
-        assert_eq!(super::stream_frame(110, Some(100)), (false, 23));
-        assert_eq!(super::stream_frame(133, Some(100)), (true, 0));
-        // The timer paints and the next chunk paints again right after it.
-        assert_eq!(super::stream_frame(140, Some(133)), (false, 26));
-    }
 }
 
 #[cfg(test)]

@@ -7,13 +7,21 @@
 import { InboxDoc } from "@earendil-works/pi-durable";
 import { Inserts } from "./inserts.ts";
 
+/** A tool call in one line: what it acts on (a command, a path, a query…). */
+export function preview(name: string, args: any): string {
+	if (!args || typeof args !== "object") return "";
+	const pick = args.command ?? args.path ?? args.query ?? args.url ?? args.urls?.[0] ?? args.name ?? args.goal ?? args.pattern ?? args.action;
+	const text = typeof pick === "string" ? pick : JSON.stringify(args);
+	return text.length > 160 ? text.slice(0, 157) + "..." : text;
+}
+
 /** One thing the thread shows. `key` is unique and stable; `seq` is the entry id it came from. */
 export type ThreadItem =
 	| { key: string; seq: number; kind: "user"; text: string; at?: number }
 	| { key: string; seq: number; kind: "thought"; text: string; at?: number }
 	| { key: string; seq: number; kind: "text"; text: string; at?: number; error?: string }
-	| { key: string; seq: number; kind: "tool"; call_id: string; name: string; args: unknown; at?: number }
-	| { key: string; seq: number; kind: "result"; call_id: string; name: string; output: string; failed: boolean; at?: number }
+	| { key: string; seq: number; kind: "tool"; call_id: string; name: string; args: unknown; preview: string; at?: number }
+	| { key: string; seq: number; kind: "result"; call_id: string; name: string; output: string; failed: boolean; diff?: string; at?: number }
 	| { key: string; seq: number; kind: "insert"; id: string; insert_key: string }
 	| { key: string; seq: number; kind: "fail"; text: string };
 
@@ -74,11 +82,13 @@ export function itemsOf(entry: any): ThreadItem[] {
 			for (const b of m.content ?? []) {
 				if (b.type === "thinking" && b.thinking?.trim()) out.push({ key: key(), seq, kind: "thought", text: b.thinking, at });
 				else if (b.type === "text" && b.text?.trim()) out.push({ key: key(), seq, kind: "text", text: b.text, at });
-				else if (b.type === "toolCall") out.push({ key: key(), seq, kind: "tool", call_id: String(b.id), name: String(b.name), args: b.arguments ?? {}, at });
+				else if (b.type === "toolCall") out.push({ key: key(), seq, kind: "tool", call_id: String(b.id), name: String(b.name), args: b.arguments ?? {}, preview: preview(String(b.name), b.arguments), at });
 			}
 			if (m.stopReason === "error") out.push({ key: key(), seq, kind: "text", text: "", at, error: String(m.errorMessage ?? "the model stopped with an error") });
 		} else if (m.role === "toolResult") {
-			out.push({ key: key(), seq, kind: "result", call_id: String(m.toolCallId), name: String(m.toolName), output: textOf(m.content), failed: !!m.isError, at });
+			// An edit's unified patch, as Pi's edit tool reports it in its details.
+			const patch = (entry.data as any)?.details?.patch ?? m.details?.patch;
+			out.push({ key: key(), seq, kind: "result", call_id: String(m.toolCallId), name: String(m.toolName), output: textOf(m.content), failed: !!m.isError, ...(typeof patch === "string" ? { diff: patch } : {}), at });
 		}
 	}
 	return out;

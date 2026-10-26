@@ -11,7 +11,10 @@
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::model::{BgProcess, FileEdit, Place, Profile, SessionRow, Step, Target, Turn, Usage};
+use crate::model::{BgProcess, Place, Profile, SessionRow, Target, Usage};
+use ::thread::Thread;
+use protocol::{ThreadItem, ThreadOpen};
+use serde_json::{Value, json};
 
 fn demo_file(name: &str) -> String {
     format!("{}/assets/demo/{name}", env!("CARGO_MANIFEST_DIR"))
@@ -30,14 +33,118 @@ fn session(id: &str, title: &str, messages: u64, running: bool, source: &str) ->
     }
 }
 
-fn tool(name: &str, detail: &str) -> Step {
-    Step::Tool {
-        name: name.into(),
-        detail: detail.into(),
-        failed: false,
-        call_id: String::new(),
-        args: String::new(),
-        output: String::new(),
+/// A made-up step of the agent's work: a tool, what it acted on, its arguments, an edit's diff.
+#[derive(Clone)]
+struct Call {
+    name: &'static str,
+    preview: String,
+    args: Value,
+    diff: Option<String>,
+}
+
+fn tool(name: &'static str, detail: &str) -> Call {
+    let args = match name {
+        "edit" | "read" | "write" => json!({ "path": detail }),
+        "web_fetch" | "browser_navigate" => json!({ "url": detail }),
+        _ => json!({ "command": detail }),
+    };
+    Call {
+        name,
+        preview: detail.into(),
+        args,
+        diff: None,
+    }
+}
+
+fn edit(path: &str, diff: &str) -> Call {
+    Call {
+        diff: Some(diff.into()),
+        ..tool("edit", path)
+    }
+}
+
+/// A made-up journal, entry ids in order as Pi gives them; times in Unix milliseconds.
+#[derive(Default)]
+struct Journal {
+    items: Vec<ThreadItem>,
+    seq: u64,
+}
+
+impl Journal {
+    fn next(&mut self) -> u64 {
+        self.seq += 1;
+        self.seq
+    }
+
+    /// One exchange: the person's words, the work, the answer, `secs` after `at` (seconds).
+    fn turn(
+        &mut self,
+        user: &str,
+        thought: Option<&str>,
+        calls: Vec<Call>,
+        answer: &str,
+        at: f64,
+        secs: f64,
+    ) {
+        let ms = |t: f64| Some(t * 1000.);
+        let seq = self.next();
+        self.items.push(ThreadItem::User {
+            key: format!("{seq}.0"),
+            seq,
+            text: user.into(),
+            at: ms(at),
+        });
+        let n = calls.len().max(1) as f64;
+        for (k, c) in calls.into_iter().enumerate() {
+            let t = at + secs * (k as f64 + 1.) / (n + 1.);
+            let seq = self.next();
+            if k == 0 {
+                if let Some(th) = thought {
+                    self.items.push(ThreadItem::Thought {
+                        key: format!("{seq}.0"),
+                        seq,
+                        text: th.into(),
+                        at: ms(t),
+                    });
+                }
+            }
+            let call_id = format!("c{seq}");
+            self.items.push(ThreadItem::Tool {
+                key: format!("{seq}.1"),
+                seq,
+                call_id: call_id.clone(),
+                name: c.name.into(),
+                args: c.args,
+                preview: c.preview,
+                at: ms(t),
+            });
+            let seq = self.next();
+            self.items.push(ThreadItem::Result {
+                key: format!("{seq}.0"),
+                seq,
+                call_id,
+                name: c.name.into(),
+                output: "ok".into(),
+                failed: false,
+                diff: c.diff,
+                at: ms(t + 1.),
+            });
+        }
+        let seq = self.next();
+        self.items.push(ThreadItem::Text {
+            key: format!("{seq}.0"),
+            seq,
+            text: answer.into(),
+            at: ms(at + secs),
+            error: None,
+        });
+    }
+
+    fn thread(self) -> Thread {
+        Thread::open(ThreadOpen {
+            items: self.items,
+            ..Default::default()
+        })
     }
 }
 
@@ -181,7 +288,7 @@ deploy@{alias}:~$ "
 }
 
 /// A thread about something (`tasks:today`, `ssh:web-1`…): one turn, done.
-fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, turn: Turn) {
+fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {
     let mut row = session(id, title, 2, false, "desktop");
     // An environment is the thread's top; a tool, an insert before the first message.
     if subject.starts_with("env:") {
@@ -204,7 +311,7 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, turn: Turn) 
         app.inserts.insert(
             id.into(),
             vec![crate::model::Insert {
-                id: format!("i-{id}"),
+                id: format!("i{id}"),
                 key,
                 state,
                 folded: false,
@@ -213,7 +320,29 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, turn: Turn) 
         );
     }
     app.sessions.push(row);
-    app.demo_threads.insert(id.into(), vec![turn]);
+    // The insert the thread is about stands first, before the first message.
+    let mut items = vec![];
+    if app.inserts.contains_key(id) {
+        items.push(ThreadItem::Insert {
+            key: "0".into(),
+            seq: 0,
+            id: format!("i{id}"),
+            insert_key: String::new(),
+        });
+    }
+    let mut t = journal.thread();
+    let inserts = app.inserts.get(id).map(|list| {
+        list.iter()
+            .map(|i| (i.id.clone(), json!({ "key": i.key })))
+            .collect::<serde_json::Map<_, _>>()
+    });
+    if !items.is_empty() {
+        t.apply(protocol::ThreadEvent::Append(items));
+    }
+    if let Some(m) = inserts {
+        t.apply(protocol::ThreadEvent::Inserts(m));
+    }
+    app.demo_threads.insert(id.into(), t);
 }
 
 /// The blog project's environment, for its environment thread.
@@ -263,13 +392,10 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
 
 /// One thread per subject, so every sidebar group opens to something.
 fn subject_threads(app: &mut BenchApp, now: f64) {
-    let done = |user: &str, steps: Vec<Step>, answer: &str, secs: f64| Turn {
-        user: user.into(),
-        steps,
-        answer: answer.into(),
-        started: Some(now - 600.0),
-        finished: Some(now - 600.0 + secs),
-        ..Default::default()
+    let done = |user: &str, calls: Vec<Call>, answer: &str, secs: f64| {
+        let mut j = Journal::default();
+        j.turn(user, None, calls, answer, now - 600.0, secs);
+        j
     };
     thread(
         app,
@@ -496,7 +622,7 @@ pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
     }
 
     let (chart, flow, clips) = media();
-    let top = std::env::var("BENCH_DEMO").as_deref() != Ok("landing");
+
     let answer = format!(
         "The new landing page is **live**, and the numbers so far look good.\n\n\
 ## What changed\n\n\
@@ -512,66 +638,43 @@ To run it locally:\n\n\
 ```bash\nnpm install\nnpm run dev -- --port 5173\n```\n\n\
 {clips}"
     );
-    app.turns = vec![Turn {
-        user: "Ship the spring landing page we discussed: shorter hero, quotes first, two \
-fewer form fields. Then check what it did to signups and give me a short summary."
-            .into(),
-        steps: vec![
-            Step::Thought("Plan: edit the page, run the dev server, compare signups.".into()),
-            tool("read", "src/pages/landing.tsx"),
-            tool("edit", "src/pages/landing.tsx"),
-            tool("edit", "src/components/SignupForm.tsx"),
+    let mut journal = Journal::default();
+    journal.turn(
+        "Ship the spring landing page we discussed: shorter hero, quotes first, two \
+fewer form fields. Then check what it did to signups and give me a short summary.",
+        Some("Plan: edit the page, run the dev server, compare signups."),
+        vec![
+            tool("read", "/Users/demo/code/storefront/src/pages/landing.tsx"),
+            edit(
+                "/Users/demo/code/storefront/src/pages/landing.tsx",
+                "@@ -12,9 +12,7 @@\n-  <Hero title={long} subtitle={sub} />\n+  <Hero title=\"Ship faster\" />\n+  <Quotes />\n   <Features />\n-  <Quotes />\n",
+            ),
+            edit(
+                "/Users/demo/code/storefront/src/components/SignupForm.tsx",
+                "@@ -30,6 +30,4 @@\n-  <Field name=\"companySize\" />\n-  <Field name=\"phone\" />\n",
+            ),
             tool("bash", "npm run dev -- --port 5173"),
-            tool("browser_navigate", "http://localhost:5173"),
-            Step::Subagent {
-                id: "sub-1".into(),
-                goal: "Pull six weeks of signups from analytics".into(),
-                status: "completed".into(),
-                lines: vec!["web_search  analytics export API".into(), "bash  export.csv".into()],
-                summary: "6 weeks exported".into(),
-            },
+            tool("web_fetch", "https://www.nngroup.com/articles/landing-page-guidelines/"),
+            tool("web_fetch", "https://developer.mozilla.org/en-US/docs/Web/Performance"),
             tool("execute_code", "chart of weekly signups"),
             tool("text_to_speech", "summary.m4a"),
         ],
-        answer,
-        files: vec![
-            FileEdit {
-                path: "/Users/demo/code/storefront/src/pages/landing.tsx".into(),
-                diff: Some(
-                    "@@ -12,9 +12,7 @@\n-  <Hero title={long} subtitle={sub} />\n+  <Hero title=\"Ship faster\" />\n+  <Quotes />\n   <Features />\n-  <Quotes />\n".into(),
-                ),
-            },
-            FileEdit {
-                path: "/Users/demo/code/storefront/src/components/SignupForm.tsx".into(),
-                diff: Some("@@ -30,6 +30,4 @@\n-  <Field name=\"companySize\" />\n-  <Field name=\"phone\" />\n".into()),
-            },
-        ],
-        sources: vec![
-            "https://www.nngroup.com/articles/landing-page-guidelines/".into(),
-            "https://developer.mozilla.org/en-US/docs/Web/Performance".into(),
-        ],
-        started: Some(now - 312.0),
-        finished: Some(now - 60.0),
-        expanded: std::env::var("BENCH_DEMO").as_deref() == Ok("top"),
-        ..Default::default()
-    }];
-    // The beginning of the answer: once the first frames have laid the chat out (and media
-    // loading has pulled it to the bottom), scroll back to the top and stop following the tail.
-    if top {
-        cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(std::time::Duration::from_millis(1500))
-                .await;
-            let _ = this.update(cx, |this, cx| {
-                this.follow = false;
-                this.chat_scroll.scroll_to_top_of_item(0);
-                cx.notify();
-            });
-        })
-        .detach();
+        &answer,
+        now - 312.0,
+        252.0,
+    );
+    let landing = journal.thread();
+    if std::env::var("BENCH_DEMO").as_deref() == Ok("top") {
+        if let Some(::thread::Row::Work { key, .. }) = landing
+            .rows()
+            .into_iter()
+            .find(|r| matches!(r, ::thread::Row::Work { .. }))
+        {
+            app.open_work.insert(key);
+        }
     }
-    app.demo_threads
-        .insert("d-landing".into(), app.turns.clone());
+    app.thread = landing.clone();
+    app.demo_threads.insert("d-landing".into(), landing);
     app.session = Some("d-landing".into());
     other_modes(app);
     subject_threads(app, now);
@@ -612,7 +715,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
     };
     if let Some(id) = open {
         app.session = Some(id.into());
-        app.turns = app.demo_threads.get(id).cloned().unwrap_or_default();
+        app.thread = app.demo_threads.get(id).cloned().unwrap_or_default();
     }
     app.processes = processes(now);
     if open.is_some() {

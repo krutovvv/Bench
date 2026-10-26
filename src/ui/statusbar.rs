@@ -11,7 +11,7 @@ use gpui_kit::*;
 use super::compact;
 use crate::app::{BenchApp, Panel};
 use crate::icons::Ico;
-use crate::model::Step;
+use ::thread::{Row, Step};
 
 impl BenchApp {
     pub(super) fn render_statusbar(
@@ -109,7 +109,7 @@ impl BenchApp {
             0.
         };
         let stats = self.session_stats(used, max, estimated);
-        let context = (max > 0 && (self.session.is_some() || !self.turns.is_empty())).then(|| {
+        let context = (max > 0 && (self.session.is_some() || !self.thread.is_empty())).then(|| {
             let color = if percent > 85. {
                 theme.danger
             } else if percent > 60. {
@@ -372,19 +372,21 @@ impl BenchApp {
     /// Rough tokens of the open chat: its text at ~3.5 characters a token.
     fn estimate_tokens(&self) -> u64 {
         let chars: usize = self
-            .turns
+            .tv
+            .rows
             .iter()
-            .map(|t| {
-                t.user.len()
-                    + t.answer.len()
-                    + t.steps
-                        .iter()
-                        .map(|s| match s {
-                            Step::Tool { args, output, .. } => args.len() + output.len(),
-                            Step::Note(x) | Step::Thought(x) => x.len(),
-                            Step::Subagent { summary, .. } => summary.len(),
-                        })
-                        .sum::<usize>()
+            .map(|r| match r {
+                Row::User { text, .. } | Row::Answer { text, .. } => text.len(),
+                Row::Work { steps, .. } => steps
+                    .iter()
+                    .map(|s| match s {
+                        Step::Tool { args, output, .. } => {
+                            args.to_string().len() + output.as_ref().map_or(0, String::len)
+                        }
+                        Step::Note(x) | Step::Thought(x) => x.len(),
+                    })
+                    .sum(),
+                _ => 0,
             })
             .sum();
         (chars as f64 / 3.5) as u64
@@ -414,29 +416,24 @@ impl BenchApp {
         if max > 0 {
             rows.push(("Left".into(), compact(max.saturating_sub(used))));
         }
-        rows.push(("Turns".into(), self.turns.len().to_string()));
+        let messages = self
+            .tv
+            .rows
+            .iter()
+            .filter(|r| matches!(r, Row::User { .. }))
+            .count();
+        rows.push(("Messages".into(), messages.to_string()));
         let tools = self
-            .turns
+            .tv
+            .rows
             .iter()
-            .flat_map(|t| &t.steps)
-            .filter(|s| matches!(s, Step::Tool { .. }))
-            .count();
+            .filter_map(|r| match r {
+                Row::Work { steps, .. } => Some(steps.iter().filter(|s| s.is_tool()).count()),
+                _ => None,
+            })
+            .sum::<usize>();
         rows.push(("Tool calls".into(), tools.to_string()));
-        let subagents = self
-            .turns
-            .iter()
-            .flat_map(|t| &t.steps)
-            .filter(|s| matches!(s, Step::Subagent { .. }))
-            .count();
-        if subagents > 0 {
-            rows.push(("Subagents".into(), subagents.to_string()));
-        }
-        let files: std::collections::HashSet<&str> = self
-            .turns
-            .iter()
-            .flat_map(|t| &t.files)
-            .map(|f| f.path.as_str())
-            .collect();
+        let files = self.session_files();
         if !files.is_empty() {
             rows.push(("Files changed".into(), files.len().to_string()));
         }
