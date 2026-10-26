@@ -63,6 +63,7 @@ icons! {
     Image => "image",
     Music => "music",
     Folder => "folder",
+    FolderOpen => "folder-open",
     FileArchive => "file-archive",
     FileAudio => "file-audio",
     FileCode => "file-code",

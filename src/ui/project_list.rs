@@ -255,18 +255,21 @@ impl BenchApp {
                     }
                 }))
             };
-        // A row: its name, a one-line note; lit when its card is open.
-        let row = |kind: &'static str,
-                   name: String,
-                   label: String,
-                   note: String,
-                   bad: bool,
-                   first: bool,
-                   cx: &mut Context<Self>| {
+        // A row: its name, a one-line note, its actions on hover; lit when its card is open.
+        let row_with = |kind: &'static str,
+                        name: String,
+                        label: String,
+                        note: String,
+                        bad: bool,
+                        first: bool,
+                        actions: Vec<AnyElement>,
+                        cx: &mut Context<Self>| {
             let note = note.split_whitespace().collect::<Vec<_>>().join(" ");
             let on = card.as_ref().is_some_and(|(k, n)| *k == kind && *n == name);
+            let group = SharedString::from(format!("env-g-{kind}-{name}"));
             h_flex()
                 .id(SharedString::from(format!("env-{kind}-{name}")))
+                .group(group.clone())
                 .px_3()
                 .py_1p5()
                 .gap_2()
@@ -285,11 +288,27 @@ impl BenchApp {
                         .text_color(if bad { theme.danger } else { muted })
                         .child(note),
                 )
+                .children(actions.into_iter().map(|a| {
+                    div()
+                        .flex_none()
+                        .opacity(0.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .child(a)
+                }))
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
                     this.env_card(kind, name.clone(), window, cx)
                 }))
                 .into_any_element()
+        };
+        let row = |kind: &'static str,
+                   name: String,
+                   label: String,
+                   note: String,
+                   bad: bool,
+                   first: bool,
+                   cx: &mut Context<Self>| {
+            row_with(kind, name, label, note, bad, first, vec![], cx)
         };
         let empty = |text: &'static str| {
             div()
@@ -472,13 +491,66 @@ impl BenchApp {
         let extra = add("env-mcp-add", "mcp", "", cx).into_any_element();
         blocks.push(("MCP servers", section("MCP servers", Some(extra), rows, cx)));
 
-        // Skills.
+        // Skills: every one its threads can use, by where it lives; Finder on a row's hover.
         let mut rows = vec![];
         if e.skills.is_empty() {
-            rows.push(empty("None of its own: the general ones work here too."));
+            rows.push(empty("No skills yet: + Add writes one for this project."));
         }
-        for (k, (name, desc)) in e.skills.clone().into_iter().enumerate() {
-            rows.push(row("skill", name.clone(), name, desc, false, k == 0, cx));
+        let groups: [(&str, &str); 3] = [
+            ("project", "This project"),
+            ("repo", "Its folder · .agents/skills"),
+            ("general", if general { "This Mac" } else { "General" }),
+        ];
+        for (scope, label) in groups {
+            let skills: Vec<_> = e
+                .skills
+                .iter()
+                .filter(|k| k.scope == scope)
+                .cloned()
+                .collect();
+            if skills.is_empty() {
+                continue;
+            }
+            rows.push(
+                div()
+                    .px_3()
+                    .pt_2()
+                    .pb_1()
+                    .when(!rows.is_empty(), |d| {
+                        d.border_t_1().border_color(theme.border.opacity(0.5))
+                    })
+                    .text_xs()
+                    .text_color(muted)
+                    .child(label)
+                    .into_any_element(),
+            );
+            for k in skills {
+                let finder = (!remote).then(|| {
+                    let dir = k.dir.clone();
+                    super::inserts::icon_button(
+                        &format!("env-skill-finder-{}", k.name),
+                        crate::icons::Ico::FolderOpen,
+                        "Show in Finder",
+                        &theme,
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        cx.stop_propagation();
+                        this.reveal_in_finder(&dir, window, cx)
+                    }))
+                    .into_any_element()
+                });
+                rows.push(row_with(
+                    "skill",
+                    k.name.clone(),
+                    k.name,
+                    k.description,
+                    false,
+                    false,
+                    finder.into_iter().collect(),
+                    cx,
+                ));
+            }
         }
         let extra = add("env-skill-add", "skill", "", cx).into_any_element();
         blocks.push(("Skills", section("Skills", Some(extra), rows, cx)));
@@ -662,25 +734,10 @@ impl BenchApp {
                 }))
                 .into_any_element()
             };
-        // A text: a code editor as tall as its wrapped text (the thread scrolls, not it).
-        let code = |state: &Entity<gpui_kit::component::input::EditorState>, cx: &App| {
-            let text = state.read(cx).value().to_string();
-            let lines: usize = text
-                .lines()
-                .map(|l| l.chars().count() / 100 + 1)
-                .sum::<usize>()
-                .max(1);
-            div()
-                .h(px(super::editor_height(lines, cx)))
-                .child(
-                    gpui_kit::component::input::Editor::new(state)
-                        .appearance(false)
-                        .h_full(),
-                )
-                .into_any_element()
-        };
         let pad = |d: Div| d.px_3().py_2().gap_2().into_any_element();
         let mut actions: Vec<AnyElement> = vec![];
+        // Cards that follow this one (a skill's open file).
+        let mut follow: Vec<AnyElement> = vec![];
         let (title, body): (String, AnyElement) = match kind {
             "name" => {
                 actions.push(save("name", e.name_dirty, cx));
@@ -777,14 +834,60 @@ impl BenchApp {
                 actions.push(remove("mcp", name.clone(), "Remove", cx));
                 (format!("MCP server · {name}"), code(&e.mcp_json, cx))
             }
+            // A skill is a folder: its tree here, a new file's or folder's name and the open
+            // file as the next cards.
             "skill" => {
-                if !e.skills.iter().any(|k| k.0 == name) {
-                    return None;
+                let k = e.skills.iter().find(|k| k.name == name)?.clone();
+                let general = e.id == "general";
+                let remote = self
+                    .projects
+                    .iter()
+                    .any(|p| p.id == e.id && p.host.is_some());
+                let folder = e.skill_folder.clone();
+                for (what, ico, tip) in [
+                    ("file", crate::icons::Ico::FilePlus, "New file"),
+                    ("folder", crate::icons::Ico::FolderPlus, "New folder"),
+                ] {
+                    let folder = folder.clone();
+                    actions.push(
+                        super::inserts::icon_button(
+                            &format!("env-skill-new-{what}"),
+                            ico,
+                            tip,
+                            &theme,
+                        )
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            this.skill_form(what, folder.clone(), window, cx)
+                        }))
+                        .into_any_element(),
+                    );
                 }
-                actions.push(save("skill", e.skill_dirty, cx));
-                actions.extend(revert("skill", e.skill_dirty, cx));
-                actions.push(remove("skill", name.clone(), "Remove", cx));
-                (format!("Skill · {name}"), code(&e.skill_text, cx))
+                if !remote {
+                    let dir = k.dir.clone();
+                    actions.push(
+                        super::inserts::icon_button(
+                            "env-skill-finder",
+                            crate::icons::Ico::FolderOpen,
+                            "Show in Finder",
+                            &theme,
+                        )
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            this.reveal_in_finder(&dir, window, cx)
+                        }))
+                        .into_any_element(),
+                    );
+                }
+                // Only a skill of this environment's own goes as a whole; the folder's and the
+                // general ones are removed where they live.
+                if k.scope == "project" || (general && k.scope == "general") {
+                    actions.push(remove("skill", name.clone(), "Remove", cx));
+                }
+                let (tree, form, file) = self.skill_parts(&k, cx);
+                follow.extend(form);
+                follow.extend(file);
+                (format!("Skill · {name}"), tree)
             }
             "prompt" => {
                 if !e.prompts.contains(&name) {
@@ -1000,8 +1103,280 @@ impl BenchApp {
             )
             .children(actions)
             .child(close);
-        Some(super::inserts::card(head, body, &theme))
+        let card = super::inserts::card(head, body, &theme);
+        if follow.is_empty() {
+            return Some(card);
+        }
+        Some(
+            v_flex()
+                .w_full()
+                .gap_4()
+                .child(card)
+                .children(follow)
+                .into_any_element(),
+        )
     }
+
+    /// The open skill's tree (folders open in place, a file opens under it; a row's rename and
+    /// trash on hover), the field naming a new file or folder, and the open file's card.
+    fn skill_parts(
+        &self,
+        k: &crate::app::project_env::SkillInfo,
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, Option<AnyElement>, Option<AnyElement>) {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let Some(e) = self.project_env.as_ref() else {
+            return (div().into_any_element(), None, None);
+        };
+        let shown = |rel: &str| {
+            let mut up = rel;
+            while let Some((p, _)) = up.rsplit_once('/') {
+                if !e.skill_expanded.contains(p) {
+                    return false;
+                }
+                up = p;
+            }
+            true
+        };
+        let mut rows: Vec<AnyElement> = vec![
+            div()
+                .px_3()
+                .py_1()
+                .min_w_0()
+                .truncate()
+                .text_sm()
+                .text_color(muted)
+                .child(k.dir.clone())
+                .into_any_element(),
+        ];
+        for (n, (rel, dir)) in e.skill_tree.iter().filter(|(r, _)| shown(r)).enumerate() {
+            let (rel, dir) = (rel.clone(), *dir);
+            let depth = rel.matches('/').count();
+            let name = rel.rsplit('/').next().unwrap_or_default().to_string();
+            let open = e.skill_expanded.contains(&rel);
+            let chosen = !dir && e.skill_file.as_deref() == Some(rel.as_str());
+            let group = SharedString::from(format!("env-skill-g{n}"));
+            let armed = e.armed.as_deref() == Some(format!("skillfile:{rel}").as_str());
+            let (ico, color) = super::file_icon(&name, dir, &theme);
+            let chevron = if open {
+                crate::icons::Ico::ChevronDown
+            } else {
+                crate::icons::Ico::ChevronRight
+            };
+            let (r1, r2) = (rel.clone(), rel.clone());
+            let rename = super::inserts::icon_button(
+                &format!("env-skill-mv{n}"),
+                crate::icons::Ico::Pencil,
+                "Rename",
+                &theme,
+            )
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.click_claimed = true;
+                cx.stop_propagation();
+                this.skill_form("rename", r1.clone(), window, cx)
+            }));
+            let trash = div()
+                .id(SharedString::from(format!("env-skill-rm{n}")))
+                .flex_none()
+                .px_1()
+                .cursor_pointer()
+                .text_sm()
+                .when(!armed, |d| {
+                    d.text_color(muted)
+                        .hover(|s| s.text_color(theme.danger))
+                        .child(crate::icons::Ico::Trash.icon().small())
+                })
+                .when(armed, |d| d.text_color(theme.danger).child("Delete?"))
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    cx.stop_propagation();
+                    this.skill_delete(r2.clone(), window, cx)
+                }));
+            rows.push(
+                h_flex()
+                    .id(SharedString::from(format!("env-skill-row{n}")))
+                    .group(group.clone())
+                    .pl(px(12. + 16. * depth as f32))
+                    .pr_3()
+                    .py_1()
+                    .gap_2()
+                    .items_center()
+                    .cursor_pointer()
+                    .border_t_1()
+                    .border_color(theme.border.opacity(0.5))
+                    .when(chosen, |d| d.bg(theme.list_active))
+                    .hover(|s| s.bg(theme.list_hover))
+                    .child(
+                        div()
+                            .w(px(12.))
+                            .flex_none()
+                            .text_color(muted)
+                            .when(dir, |d| d.child(chevron.icon().xsmall())),
+                    )
+                    .child(ico.icon().small().text_color(color))
+                    .child(div().flex_1().min_w_0().truncate().child(name))
+                    .child(
+                        h_flex()
+                            .flex_none()
+                            .when(!armed, |d| {
+                                d.opacity(0.).group_hover(group, |s| s.opacity(1.))
+                            })
+                            .child(rename)
+                            .child(trash),
+                    )
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.skill_entry(rel.clone(), dir, window, cx)
+                    }))
+                    .into_any_element(),
+            );
+        }
+        if e.skill_tree.is_empty() {
+            rows.push(
+                div()
+                    .px_3()
+                    .py_1()
+                    .border_t_1()
+                    .border_color(theme.border.opacity(0.5))
+                    .text_color(muted)
+                    .child("Reading the folder…")
+                    .into_any_element(),
+            );
+        }
+        let tree = v_flex().w_full().children(rows).into_any_element();
+
+        let form = e.skill_form.as_ref().map(|(what, target)| {
+            let title = match *what {
+                "file" => "New file",
+                "folder" => "New folder",
+                _ => "Rename",
+            };
+            let place = if *what == "rename" {
+                target.clone()
+            } else if target.is_empty() {
+                format!("In {}", k.name)
+            } else {
+                format!("In {}/{target}", k.name)
+            };
+            let actions = vec![
+                super::form_action(
+                    "env-skill-form-ok",
+                    if *what == "rename" {
+                        "Rename"
+                    } else {
+                        "Create"
+                    },
+                    true,
+                    cx,
+                )
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.click_claimed = true;
+                    this.skill_form_done(window, cx)
+                }))
+                .into_any_element(),
+                super::form_action("env-skill-form-cancel", "Cancel", false, cx)
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.click_claimed = true;
+                        if let Some(e) = this.project_env.as_mut() {
+                            e.skill_form = None;
+                        }
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            ];
+            super::inline_form(
+                title,
+                vec![(
+                    "Name",
+                    gpui_kit::component::input::Input::new(&e.skill_form_name).into_any_element(),
+                )],
+                Some(place.into()),
+                actions,
+                cx,
+            )
+        });
+
+        let file = e.skill_file.clone().map(|rel| {
+            let dirty = e.skill_dirty;
+            let save = div()
+                .id("env-skill-file-save")
+                .flex_none()
+                .px_2()
+                .rounded_md()
+                .when(dirty, |d| {
+                    d.cursor_pointer()
+                        .bg(theme.primary)
+                        .text_color(theme.primary_foreground)
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.click_claimed = true;
+                            this.env_save("skill", window, cx)
+                        }))
+                })
+                .when(!dirty, |d| d.text_color(muted))
+                .child("Save");
+            let revert = dirty.then(|| {
+                div()
+                    .id("env-skill-file-revert")
+                    .flex_none()
+                    .cursor_pointer()
+                    .text_color(muted)
+                    .hover(|s| s.opacity(0.8))
+                    .child("Revert")
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.env_revert("skill", window, cx)
+                    }))
+            });
+            let close = super::inserts::icon_button(
+                "env-skill-file-close",
+                crate::icons::Ico::X,
+                "Close the file",
+                &theme,
+            )
+            .on_click(cx.listener(|this, _, _, cx| {
+                this.click_claimed = true;
+                if let Some(e) = this.project_env.as_mut().filter(|e| !e.skill_dirty) {
+                    e.skill_file = None;
+                }
+                cx.notify();
+            }));
+            let head = super::block_head(&theme, true)
+                .gap_3()
+                .child(crate::icons::Ico::File.icon().small())
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .truncate()
+                        .text_color(theme.foreground)
+                        .child(rel),
+                )
+                .child(save)
+                .children(revert)
+                .child(close);
+            super::inserts::card(head, code(&e.skill_text, cx), &theme)
+        });
+        (tree, form, file)
+    }
+}
+
+/// A text: a code editor as tall as its wrapped text (the thread scrolls, not it).
+fn code(state: &Entity<gpui_kit::component::input::EditorState>, cx: &App) -> AnyElement {
+    let text = state.read(cx).value().to_string();
+    let lines: usize = text
+        .lines()
+        .map(|l| l.chars().count() / 100 + 1)
+        .sum::<usize>()
+        .max(1);
+    div()
+        .h(px(super::editor_height(lines, cx)))
+        .child(
+            gpui_kit::component::input::Editor::new(state)
+                .appearance(false)
+                .h_full(),
+        )
+        .into_any_element()
 }
 
 /// A run's time as read: "today 18:00", "tomorrow 09:00", "Mon 2 Nov 09:00".

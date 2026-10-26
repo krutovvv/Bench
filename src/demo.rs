@@ -232,8 +232,10 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
         ],
         "mcp_json": "{\n  \"mcpServers\": {\n    \"ghost\": { \"url\": \"https://blog.example.com/ghost/mcp\", \"headers\": { \"Authorization\": \"${GHOST_ADMIN_KEY}\" } },\n    \"unsplash\": { \"command\": \"npx\", \"args\": [\"unsplash-mcp\"] },\n    \"search-console\": { \"command\": \"uvx\", \"args\": [\"gsc-mcp\"], \"enabled\": false }\n  }\n}\n",
         "skills": [
-            {"name": "release-notes", "description": "Turn a changelog into a post: what changed for the reader, not the commit list."},
-            {"name": "cover-image", "description": "A 1600×900 cover in the blog's colors, from a photo or a gradient."}
+            {"name": "release-notes", "description": "Turn a changelog into a post: what changed for the reader, not the commit list.", "scope": "project", "dir": "~/.bench/projects/p-blog/skills/release-notes"},
+            {"name": "cover-image", "description": "A 1600×900 cover in the blog's colors, from a photo or a gradient.", "scope": "project", "dir": "~/.bench/projects/p-blog/skills/cover-image"},
+            {"name": "ghost-theme", "description": "How the blog's Ghost theme is built and changed.", "scope": "repo", "dir": "~/Projects/blog/.agents/skills/ghost-theme"},
+            {"name": "humanizer", "description": "Make a text read as written by a person.", "scope": "general", "dir": "~/.bench/agents/default/skills/humanizer"}
         ],
         "hosts": [{"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"}],
         "cron": [
@@ -246,8 +248,15 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
     if std::env::var("BENCH_DEMO").as_deref() == Ok("env-open") && e.card.is_none() {
         app.env_card("skill", "release-notes".into(), window, cx);
         if let Some(e) = app.project_env.as_mut() {
-            e.folded
-                .extend(["Project", "MCP servers", "Prompts", "Schedule", "Accesses"]);
+            e.folded.extend([
+                "Project",
+                "Model",
+                "MCP servers",
+                "Skills",
+                "Prompts",
+                "Schedule",
+                "Accesses",
+            ]);
         }
     }
 }

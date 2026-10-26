@@ -40,12 +40,23 @@ pub struct ProjectEnv {
     pub prompt_open: Option<String>,
     pub prompt_text: Entity<EditorState>,
     pub prompt_dirty: bool,
-    /// Its own skills: (name, description).
-    pub skills: Vec<(String, String)>,
-    /// The skill opened under its row, and its SKILL.md being edited.
+    /// Every skill its threads can use, with where each lives.
+    pub skills: Vec<SkillInfo>,
+    /// The skill opened under its row (its folder as a tree), and the file of it being edited.
     pub skill_open: Option<String>,
     pub skill_text: Entity<EditorState>,
     pub skill_dirty: bool,
+    /// The open skill's folder: (path inside it, is a folder), folders first at each level.
+    pub skill_tree: Vec<(String, bool)>,
+    /// Its folders shown open, and the one a new file or folder goes into ("" its top).
+    pub skill_expanded: std::collections::HashSet<String>,
+    pub skill_folder: String,
+    /// The file of it open under the tree (a path inside the skill).
+    pub skill_file: Option<String>,
+    /// A new file or folder, or a rename, being named: ("file" | "folder" | "rename", the
+    /// folder it goes into or the entry renamed), and the name.
+    pub skill_form: Option<(&'static str, String)>,
+    pub skill_form_name: Entity<InputState>,
     /// Its accesses: (id, name, kind, address).
     pub hosts: Vec<(String, String, String, String)>,
     /// Its scheduled jobs; the one opened under its row ("new": a new one's form) and its fields.
@@ -74,6 +85,28 @@ pub struct ProjectEnv {
     /// second click does it.
     pub armed: Option<String>,
     pub error: Option<String>,
+}
+
+/// A skill a project's threads can use: its name, its front matter's description, where it lives
+/// ("project": its own, "repo": the folder's .agents/skills, "general": the general agent's) and
+/// its folder.
+#[derive(Clone, Debug, Default)]
+pub struct SkillInfo {
+    pub name: String,
+    pub description: String,
+    pub scope: String,
+    pub dir: String,
+}
+
+impl SkillInfo {
+    /// The skill's folder holds `rel` (a path inside it, "" its top).
+    pub fn path(&self, rel: &str) -> String {
+        if rel.is_empty() {
+            self.dir.clone()
+        } else {
+            format!("{}/{rel}", self.dir.trim_end_matches('/'))
+        }
+    }
 }
 
 /// A scheduled job of the project (the agent's `cron_jobs`): it runs `prompt` in a new thread of
@@ -149,6 +182,7 @@ impl BenchApp {
         });
         let name = cx.new(|cx| InputState::new(window, cx));
         let new_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name"));
+        let skill_form_name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name"));
         let tg_token =
             cx.new(|cx| InputState::new(window, cx).placeholder("Bot token from @BotFather"));
         let tg_users = cx.new(|cx| {
@@ -219,6 +253,12 @@ impl BenchApp {
             skill_open: None,
             skill_text,
             skill_dirty: false,
+            skill_tree: vec![],
+            skill_expanded: Default::default(),
+            skill_folder: String::new(),
+            skill_file: None,
+            skill_form: None,
+            skill_form_name,
             hosts: vec![],
             cron: vec![],
             cron_open: None,
@@ -442,14 +482,25 @@ impl BenchApp {
                 let Some(name) = e.skill_open.clone() else {
                     return;
                 };
-                let text = json!({"text": e.skill_text.read(cx).value().to_string()});
+                let text = e.skill_text.read(cx).value().to_string();
                 if name == "new" {
-                    ("POST", format!("/api/projects/{eid}/skills"), text)
-                } else {
                     (
-                        "PUT",
-                        format!("/api/projects/{eid}/skills/{}", enc(&name)),
-                        text,
+                        "POST",
+                        format!("/api/projects/{eid}/skills"),
+                        json!({"text": text}),
+                    )
+                } else {
+                    // The open file of the skill, wherever the skill lives.
+                    let (Some(k), Some(rel)) = (
+                        e.skills.iter().find(|k| k.name == name),
+                        e.skill_file.as_ref(),
+                    ) else {
+                        return;
+                    };
+                    (
+                        "POST",
+                        "/api/fs/write-text".to_string(),
+                        json!({"path": k.path(rel), "content": text}),
                     )
                 }
             }
@@ -525,8 +576,8 @@ impl BenchApp {
             }
             _ => {
                 e.skill_dirty = false;
-                if let Some(name) = e.skill_open.take() {
-                    return self.env_open_skill(name, window, cx);
+                if let Some(rel) = e.skill_file.clone() {
+                    return self.skill_open_file(rel, window, cx);
                 }
             }
         }
@@ -652,7 +703,8 @@ impl BenchApp {
         );
     }
 
-    /// A skill's row: its SKILL.md opens under it to read and edit (again: closes).
+    /// A skill's row: its folder opens under it as a tree, with its SKILL.md open to read and
+    /// edit (again: closes).
     pub fn env_open_skill(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
         let Some(e) = self.project_env.as_mut() else {
             return;
@@ -664,21 +716,54 @@ impl BenchApp {
         }
         e.skill_open = Some(name.clone());
         e.skill_dirty = false;
+        e.skill_tree.clear();
+        e.skill_expanded.clear();
+        e.skill_folder.clear();
+        e.skill_form = None;
+        e.skill_file = Some("SKILL.md".into());
         if self.demo {
             let text = format!(
                 "---\nname: {name}\ndescription: A made-up skill of the demo.\n---\n\nWhat to do, step by step."
             );
+            e.skill_tree = vec![
+                ("references".into(), true),
+                ("references/style.md".into(), false),
+                ("scripts".into(), true),
+                ("SKILL.md".into(), false),
+            ];
+            e.skill_expanded.insert("references".into());
             e.skill_text
                 .update(cx, |s, cx| s.set_value(text, window, cx));
+            e.skill_dirty = false;
             cx.notify();
             return;
         }
-        let pid = e.id.clone();
-        let Some((conn, eid)) = self.env_target(&pid) else {
+        self.skill_load_tree(window, cx);
+        self.skill_open_file("SKILL.md".into(), window, cx);
+    }
+
+    /// The open skill, as the environment lists it.
+    fn open_skill(&self) -> Option<SkillInfo> {
+        let e = self.project_env.as_ref()?;
+        let name = e.skill_open.as_ref()?;
+        e.skills.iter().find(|k| &k.name == name).cloned()
+    }
+
+    /// Read the open skill's folder again (after a file or folder is made, renamed or removed).
+    pub fn skill_load_tree(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(skill) = self.open_skill() else {
             return;
         };
-        let path = format!("/api/projects/{eid}/skills/{}", enc(&name));
+        let pid = self
+            .project_env
+            .as_ref()
+            .map(|e| e.id.clone())
+            .unwrap_or_default();
+        let Some((conn, _)) = self.env_target(&pid) else {
+            return;
+        };
         let profile = self.current_profile();
+        let path = format!("/api/fs/tree?path={}", enc(&skill.dir));
         self.background(
             window,
             cx,
@@ -688,18 +773,304 @@ impl BenchApp {
                     if let Some(e) = this
                         .project_env
                         .as_mut()
-                        .filter(|e| e.skill_open.as_deref() == Some(&name))
+                        .filter(|e| e.skill_open.as_deref() == Some(&skill.name))
                     {
-                        let text = v["text"].as_str().unwrap_or_default().to_string();
-                        e.skill_text
-                            .update(cx, |s, cx| s.set_value(text, window, cx));
-                        e.skill_dirty = false;
+                        e.skill_tree = v["entries"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .map(|t| {
+                                (
+                                    t["path"].as_str().unwrap_or_default().to_string(),
+                                    t["dir"].as_bool().unwrap_or(false),
+                                )
+                            })
+                            .collect();
                     }
                     cx.notify();
                 }
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
             },
         );
+    }
+
+    /// A file of the open skill opens under its tree, highlighted as its kind.
+    pub fn skill_open_file(&mut self, rel: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(skill) = self.open_skill() else {
+            return;
+        };
+        let pid = self
+            .project_env
+            .as_ref()
+            .map(|e| e.id.clone())
+            .unwrap_or_default();
+        let Some((conn, _)) = self.env_target(&pid) else {
+            return;
+        };
+        let profile = self.current_profile();
+        let path = skill.path(&rel);
+        self.background(
+            window,
+            cx,
+            move || rest::read_text(&conn, &profile, &path),
+            move |this, r, window, cx| {
+                match r {
+                    Ok(t) if t.binary => this.toast(
+                        NotificationType::Info,
+                        "Not a text file: show it in Finder",
+                        window,
+                        cx,
+                    ),
+                    Ok(t) => {
+                        if let Some(e) = this
+                            .project_env
+                            .as_mut()
+                            .filter(|e| e.skill_open.as_deref() == Some(&skill.name))
+                        {
+                            let language = crate::lang::language_for_text(&rel, &t.text);
+                            e.skill_file = Some(rel);
+                            e.skill_text.update(cx, |s, cx| {
+                                s.set_highlighter(language, cx);
+                                s.set_value(t.text, window, cx)
+                            });
+                            e.skill_dirty = false;
+                        }
+                    }
+                    Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+                }
+                cx.notify();
+            },
+        );
+    }
+
+    /// A row of the skill's tree: a folder opens or shuts (and is where a new file goes), a file
+    /// opens under the tree.
+    pub fn skill_entry(
+        &mut self,
+        rel: String,
+        dir: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        if dir {
+            if !e.skill_expanded.remove(&rel) {
+                e.skill_expanded.insert(rel.clone());
+                e.skill_folder = rel;
+            } else {
+                e.skill_folder = parent_rel(&rel);
+            }
+            cx.notify();
+            return;
+        }
+        if e.skill_dirty {
+            self.toast(
+                NotificationType::Info,
+                "Save or revert the open file first",
+                window,
+                cx,
+            );
+            return;
+        }
+        e.skill_folder = parent_rel(&rel);
+        self.skill_open_file(rel, window, cx);
+    }
+
+    /// "New file", "New folder" (in the folder last opened), or a row's rename: the field that
+    /// names it, under the tree.
+    pub fn skill_form(
+        &mut self,
+        what: &'static str,
+        target: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        let name = if what == "rename" {
+            target.rsplit('/').next().unwrap_or_default().to_string()
+        } else {
+            String::new()
+        };
+        e.skill_form_name.update(cx, |s, cx| {
+            s.set_value(name, window, cx);
+            s.focus(window, cx)
+        });
+        e.skill_form = Some((what, target));
+        cx.notify();
+    }
+
+    /// Make what the field names (or rename), then read the tree again; a new file opens.
+    pub fn skill_form_done(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let (Some(skill), Some(e)) = (self.open_skill(), self.project_env.as_ref()) else {
+            return;
+        };
+        let Some((what, target)) = e.skill_form.clone() else {
+            return;
+        };
+        let name = e
+            .skill_form_name
+            .read(cx)
+            .value()
+            .trim()
+            .trim_matches('/')
+            .to_string();
+        if name.is_empty()
+            || name.split('/').any(|p| p.is_empty() || p == "..")
+            || (what == "rename" && name.contains('/'))
+        {
+            self.toast(
+                NotificationType::Error,
+                "A name (a file may go in a folder: a/b.md)",
+                window,
+                cx,
+            );
+            return;
+        }
+        let rel = match what {
+            "rename" => {
+                let up = parent_rel(&target);
+                if up.is_empty() {
+                    name.clone()
+                } else {
+                    format!("{up}/{name}")
+                }
+            }
+            _ if target.is_empty() => name.clone(),
+            _ => format!("{target}/{name}"),
+        };
+        let Some((conn, _)) = self.env_target(&e.id) else {
+            return;
+        };
+        let profile = self.current_profile();
+        let (path, from) = (skill.path(&rel), skill.path(&target));
+        let rel2 = rel.clone();
+        self.background(
+            window,
+            cx,
+            move || match what {
+                "folder" => rest::send_json(
+                    &conn,
+                    "POST",
+                    "/api/fs/mkdir",
+                    &profile,
+                    json!({"path": path}),
+                )
+                .map(|_| ()),
+                "file" => rest::write_text(&conn, &profile, &path, ""),
+                _ => rest::send_json(
+                    &conn,
+                    "POST",
+                    "/api/fs/rename",
+                    &profile,
+                    json!({"from": from, "to": path}),
+                )
+                .map(|_| ()),
+            },
+            move |this, r, window, cx| match r {
+                Ok(()) => {
+                    if let Some(e) = this.project_env.as_mut() {
+                        e.skill_form = None;
+                        let up = parent_rel(&rel2);
+                        if !up.is_empty() {
+                            e.skill_expanded.insert(up);
+                        }
+                        // What was renamed: the open file (or a folder above it) moves with it.
+                        if what == "rename" {
+                            if let Some(f) = e.skill_file.clone() {
+                                if f == target {
+                                    e.skill_file = Some(rel2.clone());
+                                } else if let Some(rest) = f.strip_prefix(&format!("{target}/")) {
+                                    e.skill_file = Some(format!("{rel2}/{rest}"));
+                                }
+                            }
+                        }
+                    }
+                    this.skill_load_tree(window, cx);
+                    if what == "file" {
+                        this.skill_open_file(rel2, window, cx);
+                    }
+                    let id = this
+                        .project_env
+                        .as_ref()
+                        .map(|e| e.id.clone())
+                        .unwrap_or_default();
+                    this.load_env(&id, window, cx);
+                }
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+
+    /// A tree row's trash, twice: armed, then the file or the folder (with what is in it) goes.
+    pub fn skill_delete(&mut self, rel: String, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(skill) = self.open_skill() else {
+            return;
+        };
+        let Some(e) = self.project_env.as_mut() else {
+            return;
+        };
+        let key = format!("skillfile:{rel}");
+        if e.armed.as_deref() != Some(&key) {
+            e.armed = Some(key);
+            cx.notify();
+            return;
+        }
+        e.armed = None;
+        let id = e.id.clone();
+        let Some((conn, _)) = self.env_target(&id) else {
+            return;
+        };
+        let profile = self.current_profile();
+        let path = skill.path(&rel);
+        self.background(
+            window,
+            cx,
+            move || {
+                rest::send_json(
+                    &conn,
+                    "POST",
+                    "/api/fs/delete",
+                    &profile,
+                    json!({"path": path}),
+                )
+            },
+            move |this, r, window, cx| match r {
+                Ok(_) => {
+                    if let Some(e) = this.project_env.as_mut() {
+                        if e.skill_file
+                            .as_ref()
+                            .is_some_and(|f| *f == rel || f.starts_with(&format!("{rel}/")))
+                        {
+                            e.skill_file = None;
+                            e.skill_dirty = false;
+                        }
+                    }
+                    this.skill_load_tree(window, cx);
+                    let id = this
+                        .project_env
+                        .as_ref()
+                        .map(|e| e.id.clone())
+                        .unwrap_or_default();
+                    this.load_env(&id, window, cx);
+                }
+                Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
+            },
+        );
+    }
+
+    /// A folder or file shown in Finder (this Mac's projects only).
+    pub fn reveal_in_finder(&mut self, path: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if let Err(err) = std::process::Command::new("open")
+            .arg("-R")
+            .arg(path)
+            .spawn()
+        {
+            self.toast(NotificationType::Error, format!("{err:#}"), window, cx);
+        }
     }
 
     /// A row's click: its card opens under the block (again: it closes); one card at a time.
@@ -721,6 +1092,7 @@ impl BenchApp {
         e.tg_open = false;
         e.mcp_open = None;
         e.skill_open = None;
+        e.skill_form = None;
         e.prompt_open = None;
         e.cron_open = None;
         e.armed = None;
@@ -898,6 +1270,13 @@ impl BenchApp {
     }
 }
 
+/// The folder a path inside a skill is in ("" its top).
+fn parent_rel(rel: &str) -> String {
+    rel.rsplit_once('/')
+        .map(|(p, _)| p.to_string())
+        .unwrap_or_default()
+}
+
 /// The agent's answer into the block; fields being typed in keep their text.
 pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
     e.dir = v["dir"].as_str().unwrap_or_default().to_string();
@@ -929,10 +1308,13 @@ pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         .into_iter()
         .flatten()
         .map(|k| {
-            (
-                k["name"].as_str().unwrap_or_default().to_string(),
-                k["description"].as_str().unwrap_or_default().to_string(),
-            )
+            let s = |f: &str| k[f].as_str().unwrap_or_default().to_string();
+            SkillInfo {
+                name: s("name"),
+                description: s("description"),
+                scope: s("scope"),
+                dir: s("dir"),
+            }
         })
         .collect();
     e.hosts = v["hosts"]
