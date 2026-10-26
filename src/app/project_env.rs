@@ -566,8 +566,8 @@ impl BenchApp {
         self.load_env(&id, window, cx);
     }
 
-    /// A row's Remove, twice: armed, then done. `what`: "mcp", "skill", "host" (out of the
-    /// project), "project".
+    /// A row's Remove, twice: armed, then done. `what`: "mcp", "skill", "host" (a file host is
+    /// deleted — it is this project's own; an SSH access only leaves the project), "project".
     pub fn env_remove(
         &mut self,
         what: &'static str,

@@ -960,7 +960,18 @@ impl BenchApp {
             }
             "host" => {
                 let (hid, hname, hkind, at) = e.hosts.iter().find(|h| h.0 == name).cloned()?;
-                actions.push(remove("host", hid, "Remove from the project", cx));
+                // A file host is this project's own: the row and its password go with it. Only an
+                // SSH access is the machine's (~/.ssh/config) and is just taken out of the project.
+                actions.push(remove(
+                    "host",
+                    hid,
+                    if hkind == "ssh" {
+                        "Take out of the project"
+                    } else {
+                        "Delete the access"
+                    },
+                    cx,
+                ));
                 (
                     format!("Access · {hname}"),
                     pad(v_flex().child(div().text_color(muted).child(format!("{hkind} · {at}")))),
