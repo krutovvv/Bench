@@ -54,8 +54,10 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	});
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m" } as any);
 	const told: any[][] = [];
+	const runs: boolean[] = [];
 	const rt = new Runtime((_sid, type, payload: any) => {
 		if (type === "thread.queue") told.push(payload.items.map((i: any) => i.text));
+		if (type === "thread.run") runs.push(payload.running);
 	});
 	await rt.open();
 	const { row } = await rt.create("default", undefined, "local");
@@ -66,6 +68,7 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	await rt.submit(id, "second", [], "", "queue");
 	await rt.submit(id, "third", [], "", "queue");
 	assert.equal(rt.isBusy(id), true, "the stalled run is live");
+	assert.deepEqual(runs, [true], "Bench is told the run is live as soon as the message starts it");
 	const before = await rt.queue(id);
 	assert.deepEqual(before.map((i) => i.text), ["second", "third"]);
 

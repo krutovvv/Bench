@@ -404,6 +404,8 @@ export class Runtime {
 		live.usage.started = Date.now();
 		live.usage.output = 0;
 		this.emit(id, "message.start", {});
+		// The run is live from here: Pi's own run_start comes later and finds the thread busy.
+		this.emit(id, "thread.run", { running: true });
 		await live.conversation.submit({ type: "input", content, requestId: randomUUID() }, ctx);
 		if (!row.title) void this.title(live, text);
 	}
