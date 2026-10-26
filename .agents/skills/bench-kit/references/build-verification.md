@@ -1,5 +1,11 @@
 # Verifying UI changes
 
+**The main way to check a change is a picture of your own copy:** `cargo build`, then
+`scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=…`, then read the picture
+(and measure). It works from inside Bench too (Bench is allowed in Screen Recording; confirmed
+2026-10-27). A change the person will see is not done until you have looked at it this way —
+before you commit, before you build the app, before you report.
+
 The user judges spacing to the pixel. "Looks fine to me" is not verification. Measure.
 
 ## Never in the user's window

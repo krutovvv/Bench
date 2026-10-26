@@ -131,7 +131,8 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
   1. **Change and look, on your own copy.** `cargo build`, then
      `.agents/skills/bench-kit/scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=…`:
      a separate copy of the debug binary on made-up data (no app, no permissions), shot and
-     quit. Read the picture; again until it is right. Never rebuild the app to see a change.
+     quit. Read the picture; again until it is right. This is the main check of a change.
+     Never rebuild the app to see a change.
      (It needs Bench allowed in Privacy & Security → Screen & System Audio Recording; without a
      picture, ask the person to allow it.)
   2. **Check and commit.** Tests (below), one change one commit.
@@ -155,7 +156,9 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 - **Screenshots only of your own copy** (`.agents/skills/bench-kit/scripts/shot.sh`, with
   `BENCH_DEMO=…` or `BENCH_HOME=<a copy>`), never the person's window.
 - **Disk space is tight.** Clean `target/` (`cargo clean --profile dev`) before it fills.
-- **Checks.** `cargo build` with zero warnings, `cargo test --workspace`, and
+- **Checks.** The main check of anything the person will see is the picture of your own copy
+  (step 1 of the loop, `shot.sh` on demo data): a change is not done until you have looked at it.
+  Then `cargo build` with zero warnings, `cargo test --workspace`, and
   `cd agent && node --test test/*.test.ts` for agent changes.
 
 ## The look, in short
