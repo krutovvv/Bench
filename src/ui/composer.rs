@@ -138,7 +138,9 @@ impl BenchApp {
             )
             .w_full()
             .flex_none()
-            .bg(theme.background)
+            // No background of its own: it is the thread's last row and sits on the page, so a
+            // fill here only ever showed — a white slab under the words when a dropped file
+            // tints the chat area.
             // ⌘V of a screenshot or of Finder files attaches them. The command list's ↑ ↓ Tab
             // Esc are answered at the root (app/keys.rs), where every key is seen first.
             .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, _window, cx| {
