@@ -226,7 +226,11 @@ impl BenchApp {
             move |this, r, window, cx| {
                 // The name is the sidebar's: a server's Host is named in this Mac's list of agents,
                 // not by the server (`places.rs`).
-                let name = this.projects.iter().find(|p| p.id == asked).map(|p| p.name.clone());
+                let name = this
+                    .projects
+                    .iter()
+                    .find(|p| p.id == asked)
+                    .map(|p| p.name.clone());
                 let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked) else {
                     return;
                 };

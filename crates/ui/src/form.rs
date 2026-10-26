@@ -4,8 +4,8 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::icons::Ico;
 use crate::OnPick;
+use crate::icons::Ico;
 use crate::metrics::RING_CLEAR;
 
 /// A form in the thread: a title, rows of a muted label and its field, a note, the actions.
@@ -141,7 +141,11 @@ pub fn settings_tabs(
                 // the 2 px accent under the open tab stands in for the 1 px rule
                 .border_b_2()
                 .border_color(if on { theme.primary } else { theme.transparent })
-                .text_color(if on { theme.foreground } else { theme.muted_foreground })
+                .text_color(if on {
+                    theme.foreground
+                } else {
+                    theme.muted_foreground
+                })
                 .when(!on, |d| d.hover(|s| s.text_color(theme.foreground)))
                 .child(icon.icon().small().text_color(theme.foreground))
                 .child(

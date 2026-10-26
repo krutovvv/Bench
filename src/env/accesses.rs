@@ -99,16 +99,33 @@ impl Section for Accesses {
     }
     /// Accesses are the agent's to add: "+ Add" starts the request in the composer.
     fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-        Some(add("env-host-add", "", "Add to this project the file host (SFTP or FTP): ", cx).into_any_element())
+        Some(
+            add(
+                "env-host-add",
+                "",
+                "Add to this project the file host (SFTP or FTP): ",
+                cx,
+            )
+            .into_any_element(),
+        )
     }
     fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let Some(e) = app.project_env.as_ref() else {
             return vec![];
         };
         let mut rows = vec![];
-        let list: Vec<Access> = e.hosts.list.iter().filter(|a| a.kind != "ssh").cloned().collect();
+        let list: Vec<Access> = e
+            .hosts
+            .list
+            .iter()
+            .filter(|a| a.kind != "ssh")
+            .cloned()
+            .collect();
         if list.is_empty() {
-            rows.push(empty("No file hosts yet: /ftp in its threads offers only these.", cx));
+            rows.push(empty(
+                "No file hosts yet: /ftp in its threads offers only these.",
+                cx,
+            ));
         }
         for (k, a) in list.into_iter().enumerate() {
             let note = format!("{} · {}", a.kind, a.at());
@@ -311,19 +328,47 @@ impl Section for Machines {
         Accesses.shown(app)
     }
     fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-        Some(add("env-ssh-add", "", "Add to this project the server (SSH): ", cx).into_any_element())
+        Some(
+            add(
+                "env-ssh-add",
+                "",
+                "Add to this project the server (SSH): ",
+                cx,
+            )
+            .into_any_element(),
+        )
     }
     fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let Some(e) = app.project_env.as_ref() else {
             return vec![];
         };
-        let list: Vec<Access> = e.hosts.list.iter().filter(|a| a.kind == "ssh").cloned().collect();
+        let list: Vec<Access> = e
+            .hosts
+            .list
+            .iter()
+            .filter(|a| a.kind == "ssh")
+            .cloned()
+            .collect();
         if list.is_empty() {
-            return vec![empty("No servers yet: /ssh in its threads offers only these.", cx)];
+            return vec![empty(
+                "No servers yet: /ssh in its threads offers only these.",
+                cx,
+            )];
         }
         list.into_iter()
             .enumerate()
-            .map(|(k, a)| row(e, "ssh-host", a.id.clone(), a.name.clone(), format!("ssh · {}", a.at()), false, k == 0, cx))
+            .map(|(k, a)| {
+                row(
+                    e,
+                    "ssh-host",
+                    a.id.clone(),
+                    a.name.clone(),
+                    format!("ssh · {}", a.at()),
+                    false,
+                    k == 0,
+                    cx,
+                )
+            })
             .collect()
     }
     /// The same card as in the accesses: the machine's, shown, taken out of the project.

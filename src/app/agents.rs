@@ -221,20 +221,21 @@ impl BenchApp {
                     .map(|p| p.id.clone())
                     .collect();
                 self.sessions.retain(|s| s.host != host);
-                self.sessions.extend(
-                    rows.into_iter()
-                        .filter(|s| s.source != "subagent")
-                        .map(|mut s| {
-                            s.host = host.to_string();
-                            let own = ProjectKey::new(host, &s.project).to_string();
-                            s.project = if !s.project.is_empty() && known.contains(&own) {
-                                own
-                            } else {
-                                home.clone()
-                            };
-                            s
-                        }),
-                );
+                self.sessions
+                    .extend(
+                        rows.into_iter()
+                            .filter(|s| s.source != "subagent")
+                            .map(|mut s| {
+                                s.host = host.to_string();
+                                let own = ProjectKey::new(host, &s.project).to_string();
+                                s.project = if !s.project.is_empty() && known.contains(&own) {
+                                    own
+                                } else {
+                                    home.clone()
+                                };
+                                s
+                            }),
+                    );
                 cx.notify();
             }
             Evt::SessionsChanged | Evt::Deleted => {

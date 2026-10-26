@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
 
-use crate::connection::{state_dir, Connection};
+use crate::connection::{Connection, state_dir};
 use crate::model::Target;
 use crate::rest;
 

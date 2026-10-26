@@ -41,7 +41,11 @@ impl BenchApp {
         };
         self.agent_form = Some(AgentForm {
             host: self.hosts_without_agent().into_iter().next(),
-            name: field("How it shows in the sidebar (empty: the host's name)", window, cx),
+            name: field(
+                "How it shows in the sidebar (empty: the host's name)",
+                window,
+                cx,
+            ),
             address: field("Address or domain", window, cx),
             user: field("Login", window, cx),
             port: field("22", window, cx),
@@ -63,10 +67,19 @@ impl BenchApp {
             None => {
                 let address = v(&form.address);
                 if address.is_empty() {
-                    self.toast(NotificationType::Error, "The server's address is empty", window, cx);
+                    self.toast(
+                        NotificationType::Error,
+                        "The server's address is empty",
+                        window,
+                        cx,
+                    );
                     return;
                 }
-                let base = if typed_name.is_empty() { address.clone() } else { typed_name.clone() };
+                let base = if typed_name.is_empty() {
+                    address.clone()
+                } else {
+                    typed_name.clone()
+                };
                 let alias: String = base
                     .to_lowercase()
                     .chars()
@@ -83,7 +96,12 @@ impl BenchApp {
                     ..Default::default()
                 };
                 if let Err(e) = crate::sshconfig::save(None, &server) {
-                    self.toast(NotificationType::Error, format!("~/.ssh/config: {e:#}"), window, cx);
+                    self.toast(
+                        NotificationType::Error,
+                        format!("~/.ssh/config: {e:#}"),
+                        window,
+                        cx,
+                    );
                     return;
                 }
                 self.reload_servers(cx);
@@ -92,7 +110,9 @@ impl BenchApp {
         };
         let name = if typed_name.is_empty() {
             let mut c = alias.chars();
-            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
         } else {
             typed_name
         };
@@ -101,7 +121,13 @@ impl BenchApp {
             window,
             cx,
             move || {
-                rest::send_json(&conn, "POST", "/api/agents", &profile, json!({"name": name, "host": alias}))
+                rest::send_json(
+                    &conn,
+                    "POST",
+                    "/api/agents",
+                    &profile,
+                    json!({"name": name, "host": alias}),
+                )
             },
             |this, r, window, cx| match r {
                 Ok(_) => {

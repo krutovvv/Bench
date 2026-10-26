@@ -49,7 +49,16 @@ impl Section for Name {
             return vec![];
         };
         let name = e.name.field.read(cx).value().to_string();
-        vec![row(e, "name", String::new(), "Name".into(), name, false, true, cx)]
+        vec![row(
+            e,
+            "name",
+            String::new(),
+            "Name".into(),
+            name,
+            false,
+            true,
+            cx,
+        )]
     }
     fn card(&self, app: &BenchApp, _name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
         let e = app.project_env.as_ref()?;
@@ -59,7 +68,13 @@ impl Section for Name {
         actions.extend(revert("name", e.name.dirty, cx));
         // An agent's Host is not removed: a server's agent leaves Bench in the gear.
         if !host {
-            actions.push(remove(e, "project", String::new(), "Remove the project", cx));
+            actions.push(remove(
+                e,
+                "project",
+                String::new(),
+                "Remove the project",
+                cx,
+            ));
         }
         let note = if host {
             "The server's name in Bench; its agent is added and removed in the gear."
@@ -76,8 +91,13 @@ impl Section for Name {
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         if !e.name.dirty {
-            let name = v["project"]["name"].as_str().unwrap_or_default().to_string();
-            e.name.field.update(cx, |s, cx| s.set_value(name, window, cx));
+            let name = v["project"]["name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            e.name
+                .field
+                .update(cx, |s, cx| s.set_value(name, window, cx));
         }
     }
     // Saving goes through `BenchApp::rename_project` (`env_save`): a project is renamed where it

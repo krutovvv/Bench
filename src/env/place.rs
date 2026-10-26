@@ -25,7 +25,8 @@ pub struct PlaceEnv {
 
 impl PlaceEnv {
     pub(super) fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
-        let folder = cx.new(|cx| InputState::new(window, cx).placeholder("/path/to/the/folder — empty: none"));
+        let folder = cx
+            .new(|cx| InputState::new(window, cx).placeholder("/path/to/the/folder — empty: none"));
         on_change(&folder, cx, |e| e.place.dirty = true);
         Self {
             folder,
@@ -66,7 +67,16 @@ impl Section for Place {
                 link.is_some_and(|l| l.error.is_some()),
             )
         };
-        rows.push(row(e, "place", "agent".into(), "Agent".into(), agent, bad, false, cx));
+        rows.push(row(
+            e,
+            "place",
+            "agent".into(),
+            "Agent".into(),
+            agent,
+            bad,
+            false,
+            cx,
+        ));
         if let Some(m) = &at.machine {
             rows.push(row(
                 e,
@@ -86,7 +96,16 @@ impl Section for Place {
                 (Some(f), false) => f.clone(),
                 (None, _) => format!("none — a folder its agent keeps for it ({})", e.dir),
             };
-            rows.push(row(e, "place", "folder".into(), "Folder".into(), folder, false, false, cx));
+            rows.push(row(
+                e,
+                "place",
+                "folder".into(),
+                "Folder".into(),
+                folder,
+                false,
+                false,
+                cx,
+            ));
         }
         rows
     }
@@ -95,9 +114,12 @@ impl Section for Place {
         let muted = cx.theme().muted_foreground;
         let at = app.location(&e.id);
         let lines = |lines: Vec<String>| {
-            pad(v_flex().gap_1().children(lines.into_iter().enumerate().map(move |(k, l)| {
-                div().when(k > 0, |d| d.text_color(muted)).child(l)
-            })))
+            pad(v_flex().gap_1().children(
+                lines
+                    .into_iter()
+                    .enumerate()
+                    .map(move |(k, l)| div().when(k > 0, |d| d.text_color(muted)).child(l)),
+            ))
         };
         match name {
             "agent" if at.agent.is_empty() => Some(Card::new(
@@ -178,9 +200,14 @@ impl Section for Place {
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         if !e.place.dirty {
-            let folder = v["project"]["folder"].as_str().unwrap_or_default().to_string();
+            let folder = v["project"]["folder"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
             e.place.confined = v["project"]["confined"].as_bool().unwrap_or(false);
-            e.place.folder.update(cx, |s, cx| s.set_value(folder, window, cx));
+            e.place
+                .folder
+                .update(cx, |s, cx| s.set_value(folder, window, cx));
         }
     }
     fn save(
@@ -205,7 +232,13 @@ impl Section for Place {
     /// The sidebar knows the folder too (Zed, the icon).
     fn reload(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
         app.load_projects(window, cx);
-        let agent = ProjectKey::parse(app.project_env.as_ref().map(|e| e.id.as_str()).unwrap_or("")).agent;
+        let agent = ProjectKey::parse(
+            app.project_env
+                .as_ref()
+                .map(|e| e.id.as_str())
+                .unwrap_or(""),
+        )
+        .agent;
         if !agent.is_empty() {
             app.load_server_projects(agent, window, cx);
         }
@@ -237,7 +270,9 @@ impl BenchApp {
             let _ = this.update_in(cx, |this, window, cx| {
                 if let Some(e) = this.project_env.as_mut() {
                     let folder = path.to_string_lossy().to_string();
-                    e.place.folder.update(cx, |s, cx| s.set_value(folder, window, cx));
+                    e.place
+                        .folder
+                        .update(cx, |s, cx| s.set_value(folder, window, cx));
                     e.place.dirty = true;
                 }
                 cx.notify();
@@ -254,9 +289,24 @@ fn address_of(app: &BenchApp, alias: &str) -> String {
         .iter()
         .find(|s| s.alias == alias)
         .map(|s| {
-            let user = if s.user.is_empty() { String::new() } else { format!("{}@", s.user) };
-            let port = if s.port.is_empty() || s.port == "22" { String::new() } else { format!(":{}", s.port) };
-            format!("{user}{}{port}", if s.hostname.is_empty() { alias } else { &s.hostname })
+            let user = if s.user.is_empty() {
+                String::new()
+            } else {
+                format!("{}@", s.user)
+            };
+            let port = if s.port.is_empty() || s.port == "22" {
+                String::new()
+            } else {
+                format!(":{}", s.port)
+            };
+            format!(
+                "{user}{}{port}",
+                if s.hostname.is_empty() {
+                    alias
+                } else {
+                    &s.hostname
+                }
+            )
         })
         .unwrap_or_else(|| "not in ~/.ssh/config".into())
 }

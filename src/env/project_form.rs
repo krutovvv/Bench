@@ -87,7 +87,12 @@ impl BenchApp {
         };
         let name = form.name.read(cx).value().trim().to_string();
         if name.is_empty() {
-            self.toast(NotificationType::Error, "The project needs a name", window, cx);
+            self.toast(
+                NotificationType::Error,
+                "The project needs a name",
+                window,
+                cx,
+            );
             return;
         }
         let agent = form.agent.clone();
@@ -280,9 +285,9 @@ impl BenchApp {
                                 false,
                                 cx,
                             )
-                            .on_click(cx.listener(|this, _, window, cx| {
-                                this.pick_project_codebase(window, cx)
-                            })),
+                            .on_click(cx.listener(
+                                |this, _, window, cx| this.pick_project_codebase(window, cx),
+                            )),
                         )
                         .when(has, |d| {
                             d.child(

@@ -158,7 +158,11 @@ impl Render for Story {
             .child(
                 settings_tabs(
                     "stab",
-                    &[(Ico::Bot, "Agents"), (Ico::Layers, "Presets"), (Ico::Moon, "Appearance")],
+                    &[
+                        (Ico::Bot, "Agents"),
+                        (Ico::Layers, "Presets"),
+                        (Ico::Moon, "Appearance"),
+                    ],
                     self.tab_open,
                     cx,
                     tab_pick,
@@ -208,9 +212,9 @@ impl Render for Story {
                 }),
             )
             .child(pick_row("pk", Ico::Server, "dev", "root@10.0.0.2", cx))
-            .child(
-                choice_row("ch1", cx).child("A choice of the agent's question — as wide as the card, its text wrapped."),
-            );
+            .child(choice_row("ch1", cx).child(
+                "A choice of the agent's question — as wide as the card, its text wrapped.",
+            ));
 
         let files = row(Gap::L).children(
             [

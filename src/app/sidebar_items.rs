@@ -118,13 +118,15 @@ impl BenchApp {
             s.set_value(name, window, cx);
             s.focus(window, cx);
         });
-        let events = cx.subscribe_in(&field, window, |this, _, ev: &InputEvent, window, cx| {
-            match ev {
+        let events = cx.subscribe_in(
+            &field,
+            window,
+            |this, _, ev: &InputEvent, window, cx| match ev {
                 InputEvent::PressEnter { .. } => this.commit_rename(window, cx),
                 InputEvent::Blur => this.cancel_rename(cx),
                 _ => {}
-            }
-        });
+            },
+        );
         self.renaming = Some(Renaming {
             item,
             field,
@@ -198,7 +200,9 @@ impl BenchApp {
                     return;
                 }
                 // The one after it opens (the one before, at the end): deleting goes on with ⌫.
-                let next = order.get(k + 1).or(k.checked_sub(1).and_then(|p| order.get(p)));
+                let next = order
+                    .get(k + 1)
+                    .or(k.checked_sub(1).and_then(|p| order.get(p)));
                 let next = next.cloned();
                 self.delete_session(order[k].clone(), window, cx);
                 if let Some(n) = next {

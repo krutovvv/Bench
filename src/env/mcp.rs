@@ -238,25 +238,30 @@ impl Section for Mcp {
             // its name and config, keys and all — to look at and Save; or write one by hand.
             let have: Vec<&str> = e.mcp.servers.iter().map(|m| m.name.as_str()).collect();
             let theme = cx.theme().clone();
-            let chips = app.presets.mcp.iter().filter(|(n, _, _)| !have.contains(&n.as_str())).map(|(n, title, spec)| {
-                let (n, spec) = (n.clone(), spec.clone());
-                div()
-                    .id(SharedString::from(format!("env-mcp-preset-{n}")))
-                    .px_2()
-                    .py_0p5()
-                    .rounded_md()
-                    .border_1()
-                    .border_color(theme.border)
-                    .cursor_pointer()
-                    .hover(|s| s.bg(theme.list_hover))
-                    .child(title.clone())
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        cx.stop_propagation();
-                        this.env_fill_mcp(n.clone(), &spec, window, cx)
-                    }))
-                    .into_any_element()
-            });
+            let chips = app
+                .presets
+                .mcp
+                .iter()
+                .filter(|(n, _, _)| !have.contains(&n.as_str()))
+                .map(|(n, title, spec)| {
+                    let (n, spec) = (n.clone(), spec.clone());
+                    div()
+                        .id(SharedString::from(format!("env-mcp-preset-{n}")))
+                        .px_2()
+                        .py_0p5()
+                        .rounded_md()
+                        .border_1()
+                        .border_color(theme.border)
+                        .cursor_pointer()
+                        .hover(|s| s.bg(theme.list_hover))
+                        .child(title.clone())
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            this.click_claimed = true;
+                            cx.stop_propagation();
+                            this.env_fill_mcp(n.clone(), &spec, window, cx)
+                        }))
+                        .into_any_element()
+                });
             let body = std::mem::replace(&mut card.body, div().into_any_element());
             card.body = v_flex()
                 .child(h_flex().flex_wrap().gap_1p5().px_3().pt_2().children(chips))
@@ -483,7 +488,13 @@ impl BenchApp {
 
 impl BenchApp {
     /// A preset into the new MCP server's form: its name and its config, to look at and Save.
-    pub fn env_fill_mcp(&mut self, name: String, spec: &Value, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn env_fill_mcp(
+        &mut self,
+        name: String,
+        spec: &Value,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(e) = self.project_env.as_mut() else {
             return;
         };

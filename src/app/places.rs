@@ -22,7 +22,9 @@ pub struct ServerAgent {
 
 /// A project as an agent lists it (`/api/projects`), under `agent`.
 pub fn entry_of(agent: &str, p: &Value) -> Option<ProjectEntry> {
-    let id = p["id"].as_str().filter(|id| !id.is_empty() && *id != ProjectKey::HOST)?;
+    let id = p["id"]
+        .as_str()
+        .filter(|id| !id.is_empty() && *id != ProjectKey::HOST)?;
     let text = |k: &str| p[k].as_str().filter(|v| !v.is_empty()).map(str::to_string);
     Some(ProjectEntry {
         id: ProjectKey::new(agent, id).to_string(),
@@ -46,7 +48,12 @@ impl BenchApp {
                 agent: a.host.clone(),
                 ..Default::default()
             });
-            all.extend(self.server_projects.get(&a.host).cloned().unwrap_or_default());
+            all.extend(
+                self.server_projects
+                    .get(&a.host)
+                    .cloned()
+                    .unwrap_or_default(),
+            );
         }
         self.projects = all;
     }
@@ -76,10 +83,12 @@ impl BenchApp {
                     })
                     .collect();
                 // An agent no longer listed is let go: its link, its threads, its projects.
-                let known: Vec<String> = this.server_agents.iter().map(|a| a.host.clone()).collect();
+                let known: Vec<String> =
+                    this.server_agents.iter().map(|a| a.host.clone()).collect();
                 this.agents.retain(|h, _| h.is_empty() || known.contains(h));
                 this.server_projects.retain(|h, _| known.contains(h));
-                this.sessions.retain(|s| s.host.is_empty() || known.contains(&s.host));
+                this.sessions
+                    .retain(|s| s.host.is_empty() || known.contains(&s.host));
                 this.compose_projects();
                 this.connect_remotes(window, cx);
                 cx.notify();
@@ -88,7 +97,12 @@ impl BenchApp {
     }
 
     /// A server's own projects (its agent lists them), after its Host in the sidebar.
-    pub fn load_server_projects(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn load_server_projects(
+        &mut self,
+        host: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(conn) = self.conn_of(&host) else {
             return;
         };
@@ -165,7 +179,10 @@ impl BenchApp {
     }
 
     /// The connection a project's environment is read through, and its id on that agent.
-    pub fn env_target(&self, project: &str) -> Option<(std::sync::Arc<crate::connection::Connection>, String)> {
+    pub fn env_target(
+        &self,
+        project: &str,
+    ) -> Option<(std::sync::Arc<crate::connection::Connection>, String)> {
         let key = ProjectKey::parse(project);
         self.conn_of(&key.agent).map(|c| (c, key.id))
     }
@@ -189,20 +206,42 @@ impl BenchApp {
 
     /// A project's new name, where it lives: an agent's Host is named in the list of agents (a
     /// server's) — this Mac's Host has no name to change; any other on its agent.
-    pub fn rename_project(&mut self, project: String, name: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn rename_project(
+        &mut self,
+        project: String,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let key = ProjectKey::parse(&project);
         let (conn, method, path) = match (key.agent.is_empty(), key.is_host()) {
             (true, true) => return,
-            (false, true) => (self.local_conn(), "PUT", format!("/api/agents/{}", key.agent)),
-            _ => (self.conn_of(&key.agent), "PUT", format!("/api/projects/{}", key.id)),
+            (false, true) => (
+                self.local_conn(),
+                "PUT",
+                format!("/api/agents/{}", key.agent),
+            ),
+            _ => (
+                self.conn_of(&key.agent),
+                "PUT",
+                format!("/api/projects/{}", key.id),
+            ),
         };
         let Some(conn) = conn else {
             return;
         };
-        for a in self.server_agents.iter_mut().filter(|a| key.is_host() && a.host == key.agent) {
+        for a in self
+            .server_agents
+            .iter_mut()
+            .filter(|a| key.is_host() && a.host == key.agent)
+        {
             a.name = name.clone();
         }
-        for p in self.local_projects.iter_mut().chain(self.server_projects.values_mut().flatten()) {
+        for p in self
+            .local_projects
+            .iter_mut()
+            .chain(self.server_projects.values_mut().flatten())
+        {
             if p.id == project {
                 p.name = name.clone();
             }

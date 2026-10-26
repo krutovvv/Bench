@@ -134,7 +134,12 @@ impl Texts {
     /// was being written keeps its parsed text when it becomes the journal's entry, instead of
     /// being parsed again (a long one in the background, blank meanwhile — the thread flickers).
     pub fn rename(&mut self, from: &str, to: &str) {
-        let ids: Vec<String> = self.0.keys().filter(|id| id.starts_with(from)).cloned().collect();
+        let ids: Vec<String> = self
+            .0
+            .keys()
+            .filter(|id| id.starts_with(from))
+            .cloned()
+            .collect();
         for id in ids {
             if let Some(v) = self.0.remove(&id) {
                 self.0.insert(format!("{to}{}", &id[from.len()..]), v);
@@ -334,7 +339,9 @@ impl BenchApp {
         let machine = self.files_machine();
         cx.spawn(async move |this, cx| {
             let r = cx
-                .background_spawn(async move { media::fetch(&conn, &target, machine.as_deref(), &profile, &path) })
+                .background_spawn(async move {
+                    media::fetch(&conn, &target, machine.as_deref(), &profile, &path)
+                })
                 .await;
             let _ = this.update(cx, |this, cx| {
                 this.media.insert(key, r.into());

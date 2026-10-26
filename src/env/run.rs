@@ -8,8 +8,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::json;
 
-use super::{ProjectEnv, env_agent};
 use super::section::{Card, Section, row};
+use super::{ProjectEnv, env_agent};
 use crate::app::BenchApp;
 use crate::rest;
 
@@ -138,9 +138,18 @@ impl Section for Run {
                     .gap_2()
                     .cursor_pointer()
                     .hover(|s| s.bg(theme.list_hover))
-                    .child(div().flex_1().min_w_0().truncate().child(compaction_note(at, e.run.window, &names)))
+                    .child(div().flex_1().min_w_0().truncate().child(compaction_note(
+                        at,
+                        e.run.window,
+                        &names,
+                    )))
                     .when(on, |d| {
-                        d.child(crate::icons::Ico::Check.icon().xsmall().text_color(theme.foreground))
+                        d.child(
+                            crate::icons::Ico::Check
+                                .icon()
+                                .xsmall()
+                                .text_color(theme.foreground),
+                        )
                     })
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
@@ -177,7 +186,10 @@ impl Section for Run {
             "reasoning" => (e.run.effort.clone(), app.efforts.clone()),
             _ => (
                 e.run.approvals.clone(),
-                crate::model::APPROVAL_MODES.iter().map(|m| m.to_string()).collect(),
+                crate::model::APPROVAL_MODES
+                    .iter()
+                    .map(|m| m.to_string())
+                    .collect(),
             ),
         };
         let mut items: Vec<AnyElement> = vec![];

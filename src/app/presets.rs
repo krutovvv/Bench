@@ -30,7 +30,11 @@ impl Presets {
                 .map(|o| {
                     o.iter()
                         .map(|(n, p)| {
-                            (n.clone(), p["title"].as_str().unwrap_or(n).to_string(), p["spec"].clone())
+                            (
+                                n.clone(),
+                                p["title"].as_str().unwrap_or(n).to_string(),
+                                p["spec"].clone(),
+                            )
                         })
                         .collect()
                 })
@@ -43,7 +47,12 @@ impl Presets {
                 .as_array()
                 .into_iter()
                 .flatten()
-                .filter_map(|c| Some((c["at"].as_f64()?, c["name"].as_str().unwrap_or_default().to_string())))
+                .filter_map(|c| {
+                    Some((
+                        c["at"].as_f64()?,
+                        c["name"].as_str().unwrap_or_default().to_string(),
+                    ))
+                })
                 .collect(),
             reasoning: v["reasoning"]
                 .as_array()
@@ -96,7 +105,12 @@ impl BenchApp {
     }
 
     /// A kind of presets opened to edit, as JSON.
-    pub fn edit_presets(&mut self, kind: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn edit_presets(
+        &mut self,
+        kind: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.preset_editor.as_ref().is_some_and(|e| e.kind == kind) {
             self.preset_editor = None;
             cx.notify();

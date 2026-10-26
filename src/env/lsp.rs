@@ -111,7 +111,9 @@ impl Section for Lsp {
                     .px_3()
                     .py_1p5()
                     .gap_2()
-                    .when(!added, |d| d.cursor_pointer().hover(|s| s.bg(theme.list_hover)))
+                    .when(!added, |d| {
+                        d.cursor_pointer().hover(|s| s.bg(theme.list_hover))
+                    })
                     .child(div().flex_none().child(title.clone()))
                     .child(
                         div()
@@ -119,7 +121,11 @@ impl Section for Lsp {
                             .min_w_0()
                             .truncate()
                             .text_color(theme.muted_foreground)
-                            .child(if added { "added".to_string() } else { exts.join(", ") }),
+                            .child(if added {
+                                "added".to_string()
+                            } else {
+                                exts.join(", ")
+                            }),
                     )
                     .when(!added, |d| {
                         d.on_click(cx.listener(move |this, _, window, cx| {
@@ -218,7 +224,13 @@ impl Section for Lsp {
 impl BenchApp {
     /// A preset's server into the project's lsp.json (wherever the project lives), then the
     /// environment read again.
-    pub fn env_add_lsp(&mut self, key: String, spec: Value, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn env_add_lsp(
+        &mut self,
+        key: String,
+        spec: Value,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
             return;
         };

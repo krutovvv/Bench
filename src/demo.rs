@@ -721,14 +721,18 @@ fewer form fields. Then check what it did to signups and give me a short summary
         .into();
     }
     // The demo's own marks, not the person's: two projects in colors, a thread in one.
-    app.marks = [
-        ("p:p-blog", 4),
-        ("p:p-audit", 1),
-        ("d-api", 2),
-    ]
-    .into_iter()
-    .map(|(k, c)| (k.to_string(), crate::app::marks::Mark { color: Some(c), pinned: false }))
-    .collect();
+    app.marks = [("p:p-blog", 4), ("p:p-audit", 1), ("d-api", 2)]
+        .into_iter()
+        .map(|(k, c)| {
+            (
+                k.to_string(),
+                crate::app::marks::Mark {
+                    color: Some(c),
+                    pinned: false,
+                },
+            )
+        })
+        .collect();
     // The demo's own folds, not the person's: every group open but the long Tools.
     app.ssh.collapsed = ["s:Tools".to_string()].into_iter().collect();
     // `BENCH_DEMO=tasks|server|browser|tool`: that thread open instead.
@@ -748,8 +752,16 @@ fewer form fields. Then check what it did to signups and give me a short summary
     if std::env::var("BENCH_DEMO").as_deref() == Ok("long") {
         let mut journal = Journal::default();
         for k in 0..60 {
-            let answer = format!("Answer {k}. ") + &"The numbers held steady through the week. ".repeat(8 + k % 5 * 6);
-            journal.turn(&format!("Question {k}?"), None, vec![], &answer, now - 7200. + k as f64 * 100., 30.);
+            let answer = format!("Answer {k}. ")
+                + &"The numbers held steady through the week. ".repeat(8 + k % 5 * 6);
+            journal.turn(
+                &format!("Question {k}?"),
+                None,
+                vec![],
+                &answer,
+                now - 7200. + k as f64 * 100.,
+                30.,
+            );
         }
         app.session = Some("d-landing".into());
         app.thread = journal.thread();
@@ -758,7 +770,9 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // `BENCH_DEMO_JUMP=1`: "Jump to latest" pressed two seconds after opening.
     if std::env::var("BENCH_DEMO_JUMP").is_ok() {
         cx.spawn(async move |this, cx| {
-            cx.background_executor().timer(std::time::Duration::from_secs(2)).await;
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(2))
+                .await;
             this.update(cx, |app, cx| app.jump_to_latest(cx)).ok();
         })
         .detach();
@@ -820,42 +834,101 @@ fn run(cx: &mut Context<BenchApp>) {
     cx.spawn(async move |this, cx| {
         let now = crate::app::now_secs() * 1000.;
         let mut events = vec![
-            (1500, ThreadEvent::Append(vec![ThreadItem::User {
-                key: "900.0".into(),
-                seq: 900,
-                text: "And the bounce rate?".into(),
-                at: Some(now),
-            }])),
+            (
+                1500,
+                ThreadEvent::Append(vec![ThreadItem::User {
+                    key: "900.0".into(),
+                    seq: 900,
+                    text: "And the bounce rate?".into(),
+                    at: Some(now),
+                }]),
+            ),
             (100, ThreadEvent::Run(true)),
         ];
         for _ in 0..10 {
-            events.push((80, ThreadEvent::Stream(StreamKind::Thought, "Looking at the numbers. ".into())));
+            events.push((
+                80,
+                ThreadEvent::Stream(StreamKind::Thought, "Looking at the numbers. ".into()),
+            ));
         }
-        events.push((300, ThreadEvent::Append(vec![
-            ThreadItem::Thought { key: "901.0".into(), seq: 901, text: "Looking at the numbers. ".repeat(10), at: Some(now) },
-            ThreadItem::Tool { key: "901.1".into(), seq: 901, call_id: "c901".into(), name: "web_fetch".into(), args: json!({}), preview: "analytics".into(), at: Some(now) },
-        ])));
-        events.push((600, ThreadEvent::Append(vec![ThreadItem::Result {
-            key: "902.0".into(), seq: 902, call_id: "c901".into(), name: "web_fetch".into(),
-            output: "ok".into(), failed: false, diff: None, at: Some(now),
-        }])));
+        events.push((
+            300,
+            ThreadEvent::Append(vec![
+                ThreadItem::Thought {
+                    key: "901.0".into(),
+                    seq: 901,
+                    text: "Looking at the numbers. ".repeat(10),
+                    at: Some(now),
+                },
+                ThreadItem::Tool {
+                    key: "901.1".into(),
+                    seq: 901,
+                    call_id: "c901".into(),
+                    name: "web_fetch".into(),
+                    args: json!({}),
+                    preview: "analytics".into(),
+                    at: Some(now),
+                },
+            ]),
+        ));
+        events.push((
+            600,
+            ThreadEvent::Append(vec![ThreadItem::Result {
+                key: "902.0".into(),
+                seq: 902,
+                call_id: "c901".into(),
+                name: "web_fetch".into(),
+                output: "ok".into(),
+                failed: false,
+                diff: None,
+                at: Some(now),
+            }]),
+        ));
         let line = "The bounce rate fell from 61% to 48% in the three weeks since the launch. ";
         for k in 0..60 {
-            let delta = if k % 6 == 5 { format!("{line}\n\n") } else { line.to_string() };
+            let delta = if k % 6 == 5 {
+                format!("{line}\n\n")
+            } else {
+                line.to_string()
+            };
             events.push((60, ThreadEvent::Stream(StreamKind::Text, delta)));
         }
-        let text = (0..10).map(|_| line.repeat(6)).collect::<Vec<_>>().join("\n\n");
-        events.push((300, ThreadEvent::Append(vec![ThreadItem::Text {
-            key: "903.0".into(), seq: 903, text, at: Some(now), error: None,
-        }])));
+        let text = (0..10)
+            .map(|_| line.repeat(6))
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        events.push((
+            300,
+            ThreadEvent::Append(vec![ThreadItem::Text {
+                key: "903.0".into(),
+                seq: 903,
+                text,
+                at: Some(now),
+                error: None,
+            }]),
+        ));
         events.push((100, ThreadEvent::Run(false)));
         for (ms, e) in events {
-            cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
-            eprintln!("demo-run: {}", match &e {
-                ThreadEvent::Append(_) => "append", ThreadEvent::Stream(..) => "stream",
-                ThreadEvent::Run(true) => "run start", ThreadEvent::Run(false) => "run end", _ => "other",
-            });
-            if this.update(cx, |app, cx| { app.thread.apply(e); cx.notify(); }).is_err() {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(ms))
+                .await;
+            eprintln!(
+                "demo-run: {}",
+                match &e {
+                    ThreadEvent::Append(_) => "append",
+                    ThreadEvent::Stream(..) => "stream",
+                    ThreadEvent::Run(true) => "run start",
+                    ThreadEvent::Run(false) => "run end",
+                    _ => "other",
+                }
+            );
+            if this
+                .update(cx, |app, cx| {
+                    app.thread.apply(e);
+                    cx.notify();
+                })
+                .is_err()
+            {
                 return;
             }
         }

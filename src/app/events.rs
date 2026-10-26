@@ -90,7 +90,10 @@ impl BenchApp {
                     // `BENCH_GEAR_AGENT=<host>`: that agent's settings shown.
                     self.gear_agent = std::env::var("BENCH_GEAR_AGENT").unwrap_or_default();
                     // `BENCH_GEAR_TAB=<0|1|2>`: that tab (agents, presets, look).
-                    self.gear_tab = std::env::var("BENCH_GEAR_TAB").ok().and_then(|t| t.parse().ok()).unwrap_or(0);
+                    self.gear_tab = std::env::var("BENCH_GEAR_TAB")
+                        .ok()
+                        .and_then(|t| t.parse().ok())
+                        .unwrap_or(0);
                     self.open_panel(Panel::Providers, window, cx);
                     // `BENCH_AGENT_FORM=1`: with "+ Agent on a server" open.
                     if std::env::var("BENCH_AGENT_FORM").is_ok() {

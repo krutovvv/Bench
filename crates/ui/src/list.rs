@@ -20,7 +20,11 @@ pub fn head_icon_in(icon: Ico, color: Option<Hsla>, cx: &App) -> impl IntoElemen
         .flex()
         .items_center()
         .justify_center()
-        .child(icon.icon().small().text_color(color.unwrap_or(cx.theme().muted_foreground)))
+        .child(
+            icon.icon()
+                .small()
+                .text_color(color.unwrap_or(cx.theme().muted_foreground)),
+        )
 }
 
 /// The room a head's "+" takes, kept when it has none, so every chevron sits at one x.

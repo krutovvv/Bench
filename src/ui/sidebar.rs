@@ -108,16 +108,19 @@ impl BenchApp {
             _ => Ico::Layers,
         };
         // A remote project's agent: connecting, or why it is not there.
-        let remote_note = Some(&p.agent).filter(|_| remote).and_then(|h| match self.agents.get(h) {
-            Some(r) if r.conn.is_some() => None,
-            Some(r) => Some(
-                r.error
-                    .clone()
-                    .map(|e| format!("{h}: {e}"))
-                    .unwrap_or_else(|| format!("Connecting to {h}…")),
-            ),
-            None => Some(format!("{h}: not connected")),
-        });
+        let remote_note =
+            Some(&p.agent)
+                .filter(|_| remote)
+                .and_then(|h| match self.agents.get(h) {
+                    Some(r) if r.conn.is_some() => None,
+                    Some(r) => Some(
+                        r.error
+                            .clone()
+                            .map(|e| format!("{h}: {e}"))
+                            .unwrap_or_else(|| format!("Connecting to {h}…")),
+                    ),
+                    None => Some(format!("{h}: not connected")),
+                });
         let (new_id, menu_id) = (p.id.clone(), p.id.clone());
         let mark = self.mark_of(&format!("p:{}", p.id));
         let pinned = mark.pinned;
@@ -133,7 +136,12 @@ impl BenchApp {
             .clone()
             .filter(|f| !f.is_empty())
             // Zed opens it where its files are: this Mac, or that machine over SSH.
-            .map(|f| (f, Some(p.location().machine_here()).filter(|m| !m.is_empty())));
+            .map(|f| {
+                (
+                    f,
+                    Some(p.location().machine_here()).filter(|m| !m.is_empty()),
+                )
+            });
         let mut out = vec![
             h_flex()
                 .id(("phead", g))
@@ -508,7 +516,12 @@ impl BenchApp {
                         .ghost()
                         .xsmall()
                         .icon(Ico::Ellipsis.icon())
-                        .dropdown_menu(item_menu(view.clone(), Item::Thread(id.clone()), mark.pinned, None)),
+                        .dropdown_menu(item_menu(
+                            view.clone(),
+                            Item::Thread(id.clone()),
+                            mark.pinned,
+                            None,
+                        )),
                 )
                 .into_any_element()
         };
@@ -584,18 +597,27 @@ impl BenchApp {
                                     .flex_1()
                                     .min_w_0()
                                     .text_size(px(SESSION_TITLE))
-                                    .child(div().truncate().text_color(gpui_kit::transparent_black()).child(s.title.clone()))
+                                    .child(
+                                        div()
+                                            .truncate()
+                                            .text_color(gpui_kit::transparent_black())
+                                            .child(s.title.clone()),
+                                    )
                                     .child(
                                         div()
                                             .absolute()
                                             .inset_0()
                                             .flex()
                                             .items_center()
-                                            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                                            .on_mouse_down(MouseButton::Left, |_, _, cx| {
+                                                cx.stop_propagation()
+                                            })
                                             .child(
                                                 bench_ui::bare_field(&field)
                                                     // Input draws at 0.875 of its size: the title's.
-                                                    .with_size(gpui_kit::component::Size::Size(px(SESSION_TITLE / 0.875)))
+                                                    .with_size(gpui_kit::component::Size::Size(px(
+                                                        SESSION_TITLE / 0.875,
+                                                    )))
                                                     .px_0(),
                                             ),
                                     )
@@ -757,17 +779,18 @@ fn item_menu(
             let current = swatch_view.read(cx).mark_of(&swatch_key).color;
             color_row(&swatch_view, &swatch_key, current, cx)
         }))
-        .when(!host, |menu| menu.separator().item(
-            PopupMenuItem::new(match del {
-                Item::Thread(_) => "Delete…",
-                Item::Project(_) => "Remove project…",
-            })
-            .icon(Ico::Trash.icon())
-            .on_click(act(Box::new(move |this, window, cx| match &del {
-                Item::Thread(id) => this.arm_delete(id.clone(), cx),
-                Item::Project(id) => this.delete_project(id.clone(), window, cx),
-            }))),
-        ))
+        .when(!host, |menu| {
+            menu.separator().item(
+                PopupMenuItem::new(match del {
+                    Item::Thread(_) => "Delete…",
+                    Item::Project(_) => "Remove project…",
+                })
+                .icon(Ico::Trash.icon())
+                .on_click(act(Box::new(move |this, window, cx| match &del {
+                    Item::Thread(id) => this.arm_delete(id.clone(), cx),
+                    Item::Project(id) => this.delete_project(id.clone(), window, cx),
+                }))),
+            )
+        })
     }
 }
-

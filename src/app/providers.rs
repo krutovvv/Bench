@@ -93,7 +93,12 @@ impl BenchApp {
 
     /// Fill both tabs from the agent.
     /// The gear shows the agent under `host`: its providers, fallback and voice are read anew.
-    pub(crate) fn show_gear_agent(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn show_gear_agent(
+        &mut self,
+        host: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if host == self.gear_agent {
             return;
         }

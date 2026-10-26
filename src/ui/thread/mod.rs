@@ -258,7 +258,10 @@ impl BenchApp {
             }
         }
         // `BENCH_DEMO_SCROLL=end`: the thread scrolled as far down as it goes (for screenshots).
-        if self.demo && !self.demo_scrolled && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end") {
+        if self.demo
+            && !self.demo_scrolled
+            && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end")
+        {
             self.demo_scrolled = true;
             self.tv.list.scroll_to_end();
         }
@@ -269,7 +272,10 @@ impl BenchApp {
                 Some((i.parse::<usize>().ok()?, o.parse::<f32>().ok()?))
             }) {
                 self.demo_scrolled = true;
-                self.tv.list.scroll_to(ListOffset { item_ix: i, offset_in_item: px(o) });
+                self.tv.list.scroll_to(ListOffset {
+                    item_ix: i,
+                    offset_in_item: px(o),
+                });
             }
         }
         // `BENCH_TRACE_SCROLL=1`: where the thread's content stands each frame (a jerk shows).
@@ -277,13 +283,26 @@ impl BenchApp {
             let top = self.tv.list.logical_scroll_top();
             let first = self.tv.list.bounds_for_item(top.item_ix).map(|b| b.top());
             let heights: Vec<i32> = (1..=self.tv.tail())
-                .map(|i| self.tv.list.bounds_for_item(i).map_or(-1, |b| f32::from(b.size.height) as i32))
+                .map(|i| {
+                    self.tv
+                        .list
+                        .bounds_for_item(i)
+                        .map_or(-1, |b| f32::from(b.size.height) as i32)
+                })
                 .collect();
             eprintln!(
                 "scroll: item {} offset {:?} first-top {:?} rows {} room {:?} composer-bottom {:?} viewport-bottom {:?} heights {:?}",
-                top.item_ix, top.offset_in_item, first, self.tv.rows.len(), self.tv.room,
-                self.tv.list.bounds_for_item(self.tv.tail()).map(|b| b.bottom()),
-                self.tv.list.viewport_bounds().bottom(), heights
+                top.item_ix,
+                top.offset_in_item,
+                first,
+                self.tv.rows.len(),
+                self.tv.room,
+                self.tv
+                    .list
+                    .bounds_for_item(self.tv.tail())
+                    .map(|b| b.bottom()),
+                self.tv.list.viewport_bounds().bottom(),
+                heights
             );
         }
         let theme = cx.theme().clone();
@@ -367,7 +386,8 @@ impl BenchApp {
         for (k, old) in self.tv.rows.iter().enumerate() {
             match (old, rows.get(k)) {
                 (Row::Writing { .. }, Some(Row::Answer { key, .. })) => {
-                    self.texts.rename("answer-writing-", &format!("answer-{key}-"));
+                    self.texts
+                        .rename("answer-writing-", &format!("answer-{key}-"));
                     self.texts.rename("code-writing-", &format!("code-{key}-"));
                 }
                 (Row::Work { key: was, .. }, Some(Row::Work { key, .. }))

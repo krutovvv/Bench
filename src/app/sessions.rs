@@ -178,9 +178,7 @@ impl BenchApp {
         self.sessions.retain(|s| s.id != id);
         let runtime = self.opened.remove(&id);
         let rid = id.clone();
-        let remote = (!host.is_empty())
-            .then(|| self.conn_of(&host))
-            .flatten();
+        let remote = (!host.is_empty()).then(|| self.conn_of(&host)).flatten();
         if let Some(conn) = remote {
             let p = profile.clone();
             self.background(

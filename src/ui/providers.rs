@@ -150,7 +150,9 @@ impl BenchApp {
                     (None, None) => "connecting…".into(),
                     (None, Some(_)) => match (&a.build, &current) {
                         (Some(b), Some(c)) if b == c => "connected · up to date".into(),
-                        (Some(_), Some(_)) => "connected · an older version: updated when idle".into(),
+                        (Some(_), Some(_)) => {
+                            "connected · an older version: updated when idle".into()
+                        }
                         _ => "connected".into(),
                     },
                 },
@@ -160,7 +162,10 @@ impl BenchApp {
             // A server's agent can be forgotten here (asked once); this Mac's is always there.
             let armed = self.confirm_delete.as_deref() == Some(format!("agent:{host}").as_str());
             let remove = (!host.is_empty()).then(|| {
-                let (gone, label) = (host.clone(), if armed { "Remove from Bench" } else { "Remove" });
+                let (gone, label) = (
+                    host.clone(),
+                    if armed { "Remove from Bench" } else { "Remove" },
+                );
                 self.pv_button(
                     SharedString::from(format!("gear-agent-rm-{host}")),
                     label,
@@ -218,7 +223,10 @@ impl BenchApp {
             self.pv_heading(
                 // One model for every thread of this agent's projects: the main one and the
                 // fallback below.
-                format!("MODELS · {} · its projects", Self::agent_name(&self.gear_agent)),
+                format!(
+                    "MODELS · {} · its projects",
+                    Self::agent_name(&self.gear_agent)
+                ),
                 cx,
             )
             .into_any_element(),
@@ -510,16 +518,18 @@ impl BenchApp {
     fn render_agent_form(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
         let Some(form) = self.agent_form.as_ref() else {
-            return vec![h_flex()
-                .py_2()
-                .child(self.pv_button(
-                    "gear-agent-add",
-                    "+ Agent on a server",
-                    false,
-                    cx,
-                    Box::new(|this, w, cx| this.open_agent_form(w, cx)),
-                ))
-                .into_any_element()];
+            return vec![
+                h_flex()
+                    .py_2()
+                    .child(self.pv_button(
+                        "gear-agent-add",
+                        "+ Agent on a server",
+                        false,
+                        cx,
+                        Box::new(|this, w, cx| this.open_agent_form(w, cx)),
+                    ))
+                    .into_any_element(),
+            ];
         };
         let (host, name, address, user, port, key) = (
             form.host.clone(),
@@ -564,10 +574,21 @@ impl BenchApp {
                 ("Port", "Empty: 22", &port),
                 ("Key file", "Empty: ssh-agent", &key),
             ] {
-                out.push(self.pv_row(title, hint, self.pv_input(input), cx).into_any_element());
+                out.push(
+                    self.pv_row(title, hint, self.pv_input(input), cx)
+                        .into_any_element(),
+                );
             }
         }
-        out.push(self.pv_row("Name", "Its project in the sidebar", self.pv_input(&name), cx).into_any_element());
+        out.push(
+            self.pv_row(
+                "Name",
+                "Its project in the sidebar",
+                self.pv_input(&name),
+                cx,
+            )
+            .into_any_element(),
+        );
         out.push(
             div()
                 .pt_2()
@@ -617,14 +638,25 @@ impl BenchApp {
             .into_any_element()];
         for (kind, title) in crate::app::presets::KINDS {
             let lines: Vec<(String, String)> = match kind {
-                "mcp" => p.mcp.iter().map(|(n, t, _)| (n.clone(), t.clone())).collect(),
-                "lsp" => p.lsp.iter().map(|(n, t, _)| (n.clone(), t.clone())).collect(),
+                "mcp" => p
+                    .mcp
+                    .iter()
+                    .map(|(n, t, _)| (n.clone(), t.clone()))
+                    .collect(),
+                "lsp" => p
+                    .lsp
+                    .iter()
+                    .map(|(n, t, _)| (n.clone(), t.clone()))
+                    .collect(),
                 "compaction" => p
                     .compaction
                     .iter()
                     .map(|(at, n)| (format!("{}%", (at * 100.).round()), n.clone()))
                     .collect(),
-                _ => vec![(p.reasoning.join(", "), "offered in a project's Model section and the composer".into())],
+                _ => vec![(
+                    p.reasoning.join(", "),
+                    "offered in a project's Model section and the composer".into(),
+                )],
             };
             out.push(self.pv_heading(title.to_uppercase(), cx).into_any_element());
             for (name, note) in lines {
@@ -635,14 +667,30 @@ impl BenchApp {
                         .border_b_1()
                         .border_color(cx.theme().border)
                         .child(div().flex_none().child(name))
-                        .child(div().flex_1().min_w_0().truncate().text_color(muted).child(note))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .truncate()
+                                .text_color(muted)
+                                .child(note),
+                        )
                         .into_any_element(),
                 );
             }
-            let open = self.preset_editor.as_ref().filter(|e| e.kind == kind).map(|e| e.text.clone());
+            let open = self
+                .preset_editor
+                .as_ref()
+                .filter(|e| e.kind == kind)
+                .map(|e| e.text.clone());
             match open {
                 Some(text) => {
-                    out.push(div().pt_2().child(crate::env::section::code(&text, cx)).into_any_element());
+                    out.push(
+                        div()
+                            .pt_2()
+                            .child(crate::env::section::code(&text, cx))
+                            .into_any_element(),
+                    );
                     out.push(
                         h_flex()
                             .py_2()
