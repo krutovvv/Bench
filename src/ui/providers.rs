@@ -110,11 +110,8 @@ impl BenchApp {
         // ---- custom endpoints ----
         page.push(
             self.pv_heading(
-                format!(
-                    "MODELS · {} · {}",
-                    self.target.label(),
-                    self.current_profile()
-                ),
+                // One model for every project's threads: the main one and the fallback below.
+                format!("MODELS · {} · every project", self.target.label()),
                 cx,
             )
             .into_any_element(),
@@ -431,7 +428,7 @@ impl BenchApp {
         page.push(
             self.pv_row(
                 "Fallback model",
-                "Takes over when the main model fails",
+                "Answers when the main model fails or goes silent",
                 h_flex().child(picker).into_any_element(),
                 cx,
             )

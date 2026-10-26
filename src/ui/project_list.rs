@@ -416,8 +416,8 @@ impl BenchApp {
             section(if general { "Host" } else { "Project" }, None, rows, cx),
         ));
 
-        // How it runs: the model, how hard it thinks, what it may run without asking. Once for
-        // the project, not per chat — its threads start on these.
+        // How it runs: how hard it thinks, what it may run without asking. Once for the project,
+        // not per chat — its threads start on these. The model is one for every project (the gear).
         {
             let approval = match e.approvals.as_str() {
                 "off" => "off — it asks for nothing",
@@ -433,15 +433,6 @@ impl BenchApp {
                 }
             };
             let rows = vec![
-                row(
-                    "model",
-                    "model".into(),
-                    "Model".into(),
-                    dash(&e.model),
-                    false,
-                    true,
-                    cx,
-                ),
                 row(
                     "model",
                     "reasoning".into(),
@@ -980,59 +971,18 @@ impl BenchApp {
             "model" => {
                 let kind: &'static str = match name.as_str() {
                     "reasoning" => "reasoning",
-                    "approvals" => "approvals",
-                    _ => "model",
+                    _ => "approvals",
                 };
-                let cur = match kind {
-                    "reasoning" => e.effort.clone(),
-                    "approvals" => e.approvals.clone(),
-                    _ => e.model.clone(),
-                };
-                // (value, label, its provider); the models are listed under their provider.
-                let opts: Vec<(String, String, String)> = match kind {
-                    "reasoning" => crate::model::EFFORTS
-                        .iter()
-                        .map(|s| (s.to_string(), s.to_string(), String::new()))
-                        .collect(),
-                    "approvals" => crate::model::APPROVAL_MODES
-                        .iter()
-                        .map(|m| (m.to_string(), m.to_string(), String::new()))
-                        .collect(),
-                    _ => e
-                        .models
-                        .iter()
-                        .map(|c| {
-                            let label = if c.tag.is_empty() {
-                                c.model.clone()
-                            } else {
-                                format!("{} · {}", c.model, c.tag)
-                            };
-                            (c.model.clone(), label, c.provider.clone())
-                        })
-                        .collect(),
+                let (cur, opts): (String, &[&str]) = match kind {
+                    "reasoning" => (e.effort.clone(), crate::model::EFFORTS),
+                    _ => (e.approvals.clone(), crate::model::APPROVAL_MODES),
                 };
                 let mut items: Vec<AnyElement> = vec![];
-                let mut shown = String::new();
-                for (value, label, provider) in opts.into_iter() {
-                    if !provider.is_empty() && provider != shown {
-                        shown = provider.clone();
-                        items.push(
-                            div()
-                                .px_3()
-                                .pt_2()
-                                .pb_1()
-                                .text_xs()
-                                .text_color(muted)
-                                .child(shown.clone())
-                                .into_any_element(),
-                        );
-                    }
-                    let on = value == cur && (kind != "model" || provider == e.provider);
-                    let (id, value, label, provider) = (
+                for value in opts.iter().map(|v| v.to_string()) {
+                    let on = value == cur;
+                    let (id, label) = (
                         SharedString::from(format!("env-run-{name}-{value}")),
                         value.clone(),
-                        label,
-                        provider,
                     );
                     items.push(
                         h_flex()
@@ -1054,7 +1004,7 @@ impl BenchApp {
                             .on_click(cx.listener(move |this, _, window, cx| {
                                 this.click_claimed = true;
                                 cx.stop_propagation();
-                                this.env_set_run(kind, value.clone(), provider.clone(), window, cx)
+                                this.env_set_run(kind, value.clone(), window, cx)
                             }))
                             .into_any_element(),
                     );
@@ -1064,13 +1014,9 @@ impl BenchApp {
                         "Reasoning",
                         "How hard it thinks. A new thread of the project starts on it.",
                     ),
-                    "approvals" => (
+                    _ => (
                         "Approvals",
                         "What it may run without asking: off — nothing, smart — what is safe, manual — everything.",
-                    ),
-                    _ => (
-                        "Model",
-                        "The model the project's threads start on. A thread already begun keeps its own.",
                     ),
                 };
                 (
