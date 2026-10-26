@@ -1,70 +1,36 @@
 #!/bin/bash
-# Build Bench as one of its two apps (release binary + icon + Info.plist), each at a fixed place:
+# Build Bench (release binary + icon + Info.plist) at its one place: /Applications/Bench.app,
+# bundle id local.bench.app. There is one app: the person works in it, and ship.sh rebuilds it
+# in place when they ask. (/System/Applications is macOS's own read-only volume.)
 #
-#   scripts/bundle-macos.sh            "dist/Bench Dev.app"        bundle id local.bench.dev
-#   scripts/bundle-macos.sh release    "/Applications/Bench.app"  bundle id local.bench.app
+# It keeps one path and one bundle id and is signed with the Apple Development certificate from
+# the keychain: macOS then knows Bench by team and bundle id, not by the build's hash, so privacy
+# grants (microphone, local network, notifications) are given once and survive rebuilds. Local
+# network privacy also tells apps apart by the executable's Mach-O UUID, derived below from the
+# linker's and the bundle id (it stays the same, or the grant is asked again). The id was
+# local.bench until macOS's local network list filled with dead local.bench entries it matched
+# instead of asking; there is no way to remove them, so the app took a fresh id. Without such a
+# certificate the build falls back to ad-hoc signing (grants are asked again after every build);
+# BENCH_SIGN=<identity> picks another one.
 #
-# (/System/Applications is macOS's own read-only volume, for Apple's apps only.)
-#
-# Bench is developed from inside Bench: the person works in the release app (and talks to the
-# agent through it), rebuilt by ship.sh when they ask. Bench Dev (ship.sh --dev) is built only to
-# compare two states of the interface; it shares ~/.bench, so the threads are the same.
-#
-# Each app keeps one path and one bundle id, and both are signed with the Apple Development
-# certificate from the keychain: macOS then knows Bench by team and bundle id, not by the
-# build's hash, so privacy grants (microphone, local network, notifications) are given once per
-# app and survive rebuilds. Local network privacy also tells apps apart by the executable's
-# Mach-O UUID, and both apps are built from the same binary: each gets its own UUID (below), or
-# macOS mixes their grants up. The release id was local.bench until macOS's local network list
-# filled with dead local.bench entries (one per path of the old per-commit builds) that it
-# matched instead of asking; there is no way to remove them, so the release took a fresh id.
-# Without such a certificate the build falls back to ad-hoc signing
-# (grants are asked again after every build); BENCH_SIGN=<identity> picks another one.
-#
-# Neither build quits anything. A running Bench Dev stops the Dev build (ship.sh quits it
-# first). A running release app is left running from its old (deleted) copy; the new one starts
-# the next time the person opens Bench. Nothing is parked beside it: /Applications holds the app
-# only, and rolling back means rebuilding an earlier commit.
-#
-# Commit first: a build is one commit, so uncommitted changes stop it. For a quick experiment,
-# BENCH_DIRTY=1 builds Dev anyway (a release is always a clean commit).
+# It quits nothing (ship.sh does): a running Bench keeps running from its old (deleted) copy and
+# the new one starts on its next open. Nothing is parked beside it: rolling back means
+# rebuilding an earlier commit, so uncommitted changes stop a build.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-KIND=${1:-dev}
 
 HASH=$(git rev-parse --short=7 HEAD)
 # `.agents/` (the agents' skills) never goes into the app, so skills being written there don't
 # stop a build.
 if [[ -n "$(git status --porcelain --untracked-files=normal -- . ':!dist' ':!.agents')" ]]; then
-    if [[ "${BENCH_DIRTY:-}" == 1 && "$KIND" == dev ]]; then
-        HASH="$HASH-dirty"
-    else
-        echo "Uncommitted changes — commit them first (a build is one commit's):" >&2
-        git status --short -- . ':!dist' | head -20 >&2
-        exit 1
-    fi
+    echo "Uncommitted changes — commit them first (a build is one commit's):" >&2
+    git status --short -- . ':!dist' | head -20 >&2
+    exit 1
 fi
 
-case "$KIND" in
-dev)
-    NAME="Bench Dev"
-    ID=local.bench.dev
-    APP="$PWD/dist/Bench Dev.app"
-    if pgrep -f "/dist/Bench Dev.app/Contents/MacOS/" >/dev/null; then
-        echo "Bench Dev is running — quit it first (ship.sh does)" >&2
-        exit 1
-    fi
-    ;;
-release)
-    NAME="Bench"
-    ID=local.bench.app
-    APP="/Applications/Bench.app"
-    ;;
-*)
-    echo "usage: $0 [dev|release]" >&2
-    exit 1
-    ;;
-esac
+NAME="Bench"
+ID=local.bench.app
+APP="/Applications/Bench.app"
 COUNT=$(git rev-list --count HEAD)
 
 SIGN=${BENCH_SIGN:-$(security find-identity -v -p codesigning |
@@ -146,10 +112,8 @@ else
     codesign --force --sign - --identifier "$ID" "$NEW"
 fi
 
-if [[ "$KIND" == release && -d "$APP" ]]; then
-    if pgrep -f "$APP/Contents/MacOS/" >/dev/null; then
-        echo "a Bench from $APP is still running — the new one starts on its next open" >&2
-    fi
+if pgrep -f "$APP/Contents/MacOS/" >/dev/null; then
+    echo "a Bench from $APP is still running — the new one starts on its next open" >&2
 fi
 rm -rf "$APP"
 mv "$NEW" "$APP"

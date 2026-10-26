@@ -125,8 +125,8 @@ Dated where it changed. The person's later decisions win over earlier ones: a ru
   nothing. Never quit their Bench outside `ship.sh` (they develop Bench from inside Bench).
 - One app: `/Applications/Bench.app`, rebuilt in place by `ship.sh`, signed with the Apple
   Development certificate so permissions are asked once. (An app per commit filled System
-  Settings → Privacy with dead entries; a parked second app was dropped too.) `ship.sh --dev`
-  builds `dist/Bench Dev.app` only to compare two states of the interface.
+  Settings → Privacy with dead entries; a parked second app and the Dev build were dropped too: one app, and a bad change is fixed
+  by the next one.)
 - When an approach turns out heavier than expected (a browser engine, a big runtime), stop and
   say so before shipping it; the user prefers dropping a feature to carrying weight.
 - **The composer is part of the thread** (2026-10-24): the messages' font size, no buttons

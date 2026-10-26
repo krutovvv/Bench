@@ -46,10 +46,8 @@ $K/shot.sh target/release/bench /tmp/before.png 8          # prints the size in 
   data, never the person's own folder): `$K/shot.sh target/release/bench /tmp/before.png 8
   BENCH_DEMO=landing`. Every demo state and hook: `build-verification.md`. Only when neither
   reaches the state, a temporary hook (step 5).
-- The data sits behind a macOS permission (the microphone, notifications)? A bare binary
-  is refused. Bundle and shoot the app instead: `scripts/bundle-macos.sh` (`dist/Bench Dev.app`),
-  then `$K/shot.sh "dist/Bench Dev.app" /tmp/before.png 8 BENCH_DEMO=1`. The script starts a
-  separate copy with `open -n` and leaves the person's copy alone.
+- The data sits behind a macOS permission (the microphone, notifications)? A bare binary is
+  refused, and Bench is one app: commit, ask the person to ship, and check it with them in Bench.
 - Wait longer when the app connects over SSH: 25–40 s.
 
 Then read the numbers:
@@ -158,21 +156,19 @@ of changes is ready ("пересобери", "обнови", "ship"). Until then
 
 ```bash
 git add -A && git commit -m "<what changed, in the person's words>"   # a build is one commit
-$K/ship.sh            # quits Bench, rebuilds /Applications/Bench.app, opens it (--dev: the side copy)
+$K/ship.sh            # quits Bench, rebuilds /Applications/Bench.app, opens it
 ```
 **One app** (Bench is developed from inside Bench): the person works in
 **Bench** (`/Applications/Bench.app`, `local.bench.app`), and `ship.sh` rebuilds it in place;
-`ship.sh --dev` builds `dist/Bench Dev.app` (`local.bench.dev`) only to compare two states of the
-interface. Bench is
+there is no other build. Bench is
 a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
 and reopening it costs the person a few seconds and an unfinished run comes back with the window.
 Never kill it or quit it outside `ship.sh`. Rolling back means rebuilding an earlier commit —
 nothing is parked beside `/Applications/Bench.app`. Signed with the Apple Development
-certificate, so macOS grants are given once per app. Uncommitted changes stop the build
-(`BENCH_DIRTY=1` for a throwaway one).
+certificate, so macOS grants are given once. Uncommitted changes stop the build.
 
 **A grant that is on but doesn't work** (local network above all: the toggle is on in Privacy &
-Security, macOS never asks, and every request to a local service fails, while Bench Dev works).
+Security, macOS never asks, and every request to a local service fails).
 macOS matched the app to a dead entry: an old path, or another app with the same Mach-O UUID.
 Its local network list can't be cleaned. `tccutil` doesn't cover it, and
 `/Library/Preferences/com.apple.networkextension.plist` can't be edited on a running Mac (the

@@ -16,6 +16,9 @@ Button::new(("row-menu", i)).ghost().xsmall().icon(Ico::Ellipsis.icon())
     })
 ```
 
+- `.dropdown_menu` exists on `Button` only (gpui-component's `DropdownMenu`), not on a `div`:
+  a menu on an icon is an icon `Button` (`.ghost().small().icon(…)`, no label — an empty label
+  still adds the label's padding and gap). A right-click menu (`.context_menu`) goes on any element.
 - Item closures are `'static`: clone the view entity (`let view = cx.entity();`) into each and
   call `view.update(cx, |this, cx| …)`.
 - Separate unrelated groups of items with `.separator()` (Environment, Open in Zed | Pin, Rename |

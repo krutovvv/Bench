@@ -133,10 +133,8 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
   `.agents/skills/bench-kit/scripts/ship.sh`: it quits Bench the honest way (`osascript … quit`,
   never a kill), rebuilds `/Applications/Bench.app` in place and opens it again. Uncommitted
   changes stop it. The way back from a bad change is an earlier commit, rebuilt — there is no
-  second app parked beside it. `ship.sh --dev` builds `dist/Bench Dev.app` only when two states
-  of the interface must be compared; it shares `~/.bench` with Bench and isolates nothing but a
-  window. Both are signed with the Apple Development certificate, so macOS asks for each
-  permission once.
+  second app parked beside it and no second build: Bench is one app. It is signed with the
+  Apple Development certificate, so macOS asks for each permission once.
 - **Never kill Bench or quit it outside `ship.sh`** (`pkill`, deleting its `.app`, an ad-hoc
   quit): it is the window the person works in.
 - **Don't push without asking.** The repository is public: no private names, tokens or the

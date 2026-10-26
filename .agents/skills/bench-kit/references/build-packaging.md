@@ -1,14 +1,14 @@
 # macOS packaging, permissions, logs
 
-Working script: `scripts/bundle-macos.sh` — `release` builds `/Applications/Bench.app` (id
-`local.bench.app`, what `ship.sh` runs); without it `dist/Bench Dev.app` (`local.bench.dev`).
+Working script: `scripts/bundle-macos.sh` — builds `/Applications/Bench.app` (id
+`local.bench.app`), what `ship.sh` runs. There is no other build.
 
 ## What the bundle needs
 
 1. `cargo build --release`, copy the binary to `Contents/MacOS/`.
 2. App icon: render `assets/logo.svg` with `magick` at 1024, resize to every iconset size,
    `iconutil -c icns` → `Contents/Resources/AppIcon.icns`.
-3. `Info.plist`: `CFBundleIdentifier` (stable: `local.bench.app`, `local.bench.dev`), `CFBundleExecutable`,
+3. `Info.plist`: `CFBundleIdentifier` (stable: `local.bench.app`), `CFBundleExecutable`,
    `CFBundleIconFile`, `NSHighResolutionCapable`, `LSMinimumSystemVersion`, and a usage string
    for **every** protected resource the app touches:
    - `NSMicrophoneUsageDescription` (dictation),
@@ -31,8 +31,7 @@ Fix: the stable `--identifier` plus `NSLocalNetworkUsageDescription`. After that
 appears once and the grant survives rebuilds.
 
 Diagnose like this: make the app append each host check result to a log file in its state dir,
-launch the bundle with `open -n "dist/Bench Dev.app"` (a second instance — `open` alone just focuses
-an already running copy), read the log.
+ship it, have the person open it, read the log.
 
 ## Finder-launched process environment
 

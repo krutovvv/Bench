@@ -109,9 +109,8 @@ notification replaces the older one for the same thread.
   all the time and would be noise. Nothing when the finished thread is the one on screen in front.
 - **Only inside the .app.** Asking for the notification center from a bare `target/` binary
   aborts the process (no bundle): `notify` checks `current_exe()` contains `.app/Contents/MacOS/`
-  and does nothing otherwise. Test it from a bundle (`ship.sh --dev`, then `shot.sh` on
-  `dist/Bench Dev.app` with a hook that posts one); the permission prompt shows on the person's screen the first time
-  — tell them to allow it.
+  and does nothing otherwise. Test it in Bench after `ship.sh`; the permission prompt shows
+  on the person's screen the first time — tell them to allow it.
 
 ## Delivered files
 
@@ -157,11 +156,10 @@ project opens in Zed from its ⋯ menu.
 
 **One app, rebuilt in place, when the person asks for it** (not after every commit): `ship.sh`
 quits the running Bench with `osascript … quit`, rebuilds `/Applications/Bench.app`
-(`local.bench.app`) and opens it again. `--dev` builds the side copy (`dist/Bench Dev.app`,
-`local.bench.dev`) only to compare two states of the interface. Bench is a client: threads, the
+(`local.bench.app`) and opens it again; there is no other build. Bench is a client: threads, the
 queue and the agent live in the agent process and `~/.bench`, so quitting and reopening it costs
 the person a few seconds and an unfinished run comes back with the window. Never kill it or quit
 it outside `ship.sh`. Rolling back means rebuilding an earlier commit — nothing is parked beside
 `/Applications/Bench.app`. Signed with the Apple Development certificate, so macOS grants are
-given once per app. Uncommitted changes stop the build (`BENCH_DIRTY=1` for a throwaway one).
+given once. Uncommitted changes stop the build.
 Saying "done" without building the app got "I see no changes".

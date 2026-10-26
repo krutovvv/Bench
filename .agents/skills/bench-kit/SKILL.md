@@ -26,7 +26,10 @@ and says where its work is; its **environment** is edited in its own thread. The
    `docs/remote-projects.md`.
 
 Never search `~/.cargo/registry` for how gpui-kit draws something: the answer you need is a
-constant or an element in `crates/ui`. If it is missing there, add it there.
+constant or an element in `crates/ui`, or a page here (`ui-overlays.md` for menus). If it is
+missing there, add it there. When the framework's own source must be read: gpui-kit is a facade
+over `gpui-component-0.8.0` (`~/.cargo/registry/src/index.crates.io-*/gpui-component-0.8.0/src`);
+gpui itself is `vendor/gpui-base` (patched). Go there directly, with one grep.
 
 ## The two cores (read before touching them)
 
