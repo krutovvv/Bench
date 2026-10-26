@@ -364,13 +364,15 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const agent = row?.profile ?? profile;
 		const m = resolveModel(agent, { model: row?.model, provider: row?.provider });
 		const name = project ? (projects.get(project)?.name ?? project) : "Host";
-		const k = Math.round(m.contextLength / 1024);
+		// The exact number, with the familiar short form beside it: 131072 tokens is the same
+		// window people call 128K, and showing one of the two alone reads as a different setting.
+		const ctx = `${m.contextLength.toLocaleString("en-US")} tokens (${Math.round(m.contextLength / 1024)}K)`;
 		return [
 			`✨ <b>New session</b> · ${esc(name)}`,
 			"",
 			`◆ Model: <code>${esc(m.model)}</code>`,
 			`◆ Provider: ${esc(m.provider)}`,
-			`◆ Context: ${k}K tokens`,
+			`◆ Context: ${esc(ctx)}`,
 			`◆ Thinking: ${esc(row?.effort || reasoningEffort(homeAgent(agent)))}`,
 			`◆ Approvals: ${approvalsMode(homeAgent(agent)) === "manual" ? "asks before risky commands" : "off"}`,
 			"",
