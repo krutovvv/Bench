@@ -15,23 +15,9 @@ export function preview(name: string, args: any): string {
 	return text.length > 160 ? text.slice(0, 157) + "..." : text;
 }
 
-/** One thing the thread shows. `key` is unique and stable; `seq` is the entry id it came from. */
-export type ThreadItem =
-	| { key: string; seq: number; kind: "user"; text: string; at?: number }
-	| { key: string; seq: number; kind: "thought"; text: string; at?: number }
-	| { key: string; seq: number; kind: "text"; text: string; at?: number; error?: string }
-	| { key: string; seq: number; kind: "tool"; call_id: string; name: string; args: unknown; preview: string; at?: number }
-	| { key: string; seq: number; kind: "result"; call_id: string; name: string; output: string; failed: boolean; diff?: string; at?: number }
-	| { key: string; seq: number; kind: "insert"; id: string; insert_key: string }
-	| { key: string; seq: number; kind: "fail"; text: string };
-
-/** A message waiting in the inbox. Its key is the submission id, so it is stable while it waits. */
-export interface QueuedItem {
-	key: string;
-	sub: string;
-	mode: "steer" | "followUp";
-	text: string;
-}
+// The items and the queue are typed in crates/protocol: Bench reads them with the same types.
+import type { QueuedItem, ThreadItem } from "./protocol.gen.ts";
+export type { QueuedItem, ThreadItem };
 
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
 export const FAIL_KIND = "bench.fail";

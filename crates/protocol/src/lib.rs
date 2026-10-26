@@ -5,68 +5,84 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use ts_rs::TS;
 
 /// One item of the thread's journal. `key` is unique and stable; `seq` is the Pi entry id.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "kind", rename_all = "lowercase")]
 pub enum ThreadItem {
     User {
         key: String,
+        #[ts(type = "number")]
         seq: u64,
         text: String,
+        #[ts(optional)]
         #[serde(default)]
         at: Option<f64>,
     },
     Thought {
         key: String,
+        #[ts(type = "number")]
         seq: u64,
         text: String,
+        #[ts(optional)]
         #[serde(default)]
         at: Option<f64>,
     },
     Text {
         key: String,
+        #[ts(type = "number")]
         seq: u64,
         text: String,
+        #[ts(optional)]
         #[serde(default)]
         at: Option<f64>,
+        #[ts(optional)]
         #[serde(default)]
         error: Option<String>,
     },
     Tool {
         key: String,
+        #[ts(type = "number")]
         seq: u64,
         call_id: String,
         name: String,
+        #[ts(type = "unknown")]
         #[serde(default)]
         args: Value,
         /// What it acts on, in one line (a command, a path).
         #[serde(default)]
         preview: String,
+        #[ts(optional)]
         #[serde(default)]
         at: Option<f64>,
     },
     Result {
         key: String,
+        #[ts(type = "number")]
         seq: u64,
         call_id: String,
         name: String,
         output: String,
         failed: bool,
         /// An edit's unified patch.
+        #[ts(optional)]
         #[serde(default)]
         diff: Option<String>,
+        #[ts(optional)]
         #[serde(default)]
         at: Option<f64>,
     },
     Insert {
         key: String,
+        #[ts(type = "number")]
         seq: u64,
         id: String,
         insert_key: String,
     },
     Fail {
         key: String,
+        #[ts(type = "number")]
         seq: u64,
         text: String,
     },
@@ -121,7 +137,7 @@ impl ThreadItem {
 }
 
 /// A message waiting in the inbox, in the order the agent will take them.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 pub struct QueuedItem {
     pub key: String,
     pub sub: String,
@@ -130,21 +146,23 @@ pub struct QueuedItem {
 }
 
 /// The answer to `thread.open {session_id, since}`.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
 pub struct ThreadOpen {
     pub items: Vec<ThreadItem>,
     #[serde(default)]
     pub queue: Vec<QueuedItem>,
+    #[ts(type = "Record<string, unknown>")]
     #[serde(default)]
     pub inserts: Map<String, Value>,
     #[serde(default)]
     pub running: bool,
     #[serde(default)]
+    #[ts(type = "number")]
     pub head: u64,
 }
 
 /// Which part of the answer being written a stream delta extends.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 pub enum StreamKind {
     Text,
@@ -230,5 +248,42 @@ mod tests {
         assert!(
             matches!(ThreadEvent::parse("thread.append", &json!({"items": [{"key": "1.0", "seq": 1, "kind": "user", "text": "x"}]})), Some(ThreadEvent::Append(v)) if v.len() == 1)
         );
+    }
+}
+
+/// The TypeScript the agent imports (agent/src/protocol.gen.ts): the same types, from here.
+pub fn typescript() -> String {
+    let mut out = String::from(
+        "// Generated from crates/protocol (cargo test -p protocol). Do not edit: change the Rust types.\n\n",
+    );
+    for decl in [
+        ThreadItem::decl(),
+        QueuedItem::decl(),
+        ThreadOpen::decl(),
+        StreamKind::decl(),
+    ] {
+        out.push_str("export ");
+        out.push_str(&decl);
+        out.push_str("\n\n");
+    }
+    out.trim_end().to_string() + "\n"
+}
+
+#[cfg(test)]
+mod generated {
+    /// The agent's copy of the types is current; when it is not, it is written again and the
+    /// test fails once, so the new file is seen and committed.
+    #[test]
+    fn agent_types_are_current() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../agent/src/protocol.gen.ts"
+        );
+        let want = super::typescript();
+        let have = std::fs::read_to_string(path).unwrap_or_default();
+        if have != want {
+            std::fs::write(path, &want).unwrap();
+            panic!("agent/src/protocol.gen.ts was out of date: written again, commit it");
+        }
     }
 }
