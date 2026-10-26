@@ -77,6 +77,14 @@ impl BenchApp {
         }
     }
 
+    /// An agent came up: what waited for it is asked now — the gear showing it.
+    pub fn agent_up(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+        if self.panel == super::Panel::Providers && self.gear_agent == host && !self.pv.loaded {
+            self.load_providers(window, cx);
+        }
+        self.ask_build(host, cx);
+    }
+
     /// Ask a newly connected agent which sources it runs (for the gear).
     pub fn ask_build(&mut self, host: String, cx: &mut Context<Self>) {
         let Some(conn) = self.conn_of(&host) else {
@@ -171,7 +179,7 @@ impl BenchApp {
                     r.error = None;
                     r.gateway.send(Cmd::Sessions("default".into()));
                 }
-                self.ask_build(host.to_string(), cx);
+                self.agent_up(host.to_string(), window, cx);
                 cx.notify();
             }
             Evt::Error(e) => {

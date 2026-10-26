@@ -17,7 +17,7 @@ impl BenchApp {
                     a.conn = Some(conn);
                     a.error = None;
                 }
-                self.ask_build(String::new(), cx);
+                self.agent_up(String::new(), window, cx);
                 self.connecting = false;
                 // Tasks live with the agent: another machine, its own tasks.
                 self.restart_tasks(cx);
@@ -81,6 +81,16 @@ impl BenchApp {
                         self.load_telegram_owners(window, cx);
                     }
                     self.load_places(window, cx);
+                }
+                // `BENCH_PANEL=providers`: the gear open once the threads are known (for
+                // screenshots; the last thread reopening would close it before).
+                if std::env::var("BENCH_PANEL").as_deref() == Ok("providers")
+                    && !self.subject_opened
+                {
+                    self.subject_opened = true;
+                    // `BENCH_GEAR_AGENT=<host>`: that agent's settings shown.
+                    self.gear_agent = std::env::var("BENCH_GEAR_AGENT").unwrap_or_default();
+                    self.open_panel(Panel::Providers, window, cx);
                 }
                 if let Some(key) = subject_at_start {
                     self.subject_opened = true;
