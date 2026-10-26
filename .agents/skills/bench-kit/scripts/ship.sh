@@ -31,13 +31,19 @@ if [[ "$KIND" == dev ]]; then
 else
     RUNNING="/Applications/Bench.app/Contents/MacOS/"; NAME="Bench"; ID="local.bench.app"
 fi
-if pgrep -f "$RUNNING" >/dev/null; then
+# Is it running? pgrep cannot be trusted from the agent's shell (it does not see the app at
+# all, so a quit was once skipped and the person kept running the previous build), so ask ps.
+running() {
+    ps -ww -eo pid=,args= 2>/dev/null | awk -v pat="$RUNNING" \
+        'index($0, pat) { found = 1 } END { exit !found }'
+}
+if running; then
     osascript -e "tell application id \"$ID\" to quit" >/dev/null 2>&1 || true
     for _ in $(seq 40); do
-        pgrep -f "$RUNNING" >/dev/null || break
+        running || break
         sleep 0.5
     done
-    if pgrep -f "$RUNNING" >/dev/null; then
+    if running; then
         echo "$NAME didn't quit — ask the person to quit it, then ship again" >&2
         exit 1
     fi
