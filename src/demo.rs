@@ -784,6 +784,14 @@ fewer form fields. Then check what it did to signups and give me a short summary
     if std::env::var("BENCH_DEMO_RUN").is_ok() {
         run(cx);
     }
+    // `BENCH_PANEL=providers` (+ `BENCH_GEAR_TAB=<0|1|2>`): the gear open, for screenshots.
+    if std::env::var("BENCH_PANEL").as_deref() == Ok("providers") {
+        app.gear_tab = std::env::var("BENCH_GEAR_TAB")
+            .ok()
+            .and_then(|t| t.parse().ok())
+            .unwrap_or(0);
+        app.panel = crate::app::Panel::Providers;
+    }
     cx.notify();
 }
 

@@ -25,6 +25,7 @@ takes them again).
 | Delete without a dialog | `arm_delete_button(id, armed, cx)` | `button.rs` |
 | A field | `field(&state)`, `bare_field`, `secret_field` (state from `secret_state`), `search_field` | `field.rs` |
 | A labelled field, a form, a setting | `field_row`, `inline_form`, `settings_row`, `segmented` | `form.rs` |
+| The sections of a settings panel | `settings_tabs(id, &[(Ico, "Label")], open, cx, on_pick)` — text tabs with icons, the open one underlined in the accent over a rule across the page | `form.rs` |
 | A block (insert, card, pane) | `block(title, actions, body, cx)`, `block_head`, `block_body` | `block.rs` |
 | Who speaks | `avatar(agent, theme)` | `block.rs` |
 | One line saying nothing is there | `empty_state` | `block.rs` |

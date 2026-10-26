@@ -1,9 +1,10 @@
 //! Forms: label + field rows, settings rows, a segmented pick.
 
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use crate::icons::Ico;
 use crate::OnPick;
 use crate::metrics::RING_CLEAR;
 
@@ -107,6 +108,48 @@ pub fn segmented(
                 })
                 .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
                 .child(*label)
+                .on_click(move |_, window, cx| pick(k, window, cx))
+        }))
+}
+
+/// Sections of a settings panel: quiet text tabs with icons, the open one in the foreground
+/// with a 2 px accent underline over the rule that crosses the page beneath them.
+pub fn settings_tabs(
+    id: &'static str,
+    tabs: &[(Ico, &'static str)],
+    open: usize,
+    cx: &App,
+    on_pick: OnPick,
+) -> Div {
+    let theme = cx.theme().clone();
+    h_flex()
+        .flex_1()
+        .gap_2()
+        .items_end()
+        .border_b_1()
+        .border_color(theme.border)
+        .children(tabs.iter().enumerate().map(|(k, (icon, label))| {
+            let on = k == open;
+            let pick = on_pick.clone();
+            h_flex()
+                .id((id, k))
+                .gap_1p5()
+                .items_center()
+                .px_2()
+                .py_2()
+                .cursor_pointer()
+                // the 2 px accent under the open tab stands in for the 1 px rule
+                .border_b_2()
+                .border_color(if on { theme.primary } else { theme.transparent })
+                .text_color(if on { theme.foreground } else { theme.muted_foreground })
+                .when(!on, |d| d.hover(|s| s.text_color(theme.foreground)))
+                .child(icon.icon().small().text_color(theme.foreground))
+                .child(
+                    div()
+                        .text_sm()
+                        .when(on, |d| d.font_weight(FontWeight::MEDIUM))
+                        .child(*label),
+                )
                 .on_click(move |_, window, cx| pick(k, window, cx))
         }))
 }

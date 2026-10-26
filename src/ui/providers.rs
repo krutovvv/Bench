@@ -97,15 +97,24 @@ impl BenchApp {
         let mut page: Vec<AnyElement> = vec![];
 
         // ---- tabs: the agents (the main thing), the presets, the look ----
-        let tabs = crate::inserts::tools::view::segmented_tall(
-            "gear-tabs",
-            &["Agents", "Presets", "Appearance"],
-            self.gear_tab,
-            cx,
-            |this, k, _, cx| {
+        let view = cx.entity();
+        let pick: bench_ui::OnPick = std::rc::Rc::new(move |k, _, cx| {
+            let view = view.clone();
+            view.update(cx, |this, cx| {
                 this.gear_tab = k;
                 cx.notify();
-            },
+            });
+        });
+        let tabs = bench_ui::settings_tabs(
+            "gear-tabs",
+            &[
+                (bench_ui::Ico::Bot, "Agents"),
+                (bench_ui::Ico::Layers, "Presets"),
+                (bench_ui::Ico::Moon, "Appearance"),
+            ],
+            self.gear_tab,
+            cx,
+            pick,
         );
         page.push(h_flex().pt_4().child(tabs).into_any_element());
         match self.gear_tab {

@@ -18,6 +18,7 @@ struct Story {
     search: Entity<InputState>,
     empty: Entity<InputState>,
     picked: usize,
+    tab_open: usize,
     armed: bool,
 }
 
@@ -37,6 +38,7 @@ impl Story {
             search: input("", "Search sessions", window, cx),
             empty: input("", "Empty field", window, cx),
             picked: 1,
+            tab_open: 0,
             armed: false,
         }
     }
@@ -53,6 +55,14 @@ impl Render for Story {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme().clone();
         let view = cx.entity();
+        let tab_view = view.clone();
+        let tab_pick: OnPick = Rc::new(move |k, _, cx| {
+            let view = tab_view.clone();
+            view.update(cx, |this, cx| {
+                this.tab_open = k;
+                cx.notify();
+            })
+        });
         let pick: OnPick = Rc::new(move |k, _, cx| {
             view.update(cx, |this, cx| {
                 this.picked = k;
@@ -144,9 +154,19 @@ impl Render for Story {
                 segmented("seg", &["Light", "Dark", "System"], self.picked, cx, pick)
                     .into_any_element(),
                 cx,
-            ));
+            ))
+            .child(
+                settings_tabs(
+                    "stab",
+                    &[(Ico::Bot, "Agents"), (Ico::Layers, "Presets"), (Ico::Moon, "Appearance")],
+                    self.tab_open,
+                    cx,
+                    tab_pick,
+                )
+                .w(px(560.)),
+            );
 
-        let view = cx.entity();
+        let lists_view = cx.entity();
         let lists = v_flex()
             .w(px(280.))
             .bg(theme.sidebar)
@@ -181,7 +201,7 @@ impl Render for Story {
                     cx,
                 )
                 .on_click(move |_, _, cx| {
-                    view.update(cx, |this, cx| {
+                    lists_view.update(cx, |this, cx| {
                         this.armed = !this.armed;
                         cx.notify();
                     })
