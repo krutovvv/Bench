@@ -57,6 +57,8 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 	routes: {
 		"GET /api/status": () => ({
 			version: `bench-agent ${pkg.version}`,
+			// The sources it runs (Bench installs its own on a server when they differ).
+			build: process.env.BENCH_AGENT_BUILD ?? null,
 			gateway_running: true,
 			gateway_state: "running",
 			overall: "ok",

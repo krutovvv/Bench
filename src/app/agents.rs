@@ -17,6 +17,8 @@ pub struct AgentLink {
     pub gateway: Gateway,
     pub conn: Option<Arc<Connection>>,
     pub error: Option<String>,
+    /// The sources it runs, as its status says (None until asked, or an agent too old to say).
+    pub build: Option<String>,
 }
 
 impl AgentLink {
@@ -25,6 +27,7 @@ impl AgentLink {
             gateway,
             conn: None,
             error: None,
+            build: None,
         }
     }
 }
@@ -56,6 +59,70 @@ impl BenchApp {
 
     pub fn thread_target(&self) -> Target {
         self.target_of(&self.thread_host())
+    }
+
+    /// The agents in the order the gear lists them: this Mac's, then the servers' by name.
+    pub fn agent_hosts(&self) -> Vec<String> {
+        let mut hosts: Vec<String> = self.agents.keys().cloned().collect();
+        hosts.sort_by(|a, b| (!a.is_empty(), a).cmp(&(!b.is_empty(), b)));
+        hosts
+    }
+
+    /// An agent as people call it.
+    pub fn agent_name(host: &str) -> String {
+        if host.is_empty() {
+            "This Mac".into()
+        } else {
+            host.to_string()
+        }
+    }
+
+    /// Ask a newly connected agent which sources it runs (for the gear).
+    pub fn ask_build(&mut self, host: String, cx: &mut Context<Self>) {
+        let Some(conn) = self.conn_of(&host) else {
+            return;
+        };
+        cx.spawn(async move |this, cx| {
+            let build = cx
+                .background_spawn(async move {
+                    crate::rest::get_json(&conn, "/api/status")
+                        .ok()
+                        .and_then(|v| v["build"].as_str().map(str::to_string))
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                if let Some(a) = this.agents.get_mut(&host) {
+                    a.build = build;
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Run `job` off the UI thread with the agent under `host`, then `done` on the UI thread.
+    pub(crate) fn rest_on<T: Send + 'static>(
+        &mut self,
+        host: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        job: impl FnOnce(&Connection, &str) -> anyhow::Result<T> + Send + 'static,
+        done: impl FnOnce(&mut Self, anyhow::Result<T>, &mut Window, &mut Context<Self>) + 'static,
+    ) {
+        let Some(conn) = self.conn_of(&host) else {
+            return;
+        };
+        let profile = self.current_profile();
+        cx.spawn_in(window, async move |this, cx| {
+            let result = cx
+                .background_spawn(async move { job(&conn, &profile) })
+                .await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                done(this, result, window, cx);
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     /// Connect to the agents of the remote projects (once each).
@@ -104,6 +171,7 @@ impl BenchApp {
                     r.error = None;
                     r.gateway.send(Cmd::Sessions("default".into()));
                 }
+                self.ask_build(host.to_string(), cx);
                 cx.notify();
             }
             Evt::Error(e) => {

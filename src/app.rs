@@ -106,6 +106,8 @@ pub struct BenchApp {
     pub prompts_for: Option<String>,
     /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
     pub agents: HashMap<String, agents::AgentLink>,
+    /// The agent whose models and voice the gear shows ("" = this Mac's).
+    pub gear_agent: String,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -612,6 +614,7 @@ impl BenchApp {
             ssh_projects: HashMap::new(),
             prompts_for: None,
             agents: HashMap::new(),
+            gear_agent: String::new(),
             subject_opened: false,
             sites: Default::default(),
             sites_error: None,

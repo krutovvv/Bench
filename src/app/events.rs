@@ -17,6 +17,7 @@ impl BenchApp {
                     a.conn = Some(conn);
                     a.error = None;
                 }
+                self.ask_build(String::new(), cx);
                 self.connecting = false;
                 // Tasks live with the agent: another machine, its own tasks.
                 self.restart_tasks(cx);

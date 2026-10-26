@@ -36,6 +36,11 @@ fn purpose(method: &str, path: &str) -> &'static str {
     }
 }
 
+/// A GET answered with JSON, for what is no one profile's (the agent's status).
+pub fn get_json(conn: &Connection, path: &str) -> Result<Value> {
+    get(conn, path, "")
+}
+
 fn get(conn: &Connection, path: &str, profile: &str) -> Result<Value> {
     let (h, v) = conn.rest_auth(profile, "native-http")?;
     let resp = ureq::get(&url(conn, path, profile))

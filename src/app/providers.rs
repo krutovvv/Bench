@@ -92,8 +92,20 @@ impl BenchApp {
     // ---- loading ----------------------------------------------------------------------
 
     /// Fill both tabs from the agent.
+    /// The gear shows the agent under `host`: its providers, fallback and voice are read anew.
+    pub(crate) fn show_gear_agent(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+        if host == self.gear_agent {
+            return;
+        }
+        self.gear_agent = host;
+        self.pv = Default::default();
+        self.load_providers(window, cx);
+        cx.notify();
+    }
+
     pub(crate) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.rest(
+        self.rest_on(
+            self.gear_agent.clone(),
             window,
             cx,
             move |conn, profile| {
@@ -297,7 +309,8 @@ impl BenchApp {
             cx.notify();
             return;
         }
-        self.rest(
+        self.rest_on(
+            self.gear_agent.clone(),
             window,
             cx,
             move |conn, profile| rest::save_endpoint(conn, profile, body),
@@ -320,7 +333,8 @@ impl BenchApp {
         let body = self.endpoint_body(i, cx);
         self.pv.endpoints[i].check = Some((true, "Checking…".into()));
         cx.notify();
-        self.rest(
+        self.rest_on(
+            self.gear_agent.clone(),
             window,
             cx,
             move |conn, profile| rest::validate_endpoint(conn, profile, body),
@@ -349,7 +363,8 @@ impl BenchApp {
 
     pub fn make_endpoint_default(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         let id = self.pv.endpoints[i].id.clone();
-        self.rest(
+        self.rest_on(
+            self.gear_agent.clone(),
             window,
             cx,
             move |conn, profile| rest::activate_endpoint(conn, profile, &id),
@@ -379,7 +394,8 @@ impl BenchApp {
             return;
         }
         self.pv.armed = None;
-        self.rest(
+        self.rest_on(
+            self.gear_agent.clone(),
             window,
             cx,
             move |conn, profile| rest::delete_endpoint(conn, profile, &id),
@@ -408,7 +424,8 @@ impl BenchApp {
         };
         self.pv.fallback = pick;
         cx.notify();
-        self.rest(
+        self.rest_on(
+            self.gear_agent.clone(),
             window,
             cx,
             move |conn, profile| {
@@ -443,7 +460,8 @@ impl BenchApp {
             "stt": {"provider": "openai", "openai": stt},
             "tts": {"provider": "openai", "openai": tts},
         });
-        self.rest(
+        self.rest_on(
+            self.gear_agent.clone(),
             window,
             cx,
             move |conn, profile| rest::merge_config(conn, profile, config),

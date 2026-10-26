@@ -94,24 +94,71 @@ impl BenchApp {
     pub(crate) fn render_providers(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        if !self.pv.loaded {
-            return div()
-                .size_full()
-                .flex()
-                .items_center()
-                .justify_center()
-                .text_base()
-                .text_color(muted)
-                .child("Loading…")
-                .into_any_element();
-        }
         let mut page: Vec<AnyElement> = vec![];
+
+        // ---- agents: each has its own models and voice (its own network: a model on its
+        // own machine is localhost there) ----
+        page.push(self.pv_heading("AGENTS", cx).into_any_element());
+        for host in self.agent_hosts() {
+            let a = &self.agents[&host];
+            let current = crate::pi_agent::build();
+            let state = match (&a.error, &a.conn) {
+                (Some(e), _) => e.clone(),
+                (None, None) => "connecting…".into(),
+                (None, Some(_)) => match (&a.build, &current) {
+                    (Some(b), Some(c)) if b == c => "connected · up to date".into(),
+                    (Some(_), Some(_)) => "connected · an older version: updated when idle".into(),
+                    _ => "connected".into(),
+                },
+            };
+            let shown = host == self.gear_agent;
+            let pick = host.clone();
+            page.push(
+                self.pv_row(
+                    Self::agent_name(&host),
+                    state,
+                    h_flex()
+                        .justify_end()
+                        .child(self.pv_button(
+                            SharedString::from(format!("gear-agent-{host}")),
+                            if shown { "Shown below" } else { "Show" },
+                            shown,
+                            cx,
+                            Box::new(move |this, w, cx| this.show_gear_agent(pick.clone(), w, cx)),
+                        ))
+                        .into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+        }
+
+        // The shown agent's settings, once read.
+        if !self.pv.loaded {
+            page.push(
+                div()
+                    .py_2p5()
+                    .text_base()
+                    .text_color(muted)
+                    .child(if self.conn_of(&self.gear_agent).is_some() {
+                        "Loading…"
+                    } else {
+                        "Not connected: its settings show once it answers."
+                    })
+                    .into_any_element(),
+            );
+            // The look is Bench's, not an agent's: there whichever agent is shown.
+            page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
+            page.push(self.render_appearance(cx).into_any_element());
+            return Self::providers_page(page);
+        }
 
         // ---- custom endpoints ----
         page.push(
             self.pv_heading(
-                // One model for every project's threads: the main one and the fallback below.
-                format!("MODELS · {} · every project", self.target.label()),
+                // One model for every thread of this agent's projects: the main one and the
+                // fallback below.
+                format!("MODELS · {} · its projects", Self::agent_name(&self.gear_agent)),
                 cx,
             )
             .into_any_element(),
@@ -383,6 +430,10 @@ impl BenchApp {
         // No list of keys here: each key is set on the card or MCP server that reads it.
         page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
         page.push(self.render_appearance(cx).into_any_element());
+        Self::providers_page(page)
+    }
+
+    fn providers_page(page: Vec<AnyElement>) -> AnyElement {
         v_flex()
             .id("providers")
             .size_full()
