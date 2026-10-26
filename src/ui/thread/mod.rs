@@ -105,13 +105,13 @@ impl View {
     fn room_past_end(&self, window_h: Pixels) -> Pixels {
         let viewport = match self.list.viewport_bounds().size.height {
             h if h > px(0.) => h,
-            _ => window_h - px(crate::ui::STATUS_H + 36.),
+            _ => window_h - px(crate::ui::STATUS_H + 36. + crate::ui::CHAT_LEFT - crate::ui::TURN_Y),
         };
         let tail = self
             .list
             .bounds_for_item(self.tail())
             .map_or(px(0.), |b| b.size.height);
-        (viewport - px(crate::ui::CHAT_LEFT - crate::ui::TURN_Y) - tail).max(px(0.))
+        (viewport - tail).max(px(0.))
     }
 
     /// The composer reaches the viewport's bottom edge, or is past it (or is not laid out). Above
@@ -251,7 +251,8 @@ impl BenchApp {
             self.tv.list.clone(),
             cx.processor(|this, ix: usize, window, cx| this.render_item(ix, window, cx)),
         )
-        .size_full();
+        .flex_1()
+        .min_h_0();
         div()
             .relative()
             .size_full()
@@ -259,6 +260,9 @@ impl BenchApp {
                 v_flex()
                     .id("chat")
                     .size_full()
+                    // The air above the thread stays put and the rows scroll under its edge: scrolled
+                    // to the end, nothing of the last message shows above the composer.
+                    .pt(px(crate::ui::CHAT_LEFT - crate::ui::TURN_Y))
                     // A click anywhere in the thread means "I'm about to type": the composer takes
                     // the focus, unless the click went into something that types itself, or the
                     // mouse moved (a drag selects text).
@@ -354,7 +358,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let n = self.tv.rows.len();
-        let el = if ix == 0 {
+        if ix == 0 {
             self.render_head(window, cx)
         } else if ix <= n {
             self.render_row(ix - 1, window, cx)
@@ -362,15 +366,6 @@ impl BenchApp {
             self.render_tail(window, cx)
         } else {
             div().h(self.tv.room).into_any_element()
-        };
-        // The first row keeps as much air above it as the thread has at its sides.
-        if ix == 0 {
-            div()
-                .pt(px(crate::ui::CHAT_LEFT - crate::ui::TURN_Y))
-                .child(el)
-                .into_any_element()
-        } else {
-            el
         }
     }
 
