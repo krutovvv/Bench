@@ -37,6 +37,7 @@ impl BenchApp {
                 Button::new("new-item")
                     .ghost()
                     .small()
+                    .icon(bench_ui::icons::Ico::FolderPlus.icon())
                     .child(div().text_xs().child("New project"))
                     .text_color(cx.theme().muted_foreground)
                     .ml_auto()

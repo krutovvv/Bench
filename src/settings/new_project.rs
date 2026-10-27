@@ -1,8 +1,9 @@
-//! The new project's dialog (the sidebar's "New project"), `docs/remote-projects.md`: its name,
-//! its agent — this Mac's or a server's — and where its work is. A short decision gets a short
-//! surface: a card over the thread, not a page; every line of prose the page carried became a
-//! placeholder or went away — the chips name themselves ("This Mac", "dev"), the folder field
-//! says its shape in the placeholder.
+//! The new project's popover (the sidebar's "New project"), `docs/remote-projects.md`: its
+//! name, its agent — this Mac's or a server's — and where its work is. A short decision gets
+//! a short surface: a popover under the sidebar's strip, where the button pressed lives, as
+//! the status bar's panels do — not a takeover of the window. Every line of prose the page
+//! carried became a placeholder or went away — the chips name themselves ("This Mac", "dev"),
+//! the folder field says its shape in the placeholder.
 //!
 //! Creating it starts its first thread; its environment is set up in its environment thread.
 
@@ -300,13 +301,14 @@ impl BenchApp {
                 .into_any_element()
         };
         v_flex()
-            .w(px(440.))
-            .gap_4()
-            .p_5()
+            .w(px(400.))
+            .gap_3()
+            .p_4()
             .rounded_lg()
             .border_1()
             .border_color(theme.border)
             .bg(theme.background)
+            .shadow_lg()
             // Clicks inside the card are the card's; only the dim behind closes it.
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .child(

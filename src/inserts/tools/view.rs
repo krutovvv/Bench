@@ -443,17 +443,22 @@ pub(crate) fn segmented_tall_owned(
 ) -> AnyElement {
     let theme = cx.theme().clone();
     h_flex()
+        // Roomy where it has room; in a narrow popover the segments wrap instead of clipping.
         .flex_none()
-        .h(px(bench_ui::FIELD_H))
+        .flex_wrap()
+        .min_h(px(bench_ui::FIELD_H))
         .border_1()
         .rounded_md()
         .overflow_hidden()
+        .items_center()
         .border_color(theme.border)
         .children(labels.into_iter().enumerate().map(|(k, label)| {
             let on = on.clone();
             div()
                 .id((id, k))
-                .h_full()
+                // Their own height, not the container's: when a row wraps, the second line is
+                // as tall as the first — `h_full` stretched every line to the grown box.
+                .h(px(bench_ui::FIELD_H - 2.))
                 .flex()
                 .items_center()
                 .px_3()

@@ -146,24 +146,29 @@ impl Render for BenchApp {
             }))
             .child(div().flex_1().min_h_0().child(content))
             .child(self.render_statusbar(window, cx));
-        // The new project's card, over everything: the shortest surface a short
-        // decision deserves (the design guides' dialog rule). Behind it, the dimmed window.
+        // The new project's popover, hanging under the sidebar's strip where its button is —
+        // like the context panel over the status bar, not a takeover of the window. Behind it
+        // an invisible catcher: a click anywhere else closes it.
         div()
             .relative()
             .size_full()
             .child(base)
             .when(self.project_form.is_some(), |d| {
+                // Its right edge under the button's, in the strip's corner.
+                let left = (self.left_dock.size() - px(406.)).max(px(8.));
                 d.child(
                     div()
                         .id("project-mask")
                         .absolute()
                         .inset_0()
-                        .bg(rgb(0x0000_0000).opacity(0.55))
-                        .flex()
-                        .items_center()
-                        .justify_center()
                         .on_click(cx.listener(|this, _, _, cx| this.cancel_project_form(cx)))
-                        .child(self.render_project_dialog(cx)),
+                        .child(
+                            div()
+                                .absolute()
+                                .top(bench_ui::bar_h(cx) + px(2.))
+                                .left(left)
+                                .child(self.render_project_dialog(cx)),
+                        ),
                 )
             })
     }
