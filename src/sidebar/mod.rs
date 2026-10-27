@@ -117,13 +117,13 @@ impl BenchApp {
                 .pb_1()
                 .gap_1p5()
                 .items_center()
-                .text_base()
+                // Small caps, as every project's head (`project_row`): HOST is a group too.
+                .text_xs()
                 .child(bench_ui::head_icon_in(Ico::Server, host_color, cx))
                 .child(
                     div()
                         .min_w_0()
                         .truncate()
-                        .font_weight(FontWeight::MEDIUM)
                         .text_color(host_color.unwrap_or(muted))
                         .child(crate::app::LOCAL_HOST.to_uppercase()),
                 )
