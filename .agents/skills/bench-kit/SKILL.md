@@ -100,6 +100,7 @@ build again.
 
 | Page | What |
 |---|---|
+| `../bench-structure/SKILL.md` | How to grow Bench without patches (in Russian): the forecast and the three cores first, then a file tree readable without docs, then Rust and Zed words |
 | `references/build-thread.md` | The thread core: pipeline, what the view promises, how to see it |
 | `references/build-projects.md` | Projects, agents, machines: the model, the agent side, growing it |
 | `references/ui-catalog.md` | Every element: the call and its file |

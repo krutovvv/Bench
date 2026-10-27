@@ -1,7 +1,10 @@
 # AGENTS.md: Bench
 
 Read this first. Then `docs/map.md` to find the file for your change — open that file, not its
-neighbours. Read the skill `.agents/skills/bench-kit/SKILL.md` before any UI or insert work.
+neighbours. Read the skill `.agents/skills/bench-kit/SKILL.md` before any UI or insert work, and
+`.agents/skills/bench-structure/SKILL.md` (in Russian) before adding a feature, a module, a file
+or a new kind of thing, and before any refactor: structure fitting where Bench goes first, then a
+file tree readable without docs, then Rust and Zed words.
 
 ## What Bench is
 
@@ -61,7 +64,7 @@ person: there are projects.
   server and is followed by the server's own projects. `/terminal` opens on the thread's machine
   (`thread_machine()`).
 - **Explorer**: the third way to look at a project, beside threads and Settings — its files and
-  the agent's texts as an IDE shows them (a tree in the sidebar, documents in tabs, a file
+  the agent's texts as an IDE shows them (a tree in the sidebar, documents in tabs, the thread
   beside). It does not replace Zed (still one click away); it is the familiar view of a project.
   The window is Zed's workspace: a left dock (threads or Explorer), the center, a right dock.
 - **The gear** (Bench → Settings… in the macOS menu, ⌘,) holds the app's settings, in tabs: Agents (each one's models and voice;
