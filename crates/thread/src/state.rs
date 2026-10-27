@@ -23,6 +23,9 @@ pub struct Thread {
     head: u64,
     /// Messages the person sent that the journal has not shown yet, in the order sent.
     sent: Vec<String>,
+    /// Messages pressed while the agent works that its queue has not returned yet: shown as
+    /// waiting rows of their own, without controls, until the queue answers or takes them.
+    sent_queue: Vec<String>,
     /// Grows with every change, so a view knows when to rebuild its rows.
     version: u64,
 }
@@ -63,7 +66,12 @@ impl Thread {
                 StreamKind::Thought => self.stream.0.push_str(&delta),
                 StreamKind::Text => self.stream.1.push_str(&delta),
             },
-            ThreadEvent::Queue(q) => self.queue = q,
+            ThreadEvent::Queue(q) => {
+                self.queue = q;
+                // The queue came back holding the words: the waiting echo was its, it is one row now.
+                self.sent_queue
+                    .retain(|s| !self.queue.iter().any(|q| &q.text == s));
+            }
             ThreadEvent::Inserts(m) => self.inserts = m,
             ThreadEvent::Run(on) => {
                 self.running = on;
@@ -98,6 +106,9 @@ impl Thread {
                 if let Some(k) = self.sent.iter().position(|s| s == text) {
                     self.sent.remove(k);
                 }
+                if let Some(k) = self.sent_queue.iter().position(|s| s == text) {
+                    self.sent_queue.remove(k);
+                }
             }
             self.head = self.head.max(it.seq());
             let at = self.log.partition_point(|x| x.order() <= it.order());
@@ -109,6 +120,13 @@ impl Thread {
     /// The person sent `text`: it shows at once, where the journal will put it.
     pub fn sent(&mut self, text: String) {
         self.sent.push(text);
+        self.version += 1;
+    }
+
+    /// Enter pressed while the run lives: the message is on its way to the queue; show it
+    /// as waiting at once, so the composer never empties onto nothing.
+    pub fn queued_now(&mut self, text: String) {
+        self.sent_queue.push(text);
         self.version += 1;
     }
 
@@ -125,6 +143,7 @@ impl Thread {
     /// Every sent message the journal has not shown: the send failed.
     pub fn clear_sent(&mut self) {
         self.sent.clear();
+        self.sent_queue.clear();
         self.version += 1;
     }
 
@@ -144,6 +163,7 @@ impl Thread {
             &self.stream,
             &self.sent,
             &self.queue,
+            &self.sent_queue,
         )
     }
 

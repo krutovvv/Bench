@@ -720,3 +720,40 @@ fn words_appended_mid_run_join_their_turn_as_a_note() {
         "the words ride the work line: {steps:?}"
     );
 }
+
+#[test]
+fn pressed_queue_shows_at_once_and_never_twice() {
+    // Enter while the run lives: the row waits under the work at once (no id yet), and the
+    // queue's answer — or the agent taking the message up — folds the echo into one row.
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go")],
+        ..ThreadOpen::default()
+    });
+    t.apply(ThreadEvent::Run(true));
+    t.queued_now("later".into());
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:0+", "queued:later"]);
+    // The agent's queue answers with the same words: one row, now with its id.
+    t.apply(ThreadEvent::Queue(vec![queued(9, "later")]));
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:0+", "queued:later"]);
+    let Row::Queued { sub, .. } = &t.rows()[2] else {
+        panic!()
+    };
+    assert_eq!(sub, "9", "the queue's own row takes over");
+    // The agent takes it up mid-run: it joins the journal, the queue empties, no ghost stays.
+    t.apply(ThreadEvent::Append(vec![user(2, "later")]));
+    t.apply(ThreadEvent::Queue(vec![]));
+    assert_eq!(kinds(&t.rows()), ["user:go", "user:later", "work:0+"]);
+}
+
+#[test]
+fn pressed_queue_clears_with_the_rest_when_the_send_fails() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go")],
+        ..ThreadOpen::default()
+    });
+    t.apply(ThreadEvent::Run(true));
+    t.queued_now("gone".into());
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:0+", "queued:gone"]);
+    t.clear_sent();
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:0+"]);
+}

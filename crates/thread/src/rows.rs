@@ -116,6 +116,7 @@ pub(crate) fn rows_of(
     stream: &(String, String),
     sent: &[String],
     queue: &[QueuedItem],
+    sent_queue: &[String],
 ) -> Vec<Row> {
     // Words on the way are notes on the work line: a text is a note only while its turn
     // still has a thought or a call AFTER it — the last words of a turn answer, however much
@@ -421,6 +422,14 @@ pub(crate) fn rows_of(
         sub: q.sub.clone(),
         mode: q.mode.clone(),
         text: q.text.clone(),
+    }));
+    // Words on their way to the queue: the row of a waiting message, but with no controls —
+    // the agent has no id for them yet, so there is nothing to withdraw or hurry.
+    rows.extend(sent_queue.iter().enumerate().map(|(k, t)| Row::Queued {
+        key: format!("sent-queue-{k}"),
+        sub: String::new(),
+        mode: String::new(),
+        text: t.clone(),
     }));
     rows
 }

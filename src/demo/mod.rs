@@ -360,6 +360,35 @@ fewer form fields. Then check what it did to signups and give me a short summary
         })
         .detach();
     }
+    // `BENCH_DEMO_SEND=1` (with `BENCH_DEMO_TYPE=1`) presses Send three seconds in: the
+    // message goes to the queue of the running demo thread and its waiting row must show
+    // the same frame, before the (absent) agent could ever answer.
+    if std::env::var("BENCH_DEMO_SEND").is_ok() {
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(3))
+                .await;
+            // Deferred a beat off the app's own update: Send reads the app, and it must
+            // not be borrowed already.
+            this.update_in(cx, |app, window, cx| {
+                let at = app.active_thread.clone();
+                window.defer(cx, move |window, cx| {
+                    at.update(cx, |v, cx| {
+                        if v.thread.runtime.is_none() {
+                            v.thread.runtime = Some("demo".into());
+                        }
+                        if v.thread.live.is_none() {
+                            v.thread.live =
+                                Some(crate::app::Live { label: "Thinking…".into() });
+                        }
+                        v.send(window, cx);
+                    });
+                });
+            })
+            .ok();
+        })
+        .detach();
+    }
     // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {
         open_thread(app, cx, |t| {

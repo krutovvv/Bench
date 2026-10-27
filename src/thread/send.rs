@@ -183,6 +183,10 @@ impl ThreadView {
             // It becomes the thread's next message: the inserts that waited with it go after it.
             let after = self.thread.journal.messages() + 1;
             if files.is_empty() {
+                // The waiting row shows the frame it was pressed, not the frame the agent's
+                // queue answers with: the composer must never empty onto nothing.
+                self.thread.journal.queued_now(text.clone());
+                self.follow = true;
                 self.cmd(
                     Cmd::Queue {
                         session,

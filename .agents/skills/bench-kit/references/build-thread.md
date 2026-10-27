@@ -48,6 +48,8 @@ renderer in `src/thread/`.
 - `BENCH_DEMO=landing` (a thread at its end), `top` (at its top), `long` (60 exchanges), `new`.
 - `BENCH_DEMO_RUN=1` plays a run (message, thinking, a tool, the answer streamed, its entry, the
   end) in the open demo thread.
+- `BENCH_DEMO_TYPE=1` writes into the composer two seconds in; `BENCH_DEMO_SEND=1` with it
+  presses Send on the running thread (the queue's echo row must show the same frame).
 - `BENCH_DEMO_SCROLL=end` or `<item>:<px>` opens it scrolled; `BENCH_DEMO_JUMP=1` presses "Jump
   to latest"; `BENCH_DEMO_RENAME=<thread id>` opens a thread's rename.
 - `BENCH_TRACE_SCROLL=1` logs, every frame, the scroll top, the composer's bottom and every row's
