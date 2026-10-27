@@ -215,14 +215,22 @@ fn answer_style(view: TextView, cx: &App) -> TextView {
     )
 }
 
+/// A code block taller than this shows its first lines and a “Show all” line: a log dump must
+/// not take the window when nobody is going to read it.
+pub(super) const FOLD_AFTER_LINES: usize = 10;
+pub(super) const FOLD_PREVIEW_H: f32 = 140.;
+
 /// A code block in an answer, as chat UIs show one: a header with the language on the left and
-/// a copy button on the right, the highlighted code under it (one frame around both).
+/// a copy button on the right, the highlighted code under it (one frame around both). A long one
+/// comes folded (`folded`) with the caller's `more` line below.
 pub(super) fn render_code(
     body: TextView,
     i: &str,
     k: usize,
     lang: String,
     code: String,
+    folded: bool,
+    more: Option<AnyElement>,
     cx: &App,
 ) -> AnyElement {
     let theme = cx.theme();
@@ -278,6 +286,11 @@ pub(super) fn render_code(
                         }),
                 ),
         )
-        .child(body)
+        .child(
+            div()
+                .when(folded, |d| d.max_h(px(FOLD_PREVIEW_H)).overflow_hidden())
+                .child(body),
+        )
+        .when_some(more, |d, m| d.child(m))
         .into_any_element()
 }

@@ -226,7 +226,7 @@ pub struct BenchApp {
     pub video: Option<crate::media::video::Player>,
     pub video_loading: Option<String>,
     pub video_task: Option<Task<()>>,
-    /// Markdown files shown in full rather than their first lines.
+    /// Markdown files and long code blocks opened in full rather than their first lines.
     pub media_open: HashSet<String>,
 
     /// /terminal: the servers of ~/.ssh/config and the terminals' shells.

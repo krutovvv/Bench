@@ -10,7 +10,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::text::{Texts, answer_segments, markdown, render_code};
+use super::text::{FOLD_AFTER_LINES, Texts, answer_segments, markdown, render_code};
 use crate::app::BenchApp;
 use crate::media::{self, Fetched, Kind, Loaded, Segment, file_name};
 use crate::thread::ThreadRef;
@@ -65,8 +65,39 @@ impl BenchApp {
                         lang.as_str()
                     };
                     let md = format!("{fence}{fence_lang}\n{code}{fence}");
-                    let body = TextView::new(&texts.state(&format!("code-{key}-{k}"), &md, cx));
-                    render_code(body, key, k, lang, code, cx)
+                    let state_key = format!("code-{key}-{k}");
+                    let body = TextView::new(&texts.state(&state_key, &md, cx));
+                    // A long block (a log dump) comes folded to its first lines; opening it is
+                    // the person's, remembered while Bench runs, like an unfolded Markdown file.
+                    let long = code.lines().count() > FOLD_AFTER_LINES;
+                    let open = self.media_open.contains(&state_key);
+                    let more = long.then(|| {
+                        let k2 = state_key.clone();
+                        let n = code.lines().count();
+                        div()
+                            .id(SharedString::from(format!("code-more-{key}-{k}")))
+                            .px_3()
+                            .py_1()
+                            .text_base()
+                            .text_color(cx.theme().muted_foreground)
+                            .border_t_1()
+                            .border_color(cx.theme().border)
+                            .cursor_pointer()
+                            .hover(|s| s.text_color(cx.theme().foreground))
+                            .child(if open {
+                                "Show less".to_string()
+                            } else {
+                                format!("Show all · {n} lines")
+                            })
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                if !this.media_open.remove(&k2) {
+                                    this.media_open.insert(k2.clone());
+                                }
+                                cx.notify();
+                            }))
+                            .into_any_element()
+                    });
+                    render_code(body, key, k, lang, code, long && !open, more, cx)
                 }
             })
             .collect()

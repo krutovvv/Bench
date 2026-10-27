@@ -21,6 +21,7 @@
 | anything else (glb, stl, zip…) | row: icon, name, folder; the **whole row** is clickable | opens in its default app |
 | missing / failed | row with the error in red | click retries |
 | ```mermaid block | SVG diagram (mermaid-rs-renderer), theme follows light/dark | opens the SVG |
+| ``` code block over 10 lines | folded to ~140 pt + "Show all · N lines" (like the md card) | Show all / Show less |
 | `$…$`, `$$…$$` | Unicode text (unicodeit), italic | — |
 
 Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()`, `media/view.rs`.
