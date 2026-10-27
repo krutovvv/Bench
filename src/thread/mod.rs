@@ -434,6 +434,14 @@ impl ThreadView {
                 &plan,
                 &asks,
                 live && !self.thread.processes.is_empty(),
+                // The answer that follows this work: its read-aloud and copy ride this
+                // line's far edge — the very place Pause and Stop held while the run lived.
+                match self.thread.tv.rows.get(k + 1) {
+                    Some(Row::Answer { key: ak, text, .. }) if text.trim() != "" => {
+                        Some((ak.clone(), text.clone()))
+                    }
+                    _ => None,
+                },
                 cx,
             ),
             Row::Answer { key, text, error } => {

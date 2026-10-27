@@ -27,6 +27,10 @@ impl ThreadView {
         plan: &[(String, Vec<PlanStep>)],
         asks: &[AskCard],
         procs: bool,
+        // The answer this work leads to, when the run has ended: its read-aloud and copy
+        // ride this line's far edge, the exact place Pause and Stop held while the run
+        // lived — standing there from the start, shown on hover.
+        answer: Option<(String, String)>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
@@ -81,8 +85,21 @@ impl ThreadView {
             _ => "Thinking…".to_string(),
         });
         let work_key = key.to_string();
+        // The tail's two, in the transport's seat: same buttons' size, same edge, same gap.
+        let tail = answer.filter(|_| !live);
+        let tgroup: SharedString = format!("worktail-{key}").into();
+        let (tplay, tspeak) = tail
+            .as_ref()
+            .map_or((false, false), |(ak, _)| match self.app(cx) {
+                Some(a) => (
+                    a.playing.as_ref().is_some_and(|(j, _)| j == ak),
+                    a.speaking.as_deref() == Some(ak),
+                ),
+                None => (false, false),
+            });
         let summary = h_flex()
             .id(SharedString::from(format!("work-{key}")))
+            .group(tgroup.clone())
             .gap_1p5()
             .items_center()
             .min_w_0()
@@ -164,6 +181,54 @@ impl ThreadView {
                                     }
                                     cx.notify();
                                 })),
+                        ),
+                )
+            })
+            // The answer's own two, in the same seat the hold and the stop sat in: read
+            // aloud, and copy the agent's markdown. Hidden until the line is hovered —
+            // unless that answer is playing or being spoken right now.
+            .when_some(tail, |d, (ak, atext)| {
+                let copy_id = format!("work-copy-{key}");
+                let speak_id = format!("work-speak-{key}");
+                let ak_copy = ak.clone();
+                d.child(
+                    h_flex()
+                        .flex_none()
+                        .ml_auto()
+                        .gap_1()
+                        .items_center()
+                        .when(!(tplay || tspeak) && std::env::var("BENCH_TOOLS_SHOWN").is_err(), |s| {
+                            s.opacity(0.).group_hover(tgroup, |g| g.opacity(1.))
+                        })
+                        .child(
+                            bench_ui::head_icon_button(&copy_id, Ico::Copy, "Copy", cx).on_click(
+                                cx.listener(move |this, _, window, cx| {
+                                    this.claim_click(cx);
+                                    this.copy_answer(&ak_copy, window, cx);
+                                }),
+                            ),
+                        )
+                        .child(
+                            bench_ui::head_icon_button(
+                                &speak_id,
+                                if tplay {
+                                    Ico::Square
+                                } else if tspeak {
+                                    Ico::Loader
+                                } else {
+                                    Ico::Volume
+                                },
+                                if tplay { "Stop" } else { "Read aloud" },
+                                cx,
+                            )
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.claim_click(cx);
+                                this.app
+                                    .update(cx, |app, cx| {
+                                        app.toggle_speak(&ak, atext.clone(), window, cx)
+                                    })
+                                    .ok();
+                            })),
                         ),
                 )
             })

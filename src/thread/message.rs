@@ -173,7 +173,9 @@ impl ThreadView {
                 speaker_row(if after_work { None } else { Some(true) }, body, cx)
                     .when(after_work, |d| d.pt_0()),
             )
-            .when(!text.trim().is_empty(), |d| d.child(actions))
+            // A pure chat answer carries its two where they are; an answer after work wears
+            // them on the work line itself, in the transport's seat (`work.rs`).
+            .when(!after_work && !text.trim().is_empty(), |d| d.child(actions))
             .into_any_element()
     }
 
