@@ -32,7 +32,9 @@ impl BenchApp {
         }
         match (ks.key.as_str(), m.shift) {
             ("n", false) => {
-                self.new_session(cx);
+                // The new thread appears where a thread lives: beside a document, in the
+                // dock; otherwise the center shows it (`new_thread_here`).
+                self.new_thread_here(cx);
                 self.focus_composer(window, cx);
             }
             ("2", false) if crate::app::shortcuts::SSH => self.open_terminal_thread(window, cx),

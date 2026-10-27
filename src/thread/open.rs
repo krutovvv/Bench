@@ -130,6 +130,29 @@ impl BenchApp {
         cx.notify();
     }
 
+    /// A new thread where the open one is shown: a document in the middle, the thread in the
+    /// right dock — the panel's "+" and ⌘N reset that thread to a new one and the document
+    /// stays. `new_session` is the same when no thread sits beside a document: the new one
+    /// becomes the center's.
+    pub fn new_thread_in_panel(&mut self, cx: &mut Context<Self>) {
+        self.reset_chat(cx);
+        self.save_place(cx);
+        cx.notify();
+    }
+
+    /// ⌘N and the panel's "+": the new thread appears where a thread lives — beside a
+    /// document, in the dock; otherwise the center shows it.
+    pub fn new_thread_here(&mut self, cx: &mut Context<Self>) {
+        use crate::workspace::{DockPosition, Panel};
+        if self.center == Center::Doc
+            && self.shown_panel(DockPosition::Right) == Some(Panel::Thread)
+        {
+            self.new_thread_in_panel(cx);
+        } else {
+            self.new_session(cx);
+        }
+    }
+
     /// The project a session belongs to, as the sidebar lists it ("" = none).
     pub(crate) fn project_of_session(&self, id: &str) -> String {
         self.sessions

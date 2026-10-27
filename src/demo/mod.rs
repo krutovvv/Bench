@@ -303,6 +303,22 @@ fewer form fields. Then check what it did to signups and give me a short summary
         })
         .detach();
     }
+    // `BENCH_DEMO_NEW=1`: the dock panel's "+" pressed two seconds after opening — with
+    // `BENCH_DEMO=explorer BENCH_EXPLORER=thread` it shows a new thread in the dock while
+    // the document keeps the middle.
+    if std::env::var("BENCH_DEMO_NEW").is_ok() {
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(2))
+                .await;
+            this.update_in(cx, |app, window, cx| {
+                app.new_thread_in_panel(cx);
+                app.focus_composer(window, cx);
+            })
+            .ok();
+        })
+        .detach();
+    }
     // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {
         open_thread(app, cx, |t| {

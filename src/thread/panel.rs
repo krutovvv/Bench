@@ -66,13 +66,15 @@ impl BenchApp {
                 .child(div().flex_1().min_h_0().child(view))
                 .into_any_element();
         }
+        // A document in the middle: "+" starts a new thread here, in this panel — the
+        // document keeps the middle (`new_thread_here`).
         let head = bench_ui::ide_head(
             title,
             None,
             vec![
                 bench_ui::icon_button("thread-new", Ico::Plus, "New thread  ⌘N", false, cx)
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.new_session(cx);
+                        this.new_thread_here(cx);
                         this.focus_composer(window, cx);
                     }))
                     .into_any_element(),
