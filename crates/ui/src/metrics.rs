@@ -80,9 +80,10 @@ pub fn nest_pl(cx: &App) -> Pixels {
 }
 
 /// Where the sidebar's project header starts its name: a 16 px inset, a 16 px head icon and
-/// a 6 px gap. The rows under it — sessions, the remote note — start their text on this line,
-/// so a project and its threads read as one column.
-pub const PROJECT_NAME_X: f32 = 38.;
+/// the small gap between — measured on screen, the name's ink begins at 36 px, not 38: the
+/// gap step is 4 px. The rows under it — sessions, the remote note — start their text on this
+/// line, so a project and its threads read as one column.
+pub const PROJECT_NAME_X: f32 = 36.;
 
 /// One line of the code editor (mono font × 1.5).
 pub fn editor_line(cx: &App) -> f32 {
