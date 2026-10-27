@@ -23,7 +23,6 @@ import type { Emit, Runtime } from "./runtime.ts";
 
 const MAX = 4096;
 const EDIT_EVERY_MS = 1500;
-const SHOWN_STEPS = 6;
 /** Messages that come in a run (several written one after another, a forwarded batch) are one
  * turn: it starts once the chat is quiet this long after the last of them is ready (a voice
  * message once it is transcribed), or longer while the batch is only forwarded messages (the
@@ -76,7 +75,10 @@ interface Turn {
 	/** The person's message it answers: the status and the answer are replies to it. */
 	replyTo?: number;
 	status?: number;
-	steps: string[];
+	steps: number;
+	/** The answer as it is being written: its last line is what the status says — the model's
+	 * own words read better in one line than a list of tool calls, and stay until new words. */
+	text?: string;
 	started: number;
 	dirty: boolean;
 	lastEdit: number;
@@ -86,12 +88,11 @@ interface Turn {
 	typing?: NodeJS.Timeout;
 }
 
-/** A tool step as one short line: an icon, the tool, its main argument. */
-function stepLine(name: string, detail: string): string {
-	const icon: Record<string, string> = { bash: "💻", read: "📄", write: "✏️", edit: "✏️", skill_view: "📖", skill_manage: "📖", memory: "🧠", clarify: "❓", todo: "📋", delegate: "👥", cron: "⏰", session_search: "🔎", tool_search: "🧰" };
-	const label = name.startsWith("mcp__") ? name.split("__").slice(1).join(" ") : name;
-	const short = detail.replace(/\s+/g, " ").trim().slice(0, 70);
-	return `${icon[name] ?? (name.startsWith("mcp__") ? "🔌" : "🔧")} ${label}${short ? `: ${short}` : ""}`;
+/** The status's one live line from the streamed answer: its last written line, bare. */
+function liveLine(text: string | undefined): string {
+	if (!text) return "";
+	const lines = text.split("\n").map((l) => l.replace(/^[#>\-*+\d.\s]+/, "").trim()).filter(Boolean);
+	return (lines[lines.length - 1] ?? "").slice(0, 120);
 }
 
 /** The bots running: "" the general one, else a project's id → its settings and how to stop it. */
@@ -175,10 +176,9 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 
 	const statusText = (t: Turn, done?: string) => {
 		const secs = Math.round((Date.now() - t.started) / 1000);
-		if (done) return `${done} · ${t.steps.length} ${t.steps.length === 1 ? "step" : "steps"} · ${secs} s`;
-		const shown = t.steps.slice(-SHOWN_STEPS);
-		const more = t.steps.length - shown.length;
-		return [`⏳ Working… ${secs} s`, ...(more > 0 ? [`… ${more} more`] : []), ...shown].join("\n");
+		if (done) return `${done} · ${t.steps} ${t.steps === 1 ? "step" : "steps"} · ${secs} s`;
+		const line = liveLine(t.text);
+		return line ? `⏳ ${line} · ${secs} s` : `⏳ Working… ${secs} s`;
 	};
 	const editStatus = async (t: Turn, done?: string) => {
 		t.dirty = false;
@@ -229,20 +229,28 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		if (type === "message.start") {
 			const replyTo = replies.get(sessionId);
 			replies.delete(sessionId);
-			const t: Turn = { chat, replyTo, steps: [], started: Date.now(), dirty: false, lastEdit: 0 };
+			const t: Turn = { chat, replyTo, steps: 0, text: "", started: Date.now(), dirty: false, lastEdit: 0 };
 			turns.set(sessionId, t);
 			void editStatus(t);
 			api.sendChatAction(chat, "typing").catch(() => {});
 			t.typing = setInterval(() => api.sendChatAction(chat, "typing").catch(() => {}), 4500);
+		} else if (type === "message.delta") {
+			const t = turns.get(sessionId);
+			if (!t) return;
+			t.text = (t.text ?? "") + String(payload.text ?? "");
+			schedule(t);
 		} else if (type === "tool.start") {
 			const t = turns.get(sessionId);
 			if (!t) return;
-			t.steps.push(stepLine(String(payload.name), String(payload.context ?? "")));
+			// Counted, not shown: the status line is the model's words, not its commands.
+			t.steps++;
 			schedule(t);
 		} else if (type === "subagent.start") {
 			const t = turns.get(sessionId);
 			if (!t) return;
-			t.steps.push(`👥 ${String(payload.goal ?? "").slice(0, 70)}`);
+			t.steps++;
+			// A delegation says what it delegated — it is a readable line in its own right.
+			t.text = `👥 ${String(payload.goal ?? "").slice(0, 110)}`;
 			schedule(t);
 		} else if (type === "message.complete") {
 			const t = turns.get(sessionId);

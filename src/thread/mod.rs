@@ -148,9 +148,49 @@ impl ThreadView {
                 },
             ]));
             // A queue like this means a live run: the plan of that run shows, and it shows in
-            // the work it belongs to — a journal item, as any plan is.
+            // the work it belongs to — a journal item, as any plan is. Before the plan: what
+            // the agent said aloud and the call it went on to make — the header line keeps the
+            // words while the command runs.
             self.thread.journal.apply(protocol::ThreadEvent::Run(true));
             self.thread.journal.apply(protocol::ThreadEvent::Append(vec![
+                protocol::ThreadItem::Tool {
+                    key: "demo-live-1".into(),
+                    seq: u64::MAX - 5,
+                    call_id: "demo-live-c".into(),
+                    name: "bash".into(),
+                    args: serde_json::json!({ "command": "python3 bills/match.py --month oct" }),
+                    preview: "python3 bills/match.py --month oct".into(),
+                    at: None,
+                },
+                protocol::ThreadItem::Result {
+                    key: "demo-live-2".into(),
+                    seq: u64::MAX - 4,
+                    call_id: "demo-live-c".into(),
+                    name: "bash".into(),
+                    output: "3 unmatched".into(),
+                    failed: false,
+                    diff: None,
+                    at: None,
+                },
+                protocol::ThreadItem::Text {
+                    key: "demo-live-3".into(),
+                    // Same seq as the calls of its block: that is what makes its text a note
+                    // on the way, not an answer (see `rows_of`).
+                    seq: u64::MAX - 2,
+                    text: "Reading the billing export, then matching it against the invoices."
+                        .into(),
+                    at: None,
+                    error: None,
+                },
+                protocol::ThreadItem::Tool {
+                    key: "demo-live-4".into(),
+                    seq: u64::MAX - 2,
+                    call_id: "demo-live-c2".into(),
+                    name: "bash".into(),
+                    args: serde_json::json!({ "command": "grep -c INV-2026 invoices/*.csv" }),
+                    preview: "grep -c INV-2026 invoices/*.csv".into(),
+                    at: None,
+                },
                 protocol::ThreadItem::Plan {
                     key: "demo-plan".into(),
                     seq: u64::MAX - 1,

@@ -52,11 +52,24 @@ impl ThreadView {
             parts.push((clock(s as u64), muted));
         }
         let has_parts = !parts.is_empty();
-        // What the agent is doing now: its last step, said in a line.
-        let doing = live.then(|| match steps.last() {
-            Some(Step::Tool { name, preview, .. }) => tool_label(name, preview),
-            Some(Step::Note(t)) => clip(t, 160),
-            _ => "Thinking…".to_string(),
+        // What the agent is doing now: its newest words, in a line. A command preview reads as
+        // noise in a status; the words the model writes between its calls carry the sense of the
+        // work — so the last thing it said stays on the line until it says something new, and
+        // until it has said anything, the neutral word.
+        let doing = live.then(|| {
+            steps
+                .iter()
+                .rev()
+                .find_map(|s| match s {
+                    Step::Note(t) => t
+                        .lines()
+                        .rev()
+                        .map(str::trim)
+                        .find(|l| !l.is_empty() && !l.starts_with('#'))
+                        .map(|l| clip(l, 160)),
+                    _ => None,
+                })
+                .unwrap_or_else(|| "Thinking…".to_string())
         });
         let work_key = key.to_string();
         let summary = h_flex()
