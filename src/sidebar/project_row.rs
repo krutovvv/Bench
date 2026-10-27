@@ -9,9 +9,9 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::sidebar::items::Item;
 use super::menu::item_menu;
 use crate::app::BenchApp;
+use crate::sidebar::items::Item;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -221,5 +221,4 @@ impl BenchApp {
         }
         out
     }
-
 }

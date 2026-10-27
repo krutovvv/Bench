@@ -1,7 +1,6 @@
 //! The bar over the center: the thread's title and its project's branch, the documents' tabs
 //! (`explorer/tabs.rs`) with the thread-beside button, or a settings page's title and its close.
 
-
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
 
@@ -145,4 +144,3 @@ impl BenchApp {
         .into_any_element()
     }
 }
-

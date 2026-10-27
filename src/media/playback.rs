@@ -1,13 +1,18 @@
 //! Sound and video playing in place in an answer: a delivered audio file, a video's frames and
 //! sound (ffmpeg).
 
-use std::path::PathBuf;
-use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::media::audio::{self, Playback};
+use gpui_kit::*;
+use std::path::PathBuf;
 
 impl BenchApp {
-    pub(super) fn toggle_media_audio(&mut self, key: String, local: PathBuf, cx: &mut Context<Self>) {
+    pub(super) fn toggle_media_audio(
+        &mut self,
+        key: String,
+        local: PathBuf,
+        cx: &mut Context<Self>,
+    ) {
         if self.media_playing.as_ref().is_some_and(|(k, _)| *k == key) {
             self.media_playing = None;
             cx.notify();
@@ -56,7 +61,9 @@ impl BenchApp {
         self.video_task = Some(cx.spawn(async move |this, cx| {
             let (k, fallback) = (key.clone(), file.clone());
             let player = cx
-                .background_spawn(async move { crate::media::video::Player::start(k, &file, pw, ph) })
+                .background_spawn(
+                    async move { crate::media::video::Player::start(k, &file, pw, ph) },
+                )
                 .await;
             let ok = this.update(cx, |this, cx| {
                 this.video_loading = None;

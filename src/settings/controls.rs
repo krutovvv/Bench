@@ -12,7 +12,6 @@ use crate::app::BenchApp;
 pub(super) type Act = Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>;
 
 impl BenchApp {
-
     pub(super) fn providers_page(page: Vec<AnyElement>) -> AnyElement {
         v_flex()
             .id("providers")

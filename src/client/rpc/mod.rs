@@ -7,8 +7,8 @@ use std::sync::{Arc, mpsc};
 
 use serde_json::Value;
 
-use crate::client::connection::Connection;
 use crate::app::model::{Profile, SessionRow, Target, Usage};
+use crate::client::connection::Connection;
 
 pub enum Cmd {
     Sessions(String),
@@ -240,4 +240,3 @@ impl Gateway {
         let _ = self.tx.send(cmd);
     }
 }
-

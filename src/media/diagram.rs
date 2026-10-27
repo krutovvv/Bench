@@ -1,9 +1,9 @@
 //! Mermaid diagrams drawn as SVG in plain Rust, cached on disk by source and theme.
 
-use std::path::PathBuf;
-use anyhow::{Result, bail};
-use crate::client::connection::state_dir;
 use super::hash_of;
+use crate::client::connection::state_dir;
+use anyhow::{Result, bail};
+use std::path::PathBuf;
 
 /// A diagram as an SVG file and its size in points. Cached on disk by source and theme.
 pub type Diagram = (PathBuf, (f32, f32));

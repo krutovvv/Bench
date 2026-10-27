@@ -8,13 +8,13 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use bench_ui::plural;
-use crate::sidebar::items::Item;
 use super::SESSION_TITLE;
 use super::menu::item_menu;
 use crate::app::BenchApp;
+use crate::sidebar::items::Item;
 use crate::workspace::Center;
 use bench_ui::icons::Ico;
+use bench_ui::plural;
 
 impl BenchApp {
     /// `guide`: under a group header, indented on the group's guide line (`Some(last row)`).

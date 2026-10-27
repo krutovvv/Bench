@@ -1,10 +1,8 @@
 //! The thread's list state (`View`): what it shows, how it is scrolled, the room past the end, and
 //! the rows synced from the journal by diff.
 
-
 use ::thread::Row;
 use gpui_kit::*;
-
 
 /// What the list shows and how it is scrolled. Owned by `BenchApp`.
 pub struct View {

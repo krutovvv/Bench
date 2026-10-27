@@ -8,8 +8,8 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::workspace::Center;
 use crate::client::rest;
+use crate::workspace::Center;
 
 /// A file as the Explorer reaches it: through the agent of `project`, on `machine` when that is
 /// not the agent's own (a project this Mac's agent works on over SSH).

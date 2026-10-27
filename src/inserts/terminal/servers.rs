@@ -11,9 +11,9 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
+use crate::app::model::Target;
 use crate::client::connection::{self, HostCheck};
 use crate::inserts::terminal::session::Session;
-use crate::app::model::Target;
 use crate::system::sshconfig::{self, Server};
 
 /// An open terminal: one ssh connection.

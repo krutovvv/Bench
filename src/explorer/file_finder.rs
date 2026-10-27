@@ -7,9 +7,9 @@ use gpui_kit::*;
 
 use super::{DocKey, Quick};
 use crate::app::BenchApp;
-use crate::workspace::SidebarPanel;
-use crate::env::enc;
 use crate::client::rest;
+use crate::env::enc;
+use crate::workspace::SidebarPanel;
 
 impl BenchApp {
     /// ⌘P: a field over the middle and every file of the project's folder to choose from.

@@ -4,16 +4,16 @@
 use gpui_kit::*;
 
 use super::tree::{act, quiet};
+use super::{DocKey, FileRef, Find};
 use crate::app::BenchApp;
-use gpui_kit::component::input::Input;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use crate::client::rest;
+use crate::env::enc;
+use crate::workspace::SidebarPanel;
 use bench_ui::icons::Ico;
+use gpui_kit::component::input::Input;
 use gpui_kit::component::input::{InputEvent, InputState, Position};
 use gpui_kit::component::notification::NotificationType;
-use super::{DocKey, FileRef, Find};
-use crate::workspace::SidebarPanel;
-use crate::env::enc;
-use crate::client::rest;
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 
 impl BenchApp {
     /// ⌘⇧F in place of the tree: the field, then the lines found by file; a line opens its file

@@ -1,6 +1,9 @@
 //! An answer's text: Markdown kept parsed while the thread is open (`Texts`), formulas as Unicode,
 //! code blocks with their head.
 
+use crate::app::BenchApp;
+use crate::media::{self, Segment, latex_text};
+use bench_ui::icons::Ico;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::text::{
     MarkdownNode, MarkdownParseContext, MarkdownPlugin, TextView, TextViewState, markdown_ast,
@@ -8,9 +11,6 @@ use gpui_kit::component::text::{
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use crate::app::BenchApp;
-use bench_ui::icons::Ico;
-use crate::media::{self, Segment, latex_text};
 
 /// `$…$`: a formula as Unicode text in italics. Money ("$5 and $10") is not one: TeX math
 /// never starts or ends with a space.

@@ -4,8 +4,8 @@
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 
-use super::{DocKey, FileRef, Named};
 use super::tree::{act, quiet};
+use super::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
 use crate::env::{Home, SECTIONS};
 use bench_ui::icons::Ico;

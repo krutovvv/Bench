@@ -14,8 +14,8 @@ use super::section::{
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
-use crate::env::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 use crate::client::rest;
+use crate::env::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 
 /// One MCP server of the project. `checked` is the field that matters most: the agent only knows
 /// a server once something has asked for its tools, so without it "no answer yet" and "answers

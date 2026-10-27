@@ -2,36 +2,37 @@
 //! (`workspace/`, `titlebar/`, `sidebar/`, `thread/`, `settings/`, `statusbar/`).
 
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 
 use web_time::Instant;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
+use gpui_kit::component::input::{InputState, TextareaState};
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::select::SelectState;
 use gpui_kit::*;
 
 pub(crate) mod agents;
 mod backend;
+mod connect;
 mod events;
 mod keys;
 pub(crate) mod model;
 pub(crate) mod places;
 pub(crate) mod projects;
 pub(crate) mod shortcuts;
+mod subscriptions;
 
 use crate::env::ProjectEnv;
 use crate::settings::new_project::ProjectForm;
 use crate::workspace::{Center, RightPanel, SidebarPanel};
 
-use crate::media::audio::{Playback, Recorder};
-use crate::client::connection::{self, Connection};
-use crate::client::rpc::{Cmd, Evt, Gateway};
-use crate::media::{self, Loaded};
 use crate::app::model::{EFFORTS, Profile, SessionRow, SkillRow, Target, Usage};
+use crate::client::connection::{self};
 use crate::client::rest;
+use crate::client::rpc::Evt;
+use crate::media::audio::{Playback, Recorder};
+use crate::media::{self, Loaded};
 
 pub type Choice = SelectState<Vec<SharedString>>;
 
@@ -363,206 +364,19 @@ impl BenchApp {
                 cx,
             )
         });
-        let subs = vec![
-            // "System" follows macOS light/dark as it changes.
-            cx.observe_window_appearance(window, |this, window, cx| {
-                if this.appearance.mode == bench_ui::theme::Mode::System {
-                    bench_ui::theme::apply(this.appearance, Some(window), cx);
-                    this.repaint_terminals(cx);
-                }
-            }),
-            // Enter in the question card's field sends that text as the answer.
-            cx.subscribe_in(
-                &clarify_input,
-                window,
-                |this, state, ev: &InputEvent, window, cx| {
-                    if let InputEvent::PressEnter { .. } = ev {
-                        let text = state.read(cx).value().trim().to_string();
-                        if !text.is_empty() {
-                            this.answer_clarify(text, window, cx);
-                        }
-                    }
-                },
-            ),
-            cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
-                match ev {
-                    // Enter is a new line; ⌘Enter sends.
-                    InputEvent::PressEnter {
-                        secondary: true, ..
-                    } => this.send(window, cx),
-                    // New text: the command list starts over at its first row.
-                    InputEvent::Change => {
-                        this.note_draft(cx);
-                        this.slash_sel = 0;
-                        // Esc hides the list for the current word; a new word may open it again.
-                        let text = this.composer.read(cx).value();
-                        if text.is_empty() || text.ends_with(char::is_whitespace) {
-                            this.slash_closed = false;
-                        }
-                        cx.notify();
-                    }
-                    _ => {}
-                }
-            }),
-            cx.subscribe_in(
-                &search,
-                window,
-                |this, state, ev: &InputEvent, window, cx| {
-                    if matches!(ev, InputEvent::Change) {
-                        let q = state.read(cx).value().trim().to_string();
-                        this.search_sessions(q, window, cx);
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &project_path,
-                window,
-                |this, state, ev: &InputEvent, window, cx| {
-                    if let InputEvent::PressEnter { .. } = ev {
-                        let path = state.read(cx).value().trim().to_string();
-                        if !path.is_empty() {
-                            this.path_entry = false;
-                            this.set_new_project(path, window, cx);
-                        }
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &effort_choice,
-                window,
-                |this, _, ev: &SelectEvent<Vec<SharedString>>, _, cx| {
-                    let SelectEvent::Confirm(Some(label)) = ev else {
-                        return;
-                    };
-                    if let Some(i) = this.efforts.iter().position(|e| e == label.as_ref()) {
-                        this.set_effort(i, cx);
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &target_choice,
-                window,
-                |this, _, ev: &SelectEvent<Vec<SharedString>>, window, cx| {
-                    let SelectEvent::Confirm(Some(label)) = ev else {
-                        return;
-                    };
-                    if let Some(t) = this
-                        .targets
-                        .iter()
-                        .find(|t| t.label() == label.as_ref())
-                        .cloned()
-                    {
-                        if t != this.target || this.local_conn().is_none() {
-                            this.connect(t, window, cx);
-                        }
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &profile_choice,
-                window,
-                |this, _, ev: &SelectEvent<Vec<SharedString>>, window, cx| {
-                    let SelectEvent::Confirm(Some(label)) = ev else {
-                        return;
-                    };
-                    if let Some(p) = this.profiles.iter().find(|p| p.label == label.as_ref()) {
-                        let name = p.name.clone();
-                        this.select_profile(name, window, cx);
-                    }
-                },
-            ),
-        ];
+        let subs = Self::subscriptions(
+            &clarify_input,
+            &composer,
+            &search,
+            &project_path,
+            &effort_choice,
+            &target_choice,
+            &profile_choice,
+            window,
+            cx,
+        );
 
-        let events = cx.spawn_in(window, async move |this, cx| {
-            while let Ok(evt) = evt_rx.recv().await {
-                if this
-                    .update_in(cx, |this, window, cx| this.on_event(evt, window, cx))
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        });
-        // Live clock + playback end detection.
-        let ticker = cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor()
-                    .timer(Duration::from_millis(500))
-                    .await;
-                let alive = this.update(cx, |this, cx| {
-                    if this.playing.as_ref().is_some_and(|(_, p)| p.is_done()) {
-                        this.playing = None;
-                        cx.notify();
-                    }
-                    if this
-                        .media_playing
-                        .as_ref()
-                        .is_some_and(|(_, p)| p.is_done())
-                    {
-                        this.media_playing = None;
-                    }
-                    if this.media_playing.is_some() {
-                        cx.notify(); // the elapsed time
-                    }
-                    if this.live.is_some() {
-                        this.speed.tick();
-                    }
-                    if this.live.is_some() || this.recorder.is_some() {
-                        cx.notify();
-                    }
-                    this.tick_tasks(cx);
-                });
-                if alive.is_err() {
-                    break;
-                }
-            }
-        });
-        // The open session's background processes, every 3 s (the gateway has no event for them).
-        let processes = cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor().timer(Duration::from_secs(3)).await;
-                if this.update(cx, |this, _| this.poll_processes()).is_err() {
-                    break;
-                }
-            }
-        });
-        // The gateway item in the status bar: its state and the last lines of its log, every 10 s
-        // while connected. Both come from where this project's agent runs, so a project on a
-        // server shows that server's gateway.
-        let backend = cx.spawn(async move |this, cx| {
-            loop {
-                let Ok(job) = this.update(cx, |this, _| {
-                    this.thread_conn()
-                        .map(|c| (c, this.current_profile(), this.thread_target()))
-                }) else {
-                    break;
-                };
-                if let Some((conn, profile, target)) = job {
-                    let r = cx
-                        .background_spawn(async move {
-                            (
-                                rest::gateway_status(&conn, &profile),
-                                connection::gateway_log(&target, 12),
-                            )
-                        })
-                        .await;
-                    if this
-                        .update(cx, |this, cx| {
-                            this.gw_status = Some(r.0.map_err(|e| format!("{e:#}")));
-                            this.gw_log = r.1;
-                            cx.notify();
-                        })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-                cx.background_executor()
-                    .timer(Duration::from_secs(10))
-                    .await;
-            }
-        });
-        let mut tasks = vec![events, ticker, processes, backend];
+        let mut tasks = Self::timers(evt_rx, window, cx);
 
         // The gateway list keeps the SSH hosts that can run the agent (asked again when the menu opens).
         let ssh = crate::inserts::terminal::servers::Ssh::new();
@@ -758,100 +572,6 @@ impl BenchApp {
     }
 
     // ---- connection ------------------------------------------------------
-
-    pub fn connect(&mut self, target: Target, _window: &mut Window, cx: &mut Context<Self>) {
-        self.agents.remove(""); // drops the old thread
-        self.target = target.clone();
-        self.connecting = true;
-        self.profile_ready = false;
-        self.approval_mode = None;
-        self.opened.clear();
-        self.profiles.clear();
-        self.profile = None;
-        self.sessions.clear();
-        self.skills.clear();
-        self.reset_chat(cx);
-        self.pv = Default::default();
-        self.gw_status = None;
-        self.gw_log.clear();
-        let dir = connection::state_dir();
-        let _ = std::fs::create_dir_all(&dir)
-            .and_then(|_| std::fs::write(dir.join("last-target"), target.label()));
-        self.agents.insert(
-            String::new(),
-            agents::AgentLink::new(Gateway::start(target, self.evt_tx.clone())),
-        );
-        cx.notify();
-    }
-
-    /// To the agent the command concerns (`agents.rs`): this Mac's, or a remote project's.
-    pub(crate) fn cmd(&self, cmd: Cmd) {
-        self.route(cmd);
-    }
-
-    pub fn current_profile(&self) -> String {
-        self.profile.clone().unwrap_or_default()
-    }
-
-    /// Events carry the runtime id.
-    pub(crate) fn is_current(&self, sid: &str) -> bool {
-        self.runtime.as_deref() == Some(sid)
-    }
-
-    pub(crate) fn refresh_sessions(&self) {
-        if let Some(p) = self.profile.clone() {
-            self.cmd(Cmd::Sessions(p));
-        }
-    }
-
-    // ---- events ----------------------------------------------------------
-
-    // ---- chat ------------------------------------------------------------
-
-    // ---- background REST helpers -------------------------------------------
-
-    /// Run `job` off the UI thread with the current connection, then `done` on it.
-    pub(crate) fn rest<T: Send + 'static>(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-        job: impl FnOnce(&Connection, &str) -> anyhow::Result<T> + Send + 'static,
-        done: impl FnOnce(&mut Self, anyhow::Result<T>, &mut Window, &mut Context<Self>) + 'static,
-    ) {
-        let Some(conn) = self.local_conn() else {
-            return;
-        };
-        let profile = self.current_profile();
-        cx.spawn_in(window, async move |this, cx| {
-            let result = cx
-                .background_spawn(async move { job(&conn, &profile) })
-                .await;
-            let _ = this.update_in(cx, |this, window, cx| {
-                done(this, result, window, cx);
-                cx.notify();
-            });
-        })
-        .detach();
-    }
-
-    // ---- profile defaults & telegram filter ---------------------------------
-
-    // ---- right panel: changed files, tree, viewer --------------------------
-
-    pub fn set_appearance(
-        &mut self,
-        a: bench_ui::theme::Appearance,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.appearance = a;
-        crate::settings::appearance::save(&a);
-        bench_ui::theme::apply(a, Some(window), cx);
-        self.repaint_terminals(cx);
-        cx.notify();
-    }
-
-    // ---- voice -----------------------------------------------------------
 }
 
 pub fn now_secs() -> f64 {
@@ -859,56 +579,4 @@ pub fn now_secs() -> f64 {
         .duration_since(web_time::UNIX_EPOCH)
         .map(|d| d.as_secs_f64())
         .unwrap_or_default()
-}
-
-///  ("session search"; an MCP tool
-/// `mcp__<server>__<tool>` as "<server> · <tool>"), then what it worked on.
-pub fn tool_label(name: &str, detail: &str) -> String {
-    let name = match name.strip_prefix("mcp__").and_then(|n| n.split_once("__")) {
-        Some((server, tool)) => format!("{server} · {}", tool.replace('_', " ")),
-        None => name.replace('_', " "),
-    };
-    // One line: a command with a heredoc, a patch, a quoted page — the running line is one row
-    // tall whatever the tool was handed, or the thread jumps in height as the work changes.
-    let detail = clip_line(detail);
-    if detail.is_empty() {
-        name
-    } else {
-        format!("{name}: {detail}")
-    }
-}
-
-/// One line of at most 160 characters.
-fn clip_line(s: &str) -> String {
-    let line = s
-        .lines()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or_default()
-        .trim();
-    if line.chars().count() > 160 {
-        format!("{}…", line.chars().take(159).collect::<String>())
-    } else {
-        line.to_string()
-    }
-}
-
-impl BenchApp {}
-
-#[cfg(test)]
-mod tool_label_tests {
-    #[test]
-    fn labels() {
-        assert_eq!(super::tool_label("bash", "ls"), "bash: ls");
-        assert_eq!(super::tool_label("session_search", ""), "session search");
-        assert_eq!(
-            super::tool_label("bash", "python3 - <<'PY'\nimport re\np='src/app.rs'"),
-            "bash: python3 - <<'PY'",
-            "a multiline command stays one line"
-        );
-        assert_eq!(super::tool_label("bash", "\n\n   \n"), "bash");
-        assert_eq!(
-            super::tool_label("mcp__reminders__list_items", "Today"),
-            "reminders · list items: Today"
-        );
-    }
 }

@@ -21,14 +21,14 @@ pub(crate) mod drafts;
 mod extras;
 mod list;
 mod message;
-mod queued;
-mod rail;
 mod open;
 mod processes;
 mod prompts;
+mod queued;
+mod rail;
 pub(crate) mod send;
 mod slash;
-mod work;
+pub(crate) mod work;
 
 pub use list::View;
 

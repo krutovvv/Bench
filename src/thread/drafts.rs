@@ -2,7 +2,6 @@
 
 use gpui_kit::*;
 
-
 use crate::app::BenchApp;
 
 impl BenchApp {

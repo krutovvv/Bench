@@ -260,7 +260,9 @@ impl BenchApp {
                 .pl(px(bench_ui::CHAT_LEFT))
                 .pr(px(bench_ui::CHAT_RIGHT))
                 .py(px(bench_ui::TURN_Y))
-                .gap(px(bench_ui::CHAT_TEXT - bench_ui::CHAT_LEFT - bench_ui::AVATAR))
+                .gap(px(bench_ui::CHAT_TEXT
+                    - bench_ui::CHAT_LEFT
+                    - bench_ui::AVATAR))
                 .items_start()
                 .child(bench_ui::avatar(true, &theme))
                 .child(div().flex_1().min_w_0().child(frame))

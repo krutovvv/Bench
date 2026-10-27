@@ -7,8 +7,8 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::client::rpc::Cmd;
 use crate::app::model::ProjectEntry;
+use crate::client::rpc::Cmd;
 
 /// A row of the sidebar that can be pinned, colored, renamed and deleted.
 #[derive(Clone, Debug, PartialEq)]

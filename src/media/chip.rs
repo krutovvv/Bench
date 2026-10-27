@@ -1,12 +1,12 @@
 //! A file going with a message, as a chip: a small picture or its icon, and its name.
 
+use crate::app::BenchApp;
+use crate::media::{self, Kind, file_name};
+use bench_ui::icons::Ico;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
-use crate::app::BenchApp;
-use bench_ui::icons::Ico;
-use crate::media::{self, Kind, file_name};
 
 impl BenchApp {
     /// A file going with a message: a small picture for an image, else its icon, and the name.

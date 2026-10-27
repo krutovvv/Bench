@@ -9,8 +9,8 @@ use std::collections::HashMap;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::client::connection;
 use crate::app::model::Project;
+use crate::client::connection;
 use crate::client::rest;
 
 impl BenchApp {

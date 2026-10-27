@@ -1,17 +1,17 @@
 //! The JSON-RPC session itself, on its own thread: each `Cmd` sent as a call over the WebSocket,
 //! what comes back handed to `events`.
 
+use super::events::{log_error, on_event, on_result};
+use super::{Cmd, Evt};
+use crate::app::model::Target;
+use crate::client::connection::Connection;
+use anyhow::{Result, anyhow};
+use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::ErrorKind;
 use std::net::TcpStream;
 use std::sync::{Arc, mpsc};
-use anyhow::{Result, anyhow};
-use serde_json::{Value, json};
 use tungstenite::{Message, WebSocket};
-use crate::client::connection::Connection;
-use crate::app::model::Target;
-use super::events::{on_event, on_result, log_error};
-use super::{Cmd, Evt};
 
 pub(super) enum Pending {
     Profiles,

@@ -27,8 +27,8 @@ use gpui_kit::*;
 use serde_json::Value;
 
 use crate::app::BenchApp;
-use bench_ui::icons::Ico;
 use crate::app::model::{Insert, SlashCommand};
+use bench_ui::icons::Ico;
 
 /// What the title's menu offers: show something else (`to`, a patch of the insert: its key, its
 /// state).

@@ -6,12 +6,17 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::sidebar::items::Item;
 use crate::app::BenchApp;
+use crate::sidebar::items::Item;
 use bench_ui::icons::Ico;
 
 /// The swatches row of a session's menu: the colors and "none".
-pub(super) fn color_row(view: &Entity<BenchApp>, id: &str, current: Option<usize>, cx: &App) -> AnyElement {
+pub(super) fn color_row(
+    view: &Entity<BenchApp>,
+    id: &str,
+    current: Option<usize>,
+    cx: &App,
+) -> AnyElement {
     let theme = cx.theme();
     let swatch = |k: Option<usize>| {
         let (view, id) = (view.clone(), id.to_string());

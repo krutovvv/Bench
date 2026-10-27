@@ -16,7 +16,6 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 
 impl BenchApp {
-
     pub(crate) fn render_providers(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;

@@ -1,6 +1,5 @@
 //! LaTeX as Unicode text, so a formula reads in the answer's own font.
 
-
 /// LaTeX as Unicode text: x², α, √x, ∑ᵢ, a/b. Fractions, text and roots are unwrapped here;
 /// the symbols are unicodeit's.
 pub fn latex_text(tex: &str) -> String {

@@ -12,8 +12,8 @@ use gpui_kit::*;
 
 use super::text::{answer_segments, markdown, render_code};
 use crate::app::BenchApp;
-use bench_ui::icons::Ico;
 use crate::media::{self, Fetched, Kind, Loaded, Segment, file_name};
+use bench_ui::icons::Ico;
 
 /// The largest box an image or preview takes, in points.
 pub(super) const MAX_W: f32 = 560.;
@@ -485,5 +485,4 @@ impl BenchApp {
             _ => div().into_any_element(),
         }
     }
-
 }

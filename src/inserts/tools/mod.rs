@@ -10,9 +10,9 @@ use gpui_kit::*;
 use serde_json::json;
 
 use crate::app::BenchApp;
+use crate::app::model::Insert;
 use crate::inserts::subjects::tool_key;
 use crate::inserts::{InsertKind, Switch, clip};
-use crate::app::model::Insert;
 use devtools::{GROUPS, Tool};
 
 /// The tool's least height in the thread (it grows with its text).

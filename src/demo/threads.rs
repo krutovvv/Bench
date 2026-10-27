@@ -1,12 +1,11 @@
 //! The demo's threads: one per subject, so every sidebar group opens to something, each one turn
 //! and done; the landing page's dev server still running.
 
-
+use super::journal::*;
 use crate::app::BenchApp;
 use crate::app::model::BgProcess;
 use protocol::ThreadItem;
 use serde_json::json;
-use super::journal::*;
 
 /// A thread about something (`tasks:today`, `ssh:local`…): one turn, done.
 fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {

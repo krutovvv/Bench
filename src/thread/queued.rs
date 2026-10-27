@@ -7,9 +7,9 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
+use crate::client::rpc::Cmd;
 use bench_ui::icons::Ico;
 use gpui_kit::component::input::{InputEvent, TextareaState};
-use crate::client::rpc::Cmd;
 
 impl BenchApp {
     pub(crate) fn render_queued(

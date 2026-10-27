@@ -140,3 +140,18 @@ impl BenchApp {
         )
     }
 }
+
+impl BenchApp {
+    pub fn set_appearance(
+        &mut self,
+        a: bench_ui::theme::Appearance,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.appearance = a;
+        crate::settings::appearance::save(&a);
+        bench_ui::theme::apply(a, Some(window), cx);
+        self.repaint_terminals(cx);
+        cx.notify();
+    }
+}

@@ -1,9 +1,9 @@
 //! What the agent sends back — answers to calls and events — read into `Evt`s.
 
-use serde_json::Value;
-use crate::app::model::{Profile, SessionRow, Usage};
-use super::session::Pending;
 use super::Evt;
+use super::session::Pending;
+use crate::app::model::{Profile, SessionRow, Usage};
+use serde_json::Value;
 
 pub(super) fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
     let list = |v: &Value| v.as_array().cloned().unwrap_or_default();

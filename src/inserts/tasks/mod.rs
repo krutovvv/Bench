@@ -11,9 +11,9 @@ use gpui_kit::*;
 use serde_json::json;
 
 use crate::app::BenchApp;
+use crate::app::model::Insert;
 use crate::inserts::InsertKind;
 use crate::inserts::tasks::model::{LISTS, List};
-use crate::app::model::Insert;
 
 pub struct Tasks;
 

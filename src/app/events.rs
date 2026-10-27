@@ -273,7 +273,7 @@ impl BenchApp {
             } if self.is_current(&session) => {
                 self.speed.tool_call();
                 if let Some(live) = self.live.as_mut() {
-                    live.label = tool_label(&name, &detail).into();
+                    live.label = crate::thread::work::tool_label(&name, &detail).into();
                 }
             }
             Evt::ToolDone { session } if self.is_current(&session) => {
@@ -372,7 +372,11 @@ impl BenchApp {
                         .find(|l| !l.is_empty())
                         .unwrap_or("Done");
                     let id = self.session.clone().unwrap_or_default();
-                    crate::system::notify::post(&id, &self.current_title(), &bench_ui::clip(first, 140));
+                    crate::system::notify::post(
+                        &id,
+                        &self.current_title(),
+                        &bench_ui::clip(first, 140),
+                    );
                 }
                 self.live = None;
                 self.speed.finish();

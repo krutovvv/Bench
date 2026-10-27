@@ -1,10 +1,10 @@
 //! The agent's model providers, keys and messaging: custom endpoints, environment keys, the
 //! config, the gateway's status.
 
+use super::{enc, get, send};
+use crate::client::connection::Connection;
 use anyhow::Result;
 use serde_json::{Value, json};
-use crate::client::connection::Connection;
-use super::{enc, get, send};
 
 // ---- providers, keys, messaging ---------------------------------------------------------
 

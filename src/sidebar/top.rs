@@ -71,4 +71,3 @@ impl BenchApp {
             .into_any_element()
     }
 }
-

@@ -1,18 +1,17 @@
 //! Sending: the composer's message, the reasoning level, regenerate, copy, stop, an approval.
 //! The queue is `queued.rs`, drafts `drafts.rs`.
 
-use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::IndexPath;
+use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use crate::media::attach;
 use crate::client::connection;
 use crate::client::rpc::Cmd;
+use crate::media::attach;
 
 use crate::app::{BenchApp, Live};
 
 impl BenchApp {
-
     /// An open session takes the level at once (its next turn runs on it, the gateway confirms
     /// with session.info); a chat not created yet takes it with its first message.
     /// The reasoning levels offered anew (the presets'): the composer's choice follows, the
@@ -360,7 +359,6 @@ impl BenchApp {
         });
         cx.notify();
     }
-
 }
 
 /// The message's text with the files' `[attached: …]` lines under it.
@@ -371,4 +369,3 @@ pub(crate) fn with_attachments(text: &str, lines: &[String]) -> String {
         .collect::<Vec<_>>()
         .join("\n\n")
 }
-

@@ -4,9 +4,9 @@
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::*;
 
-use bench_ui::compact;
 use crate::app::BenchApp;
 use ::thread::{Row, Step};
+use bench_ui::compact;
 
 impl BenchApp {
     /// Rough tokens of the open chat: its text at ~3.5 characters a token.
@@ -33,7 +33,12 @@ impl BenchApp {
     }
 
     /// The rows of the context panel: what this chat has used and done.
-    pub(super) fn session_stats(&self, used: u64, max: u64, estimated: bool) -> Vec<(String, String)> {
+    pub(super) fn session_stats(
+        &self,
+        used: u64,
+        max: u64,
+        estimated: bool,
+    ) -> Vec<(String, String)> {
         let mut rows: Vec<(String, String)> = vec![];
         let tilde = if estimated { "~" } else { "" };
         // Which model this thread answers with; the project sets it in its environment.
@@ -107,7 +112,12 @@ impl BenchApp {
 
 /// The speed panel: per-second generation speed of the current/last answer as bars, its range,
 /// and the last call's measured prefill and generation.
-pub(super) fn speed_panel(samples: &[f64], prefill: Option<f64>, generation: Option<f64>, cx: &App) -> Div {
+pub(super) fn speed_panel(
+    samples: &[f64],
+    prefill: Option<f64>,
+    generation: Option<f64>,
+    cx: &App,
+) -> Div {
     let theme = cx.theme();
     let row = |k: &str, v: String| {
         h_flex()

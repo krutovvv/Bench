@@ -1,12 +1,12 @@
 //! Files through the agent: read, write, list and download on the agent's machine or a project's
 //! (`machine`), and uploads.
 
-use std::time::Duration;
+use super::{enc, get, send, url};
+use crate::client::connection::Connection;
 use anyhow::{Result, anyhow};
 use base64::Engine as _;
 use serde_json::{Value, json};
-use crate::client::connection::Connection;
-use super::{enc, get, send, url};
+use std::time::Duration;
 
 /// A text file as the gateway sees it. `truncated` files must not be saved back.
 pub struct TextFile {

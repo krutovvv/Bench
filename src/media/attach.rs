@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
 
-use crate::client::connection::{Connection, state_dir};
 use crate::app::model::Target;
+use crate::client::connection::{Connection, state_dir};
 use crate::client::rest;
 
 /// What a message carries for its files.

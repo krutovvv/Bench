@@ -1,7 +1,6 @@
 //! What the inserts show in the demo: made-up ~/.ssh/config servers (and a terminal's last screen)
 //! and tasks, so the demo never shows the person's own.
 
-
 use crate::app::BenchApp;
 
 fn server(alias: &str, hostname: &str, folder: &str) -> crate::system::sshconfig::Server {

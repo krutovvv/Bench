@@ -12,8 +12,8 @@ use anyhow::{Context as _, Result, anyhow};
 use base64::Engine as _;
 use serde_json::{Value, json};
 
-use crate::client::connection::Connection;
 use crate::app::model::SkillRow;
+use crate::client::connection::Connection;
 
 fn url(conn: &Connection, path: &str, profile: &str) -> String {
     let sep = if path.contains('?') { '&' } else { '?' };
@@ -485,4 +485,3 @@ pub fn profile_home(conn: &Connection, profile: &str) -> Result<String> {
     };
     Ok(format!("{home}/.bench/profiles/{name}"))
 }
-

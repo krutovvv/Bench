@@ -9,8 +9,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use bench_ui::icons::Ico;
 use crate::inserts::tasks::model::{self as tasks, List, Task, today};
+use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// A task list as a thread's live block: the same rows, no scroll of its own (the thread

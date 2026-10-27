@@ -10,8 +10,8 @@ use serde_json::json;
 
 use super::{DocKey, Entry, Explorer, FileRef, Named, Naming};
 use crate::app::BenchApp;
-use crate::workspace::SidebarPanel;
 use crate::client::rest;
+use crate::workspace::SidebarPanel;
 
 impl BenchApp {
     /// The Explorer on `project` (its environment read, its tree as it was left).
@@ -391,7 +391,6 @@ impl BenchApp {
             },
         );
     }
-
 }
 
 impl Explorer {

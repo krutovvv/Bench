@@ -9,9 +9,9 @@ use std::sync::Arc;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
+use crate::app::model::{ProjectKey, Target};
 use crate::client::connection::Connection;
 use crate::client::rpc::{Cmd, Evt, Gateway};
-use crate::app::model::{ProjectKey, Target};
 
 /// One agent: its command channel, its REST connection once up, why it is not up.
 pub struct AgentLink {
@@ -176,7 +176,9 @@ impl BenchApp {
         let target = Target::Ssh(host.clone());
         cx.spawn_in(window, async move |this, cx| {
             let _ = cx
-                .background_spawn(async move { crate::client::connection::restart_gateway(&target, true) })
+                .background_spawn(async move {
+                    crate::client::connection::restart_gateway(&target, true)
+                })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| {
                 this.agents.remove(&host);

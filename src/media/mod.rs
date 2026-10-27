@@ -5,13 +5,13 @@
 
 pub(crate) mod attach;
 pub(crate) mod audio;
-pub(crate) mod video;
 pub(crate) mod chip;
 mod diagram;
 mod fetch;
 mod latex;
 mod playback;
 pub(crate) mod text;
+pub(crate) mod video;
 pub(crate) mod view;
 mod voice;
 
@@ -22,7 +22,6 @@ pub use latex::*;
 use std::path::Path;
 
 use anyhow::Result;
-
 
 /// Something fetched or drawn off the UI thread.
 #[derive(Clone, Debug)]

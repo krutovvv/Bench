@@ -17,8 +17,8 @@
 
 pub mod instructions;
 pub mod lsp;
-pub mod mcp_status;
 pub mod mcp;
+pub mod mcp_status;
 pub mod name;
 mod page;
 pub mod place;

@@ -14,8 +14,8 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::inserts::InsertKind;
 use crate::app::model::Insert;
+use crate::inserts::InsertKind;
 
 pub struct Browser;
 

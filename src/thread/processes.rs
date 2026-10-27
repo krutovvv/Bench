@@ -5,14 +5,14 @@
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::client::rpc::Cmd;
 use crate::app::model::BgProcess;
+use crate::client::rpc::Cmd;
+use crate::media::text::plain_text;
+use bench_ui::clock;
+use bench_ui::icons::Ico;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
-use bench_ui::icons::Ico;
-use crate::media::text::plain_text;
-use bench_ui::clock;
 
 impl BenchApp {
     /// Ask the gateway again (the poll, and right after a Stop).

@@ -19,9 +19,9 @@ use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use bench_ui::icons::Ico;
-use crate::inserts::InsertKind;
 use crate::app::model::Insert;
+use crate::inserts::InsertKind;
+use bench_ui::icons::Ico;
 
 /// The tallest a terminal gets in a thread; its program's screen is this many rows.
 const MAX_H: f32 = 280.;

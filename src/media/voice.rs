@@ -5,8 +5,8 @@ use std::time::Duration;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use crate::media::audio::{Playback, Recorder};
 use crate::client::rest;
+use crate::media::audio::{Playback, Recorder};
 
 use crate::app::BenchApp;
 

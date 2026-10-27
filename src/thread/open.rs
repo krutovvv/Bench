@@ -8,8 +8,8 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::client::connection;
-use crate::client::rpc::Cmd;
 use crate::client::rest;
+use crate::client::rpc::Cmd;
 
 use crate::app::{BenchApp, now_secs};
 use crate::workspace::Center;

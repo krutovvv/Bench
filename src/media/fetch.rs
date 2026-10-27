@@ -1,16 +1,16 @@
 //! Delivered files brought to this Mac and prepared for showing: downloaded through the agent
 //! (or read in place), their Quick Look picture or video frame made off the UI thread.
 
+use super::{Kind, file_name, kind};
+use crate::app::model::Target;
+use crate::client::connection::{Connection, state_dir};
+use crate::client::rest;
+use anyhow::{Result, bail};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use super::{Kind, file_name, kind};
-use anyhow::{Result, bail};
-use crate::client::connection::{Connection, state_dir};
-use crate::app::model::Target;
-use crate::client::rest;
 
 pub(crate) fn hash_of(parts: &[&str]) -> String {
     let mut h = DefaultHasher::new();

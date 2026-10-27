@@ -178,7 +178,12 @@ impl BenchApp {
     }
 
     /// A folder's entries under it, `depth` deep; its open folders' entries under them.
-    pub(super) fn folder_rows(&self, dir: &FileRef, depth: usize, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    pub(super) fn folder_rows(
+        &self,
+        dir: &FileRef,
+        depth: usize,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
         let mut out = vec![];
         out.extend(self.naming_row(&super::Named::File(dir.clone()), depth));
         out.extend(self.naming_row(&super::Named::Folder(dir.clone()), depth));
@@ -334,7 +339,6 @@ impl BenchApp {
                 .into_any_element(),
         )
     }
-
 }
 
 /// A small icon action on a row (shown on its hover) or a heading.

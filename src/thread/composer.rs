@@ -194,7 +194,9 @@ impl BenchApp {
                     .pl(px(bench_ui::CHAT_LEFT))
                     .pr(px(bench_ui::CHAT_RIGHT))
                     .py(px(bench_ui::TURN_Y))
-                    .gap(px(bench_ui::CHAT_TEXT - bench_ui::CHAT_LEFT - bench_ui::AVATAR))
+                    .gap(px(bench_ui::CHAT_TEXT
+                        - bench_ui::CHAT_LEFT
+                        - bench_ui::AVATAR))
                     .items_start()
                     .text_base()
                     // The person's avatar even in a new chat: an empty sheet with no sign of whose

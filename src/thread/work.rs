@@ -9,7 +9,7 @@ use gpui_kit::*;
 use serde_json::Value;
 
 use super::message::speaker_row;
-use crate::app::{BenchApp, now_secs, tool_label};
+use crate::app::{BenchApp, now_secs};
 use bench_ui::icons::Ico;
 use bench_ui::{clip, clock, plural};
 
@@ -346,6 +346,56 @@ mod tests {
         assert_eq!(
             super::host_of("https://www.example.com:8080/a"),
             "example.com"
+        );
+    }
+}
+
+///  ("session search"; an MCP tool
+/// `mcp__<server>__<tool>` as "<server> · <tool>"), then what it worked on.
+pub fn tool_label(name: &str, detail: &str) -> String {
+    let name = match name.strip_prefix("mcp__").and_then(|n| n.split_once("__")) {
+        Some((server, tool)) => format!("{server} · {}", tool.replace('_', " ")),
+        None => name.replace('_', " "),
+    };
+    // One line: a command with a heredoc, a patch, a quoted page — the running line is one row
+    // tall whatever the tool was handed, or the thread jumps in height as the work changes.
+    let detail = clip_line(detail);
+    if detail.is_empty() {
+        name
+    } else {
+        format!("{name}: {detail}")
+    }
+}
+
+/// One line of at most 160 characters.
+fn clip_line(s: &str) -> String {
+    let line = s
+        .lines()
+        .find(|l| !l.trim().is_empty())
+        .unwrap_or_default()
+        .trim();
+    if line.chars().count() > 160 {
+        format!("{}…", line.chars().take(159).collect::<String>())
+    } else {
+        line.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tool_label_tests {
+    #[test]
+    fn labels() {
+        assert_eq!(super::tool_label("bash", "ls"), "bash: ls");
+        assert_eq!(super::tool_label("session_search", ""), "session search");
+        assert_eq!(
+            super::tool_label("bash", "python3 - <<'PY'\nimport re\np='src/app.rs'"),
+            "bash: python3 - <<'PY'",
+            "a multiline command stays one line"
+        );
+        assert_eq!(super::tool_label("bash", "\n\n   \n"), "bash");
+        assert_eq!(
+            super::tool_label("mcp__reminders__list_items", "Today"),
+            "reminders · list items: Today"
         );
     }
 }
