@@ -78,8 +78,8 @@ impl BenchApp {
         let theme = cx.theme();
         let info = self.git_info.get(&dir).cloned();
         let app = cx.entity().downgrade();
-        let copy = |app: gpui::WeakEntity<BenchApp>, what: String| {
-            PopupMenuItem::new(what.clone()).on_click(move |_, window, cx| {
+        let copy = |app: gpui::WeakEntity<BenchApp>, shown: String, what: String| {
+            PopupMenuItem::new(shown).on_click(move |_, window, cx| {
                 let what = what.clone();
                 let _ = app.update(cx, |this, cx| {
                     cx.write_to_clipboard(ClipboardItem::new_string(what.clone()));
@@ -100,7 +100,9 @@ impl BenchApp {
                 .icon(bench_ui::icons::Ico::GitBranch.icon().small())
                 .label(label)
                 .dropdown_menu(move |menu, _, _| {
-                    let mut menu = menu.item(PopupMenuItem::label(dir.clone()));
+                    // One line each, clipped: a long subject or path must not grow the menu
+                    // wider than the window (clicking still copies the whole thing).
+                    let mut menu = menu.item(PopupMenuItem::label(bench_ui::clip(&dir, 64)));
                     let Some(info) = info.clone() else {
                         return menu.item(PopupMenuItem::new("Reading the repo…").disabled(true));
                     };
@@ -116,19 +118,26 @@ impl BenchApp {
                     if !info.commits.is_empty() {
                         menu = menu.separator();
                         for c in info.commits {
+                            let line = format!("{}  {} · {}", c.sha, c.subject, c.age);
                             menu = menu.item(
                                 copy(
                                     app.clone(),
-                                    format!("{}  {} · {}", c.sha, c.subject, c.age),
+                                    bench_ui::clip(&line, 56),
+                                    line,
                                 )
                                 .disabled(false),
                             );
                         }
                     }
                     if let Some(url) = info.remote {
-                        menu = menu
-                            .separator()
-                            .item(copy(app.clone(), url).icon(bench_ui::icons::Ico::Globe.icon()));
+                        menu = menu.separator().item(
+                            copy(
+                                app.clone(),
+                                bench_ui::clip(&url, 56),
+                                url,
+                            )
+                            .icon(bench_ui::icons::Ico::Globe.icon()),
+                        );
                     }
                     menu
                 })
