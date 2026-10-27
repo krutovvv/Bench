@@ -397,6 +397,22 @@ export async function problemsOf(profile: string, root: string, machine: string 
 	return looked ? out : undefined;
 }
 
+/** Errors and warnings the project's running servers know now, by file (a path where they run). */
+export function knownProblems(profile: string): { path: string; problems: Problem[] }[] {
+	const out = new Map<string, Problem[]>();
+	for (const [key, c] of clients) {
+		if (!key.startsWith(`${profile}|`)) continue;
+		for (const [uri, d] of c.known()) {
+			const found = d.filter((x) => (x.severity ?? 1) <= 2);
+			if (!found.length) continue;
+			const list = out.get(uri) ?? [];
+			for (const x of found) list.push({ range: x.range, severity: x.severity ?? 1, message: x.message, ...(x.source ? { source: x.source } : {}) });
+			out.set(uri, list);
+		}
+	}
+	return [...out].map(([uri, problems]) => ({ path: pathOf(uri), problems })).sort((a, b) => a.path.localeCompare(b.path));
+}
+
 /** LSP's hover contents (a string, a marked string, a list of them, or markup) as Markdown. */
 function markdownOf(c: any): string {
 	if (!c) return "";

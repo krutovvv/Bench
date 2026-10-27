@@ -161,7 +161,7 @@ pub struct BenchApp {
     pub attachments: Vec<std::path::PathBuf>,
     /// The project's code sent to a thread from the Explorer, waiting with its message, by
     /// `thread_key` (each thread its own, as its draft).
-    pub references: HashMap<String, Vec<crate::thread::attachments::CodeRef>>,
+    pub references: HashMap<String, Vec<crate::thread::attachments::Reference>>,
     /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
     pub sidebar_hidden: bool,
     pub usage: Option<Usage>,

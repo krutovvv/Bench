@@ -74,10 +74,14 @@ impl BenchApp {
 
     /// The project's folder, where it is (None: it has none, an agent's Host).
     pub fn explorer_root(&self) -> Option<FileRef> {
-        let p = &self.explorer.project;
+        self.project_root(&self.explorer.project.clone())
+    }
+
+    /// The project `p`'s folder, on its machine; None: it has none.
+    pub fn project_root(&self, p: &str) -> Option<FileRef> {
         let at = self.location(p);
         Some(FileRef {
-            project: p.clone(),
+            project: p.to_string(),
             machine: at.files_machine(),
             path: at.folder.filter(|f| !f.is_empty())?,
         })

@@ -81,6 +81,10 @@ pub enum DocKey {
         kind: &'static str,
         name: String,
     },
+    /// The errors and warnings the project's language servers know (`problems.rs`).
+    Problems {
+        project: String,
+    },
 }
 
 impl DocKey {
@@ -88,7 +92,9 @@ impl DocKey {
     pub fn project(&self) -> &str {
         match self {
             DocKey::File(f) => &f.project,
-            DocKey::Settings { project } | DocKey::Part { project, .. } => project,
+            DocKey::Settings { project }
+            | DocKey::Part { project, .. }
+            | DocKey::Problems { project } => project,
         }
     }
 }
@@ -118,6 +124,7 @@ impl BenchApp {
                     self.load_env(project, window, cx);
                 }
             }
+            DocKey::Problems { project } => self.read_problems(project.clone(), window, cx),
             DocKey::Part {
                 project,
                 kind,
@@ -265,8 +272,8 @@ impl BenchApp {
     pub fn save_doc(&mut self, key: DocKey, window: &mut Window, cx: &mut Context<Self>) {
         let f = match key {
             DocKey::Part { project, kind, .. } => return self.env_save(&project, kind, window, cx),
-            // Each group of the settings has its own Save.
-            DocKey::Settings { .. } => return,
+            // Each group of the settings has its own Save; problems are only read.
+            DocKey::Settings { .. } | DocKey::Problems { .. } => return,
             DocKey::File(f) => f,
         };
         let Some(d) = self
@@ -338,7 +345,7 @@ impl BenchApp {
             DocKey::File(_) => self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
             DocKey::Part { .. } => self.part_dirty(&key),
             // Its typed fields stay in the environment until saved or reverted.
-            DocKey::Settings { .. } => false,
+            DocKey::Settings { .. } | DocKey::Problems { .. } => false,
         };
         let armed = format!("close:{key:?}");
         if dirty && self.explorer.armed.as_deref() != Some(&armed) {

@@ -1,5 +1,6 @@
 //! A project's language servers through its agent (`agent/src/modules/lsp.ts`), for the Explorer's
-//! editor: a file's problems, the hover at a place, where a symbol is defined. The file's text is
+//! editor: a file's problems, the hover at a place, where a symbol is defined; the project's
+//! Problems. The file's text is
 //! sent as the editor has it, saved or not.
 
 use super::send;
@@ -42,6 +43,24 @@ pub fn diagnostics(
         return Ok(None);
     }
     Ok(Some(serde_json::from_value(v["problems"].clone())?))
+}
+
+/// Every file's errors and warnings the project's servers know now: (path, its problems).
+pub fn problems(
+    conn: &Connection,
+    profile: &str,
+    project: &str,
+) -> Result<Vec<(String, Vec<lsp_types::Diagnostic>)>> {
+    let v = send(conn, "POST", "/api/lsp/problems", profile, json!({ "project": project }), 30)?;
+    Ok(v["files"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|f| {
+            let path = f["path"].as_str()?.to_string();
+            Some((path, serde_json::from_value(f["problems"].clone()).ok()?))
+        })
+        .collect())
 }
 
 /// What a server says of the symbol at `at`, as Markdown; empty: nothing.

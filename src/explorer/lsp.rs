@@ -168,7 +168,8 @@ impl BenchApp {
         };
         let profile = self.current_profile();
         let (machine, path) = (f.machine.clone(), f.path.clone());
-        let task = cx.spawn_in(window, async move |_, cx| {
+        let project_key = f.project.clone();
+        let task = cx.spawn_in(window, async move |this, cx| {
             cx.background_executor().timer(after).await;
             let text = editor.update(cx, |s, _| s.value().to_string());
             let sent = text.clone();
@@ -190,6 +191,9 @@ impl BenchApp {
                 if s.value().as_ref() == text {
                     underline(s, problems, cx);
                 }
+            });
+            let _ = this.update_in(cx, |this, window, cx| {
+                this.problems_changed(&project_key, window, cx)
             });
         });
         if let Some(d) = self.explorer.docs.get_mut(&key) {

@@ -1,11 +1,11 @@
 // The Explorer's editor and a project's language servers (`../lsp.ts`): a file's problems as it
-// is typed, the hover at a place, where a symbol is defined. The editor sends the file's text as
+// is typed, the hover at a place, where a symbol is defined, and all the problems they know. The editor sends the file's text as
 // it is (unsaved too); the servers are the ones the project's threads use, in the same folder.
 
 import { defaultCwd } from "../runtime.ts";
 import { projects } from "../builtin/projects.ts";
 import { HttpError, required, type Module } from "../http.ts";
-import { definitionAt, hoverAt, problemsOf, type Spot } from "../lsp.ts";
+import { definitionAt, hoverAt, knownProblems, problemsOf, type Spot } from "../lsp.ts";
 import { onMachine } from "./files.ts";
 
 /** A project's servers: its agent, the folder they run in, and its machine. "general" is Host. */
@@ -39,6 +39,8 @@ export default (): Module => ({
 			const problems = a && (await problemsOf(a.agent, a.root, a.machine, a.file, a.text));
 			return { known: problems !== undefined, problems: problems ?? [] };
 		},
+		// Every file's errors and warnings the project's servers know now (its Problems).
+		"POST /api/lsp/problems": async (req) => ({ files: knownProblems((await serversOf(String(req.body?.project ?? ""))).agent) }),
 		"POST /api/lsp/hover": async (req) => {
 			const a = await asked(req.body);
 			if (!a) return { markdown: "" };

@@ -104,17 +104,24 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         ),
         "part" => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
         "lsp" => app.open_part("p-blog".into(), "lsp", "pyright".into(), window, cx),
+        // The project's Problems, sent to the thread beside.
+        "problems" => {
+            app.session = Some("d-site".into());
+            app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
+            app.open_problems(window, cx);
+            app.send_problems_to_thread("p-blog", window, cx);
+        }
         // The thread beside the post, lines of it sent to the composer (⌘L).
         "thread" => {
             app.session = Some("d-site".into());
             app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
             app.right = Some(crate::workspace::RightPanel::Thread);
             app.add_reference(
-                crate::thread::attachments::CodeRef {
+                crate::thread::attachments::Reference::Code(crate::thread::attachments::CodeRef {
                     path: "/Users/demo/code/blog/content/posts/release-2-4.md".into(),
                     lines: Some((11, 15)),
                     text: Some("## What changed".into()),
-                },
+                }),
                 cx,
             );
         }

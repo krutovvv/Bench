@@ -105,7 +105,7 @@ impl BenchApp {
                 cx,
             )
         }));
-        // The project's code sent from the Explorer (⌘L, a dropped tab): its file and lines.
+        // What the Explorer sent (⌘L, a dropped tab, problems): its file and lines, or the problems.
         chips.extend(self.thread_references().iter().enumerate().map(|(k, r)| {
             let close = div()
                 .id(("ref-x", k))
@@ -118,7 +118,7 @@ impl BenchApp {
                     cx.stop_propagation();
                     this.remove_reference(k, cx)
                 }));
-            let (ico, color) = bench_ui::file_icon(&r.path, false, &theme);
+            let (ico, color) = r.icon(&theme);
             h_flex()
                 .id(("ref", k))
                 .h(px(bench_ui::CHIP_H))

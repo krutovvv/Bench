@@ -11,7 +11,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-lsp-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_SSH = path.join(import.meta.dirname, "fake-ssh.sh");
-const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates, parseLspSpec, writeLspServer, problemsOf, hoverAt, definitionAt } = await import("../src/lsp.ts");
+const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates, parseLspSpec, writeLspServer, problemsOf, hoverAt, definitionAt, knownProblems } = await import("../src/lsp.ts");
 after(() => {
 	writeLsp("project:p1", {});
 	fs.rmSync(home, { recursive: true, force: true });
@@ -43,6 +43,8 @@ test("the editor's questions: problems with their places, the hover, the definit
 	assert.equal(await hoverAt("project:p1", root, undefined, file, text, { line: 1, character: 4 }), "at 1:4");
 	assert.deepEqual(await definitionAt("project:p1", root, undefined, file, text, { line: 1, character: 4 }), [{ path: file, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } } }]);
 	assert.equal(await problemsOf("project:p1", root, undefined, path.join(root, "b.md"), "ERROR"), undefined);
+	// The project's Problems: every file with errors or warnings its servers know now.
+	assert.deepEqual(knownProblems("project:p1").find((f) => f.path === file)?.problems.map((p) => p.message), ["found ERROR"]);
 	assert.equal(await hoverAt("project:p1", root, undefined, path.join(root, "b.md"), "x", { line: 0, character: 0 }), "");
 });
 

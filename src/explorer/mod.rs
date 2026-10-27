@@ -10,6 +10,7 @@
 //! explorer/ops.rs   the tree's work: listing a folder, new / rename / delete, ⌘P, ⌘⇧F
 //! explorer/tabs.rs  the tabs' drag and menu; code sent to the thread (⌘L)
 //! explorer/lsp.rs   the project's language servers in the editor: problems, hover, definition
+//! explorer/problems.rs  the project's Problems as a tab; problems sent to the thread
 //! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder, Zed)
 //! explorer/tree.rs  the sidebar's tree
 //! explorer/view.rs  a document in the middle, the tabs, the thread beside, ⌘P's list
@@ -22,6 +23,7 @@ pub mod lsp;
 pub mod menus;
 pub mod ops;
 pub mod parts;
+pub mod problems;
 pub mod project_search;
 pub mod tabs;
 pub mod tree;
@@ -91,5 +93,7 @@ pub struct Explorer {
     /// A delete or a close asked once: the second click does it.
     pub armed: Option<String>,
     pub quick: Option<Quick>,
+    /// Each project's Problems as last read (None: being read): (path, its problems).
+    pub problems: HashMap<String, Option<Vec<(String, Vec<lsp_types::Diagnostic>)>>>,
     pub find: Option<Find>,
 }

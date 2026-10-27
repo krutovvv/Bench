@@ -92,8 +92,12 @@ Phases, each a thing of its own:
    (`agent/src/lsp.ts`) answer the editor too: `POST /api/lsp/{diagnostics,hover,definition}`
    (`agent/src/modules/lsp.ts`) with the file's text as typed; `explorer/lsp.rs` gives the
    editor its providers — problems underlined (checked on open, save and a pause in typing),
-   the hover, ⌘-click or F12 to the definition (another file opens as a tab). Still to come: a
-   Problems list (a dock's panel) and "Send problems to the thread".
+   the hover, ⌘-click or F12 to the definition (another file opens as a tab). The project's
+   **Problems** (⌘⇧M, the folder's menu) is a tab, as Zed's project diagnostics are
+   (`DocKey::Problems`, `explorer/problems.rs`): every error and warning the servers know, a
+   click opens the file at its line; "Send to the thread" (and a file tab's "Send its problems
+   to the thread") puts them in the composer as a reference (`thread/attachments.rs`
+   `Reference::Problems`), beside ⌘L's code.
 3. **A terminal in the bottom dock** on the project's machine — the `/terminal` insert's session
    (`src/inserts/terminal/session.rs`) in a dock instead of a thread; "Send output to the thread".
 4. **Git at a glance**: changed lines in the gutter against HEAD, a changed file's diff.

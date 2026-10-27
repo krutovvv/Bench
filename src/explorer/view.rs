@@ -23,6 +23,7 @@ impl BenchApp {
                 kind,
                 name,
             }) => self.part_pane(&project, kind, &name, cx),
+            Some(DocKey::Problems { project }) => self.problems_pane(&project, cx),
             None => note("Open a file from the tree, or find one with ⌘P", cx),
         };
         let theme = cx.theme().clone();
@@ -211,6 +212,11 @@ impl BenchApp {
                     (part_icon(kind), theme.muted_foreground),
                     self.part_dirty(&key),
                 ),
+                DocKey::Problems { .. } => (
+                    "Problems".to_string(),
+                    (Ico::CircleAlert, theme.muted_foreground),
+                    false,
+                ),
             };
             let armed = self.explorer.armed.as_deref() == Some(format!("close:{key:?}").as_str());
             let (k1, k2) = (key.clone(), key.clone());
@@ -375,7 +381,7 @@ fn save_button(id: SharedString, dirty: bool, cx: &App) -> Stateful<Div> {
 }
 
 /// One muted line, padded.
-fn note(text: &str, cx: &App) -> AnyElement {
+pub(super) fn note(text: &str, cx: &App) -> AnyElement {
     div()
         .p_3()
         .text_color(cx.theme().muted_foreground)

@@ -1,7 +1,7 @@
 //! The center's tabs: dragged to another place (or onto the thread, which takes the file), a
 //! menu each (close this, others, to the left, to the right, the saved, all; copy the path; add
 //! to the thread), and what is sent from the code to the thread — the selection or
-//! the whole file (⌘L) — as a reference (`thread/attachments.rs` `CodeRef`).
+//! the whole file (⌘L) — as a reference (`thread/attachments.rs` `Reference`).
 
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;
@@ -10,6 +10,7 @@ use gpui_kit::*;
 
 use super::{DocKey, FileRef};
 use crate::app::BenchApp;
+use crate::thread::attachments::{CodeRef, Reference};
 use crate::workspace::{Center, RightPanel};
 use bench_ui::icons::Ico;
 
@@ -101,18 +102,18 @@ impl BenchApp {
         let s = d.editor.read(cx);
         let range = s.selected_range();
         let r = if range.is_empty() {
-            crate::thread::attachments::CodeRef {
+            Reference::Code(CodeRef {
                 path: f.path.clone(),
                 lines: None,
                 text: None,
-            }
+            })
         } else {
             let text = s.value().to_string();
-            crate::thread::attachments::CodeRef {
+            Reference::Code(CodeRef {
                 path: f.path.clone(),
                 lines: Some(crate::thread::attachments::lines_of(&text, range)),
                 text: Some(s.selected_value().to_string()),
-            }
+            })
         };
         self.add_reference(r, cx);
         self.show_thread_beside(window, cx);
@@ -126,18 +127,18 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         self.add_reference(
-            crate::thread::attachments::CodeRef {
+            Reference::Code(CodeRef {
                 path: f.path.clone(),
                 lines: None,
                 text: None,
-            },
+            }),
             cx,
         );
         self.show_thread_beside(window, cx);
     }
 
     /// The thread in the right dock (unless it is the center already), its composer focused.
-    fn show_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn show_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.center != Center::Chat {
             self.right = Some(RightPanel::Thread);
         }
@@ -183,16 +184,32 @@ pub fn tab_menu(
                 },
             ))));
         }
+        if let DocKey::Problems { project } = key.clone() {
+            return menu.separator().item(
+                PopupMenuItem::new("Send to the thread")
+                    .icon(Ico::MessagesSquare.icon().small())
+                    .on_click(act(Box::new(move |this, w, cx| {
+                        this.send_problems_to_thread(&project, w, cx)
+                    }))),
+            );
+        }
         let DocKey::File(f) = key.clone() else {
             return menu;
         };
-        let (f1, f3) = (f.clone(), f);
+        let (f1, f2, f3) = (f.clone(), f.clone(), f);
         menu.separator()
             .item(
                 PopupMenuItem::new("Add to the thread  ⌘L")
                     .icon(Ico::MessagesSquare.icon().small())
                     .on_click(act(Box::new(move |this, w, cx| {
                         this.send_file_to_thread(&f1, w, cx)
+                    }))),
+            )
+            .item(
+                PopupMenuItem::new("Send its problems to the thread")
+                    .icon(Ico::CircleAlert.icon().small())
+                    .on_click(act(Box::new(move |this, w, cx| {
+                        this.send_file_problems_to_thread(&f2, w, cx)
                     }))),
             )
             .item(

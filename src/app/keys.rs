@@ -64,6 +64,7 @@ impl BenchApp {
             }
             ("p", false) => self.open_quick(window, cx),
             ("f", true) => self.open_find(window, cx),
+            ("m", true) => self.open_problems(window, cx),
             ("s", false) => return self.save_active_doc(window, cx),
             ("w", false) if self.center == Center::Doc => {
                 if let Some(key) = self.explorer.active.clone() {

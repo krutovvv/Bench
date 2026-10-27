@@ -1,5 +1,6 @@
 //! The composer's files — the paperclip, drag and drop onto the chat, ⌘V of a screenshot — and
-//! its references to the project's code sent from the Explorer (⌘L, a tab dropped on the thread).
+//! its references sent from the Explorer: the project's code (⌘L, a tab dropped on the thread),
+//! its language servers' problems.
 
 use std::path::PathBuf;
 
@@ -8,8 +9,70 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::media::attach;
 
-/// A piece of the project's code sent to the thread: a file, or lines of it with their text. The
-/// message carries it under its words (`message`), as the agent reads it and the thread shows it.
+/// What the Explorer sends to the thread: a chip in the composer, then part of the message under
+/// its words (`message`), as the agent reads it and the thread shows it.
+#[derive(Clone, Debug, PartialEq)]
+pub enum Reference {
+    Code(CodeRef),
+    Problems(ProblemsRef),
+}
+
+impl Reference {
+    /// What its chip says.
+    pub fn label(&self) -> String {
+        match self {
+            Reference::Code(c) => c.label(),
+            Reference::Problems(p) => p.label(),
+        }
+    }
+
+    /// Its part of the message.
+    pub fn message(&self) -> String {
+        match self {
+            Reference::Code(c) => c.message(),
+            Reference::Problems(p) => p.message(),
+        }
+    }
+
+    /// Its chip's icon: the file's, or the problems'.
+    pub fn icon(&self, theme: &gpui_kit::component::Theme) -> (bench_ui::icons::Ico, Hsla) {
+        match self {
+            Reference::Code(c) => bench_ui::file_icon(&c.path, false, theme),
+            Reference::Problems(_) => (bench_ui::icons::Ico::CircleAlert, theme.danger),
+        }
+    }
+}
+
+/// A language server's errors and warnings sent to the thread: of one file, or all the project's
+/// servers know (`explorer/problems.rs`), a line each.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProblemsRef {
+    /// The file they are of; None: the project's.
+    pub of: Option<String>,
+    /// `path:line:col error: message (source)`.
+    pub lines: Vec<String>,
+}
+
+impl ProblemsRef {
+    /// `Problems · landing.tsx (3)`.
+    pub fn label(&self) -> String {
+        let n = self.lines.len();
+        match &self.of {
+            Some(p) => format!("Problems · {} ({n})", p.rsplit('/').next().unwrap_or(p)),
+            None => format!("Problems ({n})"),
+        }
+    }
+
+    pub fn message(&self) -> String {
+        let of = self.of.as_ref().map_or(String::new(), |p| format!(" in `{p}`"));
+        format!(
+            "Problems from the language servers{of}:\n```\n{}\n```",
+            self.lines.join("\n")
+        )
+    }
+}
+
+/// A piece of the project's code sent to the thread: a file, or lines of it with their text.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CodeRef {
     /// As the agent reaches it (on the project's machine).
@@ -66,25 +129,25 @@ pub fn lines_of(text: &str, range: std::ops::Range<usize>) -> (usize, usize) {
 }
 
 /// The message's words with the references under them.
-pub fn with_references(text: String, refs: &[CodeRef]) -> String {
+pub fn with_references(text: String, refs: &[Reference]) -> String {
     std::iter::once(text)
         .filter(|t| !t.is_empty())
-        .chain(refs.iter().map(CodeRef::message))
+        .chain(refs.iter().map(Reference::message))
         .collect::<Vec<_>>()
         .join("\n\n")
 }
 
 impl BenchApp {
     /// The open thread's references waiting in its composer.
-    pub fn thread_references(&self) -> Vec<CodeRef> {
+    pub fn thread_references(&self) -> Vec<Reference> {
         self.references
             .get(&self.thread_key())
             .cloned()
             .unwrap_or_default()
     }
 
-    /// A reference to the project's code into the open thread's composer (once).
-    pub fn add_reference(&mut self, r: CodeRef, cx: &mut Context<Self>) {
+    /// A reference into the open thread's composer (once).
+    pub fn add_reference(&mut self, r: Reference, cx: &mut Context<Self>) {
         let list = self.references.entry(self.thread_key()).or_default();
         if !list.contains(&r) {
             list.push(r);
