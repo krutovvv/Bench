@@ -182,6 +182,11 @@ The look is Zed's: flat and precise, with one accent. Never invent a look or a c
 from `bench_ui` (`crates/ui`, shown by the storybook). A size or a gap is a `bench_ui` constant or
 `Gap` step, never a `px(…)` written in a screen; a missing piece is added to `crates/ui` first.
 
+- **Colour themes.** A theme is a pair of `Palette`s in `crates/ui/src/theme/palettes.rs` (one per
+  half) plus the syntax JSON of each half in `assets/themes/` (written by `scripts/gen_themes.py`
+  and checked against the palette by `cargo test -p bench_ui`). The gear's Appearance chips pick
+  it (`crates/ui/src/swatch.rs`). What a theme does *not* own: the accent, the fonts, the radius —
+  those are the person's and stay the same under every theme.
 - **Blocks.** Every bordered block is rounded (`rounded_md`, theme radius). Every block head is
   `block_head` (32 px). Fields are `FIELD_H` (28 px). Buttons are rounded and consistent.
 - **Scrolling.** Only the thread scrolls. There is no scroll inside a scroll, except the

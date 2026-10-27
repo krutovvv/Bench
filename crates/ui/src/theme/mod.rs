@@ -1,5 +1,10 @@
-//! Look and feel: flat, square, dense — after Zed's One Light / One Dark.
-//! Appearance (light/dark/system, accent, size) is a user preference saved next to the app state.
+//! Look and feel: flat, square, dense. Three things the person owns, in `Appearance` and saved
+//! next to the app state: the half of the day (`Mode`: light, dark, System), the colour theme
+//! (`Scheme`s in `palettes`, what the gear calls Theme) and the accent, the size and the sidebar.
+//! A theme paints the surfaces and the editor's syntax; the accent, the fonts and the radius are
+//! the same under every theme.
+
+pub mod palettes;
 
 use std::sync::Arc;
 
@@ -46,10 +51,12 @@ pub const ACCENTS: &[(&str, u32, u32)] = &[
     ("Rose", 0xC2457A, 0xEC86AE),
 ];
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Appearance {
     pub mode: Mode,
+    /// The colour theme: a name from `palettes::SCHEMES` ("" is the first of them).
+    pub scheme: String,
     pub accent: usize,
     pub size: Size,
     /// Sidebar rows as their titles only, closer together (the default: the counts and
@@ -61,6 +68,7 @@ impl Default for Appearance {
     fn default() -> Self {
         Self {
             mode: Mode::default(),
+            scheme: palettes::SCHEMES[0].name.into(),
             accent: 0,
             size: Size::default(),
             compact_sidebar: true,
@@ -98,16 +106,15 @@ impl Appearance {
             ),
         }
     }
+
+    /// The chosen colour theme (an unknown name falls back to the first).
+    pub fn scheme(&self) -> &'static palettes::Scheme {
+        palettes::find(&self.scheme)
+    }
 }
 
 fn c(hex: u32) -> Hsla {
     rgb(hex).into()
-}
-
-fn ca(hex: u32, alpha: f32) -> Hsla {
-    let mut h: Hsla = rgb(hex).into();
-    h.a = alpha;
-    h
 }
 
 fn shade(color: Hsla, dl: f32) -> Hsla {
@@ -117,7 +124,6 @@ fn shade(color: Hsla, dl: f32) -> Hsla {
     }
 }
 
-/// Apply the appearance to every window.
 /// The monospace font for code, terminals and paths: Menlo on the desktop, the built-in Fira
 /// Mono in the browser build (no system fonts there).
 pub const MONO: &str = if cfg!(target_family = "wasm") {
@@ -126,8 +132,10 @@ pub const MONO: &str = if cfg!(target_family = "wasm") {
     "Menlo"
 };
 
-pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
+/// Apply the appearance to every window.
+pub fn apply(a: &Appearance, window: Option<&Window>, cx: &mut App) {
     let dark = a.is_dark(window, cx);
+    let scheme = a.scheme();
     Theme::change(
         if dark {
             ThemeMode::Dark
@@ -138,9 +146,9 @@ pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
         cx,
     );
     let highlight: Option<HighlightTheme> = serde_json::from_str(if dark {
-        include_str!("../../../assets/themes/one-dark.json")
+        scheme.syntax_dark
     } else {
-        include_str!("../../../assets/themes/one-light.json")
+        scheme.syntax_light
     })
     .ok();
     let (accent_light, accent_dark) = ACCENTS
@@ -164,23 +172,17 @@ pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
         if let Some(h) = highlight {
             t.highlight_theme = Arc::new(h);
         }
-        if dark {
-            dark_palette(t);
-        } else {
-            light_palette(t);
-        }
+        palettes::paint(t, scheme.pick(dark), dark);
 
         let accent = c(if dark { accent_dark } else { accent_light });
         let hover = if dark { 0.06 } else { -0.05 };
         t.primary = accent;
         t.primary_hover = shade(accent, hover);
         t.primary_active = shade(accent, hover * 2.);
-        t.primary_foreground = if dark { c(0x1E2127) } else { c(0xFFFFFF) };
         // Primary buttons (Save, Send, …) in the accent too, not the kit's black.
         t.button_primary = t.primary;
         t.button_primary_hover = t.primary_hover;
         t.button_primary_active = t.primary_active;
-        t.button_primary_foreground = t.primary_foreground;
         t.ring = accent;
         t.link = accent;
         t.caret = accent;
@@ -190,82 +192,4 @@ pub fn apply(a: Appearance, window: Option<&Window>, cx: &mut App) {
             ..accent
         };
     });
-}
-
-fn light_palette(t: &mut Theme) {
-    // Surfaces: editor-white content, one step darker chrome, thin neutral borders.
-    t.background = c(0xFAFAFA);
-    t.foreground = c(0x242529);
-    // The chrome half a step darker than it was (EFEFF0 / E9E9EA): the sidebar needs no rule
-    // against the chat, and the middle reads as the page.
-    t.sidebar = c(0xEAEAEC);
-    t.sidebar_foreground = c(0x242529);
-    t.sidebar_border = c(0xD9D9DA);
-    t.sidebar_accent = c(0xDEDEE1);
-    t.sidebar_accent_foreground = c(0x242529);
-    t.title_bar = c(0xE4E4E6);
-    t.title_bar_border = c(0xD9D9DA);
-    t.status_bar = c(0xE4E4E6);
-    t.status_bar_border = c(0xD9D9DA);
-    t.tab_bar = c(0xE4E4E6);
-    t.border = c(0xD9D9DA);
-    t.input = c(0xC9C9CB);
-    t.window_border = c(0xC9C9CB);
-
-    t.muted = c(0xEBEBEC);
-    t.muted_foreground = c(0x6E6F75);
-    t.secondary = c(0xEDEDEE);
-    t.secondary_hover = c(0xE2E2E4);
-    t.secondary_active = c(0xD6D6D8);
-    t.secondary_foreground = c(0x242529);
-    t.accent = c(0xE2E2E4);
-    t.accent_foreground = c(0x242529);
-    t.list_hover = c(0xE6E6E8);
-    t.popover = c(0xFAFAFA);
-    t.popover_foreground = c(0x242529);
-    t.scrollbar_thumb = ca(0x242529, 0.18);
-    t.scrollbar_thumb_hover = ca(0x242529, 0.3);
-
-    t.danger = c(0xC9503F);
-    t.danger_foreground = c(0xFFFFFF);
-    t.success = c(0x4F8A3F);
-    t.warning = c(0xB7791F);
-}
-
-fn dark_palette(t: &mut Theme) {
-    // Zed One Dark: editor #282C33, panels #2F343E, chrome #3B414D.
-    t.background = c(0x282C33);
-    t.foreground = c(0xDCE0E5);
-    t.sidebar = c(0x2F343E);
-    t.sidebar_foreground = c(0xDCE0E5);
-    t.sidebar_border = c(0x464B57);
-    t.sidebar_accent = c(0x363C46);
-    t.sidebar_accent_foreground = c(0xDCE0E5);
-    t.title_bar = c(0x3B414D);
-    t.title_bar_border = c(0x464B57);
-    t.status_bar = c(0x3B414D);
-    t.status_bar_border = c(0x464B57);
-    t.tab_bar = c(0x3B414D);
-    t.border = c(0x464B57);
-    t.input = c(0x535966);
-    t.window_border = c(0x535966);
-
-    t.muted = c(0x333842);
-    t.muted_foreground = c(0xA9AFBC);
-    t.secondary = c(0x363C46);
-    t.secondary_hover = c(0x3E4451);
-    t.secondary_active = c(0x454A56);
-    t.secondary_foreground = c(0xDCE0E5);
-    t.accent = c(0x3E4451);
-    t.accent_foreground = c(0xDCE0E5);
-    t.list_hover = c(0x363C46);
-    t.popover = c(0x2F343E);
-    t.popover_foreground = c(0xDCE0E5);
-    t.scrollbar_thumb = ca(0xDCE0E5, 0.18);
-    t.scrollbar_thumb_hover = ca(0xDCE0E5, 0.3);
-
-    t.danger = c(0xD07277);
-    t.danger_foreground = c(0x1E2127);
-    t.success = c(0xA1C181);
-    t.warning = c(0xDEC184);
 }

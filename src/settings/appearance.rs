@@ -23,7 +23,7 @@ impl BenchApp {
         use bench_ui::theme::{ACCENTS, Mode};
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let a = self.appearance;
+        let a = self.appearance.clone();
 
         let row = |title: &'static str, hint: &'static str, control: AnyElement| {
             h_flex()
@@ -63,7 +63,7 @@ impl BenchApp {
                         .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
                         .child(label)
                         .on_click(cx.listener(move |this, _, window, cx| {
-                            this.set_appearance(next, window, cx)
+                            this.set_appearance(next.clone(), window, cx)
                         }))
                 }))
                 .into_any_element()
@@ -75,15 +75,16 @@ impl BenchApp {
             ("System", Mode::System),
         ]
         .into_iter()
-        .map(|(l, m)| (l, a.mode == m, bench_ui::theme::Appearance { mode: m, ..a }))
+        .map(|(l, m)| (l, a.mode == m, bench_ui::theme::Appearance { mode: m, ..a.clone() }))
         .collect();
         let view = cx.entity();
+        let look = a.clone();
         let compact = Checkbox::new("compact-sidebar")
             .checked(a.compact_sidebar)
             .on_click(move |on, window, cx| {
                 let next = bench_ui::theme::Appearance {
                     compact_sidebar: *on,
-                    ..a
+                    ..look.clone()
                 };
                 view.update(cx, |this, cx| this.set_appearance(next, window, cx));
             })
@@ -98,7 +99,7 @@ impl BenchApp {
                     .map(|(k, (name, light, dark_c))| {
                         let on = a.accent == k;
                         let color: Hsla = rgb(if dark { *dark_c } else { *light }).into();
-                        let next = bench_ui::theme::Appearance { accent: k, ..a };
+                        let next = bench_ui::theme::Appearance { accent: k, ..a.clone() };
                         div()
                             .id(("accent", k))
                             .p(px(3.))
@@ -115,19 +116,38 @@ impl BenchApp {
                                 gpui_kit::component::tooltip::Tooltip::new(*name).build(window, cx)
                             })
                             .on_click(cx.listener(move |this, _, window, cx| {
-                                this.set_appearance(next, window, cx)
+                                this.set_appearance(next.clone(), window, cx)
                             }))
                     }),
             )
             .into_any_element();
+
+        // A colour theme paints the surfaces and the code; the accent below stays the person's.
+        let view = cx.entity();
+        let chips = bench_ui::theme_chips(
+            &a.scheme,
+            theme.mode.is_dark(),
+            cx,
+            std::rc::Rc::new(move |k, window, cx| {
+                let name = bench_ui::theme::palettes::SCHEMES[k].name;
+                view.update(cx, |this, cx| {
+                    let next = bench_ui::theme::Appearance {
+                        scheme: name.into(),
+                        ..this.appearance.clone()
+                    };
+                    this.set_appearance(next, window, cx);
+                });
+            }),
+        );
 
         // The page's own width: these rows are rows of the same list, and a narrower column for
         // them alone read as a mistake (their rules ended short of every other rule).
         v_flex().w_full().child(
             v_flex()
                 .w_full()
+                .child(row("Theme", a.scheme().halves, chips))
                 .child(row(
-                    "Theme",
+                    "Mode",
                     "Light, dark, or follow macOS.",
                     segmented("mode", modes, cx),
                 ))
@@ -148,9 +168,9 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.appearance = a;
         crate::settings::appearance::save(&a);
-        bench_ui::theme::apply(a, Some(window), cx);
+        self.appearance = a;
+        bench_ui::theme::apply(&self.appearance, Some(window), cx);
         self.repaint_terminals(cx);
         cx.notify();
     }

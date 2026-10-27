@@ -219,7 +219,7 @@ fn main() {
         .with_assets(gpui_kit::assets::Assets)
         .run(|cx| {
             gpui_kit::init(cx);
-            bench_ui::theme::apply(settings::appearance::load(), None, cx);
+            bench_ui::theme::apply(&settings::appearance::load(), None, cx);
             app::menu::install(cx);
 
             open_main_window(cx);
@@ -253,7 +253,7 @@ fn main() {
             if let Err(e) = cx.text_system().add_fonts(fonts) {
                 log_error(&format!("fonts: {e:#}"));
             }
-            bench_ui::theme::apply(settings::appearance::load(), None, cx);
+            bench_ui::theme::apply(&settings::appearance::load(), None, cx);
             open_main_window(cx);
         });
 }

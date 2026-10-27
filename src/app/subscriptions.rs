@@ -28,7 +28,7 @@ impl BenchApp {
             // "System" follows macOS light/dark as it changes.
             cx.observe_window_appearance(window, |this, window, cx| {
                 if this.appearance.mode == bench_ui::theme::Mode::System {
-                    bench_ui::theme::apply(this.appearance, Some(window), cx);
+                    bench_ui::theme::apply(&this.appearance, Some(window), cx);
                     this.repaint_terminals(cx);
                 }
             }),

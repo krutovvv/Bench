@@ -139,7 +139,7 @@ impl BenchApp {
         if next != self.appearance.size {
             let a = bench_ui::theme::Appearance {
                 size: next,
-                ..self.appearance
+                ..self.appearance.clone()
             };
             self.set_appearance(a, window, cx);
         }

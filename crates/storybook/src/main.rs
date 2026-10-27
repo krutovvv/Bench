@@ -345,6 +345,14 @@ impl Render for Story {
                     .child(search_band(&self.search, cx)),
             );
 
+        // The gear's colour themes, as on the Appearance tab.
+        let chips = bench_ui::theme_chips(
+            bench_ui::theme::palettes::SCHEMES[0].name,
+            theme.mode.is_dark(),
+            cx,
+            std::rc::Rc::new(|_, _, _| {}),
+        );
+
         let icons = row(Gap::M).flex_wrap().children(
             Ico::ALL
                 .iter()
@@ -383,6 +391,7 @@ impl Render for Story {
                                     .flex_1()
                                     .child(section("Forms", forms, cx))
                                     .child(section("Lists", lists, cx))
+                                    .child(section("Theme chips", chips, cx))
                                     .child(section("File icons", files, cx))
                                     .child(section("Bars", bars, cx))
                                     .child(section("Icons", icons, cx)),
@@ -402,7 +411,7 @@ fn main() {
                 mode: if dark { Mode::Dark } else { Mode::Light },
                 ..Default::default()
             };
-            theme::apply(look, None, cx);
+            theme::apply(&look, None, cx);
             let options = WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
                     None,
