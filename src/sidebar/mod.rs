@@ -145,7 +145,6 @@ impl BenchApp {
                                     cx.entity(),
                                     Item::Project(crate::app::model::ProjectKey::HOST.into()),
                                     false,
-                                    None,
                                 )),
                         ),
                 )
@@ -174,7 +173,6 @@ impl BenchApp {
                     cx.entity(),
                     Item::Project(crate::app::model::ProjectKey::HOST.into()),
                     false,
-                    None,
                 ))
                 .into_any_element(),
         ];

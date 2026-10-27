@@ -105,7 +105,7 @@ pub struct Doc {
     pub saved: String,
     pub dirty: bool,
     pub loading: bool,
-    /// Not text, or too large to be read whole: nothing to edit or save here (Zed opens it).
+    /// Not text, or too large to be read whole: nothing to edit or save here.
     pub binary: bool,
     /// The line to put the caret on once it is read (⌘⇧F's hit).
     pub goto: Option<u32>,

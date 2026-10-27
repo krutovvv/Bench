@@ -80,8 +80,7 @@ impl BenchApp {
                 )
                 .into_any_element()
         } else {
-            // "⋯" on hover: pin, color, its files (the mini IDE; Zed is one click from there),
-            // delete.
+            // "⋯" on hover: pin, color, rename, delete.
             let view = cx.entity();
             let id = s.id.clone();
             let mark = self.mark_of(&s.id);
@@ -99,7 +98,6 @@ impl BenchApp {
                             view.clone(),
                             Item::Thread(id.clone()),
                             mark.pinned,
-                            None,
                         )),
                 )
                 .into_any_element()
@@ -227,6 +225,6 @@ impl BenchApp {
                 this.open_session(open_id.clone(), cx);
                 window.focus(&this.sidebar_focus, cx);
             }))
-            .context_menu(item_menu(cx.entity(), Item::Thread(menu_id), pinned, None))
+            .context_menu(item_menu(cx.entity(), Item::Thread(menu_id), pinned))
     }
 }

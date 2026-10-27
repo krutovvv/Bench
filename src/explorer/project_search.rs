@@ -196,6 +196,17 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         self.open_doc(DocKey::File(f.clone()), window, cx);
+        self.goto_line(f, line, window, cx);
+    }
+
+    /// The caret on `line` (1-based) of an open file, now or once its text is read (`goto`).
+    pub fn goto_line(
+        &mut self,
+        f: FileRef,
+        line: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(d) = self.explorer.docs.get_mut(&DocKey::File(f)) {
             d.goto = Some(line.saturating_sub(1) as u32);
             if !d.loading {

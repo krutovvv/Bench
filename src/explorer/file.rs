@@ -1,6 +1,6 @@
 //! A file of the Explorer as a document (`DocKey::File`): read into an editor of its own — on the
 //! project's machine, or the agent's own (its soul, prompts, skills are files there) — saved with
-//! ⌘S, reverted, drawn with its head (where it is, Save, its changes, Finder, Zed).
+//! ⌘S, reverted, drawn with its head (where it is, Save, its changes, Finder).
 
 use gpui_kit::component::input::{Editor, InputEvent};
 use gpui_kit::component::notification::NotificationType;
@@ -212,7 +212,7 @@ impl BenchApp {
         }
     }
 
-    /// A file: its head (where it is; Revert and Save while changed; Finder, Zed) and its editor.
+    /// A file: its head (where it is; Revert and Save while changed; Finder) and its editor.
     fn file_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
         let key = DocKey::File(f.clone());
         let Some(d) = self.explorer.docs.get(&key) else {
@@ -251,13 +251,13 @@ impl BenchApp {
                     .into_any_element(),
             );
         }
-        // Where else it opens: Zed (on its machine), Finder on this Mac.
+        // On this Mac, Finder can show it.
         let at = self.location(&f.project);
         let host = f
             .machine
             .clone()
             .or_else(|| (!at.agent.is_empty()).then(|| at.agent.clone()));
-        let (zed, finder) = (f.path.clone(), f.path.clone());
+        let finder = f.path.clone();
         if host.is_none() {
             actions.push(
                 bench_ui::head_icon_button("doc-finder", Ico::FolderOpen, "Show in Finder", cx)
@@ -267,20 +267,13 @@ impl BenchApp {
                     .into_any_element(),
             );
         }
-        actions.push(
-            bench_ui::head_icon_button("doc-zed", Ico::Zed, "Open in Zed", cx)
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.open_in_zed(&zed, None, host.as_deref(), cx)
-                }))
-                .into_any_element(),
-        );
         let where_ = match &f.machine {
             Some(m) => format!("{m}:{}", f.path),
             None => f.path.clone(),
         };
         let head = bench_ui::ide_head(f.name().to_string(), Some(where_.into()), actions, cx);
         let body = if binary {
-            note("Not text, or too large to edit here: Zed opens it", cx)
+            note("Not text, or too large to edit here", cx)
         } else if loading {
             note("Reading…", cx)
         } else {

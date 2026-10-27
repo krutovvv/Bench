@@ -65,7 +65,8 @@ person: there are projects.
   (`thread_machine()`).
 - **Explorer**: the third way to look at a project, beside threads and Settings — its files and
   the agent's texts as an IDE shows them (a tree in the sidebar, documents in tabs, the thread
-  beside). It does not replace Zed (still one click away); it is the familiar view of a project.
+  beside). It is the familiar view of a project, built into Bench: no external editor is
+  referenced or needed.
   The window is Zed's workspace: a left dock (threads or Explorer), the center, a right dock.
   Two threads can sit side by side: a thread's menu in the sidebar has "Open beside".
 - **The gear** (Bench → Settings… in the macOS menu, ⌘,) holds the app's settings, in tabs: Agents (each one's models and voice;

@@ -107,8 +107,6 @@ icons! {
     Volume => "volume-2",
     Search => "search",
     X => "x",
-    // Not Lucide: a Z in Lucide's style, for "open in Zed".
-    Zed => "zed",
     BookCheck => "book-check",
     Wrench => "wrench",
     CalendarDays => "calendar-days",

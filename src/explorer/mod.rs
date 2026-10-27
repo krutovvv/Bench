@@ -15,7 +15,7 @@
 //! explorer/problems.rs  the project's Problems as a tab; problems sent to the thread
 //! explorer/persistence.rs  the tabs and folds kept on this Mac between starts
 //! explorer/git.rs   lines changed since HEAD in the gutter, a file's diff as a tab
-//! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder, Zed)
+//! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder)
 //! explorer/tree.rs  the sidebar's tree
 //! explorer/view.rs  the middle: the open document, the tabs, ⌘P's list
 //! ```

@@ -61,7 +61,7 @@ appears as a card in the thread, under the insert that asked for it, not in a se
 
 The sidebar holds only **projects** and their threads. A project is whatever you work on: a
 client, a site, a codebase, a kind of work. It may have a folder on disk (then the threads work
-in it, and the project's ⋯ menu opens it in Zed), and it may live on a server (its agent runs
+in it), and it may live on a server (its agent runs
 there, over SSH).
 
 Each project carries its **environment**, the way Claude Code reads a repository's setup:

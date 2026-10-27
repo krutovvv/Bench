@@ -1,5 +1,5 @@
 //! The tree's context menus, as an IDE has them: a file's (open, add to the thread, rename,
-//! delete, copy the path, show in Finder, open in Zed), a folder's (new file, new folder, and the
+//! delete, copy the path, show in Finder), a folder's (new file, new folder, and the
 //! same), the project folder's (also find in it, read it again), the prompts' and skills' (a new
 //! one). The rows themselves carry no buttons.
 
@@ -182,9 +182,9 @@ pub fn new_menu(
     }
 }
 
-/// Where else an entry is: its path copied, Finder (on this Mac), Zed (on its machine).
+/// Where else an entry is: its path copied, Finder (on this Mac).
 fn place_items(menu: PopupMenu, view: &Entity<BenchApp>, f: &FileRef, here: bool) -> PopupMenu {
-    let (a, b, c) = (f.clone(), f.clone(), f.clone());
+    let (a, b) = (f.clone(), f.clone());
     let menu = menu.item(
         PopupMenuItem::new("Copy path")
             .icon(Ico::Copy.icon())
@@ -193,7 +193,7 @@ fn place_items(menu: PopupMenu, view: &Entity<BenchApp>, f: &FileRef, here: bool
                 Box::new(move |this, w, cx| this.copy_path(&a, w, cx)),
             )),
     );
-    let menu = if here {
+    if here {
         menu.item(
             PopupMenuItem::new("Show in Finder")
                 .icon(Ico::FolderOpen.icon())
@@ -204,28 +204,18 @@ fn place_items(menu: PopupMenu, view: &Entity<BenchApp>, f: &FileRef, here: bool
         )
     } else {
         menu
-    };
-    menu.item(
-        PopupMenuItem::new("Open in Zed")
-            .icon(Ico::Zed.icon())
-            .on_click(act(
-                view,
-                Box::new(move |this, _, cx| {
-                    let host = this.zed_host(&c);
-                    this.open_in_zed(&c.path, None, host.as_deref(), cx)
-                }),
-            )),
-    )
+    }
 }
 
 impl BenchApp {
     /// Whether a file is on this Mac (Finder can show it).
     pub fn is_this_mac(&self, f: &FileRef) -> bool {
-        self.zed_host(f).is_none()
+        self.file_remote_machine(f).is_none()
     }
 
-    /// The machine Zed opens a file on: the project's over SSH, or the agent's server; None here.
-    pub fn zed_host(&self, f: &FileRef) -> Option<String> {
+    /// The machine a file's contents live on (the Explorer reaches it through the agent there):
+    /// the project's over SSH, or the agent's server; None here.
+    pub fn file_remote_machine(&self, f: &FileRef) -> Option<String> {
         let at = self.location(&f.project);
         f.machine
             .clone()

@@ -95,7 +95,7 @@ impl ThreadView {
                                 .child("written"),
                         )
                     })
-                    // In the editor, the thread beside it (Zed from the file's head).
+                    // In the Explorer, the thread beside it.
                     .on_click(self.app_listener(move |this, _, window, cx| {
                         let project = at.project_or_host();
                         let machine = this.location(&project).files_machine();

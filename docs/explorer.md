@@ -140,7 +140,7 @@ Phases, each a thing of its own:
 ## What the person sees, briefly
 
 - The tree's work is in context menus (a file: open, add to the thread, rename, delete, copy the
-  path, Finder, Zed; a folder: new file, new folder and the same; the project's folder: also find
+  path, Finder (on this Mac); a folder: new file, new folder and the same; the project's folder: also find
   in it and read it again; Prompts and Skills: a new one). Rows carry no buttons.
 - The center's tabs are its own bar under the window's title bar (which drags the window).
 - The project's settings are the tree's last row, a document like the rest; MCP and language

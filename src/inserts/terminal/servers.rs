@@ -178,9 +178,8 @@ impl BenchApp {
     }
 
     /// ⌘-click in a terminal: a URL opens in the browser; a path — absolute, `~/…`, or relative
-    /// to the terminal's folder (`wp-config.php` in an `ls`) — opens in the mini IDE on that
-    /// machine: a file in the editor (at its `:line`), a folder as the tree. A file under the
-    /// tree already open keeps that tree.
+    /// to the terminal's folder (`wp-config.php` in an `ls`) — opens in the Explorer: the file
+    /// in the editor at its `:line`, in the open thread's project, on that machine.
     pub fn open_terminal_link(
         &mut self,
         alias: String,
@@ -204,8 +203,9 @@ impl BenchApp {
             }
         };
         let line = link.line;
+        let project = self.thread_ref(cx).project_or_host();
         if alias == crate::inserts::terminal::session::LOCAL {
-            self.open_local_link(&path, line, window, cx);
+            self.open_local_link(&project, &path, line, window, cx);
             return;
         }
         let a = alias.clone();
@@ -228,7 +228,15 @@ impl BenchApp {
                 Ok(String::from_utf8_lossy(&out).trim().to_string())
             },
             move |this, r, window, cx| match r.as_deref().ok().and_then(|o| o.split_once(' ')) {
-                Some((_, found)) => this.open_in_zed(found, line, Some(&alias), cx),
+                Some(("f", found)) => {
+                    this.open_terminal_file(&project, Some(&alias), found, line, window, cx)
+                }
+                Some((_, found)) => this.toast(
+                    NotificationType::Info,
+                    format!("{alias}: {found} is a folder, not a file"),
+                    window,
+                    cx,
+                ),
                 _ => this.toast(
                     NotificationType::Info,
                     format!("{alias}: no file or folder at {path}"),
@@ -239,9 +247,10 @@ impl BenchApp {
         );
     }
 
-    /// ⌘-click on a path in this machine's terminal: it opens in Zed.
+    /// ⌘-click on a path in this machine's terminal: it opens in the Explorer.
     fn open_local_link(
         &mut self,
+        project: &str,
         link: &str,
         line: Option<usize>,
         window: &mut Window,
@@ -254,15 +263,37 @@ impl BenchApp {
             None => link.to_string(),
         };
         let p = std::path::Path::new(&path);
-        if p.exists() {
-            self.open_in_zed(&path, line, None, cx);
+        if p.is_file() {
+            self.open_terminal_file(project, None, &path, line, window, cx);
         } else {
             self.toast(
                 NotificationType::Info,
-                format!("No file or folder at {link}"),
+                format!("No file at {link}"),
                 window,
                 cx,
             );
+        }
+    }
+
+    /// A terminal's ⌘-click path in the Explorer: its tab on that machine, the caret at `line`.
+    fn open_terminal_file(
+        &mut self,
+        project: &str,
+        machine: Option<&str>,
+        path: &str,
+        line: Option<usize>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let f = crate::explorer::FileRef {
+            project: project.to_string(),
+            machine: machine.map(|m| m.to_string()),
+            path: path.to_string(),
+        };
+        self.show_explorer(project.to_string(), window, cx);
+        self.open_doc(crate::explorer::DocKey::File(f.clone()), window, cx);
+        if let Some(line) = line {
+            self.goto_line(f, line, window, cx);
         }
     }
 }

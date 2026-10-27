@@ -199,23 +199,3 @@ impl BenchApp {
     }
 }
 
-impl BenchApp {
-    /// A file or folder in Zed (the code editor beside Bench): `zed://file/<path>:<line>`, or
-    /// over SSH `zed://ssh/<alias>/<path>` for a server's.
-    pub fn open_in_zed(
-        &mut self,
-        path: &str,
-        line: Option<usize>,
-        host: Option<&str>,
-        cx: &mut Context<Self>,
-    ) {
-        let at = line.map(|l| format!(":{l}")).unwrap_or_default();
-        let url = match host
-            .filter(|h| !h.is_empty() && *h != crate::inserts::terminal::session::LOCAL)
-        {
-            Some(h) => format!("zed://ssh/{h}{path}{at}"),
-            None => format!("zed://file{path}{at}"),
-        };
-        cx.open_url(&url);
-    }
-}

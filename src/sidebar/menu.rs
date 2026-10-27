@@ -64,12 +64,11 @@ pub(super) fn color_row(
 }
 
 /// The menu of a sidebar item (its "⋯" and a right click), the same for a thread and a
-/// project: a project's own entries (environment, Zed), then pin, color, rename, delete.
+/// project: a project's own entries (settings, Explorer), then pin, color, rename, delete.
 pub(super) fn item_menu(
     view: Entity<BenchApp>,
     item: Item,
     pinned: bool,
-    zed: Option<(String, Option<String>)>,
 ) -> impl Fn(
     gpui_kit::component::menu::PopupMenu,
     &mut Window,
@@ -104,16 +103,6 @@ pub(super) fn item_menu(
                         .on_click(act(Box::new(move |this, window, cx| {
                             this.show_explorer(id.clone(), window, cx)
                         })))
-                })
-                // A project with a folder opens in Zed (a server's over SSH).
-                .when_some(zed.clone(), |menu, (folder, host)| {
-                    menu.item(
-                        PopupMenuItem::new("Open in Zed")
-                            .icon(Ico::Zed.icon())
-                            .on_click(act(Box::new(move |this, _, cx| {
-                                this.open_in_zed(&folder, None, host.as_deref(), cx)
-                            }))),
-                    )
                 })
                 .separator()
             }

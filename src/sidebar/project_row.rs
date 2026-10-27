@@ -62,17 +62,6 @@ impl BenchApp {
             .map(|c| rgb(*c).into());
         let armed = self.confirm_delete.as_deref() == Some(format!("p:{}", p.id).as_str());
         let renaming = self.renaming_field(&Item::Project(p.id.clone()));
-        let zed = p
-            .folder
-            .clone()
-            .filter(|f| !f.is_empty())
-            // Zed opens it where its files are: this Mac, or that machine over SSH.
-            .map(|f| {
-                (
-                    f,
-                    Some(p.location().machine_here()).filter(|m| !m.is_empty()),
-                )
-            });
         let mut out = vec![
             h_flex()
                 .id(("phead", g))
@@ -153,7 +142,6 @@ impl BenchApp {
                                     cx.entity(),
                                     Item::Project(menu_id.clone()),
                                     pinned,
-                                    zed.clone(),
                                 )),
                         ),
                 )
@@ -190,9 +178,8 @@ impl BenchApp {
                 .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
                 .context_menu(item_menu(
                     cx.entity(),
-                    Item::Project(menu_id.clone()),
+                    Item::Project(menu_id),
                     pinned,
-                    zed.clone(),
                 ))
                 .into_any_element(),
         ];
