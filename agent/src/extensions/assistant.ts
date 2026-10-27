@@ -45,6 +45,9 @@ import { projects } from "../builtin/projects.ts";
 import { diagnosticsFor, knownDiagnostics } from "../lsp.ts";
 import { machineEnv } from "../ssh-env.ts";
 
+/** Tool calls since the plan's last `todo` write, per conversation (the plan's steering). */
+const planSteer = new Map<string, number>();
+
 /** A file a tool named, where it is and what it holds now (on the project's machine, if any). */
 async function placeOf(info: { cwd: string; project?: string }, p: string): Promise<{ file: string; machine?: string; text: string } | undefined> {
 	if (!p) return undefined;
@@ -106,7 +109,7 @@ export const assistant = defineExtension({
 		section("skills", s(skills), { tag: false }),
 		section("notes", s(notes), { tag: false }),
 	],
-	hooks: [
+		hooks: [
 		compactWithoutReasoning,
 		hook(ToolTask, {
 			beforeTool: async (call: any) => {
@@ -126,13 +129,42 @@ export const assistant = defineExtension({
 			// The file's errors from the project's language servers, with the edit that made them
 			// (`lsp.ts`): the model sees them as an editor shows them, without asking.
 			afterTool: async (call: any, result: any, api: any) => {
-				if ((call.name !== "edit" && call.name !== "write") || result?.isError) return undefined;
+				// The plan's steering. A model deep in work forgets to tick its plan: it stalls on
+				// the first step and then marks everything done at the end — the widget reads as
+				// broken though it mirrors the journal exactly. So after a few steps without a
+				// `todo` write while steps still stand unfinished, the next tool result carries a
+				// quiet reminder; again every six steps, never every call.
+				const cid = String(api.conversationId ?? "");
+				let steered = false;
+				if (call.name === "todo") planSteer.delete(cid);
+				else {
+					const info0 = host().session(cid);
+					const todos = info0 ? (host().todos(info0.id) as any[]) : [];
+					if (todos.some((t) => t?.status !== "completed" && t?.status !== "cancelled")) {
+						const n = (planSteer.get(cid) ?? 0) + 1;
+						planSteer.set(cid, n);
+						if (n === 4 || (n > 4 && (n - 4) % 6 === 0)) {
+							steered = true;
+							result = {
+								...result,
+								output: [
+									...(result?.output ?? []),
+									{
+										type: "text",
+										text: `<plan-reminder>${n} steps have passed without updating the plan, and its steps still stand unfinished. Move every finished step to completed and the one you are on to in_progress with the \`todo\` tool now; if a step is no longer on the way, cancel it. A stale plan misleads the person more than no plan.</plan-reminder>`,
+									},
+								],
+							};
+						}
+					} else planSteer.delete(cid);
+				}
+				if ((call.name !== "edit" && call.name !== "write") || result?.isError) return steered ? result : undefined;
 				const info = host().session(api.conversationId);
 				if (!info) return undefined;
 				const at = await placeOf(info, String(call.arguments?.path ?? ""));
 				if (!at) return undefined;
 				const diag = await diagnosticsFor(info.profile, info.cwd, at.machine, at.file, at.text).catch(() => undefined);
-				return diag ? { ...result, output: [...(result.output ?? []), { type: "text", text: diag }] } : undefined;
+				return diag ? { ...result, output: [...(result.output ?? []), { type: "text", text: diag }] } : steered ? result : undefined;
 			},
 		} as any),
 	],
