@@ -169,6 +169,18 @@ impl ThreadView {
             .group(group)
             .relative()
             .w_full()
+            // When this answer wears its actions on the work line above, hovering the text
+            // is what reveals them — hitting the thin line itself is too small a target.
+            .when(after_work && !text.trim().is_empty(), |d| {
+                let hk = key.to_string();
+                d.on_hover(cx.listener(move |this, &over, _, cx| {
+                    let now = if over { Some(hk.clone()) } else { None };
+                    if this.reveal_tail != now {
+                        this.reveal_tail = now;
+                        cx.notify();
+                    }
+                }))
+            })
             .child(
                 speaker_row(if after_work { None } else { Some(true) }, body, cx)
                     .when(after_work, |d| d.pt_0()),

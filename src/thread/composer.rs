@@ -154,22 +154,29 @@ impl ThreadView {
             .and_then(|a| a.read(cx).recorder.as_ref().map(|r| r.level().min(1.)))
             .unwrap_or(0.);
         let empty = self.composer.read(cx).value().trim().is_empty();
-        // Empty: level with the avatar. Words: under them, at the last line's side. The
-        // bottom is computed from the composer's measured height rather than anchored
-        // with `bottom`, whose stretch semantics fought the fixed height.
+
+        // Empty: level with the avatar, at the text's right column. Once a single character
+        // is there, they leave the gutter and travel below the field, a line of their own
+        // at the text's left edge — where a queue chip sits under a message. The row grows
+        // its bottom padding by their line, so they cover no word and the hover band
+        // reaches them. The bottom is computed from the composer's measured height rather
+        // than anchored with `bottom`, whose stretch semantics fought the fixed height.
         let row_h = self.composer_h.max(2. * bench_ui::TURN_Y + bench_ui::AVATAR);
-        let top = if empty {
-            bench_ui::TURN_Y
-        } else {
-            (row_h - bench_ui::TURN_Y - bench_ui::AVATAR).max(bench_ui::TURN_Y)
-        };
         let tools = h_flex()
             .absolute()
-            // The messages' right column, not the window's edge: the icons end where the
-            // thread's text ends (`right_0` measured from the row's border box, past its
-            // right padding).
-            .right(px(bench_ui::CHAT_RIGHT))
-            .top(px(top))
+            .when(empty, |d| {
+                // The messages' right column, not the window's edge: the icons end where
+                // the thread's text ends (`right_0` measures from the row's border box,
+                // past its right padding).
+                d.top(px(bench_ui::TURN_Y))
+                    .right(px(bench_ui::CHAT_RIGHT))
+            })
+            .when(!empty, |d| {
+                // Their line in the row's grown bottom band: bottom-anchored by their own
+                // height, at the text's left edge.
+                d.top(px(row_h - bench_ui::AVATAR - 2.))
+                    .left(px(bench_ui::CHAT_TEXT))
+            })
             .h(px(bench_ui::AVATAR))
             .items_center()
             .gap_1()
@@ -294,6 +301,10 @@ impl ThreadView {
                     .pl(px(bench_ui::CHAT_LEFT))
                     .pr(px(bench_ui::CHAT_RIGHT))
                     .py(px(bench_ui::TURN_Y))
+                    // The tools' line under the field, reserved while words are in it.
+                    .when(!self.composer.read(cx).value().trim().is_empty(), |d| {
+                        d.pb(px(40.))
+                    })
                     .gap(px(bench_ui::CHAT_TEXT
                         - bench_ui::CHAT_LEFT
                         - bench_ui::AVATAR))

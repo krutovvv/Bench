@@ -197,9 +197,16 @@ impl ThreadView {
                         .ml_auto()
                         .gap_1()
                         .items_center()
-                        .when(!(tplay || tspeak) && std::env::var("BENCH_TOOLS_SHOWN").is_err(), |s| {
-                            s.opacity(0.).group_hover(tgroup, |g| g.opacity(1.))
-                        })
+                        .when(
+                            !(tplay || tspeak) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
+                            |s| {
+                                let shown =
+                                    self.reveal_tail.as_deref() == Some(ak.as_str());
+                                s.when(!shown, |s| {
+                                    s.opacity(0.).group_hover(tgroup, |g| g.opacity(1.))
+                                })
+                            },
+                        )
                         .child(
                             bench_ui::head_icon_button(&copy_id, Ico::Copy, "Copy", cx).on_click(
                                 cx.listener(move |this, _, window, cx| {

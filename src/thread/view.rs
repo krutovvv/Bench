@@ -53,6 +53,10 @@ pub struct ThreadView {
     pub viewport_h: Pixels,
     /// The composer shows a new chat — what render last set.
     pub(super) composer_fresh: bool,
+    /// The answer whose hover-line the work row should reveal its tail buttons for: the
+    /// text and the thin actions line are separate rows, and one group cannot span both,
+    /// so hovering the text is remembered here while hovering the line stays a group.
+    pub(super) reveal_tail: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer; `BENCH_DEMO_SCROLL` was done.
     pub(super) demo_draft_done: bool,
     pub(super) demo_scrolled: bool,
@@ -120,6 +124,7 @@ impl ThreadView {
             composer_h: 0.,
             viewport_h: px(0.),
             composer_fresh: false,
+            reveal_tail: None,
             demo_draft_done: false,
             demo_scrolled: false,
             _subscriptions: subscriptions,
