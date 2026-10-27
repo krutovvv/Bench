@@ -129,6 +129,8 @@ impl ThreadView {
                         ),
                         cx,
                     )
+                    // The thread's one text size: the head reads like the rows under it.
+                    .text_base()
                     .when(all_add > 0, |d| {
                         d.child(div().text_color(theme.success).child(format!("+{all_add}")))
                     })
