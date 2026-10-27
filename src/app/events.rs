@@ -23,6 +23,14 @@ impl BenchApp {
                 return;
             };
             view.update(cx, |v, cx| v.on_event(&evt, window, cx));
+            // A finished run may have rewritten files where they live: every copy we cached of
+            // that agent's machine is stale now, and the next look (a click, a redraw) brings
+            // the current one. An open video keeps playing from its copy; it re-shows after.
+            if matches!(evt, Evt::Complete { .. }) {
+                let label = self.thread_target(&view.read(cx).thread_ref()).label();
+                self.media
+                    .retain(|k, _| !k.starts_with(&format!("{label}\0")));
+            }
             // A command that expanded into a prompt (skills, /goal, …) runs as a turn of its
             // thread, whichever it is.
             if let Evt::Dispatched {

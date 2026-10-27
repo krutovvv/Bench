@@ -218,6 +218,9 @@ pub struct BenchApp {
     pub speaking: Option<String>,
     /// Files answers delivered, by target and path; diagrams, by source and dark theme.
     pub media: HashMap<String, Loaded<media::Fetched>>,
+    /// A media key whose fresh copy to open in its app once it arrives (a click on a remote
+    /// file re-fetches first — its name alone doesn't say the file is the same file).
+    pub open_after_fetch: Option<String>,
     pub diagrams: HashMap<(String, bool), Loaded<media::Diagram>>,
     /// The delivered audio file playing, by its media key, and since when.
     pub media_playing: Option<(String, Playback)>,
@@ -423,6 +426,7 @@ impl BenchApp {
             demo_threads: HashMap::new(),
             restart_armed: None,
             media: HashMap::new(),
+            open_after_fetch: None,
             diagrams: HashMap::new(),
             media_playing: None,
             media_since: Instant::now(),

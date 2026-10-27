@@ -103,10 +103,23 @@ impl BenchApp {
             .collect()
     }
 
-    fn fetch_media(&mut self, at: &ThreadRef, key: String, path: String, cx: &mut Context<Self>) {
+    /// Bring a thread's file here. `force` downloads again even when a copy is cached: a
+    /// remote file may have been rewritten where it lives, and its name alone doesn't say
+    /// it's the same file.
+    fn fetch_media(
+        &mut self,
+        at: &ThreadRef,
+        key: String,
+        path: String,
+        force: bool,
+        cx: &mut Context<Self>,
+    ) {
         let Some(conn) = self.thread_conn(at) else {
             return; // still connecting: the next frame asks again
         };
+        if force && matches!(self.media.get(&key), Some(Loaded::Pending)) {
+            return; // a fresh copy is already on its way
+        }
         self.media.insert(key.clone(), Loaded::Pending);
         let (target, profile) = (self.thread_target(at), self.current_profile());
         let machine = self.files_machine(at);
@@ -117,7 +130,18 @@ impl BenchApp {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
+                // A click waited on this copy: open it in its app now that it is here.
+                let open = match &r {
+                    Ok(f) if this.open_after_fetch.as_deref() == Some(key.as_str()) => {
+                        this.open_after_fetch = None;
+                        Some(f.local.clone())
+                    }
+                    _ => None,
+                };
                 this.media.insert(key, r.into());
+                if let Some(p) = open {
+                    cx.open_with_system(&p);
+                }
                 cx.notify();
             });
         })
@@ -140,7 +164,7 @@ impl BenchApp {
                 Some(f) => {
                     self.media.insert(key.clone(), Loaded::Ready(f));
                 }
-                None => self.fetch_media(at, key.clone(), path.clone(), cx),
+                None => self.fetch_media(at, key.clone(), path.clone(), false, cx),
             }
         }
         let theme = cx.theme().clone();
@@ -476,17 +500,28 @@ impl BenchApp {
                     })
                     .into_any_element()
             }
-            // Anything else (3D models, archives, …) opens in its own app on a click.
-            Kind::File => row(
-                Some(open_button(local.clone(), "Open").into_any_element()),
-                Some((where_, theme.muted_foreground)),
-            )
-            .id(id("file"))
-            .cursor_pointer()
-            .hover(|s| s.bg(theme.list_hover))
-            .tooltip(|window, cx| Tooltip::new("Open in its app").build(window, cx))
-            .on_click(opener(local))
-            .into_any_element(),
+            // Anything else (3D models, archives, …) opens in its own app on a click — the
+            // fresh copy: the agent may have rewritten it where it lives since it was last here.
+            Kind::File => {
+                let (k2, p2, at2) = (key.clone(), path.clone(), at.clone());
+                row(
+                    Some(open_button(local.clone(), "Open").into_any_element()),
+                    Some((where_, theme.muted_foreground)),
+                )
+                .id(id("file"))
+                .cursor_pointer()
+                .hover(|s| s.bg(theme.list_hover))
+                .tooltip(|window, cx| Tooltip::new("Open in its app").build(window, cx))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    if matches!(this.thread_target(&at2), crate::app::model::Target::Local) {
+                        cx.open_with_system(&local); // here already: this is the file itself
+                        return;
+                    }
+                    this.open_after_fetch = Some(k2.clone());
+                    this.fetch_media(&at2, k2.clone(), p2.clone(), true, cx);
+                }))
+                .into_any_element()
+            }
         }
     }
 
