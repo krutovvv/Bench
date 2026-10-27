@@ -212,7 +212,9 @@ impl BenchApp {
                     .pl(bench_ui::nest_pl(cx))
                     .pr_4()
                     .py_1()
-                    .text_sm()
+                    // Compact asks for one size in the sidebar; only the roomy one may write a
+                    // note smaller than its rows.
+                    .when(!self.appearance.compact_sidebar, |d| d.text_sm())
                     .text_color(muted)
                     .truncate()
                     .child(note)

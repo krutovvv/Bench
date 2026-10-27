@@ -40,7 +40,7 @@ impl ThreadView {
             .flex_none()
             .gap_1()
             .items_center()
-            .text_sm()
+            .text_base()
             .text_color(theme.muted_foreground)
             .child(if field.is_some() {
                 "Editing"

@@ -209,7 +209,7 @@ fn answer_style(view: TextView, cx: &App) -> TextView {
             .inline_code(code)
             .code_block(
                 StyleRefinement::default()
-                    .text_size(rems(0.8125))
+                    .text_size(rems(1.0))
                     .line_height(relative(bench_ui::LEAD)),
             ),
     )
@@ -234,7 +234,7 @@ pub(super) fn render_code(
                 .inline_code(code_span(&theme))
                 .code_block(
                     StyleRefinement::default()
-                        .text_size(rems(0.8125))
+                        .text_size(rems(1.0))
                         .line_height(relative(bench_ui::LEAD))
                         .border_0()
                         // No fill, like the audio, video and changed-files cards: the frame alone.

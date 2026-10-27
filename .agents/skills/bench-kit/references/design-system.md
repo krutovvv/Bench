@@ -65,15 +65,25 @@ Key colors (light): keyword `#A626A4`, function `#4078F2`, string `#50A14F`, num
 
 ## Typography
 
-- UI: system font, 14px base. The thread is **one size**, `text_base` — messages, answers,
-  steps, cards' heads, the composer; secondary things are muted, never smaller. Chrome (the
-  header, the status bar, block heads) is `text_sm`. Medium weight only for titles and the header.
+- UI: system font, 14px base.
+- **The thread is one size: `text_base`, everything.** The words, the steps, the queue and its
+  labels, the plan and its steps, the background row, every block's head and every code block in
+  the thread (`bench_ui::block_head`, `fold_head`, the code in `media/text.rs`), and the composer.
+  A thread is an editor of its own, and in an editor nothing changes size mid-document: what
+  sets a row apart is **colour and weight**, never a smaller type. Only the composer's own chrome
+  (the `/` list's descriptions, an attachment chip) and the text inside a utility's form stay
+  `text_sm` / `mono_font_size`.
+- Chrome outside the thread is `text_sm`: the header, the status bar, a search hit, an empty
+  state. Medium weight only for titles and the header.
 - The sidebar and the Explorer's tree are **one size too**: `text_base` for every row — a
-  project's head, its threads, a file, a skill, an MCP server, Settings. A group says "section"
-  by CAPITAL LETTERS, not by a smaller type: a project's head (`project_row.rs`) and the tree's
-  headings (`tree_heading`, `text_xs`, muted). Under a row, a note (a skill's line, a server's
-  transport) stays `text_xs` and muted — it is an annotation, not a row.
-- Code: Menlo, `mono_font_size` 12 — editors, diffs, command names, cron schedules.
+  project's head, its threads, a file, a skill, an MCP server, Settings. A compact sidebar keeps
+  that rule strictly: a note under a row goes away with it, and only the roomy one may write a
+  note (`text_xs`/`text_sm`) under a row. A group says "section" by CAPITAL LETTERS, not by a
+  smaller type: a project's head (`project_row.rs`) and the tree's headings (`tree_heading`,
+  `text_xs`, muted). Under a row, a note (a skill's line, a server's transport) stays `text_xs`
+  and muted — it is an annotation, not a row.
+- Code: Menlo. **In the thread it is the words' size** (`rems(1.0)`): mono by family, not by
+  size. Elsewhere `mono_font_size` 12 — the Explorer's editors, diffs, a cron schedule in a note.
 - Size presets (⌘+ / ⌘−; no setting): Small 13/11, Normal 14/12, Large 15/13. Rem-based
   spacing scales with the font; fixed sizes don't — rems for what must keep proportions.
 - Leading: the thread's is `LEAD` (1.5rem), shared by messages and the composer; wrapped list

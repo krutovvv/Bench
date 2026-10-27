@@ -17,7 +17,7 @@ pub fn block_head(theme: &Theme, over_body: bool) -> Div {
         .items_center()
         .bg(theme.muted.opacity(0.35))
         .when(over_body, |d| d.border_b_1().border_color(theme.border))
-        .text_sm()
+        .text_base()
         .text_color(theme.muted_foreground)
 }
 
