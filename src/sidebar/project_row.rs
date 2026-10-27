@@ -209,7 +209,7 @@ impl BenchApp {
         if let Some(note) = remote_note {
             out.push(
                 div()
-                    .pl(bench_ui::nest_pl(cx))
+                    .pl(px(bench_ui::PROJECT_NAME_X))
                     .pr_4()
                     .py_1()
                     // The note belongs to the head: the heading's own size.

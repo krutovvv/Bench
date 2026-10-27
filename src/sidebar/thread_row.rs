@@ -119,11 +119,9 @@ impl BenchApp {
             .group(group)
             .relative()
             .gap_1()
-            .pl(if guide.is_some() {
-                bench_ui::nest_pl(cx)
-            } else {
-                px(14.)
-            })
+            // The title starts where the project's name does (the row's 2 px border is part
+            // of that inset), so a project and its threads read as one column.
+            .pl(px(bench_ui::PROJECT_NAME_X) - px(2.))
             .when_some(guide, |d, last| d.child(bench_ui::nest_guide(cx, last)))
             .pr_3()
             .map(|d| if compact { d.py_1p5() } else { d.py(px(5.)) })

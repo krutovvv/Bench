@@ -79,6 +79,11 @@ pub fn nest_pl(cx: &App) -> Pixels {
     cx.theme().font_size * 2.375 - px(4.)
 }
 
+/// Where the sidebar's project header starts its name: a 16 px inset, a 16 px head icon and
+/// a 6 px gap. The rows under it — sessions, the remote note — start their text on this line,
+/// so a project and its threads read as one column.
+pub const PROJECT_NAME_X: f32 = 38.;
+
 /// One line of the code editor (mono font × 1.5).
 pub fn editor_line(cx: &App) -> f32 {
     f32::from(cx.theme().mono_font_size) * 1.5
