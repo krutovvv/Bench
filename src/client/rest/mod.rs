@@ -1,6 +1,7 @@
 //! Blocking REST calls to the gateway's dashboard API. Call them off the UI thread.
 
 mod files;
+pub mod lsp;
 mod providers;
 
 pub use files::*;

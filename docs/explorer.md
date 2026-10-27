@@ -88,11 +88,12 @@ Phases, each a thing of its own:
 1. **Tabs and the thread beside** (done): tabs drag to reorder and have a menu (close others,
    to the left, to the right, saved, all; copy the path; add to the thread); the
    right dock's panels; references from the code to the thread.
-2. **Language servers through the agent.** The agent already runs a project's servers
-   (`agent/src/lsp.ts`); the editor already takes LSP providers (gpui's `Lsp`: diagnostics,
-   hover, go to definition, completion). A small REST bridge (`/api/lsp/{diagnostics,hover,
-   definition}`) and providers in `explorer/lsp.rs` give underlined problems, hover and ⌘-click
-   to the definition; a Problems list; "Send problems to the thread".
+2. **Language servers through the agent** (in the editor: done). The servers the threads use
+   (`agent/src/lsp.ts`) answer the editor too: `POST /api/lsp/{diagnostics,hover,definition}`
+   (`agent/src/modules/lsp.ts`) with the file's text as typed; `explorer/lsp.rs` gives the
+   editor its providers — problems underlined (checked on open, save and a pause in typing),
+   the hover, ⌘-click or F12 to the definition (another file opens as a tab). Still to come: a
+   Problems list (a dock's panel) and "Send problems to the thread".
 3. **A terminal in the bottom dock** on the project's machine — the `/terminal` insert's session
    (`src/inserts/terminal/session.rs`) in a dock instead of a thread; "Send output to the thread".
 4. **Git at a glance**: changed lines in the gutter against HEAD, a changed file's diff.

@@ -1,4 +1,5 @@
-// A language server for tests: every line with ERROR in it is an error, WARN a warning.
+// A language server for tests: every line with ERROR in it is an error, WARN a warning; a hover
+// names the place asked; every symbol is defined at the start of the file.
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter } from "vscode-jsonrpc/node.js";
 const c = createMessageConnection(new StreamMessageReader(process.stdin), new StreamMessageWriter(process.stdout));
 const publish = (uri, text) =>
@@ -12,4 +13,6 @@ const publish = (uri, text) =>
 c.onRequest("initialize", () => ({ capabilities: { textDocumentSync: 1 } }));
 c.onNotification("textDocument/didOpen", (p) => publish(p.textDocument.uri, p.textDocument.text));
 c.onNotification("textDocument/didChange", (p) => publish(p.textDocument.uri, p.contentChanges[0].text));
+c.onRequest("textDocument/hover", (p) => ({ contents: { kind: "markdown", value: `at ${p.position.line}:${p.position.character}` } }));
+c.onRequest("textDocument/definition", (p) => [{ targetUri: p.textDocument.uri, targetRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } }, targetSelectionRange: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } } }]);
 c.listen();

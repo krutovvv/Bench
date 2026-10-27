@@ -103,6 +103,8 @@ pub struct Doc {
     pub binary: bool,
     /// The line to put the caret on once it is read (⌘⇧F's hit).
     pub goto: Option<u32>,
+    /// Its language servers' check under way (`lsp.rs`); a newer one replaces it.
+    pub checking: Task<()>,
 }
 
 impl BenchApp {
@@ -172,11 +174,13 @@ impl BenchApp {
             return;
         }
         let editor = crate::env::editor("text", window, cx);
-        let k = key.clone();
-        cx.subscribe(&editor, move |this, _, ev: &InputEvent, cx| {
+        let file = f.clone();
+        cx.subscribe_in(&editor, window, move |this, _, ev: &InputEvent, window, cx| {
+            let k = DocKey::File(file.clone());
             if let (InputEvent::Change, Some(d)) = (ev, this.explorer.docs.get_mut(&k)) {
                 if !d.loading {
                     d.dirty = true;
+                    this.check_doc_soon(&file, window, cx);
                     cx.notify();
                 }
             }
@@ -191,8 +195,10 @@ impl BenchApp {
                 loading: true,
                 binary: false,
                 goto: None,
+                checking: Task::ready(()),
             },
         );
+        self.attach_servers(&f, cx);
         self.read_doc(f, window, cx);
     }
 
@@ -209,6 +215,7 @@ impl BenchApp {
                 d.saved = text;
                 d.loading = false;
             }
+            self.check_doc(&f, Default::default(), window, cx);
             return;
         }
         let Some((conn, _)) = self.env_target(&f.project) else {
@@ -242,6 +249,7 @@ impl BenchApp {
                             d.editor
                                 .update(cx, |s, cx| s.set_cursor_position(at, window, cx));
                         }
+                        this.check_doc(&f, Default::default(), window, cx);
                     }
                     Err(err) => {
                         d.loading = false;
@@ -285,6 +293,7 @@ impl BenchApp {
                         d.saved = text;
                         d.dirty = false;
                     }
+                    this.check_doc(&f, Default::default(), window, cx);
                     this.after_write(&f, window, cx);
                     cx.notify();
                 }

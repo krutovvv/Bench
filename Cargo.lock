@@ -619,6 +619,7 @@ dependencies = [
  "hound",
  "image",
  "imagesize 0.13.0",
+ "lsp-types",
  "mermaid-rs-renderer",
  "objc2 0.6.5",
  "objc2-foundation 0.3.2",

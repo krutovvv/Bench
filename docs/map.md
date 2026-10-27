@@ -16,7 +16,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change an insert (`/terminal`, `/tasks`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
 | add an insert | `.agents/skills/bench-kit/references/build-insert.md` |
 | change a project's Settings (name, where, model, Telegram) or its parts (MCP, language servers, schedule) | `src/env/<section>.rs` (`mcp.rs`, `schedule.rs`, `telegram.rs`…); the page `src/env/page.rs`; a new section: `src/env/mod.rs` header |
-| change the Explorer (the tree and its menus, documents, tabs, ⌘P, ⌘⇧F) | `src/explorer/` (`tree.rs` and `parts.rs` the tree, `menus.rs` its context menus, `doc.rs`, `tabs.rs`, `view.rs`, `ops.rs` new/rename/delete, `file_finder.rs` ⌘P, `project_search.rs` ⌘⇧F); its pieces `crates/ui/src/ide.rs`; the agent's `/api/fs/*` in `agent/src/modules/files.ts`; why: `docs/explorer.md` |
+| change the Explorer (the tree and its menus, documents, tabs, ⌘P, ⌘⇧F) | `src/explorer/` (`tree.rs` and `parts.rs` the tree, `menus.rs` its context menus, `doc.rs`, `tabs.rs`, `view.rs`, `ops.rs` new/rename/delete, `file_finder.rs` ⌘P, `project_search.rs` ⌘⇧F, `lsp.rs` problems, hover and definition from the language servers); its pieces `crates/ui/src/ide.rs`; the agent's `/api/fs/*` in `agent/src/modules/files.ts`; why: `docs/explorer.md` |
 | change what the window's sidebar or center shows | `src/workspace/mod.rs` (`SidebarPanel`, `Center`), the layout in `src/workspace/layout.rs` |
 | change the bar over the center (a thread's title, the documents' project, a settings page's title) | `src/titlebar/mod.rs`; the documents' tab bar `src/explorer/view.rs` (`render_doc`), the tabs themselves `src/explorer/tabs.rs` |
 | change what happens on an agent event | `src/app/events.rs` |
@@ -36,7 +36,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | keep a project's agent in its folder | `agent/src/confined-env.ts` |
 | change the presets (MCP, LSP, compaction, reasoning levels) | defaults in `agent/src/builtin/presets.ts`; Bench's side `src/settings/presets.rs`, the gear's tab in `src/settings/mod.rs` |
 | change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts`; grep, glob, ls: `agent/src/builtin/search.ts` |
-| change a project's language servers (diagnostics after every edit) | `agent/src/lsp.ts`, the presets in `agent/src/lsp-presets.ts`; the section `src/env/lsp.rs` |
+| change a project's language servers (diagnostics after every edit; the editor's problems, hover, definition via `agent/src/modules/lsp.ts`) | `agent/src/lsp.ts`, the presets in `agent/src/lsp-presets.ts`; the section `src/env/lsp.rs` |
 | change when a project's conversations are compacted | `compactionPolicy` in `agent/src/config.ts`; the row in `src/env/run.rs` |
 | change the demo (screenshots) | `src/demo/` (`mod.rs` what each `BENCH_DEMO` opens, `threads.rs`, `env.rs` the blog project, `inserts.rs` servers and tasks, `journal.rs`) |
 

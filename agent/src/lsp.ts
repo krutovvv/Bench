@@ -9,6 +9,10 @@
 // (`~/.bench/lsp`, `${LSP}` in lsp.json): npm packages and stub files (`lsp-presets.ts` has the
 // usual ones). It starts on the first file it knows and stays while the agent runs. JSON-RPC is
 // Microsoft's vscode-jsonrpc, as VS Code speaks it.
+//
+// The Explorer's editor asks the same servers (`modules/lsp.ts`): a file's problems as it is
+// typed, the hover at a place, where a symbol is defined. One server per project and folder
+// serves the agent and the editor alike.
 
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
@@ -179,6 +183,8 @@ class LspClient {
 	private ready: Promise<void>;
 	private started = false;
 	private versions = new Map<string, number>();
+	/** The text each open file has on the server, so a hover after a check sends nothing again. */
+	private texts = new Map<string, string>();
 	private diags = new Map<string, Diagnostic[]>();
 	private waiters = new Map<string, () => void>();
 	failed: string | undefined;
@@ -234,7 +240,12 @@ class LspClient {
 			initializationOptions: spec.initialization ?? {},
 			capabilities: {
 				workspace: { configuration: true, workspaceFolders: true },
-				textDocument: { synchronization: { didSave: true }, publishDiagnostics: { relatedInformation: false } },
+				textDocument: {
+					synchronization: { didSave: true },
+					publishDiagnostics: { relatedInformation: false },
+					hover: { contentFormat: ["markdown", "plaintext"] },
+					definition: { linkSupport: true },
+				},
 			},
 		});
 		await conn.sendNotification("initialized", {});
@@ -242,17 +253,37 @@ class LspClient {
 		this.started = true;
 	}
 
+	/** The server has the file as `text` (opened, or changed when it differs). False: not up. */
+	private async sync(file: string, text: string): Promise<boolean> {
+		if (this.failed || !this.started || !this.conn) return false;
+		const uri = uriOf(file);
+		if (this.texts.get(uri) === text) return true;
+		this.texts.set(uri, text);
+		const ext = path.extname(file).slice(1).toLowerCase();
+		const version = (this.versions.get(uri) ?? 0) + 1;
+		this.versions.set(uri, version);
+		if (version === 1) await this.conn.sendNotification("textDocument/didOpen", { textDocument: { uri, languageId: LANGUAGE[ext] ?? ext, version, text } });
+		else await this.conn.sendNotification("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text }] });
+		return true;
+	}
+
+	/** A request about `file` as `text`, at most `ms`; undefined: not up, or no answer. */
+	async ask(method: string, file: string, text: string, params: object, ms: number): Promise<any> {
+		await Promise.race([this.ready, sleep(ms)]);
+		if (!(await this.sync(file, text))) return undefined;
+		const answer = this.conn!.sendRequest(method, { textDocument: { uri: uriOf(file) }, ...params }).catch(() => undefined);
+		return Promise.race([answer, sleep(ms).then(() => undefined)]);
+	}
+
 	/** The file as it is now; its diagnostics once the server has looked (at most `ms`). */
 	async check(file: string, text: string, ms: number): Promise<Diagnostic[] | undefined> {
 		await Promise.race([this.ready, sleep(ms)]);
 		if (this.failed || !this.started || !this.conn) return undefined;
 		const uri = uriOf(file);
-		const ext = path.extname(file).slice(1).toLowerCase();
 		const seen = new Promise<void>((resolve) => this.waiters.set(uri, resolve));
-		const version = (this.versions.get(uri) ?? 0) + 1;
-		this.versions.set(uri, version);
-		if (version === 1) await this.conn.sendNotification("textDocument/didOpen", { textDocument: { uri, languageId: LANGUAGE[ext] ?? ext, version, text } });
-		else await this.conn.sendNotification("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text }] });
+		// Checked again unchanged (a save): the server is told it is saved, and looks again.
+		this.texts.delete(uri);
+		await this.sync(file, text);
 		await this.conn.sendNotification("textDocument/didSave", { textDocument: { uri }, text });
 		const answered = await Promise.race([seen.then(() => true), sleep(ms).then(() => false)]);
 		// Servers publish more than once (syntax, then types): a moment for the later one.
@@ -337,4 +368,73 @@ export function knownDiagnostics(profile: string): string {
 				lines.push(`${decodeURIComponent(uri.replace(/^file:\/\//, ""))}:${x.range.start.line + 1}:${x.range.start.character + 1} ${x.severity === 2 ? "warning" : "error"}: ${x.message.split("\n")[0]}`);
 	}
 	return lines.length ? lines.slice(0, 100).join("\n") : "No errors or warnings in the files the language servers have seen.";
+}
+
+/** A place in a file, 0-based, as LSP counts it. */
+export interface Spot {
+	line: number;
+	character: number;
+}
+
+/** A problem as the editor underlines it: LSP's Diagnostic, as the server said it. */
+export interface Problem {
+	range: { start: Spot; end: Spot };
+	severity: number;
+	message: string;
+	source?: string;
+}
+
+/** A file's problems from every server that knows it; undefined: none knows it, or none is up. */
+export async function problemsOf(profile: string, root: string, machine: string | undefined, file: string, text: string, ms = 8000): Promise<Problem[] | undefined> {
+	let looked = false;
+	const out: Problem[] = [];
+	for (const [, c] of clientsFor(profile, root, machine, file)) {
+		const d = await c.check(file, text, ms);
+		if (d === undefined) continue;
+		looked = true;
+		for (const x of d) out.push({ range: x.range, severity: x.severity ?? 1, message: x.message, ...(x.source ? { source: x.source } : {}) });
+	}
+	return looked ? out : undefined;
+}
+
+/** LSP's hover contents (a string, a marked string, a list of them, or markup) as Markdown. */
+function markdownOf(c: any): string {
+	if (!c) return "";
+	if (typeof c === "string") return c;
+	if (Array.isArray(c)) return c.map(markdownOf).filter(Boolean).join("\n\n");
+	if (typeof c.language === "string") return "```" + c.language + "\n" + c.value + "\n```";
+	return String(c.value ?? "");
+}
+
+/** What the first server that answers says of the symbol at `at`, as Markdown; "" for nothing. */
+export async function hoverAt(profile: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 4000): Promise<string> {
+	for (const [, c] of clientsFor(profile, root, machine, file)) {
+		const h = await c.ask("textDocument/hover", file, text, { position: at }, ms);
+		const md = markdownOf(h?.contents).trim();
+		if (md) return md;
+	}
+	return "";
+}
+
+/** A place a symbol is defined: the file (a path on the project's machine) and its range. */
+export interface Place {
+	path: string;
+	range: { start: Spot; end: Spot };
+}
+
+const pathOf = (uri: string) => decodeURIComponent(uri.replace(/^file:\/\//, ""));
+
+/** Where the symbol at `at` is defined, from the first server that knows: Location, Location[]
+ * or LocationLink[] as the places themselves. */
+export async function definitionAt(profile: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 4000): Promise<Place[]> {
+	for (const [, c] of clientsFor(profile, root, machine, file)) {
+		const d = await c.ask("textDocument/definition", file, text, { position: at }, ms);
+		const list: any[] = !d ? [] : Array.isArray(d) ? d : [d];
+		const places = list
+			.map((l) => (l.targetUri ? { uri: l.targetUri, range: l.targetSelectionRange ?? l.targetRange } : l))
+			.filter((l) => typeof l?.uri === "string" && l.uri.startsWith("file://") && l.range)
+			.map((l) => ({ path: pathOf(l.uri), range: l.range }));
+		if (places.length) return places;
+	}
+	return [];
 }

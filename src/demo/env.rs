@@ -169,3 +169,22 @@ pub fn file_text(path: &str) -> String {
         _ => String::new(),
     }
 }
+
+/// What the blog's language server says of a file the demo opens (`explorer/lsp.rs`): the
+/// release post's cover is missing, its link to a draft is broken.
+pub fn file_problems(path: &str) -> Vec<lsp_types::Diagnostic> {
+    let at = |line, from, to| lsp_types::Range {
+        start: lsp_types::Position::new(line, from),
+        end: lsp_types::Position::new(line, to),
+    };
+    match path.rsplit('/').next().unwrap_or(path) {
+        "release-2-4.md" => vec![lsp_types::Diagnostic {
+            range: at(3, 7, 28),
+            severity: Some(lsp_types::DiagnosticSeverity::WARNING),
+            source: Some("marksman".into()),
+            message: "File does not exist: /images/2-4-cover.png".into(),
+            ..Default::default()
+        }],
+        _ => vec![],
+    }
+}

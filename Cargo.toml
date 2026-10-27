@@ -34,6 +34,8 @@ chrono = "0.4"
 web-time = "1"
 sha2 = "0.10"
 percent-encoding = "2"
+# The language servers' types, as the editor (gpui-base) takes them.
+lsp-types = "0.97"
 
 [workspace]
 members = [".", "crates/*"]

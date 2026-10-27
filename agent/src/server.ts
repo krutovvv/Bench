@@ -21,6 +21,7 @@ import audio from "./modules/audio.ts";
 import commands from "./modules/commands.ts";
 import cron from "./modules/cron.ts";
 import files from "./modules/files.ts";
+import lsp from "./modules/lsp.ts";
 import projects from "./modules/projects.ts";
 import settings from "./modules/settings.ts";
 import tasks from "./modules/tasks.ts";
@@ -59,7 +60,7 @@ await rt.open();
 
 // Each module declares its RPC methods and REST routes (src/modules/*.ts); the server only
 // collects them. A new area of the agent is a new module and a line here.
-const modules: Module[] = [threads, commands, projects, agents, presetsModule, tasks, cron, files, audio, settings].map((m) => m({ rt, broadcast }));
+const modules: Module[] = [threads, commands, projects, agents, presetsModule, tasks, cron, files, lsp, audio, settings].map((m) => m({ rt, broadcast }));
 const methods: Record<string, Rpc> = Object.assign({}, ...modules.map((m) => m.rpc ?? {}));
 const routes: Record<string, Route> = Object.assign({}, ...modules.map((m) => m.routes ?? {}));
 const dynamic: Dynamic[] = modules.flatMap((m) => m.dynamic ?? []);

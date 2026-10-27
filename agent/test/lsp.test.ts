@@ -11,7 +11,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-lsp-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_SSH = path.join(import.meta.dirname, "fake-ssh.sh");
-const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates, parseLspSpec, writeLspServer } = await import("../src/lsp.ts");
+const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates, parseLspSpec, writeLspServer, problemsOf, hoverAt, definitionAt } = await import("../src/lsp.ts");
 after(() => {
 	writeLsp("project:p1", {});
 	fs.rmSync(home, { recursive: true, force: true });
@@ -32,6 +32,18 @@ test("errors of a file come back; fixed, it says none; an unknown kind says noth
 	assert.match(knownDiagnostics("project:p1"), /none|No errors/i);
 	// The environment shows that it is up and answers, and what it was last asked.
 	assert.match(lspStates("project:p1").fake!, /^running · 2 files checked, all answered · last \d\d:\d\d, a\.ts$/);
+});
+
+test("the editor's questions: problems with their places, the hover, the definition", async () => {
+	writeLsp("project:p1", { fake });
+	const file = path.join(root, "e.ts");
+	const text = "let x = 1;\nlet y = ERROR;\n";
+	const problems = await problemsOf("project:p1", root, undefined, file, text);
+	assert.deepEqual(problems, [{ range: { start: { line: 1, character: 8 }, end: { line: 1, character: 14 } }, severity: 1, message: "found ERROR", source: "fake" }]);
+	assert.equal(await hoverAt("project:p1", root, undefined, file, text, { line: 1, character: 4 }), "at 1:4");
+	assert.deepEqual(await definitionAt("project:p1", root, undefined, file, text, { line: 1, character: 4 }), [{ path: file, range: { start: { line: 0, character: 0 }, end: { line: 0, character: 3 } } }]);
+	assert.equal(await problemsOf("project:p1", root, undefined, path.join(root, "b.md"), "ERROR"), undefined);
+	assert.equal(await hoverAt("project:p1", root, undefined, path.join(root, "b.md"), "x", { line: 0, character: 0 }), "");
 });
 
 test("a project on a server: its server runs there, through the SSH connection", async () => {
