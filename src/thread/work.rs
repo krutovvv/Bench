@@ -241,6 +241,11 @@ impl ThreadView {
             })
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.claim_click(cx);
+                // The click takes the auto-opened line over: from now the person decides
+                // whether it stays open, also when the run ends.
+                if this.thread.auto_work.as_deref() == Some(work_key.as_str()) {
+                    this.thread.auto_work = None;
+                }
                 if !this.thread.open_work.remove(&work_key) {
                     this.thread.open_work.insert(work_key.clone());
                 }

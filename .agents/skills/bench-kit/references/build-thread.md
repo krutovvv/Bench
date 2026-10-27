@@ -20,7 +20,14 @@ src/thread/                ThreadView (view.rs), an entity: its ActiveThread, co
 ```
 
 What the thread shows and in what order is decided in `crates/thread` and nowhere else; the view
-only draws rows. A new kind of row: a `Row` variant + its rule in `rows.rs` + a test + its
+only draws rows. Which words are the agent's answer and which its narration is decided by Pi
+itself: an assistant message that also called a tool is narration (`ThreadItem::Text
+{narration: true}` — the agent reads it off the message's blocks; mid-stream, Pi's `toolcall_start`
+says it before the entry exists, `thread.stream {kind:"narration"}`). Marked words are notes on
+the work line wherever they sit; unmarked ones are the answer at once, mid-run included — no
+guessing from position, so an answer never flashes and folds back. The live work line opens on its
+own while the run goes (its notes, thinking and steps show where they will settle) and folds at the
+run's end, unless the person clicked it over. A new kind of row: a `Row` variant + its rule in `rows.rs` + a test + its
 renderer in `src/thread/`.
 
 ## What the view promises (keep it)

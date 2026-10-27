@@ -20,6 +20,9 @@ pub struct ActiveThread {
     /// Opened pieces of work, by the work row's key; unfolded steps (work key, step); the source
     /// host whose pages are listed (work key, host).
     pub open_work: HashSet<String>,
+    /// The live work this view opened on its own, so the agent's words show where they will
+    /// settle. The person touching it (either way) takes it over; at the run's end it folds.
+    pub(crate) auto_work: Option<String>,
     pub open_steps: HashSet<(String, usize)>,
     pub open_source: Option<(String, String)>,
     /// The open thread's texts, parsed once (`ui::media::Texts`).
@@ -66,6 +69,7 @@ impl Default for ActiveThread {
             journal: Default::default(),
             tv: Default::default(),
             open_work: Default::default(),
+            auto_work: None,
             open_steps: Default::default(),
             open_source: None,
             texts: Default::default(),

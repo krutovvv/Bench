@@ -19,6 +19,9 @@ pub struct Thread {
     paused: bool,
     /// The answer being written: (reasoning, text).
     stream: (String, String),
+    /// Words the model wrote while working, whose message went on to call a tool: narration,
+    /// shown inside the work line and staying there when the entry commits.
+    narrated: String,
     /// The last entry id seen: `thread.open {since: head}` after a reconnect.
     head: u64,
     /// Messages the person sent that the journal has not shown yet, in the order sent.
@@ -65,6 +68,14 @@ impl Thread {
             ThreadEvent::Stream(kind, delta) => match kind {
                 StreamKind::Thought => self.stream.0.push_str(&delta),
                 StreamKind::Text => self.stream.1.push_str(&delta),
+                StreamKind::Narration => {
+                    if delta.is_empty() {
+                        // The words streamed so far are narration: they move to the work line.
+                        self.narrated += &std::mem::take(&mut self.stream.1);
+                    } else {
+                        self.narrated += &delta;
+                    }
+                }
             },
             ThreadEvent::Queue(q) => {
                 self.queue = q;
@@ -77,6 +88,7 @@ impl Thread {
                 self.running = on;
                 if !on {
                     self.stream = Default::default();
+                    self.narrated.clear();
                     self.paused = false;
                 }
             }
@@ -96,6 +108,7 @@ impl Thread {
                 ThreadItem::Text { .. } | ThreadItem::Thought { .. } | ThreadItem::Tool { .. }
             ) {
                 self.stream = Default::default();
+                self.narrated.clear();
             }
             // A queued message the agent took: it leaves the queue in the same step it joins the
             // journal, even before the queue's own event arrives, so it is never shown twice.
@@ -161,6 +174,7 @@ impl Thread {
             self.running,
             self.paused,
             &self.stream,
+            &self.narrated,
             &self.sent,
             &self.queue,
             &self.sent_queue,

@@ -1,6 +1,12 @@
 // Generated from crates/protocol (cargo test -p protocol). Do not edit: change the Rust types.
 
-export type ThreadItem = { "kind": "user", key: string, seq: number, text: string, at?: number, } | { "kind": "thought", key: string, seq: number, text: string, at?: number, } | { "kind": "text", key: string, seq: number, text: string, at?: number, error?: string, } | { "kind": "tool", key: string, seq: number, call_id: string, name: string, args: unknown, 
+export type ThreadItem = { "kind": "user", key: string, seq: number, text: string, at?: number, } | { "kind": "thought", key: string, seq: number, text: string, at?: number, } | { "kind": "text", key: string, seq: number, text: string, 
+/**
+ * The words of an assistant message that also called a tool: the agent's narrative
+ * of what it is about to do, not an answer. Pi's own signal — the message's blocks.
+ * `None` is an agent too old to mark them; such texts are judged by their place.
+ */
+narration?: boolean, at?: number, error?: string, } | { "kind": "tool", key: string, seq: number, call_id: string, name: string, args: unknown, 
 /**
  * What it acts on, in one line (a command, a path).
  */
@@ -32,4 +38,4 @@ export type ThreadOpen = { items: Array<ThreadItem>, queue: Array<QueuedItem>, i
  */
 paused: boolean, head: number, };
 
-export type StreamKind = "text" | "thought";
+export type StreamKind = "text" | "thought" | "narration";

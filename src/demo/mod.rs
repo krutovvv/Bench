@@ -535,6 +535,7 @@ fn run(cx: &mut Context<BenchApp>) {
                 text: "Checking the traffic splits, then rewriting the query.".into(),
                 at: Some(now),
                 error: None,
+                narration: Some(true),
             }]),
         ));
         // BENCH_DEMO_PAUSED=1 holds the run mid-work, for the hold's picture.
@@ -576,6 +577,7 @@ fn run(cx: &mut Context<BenchApp>) {
                 text,
                 at: Some(now),
                 error: None,
+                narration: Some(false),
             }]),
         ));
         events.push((100, ThreadEvent::Run(false)));

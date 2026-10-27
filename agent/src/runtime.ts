@@ -53,6 +53,8 @@ interface Live {
 	abort?: AbortController;
 	/** Text of the in-flight assistant message per content block, to turn snapshots into deltas. */
 	blocks: Map<number, { type: string; text: string }>;
+	/** The message being written has begun a tool call: its words are narration, not an answer. */
+	narrating?: boolean;
 	answer: string;
 	/** Why this run died, if it did: said at once and kept with the answer, so a dead turn is
 	 * never just silence. */
@@ -435,6 +437,7 @@ export class Runtime {
 		this.unhold(live);
 		live.answer = "";
 		live.blocks.clear();
+		live.narrating = false;
 		live.abort = new AbortController();
 		live.usage.started = Date.now();
 		live.usage.output = 0;
@@ -840,6 +843,7 @@ export class Runtime {
 					if (live.answer) this.store.addMessage(id, { role: "assistant", text: live.answer });
 					live.answer = "";
 					live.blocks.clear();
+					live.narrating = false;
 					this.emit(id, "message.user", { text: item.text, queued: true, id: String(rec.id) });
 				} else if (live.busy) live.placed.push({ id: String(rec.id), text: item.text });
 				else this.emit(id, "message.user", { text: item.text, queued: true, id: String(rec.id) });
@@ -856,6 +860,7 @@ export class Runtime {
 				break;
 			case "message_start": {
 				live.blocks.clear();
+				live.narrating = false;
 				// The first tokens can come with the start itself.
 				const msg: any = e.message;
 				if (msg?.role === "assistant") msg.content?.forEach((b: any, i: number) => this.onChange(live, { type: "block", contentIndex: i, block: b }));
@@ -882,6 +887,7 @@ export class Runtime {
 					else this.emit(id, "session.info", { fallback: this.fallbackNote(live, msg) });
 				}
 				live.blocks.clear();
+				live.narrating = false;
 				break;
 			}
 			case "tool_execution_start": {
@@ -945,8 +951,20 @@ export class Runtime {
 		const push = (kind: string, text: string) => {
 			if (!text) return;
 			this.emit(id, kind === "thinking" ? "reasoning.delta" : "message.delta", { text });
-			// The answer being written, before its entry exists. The entry's `thread.append` replaces it.
-			this.emit(id, "thread.stream", { kind: kind === "thinking" ? "thought" : "text", delta: text });
+			// The answer being written, before its entry exists. The entry's `thread.append`
+			// replaces it. Once this message has begun a tool call its words are narration:
+			// they go to the work line, never to the answer's seat.
+			this.emit(id, "thread.stream", {
+				kind: kind === "thinking" ? "thought" : live.narrating ? "narration" : "text",
+				delta: text,
+			});
+		};
+		// Pi's own sign that these words will not be the answer: the model began a tool call
+		// in this very message. Empty delta: the text streamed so far is narration too.
+		const toolBegun = () => {
+			if (live.narrating) return;
+			live.narrating = true;
+			this.emit(id, "thread.stream", { kind: "narration", delta: "" });
 		};
 		const cur = live.blocks.get(c.contentIndex);
 		if (c.type === "text_delta" || c.type === "thinking_delta") {
@@ -955,7 +973,10 @@ export class Runtime {
 			b.text += c.delta ?? "";
 			live.blocks.set(c.contentIndex, b);
 			push(kind, c.delta ?? "");
+		} else if (c.type === "toolcall_start" || c.type === "toolcall_delta") {
+			toolBegun();
 		} else if (c.type === "text_start" || c.type === "thinking_start" || c.type === "block") {
+			if (c.block?.type === "toolCall" || c.block?.type === "tool_use") return toolBegun();
 			const full = blockText(c.block);
 			if (full === undefined) return;
 			const kind = c.block.type;

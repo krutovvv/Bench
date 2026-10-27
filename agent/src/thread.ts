@@ -83,7 +83,17 @@ export function itemsOf(entry: any): ThreadItem[] {
 		} else if (m.role === "assistant") {
 			for (const b of m.content ?? []) {
 				if (b.type === "thinking" && b.thinking?.trim()) out.push({ key: key(), seq, kind: "thought", text: b.thinking, at });
-				else if (b.type === "text" && b.text?.trim()) out.push({ key: key(), seq, kind: "text", text: b.text, at });
+				else if (b.type === "text" && b.text?.trim())
+					// The words of a message that also calls a tool are the agent's narrative,
+					// not an answer — Pi's own signal, read from the message's blocks.
+					out.push({
+						key: key(),
+						seq,
+						kind: "text",
+						text: b.text,
+						at,
+						narration: m.content.some((x: any) => x?.type === "toolCall"),
+					});
 				else if (b.type === "toolCall") out.push({ key: key(), seq, kind: "tool", call_id: String(b.id), name: String(b.name), args: b.arguments ?? {}, preview: preview(String(b.name), b.arguments), at });
 			}
 			if (m.stopReason === "error") out.push({ key: key(), seq, kind: "text", text: "", at, error: String(m.errorMessage ?? "the model stopped with an error") });

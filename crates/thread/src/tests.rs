@@ -18,7 +18,16 @@ fn text(seq: u64, sub: u32, t: &str) -> ThreadItem {
         text: t.into(),
         at: Some(seq as f64 * 1000.),
         error: None,
+        narration: None,
     }
+}
+/// The agent's own marking: words of a message that also called a tool (Pi's signal).
+fn narr(seq: u64, sub: u32, t: &str) -> ThreadItem {
+    let mut it = text(seq, sub, t);
+    if let ThreadItem::Text { narration, .. } = &mut it {
+        *narration = Some(true);
+    }
+    it
 }
 fn tool(seq: u64, sub: u32, call: &str) -> ThreadItem {
     ThreadItem::Tool {
@@ -662,6 +671,76 @@ fn reasoning_streams_as_one_line_not_as_text() {
         ["user:go", "work:1+", "writing:Here"],
         "only the answer is written out"
     );
+}
+
+#[test]
+fn the_agent_s_marks_decide_without_guessing() {
+    // Mid a run, the journal already says which words are the agent's narrative and which
+    // are its answer — no flash of an answer that folds away, no note that waits to be the
+    // last entry before it shows.
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go"), tool(2, 0, "a"), narr(2, 1, "Now the tests.")],
+        running: true,
+        ..Default::default()
+    });
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:1+"]);
+    let mut marked: ThreadItem = text(3, 0, "All green.");
+    if let ThreadItem::Text { narration, .. } = &mut marked {
+        *narration = Some(false);
+    }
+    t.apply(ThreadEvent::Append(vec![marked]));
+    // The answer of a message that called nothing shows at once, though the run is live.
+    // The closed line of work is done; the answer shows at once, though the run is live.
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:1", "answer:All green."]);
+}
+
+#[test]
+fn words_reclassified_mid_stream_slide_into_the_work() {
+    // Text streams as a possible answer; the model then begins a call: Pi's sign that the
+    // words are narration. They leave the answer's seat and enter the work line as its
+    // note — and the entry, when it commits, changes nothing: same place, same words.
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go")],
+        running: true,
+        ..Default::default()
+    });
+    t.apply(ThreadEvent::Stream(StreamKind::Text, "Reading the log".into()));
+    assert_eq!(kinds(&t.rows()), ["user:go", "writing:Reading the log"]);
+    t.apply(ThreadEvent::Stream(StreamKind::Narration, String::new()));
+    let Row::Work { steps, .. } = &t.rows()[1] else {
+        panic!("the work line holds the words now")
+    };
+    assert_eq!(steps.last(), Some(&Step::Note("Reading the log".into())));
+    assert!(
+        !t.rows().iter().any(|r| matches!(r, Row::Writing { .. })),
+        "no answer's seat any more"
+    );
+    t.apply(ThreadEvent::Append(vec![narr(2, 0, "Reading the log"), tool(2, 1, "a")]));
+    let Row::Work { steps, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(
+        steps.first(),
+        Some(&Step::Note("Reading the log".into())),
+        "the committed note sits exactly where the stream left them"
+    );
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:1+"]);
+}
+
+#[test]
+fn words_after_a_begun_call_keep_streaming_into_the_work() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go")],
+        running: true,
+        ..Default::default()
+    });
+    t.apply(ThreadEvent::Stream(StreamKind::Narration, "".into()));
+    t.apply(ThreadEvent::Stream(StreamKind::Narration, "and then ".into()));
+    t.apply(ThreadEvent::Stream(StreamKind::Narration, "the fix".into()));
+    let Row::Work { steps, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(steps.last(), Some(&Step::Note("and then the fix".into())));
 }
 
 #[test]

@@ -114,15 +114,18 @@ pub(crate) fn rows_of(
     running: bool,
     paused: bool,
     stream: &(String, String),
+    narrated: &str,
     sent: &[String],
     queue: &[QueuedItem],
     sent_queue: &[String],
 ) -> Vec<Row> {
-    // Words on the way are notes on the work line: a text is a note only while its turn
-    // still has a thought or a call AFTER it — the last words of a turn answer, however much
-    // the turn acted before (Pi commits a turn's texts, thoughts and calls under one seq, so
-    // "the turn acted" alone would swallow every final answer). While the run is live, the
-    // trailing text is still on the way too: another call may follow it.
+    // The agent's own words about what it is doing are notes on the work line; the words of
+    // a message that ends its turn are the answer. Pi settles this at the entry itself: the
+    // message that called a tool is narration (its `narration` flag), the one that didn't is
+    // the answer — no guessing from position, so an answer never flashes and folds away.
+    // The flag only arrives with the agent's items; an older journal's texts are judged by
+    // what the journal still holds after them: a turn's last words answer, however much
+    // the turn acted before (Pi commits them under one seq).
     let mut actions_left: HashMap<u64, usize> = HashMap::new();
     for i in log {
         if matches!(i, ThreadItem::Tool { .. } | ThreadItem::Thought { .. }) {
@@ -225,9 +228,18 @@ pub(crate) fn rows_of(
                 text,
                 at,
                 error,
+                narration,
             } => {
-                let on_the_way = actions_left.get(seq).copied().unwrap_or(0) > 0
-                    || (running && idx + 1 == log.len());
+                let on_the_way = match narration {
+                    // The agent said what this message's words are; nothing to guess.
+                    Some(n) => *n,
+                    // An agent too old to say: what the journal still holds after them, and
+                    // a live run's trailing text, are the old signs of words on the way.
+                    None => {
+                        actions_left.get(seq).copied().unwrap_or(0) > 0
+                            || (running && idx + 1 == log.len())
+                    }
+                };
                 if error.is_none() && on_the_way {
                     step(&mut work, key, *at, Step::Note(text.clone()));
                 } else {
@@ -379,13 +391,17 @@ pub(crate) fn rows_of(
     }
     // What the model is thinking now: a step of the work in progress, folded with it like the
     // thinking already in the journal; the thread shows only the work's one line until opened.
+    // The narration streamed so far sits where its note will sit when the entry commits:
+    // the words do not move when the journal catches up with them.
     let thinking = (running && !stream.0.is_empty()).then(|| Step::Thought(stream.0.clone()));
+    let drafting = (running && !narrated.is_empty()).then(|| Step::Note(narrated.to_string()));
     // The work in progress is live while the run is: a view counts its time on from `from`.
     let had_work = work.is_some();
     if let Some(Row::Work { live, paused: p, steps, .. }) = work.as_mut() {
         *live = running;
         *p = if running { paused } else { false };
         steps.extend(thinking.clone());
+        steps.extend(drafting.clone());
     }
     close(&mut rows, &mut work);
     rows.extend(moved.into_iter().map(|(_, r)| r));
@@ -394,11 +410,12 @@ pub(crate) fn rows_of(
     if running
         && !had_work
         && (thinking.is_some()
+            || drafting.is_some()
             || (stream.1.is_empty() && matches!(rows.last(), Some(Row::User { .. }))))
     {
         rows.push(Row::Work {
             key: "thinking".into(),
-            steps: thinking.into_iter().collect(),
+            steps: thinking.into_iter().chain(drafting).collect(),
             from: None,
             to: None,
             live: true,

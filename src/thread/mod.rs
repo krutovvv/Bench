@@ -174,13 +174,14 @@ impl ThreadView {
                 },
                 protocol::ThreadItem::Text {
                     key: "demo-live-3".into(),
-                    // Same seq as the calls of its block: that is what makes its text a note
-                    // on the way, not an answer (see `rows_of`).
+                    // The words of a message that went on to call: narration, a note on the
+                    // work line (`rows_of`), exactly as the agent marks them.
                     seq: u64::MAX - 2,
                     text: "Reading the billing export, then matching it against the invoices."
                         .into(),
                     at: None,
                     error: None,
+                    narration: Some(true),
                 },
                 protocol::ThreadItem::Tool {
                     key: "demo-live-4".into(),
@@ -354,6 +355,36 @@ impl ThreadView {
                 }
                 _ => {}
             }
+        }
+        // The live work opens on its own: thinking, steps and the agent's words show in the
+        // list they belong to, and the stream's narration enters where its note will sit —
+        // nothing vanishes from a seat of its own. The run's end folds what the view opened;
+        // a person who clicked the line keeps it their way, open or shut.
+        let live_key = |rs: &[Row]| {
+            rs.iter().find_map(|r| match r {
+                Row::Work { key, live: true, .. } => Some(key.clone()),
+                _ => None,
+            })
+        };
+        let was = live_key(&t.tv.rows);
+        let now = live_key(rows);
+        match (was.as_deref(), now.as_deref(), t.auto_work.as_deref()) {
+            (Some(o), Some(k), Some(a)) if a == o && o != k => {
+                // the run moved to another line of work: the auto-open follows it
+                t.open_work.remove(o);
+                t.open_work.insert(k.to_string());
+                t.auto_work = Some(k.to_string());
+            }
+            (None, Some(k), _) if t.auto_work.is_none() && !t.open_work.contains(k) => {
+                t.open_work.insert(k.to_string());
+                t.auto_work = Some(k.to_string());
+            }
+            (Some(_), None, Some(a)) => {
+                t.open_work.remove(a);
+                t.auto_work = None;
+            }
+            (None, None, Some(_)) => t.auto_work = None,
+            _ => {}
         }
     }
 

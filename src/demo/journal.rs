@@ -133,6 +133,7 @@ impl Journal {
             text: answer.into(),
             at: ms(at + secs),
             error: None,
+            narration: Some(false),
         });
     }
 

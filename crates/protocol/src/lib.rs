@@ -34,6 +34,12 @@ pub enum ThreadItem {
         #[ts(type = "number")]
         seq: u64,
         text: String,
+        /// The words of an assistant message that also called a tool: the agent's narrative
+        /// of what it is about to do, not an answer. Pi's own signal — the message's blocks.
+        /// `None` is an agent too old to mark them; such texts are judged by their place.
+        #[ts(optional)]
+        #[serde(default)]
+        narration: Option<bool>,
         #[ts(optional)]
         #[serde(default)]
         at: Option<f64>,
@@ -230,6 +236,10 @@ pub struct ThreadOpen {
 pub enum StreamKind {
     Text,
     Thought,
+    /// The text being streamed is narration, not an answer. An empty delta says the text
+    /// streamed so far turned out to be narration: the model began a tool call mid-message,
+    /// which is Pi's sign that these words belong to the work, not to the answer.
+    Narration,
 }
 
 /// A `thread.*` event.
