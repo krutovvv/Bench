@@ -48,6 +48,19 @@ test("the editor's questions: problems with their places, the hover, the definit
 	assert.equal(await hoverAt("project:p1", root, undefined, path.join(root, "b.md"), "x", { line: 0, character: 0 }), "");
 });
 
+test("a server that dies on its own is started anew on the next ask", async () => {
+	writeLsp("project:p4", { fake });
+	const file = path.join(root, "d.ts");
+	// The text kills the fake server mid-check: nothing is said about the file.
+	assert.equal(await problemsOf("project:p4", root, undefined, file, "CRASH\n", 1500), undefined);
+	// The death reads as failed (exit or closed connection; which one wins is a race), and the
+	// next ask starts a new server.
+	await new Promise((r) => setTimeout(r, 200));
+	assert.match(lspStates("project:p4").fake!, /failed: (exited \(7\)|the connection closed)/);
+	assert.deepEqual((await problemsOf("project:p4", root, undefined, file, "let y = ERROR;\n", 4000))?.map((p) => p.message), ["found ERROR"]);
+	writeLsp("project:p4", {});
+});
+
 test("a project on a server: its server runs there, through the SSH connection", async () => {
 	const out = await diagnosticsFor("project:p1", root, "fake", path.join(root, "c.tsx"), "ERROR\n");
 	assert.match(out!, /c\.tsx:1:1 error: found ERROR/);

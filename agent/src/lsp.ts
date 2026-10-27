@@ -218,7 +218,15 @@ class LspClient {
 			? spawn(process.env.BENCH_SSH ?? "ssh", [...sshOptions(machine), `cd ${quote(root)} && exec ${[spec.command, ...(spec.args ?? [])].map(quote).join(" ")}`], { stdio: ["pipe", "pipe", "pipe"] })
 			: spawn(spec.command, spec.args ?? [], { cwd: root, env: { ...process.env, ...(spec.env ?? {}) }, stdio: ["pipe", "pipe", "pipe"] }));
 		proc.on("error", (e) => (this.failed = e.message));
-		proc.stderr?.on("data", () => {});
+		// A server that dies on its own (a crash under load) must read as failed, or the stale
+		// client is kept forever and every ask throws “Connection is closed.”. Its last stderr
+		// lines say why, and go into the state the project's environment shows.
+		let errTail = "";
+		proc.stderr?.on("data", (b: Buffer) => (errTail = (errTail + b.toString()).slice(-600)));
+		const died = (what: string) => {
+			if (!this.failed) this.failed = `${what}${errTail.trim() ? `: ${errTail.trim().split("\n").pop()}` : ""}`;
+		};
+		proc.on("exit", (code, sig) => died(`exited (${sig ?? code})`));
 		const conn = (this.conn = createMessageConnection(new StreamMessageReader(proc.stdout!), new StreamMessageWriter(proc.stdin!)));
 		conn.onNotification("textDocument/publishDiagnostics", (p: any) => {
 			this.diags.set(p.uri, p.diagnostics ?? []);
@@ -231,7 +239,8 @@ class LspClient {
 		conn.onRequest("client/registerCapability", () => null);
 		conn.onRequest("window/workDoneProgress/create", () => null);
 		conn.onRequest("workspace/workspaceFolders", () => [{ uri: uriOf(root), name: path.basename(root) }]);
-		conn.onError(() => {});
+		conn.onError((e: any) => died(String(e?.message ?? e)));
+		conn.onClose(() => died("the connection closed"));
 		conn.listen();
 		await conn.sendRequest("initialize", {
 			processId: process.pid,
@@ -258,12 +267,16 @@ class LspClient {
 		if (this.failed || !this.started || !this.conn) return false;
 		const uri = uriOf(file);
 		if (this.texts.get(uri) === text) return true;
-		this.texts.set(uri, text);
 		const ext = path.extname(file).slice(1).toLowerCase();
 		const version = (this.versions.get(uri) ?? 0) + 1;
-		this.versions.set(uri, version);
-		if (version === 1) await this.conn.sendNotification("textDocument/didOpen", { textDocument: { uri, languageId: LANGUAGE[ext] ?? ext, version, text } });
-		else await this.conn.sendNotification("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text }] });
+		try {
+			if (version === 1) await this.conn.sendNotification("textDocument/didOpen", { textDocument: { uri, languageId: LANGUAGE[ext] ?? ext, version, text } });
+			else await this.conn.sendNotification("textDocument/didChange", { textDocument: { uri, version }, contentChanges: [{ text }] });
+		} catch (e) {
+			this.failed ??= String((e as Error)?.message ?? e);
+			return false;
+		}
+		this.texts.set(uri, text);
 		return true;
 	}
 
@@ -283,8 +296,15 @@ class LspClient {
 		const seen = new Promise<void>((resolve) => this.waiters.set(uri, resolve));
 		// Checked again unchanged (a save): the server is told it is saved, and looks again.
 		this.texts.delete(uri);
-		await this.sync(file, text);
-		await this.conn.sendNotification("textDocument/didSave", { textDocument: { uri }, text });
+		try {
+			await this.sync(file, text);
+			await this.conn.sendNotification("textDocument/didSave", { textDocument: { uri }, text });
+		} catch (e) {
+			// The connection died between the checks: read as failed, the next ask starts anew.
+			this.failed ??= String((e as Error)?.message ?? e);
+			this.waiters.delete(uri);
+			return undefined;
+		}
 		const answered = await Promise.race([seen.then(() => true), sleep(ms).then(() => false)]);
 		// Servers publish more than once (syntax, then types): a moment for the later one.
 		await sleep(400);
