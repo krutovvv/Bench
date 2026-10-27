@@ -16,12 +16,21 @@ use crate::workspace::SidebarPanel;
 impl BenchApp {
     /// The Explorer on `project` (its environment read, its tree as it was left).
     pub fn show_explorer(&mut self, project: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.restore_explorer(window, cx);
         if self.explorer.project != project {
-            // Another project: its own tree; open documents stay in their tabs.
-            self.explorer.project = project.clone();
-            self.explorer.open = ["files", "instructions"].map(String::from).into();
-            self.explorer.listings.clear();
-            self.explorer.find = None;
+            // Another project: its own tree, as it was left; open documents stay in their tabs.
+            let ex = &mut self.explorer;
+            if !ex.project.is_empty() {
+                ex.folds.insert(ex.project.clone(), ex.open.clone());
+            }
+            ex.open = ex
+                .folds
+                .get(&project)
+                .cloned()
+                .unwrap_or_else(super::persistence::first_open);
+            ex.project = project.clone();
+            ex.listings.clear();
+            ex.find = None;
         }
         // The IDE takes the window: the tree on the left, documents in the center (its last one
         // again, or a word on how to open one).
@@ -45,6 +54,8 @@ impl BenchApp {
         if let Some(root) = self.explorer_root() {
             self.list_folder(root, window, cx);
         }
+        self.list_open_folders(window, cx);
+        self.keep_explorer();
         cx.notify();
     }
 
@@ -105,6 +116,7 @@ impl BenchApp {
                 self.list_folder(f, window, cx);
             }
         }
+        self.keep_explorer();
         cx.notify();
     }
 
@@ -113,6 +125,7 @@ impl BenchApp {
         if !self.explorer.open.remove(node) {
             self.explorer.open.insert(node.to_string());
         }
+        self.keep_explorer();
         cx.notify();
     }
 

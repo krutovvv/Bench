@@ -171,6 +171,7 @@ impl BenchApp {
         }
         self.explorer.active = Some(key);
         self.center = Center::Doc;
+        self.keep_explorer();
         cx.notify();
     }
 
@@ -390,6 +391,7 @@ impl BenchApp {
             self.explorer.docs.remove(&key);
         }
         self.drop_unused(&key);
+        self.keep_explorer();
         cx.notify();
     }
 

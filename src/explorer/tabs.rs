@@ -61,6 +61,7 @@ impl BenchApp {
         };
         let t = tabs.remove(from);
         tabs.insert(to, t);
+        self.keep_explorer();
         cx.notify();
     }
 

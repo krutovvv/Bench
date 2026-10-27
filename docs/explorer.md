@@ -61,6 +61,11 @@ is typed in place for a new file, folder, prompt, skill or a rename, a delete is
 ⌘P opens a file by name (`/api/fs/files`: ripgrep's list of the folder), ⌘⇧F finds a text in it
 (`/api/fs/grep`), ⌘S saves, ⌘W closes the tab.
 
+What it was left with — the open tabs and the one shown, each project's open folders and groups —
+is kept on this Mac (`explorer.json` in the state folder, `explorer/persistence.rs`) and comes
+back the first time the Explorer opens after a start; another project's tree comes back as it
+was left too.
+
 ## Settings stay settings
 
 A project's Settings (`Center::Project`, `src/env/page.rs`) are its fields: name, where it lives,

@@ -233,7 +233,7 @@ impl BenchApp {
 
 #[cfg(test)]
 mod tests {
-    use super::{CodeRef, lines_of, with_references};
+    use super::{CodeRef, ProblemsRef, Reference, lines_of, with_references};
 
     #[test]
     fn a_selection_names_its_lines() {
@@ -263,6 +263,27 @@ mod tests {
             text: None,
         };
         assert_eq!(f.label(), "README");
-        assert_eq!(with_references("look".into(), &[f]), "look\n\n`/p/README`");
+        assert_eq!(
+            with_references("look".into(), &[Reference::Code(f)]),
+            "look\n\n`/p/README`"
+        );
+    }
+
+    #[test]
+    fn problems_read_as_lines_under_the_words() {
+        let p = ProblemsRef {
+            of: Some("/p/src/a.rs".into()),
+            lines: vec!["/p/src/a.rs:2:9 error: found ERROR (fake)".into()],
+        };
+        assert_eq!(p.label(), "Problems · a.rs (1)");
+        assert_eq!(
+            with_references(String::new(), &[Reference::Problems(p)]),
+            "Problems from the language servers in `/p/src/a.rs`:\n```\n/p/src/a.rs:2:9 error: found ERROR (fake)\n```"
+        );
+        let all = ProblemsRef {
+            of: None,
+            lines: vec!["x".into(), "y".into()],
+        };
+        assert_eq!(all.label(), "Problems (2)");
     }
 }

@@ -11,6 +11,7 @@
 //! explorer/tabs.rs  the tabs' drag and menu; code sent to the thread (⌘L)
 //! explorer/lsp.rs   the project's language servers in the editor: problems, hover, definition
 //! explorer/problems.rs  the project's Problems as a tab; problems sent to the thread
+//! explorer/persistence.rs  the tabs and folds kept on this Mac between starts
 //! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder, Zed)
 //! explorer/tree.rs  the sidebar's tree
 //! explorer/view.rs  a document in the middle, the tabs, the thread beside, ⌘P's list
@@ -23,6 +24,7 @@ pub mod lsp;
 pub mod menus;
 pub mod ops;
 pub mod parts;
+pub mod persistence;
 pub mod problems;
 pub mod project_search;
 pub mod tabs;
@@ -83,6 +85,10 @@ pub struct Explorer {
     pub project: String,
     /// Open nodes of the tree (`tree.rs` names them).
     pub open: HashSet<String>,
+    /// Every project's open nodes, the shown one's as it was when another was shown.
+    pub folds: HashMap<String, HashSet<String>>,
+    /// The kept tabs and folds were read back (`persistence.rs`): changes are written from now.
+    pub restored: bool,
     /// Folders listed so far, by their path (a project's machine's or the agent's).
     pub listings: HashMap<String, Vec<Entry>>,
     /// Open documents, the tabs of the middle in order, and the one shown there.
