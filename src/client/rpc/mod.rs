@@ -89,13 +89,6 @@ pub enum Cmd {
         session: String,
         runtime: Option<String>,
     },
-    /// Switch the session's model (primary or one of the profile's fallbacks).
-    /// Drop the last exchange and ask the same question again.
-    Regenerate {
-        profile: String,
-        session: String,
-        text: String,
-    },
     /// Only the reasoning effort, no prompt (diagnostics).
     SetEffort {
         session: String,

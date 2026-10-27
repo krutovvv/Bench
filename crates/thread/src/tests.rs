@@ -310,8 +310,16 @@ fn rule_1_journal_then_writing_then_queue() {
         kinds(&t.rows()),
         ["user:go", "work:1+", "writing:Half", "queued:later"]
     );
-    // The answer's entry replaces what was being written, and still stands before the queue.
+    // The answer's entry, while the run is still live, rides the work line: another call
+    // may follow it, and a half-answer that later turns into notes must not flash as one.
     t.apply(ThreadEvent::Append(vec![text(3, 0, "Half done.")]));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:1+", "queued:later"],
+        "the words are on the way"
+    );
+    // The run ends: those same words are the answer, and the work above it is done.
+    t.apply(ThreadEvent::Run(false));
     assert_eq!(
         kinds(&t.rows()),
         ["user:go", "work:1", "answer:Half done.", "queued:later"],
@@ -660,7 +668,7 @@ fn reasoning_streams_as_one_line_not_as_text() {
 fn words_before_a_call_are_notes_on_the_work_line() {
     // The model says what it's about to do, then calls: those words belong to the line of
     // work — its narrative — not to an answer row.
-    let mut t = Thread::open(ThreadOpen {
+    let t = Thread::open(ThreadOpen {
         items: vec![
             user(1, "fix it"),
             text(2, 0, "Reading the test first."),
@@ -685,7 +693,7 @@ fn words_before_a_call_are_notes_on_the_work_line() {
 
 #[test]
 fn a_turn_that_only_answers_stays_an_answer() {
-    let mut t = Thread::open(ThreadOpen {
+    let t = Thread::open(ThreadOpen {
         items: vec![user(1, "hi"), text(2, 0, "Hello!")],
         ..ThreadOpen::default()
     });

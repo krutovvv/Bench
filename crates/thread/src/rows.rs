@@ -1,7 +1,7 @@
 //! The journal as rows: messages, pieces of work (with the plan and the questions that grew
 //! inside them), answers, inserts, the queue.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use protocol::{PlanStep, QueuedItem, ThreadItem};
 use serde_json::{Map, Value};
@@ -117,13 +117,17 @@ pub(crate) fn rows_of(
     sent: &[String],
     queue: &[QueuedItem],
 ) -> Vec<Row> {
-    // An assistant entry that thinks or acts is work: its text is a note on the way, not an
-    // answer. (A turn that only answers stays an answer.)
-    let working: HashSet<u64> = log
-        .iter()
-        .filter(|i| matches!(i, ThreadItem::Tool { .. } | ThreadItem::Thought { .. }))
-        .map(|i| i.seq())
-        .collect();
+    // Words on the way are notes on the work line: a text is a note only while its turn
+    // still has a thought or a call AFTER it — the last words of a turn answer, however much
+    // the turn acted before (Pi commits a turn's texts, thoughts and calls under one seq, so
+    // "the turn acted" alone would swallow every final answer). While the run is live, the
+    // trailing text is still on the way too: another call may follow it.
+    let mut actions_left: HashMap<u64, usize> = HashMap::new();
+    for i in log {
+        if matches!(i, ThreadItem::Tool { .. } | ThreadItem::Thought { .. }) {
+            *actions_left.entry(i.seq()).or_default() += 1;
+        }
+    }
     // Each plan lives once: its place is its first snapshot, its steps the newest one. Each
     // question too, with the answer the journal has for it.
     let mut plan_first: HashMap<&str, u64> = HashMap::new();
@@ -195,7 +199,7 @@ pub(crate) fn rows_of(
         });
         put(w);
     };
-    for it in log {
+    for (idx, it) in log.iter().enumerate() {
         match it {
             ThreadItem::User { key, text, at, .. } => {
                 close(&mut rows, &mut work);
@@ -207,7 +211,11 @@ pub(crate) fn rows_of(
                     at: *at,
                 });
             }
-            ThreadItem::Thought { key, text, at, .. } => {
+            ThreadItem::Thought {
+                key, seq, text, at, ..
+            } => {
+                *actions_left.entry(*seq).or_default() =
+                    actions_left.get(seq).copied().unwrap_or(0).saturating_sub(1);
                 step(&mut work, key, *at, Step::Thought(text.clone()))
             }
             ThreadItem::Text {
@@ -217,7 +225,9 @@ pub(crate) fn rows_of(
                 at,
                 error,
             } => {
-                if error.is_none() && working.contains(seq) {
+                let on_the_way = actions_left.get(seq).copied().unwrap_or(0) > 0
+                    || (running && idx + 1 == log.len());
+                if error.is_none() && on_the_way {
                     step(&mut work, key, *at, Step::Note(text.clone()));
                 } else {
                     close(&mut rows, &mut work);
@@ -230,13 +240,17 @@ pub(crate) fn rows_of(
             }
             ThreadItem::Tool {
                 key,
+                seq,
                 call_id,
                 name,
                 args,
                 preview,
                 at,
                 ..
-            } => step(
+            } => {
+                *actions_left.entry(*seq).or_default() =
+                    actions_left.get(seq).copied().unwrap_or(0).saturating_sub(1);
+                step(
                 &mut work,
                 key,
                 *at,
@@ -249,7 +263,8 @@ pub(crate) fn rows_of(
                     failed: false,
                     diff: None,
                 },
-            ),
+            );
+            }
             ThreadItem::Result {
                 call_id,
                 output,

@@ -1,4 +1,4 @@
-//! Sending: the composer's message, regenerate, copy, an approval (the view's); the reasoning
+//! Sending: the composer's message, copy, an approval (the view's); the reasoning
 //! level and Stop (the app's: the status bar's controls act on the open thread). The queue is
 //! `queued.rs`, drafts `drafts.rs`.
 
@@ -386,35 +386,6 @@ impl ThreadView {
                     .ok();
             }
         }
-        cx.notify();
-    }
-
-    /// Ask the last question again: the gateway drops the last exchange, then the same text is sent.
-    pub fn regenerate(&mut self, cx: &mut Context<Self>) {
-        let (Some(profile), Some(session)) = (self.profile(cx), self.thread.runtime.clone()) else {
-            return;
-        };
-        if self.thread.journal.running() {
-            return;
-        }
-        let Some(text) = self.thread.tv.rows.iter().rev().find_map(|r| match r {
-            ::thread::Row::User { text, .. } => Some(text.clone()),
-            _ => None,
-        }) else {
-            return;
-        };
-        self.thread.live = Some(Live {
-            label: "Regenerating…".into(),
-        });
-        self.follow = true;
-        self.cmd(
-            Cmd::Regenerate {
-                profile,
-                session,
-                text,
-            },
-            cx,
-        );
         cx.notify();
     }
 

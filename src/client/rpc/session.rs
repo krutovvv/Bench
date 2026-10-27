@@ -263,19 +263,6 @@ impl Rpc {
                 json!({"session_id": session}),
                 Pending::Ignore,
             )?,
-            Cmd::Regenerate {
-                profile,
-                session,
-                text,
-            } => {
-                self.call(
-                    "session.undo",
-                    json!({"session_id": session, "profile": profile, "intent": "retry"}),
-                    Pending::Ignore,
-                )?;
-                let params = json!({"session_id": session, "text": text, "profile": profile});
-                self.call("prompt.submit", params, Pending::Ignore)?
-            }
         }
         Ok(true)
     }

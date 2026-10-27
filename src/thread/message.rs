@@ -110,10 +110,14 @@ impl ThreadView {
             )
         });
         let (copy_key, speak_key) = (key.to_string(), key.to_string());
+        // Hovering anywhere over the answer reveals its two actions, at the same edge the
+        // live run's Pause and Stop sat at: read aloud, and copy — which copies the agent's
+        // own markdown, what selecting the text on screen cannot. No regenerate: an agent
+        // run is not a chat reply to roll again; it acted, checked itself, and this is it.
         let actions = h_flex()
             .absolute()
             .top(px(TURN_Y + 3.))
-            .right_6()
+            .right_0()
             .pl_1()
             .gap_0p5()
             .items_center()
@@ -147,13 +151,7 @@ impl ThreadView {
                         .update(cx, |app, cx| app.toggle_speak(&key, text, window, cx))
                         .ok();
                 })),
-            )
-            .when(last, |d| {
-                d.child(
-                    bench_ui::icon_button(("regen", k), Ico::RotateCcw, "Regenerate", false, cx)
-                        .on_click(cx.listener(|this, _, _, cx| this.regenerate(cx))),
-                )
-            });
+            );
         let body = v_flex()
             .gap_3()
             .children(self.answer_body(key, text, cx))
