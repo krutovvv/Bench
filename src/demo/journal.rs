@@ -90,6 +90,8 @@ impl Journal {
             seq,
             text: user.into(),
             at: ms(at),
+            sub: None,
+            request: None,
         });
         let n = calls.len().max(1) as f64;
         for (k, c) in calls.into_iter().enumerate() {

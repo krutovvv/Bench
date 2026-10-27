@@ -40,10 +40,13 @@ pub enum Cmd {
     },
     /// A message sent while the agent works: it waits in the conversation's queue (Pi's inbox)
     /// until the agent answers.
+    /// A message pressed while the agent works: it waits in the queue. `request` is Bench's id
+    /// for it, the row shown on Enter is matched by it (docs/thread-objects.md).
     Queue {
         session: String,
         text: String,
         context: String,
+        request: String,
     },
     /// A waiting message taken back, or sent now (into the running work).
     QueueWithdraw {
@@ -68,6 +71,8 @@ pub enum Cmd {
         /// What the thread's live block shows now (terminal lines, the tool's input…), for the
         /// agent only: it is not part of the message the person sees.
         context: String,
+        /// Bench's id for the message, when a row shows it before the agent has it.
+        request: Option<String>,
     },
     Interrupt {
         profile: String,

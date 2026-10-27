@@ -47,14 +47,40 @@ export function textOf(content: any): string {
 		.join("");
 }
 
-/** The items of one journal entry, in order. Entries the person never sees give none. */
+/**
+ * What Pi's submission records say about the person's messages: Bench's id for each (the
+ * `requestId` it sent with it), by the submission while it waits, and by its entry once Pi
+ * placed it. Bench matches the row it showed on Enter by this id, never by the words.
+ */
+export class Requests {
+	private bySub = new Map<string, string>();
+	private byEntry = new Map<number, { sub: string; request?: string }>();
+
+	/** Learn from one submission record (a commit's change, or a scan). */
+	note(rec: any): void {
+		if (rec?.type !== "input") return;
+		const sub = String(rec.id);
+		if (rec.requestId) this.bySub.set(sub, String(rec.requestId));
+		if (rec.entry !== undefined) this.byEntry.set(Number(rec.entry), { sub, request: rec.requestId ? String(rec.requestId) : undefined });
+	}
+
+	ofSub(sub: string): string | undefined {
+		return this.bySub.get(sub);
+	}
+
+	ofEntry(entry: number): { sub: string; request?: string } | undefined {
+		return this.byEntry.get(entry);
+	}
+}
+
 /** The steps a `todo` call wrote. */
 function planOf(args: any): PlanStep[] {
 	const todos = Array.isArray(args?.todos) ? args.todos : [];
 	return todos.map((t: any) => ({ id: String(t?.id ?? ""), content: String(t?.content ?? ""), status: String(t?.status ?? "pending"), ...(typeof t?.parent === "string" ? { parent: t.parent } : {}) }));
 }
 
-export function itemsOf(entry: any): ThreadItem[] {
+/** The items of one journal entry, in order. Entries the person never sees give none. */
+export function itemsOf(entry: any, requests?: Requests): ThreadItem[] {
 	const seq = Number(entry.id);
 	const out: ThreadItem[] = [];
 	if (entry.kind === "bench.insert") {
@@ -72,7 +98,9 @@ export function itemsOf(entry: any): ThreadItem[] {
 		const at = typeof m.timestamp === "number" ? m.timestamp : undefined;
 		if (m.role === "user") {
 			const text = stripBlock(textOf(m.content));
-			if (text) out.push({ key: key(), seq, kind: "user", text, at });
+			// The submission that brought it, and Bench's id for it, when Pi's records say.
+			const from = requests?.ofEntry(seq);
+			if (text) out.push({ key: key(), seq, kind: "user", text, at, ...(from ? { sub: from.sub, ...(from.request ? { request: from.request } : {}) } : {}) });
 		} else if (m.role === "assistant") {
 			for (const b of m.content ?? []) {
 				if (b.type === "thinking" && b.thinking?.trim()) out.push({ key: key(), seq, kind: "thought", text: b.thinking, at });
@@ -116,8 +144,8 @@ export function itemsOf(entry: any): ThreadItem[] {
 }
 
 /** The items of many entries, in journal order. */
-export function itemsOfAll(entries: readonly any[]): ThreadItem[] {
-	return [...entries].sort((a, b) => Number(a.id) - Number(b.id)).flatMap(itemsOf);
+export function itemsOfAll(entries: readonly any[], requests?: Requests): ThreadItem[] {
+	return [...entries].sort((a, b) => Number(a.id) - Number(b.id)).flatMap((e) => itemsOf(e, requests));
 }
 
 /** How often this thread was summarized: one for each summary in its journal. The journal keeps
@@ -127,10 +155,13 @@ export function compactionsOf(entries: readonly any[]): number {
 }
 
 /** The queue as Bench shows it: the inbox's own order, writes (inserts, notes) left out. */
-export function queueOf(inbox: { items?: readonly any[] } | null | undefined): QueuedItem[] {
+export function queueOf(inbox: { items?: readonly any[] } | null | undefined, requests?: Requests): QueuedItem[] {
 	return (inbox?.items ?? [])
 		.filter((i) => i.mode !== "write")
-		.map((i) => ({ key: `q${i.id}`, sub: String(i.id), mode: i.mode, text: stripBlock(textOf(i.content)) }));
+		.map((i) => {
+			const request = requests?.ofSub(String(i.id));
+			return { key: `q${i.id}`, sub: String(i.id), mode: i.mode, text: stripBlock(textOf(i.content)), ...(request ? { request } : {}) };
+		});
 }
 
 /** What one Pi commit means for the threads Bench watches, by conversation id. */
@@ -146,8 +177,14 @@ export interface ThreadChange {
  * becomes `queue`, a new inserts document becomes `inserts`. Only conversations `watched`
  * answers yes for are read.
  */
-export function changesOf(changes: readonly any[], watched: (conversation: string) => boolean): ThreadChange[] {
+export function changesOf(changes: readonly any[], watched: (conversation: string) => boolean, requests: (conversation: string) => Requests): ThreadChange[] {
 	const by = new Map<string, ThreadChange>();
+	// The submissions first: an entry or a queue of this same commit is told with their ids.
+	for (const ch of changes) {
+		if (ch.type !== "submission") continue;
+		const c = String(ch.value?.conversationId);
+		if (watched(c)) requests(c).note(ch.value);
+	}
 	const at = (c: string) => by.get(c) ?? by.set(c, { conversation: c }).get(c)!;
 	const entries: any[] = [];
 	for (const ch of changes) {
@@ -157,13 +194,13 @@ export function changesOf(changes: readonly any[], watched: (conversation: strin
 		} else if (ch.type === "document" && ch.conversationId !== undefined && ch.value) {
 			const c = String(ch.conversationId);
 			if (!watched(c)) continue;
-			if (ch.record?.kind === INBOX_KIND) at(c).queue = queueOf(ch.value);
+			if (ch.record?.kind === INBOX_KIND) at(c).queue = queueOf(ch.value, requests(c));
 			else if (ch.record?.kind === INSERTS_KIND) at(c).inserts = (ch.value as any).items ?? {};
 		}
 	}
 	entries.sort((a, b) => Number(a.id) - Number(b.id));
 	for (const e of entries) {
-		const items = itemsOf(e);
+		const items = itemsOf(e, requests(String(e.conversationId)));
 		if (!items.length) continue;
 		const t = at(String(e.conversationId));
 		(t.append ??= []).push(...items);

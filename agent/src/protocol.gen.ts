@@ -1,6 +1,15 @@
 // Generated from crates/protocol (cargo test -p protocol). Do not edit: change the Rust types.
 
-export type ThreadItem = { "kind": "user", key: string, seq: number, text: string, at?: number, } | { "kind": "thought", key: string, seq: number, text: string, at?: number, } | { "kind": "text", key: string, seq: number, text: string, 
+export type ThreadItem = { "kind": "user", key: string, seq: number, text: string, at?: number, 
+/**
+ * The Pi submission that brought it, when the agent's records say.
+ */
+sub?: string, 
+/**
+ * Bench's id for the message (the `request_id` it was sent with): the row shown on
+ * Enter is this one (docs/thread-objects.md).
+ */
+request?: string, } | { "kind": "thought", key: string, seq: number, text: string, at?: number, } | { "kind": "text", key: string, seq: number, text: string, 
 /**
  * The words of an assistant message that also called a tool: the agent's narrative
  * of what it is about to do, not an answer. Pi's own signal — the message's blocks.
@@ -30,7 +39,11 @@ export type PlanStep = { id: string, content: string,
  */
 status: string, parent?: string, };
 
-export type QueuedItem = { key: string, sub: string, mode: string, text: string, };
+export type QueuedItem = { key: string, sub: string, mode: string, text: string, 
+/**
+ * Bench's id for the message, when Bench sent it.
+ */
+request?: string, };
 
 export type ThreadOpen = { items: Array<ThreadItem>, queue: Array<QueuedItem>, inserts: Record<string, unknown>, running: boolean, 
 /**

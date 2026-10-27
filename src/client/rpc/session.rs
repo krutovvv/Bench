@@ -119,8 +119,9 @@ impl Rpc {
                 session,
                 text,
                 context,
+                request,
             } => {
-                let mut params = json!({"session_id": session, "text": text, "mode": "queue"});
+                let mut params = json!({"session_id": session, "text": text, "mode": "queue", "request_id": request});
                 if !context.is_empty() {
                     params["context"] = json!(context);
                 }
@@ -228,12 +229,16 @@ impl Rpc {
                 text,
                 effort,
                 context,
+                request,
             } => {
                 if let Some(value) = effort {
                     let params = json!({"key": "reasoning", "value": value, "session_id": session, "profile": profile});
                     self.call("config.set", params, Pending::Ignore)?;
                 }
                 let mut params = json!({"session_id": session, "text": text, "profile": profile});
+                if let Some(r) = request {
+                    params["request_id"] = json!(r);
+                }
                 if !context.is_empty() {
                     params["context"] = json!(context);
                 }

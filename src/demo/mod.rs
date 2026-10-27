@@ -495,6 +495,8 @@ fn run(cx: &mut Context<BenchApp>) {
                     seq: 900,
                     text: "And the bounce rate?".into(),
                     at: Some(now),
+                    sub: None,
+                    request: None,
                 }]),
             ),
             (100, ThreadEvent::Run(true)),

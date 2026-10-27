@@ -22,7 +22,7 @@ import { AGENT_HOME, agents, compactionAt, compactionPolicy, getSetting, readCon
 import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
-import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, compactionsOf, FAIL_KIND, itemsOfAll, preview, queueOf, stripBlock, textOf } from "./thread.ts";
+import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, compactionsOf, FAIL_KIND, itemsOfAll, preview, queueOf, Requests, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { noThinking } from "./thinking.ts";
@@ -67,14 +67,6 @@ interface Live {
 	toolArgs: Map<string, any>;
 	/** The thread's inserts as last read from Pi (the tools' view of them). */
 	inserts: InsertView[];
-	/** The messages waiting in Pi's inbox, as last told to Bench. */
-	queue: QueuedMessage[];
-	/** Follow-ups Pi placed while the run was ending: told to Bench after its answer, so each answer stays with its message. The id lets Bench retire its row in the queue. */
-	placed: { id: string; text: string }[];
-	/** Messages this agent queued, by Pi submission id, until placed or taken back. */
-	pending: Map<string, { text: string; mode: string }>;
-	/** Queue checks, one at a time. */
-	queueLine: Promise<void>;
 }
 
 /** A message the person sent while the agent works, waiting in the conversation's inbox. */
@@ -128,6 +120,9 @@ export class Runtime {
 	private registered = new Set<string>();
 	/** Subagents' conversations act for their parent's session. */
 	private adopted = new Map<string, string>();
+	/** Bench's ids of the person's messages, from Pi's submission records, by conversation. */
+	private requests = new Map<string, Requests>();
+	private requestsOf = (conversation: string) => this.requests.get(conversation) ?? this.requests.set(conversation, new Requests()).get(conversation)!;
 	/** Wake-ups of the calls waiting at a held run's gate (src/hold.ts). */
 	private gates = new Gates();
 
@@ -367,10 +362,6 @@ export class Runtime {
 			approvedForSession: new Set(),
 			toolArgs: new Map(),
 			inserts: [],
-			queue: [],
-			placed: [],
-			pending: new Map(),
-			queueLine: Promise.resolve(),
 		};
 		this.live.set(row.id, live);
 		this.byConversation.set(String(conversation.id), live);
@@ -405,7 +396,7 @@ export class Runtime {
 	 * A message from the person. While the agent works it waits in Pi's inbox (`mode` "queue",
 	 * sent when the agent answers) or joins the running work after its current tools ("steer").
 	 */
-	async submit(id: string, text: string, attachments: { path: string; mime: string }[] = [], context = "", mode: "queue" | "steer" = "steer"): Promise<void> {
+	async submit(id: string, text: string, attachments: { path: string; mime: string }[] = [], context = "", mode: "queue" | "steer" = "steer", request: string = randomUUID()): Promise<void> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const row = this.store.get(id)!;
@@ -428,10 +419,9 @@ export class Runtime {
 		if (live.busy) {
 			// Queued: Pi keeps it in the inbox until the run answers. Steered: placed after the
 			// current tool round.
-			const sub = await live.conversation.submit({ type: "input", content, whenBusy: mode === "queue" ? "followUp" : "steer", requestId: randomUUID() }, ctx);
-			// Watched until Pi places it (its turn starts) or it is taken back.
-			live.pending.set(String(sub.id), { text, mode: mode === "queue" ? "followUp" : "steer" });
-			if (mode === "queue") this.queueChanged(live);
+			// `request` is Bench's id for the message (docs/thread-objects.md): Pi keeps it with the
+			// submission, so its row in the queue and its entry are known as the one pressed.
+			await live.conversation.submit({ type: "input", content, whenBusy: mode === "queue" ? "followUp" : "steer", requestId: request }, ctx);
 			return;
 		}
 		live.busy = true;
@@ -447,7 +437,7 @@ export class Runtime {
 		this.emit(id, "message.start", {});
 		// The run is live from here: Pi's own run_start comes later and finds the thread busy.
 		this.emit(id, "thread.run", { running: true });
-		await live.conversation.submit({ type: "input", content, requestId: randomUUID() }, ctx);
+		await live.conversation.submit({ type: "input", content, requestId: request }, ctx);
 		if (!row.title) void this.title(live, text);
 	}
 
@@ -525,42 +515,12 @@ export class Runtime {
 			.map((i) => ({ id: String(i.id), mode: i.mode, text: stripBlock(textOf(i.content)) }));
 	}
 
-	/**
-	 * Something may have changed the queue (Pi's inbox events come in batches, so every chance
-	 * counts: a submit, a withdrawal, a placed entry, a run's start and end). Checks run one at a
-	 * time: Bench gets the queue when it changed, and the text of each queued message Pi placed in
-	 * the conversation, as the thread's next turn.
-	 */
-	private queueChanged(live: Live): void {
-		live.queueLine = live.queueLine.then(() => this.checkQueue(live)).catch((err) => console.error("[queue]", err));
-	}
-
-	private async checkQueue(live: Live): Promise<void> {
-		const now = await this.queue(live.row.id);
-		// Taken back (withdrawn, or dropped by Stop): no longer watched. A placed one is told by
-		// its `entry_appended`.
-		for (const sub of [...live.pending.keys()]) {
-			if (now.some((n) => n.id === sub)) continue;
-			const record = await (await this.harness.submission(sub as any, ctx))?.status(ctx).catch(() => undefined);
-			if (record && (record.status === "queued" || ("entry" in record && record.entry !== undefined))) continue;
-			live.pending.delete(sub);
-		}
-		if (JSON.stringify(now) !== JSON.stringify(live.queue)) {
-			live.queue = now;
-			this.emit(live.row.id, "session.queue", { items: now });
-		}
-	}
-
 	/** Take a waiting message back out of the queue. */
 	async withdraw(id: string, submission: string): Promise<string> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const result = await this.harness.abortSubmission(submission as any, ctx, live.conversation.id);
-		if (result === "aborted") {
-			live.pending.delete(submission);
-			await this.dropFromInbox(live, submission);
-		}
-		this.queueChanged(live);
+		if (result === "aborted") await this.dropFromInbox(live, submission);
 		return result;
 	}
 
@@ -584,25 +544,18 @@ export class Runtime {
 	async edit(id: string, submission: string, text: string): Promise<"edited" | "not_queued"> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
-		let done = false;
+		let was: string | undefined;
 		await live.conversation.commit(async (tx) => {
 			const inbox = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
 			const at = inbox.items.findIndex((i: any) => String(i.id) === submission);
 			if (at < 0 || inbox.items[at].mode === "write") return;
+			was = stripBlock(textOf(inbox.items[at].content));
 			inbox.items[at] = { ...inbox.items[at], content: withText(inbox.items[at].content, text) };
-			done = true;
 		}, ctx);
-		if (done) {
-			// History keeps the words the person meant, not the ones they fixed: the message was
-			// stored when it was sent, before it ever waited.
-			const watched = live.pending.get(submission);
-			if (watched) {
-				this.store.editUserMessage(live.row.id, watched.text, text);
-				watched.text = text;
-			}
-		}
-		this.queueChanged(live);
-		return done ? "edited" : "not_queued";
+		if (was === undefined) return "not_queued";
+		// The search index keeps the words the person meant, not the ones they fixed.
+		this.store.editUserMessage(live.row.id, was, text);
+		return "edited";
 	}
 
 	/** Send a waiting message now: out of the queue, into the running work (or a new run). */
@@ -613,11 +566,9 @@ export class Runtime {
 		const item = (inbox?.items ?? []).find((i: any) => String(i.id) === submission);
 		if (!item) return;
 		if ((await this.harness.abortSubmission(submission as any, ctx, live.conversation.id)) !== "aborted") return;
-		live.pending.delete(submission);
 		await this.dropFromInbox(live, submission);
 		// Its turn shows when Pi places it (after the current tools, or when the run answers).
 		const sub = await live.conversation.submit({ type: "input", content: item.content, ...(live.busy ? { whenBusy: "steer" } : {}), requestId: randomUUID() } as any, ctx);
-		live.pending.set(String(sub.id), { text: stripBlock(textOf(item.content)), mode: "steer" });
 		// A new submission lands at the END of the inbox, and a boundary places what stands first
 		// of its kind — so without this move "send now" sends the message last, which is its
 		// opposite. It is the message the person just chose, so it goes to the head, ahead of
@@ -626,7 +577,6 @@ export class Runtime {
 			const box = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
 			moveToFront(box.items, String(sub.id));
 		}, ctx);
-		this.queueChanged(live);
 	}
 
 	/** Regenerate: drop the last exchange (a fork before the last user message) so the next prompt replaces it. */
@@ -808,28 +758,16 @@ export class Runtime {
 		const id = live.row.id;
 		if (process.env.BENCH_AGENT_TRACE) fs.appendFileSync(process.env.BENCH_AGENT_TRACE, JSON.stringify(e) + "\n");
 		switch (e.type) {
-			case "inbox_update":
-				this.queueChanged(live);
-				break;
 			case "submission": {
-				// A queued message placed in the conversation: in the event stream's own order (after
-				// the previous run's end, before the next one's start), so its turn comes between them.
+				// A message placed in the conversation while the run lives (a steer joins it, a
+				// follow-up starts its next turn): from here the work answers it, so the answer so
+				// far stays with the message before. Bench sees the entry through the journal.
 				const rec: any = e.record;
-				const item = live.pending.get(String(rec?.id));
-				if (!item || rec.status !== "placed") break;
-				live.pending.delete(String(rec.id));
-				if (live.busy && item.mode === "steer") {
-					// Joined the running turn (after its current tools): from here the work answers
-					// this message, so its turn starts now, and the answer so far stays with the one
-					// before.
-					if (live.answer) this.store.addMessage(id, { role: "assistant", text: live.answer });
-					live.answer = "";
-					live.blocks.clear();
-					live.narrating = false;
-					this.emit(id, "message.user", { text: item.text, queued: true, id: String(rec.id) });
-				} else if (live.busy) live.placed.push({ id: String(rec.id), text: item.text });
-				else this.emit(id, "message.user", { text: item.text, queued: true, id: String(rec.id) });
-				this.queueChanged(live);
+				if (rec?.type !== "input" || rec.status !== "placed" || !live.busy) break;
+				if (live.answer) this.store.addMessage(id, { role: "assistant", text: live.answer });
+				live.answer = "";
+				live.blocks.clear();
+				live.narrating = false;
 				break;
 			}
 			case "run_start":
@@ -916,7 +854,6 @@ export class Runtime {
 				break;
 			case "run_end":
 				this.finish(live);
-				this.queueChanged(live);
 				break;
 			case "task_failed":
 				console.error("[pi] task failed", e.kind, e.message);
@@ -1021,8 +958,6 @@ export class Runtime {
 		this.emitUsage(live);
 		this.emit(id, "message.complete", { text });
 		this.emit(id, "sessions.changed", {});
-		for (const p of live.placed.splice(0))
-			this.emit(id, "message.user", { text: p.text, queued: true, id: p.id });
 	}
 
 	// ---- titles ----------------------------------------------------------
@@ -1067,7 +1002,7 @@ export class Runtime {
 	/** Send each commit's new entries, queue and inserts to the threads that are open. */
 	private watchCommits(): void {
 		this.harness.subscribeCommits((publication: any) => {
-			for (const ch of changesOf(publication.changes, (c) => this.byConversation.has(c))) {
+			for (const ch of changesOf(publication.changes, (c) => this.byConversation.has(c), this.requestsOf)) {
 				const id = this.byConversation.get(ch.conversation)!.row.id;
 				if (ch.append) this.emit(id, "thread.append", { items: ch.append });
 				if (ch.queue) this.emit(id, "thread.queue", { items: ch.queue });
@@ -1102,9 +1037,17 @@ export class Runtime {
 		}
 		const doc = (await this.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
 		const inbox = await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx);
+		// Pi's submission records name each message's request: the rows Bench showed on Enter.
+		const requests = this.requestsOf(String(live.conversation.id));
+		cursor = undefined;
+		do {
+			const page = await this.storage.scanSubmissions({ conversationId: live.conversation.id }, 500, cursor, ctx);
+			for (const rec of page.items) requests.note(rec);
+			cursor = page.next;
+		} while (cursor);
 		return {
-			items: itemsOfAll(entries.filter((e) => Number(e.id) > since)),
-			queue: queueOf(inbox as any),
+			items: itemsOfAll(entries.filter((e) => Number(e.id) > since), requests),
+			queue: queueOf(inbox as any, requests),
 			inserts: doc?.items ?? {},
 			running: live.busy,
 			holds: live.busy ? live.holds : [],

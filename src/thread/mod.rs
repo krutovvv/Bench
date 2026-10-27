@@ -139,12 +139,14 @@ impl ThreadView {
                     sub: "q-1".into(),
                     mode: "steer".into(),
                     text: "And the cover: the one from the spring shoot.".into(),
+                    request: None,
                 },
                 protocol::QueuedItem {
                     key: "q-2".into(),
                     sub: "q-2".into(),
                     mode: "follow-up".into(),
                     text: "Skip the pricing table for now, it goes in the next release.".into(),
+                    request: None,
                 },
             ]));
             // A queue like this means a live run: the plan of that run shows, and it shows in

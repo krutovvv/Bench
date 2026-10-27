@@ -19,6 +19,15 @@ pub enum ThreadItem {
         #[ts(optional)]
         #[serde(default)]
         at: Option<f64>,
+        /// The Pi submission that brought it, when the agent's records say.
+        #[ts(optional)]
+        #[serde(default)]
+        sub: Option<String>,
+        /// Bench's id for the message (the `request_id` it was sent with): the row shown on
+        /// Enter is this one (docs/thread-objects.md).
+        #[ts(optional)]
+        #[serde(default)]
+        request: Option<String>,
     },
     Thought {
         key: String,
@@ -209,6 +218,10 @@ pub struct QueuedItem {
     pub sub: String,
     pub mode: String,
     pub text: String,
+    /// Bench's id for the message, when Bench sent it.
+    #[ts(optional)]
+    #[serde(default)]
+    pub request: Option<String>,
 }
 
 /// The answer to `thread.open {session_id, since}`.

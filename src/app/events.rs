@@ -67,6 +67,7 @@ impl BenchApp {
                             text: message.clone(),
                             effort: None,
                             context,
+                            request: None,
                         },
                     );
                     if open {
@@ -264,7 +265,7 @@ impl BenchApp {
                 });
                 self.inserts_created(&at, &session);
                 self.save_place(cx);
-                if let (Some(text), Some(profile)) = (queued, self.profile.clone()) {
+                if let (Some((request, text)), Some(profile)) = (queued, self.profile.clone()) {
                     let cmd = match self.parse_command(&text) {
                         Some((name, arg)) => Cmd::Dispatch {
                             profile,
@@ -278,6 +279,7 @@ impl BenchApp {
                             text,
                             effort,
                             context: self.inserts_context(&at, cx),
+                            request: Some(request),
                         },
                     };
                     self.cmd_at(&at, cmd);

@@ -7,6 +7,13 @@ use serde_json::{Map, Value};
 
 use crate::rows::{Row, rows_of};
 
+/// A message shown on Enter, before the agent has it: Bench's id for it and its words.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct Pressed {
+    pub request: String,
+    pub text: String,
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct Thread {
     /// The journal, ordered by `ThreadItem::order`.
@@ -25,10 +32,10 @@ pub struct Thread {
     /// The last entry id seen: `thread.open {since: head}` after a reconnect.
     head: u64,
     /// Messages the person sent that the journal has not shown yet, in the order sent.
-    sent: Vec<String>,
+    sent: Vec<Pressed>,
     /// Messages pressed while the agent works that its queue has not returned yet: shown as
     /// waiting rows of their own, without controls, until the queue answers or takes them.
-    sent_queue: Vec<String>,
+    sent_queue: Vec<Pressed>,
     /// Grows with every change, so a view knows when to rebuild its rows.
     version: u64,
 }
@@ -79,9 +86,13 @@ impl Thread {
             },
             ThreadEvent::Queue(q) => {
                 self.queue = q;
-                // The queue came back holding the words: the waiting echo was its, it is one row now.
-                self.sent_queue
-                    .retain(|s| !self.queue.iter().any(|q| &q.text == s));
+                // The queue came back holding the message: the row shown on Enter was it.
+                self.sent_queue.retain(|p| {
+                    !self
+                        .queue
+                        .iter()
+                        .any(|q| q.request.as_deref() == Some(p.request.as_str()))
+                });
             }
             ThreadEvent::Inserts(m) => self.inserts = m,
             ThreadEvent::Run(on) => {
@@ -110,17 +121,16 @@ impl Thread {
                 self.stream = Default::default();
                 self.narrated.clear();
             }
-            // A queued message the agent took: it leaves the queue in the same step it joins the
-            // journal, even before the queue's own event arrives, so it is never shown twice.
-            if let ThreadItem::User { text, .. } = &it {
-                if let Some(k) = self.queue.iter().position(|q| &q.text == text) {
-                    self.queue.remove(k);
+            // A message the agent took leaves the queue in the same step it joins the journal,
+            // even before the queue's own event arrives — known by its submission; the row shown
+            // on Enter by its request. Never by its words: two messages may say the same.
+            if let ThreadItem::User { sub, request, .. } = &it {
+                if let Some(sub) = sub {
+                    self.queue.retain(|q| &q.sub != sub);
                 }
-                if let Some(k) = self.sent.iter().position(|s| s == text) {
-                    self.sent.remove(k);
-                }
-                if let Some(k) = self.sent_queue.iter().position(|s| s == text) {
-                    self.sent_queue.remove(k);
+                if let Some(r) = request {
+                    self.sent.retain(|p| &p.request != r);
+                    self.sent_queue.retain(|p| &p.request != r);
                 }
             }
             self.head = self.head.max(it.seq());
@@ -130,26 +140,17 @@ impl Thread {
         self.version += 1;
     }
 
-    /// The person sent `text`: it shows at once, where the journal will put it.
-    pub fn sent(&mut self, text: String) {
-        self.sent.push(text);
+    /// The person sent `text` with Bench's id `request`: it shows at once, where the journal
+    /// will put it; the journal's entry with the same request takes its place.
+    pub fn sent(&mut self, request: String, text: String) {
+        self.sent.push(Pressed { request, text });
         self.version += 1;
     }
 
     /// Enter pressed while the run lives: the message is on its way to the queue; show it
     /// as waiting at once, so the composer never empties onto nothing.
-    pub fn queued_now(&mut self, text: String) {
-        self.sent_queue.push(text);
-        self.version += 1;
-    }
-
-    /// A sent message's text became what is actually sent (its files' places once uploaded): the
-    /// journal's entry then matches it and takes its place.
-    pub fn resent(&mut self, from: &str, to: String) {
-        match self.sent.iter_mut().find(|s| *s == from) {
-            Some(s) => *s = to,
-            None => self.sent.push(to),
-        }
+    pub fn queued_now(&mut self, request: String, text: String) {
+        self.sent_queue.push(Pressed { request, text });
         self.version += 1;
     }
 
@@ -161,8 +162,8 @@ impl Thread {
     }
 
     /// A sent message that never reached the journal (the send failed): it goes.
-    pub fn unsent(&mut self, text: &str) {
-        self.sent.retain(|s| s != text);
+    pub fn unsent(&mut self, request: &str) {
+        self.sent.retain(|p| p.request != request);
         self.version += 1;
     }
 

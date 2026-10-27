@@ -6,6 +6,8 @@ use std::collections::HashMap;
 use protocol::{Hold, PlanStep, QueuedItem, ThreadItem};
 use serde_json::{Map, Value};
 
+use crate::state::Pressed;
+
 /// One line of the thread. `key` is stable: a view keeps a row's state (folded, measured) by it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Row {
@@ -131,9 +133,9 @@ pub(crate) fn rows_of(
     holds: &[Hold],
     stream: &(String, String),
     narrated: &str,
-    sent: &[String],
+    sent: &[Pressed],
     queue: &[QueuedItem],
-    sent_queue: &[String],
+    sent_queue: &[Pressed],
 ) -> Vec<Row> {
     // A question's answer is its call's result, which comes later in the journal.
     let asked: HashMap<&str, &str> = log
@@ -410,9 +412,9 @@ pub(crate) fn rows_of(
             text: stream.1.clone(),
         });
     }
-    rows.extend(sent.iter().enumerate().map(|(k, t)| Row::User {
-        key: format!("sent-{k}"),
-        text: t.clone(),
+    rows.extend(sent.iter().map(|p| Row::User {
+        key: format!("sent-{}", p.request),
+        text: p.text.clone(),
         at: None,
     }));
     rows.extend(queue.iter().map(|q| Row::Queued {
@@ -423,11 +425,11 @@ pub(crate) fn rows_of(
     }));
     // Words on their way to the queue: the row of a waiting message, but with no controls —
     // the agent has no id for them yet, so there is nothing to withdraw or hurry.
-    rows.extend(sent_queue.iter().enumerate().map(|(k, t)| Row::Queued {
-        key: format!("sent-queue-{k}"),
+    rows.extend(sent_queue.iter().map(|p| Row::Queued {
+        key: format!("sent-queue-{}", p.request),
         sub: String::new(),
         mode: String::new(),
-        text: t.clone(),
+        text: p.text.clone(),
     }));
     rows
 }

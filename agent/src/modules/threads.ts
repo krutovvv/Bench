@@ -80,8 +80,9 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			broadcast(session_id, "sessions.changed", {});
 			return { ok: true };
 		},
-		"prompt.submit": async ({ session_id, text, attachments, context, mode }) => {
-			await rt.submit(session_id, String(text ?? ""), attachments ?? [], String(context ?? ""), mode === "queue" ? "queue" : "steer");
+		// `request_id`: Bench's id for the message, the one its row on Enter is matched by.
+		"prompt.submit": async ({ session_id, text, attachments, context, mode, request_id }) => {
+			await rt.submit(session_id, String(text ?? ""), attachments ?? [], String(context ?? ""), mode === "queue" ? "queue" : "steer", request_id ? String(request_id) : undefined);
 			return { ok: true };
 		},
 		// The messages waiting while the agent works (Pi's inbox): take one back, send it now, fix its words.

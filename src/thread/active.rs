@@ -30,7 +30,8 @@ pub struct ActiveThread {
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
     pub history_error: Option<String>,
     pub live: Option<Live>,
-    pub queued: Option<String>,
+    /// The first message of a thread not made yet: its request id and words, sent once it is.
+    pub queued: Option<(String, String)>,
     /// The "Changed files" list under the last turn is unfolded (folded by default).
     pub files_open: bool,
     /// The open session's background processes (`thread/processes.rs`), the card's fold, and

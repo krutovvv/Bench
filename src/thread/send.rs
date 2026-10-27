@@ -180,18 +180,23 @@ impl ThreadView {
             let text = typed;
             self.take_composer(window, cx);
             let context = self.block_context(cx);
+            // Bench's id for the message: its row shows now and is the queue's row later.
+            let request = uuid::Uuid::new_v4().to_string();
             // It becomes the thread's next message: the inserts that waited with it go after it.
             let after = self.thread.journal.messages() + 1;
             if files.is_empty() {
                 // The waiting row shows the frame it was pressed, not the frame the agent's
                 // queue answers with: the composer must never empty onto nothing.
-                self.thread.journal.queued_now(text.clone());
+                self.thread
+                    .journal
+                    .queued_now(request.clone(), text.clone());
                 self.follow = true;
                 self.cmd(
                     Cmd::Queue {
                         session,
                         text,
                         context,
+                        request,
                     },
                     cx,
                 );
@@ -219,6 +224,7 @@ impl ThreadView {
                                 session,
                                 text: with_attachments(&text, &prep.lines),
                                 context,
+                                request,
                             },
                             cx,
                         );
@@ -249,7 +255,10 @@ impl ThreadView {
             .map(|f| format!("{}{}]", attach::PREFIX, f.display()))
             .collect();
         let shown = with_attachments(&text, &shown);
-        self.thread.journal.sent(shown.clone());
+        // Bench's id for the message: the row shown now is the journal's entry later, whatever
+        // words the upload gives it.
+        let request = uuid::Uuid::new_v4().to_string();
+        self.thread.journal.sent(request.clone(), shown);
         // Inserts put while this message was in the composer sit after it, not before.
         let after = self.thread.journal.messages();
         self.anchor_draft_inserts(after, cx);
@@ -270,7 +279,7 @@ impl ThreadView {
             .into(),
         });
         if files.is_empty() {
-            self.submit(profile, text, window, cx);
+            self.submit(profile, text, request, window, cx);
             return;
         }
         let Some((conn, target, machine)) = self.files_where(cx) else {
@@ -289,14 +298,13 @@ impl ThreadView {
                     if let Some(live) = this.thread.live.as_mut() {
                         live.label = "Sending…".into();
                     }
-                    let full = with_attachments(&text, &prep.lines);
                     // Shown with the files where they were; sent with where they are now.
-                    this.thread.journal.resent(&shown, full.clone());
-                    this.submit(profile, full, window, cx);
+                    let full = with_attachments(&text, &prep.lines);
+                    this.submit(profile, full, request, window, cx);
                 }
                 Err(e) => {
                     this.thread.live = None;
-                    this.thread.journal.unsent(&shown);
+                    this.thread.journal.unsent(&request);
                     // His files come back: the message stays his to send again.
                     this.attachments = keep;
                     window.push_notification(
@@ -347,6 +355,7 @@ impl ThreadView {
         &mut self,
         profile: String,
         text: String,
+        request: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
@@ -374,6 +383,7 @@ impl ThreadView {
                                 text,
                                 effort,
                                 context,
+                                request: Some(request),
                             },
                             cx,
                         );
@@ -383,7 +393,7 @@ impl ThreadView {
             None => {
                 // A new session is created on the first message; the effort goes with it.
                 self.thread.effort_pending = true;
-                self.thread.queued = Some(text);
+                self.thread.queued = Some((request, text));
                 let at = self.thread_ref();
                 self.app
                     .update(cx, |app, cx| app.create_session(profile, &at, window, cx))

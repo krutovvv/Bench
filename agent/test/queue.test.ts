@@ -54,9 +54,11 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	});
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m" } as any);
 	const told: any[][] = [];
+	const requests: Record<string, string | undefined> = {};
 	const runs: boolean[] = [];
 	const rt = new Runtime((_sid, type, payload: any) => {
 		if (type === "thread.queue") told.push(payload.items.map((i: any) => i.text));
+		if (type === "thread.queue") for (const i of payload.items) requests[i.text] = i.request;
 		if (type === "thread.run") runs.push(payload.running);
 	});
 	await rt.open();
@@ -65,11 +67,14 @@ test("send now: the message goes to the head of the queue, not its end", async (
 
 	await rt.submit(id, "the run's first message");
 	// Two more, sent while it works: they wait, in the order they were sent.
-	await rt.submit(id, "second", [], "", "queue");
-	await rt.submit(id, "third", [], "", "queue");
+	await rt.submit(id, "second", [], "", "queue", "bench-2");
+	await rt.submit(id, "third", [], "", "queue", "bench-3");
 	assert.equal(rt.isBusy(id), true, "the stalled run is live");
 	assert.deepEqual(runs, [true], "Bench is told the run is live as soon as the message starts it");
 	const before = await rt.queue(id);
+	// Pi keeps Bench's id with each submission, and the queue's rows carry it.
+	assert.equal(requests["second"], "bench-2");
+	assert.equal(requests["third"], "bench-3");
 	assert.deepEqual(before.map((i) => i.text), ["second", "third"]);
 
 	// The person presses "send now" on the LAST one: it must be the next thing answered.

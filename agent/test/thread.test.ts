@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { changesOf, compactionsOf, COMPACTION_KIND, FAIL_KIND, INBOX_KIND, INSERTS_KIND, itemsOf, itemsOfAll, queueOf } from "../src/thread.ts";
+import { changesOf, compactionsOf, COMPACTION_KIND, FAIL_KIND, INBOX_KIND, INSERTS_KIND, itemsOf, itemsOfAll, queueOf, Requests } from "../src/thread.ts";
 
 const user = (id: number, text: string) => ({ id, conversationId: 7, kind: "pi.user", model: [{ role: "user", content: text, timestamp: 1000 + id }] });
 const assistant = (id: number, content: any[], extra: any = {}) => ({ id, conversationId: 7, kind: "pi.assistant", model: [{ role: "assistant", content, timestamp: 1000 + id, ...extra }] });
@@ -115,7 +115,7 @@ test("a commit: entries of watched threads in id order, the inbox as the queue, 
 		{ type: "document", conversationId: 7, record: { kind: INSERTS_KIND }, value: { items: { i1: { key: "tasks" } } } },
 		{ type: "task", value: {} },
 	];
-	const out = changesOf(changes, (c) => c === "7");
+	const out = changesOf(changes, (c) => c === "7", () => new Requests());
 	assert.equal(out.length, 1, "conversation 8 is not watched");
 	const [t] = out;
 	assert.equal(t.conversation, "7");
@@ -125,9 +125,41 @@ test("a commit: entries of watched threads in id order, the inbox as the queue, 
 });
 
 test("a commit that only empties the queue says so, so the waiting row leaves", () => {
-	const [t] = changesOf([{ type: "document", conversationId: 7, record: { kind: INBOX_KIND }, value: { items: [] } }], () => true);
+	const [t] = changesOf([{ type: "document", conversationId: 7, record: { kind: INBOX_KIND }, value: { items: [] } }], () => true, () => new Requests());
 	assert.deepEqual(t.queue, []);
 	assert.equal(t.append, undefined);
+});
+
+test("a message is known by the request Bench sent it with: waiting in the queue, then as its entry", () => {
+	const req = new Requests();
+	// Admitted while the run lives: the submission and the inbox change in one commit.
+	const [waiting] = changesOf(
+		[
+			{ type: "submission", value: { type: "input", id: 50, conversationId: 7, status: "queued", requestId: "r1" } },
+			{ type: "document", conversationId: 7, record: { kind: INBOX_KIND }, value: { items: [{ id: 50, mode: "followUp", content: "same words" }] } },
+		],
+		() => true,
+		() => req,
+	);
+	assert.deepEqual(waiting.queue, [{ key: "q50", sub: "50", mode: "followUp", text: "same words", request: "r1" }]);
+	// Placed later: the entry carries the submission and the request, whatever its words.
+	const [placed] = changesOf(
+		[
+			{ type: "submission", value: { type: "input", id: 50, conversationId: 7, status: "placed", entry: 60, requestId: "r1" } },
+			{ type: "entry", value: user(60, "same words") },
+			{ type: "document", conversationId: 7, record: { kind: INBOX_KIND }, value: { items: [] } },
+		],
+		() => true,
+		() => req,
+	);
+	assert.deepEqual(
+		placed.append!.map((i: any) => [i.kind, i.text, i.sub, i.request]),
+		[["user", "same words", "50", "r1"]],
+	);
+	// A message from elsewhere (Telegram) has no request: nothing to match, nothing made up.
+	const other: any = itemsOf(user(61, "hi"), req)[0];
+	assert.equal(other.sub, undefined);
+	assert.equal(other.request, undefined);
 });
 
 test("on a real Pi: commits reach the thread as thread.* events, and thread.open since a head", async () => {

@@ -163,6 +163,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                         text,
                         effort: None,
                         context: std::env::var("PROBE_CONTEXT").unwrap_or_default(),
+                        request: None,
                     });
                     while let Ok(evt) = rx.recv_blocking() {
                         match evt {

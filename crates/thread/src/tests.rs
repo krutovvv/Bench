@@ -9,7 +9,21 @@ fn user(seq: u64, text: &str) -> ThreadItem {
         seq,
         text: text.into(),
         at: Some(seq as f64 * 1000.),
+        sub: None,
+        request: None,
     }
+}
+/// The person's message as the agent tells it once placed: its submission and Bench's request.
+fn placed(seq: u64, text: &str, sub: u64, request: &str) -> ThreadItem {
+    let mut it = user(seq, text);
+    if let ThreadItem::User {
+        sub: s, request: r, ..
+    } = &mut it
+    {
+        *s = Some(sub.to_string());
+        *r = Some(request.into());
+    }
+    it
 }
 fn text(seq: u64, sub: u32, t: &str) -> ThreadItem {
     ThreadItem::Text {
@@ -67,6 +81,13 @@ fn queued(sub: u64, t: &str) -> QueuedItem {
         sub: sub.to_string(),
         mode: "followUp".into(),
         text: t.into(),
+        request: None,
+    }
+}
+fn queued_req(sub: u64, t: &str, request: &str) -> QueuedItem {
+    QueuedItem {
+        request: Some(request.into()),
+        ..queued(sub, t)
     }
 }
 fn plan(seq: u64, id: &str, steps: &[(&str, &str, &str)]) -> ThreadItem {
@@ -393,8 +414,9 @@ fn rule_3_a_taken_message_keeps_its_place() {
         .iter()
         .position(|r| matches!(r, Row::Queued { text, .. } if text == "next"))
         .unwrap();
-    // Pi places it: the journal entry arrives first, the queue's event after.
-    t.apply(ThreadEvent::Append(vec![user(3, "next")]));
+    // Pi places it: the journal entry arrives first (naming its submission), the queue's
+    // event after.
+    t.apply(ThreadEvent::Append(vec![placed(3, "next", 10, "r1")]));
     let rows = t.rows();
     assert_eq!(
         kinds(&rows),
@@ -560,32 +582,48 @@ fn three_thousand_steps_are_cheap() {
 }
 
 #[test]
-fn rule_6_a_sent_message_shows_at_once_and_is_never_doubled() {
+fn rule_4_a_sent_message_shows_at_once_and_is_never_doubled() {
     let mut t = Thread::open(ThreadOpen {
         items: vec![user(1, "go"), text(2, 0, "ok")],
         ..Default::default()
     });
-    t.sent("next".into());
+    t.sent("r1".into(), "next".into());
     assert_eq!(kinds(&t.rows()), ["user:go", "answer:ok", "user:next"]);
-    t.apply(ThreadEvent::Append(vec![user(3, "next")]));
+    t.apply(ThreadEvent::Append(vec![placed(3, "next", 30, "r1")]));
     assert_eq!(kinds(&t.rows()), ["user:go", "answer:ok", "user:next"]);
-    t.sent("lost".into());
-    t.unsent("lost");
+    t.sent("r2".into(), "lost".into());
+    t.unsent("r2");
     assert_eq!(kinds(&t.rows()), ["user:go", "answer:ok", "user:next"]);
 }
 
 #[test]
-fn rule_6_a_message_with_files_is_one_message_once_they_are_uploaded() {
-    // Shown with the file where it was; the journal has it where it was put for the agent.
+fn rule_4_the_same_words_twice_are_two_messages() {
+    // Matched by request, never by words: "ok" sent twice is two rows until each is placed.
     let mut t = Thread::open(ThreadOpen::default());
-    t.sent("look\n[attachment:/Users/me/shot.png]".into());
-    t.resent(
-        "look\n[attachment:/Users/me/shot.png]",
-        "look\n[attachment:/tmp/bench-attachments/1-shot.png]".into(),
+    t.sent("r1".into(), "ok".into());
+    t.sent("r2".into(), "ok".into());
+    assert_eq!(kinds(&t.rows()), ["user:ok", "user:ok"]);
+    t.apply(ThreadEvent::Append(vec![placed(1, "ok", 10, "r1")]));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:ok", "user:ok"],
+        "one placed, one still on its way"
     );
-    t.apply(ThreadEvent::Append(vec![user(
+    t.apply(ThreadEvent::Append(vec![placed(2, "ok", 11, "r2")]));
+    assert_eq!(kinds(&t.rows()), ["user:ok", "user:ok"]);
+}
+
+#[test]
+fn rule_4_a_message_with_files_is_one_message_once_they_are_uploaded() {
+    // Shown with the file where it was; the journal has it where it was put for the agent —
+    // other words, the same request.
+    let mut t = Thread::open(ThreadOpen::default());
+    t.sent("r1".into(), "look\n[attachment:/Users/me/shot.png]".into());
+    t.apply(ThreadEvent::Append(vec![placed(
         1,
         "look\n[attachment:/tmp/bench-attachments/1-shot.png]",
+        10,
+        "r1",
     )]));
     assert_eq!(t.rows().len(), 1, "{:?}", kinds(&t.rows()));
 }
@@ -831,19 +869,30 @@ fn pressed_queue_shows_at_once_and_never_twice() {
         ..ThreadOpen::default()
     });
     t.apply(ThreadEvent::Run(true));
-    t.queued_now("later".into());
-    assert_eq!(kinds(&t.rows()), ["user:go", "work:0+", "queued:later"]);
-    // The agent's queue answers with the same words: one row, now with its id.
-    t.apply(ThreadEvent::Queue(vec![queued(9, "later")]));
-    assert_eq!(kinds(&t.rows()), ["user:go", "work:0+", "queued:later"]);
+    t.queued_now("r1".into(), "later".into());
+    t.queued_now("r2".into(), "later".into());
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:0+", "queued:later", "queued:later"],
+        "the same words twice are two messages"
+    );
+    // The agent's queue answers with the first: it takes that row's place, by its request.
+    t.apply(ThreadEvent::Queue(vec![queued_req(9, "later", "r1")]));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:0+", "queued:later", "queued:later"]
+    );
     let Row::Queued { sub, .. } = &t.rows()[2] else {
         panic!()
     };
     assert_eq!(sub, "9", "the queue's own row takes over");
-    // The agent takes it up mid-run: it joins the journal, the queue empties, no ghost stays.
-    t.apply(ThreadEvent::Append(vec![user(2, "later")]));
-    t.apply(ThreadEvent::Queue(vec![]));
-    assert_eq!(kinds(&t.rows()), ["user:go", "user:later", "work:0+"]);
+    // The agent takes it up mid-run: it joins the journal and leaves the queue in one step,
+    // by its submission; the second, still on its way, stays.
+    t.apply(ThreadEvent::Append(vec![placed(2, "later", 9, "r1")]));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "user:later", "work:0+", "queued:later"]
+    );
 }
 
 #[test]
@@ -853,7 +902,7 @@ fn pressed_queue_clears_with_the_rest_when_the_send_fails() {
         ..ThreadOpen::default()
     });
     t.apply(ThreadEvent::Run(true));
-    t.queued_now("gone".into());
+    t.queued_now("r1".into(), "gone".into());
     assert_eq!(kinds(&t.rows()), ["user:go", "work:0+", "queued:gone"]);
     t.clear_sent();
     assert_eq!(kinds(&t.rows()), ["user:go", "work:0+"]);
