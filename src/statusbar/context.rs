@@ -115,10 +115,12 @@ impl BenchApp {
     }
 }
 
-/// The speed panel: per-second generation speed of the current/last answer as bars, its range,
-/// and the last call's measured prefill and generation.
+/// The speed panel: per-second generation speed of the current/last answer as bars, its
+/// average, the writing time, and the last call's prefill and generation. Two things live
+/// here — how fast the model writes, and how fast it reads — nothing else.
 pub(super) fn speed_panel(
     samples: &[f64],
+    live: Option<f64>,
     prefill: Option<f64>,
     generation: Option<f64>,
     cx: &App,
@@ -150,7 +152,6 @@ pub(super) fn speed_panel(
         );
     } else {
         let max = samples.iter().cloned().fold(0., f64::max).max(1.);
-        let min = samples.iter().cloned().fold(f64::MAX, f64::min);
         let avg = samples.iter().sum::<f64>() / samples.len() as f64;
         // The last 68 seconds at most (as many 3px bars as fit); each bar is one second.
         let shown = &samples[samples.len().saturating_sub(68)..];
@@ -173,25 +174,24 @@ pub(super) fn speed_panel(
                     .border_b_1()
                     .border_color(theme.border)
                     .children(bars),
-            )
-            .child(row(
-                "Now / average",
-                format!(
-                    "{:.0} / {:.0} tok/s",
-                    shown.last().copied().unwrap_or(0.),
-                    avg
-                ),
-            ))
-            .child(row("Min – max", format!("{min:.0} – {max:.0} tok/s")))
-            // One sample is a second the model was writing; waits for tools and prefill are left
-            // out of every figure here, so this row counts writing, not the turn's wall time.
-            .child(row("Writing", format!("{} s", samples.len())));
+            );
+        // Now: the last three seconds, while the answer streams. One second can hold a burst
+        // of chunks and read twice the truth; three is about a hundred tokens — stable, and
+        // still now.
+        if let Some(now) = live {
+            panel = panel.child(row("Generation · now", format!("{now:.0} tok/s")));
+        }
+        // One sample is a second the model was writing; waits for tools are left out of the
+        // chart, so the average and the time speak of writing, not of the turn's wall time.
+        panel = panel
+            .child(row("Generation · average", format!("{avg:.0} tok/s")))
+            .child(row("Time writing", super::speed::fmt_secs(samples.len())));
     }
     if let Some(p) = prefill {
-        panel = panel.child(row("Prefill (last call)", format!("{p:.0} tok/s")));
+        panel = panel.child(row("Prefill · last call", format!("{p:.0} tok/s")));
     }
     if let Some(g) = generation {
-        panel = panel.child(row("Generation (last call)", format!("{g:.0} tok/s")));
+        panel = panel.child(row("Generation · last call", format!("{g:.0} tok/s")));
     }
     panel
 }

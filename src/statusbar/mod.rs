@@ -184,10 +184,15 @@ impl BenchApp {
                 format!("{v:.0}")
             }
         };
-        // Speed: how fast the model writes — the live reading (the last second) while text
-        // streams, else the last call's measured generation, else the agent's blended average.
-        // Prefill is not shown here: it is in the panel this opens. Click: the chart of this answer.
-        let label = match (self.speed.live, self.speed.generation) {
+        // Speed: how fast the model writes — the last three seconds while text streams (one
+        // second can hold a burst of chunks and read twice the truth), else the last call's
+        // measured generation, else the agent's blended average. Prefill is not shown here:
+        // it is in the panel this opens. Click: the chart of this answer.
+        let live = self
+            .speed
+            .live
+            .and_then(|_| self::speed::smoothed(&self.speed.samples));
+        let label = match (live, self.speed.generation) {
             (Some(l), _) => Some(format!("{} t/s", rate(l))),
             (None, Some(g)) => Some(format!("{} t/s", rate(g))),
             _ => self
@@ -210,7 +215,7 @@ impl BenchApp {
                         .child(div().text_xs().child(label))
                         .text_color(muted),
                 )
-                .content(move |_, _, cx| speed_panel(&samples, prefill, generation, cx))
+                .content(move |_, _, cx| speed_panel(&samples, live, prefill, generation, cx))
         });
 
         // Terminals sent to the background: each brings it back into its thread; Stop all ends them.

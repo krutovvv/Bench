@@ -3,9 +3,11 @@
 //! The agent reports token counts per API call (each `session.usage` frame follows one call) but
 //! only a blended `avg_tps`. Timing each call ourselves splits it:
 //! prefill = new input tokens / time to the first streamed token;
-//! generation = output tokens / the seconds the model spent writing in that call (gaps longer than
-//! `STALL` are the model waiting on a tool or the next prefill, and are not its writing).
-//! A call that cannot be timed cleanly (nothing streamed, too few tokens) leaves the last value.
+//! generation = output tokens / the span from that call's first token to its last (a tool
+//! boundary closes the span, so tool time is not the model's). Deliberately the whole span, not
+//! the sum of short gaps: bursty chunk delivery would turn gap-summing into rates the hardware
+//! cannot do. A call that cannot be timed cleanly (nothing streamed, too few tokens) leaves the
+//! last value.
 //!
 //! Live speed: while text streams, once a second the characters of that second are turned into
 //! tokens with a characters-per-token ratio calibrated on each finished call (the agent reports
@@ -34,9 +36,6 @@ pub struct Meter {
     pub generation: Option<f64>,
     /// Characters streamed in the current call (for calibrating `ratio`).
     chars_call: usize,
-    /// Seconds of the current call the model spent writing (waits left out): the honest denominator
-    /// of its generation rate.
-    call_active: f64,
     /// Characters per token, learned from finished calls.
     ratio: f64,
     /// Characters since the last one-second sample, and when that sample was taken.
@@ -152,7 +151,6 @@ impl Meter {
         self.end = None;
         self.closed = false;
         self.chars_call = 0;
-        self.call_active = 0.;
     }
 
     /// The user sent a new message: the chart starts over.
@@ -173,9 +171,6 @@ impl Meter {
         if let Some(t) = self.last_token {
             let wrote = active_added(now.duration_since(t));
             self.window_active += wrote;
-            if !self.closed {
-                self.call_active += wrote;
-            }
         }
         self.last_token = Some(now);
         self.last_tick.get_or_insert(now);
@@ -271,20 +266,20 @@ impl Meter {
         if let (Some(base), Some(first), Some(end)) = (self.base, self.first, self.end) {
             if now.2 == base.2 + 1 {
                 let (input, output) = (now.0.saturating_sub(base.0), now.1.saturating_sub(base.1));
-                // The call's own writing time, when it was measured; its wall time only for a
-                // short call whose chunks were too few to tell jitter from waiting.
-                let decode = if self.call_active > 0.25 {
-                    self.call_active
-                } else {
-                    end.duration_since(first).as_secs_f64()
-                };
+                // The call's whole writing span, first token to last — waits inside the call
+                // included, since the person waited too. Summing only the short gaps instead
+                // flatters bursty delivery into rates the hardware cannot do. A tool boundary
+                // ends `end`, so tool time stays out of the span.
+                let decode = end.duration_since(first).as_secs_f64();
                 if output >= 16 && decode > 0.25 {
                     self.generation = Some(output as f64 / decode);
                 }
-                // Learn characters per token from this call (smoothed, sane bounds).
-                if output >= 32 && self.chars_call > 0 {
-                    let r = (self.chars_call as f64 / output as f64).clamp(1., 8.);
-                    self.ratio = 0.7 * self.ratio + 0.3 * r;
+                // Learn characters per token from this call. Half-weight each reading: prose
+                // that is mostly Russian runs near 2 characters a token, and a slow learner
+                // reads such writing almost twice as fast as it is until it converges.
+                if output >= 16 && self.chars_call > 0 {
+                    let r = (self.chars_call as f64 / output as f64).clamp(0.8, 8.);
+                    self.ratio = 0.5 * self.ratio + 0.5 * r;
                 }
                 if let Some(req) = self.request {
                     let ttft = first.saturating_duration_since(req).as_secs_f64();
@@ -303,9 +298,43 @@ impl Meter {
     }
 }
 
+/// The live reading the person should see: the mean of the last three one-second samples.
+/// A single second can hold one burst of chunks delivered together, and reads twice the
+/// truth; three seconds is about a hundred tokens on a fast model — enough to be stable,
+/// short enough to still be "now".
+pub fn smoothed(samples: &[f64]) -> Option<f64> {
+    let tail = &samples[samples.len().saturating_sub(3)..];
+    (!tail.is_empty()).then(|| tail.iter().sum::<f64>() / tail.len() as f64)
+}
+
+/// Writing time in human terms: seconds while they are seconds, then minutes, then hours.
+pub fn fmt_secs(n: usize) -> String {
+    match (n / 3600, n / 60 % 60, n % 60) {
+        (0, 0, s) => format!("{s} s"),
+        (0, m, s) => format!("{m} min {s:02} s"),
+        (h, m, _) => format!("{h} h {m:02} min"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn three_seconds_average_a_burst_into_the_truth() {
+        // A burst second that reads 240 between two honest 75s.
+        assert_eq!(smoothed(&[75., 240., 75.]).unwrap(), 130.);
+        assert_eq!(smoothed(&[70.]).unwrap(), 70.);
+        assert_eq!(smoothed(&[]), None);
+    }
+
+    #[test]
+    fn writing_time_reads_like_a_person_says_it() {
+        assert_eq!(fmt_secs(47), "47 s");
+        assert_eq!(fmt_secs(219), "3 min 39 s");
+        assert_eq!(fmt_secs(60), "1 min 00 s");
+        assert_eq!(fmt_secs(4325), "1 h 12 min");
+    }
 
     #[test]
     fn a_threads_numbers_survive_the_wire() {
