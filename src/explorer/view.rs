@@ -23,7 +23,7 @@ impl BenchApp {
                 kind,
                 name,
             }) => self.part_pane(&project, kind, &name, cx),
-            None => div().into_any_element(),
+            None => note("Open a file from the tree, or find one with ⌘P", cx),
         };
         let theme = cx.theme().clone();
         v_flex()

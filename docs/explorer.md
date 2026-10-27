@@ -18,7 +18,7 @@ places that every view fills in its own way:
 ```
 
 - **The sidebar** lists one thing at a time: `SidebarPanel::Threads` (projects and their threads)
-  or `SidebarPanel::Explorer` (one project's tree). The switch is at its top; ⌘E flips it. A new
+  or `SidebarPanel::Explorer` (one project's tree). The Explorer is opened from a project (its menu's Explorer, ⌘E on the open thread's project) and takes the window: tree, documents, the thread beside on demand; its pressed button atop the sidebar (or ⌘E) closes it and brings the thread back. A new
   way to look at things (search across threads, git, tasks) is a new `SidebarPanel` with its own
   list, nothing else changes.
 - **The center** is `Center` (`src/app/workspace.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a

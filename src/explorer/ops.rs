@@ -24,7 +24,19 @@ impl BenchApp {
             self.explorer.listings.clear();
             self.explorer.find = None;
         }
+        // The IDE takes the window: the tree on the left, documents in the center (its last one
+        // again, or a word on how to open one).
         self.sidebar_panel = SidebarPanel::Explorer;
+        self.center = crate::app::Center::Doc;
+        if self.explorer.active.as_ref().is_some_and(|k| k.project() != project) {
+            self.explorer.active = self
+                .explorer
+                .tabs
+                .iter()
+                .rev()
+                .find(|k| k.project() == project)
+                .cloned();
+        }
         self.load_env(&project, window, cx);
         if let Some(root) = self.explorer_root() {
             self.list_folder(root, window, cx);
@@ -32,19 +44,28 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// The sidebar's switch: the threads, or the Explorer on the open thread's project.
+    /// The IDE closed (its pressed button atop the sidebar, ⌘E): the threads again, the thread
+    /// that was open in the center, nothing beside it. Its documents stay for the next time.
+    pub fn close_explorer(&mut self, cx: &mut Context<Self>) {
+        self.sidebar_panel = SidebarPanel::Threads;
+        self.center = crate::app::Center::Chat;
+        self.right = None;
+        let ex = &mut self.explorer;
+        ex.quick = None;
+        ex.find = None;
+        ex.naming = None;
+        ex.armed = None;
+        cx.notify();
+    }
+
+    /// ⌘E: the IDE closed, or opened on the open thread's project.
     pub fn toggle_side(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.sidebar_panel == SidebarPanel::Explorer {
-            self.sidebar_panel = SidebarPanel::Threads;
-            cx.notify();
-            return;
-        }
-        let project = if self.explorer.project.is_empty() {
-            self.thread_project_or_host()
+            self.close_explorer(cx);
         } else {
-            self.explorer.project.clone()
-        };
-        self.show_explorer(project, window, cx);
+            let project = self.thread_project_or_host();
+            self.show_explorer(project, window, cx);
+        }
     }
 
     /// The project's folder, where it is (None: it has none, an agent's Host).
