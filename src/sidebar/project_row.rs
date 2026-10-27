@@ -73,7 +73,9 @@ impl BenchApp {
                 .pb_1()
                 .gap_1p5()
                 .items_center()
-                .text_base()
+                // Small caps, as the Explorer's headings (`tree_heading`): a group of threads
+                // reads as a section, and a color on it is a mark, not a bigger type.
+                .text_xs()
                 .child(bench_ui::head_icon_in(icon, color, cx))
                 .child(match renaming {
                     Some(field) => div()
@@ -82,12 +84,10 @@ impl BenchApp {
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .child(Input::new(&field).xsmall())
                         .into_any_element(),
-                    // Capital letters, as the Explorer's headings: a group of threads reads as a
-                    // section, and a color on it is a mark, not a smaller type.
+                    // The name takes the heading's size and colour; only a chosen color marks it.
                     None => div()
                         .min_w_0()
                         .truncate()
-                        .font_weight(FontWeight::MEDIUM)
                         .text_color(color.unwrap_or(muted))
                         .child(p.name.to_uppercase())
                         .into_any_element(),
@@ -212,9 +212,8 @@ impl BenchApp {
                     .pl(bench_ui::nest_pl(cx))
                     .pr_4()
                     .py_1()
-                    // Compact asks for one size in the sidebar; only the roomy one may write a
-                    // note smaller than its rows.
-                    .when(!self.appearance.compact_sidebar, |d| d.text_sm())
+                    // The note belongs to the head: the heading's own size.
+                    .text_xs()
                     .text_color(muted)
                     .truncate()
                     .child(note)
