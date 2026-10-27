@@ -124,7 +124,9 @@ impl BenchApp {
             .pl(px(bench_ui::PROJECT_NAME_X) - px(2.))
             .when_some(guide, |d, last| d.child(bench_ui::nest_guide(cx, last)))
             .pr_3()
-            .map(|d| if compact { d.py_1p5() } else { d.py(px(5.)) })
+            // The compact list packs rows closer; the ordinary one keeps a breath around
+            // each title.
+            .map(|d| if compact { d.py(px(3.)) } else { d.py(px(4.)) })
             .cursor_pointer()
             .border_l_2()
             // A chosen color wins over the accent; it also tints the row lightly.
