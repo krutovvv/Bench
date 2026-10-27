@@ -158,6 +158,35 @@ impl BenchApp {
         .detach();
     }
 
+    /// Restart the agent under `host` from the sources this Bench carries (the gear's Update, for
+    /// one that runs an older build). A server's is stopped and its link dropped: reconnecting
+    /// installs the new sources there (`pi_agent::ensure_remote`). Its runs are durable: one
+    /// it was in the middle of resumes.
+    pub fn update_agent(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+        if host.is_empty() {
+            self.restart_gateway(window, cx);
+            return;
+        }
+        self.toast(
+            gpui_kit::component::notification::NotificationType::Info,
+            format!("Updating the agent on {host}…"),
+            window,
+            cx,
+        );
+        let target = Target::Ssh(host.clone());
+        cx.spawn_in(window, async move |this, cx| {
+            let _ = cx
+                .background_spawn(async move { crate::connection::restart_gateway(&target, true) })
+                .await;
+            let _ = this.update_in(cx, |this, window, cx| {
+                this.agents.remove(&host);
+                this.connect_remotes(window, cx);
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     /// Connect to the servers' agents this Mac knows (once each).
     pub fn connect_remotes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let hosts: Vec<String> = self.server_agents.iter().map(|a| a.host.clone()).collect();

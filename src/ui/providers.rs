@@ -143,24 +143,30 @@ impl BenchApp {
             let current = crate::pi_agent::build();
             // A server's agent is linked once this Mac's lists it; until then (and in the demo,
             // which links none) it is not started.
-            let state = match self.agents.get(&host) {
-                None => "not started".into(),
-                Some(a) => match (&a.error, &a.conn) {
-                    (Some(e), _) => e.clone(),
-                    (None, None) => "connecting…".into(),
-                    (None, Some(_)) => match (&a.build, &current) {
-                        (Some(b), Some(c)) if b == c => "connected · up to date".into(),
-                        (Some(_), Some(_)) => {
-                            "connected · an older version: updated when idle".into()
-                        }
-                        _ => "connected".into(),
-                    },
-                },
+            let (state, older) = match self.agents.get(&host) {
+                None => ("not started".into(), false),
+                Some(a) => agent_state(
+                    a.error.as_deref(),
+                    a.conn.is_some(),
+                    a.build.as_deref(),
+                    current.as_deref(),
+                ),
             };
             let shown = host == self.gear_agent;
             let pick = host.clone();
             // A server's agent can be forgotten here (asked once); this Mac's is always there.
             let armed = self.confirm_delete.as_deref() == Some(format!("agent:{host}").as_str());
+            // Restarts it from this Bench's sources; an interrupted run resumes (runs are durable).
+            let update = older.then(|| {
+                let h = host.clone();
+                self.pv_button(
+                    SharedString::from(format!("gear-agent-up-{host}")),
+                    "Update",
+                    false,
+                    cx,
+                    Box::new(move |this, w, cx| this.update_agent(h.clone(), w, cx)),
+                )
+            });
             let remove = (!host.is_empty()).then(|| {
                 let (gone, label) = (
                     host.clone(),
@@ -185,6 +191,7 @@ impl BenchApp {
                     h_flex()
                         .justify_end()
                         .gap_2()
+                        .children(update)
                         .children(remove)
                         .child(self.pv_button(
                             SharedString::from(format!("gear-agent-{host}")),
@@ -737,5 +744,71 @@ impl BenchApp {
             }
         }
         out
+    }
+}
+
+/// What the gear says of an agent, and whether it runs an older build than this Bench carries.
+/// A build is named by the first 8 of its sources' hash (`pi_agent::source_hash`).
+fn agent_state(
+    error: Option<&str>,
+    connected: bool,
+    build: Option<&str>,
+    current: Option<&str>,
+) -> (String, bool) {
+    let short = |b: &str| b.chars().take(8).collect::<String>();
+    match (error, connected, build, current) {
+        (Some(e), ..) => (e.to_string(), false),
+        (None, false, ..) => ("connecting…".into(), false),
+        (None, true, Some(b), Some(c)) if b == c => (
+            format!("connected · build {} · up to date", short(b)),
+            false,
+        ),
+        // Reattached while it was busy (`Connection::ssh`): nothing updates it until it is
+        // restarted — Update here, or Bench's next start.
+        (None, true, Some(b), Some(c)) => (
+            format!(
+                "connected · build {}, older than this Bench's {}",
+                short(b),
+                short(c)
+            ),
+            true,
+        ),
+        (None, true, Some(b), None) => (format!("connected · build {}", short(b)), false),
+        (None, true, None, _) => ("connected".into(), false),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::agent_state;
+
+    #[test]
+    fn the_gear_names_an_agents_build_and_says_when_it_is_older() {
+        let now = "3542f52d86a3399e";
+        assert_eq!(
+            agent_state(None, true, Some(now), Some(now)),
+            ("connected · build 3542f52d · up to date".into(), false)
+        );
+        assert_eq!(
+            agent_state(None, true, Some("1a2b3c4d5e6f7a8b"), Some(now)),
+            (
+                "connected · build 1a2b3c4d, older than this Bench's 3542f52d".into(),
+                true
+            )
+        );
+        assert_eq!(
+            agent_state(None, false, None, Some(now)),
+            ("connecting…".into(), false)
+        );
+        assert_eq!(
+            agent_state(
+                Some("dev: SSH could not connect"),
+                true,
+                Some("x"),
+                Some(now)
+            )
+            .1,
+            false
+        );
     }
 }
