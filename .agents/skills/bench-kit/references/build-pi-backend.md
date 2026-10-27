@@ -94,7 +94,9 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   every message into `<block-state>`.
 - **The message queue** is Pi's inbox: a message sent while the agent works is submitted with
   `whenBusy: "followUp"` (sent when it answers) or `"steer"` (joins the run after its current
-  tools), `runtime.ts` `submit`; Bench lists it from `InboxDoc` (`session.queue`). Taking one back
+  tools), `runtime.ts` `submit`, with Bench's `request_id` as Pi's `requestId`; Bench gets it from
+  `InboxDoc` in each commit (`thread.queue`), each row named with its request from Pi's submission
+  records, and the placed entry with its submission and request (`thread.ts` `Requests`). Taking one back
   is `harness.abortSubmission` + `dropFromInbox`: Pi 1.4 marks the submission unanswered but
   leaves the inbox item, so we remove it ourselves (`withdraw`, and `sendNow`, which re-submits it as a steer).
 - **Cron** (`builtin/cron.ts`): each enabled job is a durable `defineTask` (`bench.cron`) that

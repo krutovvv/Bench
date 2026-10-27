@@ -123,7 +123,10 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `session.insert`, `session.insert.patch` |
 | What the agent knows of inserts | the `inserts` prompt section, read with `input.read.snapshot(Inserts, conversationId)`, one line per kind (`prompt.ts` `inserted()`), plus `<block-state>` with each message |
 | Prompt | Pi sections (soul, environment, inserts, project, skills, notes), resent only when changed |
-| Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Pi 1.4 leaves an aborted item in the inbox, so `dropFromInbox` removes it in a commit |
+| Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Pi 1.4 leaves an aborted item in the inbox, so `dropFromInbox` removes it in a commit. Bench's id for each message is Pi's `requestId`: the row shown on Enter is matched by it, never by its words |
+| Plan, questions | the agent's own `todo` and `clarify` calls in the journal, the answer the call's result (`docs/thread-objects.md`) |
+| Pause | the conversation document `bench.hold` (`hold.ts`) and a gate in `beforeTool`: a held run stays held across a restart |
+| Fork | `conversation.fork(at)`: "Fork from here" on an answer makes a new thread through that entry |
 | `/tasks` | tool `tasks` (`builtin/tasks.ts`), data in `bench.sqlite`; one list for all projects, a project is a tag (`slug` of its name), the default filter in its threads |
 | `/terminal` | tool `ssh_run` (`builtin/ssh.ts`); without a host it takes the thread's terminal insert |
 | `/tools` | no tool of its own: the utility's input and output come in `<block-state>` |

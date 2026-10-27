@@ -52,22 +52,23 @@ Never send to "the" agent: there are several.
 
 ## Questions and plans
 
-They are **journal items**, so they stand in the thread where the agent made them and come back
-exactly so on reopen; the live events only say what is answerable *now*.
+They are the agent's **own calls in the journal** (docs/thread-objects.md): nothing is written
+beside them, so they stand where the agent made them and come back exactly so on reopen; the live
+events only say what is answerable *now*.
 
-- **Questions** (the `clarify` tool, and approvals): the agent writes `bench.ask`
-  {id, ask_kind: "clarify"|"approve", question, detail?, choices[], multi} into the conversation
-  when it asks, and `bench.asked` {id, answer} when it settles (empty answer = declined or timed
-  out). `clarify.request` {prompt_id, execution_generation, question, choices[], multi_select}
-  (+ `approval.request`) still marks the live prompt: only the matching card takes an answer
-  (`clarify.respond` / `approval.respond`; multi-select: choices joined with ", "), and
-  `clarify.settled` closes it. The card — choices, own answer, Decline — renders inside the work
-  row that asked; settled cards say what was answered.
-- **Plan** (the `todo` tool): `todo.updated` {todos: [{id, content, status, parent?}], revision}
-  still fires, but what Bench shows is the journal: the agent writes `bench.plan`
-  {id, todos} on every revision. One card per plan id, stamped in the work that made it, merged
-  in place by newer snapshots of the same id; a second plan sharing no steps gets its own card.
-  Statuses pending / in_progress / completed / cancelled; the card folds its steps ("PLAN · 2/5").
+- **Questions** (the `clarify` tool): the call is the question (`Ask` item, id = the call's id),
+  its result the answer (`Asked`, from the result's `details.answer`; "" = declined or timed
+  out). `clarify.request` {prompt_id = call id, execution_generation, choices[]} marks the live
+  prompt: only the matching card takes an answer (`clarify.respond`; multi-select: choices
+  joined with ", "), and `clarify.settled` closes it. The card — choices, own answer, × to
+  decline — renders inside the work row that asked; settled cards say what was answered.
+- **Approvals** (a dangerous `bash` in manual mode): the call waiting in `beforeTool` is the
+  journal's; `approval.request` {prompt_id = call id, command, description, choices[]} is live
+  state, and the card is drawn on the work row holding that call (`work.rs`).
+- **Plan** (the `todo` tool): the work's `todo` calls. The card stands on the first one in its
+  work and shows the steps of the newest; the next work (after the next message) has a card of
+  its own. Statuses pending / in_progress / completed / cancelled; the card folds its steps
+  ("PLAN · 2/5").
 - **Reopening a thread**: the journal carries all of the above; `session.resume` returns `prompts`
   (open approvals and questions) and the gateway replays them (`Pending::Thread {replay}`) so a
   pending prompt is still answerable after a thread switch — its card is already in place.
