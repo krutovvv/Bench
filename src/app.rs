@@ -50,6 +50,9 @@ pub struct BenchApp {
     /// The open thread: its session, its journal and list, its run, what waits in it, what it
     /// asks (`thread/active.rs`).
     pub active_thread: crate::thread::ActiveThread,
+    /// A second thread, beside the open one (the right dock's `Panel::Thread` when the center
+    /// shows a thread): its own state, its events routed to it (`app/events.rs`).
+    pub beside_thread: Option<crate::thread::ActiveThread>,
     pub targets: Vec<Target>,
     pub target: Target,
     /// The gateway list as a Select (kept for its subscription; the status bar has its own menu).
@@ -445,6 +448,7 @@ impl BenchApp {
             right_dock: Dock::new(DockPosition::Right, &[Panel::Thread], false),
             bottom_dock: Dock::new(DockPosition::Bottom, &[Panel::Terminal], false),
             active_thread: Default::default(),
+            beside_thread: None,
             explorer: Default::default(),
             skills: vec![],
             skill_open: None,

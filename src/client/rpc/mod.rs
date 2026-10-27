@@ -214,6 +214,34 @@ pub enum Evt {
     },
 }
 
+impl Evt {
+    /// The runtime session an event of one thread is about (None: the app's, or a thread's by
+    /// its stored id — its history, its creation, its inserts).
+    pub fn runtime(&self) -> Option<&str> {
+        match self {
+            Evt::Processes(s, _)
+            | Evt::ClarifyDone(s)
+            | Evt::Todos(s, _, _)
+            | Evt::Speed(s, _)
+            | Evt::ApprovalDone(s)
+            | Evt::Effort(s, _)
+            | Evt::Fallback(s, _)
+            | Evt::Thread(s, _)
+            | Evt::Started(s)
+            | Evt::Delta(s, _)
+            | Evt::Reasoning(s, _)
+            | Evt::Usage(s, _) => Some(s),
+            Evt::Dispatched { session, .. }
+            | Evt::ToolStart { session, .. }
+            | Evt::ToolDone { session }
+            | Evt::Complete { session, .. } => Some(session),
+            Evt::Approval(req) => Some(&req.session),
+            Evt::Clarify(req) => Some(&req.session),
+            _ => None,
+        }
+    }
+}
+
 /// Owns the gateway thread; dropping it shuts the session down.
 pub struct Gateway {
     tx: mpsc::Sender<Cmd>,
