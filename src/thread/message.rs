@@ -94,12 +94,9 @@ impl ThreadView {
         // put in since (a terminal, a tool), the plan of the work in progress and what waits in
         // the queue leave it the last.
         let last = !self.thread.journal.running()
-            && self.thread.tv.rows[k + 1..].iter().all(|r| {
-                matches!(
-                    r,
-                    Row::Queued { .. } | Row::Insert { .. }
-                )
-            });
+            && self.thread.tv.rows[k + 1..]
+                .iter()
+                .all(|r| matches!(r, Row::Queued { .. } | Row::Insert { .. }));
         let sources = self.render_sources(k, cx);
         let files = last.then(|| self.render_session_files(cx)).flatten();
         let group: SharedString = format!("answer-{key}").into();

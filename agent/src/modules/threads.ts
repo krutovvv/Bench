@@ -12,7 +12,7 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 				// Every thread, whatever agent or project it runs with: the sidebar groups them by project.
 				.list({ limit: limit ?? 200 })
 				.filter((s) => s.source !== "subagent")
-				.map((s) => ({ id: s.id, title: s.title, message_count: s.message_count, model: s.model, running: rt.isBusy(s.id), source: s.source, cwd: s.cwd, subject: s.subject ?? "", project: s.project ?? "", started_at: s.created, last_active: s.updated })),
+				.map((s) => ({ id: s.id, title: s.title, message_count: s.message_count, model: s.model, running: rt.isBusy(s.id), paused: rt.isPaused(s.id), source: s.source, cwd: s.cwd, subject: s.subject ?? "", project: s.project ?? "", started_at: s.created, last_active: s.updated })),
 		}),
 		"session.create": async ({ profile, cwd, subject, project }) => {
 			// A thread in a project works in the project's folder unless it asked for another.

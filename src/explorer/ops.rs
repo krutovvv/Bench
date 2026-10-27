@@ -144,12 +144,7 @@ impl BenchApp {
             let demo_ignored = crate::demo::ignored(&f.path);
             if !demo_ignored.is_empty() {
                 let root = f.path.clone();
-                match self
-                    .explorer
-                    .ignored
-                    .iter_mut()
-                    .find(|(r, _)| *r == root)
-                {
+                match self.explorer.ignored.iter_mut().find(|(r, _)| *r == root) {
                     Some((_, set)) => set.extend(demo_ignored),
                     None => self
                         .explorer
@@ -492,8 +487,9 @@ impl Explorer {
     /// (`git ls-files --directory` folds such a folder into one line).
     pub fn is_ignored(&self, path: &str) -> bool {
         self.ignored.iter().any(|(_, set)| {
-            set.iter()
-                .any(|p| path == *p || (path.starts_with(p.as_str()) && path[p.len()..].starts_with('/')))
+            set.iter().any(|p| {
+                path == *p || (path.starts_with(p.as_str()) && path[p.len()..].starts_with('/'))
+            })
         })
     }
 }

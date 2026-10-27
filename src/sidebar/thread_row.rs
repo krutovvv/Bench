@@ -30,7 +30,17 @@ impl BenchApp {
         let selected =
             self.center == Center::Chat && self.thread(cx).session.as_deref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
-        let count = if s.running {
+        // The open thread knows its hold first-hand; the others by the agent's list and the
+        // holds their views heard.
+        let open = self.thread(cx).session.as_deref() == Some(s.id.as_str());
+        let paused = if open {
+            self.thread(cx).journal.paused()
+        } else {
+            s.paused
+        };
+        let count = if s.running && paused {
+            "paused".to_string()
+        } else if s.running {
             "working…".to_string()
         } else {
             plural(s.messages as usize, "message", "messages", "messages")
@@ -103,9 +113,8 @@ impl BenchApp {
                 .into_any_element()
         };
         // A chosen color marks the row with a quiet stripe (the open chat keeps the accent).
-        let working = s.running
-            || (self.thread(cx).live.is_some()
-                && self.thread(cx).session.as_deref() == Some(s.id.as_str()));
+        // A paused run stands still: no shimmer, as nothing moves.
+        let working = !paused && (s.running || (open && self.thread(cx).live.is_some()));
         let stripe = self
             .mark_of(&s.id)
             .color

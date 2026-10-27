@@ -43,6 +43,7 @@ pub(super) fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                         .into(),
                     messages: s["message_count"].as_u64().unwrap_or(0),
                     running: s["running"].as_bool().unwrap_or(false),
+                    paused: s["paused"].as_bool().unwrap_or(false),
                     source: s["source"].as_str().unwrap_or_default().into(),
                     subject: s["subject"].as_str().unwrap_or_default().into(),
                     project: s["project"].as_str().unwrap_or_default().into(),

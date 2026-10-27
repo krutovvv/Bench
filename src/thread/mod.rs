@@ -362,7 +362,9 @@ impl ThreadView {
         // a person who clicked the line keeps it their way, open or shut.
         let live_key = |rs: &[Row]| {
             rs.iter().find_map(|r| match r {
-                Row::Work { key, live: true, .. } => Some(key.clone()),
+                Row::Work {
+                    key, live: true, ..
+                } => Some(key.clone()),
                 _ => None,
             })
         };
@@ -452,7 +454,7 @@ impl ThreadView {
                 from,
                 to,
                 live,
-                paused,
+                holds,
                 plan,
                 asks,
             } => self.render_work(
@@ -461,7 +463,7 @@ impl ThreadView {
                 from,
                 to,
                 live,
-                paused,
+                &holds,
                 &plan,
                 &asks,
                 live && !self.thread.processes.is_empty(),

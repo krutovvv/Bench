@@ -21,8 +21,9 @@ export interface SessionInfo {
 
 export interface Host {
 	session(conversationId: string | number): SessionInfo | undefined;
-	/** Waits while the person holds the run at a step boundary; resolves at once when free. */
-	hold(sessionId: string): Promise<void>;
+	/** Waits while the person holds the run at a step boundary; resolves at once when free.
+	 * False when the run was stopped while it waited: the step must not begin. */
+	hold(sessionId: string): Promise<boolean>;
 	/** A subagent's conversation acts for its parent's session. */
 	adopt(conversationId: string | number, sessionId: string): void;
 	/** How many threads other than `sessionId` are running a turn now (each holds one of the model server's slots). */

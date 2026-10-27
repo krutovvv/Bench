@@ -222,12 +222,23 @@ pub struct ThreadOpen {
     pub inserts: Map<String, Value>,
     #[serde(default)]
     pub running: bool,
-    /// The person held the run at a step boundary; it waits until they let it go on.
+    /// The live run's holds (the person's pauses), oldest first; the last one open while it
+    /// stands held. Empty when no run lives.
     #[serde(default)]
-    pub paused: bool,
+    pub holds: Vec<Hold>,
     #[serde(default)]
     #[ts(type = "number")]
     pub head: u64,
+}
+
+/// A stretch of a run the person held (paused): `from` and `to` in ms like an item's `at`;
+/// `to` is `None` while it still holds. Its time is not the work's: the work's clock skips it.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+pub struct Hold {
+    pub from: f64,
+    #[ts(optional)]
+    #[serde(default)]
+    pub to: Option<f64>,
 }
 
 /// Which part of the answer being written a stream delta extends.
@@ -255,8 +266,8 @@ pub enum ThreadEvent {
     Inserts(Map<String, Value>),
     /// A run started or ended.
     Run(bool),
-    /// The person held the run at a step boundary, or let it go on.
-    Paused(bool),
+    /// The person held the run or let it go on: the run's holds, whole.
+    Holds(Vec<Hold>),
 }
 
 impl ThreadEvent {
@@ -272,7 +283,9 @@ impl ThreadEvent {
             "thread.queue" => ThreadEvent::Queue(serde_json::from_value(items()).ok()?),
             "thread.inserts" => ThreadEvent::Inserts(items().as_object()?.clone()),
             "thread.run" => ThreadEvent::Run(payload.get("running")?.as_bool()?),
-            "thread.pause" => ThreadEvent::Paused(payload.get("paused")?.as_bool()?),
+            "thread.pause" => {
+                ThreadEvent::Holds(serde_json::from_value(payload.get("holds")?.clone()).ok()?)
+            }
             _ => return None,
         })
     }
@@ -317,8 +330,8 @@ mod tests {
             Some(ThreadEvent::Run(false))
         );
         assert_eq!(
-            ThreadEvent::parse("thread.pause", &json!({"paused": true})),
-            Some(ThreadEvent::Paused(true))
+            ThreadEvent::parse("thread.pause", &json!({"holds": [{"from": 5.0}]})),
+            Some(ThreadEvent::Holds(vec![Hold { from: 5., to: None }]))
         );
         assert_eq!(
             ThreadEvent::parse("thread.queue", &json!({"items": []})),
@@ -341,6 +354,7 @@ pub fn typescript() -> String {
         PlanStep::decl(),
         QueuedItem::decl(),
         ThreadOpen::decl(),
+        Hold::decl(),
         StreamKind::decl(),
     ] {
         out.push_str("export ");

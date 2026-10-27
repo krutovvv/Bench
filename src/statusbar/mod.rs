@@ -334,9 +334,9 @@ impl BenchApp {
                     cx.listener(|this, _, window, cx| this.toggle_terminal_panel(window, cx)),
                 )
             })
-            // Attach and dictate left the status bar for the composer itself — they belong to
-            // the message being written, not to the window's furniture.
-            // No Stop here anymore: the hold and the stop ride the actions' own line in the
-            // thread — where the minutes go, there the answers belong too (⌘. still works).
+        // Attach and dictate left the status bar for the composer itself — they belong to
+        // the message being written, not to the window's furniture.
+        // No Stop here anymore: the hold and the stop ride the actions' own line in the
+        // thread — where the minutes go, there the answers belong too (⌘. still works).
     }
 }

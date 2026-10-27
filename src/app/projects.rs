@@ -184,9 +184,9 @@ impl BenchApp {
                         .collect();
                     let remote =
                         connection::git(&target, &at, &["config", "--get", "remote.origin.url"])
-                        .ok()
-                        .map(|s| s.trim().to_string())
-                        .filter(|s| !s.is_empty());
+                            .ok()
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty());
                     RepoInfo {
                         dirty,
                         commits,

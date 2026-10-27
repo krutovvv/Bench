@@ -95,7 +95,10 @@ impl Section for Telegram {
                 })
                 .unwrap_or_default();
             (
-                s.get("state").and_then(Value::as_str).unwrap_or("").to_string(),
+                s.get("state")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
                 s.get("detail").and_then(Value::as_str).map(str::to_string),
                 at,
             )
@@ -232,7 +235,10 @@ impl SettingsForm for Telegram {
         // a dead proxy says nothing until a timeout, so the state is dated.
         let theme = cx.theme();
         let pid = e.id.clone();
-        let (dot, line) = match e.telegram.status.as_ref()
+        let (dot, line) = match e
+            .telegram
+            .status
+            .as_ref()
             .map(|(s, d, at)| (s.as_str(), d.clone(), at.clone()))
         {
             Some(("live", detail, at)) => (
@@ -245,7 +251,11 @@ impl SettingsForm for Telegram {
             ),
             Some(("error", detail, at)) => (
                 theme.danger,
-                format!("Fails: {} · {}", detail.unwrap_or_else(|| "unknown".into()), at),
+                format!(
+                    "Fails: {} · {}",
+                    detail.unwrap_or_else(|| "unknown".into()),
+                    at
+                ),
             ),
             Some((_, _, _)) => (
                 theme.warning,

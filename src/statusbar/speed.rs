@@ -211,9 +211,11 @@ impl Meter {
             if let Some(first) = self.window_first {
                 // The train's own span, last token to first — not up to this tick, which can
                 // sit up to half a second after the writing stopped.
-                let span = self.last_token.unwrap_or(now).saturating_duration_since(first);
-                if let Some(rate) =
-                    train_rate(self.window_chars, span, self.window_gap, self.ratio)
+                let span = self
+                    .last_token
+                    .unwrap_or(now)
+                    .saturating_duration_since(first);
+                if let Some(rate) = train_rate(self.window_chars, span, self.window_gap, self.ratio)
                 {
                     self.live = Some(rate);
                     self.samples.push(rate);
@@ -391,22 +393,42 @@ mod tests {
     fn a_burst_train_reads_as_throughput_not_as_the_speed_of_light() {
         // A second that holds one honest train: 300 tokens over its 0.9 s span, even though
         // the chunks inside bursts arrived milliseconds apart.
-        let r = train_rate(960, Duration::from_millis(900), Duration::from_millis(40), 3.2)
-            .unwrap();
+        let r = train_rate(
+            960,
+            Duration::from_millis(900),
+            Duration::from_millis(40),
+            3.2,
+        )
+        .unwrap();
         assert!((r - 333.3).abs() < 1., "960 chars / 3.2 / 0.9 s: {r}");
         // One burst of chunks delivered together proves nothing: it waits for more tokens.
         assert_eq!(
-            train_rate(400, Duration::from_millis(60), Duration::from_millis(3), 3.2),
+            train_rate(
+                400,
+                Duration::from_millis(60),
+                Duration::from_millis(3),
+                3.2
+            ),
             None
         );
         // Too few tokens to mean anything, same.
         assert_eq!(
-            train_rate(20, Duration::from_millis(400), Duration::from_millis(50), 3.2),
+            train_rate(
+                20,
+                Duration::from_millis(400),
+                Duration::from_millis(50),
+                3.2
+            ),
             None
         );
         // A wait inside the train is the model waiting on something else: no reading.
         assert_eq!(
-            train_rate(900, Duration::from_secs(3), Duration::from_millis(1200), 3.2),
+            train_rate(
+                900,
+                Duration::from_secs(3),
+                Duration::from_millis(1200),
+                3.2
+            ),
             None
         );
     }

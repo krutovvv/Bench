@@ -37,19 +37,18 @@ impl BenchApp {
     pub fn new_project_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
         name.update(cx, |s, cx| s.focus(window, cx));
-        let server_folder =
-            cx.new(|cx| InputState::new(window, cx).placeholder("/var/www/site — or empty: its home"));
+        let server_folder = cx.new(|cx| {
+            InputState::new(window, cx).placeholder("/var/www/site — or empty: its home")
+        });
         let mut enter = Vec::new();
         for field in [&name, &server_folder] {
-            enter.push(cx.subscribe_in(
-                field,
-                window,
-                |this, _, ev: &InputEvent, window, cx| {
+            enter.push(
+                cx.subscribe_in(field, window, |this, _, ev: &InputEvent, window, cx| {
                     if matches!(ev, InputEvent::PressEnter { .. }) {
                         this.save_project(window, cx);
                     }
-                },
-            ));
+                }),
+            );
         }
         self.project_form = Some(ProjectForm {
             name,
@@ -210,8 +209,8 @@ impl BenchApp {
                 .into_any_element()
         });
         // Where its files and commands are, when this Mac's agent runs it.
-        let machine_row = (agent.is_empty() && self.ssh.servers.iter().next().is_some()).then(
-            || {
+        let machine_row =
+            (agent.is_empty() && self.ssh.servers.iter().next().is_some()).then(|| {
                 let mut labels = vec!["This Mac".to_string()];
                 labels.extend(self.ssh.servers.iter().map(|s| s.alias.clone()));
                 let at = machine
@@ -235,8 +234,7 @@ impl BenchApp {
                         },
                     ))
                     .into_any_element()
-            },
-        );
+            });
         // The folder: picked from this Mac's disk, or typed for a server's.
         let on_server = !agent.is_empty() || machine.is_some();
         let folder_row = if on_server {
@@ -346,13 +344,13 @@ impl BenchApp {
                     .justify_end()
                     .gap_2()
                     .child(
-                        bench_ui::form_action("project-cancel", "Cancel", false, cx).on_click(
-                            cx.listener(|this, _, _, cx| this.cancel_project_form(cx)),
-                        ),
+                        bench_ui::form_action("project-cancel", "Cancel", false, cx)
+                            .on_click(cx.listener(|this, _, _, cx| this.cancel_project_form(cx))),
                     )
                     .child(
-                        bench_ui::form_action("project-save", "Create project", true, cx)
-                            .on_click(cx.listener(|this, _, window, cx| this.save_project(window, cx))),
+                        bench_ui::form_action("project-save", "Create project", true, cx).on_click(
+                            cx.listener(|this, _, window, cx| this.save_project(window, cx)),
+                        ),
                     ),
             )
             .into_any_element()

@@ -212,11 +212,15 @@ fn file_kind(lower: &str, dir: bool) -> (Ico, Tone) {
     if dir {
         return match lower {
             // Third-party code: a setting away from the work.
-            "node_modules" | "vendor" | "bower_components" | "deps" => (Ico::FolderCog, Tone::Muted),
+            "node_modules" | "vendor" | "bower_components" | "deps" => {
+                (Ico::FolderCog, Tone::Muted)
+            }
             // The source lives here.
             "src" | "lib" | "libs" | "app" | "cmd" | "internal" => (Ico::FolderCode, Tone::Blue),
             "scripts" | "tools" => (Ico::FolderCode, Tone::Green),
-            "test" | "tests" | "spec" | "specs" | "__tests__" | "e2e" => (Ico::FolderGit, Tone::Green),
+            "test" | "tests" | "spec" | "specs" | "__tests__" | "e2e" => {
+                (Ico::FolderGit, Tone::Green)
+            }
             "docs" | "doc" | "wiki" | "guides" => (Ico::FolderTree, Tone::Blue),
             // What a build makes: never the work itself.
             "dist" | "build" | "out" | "target" | "obj" | ".next" | ".nuxt" | "coverage" => {
@@ -228,8 +232,8 @@ fn file_kind(lower: &str, dir: bool) -> (Ico, Tone) {
                 (Ico::FolderCog, Tone::Cyan)
             }
             // Pictures and what ships to the browser.
-            "assets" | "static" | "public" | "images" | "img" | "media" | "resources"
-            | "fonts" | "icons" | "theme" | "themes" => (Ico::Folder, Tone::Magenta),
+            "assets" | "static" | "public" | "images" | "img" | "media" | "resources" | "fonts"
+            | "icons" | "theme" | "themes" => (Ico::Folder, Tone::Magenta),
             // A hidden folder is somebody else's bookkeeping.
             _ if lower.starts_with('.') => (Ico::Folder, Tone::Muted),
             _ => (Ico::Folder, Tone::Blue),
@@ -284,15 +288,26 @@ fn file_kind(lower: &str, dir: bool) -> (Ico, Tone) {
     }
     if matches!(
         lower,
-        "cargo.toml" | "go.mod" | "requirements.txt" | "pyproject.toml" | "setup.py"
-            | "setup.cfg" | "gemfile" | "podfile" | "build.gradle" | "pom.xml" | "build.zig"
+        "cargo.toml"
+            | "go.mod"
+            | "requirements.txt"
+            | "pyproject.toml"
+            | "setup.py"
+            | "setup.cfg"
+            | "gemfile"
+            | "podfile"
+            | "build.gradle"
+            | "pom.xml"
+            | "build.zig"
             | "meson.build"
     ) {
         return (Ico::FileCog, Tone::Red);
     }
     // How a thing is built or shipped.
-    if matches!(lower, "makefile" | "gnumakefile" | "justfile" | "rakefile" | "jenkinsfile")
-        || lower.starts_with("taskfile.")
+    if matches!(
+        lower,
+        "makefile" | "gnumakefile" | "justfile" | "rakefile" | "jenkinsfile"
+    ) || lower.starts_with("taskfile.")
     {
         return (Ico::FileTerminal, Tone::Green);
     }
@@ -306,7 +321,10 @@ fn file_kind(lower: &str, dir: bool) -> (Ico, Tone) {
         || lower.ends_with(".config.ts")
         || lower.ends_with(".config.json")
         || lower.ends_with(".config.mjs")
-        || matches!(lower, "biome.json" | ".eslintrc" | ".prettierrc" | ".editorconfig")
+        || matches!(
+            lower,
+            "biome.json" | ".eslintrc" | ".prettierrc" | ".editorconfig"
+        )
     {
         return (Ico::FileCog, Tone::Cyan);
     }
@@ -351,7 +369,7 @@ fn file_kind(lower: &str, dir: bool) -> (Ico, Tone) {
 
 #[cfg(test)]
 mod tests {
-    use super::{file_kind, Tone};
+    use super::{Tone, file_kind};
     use crate::icons::Ico;
 
     /// `file_kind` reads a name already lowered, as `file_icon` hands it over.
@@ -371,7 +389,10 @@ mod tests {
         assert_eq!(kind("Cargo.toml", false), (Ico::FileCog, Tone::Red));
         assert_eq!(kind("Cargo.lock", false), (Ico::FileLock, Tone::Muted));
         assert_eq!(kind("package.json", false), (Ico::Package, Tone::Yellow));
-        assert_eq!(kind("package-lock.json", false), (Ico::FileLock, Tone::Muted));
+        assert_eq!(
+            kind("package-lock.json", false),
+            (Ico::FileLock, Tone::Muted)
+        );
         assert_eq!(kind("pnpm-lock.yaml", false), (Ico::FileLock, Tone::Muted));
         assert_eq!(kind("Makefile", false), (Ico::FileTerminal, Tone::Green));
         assert_eq!(kind("Dockerfile", false), (Ico::FileCog, Tone::Cyan));

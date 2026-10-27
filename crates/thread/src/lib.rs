@@ -18,6 +18,6 @@ mod state;
 mod tests;
 
 pub use diff::{Change, diff};
-pub use protocol::{PlanStep, ThreadEvent};
-pub use rows::{AskCard, Row, Step};
+pub use protocol::{Hold, PlanStep, ThreadEvent};
+pub use rows::{AskCard, Row, Step, worked_ms};
 pub use state::Thread;

@@ -219,7 +219,13 @@ fn rule_1_the_plan_lives_in_the_work_that_wrote_it() {
     ]));
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "work:2·p1", "user:and hurry", "work:1+", "queued:later"],
+        [
+            "user:go",
+            "work:2·p1",
+            "user:and hurry",
+            "work:1+",
+            "queued:later"
+        ],
         "one plan, one card, where it was born"
     );
     let Row::Work { plan: cards, .. } = &t.rows()[1] else {
@@ -227,7 +233,11 @@ fn rule_1_the_plan_lives_in_the_work_that_wrote_it() {
     };
     assert_eq!(cards[0].1[1].status, "completed");
     // Another plan, sharing no steps: a card of its own, on the work going on now.
-    t.apply(ThreadEvent::Append(vec![plan(10, "q", &[("1", "another", "pending")])]));
+    t.apply(ThreadEvent::Append(vec![plan(
+        10,
+        "q",
+        &[("1", "another", "pending")],
+    )]));
     assert_eq!(
         kinds(&t.rows()),
         [
@@ -704,7 +714,10 @@ fn words_reclassified_mid_stream_slide_into_the_work() {
         running: true,
         ..Default::default()
     });
-    t.apply(ThreadEvent::Stream(StreamKind::Text, "Reading the log".into()));
+    t.apply(ThreadEvent::Stream(
+        StreamKind::Text,
+        "Reading the log".into(),
+    ));
     assert_eq!(kinds(&t.rows()), ["user:go", "writing:Reading the log"]);
     t.apply(ThreadEvent::Stream(StreamKind::Narration, String::new()));
     let Row::Work { steps, .. } = &t.rows()[1] else {
@@ -715,7 +728,10 @@ fn words_reclassified_mid_stream_slide_into_the_work() {
         !t.rows().iter().any(|r| matches!(r, Row::Writing { .. })),
         "no answer's seat any more"
     );
-    t.apply(ThreadEvent::Append(vec![narr(2, 0, "Reading the log"), tool(2, 1, "a")]));
+    t.apply(ThreadEvent::Append(vec![
+        narr(2, 0, "Reading the log"),
+        tool(2, 1, "a"),
+    ]));
     let Row::Work { steps, .. } = &t.rows()[1] else {
         panic!()
     };
@@ -735,7 +751,10 @@ fn words_after_a_begun_call_keep_streaming_into_the_work() {
         ..Default::default()
     });
     t.apply(ThreadEvent::Stream(StreamKind::Narration, "".into()));
-    t.apply(ThreadEvent::Stream(StreamKind::Narration, "and then ".into()));
+    t.apply(ThreadEvent::Stream(
+        StreamKind::Narration,
+        "and then ".into(),
+    ));
     t.apply(ThreadEvent::Stream(StreamKind::Narration, "the fix".into()));
     let Row::Work { steps, .. } = &t.rows()[1] else {
         panic!()
@@ -790,12 +809,18 @@ fn words_appended_mid_run_join_their_turn_as_a_note() {
     t.apply(ThreadEvent::Run(true));
     t.apply(ThreadEvent::Append(vec![thought(2, 0, "hm")]));
     t.apply(ThreadEvent::Append(vec![tool(2, 1, "a")]));
-    t.apply(ThreadEvent::Append(vec![text(2, 9, "Reading the test first.")]));
+    t.apply(ThreadEvent::Append(vec![text(
+        2,
+        9,
+        "Reading the test first.",
+    )]));
     let Row::Work { steps, .. } = &t.rows()[1] else {
         panic!()
     };
     assert!(
-        steps.iter().any(|s| matches!(s, Step::Note(t) if t == "Reading the test first.")),
+        steps
+            .iter()
+            .any(|s| matches!(s, Step::Note(t) if t == "Reading the test first.")),
         "the words ride the work line: {steps:?}"
     );
 }
@@ -835,4 +860,49 @@ fn pressed_queue_clears_with_the_rest_when_the_send_fails() {
     assert_eq!(kinds(&t.rows()), ["user:go", "work:0+", "queued:gone"]);
     t.clear_sent();
     assert_eq!(kinds(&t.rows()), ["user:go", "work:0+"]);
+}
+
+#[test]
+fn a_held_run_stands_still_and_goes_on_from_there() {
+    use protocol::Hold;
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go"), tool(2, 0, "c1")],
+        ..ThreadOpen::default()
+    });
+    t.apply(ThreadEvent::Run(true));
+    assert!(!t.paused());
+    // Held at 5 s: the work's clock stops there however long the hold lasts.
+    t.apply(ThreadEvent::Holds(vec![Hold {
+        from: 5000.,
+        to: None,
+    }]));
+    assert!(t.paused());
+    let work = t
+        .rows()
+        .into_iter()
+        .find(|r| matches!(r, Row::Work { .. }))
+        .unwrap();
+    assert!(work.held());
+    let Row::Work { from, holds, .. } = &work else {
+        panic!()
+    };
+    let from = from.unwrap();
+    assert_eq!(crate::worked_ms(from, 9000., holds), 3000.);
+    assert_eq!(crate::worked_ms(from, 60000., holds), 3000.);
+    // Let go at 20 s: it counts on from where it stood.
+    t.apply(ThreadEvent::Holds(vec![Hold {
+        from: 5000.,
+        to: Some(20000.),
+    }]));
+    assert!(!t.paused());
+    let Some(Row::Work { holds, .. }) =
+        t.rows().into_iter().find(|r| matches!(r, Row::Work { .. }))
+    else {
+        panic!()
+    };
+    assert_eq!(crate::worked_ms(from, 22000., &holds), 5000.);
+    // The run's end lets every hold go: finished work keeps no holds.
+    t.apply(ThreadEvent::Run(false));
+    assert!(!t.paused());
+    assert!(t.rows().iter().all(|r| !r.held()));
 }

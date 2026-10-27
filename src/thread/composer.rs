@@ -161,15 +161,16 @@ impl ThreadView {
         // its bottom padding by their line, so they cover no word and the hover band
         // reaches them. The bottom is computed from the composer's measured height rather
         // than anchored with `bottom`, whose stretch semantics fought the fixed height.
-        let row_h = self.composer_h.max(2. * bench_ui::TURN_Y + bench_ui::AVATAR);
+        let row_h = self
+            .composer_h
+            .max(2. * bench_ui::TURN_Y + bench_ui::AVATAR);
         let tools = h_flex()
             .absolute()
             .when(empty, |d| {
                 // The messages' right column, not the window's edge: the icons end where
                 // the thread's text ends (`right_0` measures from the row's border box,
                 // past its right padding).
-                d.top(px(bench_ui::TURN_Y))
-                    .right(px(bench_ui::CHAT_RIGHT))
+                d.top(px(bench_ui::TURN_Y)).right(px(bench_ui::CHAT_RIGHT))
             })
             .when(!empty, |d| {
                 // Their line in the row's grown bottom band: bottom-anchored by their own
@@ -180,14 +181,13 @@ impl ThreadView {
             .h(px(bench_ui::AVATAR))
             .items_center()
             .gap_1()
-            .when(!(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(), |d| {
-                d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.))
-            })
+            .when(
+                !(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
+                |d| d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.)),
+            )
             .child(
                 bench_ui::icon_button("composer-attach", Ico::Paperclip, "Attach files", false, cx)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.pick_attachments(window, cx)
-                    })),
+                    .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),
             )
             .child(if trans {
                 div()
@@ -200,9 +200,7 @@ impl ThreadView {
                             .icon(Ico::Loader.icon())
                             .small(),
                     )
-                    .tooltip(|window, cx| {
-                        Tooltip::new("Transcribing…").build(window, cx)
-                    })
+                    .tooltip(|window, cx| Tooltip::new("Transcribing…").build(window, cx))
                     .into_any_element()
             } else if rec {
                 div()
@@ -332,11 +330,7 @@ impl ThreadView {
                                     // the font's own 1.41 em, which set typed lines 3 px
                                     // tighter than the thread's. 1.5rem is the thread's leading
                                     // exactly, since the thread's prose is 1rem.
-                                    div()
-                                        .ml(px(-12.))
-                                        .mr(px(56.))
-                                        .my(px(-10.))
-                                        .child(
+                                    div().ml(px(-12.)).mr(px(56.)).my(px(-10.)).child(
                                         Textarea::new(&self.composer)
                                             .appearance(false)
                                             .large()

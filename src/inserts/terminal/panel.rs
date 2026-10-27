@@ -5,8 +5,8 @@
 //! the thread as a reference (`thread/attachments.rs` `TerminalRef`).
 
 use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::h_flex;
+use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::v_flex;
 use gpui_kit::*;
 
@@ -170,7 +170,11 @@ impl BenchApp {
         let alias = self.terminal_machine(&term.project);
         let t = self.insert_terminal(&term.key, &alias, window, cx)?;
         if fresh {
-            if let Some(dir) = self.location(&term.project).folder.filter(|f| !f.is_empty()) {
+            if let Some(dir) = self
+                .location(&term.project)
+                .folder
+                .filter(|f| !f.is_empty())
+            {
                 let cd = format!(
                     "cd {} && clear\r",
                     crate::inserts::subjects::shell_quote(&dir)
@@ -244,7 +248,13 @@ impl BenchApp {
                 .exited
                 .load(std::sync::atomic::Ordering::SeqCst)
         });
-        let label = if self.dock_terms.items.iter().filter(|o| o.project == t.project).count() > 1
+        let label = if self
+            .dock_terms
+            .items
+            .iter()
+            .filter(|o| o.project == t.project)
+            .count()
+            > 1
         {
             format!("{name} · {}", same + 1)
         } else {
@@ -314,19 +324,26 @@ impl BenchApp {
                         cx.stop_propagation();
                         this.dock_term_close(i, window, cx)
                     }));
-                    bench_ui::term_tab(format!("term-tab-{i}"), label, i == self.dock_terms.active, ended, close, cx)
-                        .tooltip(move |window, cx| {
-                            gpui_kit::component::tooltip::Tooltip::new(if ended {
-                                "Its shell ended — click to start it anew"
-                            } else {
-                                "Show this terminal"
-                            })
-                            .build(window, cx)
+                    bench_ui::term_tab(
+                        format!("term-tab-{i}"),
+                        label,
+                        i == self.dock_terms.active,
+                        ended,
+                        close,
+                        cx,
+                    )
+                    .tooltip(move |window, cx| {
+                        gpui_kit::component::tooltip::Tooltip::new(if ended {
+                            "Its shell ended — click to start it anew"
+                        } else {
+                            "Show this terminal"
                         })
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.dock_term_show(i, window, cx)
-                        }))
-                        .into_any_element()
+                        .build(window, cx)
+                    })
+                    .on_click(
+                        cx.listener(move |this, _, window, cx| this.dock_term_show(i, window, cx)),
+                    )
+                    .into_any_element()
                 })
                 .collect();
             h_flex()

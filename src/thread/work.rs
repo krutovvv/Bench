@@ -1,7 +1,7 @@
 //! The agent's work between two messages: one line "N actions · time · Done", the steps under
 //! it when opened. Plus what tool calls say about the outside world: the pages they touched.
 
-use ::thread::{AskCard, PlanStep, Step};
+use ::thread::{AskCard, Hold, PlanStep, Step, worked_ms};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -22,8 +22,9 @@ impl ThreadView {
         from: Option<f64>,
         to: Option<f64>,
         live: bool,
-        // The run stands held at a step boundary; the hold's own button shows it.
-        paused: bool,
+        // The person's holds of the live run: its clock skips them; the last open one means
+        // it stands held, and the hold's own button shows it.
+        holds: &[Hold],
         plan: &[(String, Vec<PlanStep>)],
         asks: &[AskCard],
         procs: bool,
@@ -41,9 +42,11 @@ impl ThreadView {
             .filter(|s| matches!(s, Step::Tool { failed: true, .. }))
             .count();
         let open = self.thread.open_work.contains(key);
-        // A live piece of work counts on; a finished one keeps the time its steps took.
+        let paused = live && holds.last().is_some_and(|h| h.to.is_none());
+        // A live piece of work counts on — but not while held: it stands, then goes on from
+        // there; a finished one keeps the time its steps took.
         let secs = match (from, to, live) {
-            (Some(a), _, true) => Some((now_secs() * 1000. - a).max(0.) / 1000.),
+            (Some(a), _, true) => Some(worked_ms(a, now_secs() * 1000., holds) / 1000.),
             (Some(a), Some(b), false) => Some((b - a).max(0.) / 1000.),
             _ => None,
         };
@@ -74,9 +77,14 @@ impl ThreadView {
             _ => None,
         });
         let doing = live.then(|| match last_live {
+            // Held: nothing is being done, and the line says so in the step's place.
+            _ if paused => match &narrative {
+                Some(n) => format!("{n} · Paused"),
+                None => "Paused".to_string(),
+            },
             Some(Step::Tool { name, preview, .. }) => {
                 let w = activity_word(name, preview);
-                match narrative {
+                match narrative.clone() {
                     Some(n) => format!("{n} · {w}"),
                     None => w,
                 }
@@ -120,17 +128,15 @@ impl ThreadView {
                     } else {
                         label
                     };
-                    d.child(
-                        div().min_w_0().truncate().child(if paused {
-                            div().text_color(muted).child(label).into_any_element()
-                        } else {
-                            ShimmerText::new(label)
-                                .text_base()
-                                .text_color(muted)
-                                .into_any_element()
-                        }),
-                    )
-                },
+                    d.child(div().min_w_0().truncate().child(if paused {
+                        div().text_color(muted).child(label).into_any_element()
+                    } else {
+                        ShimmerText::new(label)
+                            .text_base()
+                            .text_color(muted)
+                            .into_any_element()
+                    }))
+                }
                 // A piece of work without tool calls was the model thinking before it answered.
                 None => d.child(div().flex_none().child(
                     match (has_parts, tools > 0 || errors > 0) {
@@ -159,10 +165,12 @@ impl ThreadView {
                                 if held { "Resume" } else { "Pause" },
                                 cx,
                             )
-                            .on_click(cx.listener(move |this, _, _, cx| {
-                                this.claim_click(cx);
-                                this.set_paused(!held, cx);
-                            })),
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    this.claim_click(cx);
+                                    this.set_paused(!held, cx);
+                                },
+                            )),
                         )
                         .child(
                             bench_ui::head_icon_button("work-stop", Ico::Square, "Stop", cx)
@@ -172,10 +180,7 @@ impl ThreadView {
                                         (this.profile(cx), stop_view.runtime.clone())
                                     {
                                         this.cmd(
-                                            crate::client::rpc::Cmd::Interrupt {
-                                                profile,
-                                                session,
-                                            },
+                                            crate::client::rpc::Cmd::Interrupt { profile, session },
                                             cx,
                                         );
                                     }
@@ -200,8 +205,7 @@ impl ThreadView {
                         .when(
                             !(tplay || tspeak) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
                             |s| {
-                                let shown =
-                                    self.reveal_tail.as_deref() == Some(ak.as_str());
+                                let shown = self.reveal_tail.as_deref() == Some(ak.as_str());
                                 s.when(!shown, |s| {
                                     s.opacity(0.).group_hover(tgroup, |g| g.opacity(1.))
                                 })
@@ -228,14 +232,16 @@ impl ThreadView {
                                 if tplay { "Stop" } else { "Read aloud" },
                                 cx,
                             )
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.claim_click(cx);
-                                this.app
-                                    .update(cx, |app, cx| {
-                                        app.toggle_speak(&ak, atext.clone(), window, cx)
-                                    })
-                                    .ok();
-                            })),
+                            .on_click(cx.listener(
+                                move |this, _, window, cx| {
+                                    this.claim_click(cx);
+                                    this.app
+                                        .update(cx, |app, cx| {
+                                            app.toggle_speak(&ak, atext.clone(), window, cx)
+                                        })
+                                        .ok();
+                                },
+                            )),
                         ),
                 )
             })

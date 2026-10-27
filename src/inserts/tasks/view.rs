@@ -484,7 +484,8 @@ impl BenchApp {
                                 .map(|d| tasks::show_date(d, day))
                                 .unwrap_or_else(|| "Anytime".into())
                         } else {
-                            ["Today", "This evening", "Tomorrow", "Anytime"][when.min(3)].to_string()
+                            ["Today", "This evening", "Tomorrow", "Anytime"][when.min(3)]
+                                .to_string()
                         };
                         let (app, when_id) = (view.clone(), i2.clone());
                         Button::new("task-when")
@@ -501,13 +502,13 @@ impl BenchApp {
                                 ] {
                                     let (app, id) = (app.clone(), when_id.clone());
                                     menu = menu.item(
-                                        PopupMenuItem::new(name)
-                                            .checked(when == k)
-                                            .on_click(move |_, window, cx| {
+                                        PopupMenuItem::new(name).checked(when == k).on_click(
+                                            move |_, window, cx| {
                                                 app.update(cx, |this, cx| {
                                                     this.set_task_when(id.clone(), k, window, cx)
                                                 });
-                                            }),
+                                            },
+                                        ),
                                     );
                                 }
                                 menu
@@ -530,8 +531,7 @@ impl BenchApp {
                     // The tags: the projects in a menu, ticked what is on the task; the field
                     // next to it adds a tag no project has. Chips for every project ate the row.
                     .child({
-                        let lower: Vec<String> =
-                            t.tags.iter().map(|g| g.to_lowercase()).collect();
+                        let lower: Vec<String> = t.tags.iter().map(|g| g.to_lowercase()).collect();
                         let mut items: Vec<(String, bool)> = self
                             .projects
                             .iter()
@@ -570,25 +570,24 @@ impl BenchApp {
                                     let app = app.clone();
                                     let tag = tag.clone();
                                     menu = menu.item(
-                                        PopupMenuItem::new(tag.clone())
-                                            .checked(*chosen)
-                                            .on_click(move |_, window, cx| {
+                                        PopupMenuItem::new(tag.clone()).checked(*chosen).on_click(
+                                            move |_, window, cx| {
                                                 app.update(cx, |this, cx| {
                                                     this.toggle_task_tag(tag.clone(), window, cx)
                                                 });
-                                            }),
+                                            },
+                                        ),
                                     );
                                 }
                                 let app = app.clone();
-                                menu.separator().item(
-                                    PopupMenuItem::new("Clear tags").on_click(
+                                menu.separator()
+                                    .item(PopupMenuItem::new("Clear tags").on_click(
                                         move |_, window, cx| {
                                             app.update(cx, |this, cx| {
                                                 this.clear_task_tags(window, cx)
                                             });
                                         },
-                                    ),
-                                )
+                                    ))
                             })
                     })
                     .child(
@@ -602,11 +601,7 @@ impl BenchApp {
                             .flex_none()
                             .gap_1()
                             .items_center()
-                            .child(
-                                div()
-                                    .w(px(64.))
-                                    .child(Input::new(&self.tasks.spent)),
-                            )
+                            .child(div().w(px(64.)).child(Input::new(&self.tasks.spent)))
                             .child(
                                 div()
                                     .id("task-timer")
@@ -619,7 +614,11 @@ impl BenchApp {
                                     .text_xs()
                                     .border_1()
                                     .rounded_md()
-                                    .border_color(if running { theme.primary } else { theme.border })
+                                    .border_color(if running {
+                                        theme.primary
+                                    } else {
+                                        theme.border
+                                    })
                                     .text_color(if running { theme.primary } else { muted })
                                     .cursor_pointer()
                                     .hover(|s| s.bg(theme.list_hover))
@@ -670,9 +669,8 @@ impl BenchApp {
                             .hover(|s| s.bg(theme.list_hover).text_color(theme.danger))
                             .when(armed, |d| d.child("Confirm delete"))
                             .when(!armed, |d| {
-                                d.child(Ico::Trash.icon().small()).tooltip(|window, cx| {
-                                    Tooltip::new("Delete").build(window, cx)
-                                })
+                                d.child(Ico::Trash.icon().small())
+                                    .tooltip(|window, cx| Tooltip::new("Delete").build(window, cx))
                             })
                             .on_click(
                                 cx.listener(move |this, _, _, cx| this.delete_task(i5.clone(), cx)),

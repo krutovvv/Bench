@@ -23,6 +23,21 @@ impl BenchApp {
                 return;
             };
             view.update(cx, |v, cx| v.on_event(&evt, window, cx));
+            // A hold stills the thread's row in the sidebar at once, not at the next list.
+            if let Evt::Thread(_, ::thread::ThreadEvent::Holds(_) | ::thread::ThreadEvent::Run(_)) =
+                &evt
+            {
+                let v = view.read(cx);
+                let paused = v.thread.journal.paused();
+                if let Some(row) = v
+                    .thread
+                    .session
+                    .clone()
+                    .and_then(|id| self.sessions.iter_mut().find(|s| s.id == id))
+                {
+                    row.paused = paused;
+                }
+            }
             // A finished run may have rewritten files where they live: every copy we cached of
             // that agent's machine is stale now, and the next look (a click, a redraw) brings
             // the current one. An open video keeps playing from its copy; it re-shows after.
@@ -230,6 +245,7 @@ impl BenchApp {
                             title: "Untitled".into(),
                             messages: 0,
                             running: true,
+                            paused: false,
                             source: "desktop".into(),
                             subject: self.new_subject.clone(),
                             project: at.project.clone(),

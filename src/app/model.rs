@@ -30,6 +30,8 @@ pub struct SessionRow {
     pub title: String,
     pub messages: u64,
     pub running: bool,
+    /// The person paused its run: it stands still until resumed.
+    pub paused: bool,
     /// Where the session lives: "local" (desktop/CLI), "telegram", "cron", …
     pub source: String,
     /// What the thread is about, its live block: "tasks:today", "ssh:local"; "" = a plain chat.

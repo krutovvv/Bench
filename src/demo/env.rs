@@ -56,11 +56,31 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
     // The presets the gear would have read from the agent (there is none in a demo copy).
     if app.presets.lsp.is_empty() {
         app.presets.lsp = vec![
-            ("typescript".into(), "typescript-language-server".into(), serde_json::json!({"extensions": ["ts", "tsx", "js", "jsx"]})),
-            ("pyright".into(), "pyright".into(), serde_json::json!({"extensions": ["py"]})),
-            ("basedpyright".into(), "basedpyright".into(), serde_json::json!({"extensions": ["py"]})),
-            ("rust-analyzer".into(), "rust-analyzer".into(), serde_json::json!({"extensions": ["rs"]})),
-            ("php".into(), "intelephense".into(), serde_json::json!({"extensions": ["php", "inc"]})),
+            (
+                "typescript".into(),
+                "typescript-language-server".into(),
+                serde_json::json!({"extensions": ["ts", "tsx", "js", "jsx"]}),
+            ),
+            (
+                "pyright".into(),
+                "pyright".into(),
+                serde_json::json!({"extensions": ["py"]}),
+            ),
+            (
+                "basedpyright".into(),
+                "basedpyright".into(),
+                serde_json::json!({"extensions": ["py"]}),
+            ),
+            (
+                "rust-analyzer".into(),
+                "rust-analyzer".into(),
+                serde_json::json!({"extensions": ["rs"]}),
+            ),
+            (
+                "php".into(),
+                "intelephense".into(),
+                serde_json::json!({"extensions": ["php", "inc"]}),
+            ),
         ];
     }
     // `BENCH_ENV=telegram`: the page scrolls to the Telegram block a beat after opening.
@@ -134,7 +154,11 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         ),
         "part" => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
         "lsp" | "lsp-new" => {
-            let name = if explorer == "lsp-new" { "new" } else { "pyright" };
+            let name = if explorer == "lsp-new" {
+                "new"
+            } else {
+                "pyright"
+            };
             app.open_part("p-blog".into(), "lsp", name.into(), window, cx)
         }
         // The release post's changes since the last commit, beside it.

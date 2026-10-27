@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use protocol::{QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
+use protocol::{Hold, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
 use serde_json::{Map, Value};
 
 use crate::rows::{Row, rows_of};
@@ -15,8 +15,8 @@ pub struct Thread {
     queue: Vec<QueuedItem>,
     inserts: Map<String, Value>,
     running: bool,
-    /// The person held the run at a step boundary; it waits until they let it go on.
-    paused: bool,
+    /// The live run's holds (the person's pauses); the last one open while it stands held.
+    holds: Vec<Hold>,
     /// The answer being written: (reasoning, text).
     stream: (String, String),
     /// Words the model wrote while working, whose message went on to call a tool: narration,
@@ -39,7 +39,7 @@ impl Thread {
             queue: o.queue,
             inserts: o.inserts,
             running: o.running,
-            paused: o.paused,
+            holds: o.holds,
             head: o.head,
             ..Default::default()
         };
@@ -53,7 +53,7 @@ impl Thread {
         self.queue = o.queue;
         self.inserts = o.inserts;
         self.running = o.running;
-        self.paused = o.paused;
+        self.holds = o.holds;
         if !o.running {
             self.stream = Default::default();
         }
@@ -89,10 +89,10 @@ impl Thread {
                 if !on {
                     self.stream = Default::default();
                     self.narrated.clear();
-                    self.paused = false;
+                    self.holds.clear();
                 }
             }
-            ThreadEvent::Paused(on) => self.paused = on,
+            ThreadEvent::Holds(h) => self.holds = h,
         }
         self.version += 1;
     }
@@ -172,7 +172,7 @@ impl Thread {
             &self.log,
             &self.inserts,
             self.running,
-            self.paused,
+            &self.holds,
             &self.stream,
             &self.narrated,
             &self.sent,
@@ -196,8 +196,9 @@ impl Thread {
         self.running
     }
 
+    /// The run stands held: the person paused it and has not let it go on.
     pub fn paused(&self) -> bool {
-        self.paused
+        self.running && self.holds.last().is_some_and(|h| h.to.is_none())
     }
 
     pub fn head(&self) -> u64 {

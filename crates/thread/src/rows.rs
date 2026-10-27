@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use protocol::{PlanStep, QueuedItem, ThreadItem};
+use protocol::{Hold, PlanStep, QueuedItem, ThreadItem};
 use serde_json::{Map, Value};
 
 /// One line of the thread. `key` is stable: a view keeps a row's state (folded, measured) by it.
@@ -24,8 +24,9 @@ pub enum Row {
         from: Option<f64>,
         to: Option<f64>,
         live: bool,
-        /// The live run stands held at a step boundary (the person's pause).
-        paused: bool,
+        /// The live run's holds (the person's pauses): its clock skips them, and the last one
+        /// open means it stands held. Empty for finished work.
+        holds: Vec<Hold>,
         /// The agent's plans written in this work: (id, the newest snapshot of its steps).
         plan: Vec<(String, Vec<PlanStep>)>,
         /// The agent's questions put in this work, settled or still waiting.
@@ -70,7 +71,22 @@ pub struct AskCard {
     pub answer: Option<String>,
 }
 
+/// How long work from `from` to `until` (ms) took, less what the person held of it: a held
+/// run's clock stands still and goes on from where it stood.
+pub fn worked_ms(from: f64, until: f64, holds: &[Hold]) -> f64 {
+    let held: f64 = holds
+        .iter()
+        .map(|h| (h.to.unwrap_or(until).min(until) - h.from.max(from)).max(0.))
+        .sum();
+    (until - from - held).max(0.)
+}
+
 impl Row {
+    /// Work whose run stands held now.
+    pub fn held(&self) -> bool {
+        matches!(self, Row::Work { live: true, holds, .. } if holds.last().is_some_and(|h| h.to.is_none()))
+    }
+
     pub fn key(&self) -> &str {
         match self {
             Row::User { key, .. }
@@ -112,7 +128,7 @@ pub(crate) fn rows_of(
     log: &[ThreadItem],
     inserts: &Map<String, Value>,
     running: bool,
-    paused: bool,
+    holds: &[Hold],
     stream: &(String, String),
     narrated: &str,
     sent: &[String],
@@ -171,7 +187,7 @@ pub(crate) fn rows_of(
             from: at,
             to: at,
             live: false,
-            paused: false,
+            holds: vec![],
             plan: vec![],
             asks: vec![],
         });
@@ -197,7 +213,7 @@ pub(crate) fn rows_of(
             from: None,
             to: None,
             live: false,
-            paused: false,
+            holds: vec![],
             plan: vec![],
             asks: vec![],
         });
@@ -218,8 +234,11 @@ pub(crate) fn rows_of(
             ThreadItem::Thought {
                 key, seq, text, at, ..
             } => {
-                *actions_left.entry(*seq).or_default() =
-                    actions_left.get(seq).copied().unwrap_or(0).saturating_sub(1);
+                *actions_left.entry(*seq).or_default() = actions_left
+                    .get(seq)
+                    .copied()
+                    .unwrap_or(0)
+                    .saturating_sub(1);
                 step(&mut work, key, *at, Step::Thought(text.clone()))
             }
             ThreadItem::Text {
@@ -261,22 +280,25 @@ pub(crate) fn rows_of(
                 at,
                 ..
             } => {
-                *actions_left.entry(*seq).or_default() =
-                    actions_left.get(seq).copied().unwrap_or(0).saturating_sub(1);
+                *actions_left.entry(*seq).or_default() = actions_left
+                    .get(seq)
+                    .copied()
+                    .unwrap_or(0)
+                    .saturating_sub(1);
                 step(
-                &mut work,
-                key,
-                *at,
-                Step::Tool {
-                    call_id: call_id.clone(),
-                    name: name.clone(),
-                    args: args.clone(),
-                    preview: preview.clone(),
-                    output: None,
-                    failed: false,
-                    diff: None,
-                },
-            );
+                    &mut work,
+                    key,
+                    *at,
+                    Step::Tool {
+                        call_id: call_id.clone(),
+                        name: name.clone(),
+                        args: args.clone(),
+                        preview: preview.clone(),
+                        output: None,
+                        failed: false,
+                        diff: None,
+                    },
+                );
             }
             ThreadItem::Result {
                 call_id,
@@ -397,9 +419,17 @@ pub(crate) fn rows_of(
     let drafting = (running && !narrated.is_empty()).then(|| Step::Note(narrated.to_string()));
     // The work in progress is live while the run is: a view counts its time on from `from`.
     let had_work = work.is_some();
-    if let Some(Row::Work { live, paused: p, steps, .. }) = work.as_mut() {
+    if let Some(Row::Work {
+        live,
+        holds: h,
+        steps,
+        ..
+    }) = work.as_mut()
+    {
         *live = running;
-        *p = if running { paused } else { false };
+        if running {
+            *h = holds.to_vec();
+        }
         steps.extend(thinking.clone());
         steps.extend(drafting.clone());
     }
@@ -419,7 +449,7 @@ pub(crate) fn rows_of(
             from: None,
             to: None,
             live: true,
-            paused,
+            holds: holds.to_vec(),
             plan: vec![],
             asks: vec![],
         });

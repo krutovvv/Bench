@@ -65,12 +65,7 @@ impl BenchApp {
                 let what = what.clone();
                 let _ = app.update(cx, |this, cx| {
                     cx.write_to_clipboard(ClipboardItem::new_string(what.clone()));
-                    this.toast(
-                        NotificationType::Info,
-                        format!("Copied {what}"),
-                        window,
-                        cx,
-                    );
+                    this.toast(NotificationType::Info, format!("Copied {what}"), window, cx);
                 });
             })
         };
@@ -102,23 +97,14 @@ impl BenchApp {
                         for c in info.commits {
                             let line = format!("{}  {} · {}", c.sha, c.subject, c.age);
                             menu = menu.item(
-                                copy(
-                                    app.clone(),
-                                    bench_ui::clip(&line, 56),
-                                    line,
-                                )
-                                .disabled(false),
+                                copy(app.clone(), bench_ui::clip(&line, 56), line).disabled(false),
                             );
                         }
                     }
                     if let Some(url) = info.remote {
                         menu = menu.separator().item(
-                            copy(
-                                app.clone(),
-                                bench_ui::clip(&url, 56),
-                                url,
-                            )
-                            .icon(bench_ui::icons::Ico::Globe.icon()),
+                            copy(app.clone(), bench_ui::clip(&url, 56), url)
+                                .icon(bench_ui::icons::Ico::Globe.icon()),
                         );
                     }
                     menu

@@ -206,8 +206,5 @@ pub fn git_ignored(
                 .collect()
         })
         .unwrap_or_default();
-    Ok((
-        v["root"].as_str().unwrap_or_default().to_string(),
-        ignored,
-    ))
+    Ok((v["root"].as_str().unwrap_or_default().to_string(), ignored))
 }

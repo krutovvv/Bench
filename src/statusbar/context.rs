@@ -163,18 +163,17 @@ pub(super) fn speed_panel(
                 .h(px((v / max * 56.).max(1.) as f32))
                 .bg(theme.primary.opacity(0.75))
         });
-        panel = panel
-            .child(
-                h_flex()
-                    .mx_3()
-                    .mb_2()
-                    .h(px(56.))
-                    .gap(px(1.))
-                    .items_end()
-                    .border_b_1()
-                    .border_color(theme.border)
-                    .children(bars),
-            );
+        panel = panel.child(
+            h_flex()
+                .mx_3()
+                .mb_2()
+                .h(px(56.))
+                .gap(px(1.))
+                .items_end()
+                .border_b_1()
+                .border_color(theme.border)
+                .children(bars),
+        );
         // Now: the newest train's honest reading — its own span, first token to last. The
         // burst guards are in the measure, so this is the tempo itself, not a mean over it.
         if let Some(now) = live {

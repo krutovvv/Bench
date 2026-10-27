@@ -265,7 +265,9 @@ pub fn term_tab(
         .rounded_md()
         .text_sm()
         .cursor_pointer()
-        .when(open, |d| d.bg(theme.list_active).text_color(theme.foreground))
+        .when(open, |d| {
+            d.bg(theme.list_active).text_color(theme.foreground)
+        })
         .when(!open, |d| {
             d.text_color(if ended {
                 theme.muted_foreground

@@ -72,16 +72,18 @@ impl BenchApp {
         let head = bench_ui::ide_head(
             title,
             None,
-            vec![Button::new("thread-new")
-                .ghost()
-                .small()
-                .child(div().text_xs().child("New Thread"))
-                .text_color(theme.muted_foreground)
-                .on_click(cx.listener(|this, _, window, cx| {
-                    this.new_thread_here(cx);
-                    this.focus_composer(window, cx);
-                }))
-                .into_any_element()],
+            vec![
+                Button::new("thread-new")
+                    .ghost()
+                    .small()
+                    .child(div().text_xs().child("New Thread"))
+                    .text_color(theme.muted_foreground)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.new_thread_here(cx);
+                        this.focus_composer(window, cx);
+                    }))
+                    .into_any_element(),
+            ],
             cx,
         )
         .h(bench_ui::bar_h(cx))

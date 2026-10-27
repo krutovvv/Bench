@@ -34,8 +34,11 @@ export type QueuedItem = { key: string, sub: string, mode: string, text: string,
 
 export type ThreadOpen = { items: Array<ThreadItem>, queue: Array<QueuedItem>, inserts: Record<string, unknown>, running: boolean, 
 /**
- * The person held the run at a step boundary; it waits until they let it go on.
+ * The live run's holds (the person's pauses), oldest first; the last one open while it
+ * stands held. Empty when no run lives.
  */
-paused: boolean, head: number, };
+holds: Array<Hold>, head: number, };
+
+export type Hold = { from: number, to?: number, };
 
 export type StreamKind = "text" | "thought" | "narration";

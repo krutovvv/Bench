@@ -22,6 +22,7 @@ pub(super) fn session(
         title: title.into(),
         messages,
         running,
+        paused: false,
         source: source.into(),
         subject: String::new(),
         project: String::new(),

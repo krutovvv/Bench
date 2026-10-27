@@ -341,20 +341,19 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 .await;
             this.update_in(cx, |app, window, cx| {
                 app.focus_composer(window, cx);
-                app.active_thread
-                    .update(cx, |v, cx| {
-                        v.composer.update(cx, |s, cx| {
-                            s.set_value(
-                                "Check the staging deploy and tell me whether it is healthy.\n\
+                app.active_thread.update(cx, |v, cx| {
+                    v.composer.update(cx, |s, cx| {
+                        s.set_value(
+                            "Check the staging deploy and tell me whether it is healthy.\n\
                                  \n\
                                  Second paragraph, long enough to reach the very right of the \
                                  field, where the tools' gutter keeps the paperclip and the mic \
                                  clear of every word.",
-                                window,
-                                cx,
-                            );
-                        })
-                    });
+                            window,
+                            cx,
+                        );
+                    })
+                });
             })
             .ok();
         })
@@ -378,8 +377,9 @@ fewer form fields. Then check what it did to signups and give me a short summary
                             v.thread.runtime = Some("demo".into());
                         }
                         if v.thread.live.is_none() {
-                            v.thread.live =
-                                Some(crate::app::Live { label: "Thinking…".into() });
+                            v.thread.live = Some(crate::app::Live {
+                                label: "Thinking…".into(),
+                            });
                         }
                         v.send(window, cx);
                     });
@@ -540,8 +540,21 @@ fn run(cx: &mut Context<BenchApp>) {
         ));
         // BENCH_DEMO_PAUSED=1 holds the run mid-work, for the hold's picture.
         if std::env::var("BENCH_DEMO_PAUSED").is_ok() {
-            events.push((400, ThreadEvent::Paused(true)));
-            events.push((6000, ThreadEvent::Paused(false)));
+            let held = now + 400.;
+            events.push((
+                400,
+                ThreadEvent::Holds(vec![::thread::Hold {
+                    from: held,
+                    to: None,
+                }]),
+            ));
+            events.push((
+                6000,
+                ThreadEvent::Holds(vec![::thread::Hold {
+                    from: held,
+                    to: Some(held + 6000.),
+                }]),
+            ));
         }
         events.push((
             3000,
@@ -614,7 +627,11 @@ fn run(cx: &mut Context<BenchApp>) {
                         // And the thread runs live, so the meter is ticked and the sidebar
                         // says "working…", as with a real agent.
                         match &e {
-                            ThreadEvent::Run(true) => v.thread.live = Some(crate::app::Live { label: "Thinking…".into() }),
+                            ThreadEvent::Run(true) => {
+                                v.thread.live = Some(crate::app::Live {
+                                    label: "Thinking…".into(),
+                                })
+                            }
                             ThreadEvent::Stream(kind, _) => {
                                 if let Some(l) = v.thread.live.as_mut() {
                                     l.label = match kind {

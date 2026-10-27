@@ -46,9 +46,12 @@ interface Live {
 	row: SessionRow;
 	conversation: Conversation;
 	busy: boolean;
-	/** The person's hold: the run stands at a step boundary until the gate opens. */
-	paused: boolean;
-	hold?: { promise: Promise<void>; release: () => void };
+	/** The person's holds of this run (ms), oldest first; the last one open while it stands held.
+	 * Pi has no pause of a conversation, so the hold is ours: a gate before every tool call. */
+	holds: { from: number; to?: number }[];
+	/** Opens the gate a held run waits at. */
+	release?: () => void;
+	gate?: Promise<void>;
 	generation: number;
 	abort?: AbortController;
 	/** Text of the in-flight assistant message per content block, to turn snapshots into deltas. */
@@ -353,7 +356,7 @@ export class Runtime {
 			row,
 			conversation,
 			busy: false,
-			paused: false,
+			holds: [],
 			generation: 0,
 			blocks: new Map(),
 			answer: "",
@@ -435,6 +438,7 @@ export class Runtime {
 		live.generation++;
 		// A fresh turn starts free: any earlier hold belongs to the turn it ended with.
 		this.unhold(live);
+		live.holds = [];
 		live.answer = "";
 		live.blocks.clear();
 		live.narrating = false;
@@ -451,9 +455,10 @@ export class Runtime {
 	async interrupt(id: string): Promise<void> {
 		const live = this.live.get(id);
 		if (!live) return;
-		// A stop outranks a hold: nobody stands waiting on a run that is ending.
-		this.unhold(live);
+		// A stop outranks a hold: the run is marked ended first, so the call waiting at the gate
+		// sees it and does not start.
 		live.abort?.abort();
+		this.unhold(live);
 		for (const [pid, p] of live.prompts) {
 			p.resolve("");
 			live.prompts.delete(pid);
@@ -468,33 +473,39 @@ export class Runtime {
 	 * go on. The actions phase is where the minutes go; that is what the hold answers to. */
 	pause(id: string): void {
 		const live = this.live.get(id);
-		if (!live || !live.busy || live.paused) return;
-		let release!: () => void;
-		const promise = new Promise<void>((r) => (release = r));
-		live.paused = true;
-		live.hold = { promise, release };
-		this.emit(id, "thread.pause", { paused: true });
+		if (!live || !live.busy || live.gate) return;
+		live.gate = new Promise<void>((r) => (live.release = r));
+		live.holds.push({ from: Date.now() });
+		this.emit(id, "thread.pause", { holds: live.holds });
 	}
 
 	/** Let the held run take its next step. */
 	resume(id: string): void {
 		const live = this.live.get(id);
-		if (!live) return;
-		if (!live.paused) return;
+		if (!live?.gate) return;
 		this.unhold(live);
-		this.emit(id, "thread.pause", { paused: false });
+		this.emit(id, "thread.pause", { holds: live.holds });
 	}
 
+	/** Open the gate and close the open hold. */
 	private unhold(live: Live): void {
-		live.paused = false;
-		live.hold?.release();
-		live.hold = undefined;
+		const open = live.holds.at(-1);
+		if (open && open.to === undefined) open.to = Date.now();
+		live.release?.();
+		live.release = undefined;
+		live.gate = undefined;
 	}
 
-	/** Called before every tool call: waits while the person holds the run. */
-	async hold(sessionId: string): Promise<void> {
+	/** Called before every tool call (a subagent's too, through its parent's session): waits
+	 * while the person holds the run; false when they stopped it meanwhile. */
+	async hold(sessionId: string): Promise<boolean> {
 		const live = this.live.get(sessionId);
-		while (live?.paused && live.hold) await live.hold.promise;
+		while (live?.gate) await live.gate;
+		return !live?.abort?.signal.aborted;
+	}
+
+	isPaused(id: string): boolean {
+		return Boolean(this.live.get(id)?.gate);
 	}
 
 	// ---- the queue (Pi's inbox) ------------------------------------------------
@@ -759,10 +770,7 @@ export class Runtime {
 			},
 			adopt: (conversationId, sessionId) => void this.adopted.set(String(conversationId), sessionId),
 			// A subagent's call waits on its parent's hold too: the person holds the whole work.
-			hold: async (sessionId) => {
-				const live = this.live.get(sessionId);
-				while (live?.paused && live.hold) await live.hold.promise;
-			},
+			hold: (sessionId) => this.hold(sessionId),
 			busyElsewhere: (sessionId) => [...this.live.values()].filter((l) => l.busy && l.row.id !== sessionId).length,
 			ask: async (sessionId, question, choices, multiSelect, signal) => {
 				const live = await this.session(sessionId);
@@ -1024,9 +1032,9 @@ export class Runtime {
 		if (!live.busy) return;
 		live.busy = false;
 		// Whatever the person held, the run is over: the hold lets go, nobody waits on it.
-		const wasHeld = live.paused;
+		const wasHeld = Boolean(live.gate);
 		this.unhold(live);
-		if (wasHeld) this.emit(live.row.id, "thread.pause", { paused: false });
+		if (wasHeld) this.emit(live.row.id, "thread.pause", { holds: live.holds });
 		this.emit(live.row.id, "thread.run", { running: false });
 		// The turn's blended rate, as one number worth remembering.
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);
@@ -1100,7 +1108,7 @@ export class Runtime {
 	 * queue, the inserts' state, and whether a run is live. `head` is the last entry id: Bench asks
 	 * with `since: head` after a reconnect and gets only what it missed.
 	 */
-	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; paused: boolean; head: number }> {
+	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; holds: { from: number; to?: number }[]; head: number }> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const entries: any[] = [];
@@ -1126,7 +1134,7 @@ export class Runtime {
 			queue: queueOf(inbox as any),
 			inserts: doc?.items ?? {},
 			running: live.busy,
-			paused: live.paused,
+			holds: live.busy ? live.holds : [],
 			head,
 		};
 	}

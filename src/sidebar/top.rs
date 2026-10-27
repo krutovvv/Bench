@@ -2,10 +2,10 @@
 //! Explorer's button is not here: it is in the window's top-right corner (`src/titlebar`), so it
 //! is one hop from any thread and stays there while its tree is shown.
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::h_flex;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::Sizable as _;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::h_flex;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
