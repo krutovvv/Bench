@@ -302,7 +302,7 @@ impl BenchApp {
                     page.push(
                         self.pv_row(
                             "Folder",
-                            "Optional: a codebase its threads work in (opens in Zed)",
+                            "Optional: a codebase its threads work in",
                             control,
                             cx,
                         )
