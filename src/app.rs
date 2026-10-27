@@ -58,6 +58,8 @@ pub enum Panel {
     Providers,
     /// A new project: a page of its own, not a thread (a project is not a conversation).
     NewProject,
+    /// A project's settings (`project_env`): its environment's tabs (`env/page.rs`).
+    Project,
 }
 
 impl Panel {
@@ -91,9 +93,6 @@ pub struct BenchApp {
     pub insert_live: HashMap<String, String>,
     /// The waiting message whose words the person is fixing, and the field they fix them in.
     pub queue_edit: Option<(String, Entity<TextareaState>)>,
-    /// Which thread the next opening of a subject goes to: unset = its latest, `Some(None)` = a
-    /// new one (the row's "+"), `Some(Some(id))` = that thread (a row under the subject).
-    pub subject_target: Option<Option<String>>,
     /// The project the open thread belongs to (a new one is created in it); "" = none.
     pub thread_project: String,
     /// The person's projects: the sidebar.
@@ -627,7 +626,6 @@ impl BenchApp {
             queue_edit: None,
             insert_live: HashMap::new(),
             form_after: None,
-            subject_target: None,
             thread_project: String::new(),
             projects: vec![],
             host_browser: false,
@@ -884,7 +882,7 @@ impl BenchApp {
         match panel {
             Panel::Chat => {}
             Panel::Providers => self.load_providers(window, cx),
-            Panel::NewProject => {}
+            Panel::NewProject | Panel::Project => {}
         }
         cx.notify();
     }

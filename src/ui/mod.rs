@@ -132,7 +132,6 @@ impl BenchApp {
                 .map(|s| s.title.clone())
                 .filter(|t| !t.is_empty())
                 // A thread about a task list is named after it until it has a title of its own.
-                .or_else(|| self.subject_title())
                 .unwrap_or_else(|| "New session".into())
                 .into();
             return bar
@@ -153,10 +152,23 @@ impl BenchApp {
                 .into_any_element();
         }
 
-        let title = if self.panel == Panel::NewProject {
-            "New project"
-        } else {
-            "Settings"
+        let title: SharedString = match self.panel {
+            Panel::NewProject => "New project".into(),
+            Panel::Project => {
+                let id = self
+                    .project_env
+                    .as_ref()
+                    .map(|e| e.id.as_str())
+                    .unwrap_or("");
+                let name = self
+                    .projects
+                    .iter()
+                    .find(|p| p.id == id)
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| crate::app::LOCAL_HOST.into());
+                format!("{name} · Settings").into()
+            }
+            _ => "Settings".into(),
         };
         bar.child(
             div()
@@ -217,6 +229,7 @@ impl Render for BenchApp {
                 .into_any_element(),
             Panel::Providers => self.render_providers(cx),
             Panel::NewProject => self.render_project_form(cx),
+            Panel::Project => self.render_project_settings(window, cx),
         };
 
         // The sidebar folded away: its corner joins the header — room for the window's buttons

@@ -32,8 +32,8 @@ person: there are projects.
   Kinds that can be live only once (the browser, the local folder) show "click to show it here"
   on the older ones.
 - **Card**: a form or an editor that appears in the thread as an agent-message block, under the
-  insert or section that asked for it. Examples: a new server, a task, an MCP server, a skill, a
-  cron job, an open file. Bench has no settings pages for such jobs.
+  insert that asked for it (a new server, a task, an open file), or on a settings page under the
+  list it belongs to (an MCP server, a cron job).
 - **Agent**: a process of `agent/` that runs threads. This Mac's always; a server's when the
   person adds it in the gear (Bench installs and starts it over SSH). The Mac's agent keeps the
   list of servers' agents. Each agent has its own models, voice and general Telegram bot.
@@ -55,12 +55,14 @@ person: there are projects.
   - Telegram bot;
   - schedule (cron).
 
-  It is edited in its environment thread, one agent message per section, with the card under the
-  section being edited. **Host** is an agent's own environment: this Mac's is always first in the
+  It is edited in the project's **Settings** (its menu in the sidebar), a page like the gear's:
+  tabs General (name, where, model, Telegram), Instructions (soul, prompts, skills in a small
+  editor with a tree), Tools (MCP, language servers), Schedule, Access (machines, file hosts).
+  The agent changes the same files when asked, from any thread of the project. **Host** is an agent's own environment: this Mac's is always first in the
   sidebar (installing, building, looking after the machine); a server's (e.g. Dev) names that
   server and is followed by the server's own projects. `/terminal` opens on the thread's machine
   (`thread_machine()`).
-- **The gear** holds the only classic settings, in tabs: Agents (each one's models and voice;
+- **The gear** holds the app's settings, in tabs: Agents (each one's models and voice;
   add and remove servers' agents), Presets (MCP and language servers a project takes with one
   click, compaction shares, reasoning levels), Appearance.
 
@@ -81,9 +83,9 @@ built this way: `docs/architecture.md`. In short:
 | `src/app/sidebar_items.rs`, `src/app/marks.rs`, `src/app/presets.rs` | What is done to a thread or project in the sidebar (pin, color, rename, ⌫⌫, ↑↓); the person's presets |
 | `src/ui/` | The frame: `mod.rs` (layout, header), `sidebar.rs`, `statusbar.rs`, `composer.rs`, `media.rs`, `providers.rs` (the gear's tabs); `ui/thread/` the open thread on `gpui::list` |
 | `src/inserts/` | **The insert registry** (`mod.rs`: `InsertKind`, `KINDS`, `words()`) and one folder per kind: `terminal`, `files` (/files), `ftp`, `tasks`, `tools`, `browser` — each `mod.rs` + `state.rs` (+ `view.rs`) |
-| `src/env/` | A project's environment: `Section` + `SECTIONS`, one file per section |
+| `src/env/` | A project's Settings page: `Section` + `SECTIONS` (a tab and a group each), `page.rs` the tabs, `ide.rs` Instructions' tree and editor, one file per section |
 | `src/gateway.rs`, `src/rest.rs`, `src/connection.rs`, `src/pi_agent.rs` | The protocol to the agent (WebSocket JSON-RPC + REST), installing/starting it locally or over SSH |
-| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|tasks\|server\|tool\|env\|env-open`; `BENCH_CLARIFY=1` [+`_MULTI=1`] puts the agent's question card over the thread; the other hooks in `.agents/skills/bench-kit/references/build-verification.md`) |
+| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|tasks\|server\|tool\|env\|env-open`, `env` being the blog's Settings, `BENCH_ENV_TAB=general\|instructions\|tools\|schedule\|access` its tab; `BENCH_CLARIFY=1` [+`_MULTI=1`] puts the agent's question card over the thread; the other hooks in `.agents/skills/bench-kit/references/build-verification.md`) |
 | `agent/src/server.ts`, `agent/src/modules/` | The agent's server: starts, collects the modules (each declares its RPC and REST routes) |
 | `agent/src/runtime.ts`, `agent/src/thread.ts` | Pi conversations, the queue, inserts; the journal as the items Bench shows |
 | `agent/src/inserts.ts` | The insert entry and document |

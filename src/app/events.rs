@@ -272,8 +272,6 @@ impl BenchApp {
                 let subject = self.current_subject();
                 if subject.starts_with("tasks:") {
                     self.load_tasks();
-                } else if let Some(id) = subject.strip_prefix("env:") {
-                    self.load_env(id, window, cx);
                 }
                 if self.project.is_none() {
                     self.resolve_project(window, cx);

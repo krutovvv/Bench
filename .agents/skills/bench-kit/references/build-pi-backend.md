@@ -87,7 +87,7 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   document with `input.read.snapshot(Inserts, conversationId)` (`extensions/assistant.ts`), and
   what each shows now from the `<block-state>` Bench appends to each message (stripped from the
   history, `runtime.ts` `stripBlock`). Old threads' `subject` is mapped to an insert
-  (`legacyInsert`); the one subject left is `env:<id>`, a project's environment at a thread's top.
+  (`legacyInsert`). Where a project's settings live is a line of the `environment` section.
 - **Prompt sections** (`prompt.ts`, listed in `extensions/assistant.ts`, Pi's `section()`): soul,
   environment, subject, inserts, project, skills, notes. Pi resends a section only when its text changed, so the provider's
   prompt cache stays warm: keep sections stable (no clocks, no counters) and put what changes

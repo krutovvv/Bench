@@ -76,7 +76,7 @@ h_flex().id(("session", i)).group(group)          // unique group name per row!
 (`Button…dropdown_menu`, wrapped in a div that stops `MouseButton::Left` so the row doesn't open)
 and a right click (`.context_menu(item_menu(…))`). Items: a project — Environment, Open in Zed
 (with a folder; a server's over SSH), separator; then Pin/Unpin (not on this Mac's Host), Rename
-(threads; a project is renamed in its environment), the color swatches
+(threads; a project is renamed in its Settings), the color swatches
 (`PopupMenuItem::element`), Delete… / Remove project… (not on a Host). Also by keys:
 ⌫ ⌫ deletes the selected thread (asked once), a project shows Remove · Cancel in its head;
 rename is in place (the title becomes a field); ↑ ↓ walk the rows. "Open in new window" is not
@@ -137,13 +137,15 @@ room below (the list's own height decides). Enter / Tab pick, ↑ ↓ move, Esc 
 **The thread's width**: the window's whole width from its left edge, as an editor's text — no
 cap, no centering.
 
-## A project's environment, the gear
+## A project's Settings, the gear
 
-The only classic settings are the gear's tabs. Soul, MCP, language servers, skills, prompts,
-accesses, the model's settings, Telegram and the schedule are a project's environment, opened as
-its thread `env:<id>` (`open_project_env`): one agent message per section
-(`src/env/view.rs` `render_env_sections`), the card under the section being edited
-(`render_env_card`). A section is a `Section` in `src/env/` (`build-insert.md`, SKILL.md).
+Two settings pages, one look: the gear (the app's) and a project's Settings
+(`open_project_settings`, `Panel::Project`, `src/env/page.rs`). Both have `settings_tabs` on top
+and groups under `settings_heading`: a form is `settings_field` rows (Save / Revert under them once
+something changed, `form_actions`), a list is a bordered block of rows whose click opens its card
+under the list. Instructions (soul, prompts, skills) is a small IDE (`src/env/ide.rs`,
+`bench_ui::ide`): a tree on the left, the open text in the code editor filling the page — the one
+place a text scrolls inside itself. A section is a `Section` in `src/env/` with its `Tab`.
 
 ## The thread's column
 

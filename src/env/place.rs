@@ -1,22 +1,23 @@
-//! Where the project lives (`docs/remote-projects.md`), rows of its block: its agent (this Mac's,
+//! Where the project lives (`docs/remote-projects.md`), fields of General: its agent (this Mac's,
 //! or a server's — its address and whether it answers), the machine its work is on when that is
 //! another (this Mac's agent over SSH), and its folder — which can be changed, and the agent kept
 //! in it (`agent/src/confined-env.ts`). Agent and machine are chosen when the project is made.
 
 use gpui_kit::component::checkbox::Checkbox;
+use gpui_kit::component::h_flex;
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Card, Request, Section, pad, project_block, revert, row, save};
+use super::section::{Request, Section, Tab, form_actions, text};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::model::ProjectKey;
+use bench_ui::settings_field;
 
 pub struct PlaceEnv {
-    /// The folder, as its card edits it ("" none: a folder the agent keeps for it).
+    /// The folder, as its field edits it ("" none: a folder the agent keeps for it).
     pub folder: Entity<InputState>,
     /// Its agent works in the folder and nowhere else.
     pub confined: bool,
@@ -42,19 +43,25 @@ impl Section for Place {
     fn key(&self) -> &'static str {
         "place"
     }
-    fn block(&self, general: bool) -> &'static str {
-        project_block(general)
+    fn tab(&self) -> Tab {
+        Tab::General
     }
-    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
-        let Some(e) = app.project_env.as_ref() else {
-            return vec![];
-        };
+    fn block(&self, _general: bool) -> &'static str {
+        "Project"
+    }
+    /// Its agent and the machine it works on (chosen when it was made, read here), its folder and
+    /// whether the agent is kept in it.
+    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
+        let e = app.project_env.as_ref()?;
         let key = ProjectKey::parse(&e.id);
         let at = app.location(&e.id);
-        let mut rows = vec![];
-        // The agent: this Mac's, or a server's with its address and state.
-        let (agent, bad) = if at.agent.is_empty() {
-            ("This Mac".to_string(), false)
+        let mut out = vec![];
+        let (agent, hint, bad) = if at.agent.is_empty() {
+            (
+                "This Mac".to_string(),
+                "Its models and voice are This Mac's in the gear",
+                false,
+            )
         } else {
             let link = app.agents.get(&at.agent);
             let state = match link {
@@ -64,139 +71,76 @@ impl Section for Place {
             };
             (
                 format!("{} — {} · {state}", at.agent, address_of(app, &at.agent)),
+                "It runs there and keeps the project's threads, skills, servers and schedule",
                 link.is_some_and(|l| l.error.is_some()),
             )
         };
-        rows.push(row(
-            e,
-            "place",
-            "agent".into(),
-            "Agent".into(),
-            agent,
-            bad,
-            false,
-            cx,
-        ));
+        out.push(settings_field("Agent", hint, text(agent, bad, cx), cx).into_any_element());
         if let Some(m) = &at.machine {
-            rows.push(row(
-                e,
-                "place",
-                "machine".into(),
-                "Works on".into(),
-                format!("{m} — {} · over SSH", address_of(app, m)),
-                false,
-                false,
-                cx,
-            ));
+            out.push(
+                settings_field(
+                    "Works on",
+                    "This Mac's agent works there over SSH; nothing is installed on it",
+                    text(format!("{m} — {}", address_of(app, m)), false, cx),
+                    cx,
+                )
+                .into_any_element(),
+            );
         }
         // An agent's Host works in its home; any other project has a folder, or none.
-        if !key.is_host() {
-            let folder = match (&at.folder, e.place.confined) {
-                (Some(f), true) => format!("{f} · the agent is kept in it"),
-                (Some(f), false) => f.clone(),
-                (None, _) => format!("none — a folder its agent keeps for it ({})", e.dir),
-            };
-            rows.push(row(
-                e,
-                "place",
-                "folder".into(),
-                "Folder".into(),
-                folder,
-                false,
-                false,
-                cx,
-            ));
+        if key.is_host() {
+            return Some(out);
         }
-        rows
-    }
-    fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
-        let e = app.project_env.as_ref()?;
-        let muted = cx.theme().muted_foreground;
-        let at = app.location(&e.id);
-        let lines = |lines: Vec<String>| {
-            pad(v_flex().gap_1().children(
-                lines
-                    .into_iter()
-                    .enumerate()
-                    .map(move |(k, l)| div().when(k > 0, |d| d.text_color(muted)).child(l)),
-            ))
-        };
-        match name {
-            "agent" if at.agent.is_empty() => Some(Card::new(
-                "Agent",
-                lines(vec![
-                    "This Mac's agent runs its threads.".into(),
-                    "Its models and voice are This Mac's in the gear.".into(),
-                ]),
-                vec![],
-            )),
-            "agent" => Some(Card::new(
-                "Agent",
-                lines(vec![
-                    format!("ssh {} — {}", at.agent, address_of(app, &at.agent)),
-                    "Its agent runs there and keeps the project's threads, skills, MCP servers and \
-                     schedule, without this Mac; /terminal and /files work on that machine. Its \
-                     models are set in the gear; the connection is the alias's block in ~/.ssh/config."
-                        .into(),
-                ]),
-                vec![],
-            )),
-            "machine" => {
-                let m = at.machine.clone()?;
-                Some(Card::new(
-                    "Works on",
-                    lines(vec![
-                        format!("ssh {m} — {}", address_of(app, &m)),
-                        "This Mac's agent works there over SSH, one connection kept open: read, write, \
-                         edit and bash act on that machine, /terminal opens there. Nothing is installed \
-                         on it; the models are this Mac's, and it answers while this Mac is on."
-                            .into(),
-                    ]),
-                    vec![],
-                ))
-            }
-            _ => {
-                let view = cx.entity();
-                let kept = Checkbox::new("env-folder-confined")
-                    .checked(e.place.confined)
-                    .label("Keep its agent in this folder")
-                    .on_click(move |on, _, cx| {
-                        let on = *on;
-                        view.update(cx, |this, cx| {
-                            if let Some(e) = this.project_env.as_mut() {
-                                e.place.confined = on;
-                                e.place.dirty = true;
-                            }
-                            cx.notify();
-                        })
-                    });
-                let mut actions = vec![save("place", e.place.dirty, cx)];
-                actions.extend(revert("place", e.place.dirty, cx));
-                let local = at.machine_here().is_empty();
-                Some(Card::new(
-                    "Folder",
-                    pad(v_flex()
-                        .gap_2()
-                        .child(
-                            h_flex()
-                                .gap_2()
-                                .child(div().flex_1().child(Input::new(&e.place.folder)))
-                                .when(local, |d| {
-                                    d.child(crate::ui::form_action("env-folder-pick", "Choose…", false, cx).on_click(
-                                        cx.listener(|this, _, window, cx| this.env_pick_folder(window, cx)),
-                                    ))
-                                }),
+        let local = at.machine_here().is_empty();
+        out.push(
+            settings_field(
+                "Folder",
+                if at.folder.is_some() {
+                    "Its threads work in it"
+                } else {
+                    "None: a folder its agent keeps for it"
+                },
+                h_flex()
+                    .gap_2()
+                    .child(div().flex_1().child(Input::new(&e.place.folder)))
+                    .when(local, |d| {
+                        d.child(
+                            crate::ui::form_action("env-folder-pick", "Choose…", false, cx)
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.env_pick_folder(window, cx)
+                                })),
                         )
-                        .child(kept)
-                        .child(div().text_sm().text_color(muted).child(
-                            "Its threads work in it. Kept in it, the agent's tools refuse anything outside it and \
-                             its commands cannot write outside it (a sandbox: macOS's, or bubblewrap on Linux \
-                             when installed). New threads take a change; a running one keeps what it began with.",
-                        ))),
-                    actions,
-                ))
-            }
-        }
+                    })
+                    .into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        );
+        let view = cx.entity();
+        let kept = Checkbox::new("env-folder-confined")
+            .checked(e.place.confined)
+            .on_click(move |on, _, cx| {
+                let on = *on;
+                view.update(cx, |this, cx| {
+                    if let Some(e) = this.project_env.as_mut() {
+                        e.place.confined = on;
+                        e.place.dirty = true;
+                    }
+                    cx.notify();
+                })
+            });
+        out.push(
+            settings_field(
+                "Keep the agent in it",
+                "Its tools refuse anything outside the folder, its commands cannot write outside \
+                 it. New threads take a change",
+                div().flex().justify_end().child(kept).into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        );
+        out.extend(form_actions("place", e.place.dirty, cx));
+        Some(out)
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         if !e.place.dirty {
@@ -252,7 +196,7 @@ impl Section for Place {
 }
 
 impl BenchApp {
-    /// The folder card's "Choose…": a folder on this Mac.
+    /// The folder's "Choose…": a folder on this Mac.
     pub fn env_pick_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let picked = cx.prompt_for_paths(PathPromptOptions {
             files: false,

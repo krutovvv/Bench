@@ -8,7 +8,8 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, Request, Section, card_act, code, empty, head_act, pad, remove, revert, row, save, when,
+    Card, Request, Section, Tab, card_act, code, empty, head_act, pad, remove, revert, row, save,
+    when,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
@@ -67,6 +68,9 @@ pub struct Schedule;
 impl Section for Schedule {
     fn key(&self) -> &'static str {
         "cron"
+    }
+    fn tab(&self) -> Tab {
+        Tab::Schedule
     }
     fn block(&self, _general: bool) -> &'static str {
         "Schedule"

@@ -1,22 +1,26 @@
-//! A project's environment as its thread's blocks (`env:<project id>`): its name, soul, Telegram
-//! bot, how it runs, MCP servers, skills, prompts, schedule and accesses, edited in place (a card
-//! under the block, Save once something changed) or through the agent in the conversation under
-//! it. Each section is a file here:
+//! A project's settings (its environment), a page like the gear's (`Panel::Project`): tabs of
+//! General (name, where it lives, model, Telegram), Instructions (its soul, prompts and skills in
+//! a small editor with a tree), Tools (MCP and language servers), Schedule and Access (machines,
+//! file hosts). The agent can change all of it too, from any thread, with its tools. Each section
+//! is a file here:
 //!
 //! ```text
-//! env/section.rs      the `Section` trait and the pieces rows and cards are made of
-//! env/view.rs         the blocks and the open card, drawn through `SECTIONS`
-//! env/<section>.rs    a section: its state (a part of `ProjectEnv`), rows, card, save, actions
+//! env/section.rs      the `Section` trait, `Tab`, and the pieces forms, lists and cards are made of
+//! env/page.rs         the page: its tabs, each tab's groups drawn through `SECTIONS`
+//! env/ide.rs          Instructions: the tree of texts and the editor
+//! env/<section>.rs    a section: its state (a part of `ProjectEnv`), form or rows, card, save
 //! env/project_form.rs the new project's page (the sidebar's "+")
 //! ```
 //!
-//! A new section: a file like `prompts.rs`, its state in `ProjectEnv` (and `new_env`), a line in
-//! `SECTIONS` where its rows go, and its part of the agent's `/api/projects/<id>/env`.
+//! A new section: a file like `telegram.rs`, its state in `ProjectEnv` (and `new_env`), a line in
+//! `SECTIONS` (its tab and group), and its part of the agent's `/api/projects/<id>/env`.
 
 pub mod accesses;
+mod ide;
 pub mod lsp;
 pub mod mcp;
 pub mod name;
+mod page;
 pub mod place;
 pub mod project_form;
 pub mod prompts;
@@ -25,10 +29,8 @@ pub mod schedule;
 pub mod section;
 pub mod skills;
 mod skills_tree;
-mod skills_view;
 pub mod soul;
 pub mod telegram;
-mod view;
 
 use gpui_kit::component::input::{EditorState, InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
@@ -37,7 +39,7 @@ use serde_json::Value;
 
 use crate::app::BenchApp;
 use crate::rest;
-pub use section::Section;
+pub use section::{Section, Tab};
 
 pub struct ProjectEnv {
     pub id: String,
@@ -56,24 +58,26 @@ pub struct ProjectEnv {
     pub cron: schedule::ScheduleEnv,
     /// A new MCP server's or prompt's name (a new skill names itself in its front matter).
     pub new_name: Entity<InputState>,
-    /// What is open under the block, as the agent's answer: (kind, name) — a `Section::key`
-    /// ("new" for a new one).
+    /// The tab shown.
+    pub tab: Tab,
+    /// What is open: a list's card under its list, or the text in Instructions' editor —
+    /// (kind, name), the kind a `Section::key` ("new" for a new one).
     pub card: Option<(&'static str, String)>,
-    /// Its blocks shut by a click on their head (by title).
-    pub folded: std::collections::HashSet<&'static str>,
-    /// A row's remove asked once ("mcp:<name>", "skill:<name>", "host:<id>", "project"): the
+    /// A remove asked once ("mcp:<name>", "skill:<name>", "host:<id>", "project:"): the
     /// second click does it.
     pub armed: Option<String>,
     pub error: Option<String>,
 }
 
-/// The sections, in the order their rows are drawn; neighbours with the same `block` share it.
+/// The sections, in the order they are drawn on their tabs; neighbours with the same `block`
+/// share its group.
 pub static SECTIONS: &[&dyn Section] = &[
     &name::Name,
     &place::Place,
-    &soul::Soul,
-    &telegram::Telegram,
     &run::Run,
+    &telegram::Telegram,
+    &name::Danger,
+    &soul::Soul,
     &mcp::Mcp,
     &lsp::Lsp,
     &skills::Skills,
@@ -144,18 +148,73 @@ pub(crate) fn is_remote(_app: &BenchApp, id: &str) -> bool {
 }
 
 impl BenchApp {
-    /// A project's pencil: its environment's thread (the latest, or a new one in the project).
-    pub fn open_project_env(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
+    /// A project's Settings (the sidebar's menu): its page, on General ("general": this Mac's
+    /// Host).
+    pub fn open_project_settings(
+        &mut self,
+        id: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let fresh = self.project_env.as_ref().is_none_or(|e| e.id != id);
         self.load_env(&id, window, cx);
-        // "general": this Mac's own environment; its thread belongs to no project.
-        let project = if id == "general" {
-            String::new()
-        } else {
-            id.clone()
+        if fresh {
+            if let Some(e) = self.project_env.as_mut() {
+                e.tab = Tab::General;
+            }
+        }
+        self.ssh.form = None;
+        self.files_remote.form = false;
+        self.open_panel(crate::app::Panel::Project, window, cx);
+    }
+
+    /// The project a new server or file host goes to: the settings page's when it is open
+    /// (this Mac's Host: none), else the open thread's.
+    pub fn form_project(&self) -> String {
+        match self.project_env.as_ref() {
+            Some(e) if self.panel == crate::app::Panel::Project && e.id != "general" => {
+                e.id.clone()
+            }
+            Some(_) if self.panel == crate::app::Panel::Project => String::new(),
+            _ => self.thread_project.clone(),
+        }
+    }
+
+    /// The open page's environment read again.
+    pub fn reload_env(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) {
+            self.load_env(&id, window, cx);
+        }
+    }
+
+    /// A tab of the page chosen: what was open on the last one shuts (its text is kept);
+    /// Instructions opens on the soul.
+    pub fn env_tab(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(e) = self.project_env.as_mut() else {
+            return;
         };
-        self.thread_project = project.clone();
-        self.open_subject(format!("env:{id}"), cx);
-        self.thread_project = project;
+        if e.tab == tab {
+            return;
+        }
+        e.tab = tab;
+        e.armed = None;
+        let on_tab = e
+            .card
+            .as_ref()
+            .and_then(|(k, _)| section(k))
+            .is_some_and(|s| s.tab() == tab);
+        if !on_tab {
+            for s in SECTIONS {
+                s.close(e);
+            }
+            e.card = None;
+        }
+        self.ssh.form = None;
+        self.files_remote.form = false;
+        if tab == Tab::Instructions && !on_tab {
+            self.env_card("soul", String::new(), window, cx);
+        }
+        cx.notify();
     }
 
     fn new_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) -> ProjectEnv {
@@ -175,14 +234,14 @@ impl BenchApp {
             hosts: accesses::AccessesEnv::new(window, cx),
             cron: schedule::ScheduleEnv::new(window, cx),
             new_name,
+            tab: Tab::General,
             card: None,
-            folded: Default::default(),
             armed: None,
             error: None,
         }
     }
 
-    /// Read the environment for the block (again after the agent or a Save changed it); what is
+    /// Read the environment for the page (again after the agent or a Save changed it); what is
     /// being typed is kept.
     pub fn load_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
         if self.project_env.as_ref().is_none_or(|e| e.id != id) {
@@ -282,12 +341,18 @@ impl BenchApp {
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     if let Some(e) = this.project_env.as_mut() {
-                        // A new one is made: its form closes, it is in the list.
+                        // A new one is made: its form closes, it is in the list; a new prompt
+                        // stays open in the editor, under its name.
                         if e.card.as_ref().is_some_and(|(_, n)| n == "new") && what != "cron" {
                             e.card = None;
                             e.mcp.open = None;
                             e.skills.open = None;
                             e.prompts.open = None;
+                            if what == "prompt" {
+                                let name = e.new_name.read(cx).value().trim().to_string();
+                                e.prompts.open = Some(name.clone());
+                                e.card = Some(("prompt", name));
+                            }
                         }
                         section.saved(e);
                     }
@@ -313,8 +378,8 @@ impl BenchApp {
         self.load_env(&id, window, cx);
     }
 
-    /// A row's Remove, twice: armed, then done. `what`: a section's key ("mcp", "skill",
-    /// "prompt", "cron", "host"), or "project" (the project itself).
+    /// A Remove, twice: armed, then done. `what`: a section's key ("mcp", "skill", "prompt",
+    /// "cron", "host"), or "project" (the project itself: its page closes).
     pub fn env_remove(
         &mut self,
         what: &'static str,
@@ -338,6 +403,7 @@ impl BenchApp {
             // Asked already, in its card.
             self.confirm_delete = Some(format!("p:{id}"));
             self.delete_project(id, window, cx);
+            self.panel = crate::app::Panel::Chat;
             self.new_session(cx);
             self.thread_project = String::new();
             return;
@@ -367,7 +433,8 @@ impl BenchApp {
         );
     }
 
-    /// A row's click: its card opens under the block (again: it closes); one card at a time.
+    /// A row's click: its card opens under its list (again: it closes); a text of Instructions
+    /// opens in the editor. One at a time.
     pub fn env_card(
         &mut self,
         kind: &'static str,
@@ -419,20 +486,9 @@ impl BenchApp {
             self.toast(NotificationType::Error, format!("{err:#}"), window, cx);
         }
     }
-
-    /// A section's "+ Add": the start of the request in the composer, the caret after it and the
-    /// thread scrolled down to it, for the person to finish and the agent to do.
-    pub fn ask_in_composer(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
-        let end = gpui_kit::component::input::Position::new(0, text.chars().count() as u32);
-        self.composer.update(cx, |s, cx| {
-            s.set_value(text.to_string(), window, cx);
-            s.set_cursor_position(end, window, cx);
-        });
-        self.jump_to_latest(cx);
-    }
 }
 
-/// The agent's answer into the blocks; fields being typed in keep their text.
+/// The agent's answer into the sections; fields being typed in keep their text.
 pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
     e.dir = v["dir"].as_str().unwrap_or_default().to_string();
     for s in SECTIONS {

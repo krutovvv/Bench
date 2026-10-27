@@ -482,27 +482,11 @@ impl BenchApp {
         }
     }
 
-    /// Before the first row: a project's environment, a form opened at the top, or why the
-    /// thread is empty.
-    fn render_head(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    /// Before the first row: a form opened at the top, or why the thread is empty.
+    fn render_head(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        let subject = self.current_subject();
         let mut rows: Vec<AnyElement> = vec![];
-        if let Some(id) = subject.strip_prefix("env:") {
-            if self.project_env.as_ref().is_none_or(|e| e.id != id) {
-                self.load_env(id, window, cx);
-            }
-            let under = self.env_card_section();
-            for (title, part) in self.render_env_sections(window, cx) {
-                rows.push(self.agent_row(part, cx));
-                if under == Some(title) && !title.is_empty() {
-                    if let Some(card) = self.render_env_card(cx) {
-                        rows.push(self.agent_row(card, cx));
-                    }
-                }
-            }
-        }
-        let empty = self.tv.rows.is_empty() && rows.is_empty();
+        let empty = self.tv.rows.is_empty();
         if empty {
             if let (Some(id), Some(why)) = (self.session.clone(), self.history_error.clone()) {
                 rows.push(

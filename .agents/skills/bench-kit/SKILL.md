@@ -14,7 +14,7 @@ metadata:
 
 Bench is a thread-centric app: a thread is a document of messages and the person's **inserts**
 (live tools put in with `/`); a **project** belongs to an **agent** (this Mac's or a server's)
-and says where its work is; its **environment** is edited in its own thread. The repository's
+and says where its work is; its **environment** is edited on its Settings page. The repository's
 `AGENTS.md` has the concepts and the rules; this kit has the how.
 
 ## Find before you read
@@ -49,7 +49,7 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 - **What the thread shows, its order** → `crates/thread` (rules as tests), drawn by `src/ui/thread/`.
 - **Where a project lives, a new kind of place** → `src/app/places.rs` + the agent's project row.
 - **A new insert** → a folder in `src/inserts/` (`references/build-insert.md`).
-- **A project's environment** → a file in `src/env/` implementing `Section`, a line in `SECTIONS`
+- **A project's Settings** → a file in `src/env/` implementing `Section` (its `Tab`), a line in `SECTIONS`
   (`src/env/mod.rs`); where it lives: `place.rs`; its data from `/api/projects/<id>/env`.
 - **The sidebar** → `src/ui/sidebar.rs` draws; what is done to a thread or project (menu, pin,
   color, rename, ⌫⌫, ↑↓) is `src/app/sidebar_items.rs`, marks in `src/app/marks.rs`.

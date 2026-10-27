@@ -1,19 +1,19 @@
-//! The project's name: a row of its block; its card renames the project or removes it. A
+//! The project's name, the first field of General, and the project's removal, its last. A
 //! server's Host is named too (in this Mac's list of agents); this Mac's Host has no name to
 //! change.
 
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 use serde_json::Value;
 
-use super::section::{Card, Section, pad, project_block, remove, revert, row, save};
+use super::section::{Section, Tab, form_actions, remove};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::model::ProjectKey;
+use bench_ui::settings_field;
 
 pub struct NameEnv {
-    /// The project's name, as its card edits it.
+    /// The project's name, as its field edits it.
     pub field: Entity<InputState>,
     pub dirty: bool,
 }
@@ -35,8 +35,11 @@ impl Section for Name {
     fn key(&self) -> &'static str {
         "name"
     }
-    fn block(&self, general: bool) -> &'static str {
-        project_block(general)
+    fn tab(&self) -> Tab {
+        Tab::General
+    }
+    fn block(&self, _general: bool) -> &'static str {
+        "Project"
     }
     fn shown(&self, app: &BenchApp) -> bool {
         app.project_env.as_ref().is_some_and(|e| {
@@ -44,50 +47,25 @@ impl Section for Name {
             !(key.agent.is_empty() && key.is_host())
         })
     }
-    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
-        let Some(e) = app.project_env.as_ref() else {
-            return vec![];
-        };
-        let name = e.name.field.read(cx).value().to_string();
-        vec![row(
-            e,
-            "name",
-            String::new(),
-            "Name".into(),
-            name,
-            false,
-            true,
-            cx,
-        )]
-    }
-    fn card(&self, app: &BenchApp, _name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
+    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
         let e = app.project_env.as_ref()?;
-        let muted = cx.theme().muted_foreground;
         let host = ProjectKey::parse(&e.id).is_host();
-        let mut actions = vec![save("name", e.name.dirty, cx)];
-        actions.extend(revert("name", e.name.dirty, cx));
-        // An agent's Host is not removed: a server's agent leaves Bench in the gear.
-        if !host {
-            actions.push(remove(
-                e,
-                "project",
-                String::new(),
-                "Remove the project",
-                cx,
-            ));
-        }
-        let note = if host {
-            "The server's name in Bench; its agent is added and removed in the gear."
+        let hint = if host {
+            "The server's name in Bench"
         } else {
-            "Removing the project keeps its threads."
+            "As the sidebar shows it"
         };
-        Some(Card::new(
-            "Name",
-            pad(v_flex()
-                .child(Input::new(&e.name.field))
-                .child(div().text_sm().text_color(muted).child(note))),
-            actions,
-        ))
+        let mut out = vec![
+            settings_field(
+                "Name",
+                hint,
+                Input::new(&e.name.field).into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        ];
+        out.extend(form_actions("name", e.name.dirty, cx));
+        Some(out)
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         if !e.name.dirty {
@@ -110,5 +88,48 @@ impl Section for Name {
             e.name.dirty = false;
         }
         false
+    }
+}
+
+/// The last group of General: the project removed (asked once); an agent's Host is not removed
+/// here (a server's agent leaves Bench in the gear).
+pub struct Danger;
+
+impl Section for Danger {
+    fn key(&self) -> &'static str {
+        "project"
+    }
+    fn tab(&self) -> Tab {
+        Tab::General
+    }
+    fn block(&self, _general: bool) -> &'static str {
+        "Remove"
+    }
+    fn shown(&self, app: &BenchApp) -> bool {
+        app.project_env
+            .as_ref()
+            .is_some_and(|e| !ProjectKey::parse(&e.id).is_host())
+    }
+    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
+        let e = app.project_env.as_ref()?;
+        Some(vec![
+            settings_field(
+                "Remove the project",
+                "Its threads are kept, outside projects",
+                div()
+                    .flex()
+                    .justify_end()
+                    .child(remove(
+                        e,
+                        "project",
+                        String::new(),
+                        "Remove the project",
+                        cx,
+                    ))
+                    .into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        ])
     }
 }

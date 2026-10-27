@@ -19,8 +19,8 @@ read it first; the others are simpler cases of the same shape.
 | `tools` {tool} | `/tools` | every utility in its title's menu, the tool's input → output (`src/inserts/tools/`, the utilities themselves in `crates/devtools`) | none: `read`/`bash` on what it is sent | the tool's input and output |
 
 What belongs to a **project** rather than to a thread (its soul, MCP servers, skills, prompts,
-accesses, Telegram bot, scheduled jobs) is not an insert: it is the project's environment, the
-thread `env:<id>` (`src/env/`, one file per section).
+accesses, Telegram bot, scheduled jobs) is not an insert: it is the project's Settings page
+(`src/env/`, one file per section).
 
 ## How it is kept: Pi's terms
 
@@ -83,7 +83,7 @@ elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claim
 
 Then: `cargo build`; put it into a thread; ask the agent something about "this" and watch which
 tool it calls; screenshot (`build-verification.md`). Add a demo thread with it in `src/demo.rs`
-(`thread(…, "<key>", …)` makes the insert; an `env:<id>` key is a project's environment instead), so the web demo and the README show it.
+(`thread(…, "<key>", …)` makes the insert), so the web demo and the README show it.
 
 ## How the browser insert works, end to end
 

@@ -9,7 +9,9 @@ use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Card, Request, Section, add, empty, pad, remove, revert, row, save};
+use super::section::{
+    Card, Request, Section, Tab, empty, head_act, pad, remove, revert, row, save,
+};
 use super::{ProjectEnv, enc, is_remote, on_change};
 use crate::app::BenchApp;
 
@@ -89,6 +91,9 @@ impl Section for Accesses {
     fn key(&self) -> &'static str {
         "host"
     }
+    fn tab(&self) -> Tab {
+        Tab::Access
+    }
     fn block(&self, _general: bool) -> &'static str {
         "File hosts"
     }
@@ -97,16 +102,12 @@ impl Section for Accesses {
             .as_ref()
             .is_some_and(|e| !is_remote(app, &e.id))
     }
-    /// Accesses are the agent's to add: "+ Add" starts the request in the composer.
+    /// "+ Add": the new file host's form under the list.
     fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         Some(
-            add(
-                "env-host-add",
-                "",
-                "Add to this project the file host (SFTP or FTP): ",
-                cx,
-            )
-            .into_any_element(),
+            head_act("env-host-add".into(), "+ Add", cx)
+                .on_click(cx.listener(|this, _, window, cx| this.new_host_form(window, cx)))
+                .into_any_element(),
         )
     }
     fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
@@ -321,21 +322,23 @@ impl Section for Machines {
     fn key(&self) -> &'static str {
         "ssh-host"
     }
+    fn tab(&self) -> Tab {
+        Tab::Access
+    }
     fn block(&self, _general: bool) -> &'static str {
         "Machines"
     }
     fn shown(&self, app: &BenchApp) -> bool {
         Accesses.shown(app)
     }
+    /// "+ Add": the new server's form under the list (it goes into ~/.ssh/config).
     fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         Some(
-            add(
-                "env-ssh-add",
-                "",
-                "Add to this project the server (SSH): ",
-                cx,
-            )
-            .into_any_element(),
+            head_act("env-ssh-add".into(), "+ Add", cx)
+                .on_click(
+                    cx.listener(|this, _, window, cx| this.edit_server(None, None, window, cx)),
+                )
+                .into_any_element(),
         )
     }
     fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {

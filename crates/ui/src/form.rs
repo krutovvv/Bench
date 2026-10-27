@@ -50,6 +50,44 @@ pub fn field_row(label: impl Into<SharedString>, field: impl IntoElement, cx: &A
         .child(div().flex_1().max_w(px(560.)).child(field))
 }
 
+/// The left column of a settings page's field: its title and hint.
+pub const SETTING_LABEL_W: f32 = 220.;
+
+/// A setting whose control is wide (a field, a list of choices): title and hint in a fixed column
+/// on the left, the control taking the rest, a rule below.
+pub fn settings_field(
+    title: impl Into<SharedString>,
+    hint: impl Into<SharedString>,
+    control: AnyElement,
+    cx: &App,
+) -> Div {
+    let theme = cx.theme();
+    let hint: SharedString = hint.into();
+    h_flex()
+        .w_full()
+        .gap_4()
+        .py_2p5()
+        .items_center()
+        .border_b_1()
+        .border_color(theme.border)
+        .child(
+            v_flex()
+                .w(px(SETTING_LABEL_W))
+                .flex_none()
+                .gap_0p5()
+                .child(div().child(title.into()))
+                .when(!hint.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .text_sm()
+                            .text_color(theme.muted_foreground)
+                            .child(hint),
+                    )
+                }),
+        )
+        .child(div().flex_1().min_w_0().child(control))
+}
+
 /// A setting: title and a muted hint on the left, the control on the right, a rule below.
 pub fn settings_row(
     title: impl Into<SharedString>,
@@ -79,10 +117,32 @@ pub fn settings_row(
         .child(control)
 }
 
+/// A group's title on a settings page: small, muted, in capitals, with air above; its actions
+/// ("+ Add", "Check") on the right.
+pub fn settings_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx: &App) -> Div {
+    let title: SharedString = title.into();
+    h_flex()
+        .w_full()
+        .pt_6()
+        .pb_2()
+        .gap_3()
+        .items_center()
+        .text_sm()
+        .text_color(cx.theme().muted_foreground)
+        .child(
+            div()
+                .flex_1()
+                .min_w_0()
+                .truncate()
+                .child(title.to_uppercase()),
+        )
+        .children(actions)
+}
+
 /// Pick one of a few: cells sharing borders, the chosen one in the accent.
 pub fn segmented(
     id: &'static str,
-    labels: &[&'static str],
+    labels: &[SharedString],
     chosen: usize,
     cx: &App,
     on_pick: OnPick,
@@ -107,7 +167,7 @@ pub fn segmented(
                     d.bg(theme.primary).text_color(theme.primary_foreground)
                 })
                 .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
-                .child(*label)
+                .child(label.clone())
                 .on_click(move |_, window, cx| pick(k, window, cx))
         }))
 }

@@ -44,9 +44,12 @@ takes them again).
   `pick_row_removable` (a server or host to pick, trash on hover), `card` (a block an insert
   opened: a file, a task), `file_form` (naming a new file or folder), `row_trash` (a file row's
   two-click delete). Use them inside an insert; never copy them into one.
-- **Environment sections** — `src/env/section.rs`: `row` / `row_with` (a section's row, lit when
-  its card is open), `add` ("+ Add"), `save`, `revert`, `remove` (two clicks), `new_card` (a new
-  MCP server, skill, prompt), `code` (an editor as tall as its text). Every `Section` uses these.
+- **Settings sections** — `src/env/section.rs`: `row` / `row_with` (a list's row, lit when its
+  card is open), `add` ("+ Add"), `save`, `revert`, `remove` (two clicks), `form_actions` (a
+  form's Save / Revert), `choices` (one of a list), `text` (a value only read), `new_card`, `code`
+  (an editor as tall as its text). In `crates/ui`: `settings_tabs`, `settings_heading`,
+  `settings_field`, `segmented`, and `ide`, `tree_row`, `tree_heading`, `ide_head` (a tree beside
+  an editor). Every `Section` uses these.
 
 A piece that is not here: add it to `crates/ui` (and to the storybook), then use it — not in the
 screen that needs it. Ask the person before inventing a new kind of control.

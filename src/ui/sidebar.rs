@@ -726,10 +726,10 @@ fn item_menu(
             Item::Project(id) => {
                 let env_id = id.clone();
                 menu.item(
-                    PopupMenuItem::new("Environment")
-                        .icon(Ico::Pencil.icon())
+                    PopupMenuItem::new("Settings")
+                        .icon(Ico::Settings.icon())
                         .on_click(act(Box::new(move |this, window, cx| {
-                            this.open_project_env(env_id.clone(), window, cx)
+                            this.open_project_settings(env_id.clone(), window, cx)
                         }))),
                 )
                 // A project with a folder opens in Zed (a server's over SSH).

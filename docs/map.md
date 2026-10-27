@@ -15,7 +15,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change the composer | `src/ui/composer.rs`, sending in `src/app/send.rs` (`send`) |
 | change an insert (`/terminal`, `/files`, `/ftp`, `/tasks`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
 | add an insert | `.agents/skills/bench-kit/references/build-insert.md` |
-| change a project's environment (soul, MCP, skills, prompts, accesses, Telegram, schedule) | `src/env/<section>.rs` (`mcp.rs`, `skills.rs`, `schedule.rs`…); a new section: `src/env/mod.rs` header |
+| change a project's Settings (soul, MCP, skills, prompts, accesses, Telegram, schedule) | `src/env/<section>.rs` (`mcp.rs`, `skills.rs`, `schedule.rs`…); the tabs `src/env/page.rs`, Instructions' tree and editor `src/env/ide.rs`; a new section: `src/env/mod.rs` header |
 | change what happens on an agent event | `src/app/events.rs` |
 | open, delete or search threads | `src/app/sessions.rs` |
 | change the sidebar | `src/ui/sidebar.rs` (projects: `src/app/project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/app/sidebar_items.rs`, marks in `src/app/marks.rs` |
@@ -52,7 +52,7 @@ src/
   ui/            the frame: mod.rs (layout, header), sidebar, statusbar, composer, media
   ui/thread/     the open thread on gpui::list: messages, work, queued, rail, extras
   inserts/       one folder per insert kind, the registry in mod.rs
-  env/           a project's environment, one file per section, the registry in mod.rs
+  env/           a project's Settings page: one file per section, the registry in mod.rs, page.rs, ide.rs
   gateway.rs     the WebSocket to the agent;  rest.rs  its REST API
   connection.rs, pi_agent.rs   where the agent runs, starting it (here or over SSH)
 agent/src/
@@ -70,5 +70,5 @@ docs/            architecture.md (why), map.md (where), thread-rewrite.md (the t
 - **Row** (`crates/thread`): one line of the thread — User, Work, Answer, Insert, Fail, Writing, Queued.
 - **Work**: the agent's steps between two messages; counted per message, never per run.
 - **Insert** / **InsertKind** (`src/inserts/mod.rs`): a live tool in the thread and its kind.
-- **Section** (`src/env/section.rs`): one part of a project's environment.
+- **Section** (`src/env/section.rs`): one part of a project's Settings, on a `Tab`.
 - **Journal**: Pi's entries of a conversation; Bench's thread is read from it, nothing else.

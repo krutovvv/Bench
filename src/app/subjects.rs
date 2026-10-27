@@ -1,5 +1,4 @@
-//! What a thread is opened with: its project's environment at its top (`env:<id>`, the one
-//! subject left), and the `/` list that puts inserts into it (`app::inserts`). A server, a tool
+//! What a thread is opened with: the `/` list that puts inserts into it (`app::inserts`). A server, a tool
 //! or the tasks opened from the keyboard are a new thread with that insert in it.
 
 use gpui_kit::*;
@@ -8,40 +7,9 @@ use super::BenchApp;
 use devtools::{GROUPS, Tool};
 
 impl BenchApp {
-    /// The latest thread about `key` (or the one `subject_target` names), or a new chat that
-    /// will carry it.
-    pub fn open_subject(&mut self, key: String, cx: &mut Context<Self>) {
-        self.panel = super::Panel::Chat;
-        // A form in the chat area (a new server) gives way to the thread.
-        self.ssh.form = None;
-        self.files_remote.form = false;
-        self.project_form = None;
-        let target = match self.subject_target.take() {
-            Some(t) => t,
-            None => self
-                .sessions
-                .iter()
-                .find(|s| s.subject == key)
-                .map(|s| s.id.clone()),
-        };
-        match target {
-            Some(id) => self.open_session(id, cx),
-            None => {
-                self.new_session(cx);
-                self.new_subject = key;
-            }
-        }
-        cx.notify();
-    }
-
-    /// A thread with `key` in it, as the demo starts one: an environment, or a new thread
-    /// with that insert.
+    /// A thread with `key` in it, as the demo starts one: a new thread with that insert.
     pub fn open_subject_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        if key.starts_with("env:") {
-            self.open_subject(key, cx);
-        } else {
-            self.new_thread_with(key, window, cx);
-        }
+        self.new_thread_with(key, window, cx);
     }
 
     /// A new thread with one insert in it (its session is made at once).
@@ -230,19 +198,6 @@ impl BenchApp {
         self.new_thread_with(format!("tools:{}", tool_key(tool)), window, cx);
     }
 
-    /// A thread's name until it has a title of its own: a project's environment.
-    pub fn subject_title(&self) -> Option<String> {
-        let s = self.current_subject();
-        let id = s.strip_prefix("env:")?;
-        let name = self
-            .projects
-            .iter()
-            .find(|p| p.id == id)
-            .map(|p| p.name.clone())
-            .unwrap_or_else(|| crate::app::LOCAL_HOST.into());
-        Some(format!("{name}: environment"))
-    }
-
     /// The open thread's key for things kept per thread: its session id, or "draft".
     pub fn thread_key(&self) -> String {
         self.session.clone().unwrap_or_else(|| "draft".into())
@@ -307,37 +262,7 @@ impl BenchApp {
     /// shown): the terminal's last lines, the folder and open file of a host, the tool's input
     /// and output. Task lists need none: the agent reads them with its tool.
     pub fn block_context(&self, cx: &App) -> String {
-        [self.subject_context(cx), self.inserts_context(cx)]
-            .into_iter()
-            .filter(|s| !s.trim().is_empty())
-            .collect::<Vec<_>>()
-            .join("\n\n")
-    }
-
-    /// The thread's own block: a project's environment (the soul is in the agent's prompt already).
-    fn subject_context(&self, _cx: &App) -> String {
-        if !self.current_subject().starts_with("env:") {
-            return String::new();
-        }
-        let Some(e) = &self.project_env else {
-            return String::new();
-        };
-        let mcp: Vec<&str> = e.mcp.servers.iter().map(|m| m.name.as_str()).collect();
-        let skills: Vec<&str> = e.skills.list.iter().map(|k| k.name.as_str()).collect();
-        format!(
-            "The environment block shows the folder {}, MCP servers: {}, skills: {}.",
-            e.dir,
-            if mcp.is_empty() {
-                "none".to_string()
-            } else {
-                mcp.join(", ")
-            },
-            if skills.is_empty() {
-                "none".to_string()
-            } else {
-                skills.join(", ")
-            },
-        )
+        self.inserts_context(cx)
     }
 }
 

@@ -135,9 +135,8 @@ notification replaces the older one for the same thread.
 - The status bar shows approvals / reasoning / model only after the agent's defaults arrived
   (`rest::profile_defaults`, the `profile_ready` flag), never placeholder defaults.
 - A project's soul (SYSTEM.md), MCP and language servers, skills, prompts, accesses, model,
-  Telegram bot and schedule are its environment: the thread `env:<id>` (`open_project_env`,
-  `src/env/mod.rs`), one agent message per section (`src/env/`), data from
-  `/api/projects/<id>/env`.
+  Telegram bot and schedule are its environment: its Settings page (`open_project_settings`,
+  `src/env/mod.rs`), a section per file (`src/env/`), data from `/api/projects/<id>/env`.
 
 ## Agents, machines, projects
 

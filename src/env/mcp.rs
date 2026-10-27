@@ -9,7 +9,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, Request, Section, add, card_act, code, empty, head_act, new_card, remove, revert,
+    Card, Request, Section, Tab, add, card_act, code, empty, head_act, new_card, remove, revert,
     row_with, save,
 };
 use super::{ProjectEnv, editor, enc, on_change};
@@ -100,6 +100,9 @@ impl Section for Mcp {
     fn key(&self) -> &'static str {
         "mcp"
     }
+    fn tab(&self) -> Tab {
+        Tab::Tools
+    }
     fn block(&self, _general: bool) -> &'static str {
         "MCP servers"
     }
@@ -150,7 +153,7 @@ impl Section for Mcp {
                 }))
                 .into_any_element(),
         );
-        head.push(add("env-mcp-add", "mcp", "", cx).into_any_element());
+        head.push(add("env-mcp-add", "mcp", cx).into_any_element());
         Some(
             h_flex()
                 .gap_3()
@@ -229,7 +232,6 @@ impl Section for Mcp {
                 e,
                 "mcp",
                 "New MCP server: its name, and its config (Pi's format: {\"url\", \"headers\"} or {\"command\", \"args\", \"env\"})",
-                "Add an MCP server to this project: ",
                 &e.mcp.json,
                 true,
                 cx,

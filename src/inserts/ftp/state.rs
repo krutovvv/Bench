@@ -192,9 +192,8 @@ impl BenchApp {
         );
     }
 
-    /// The Files group's "+": the new host's form takes the chat area.
+    /// The new host's form, in the thread or under a project's File hosts.
     pub fn new_host_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.panel = crate::app::Panel::Chat;
         self.ssh.form = None;
         let f = &self.files_remote;
         for e in [
@@ -243,8 +242,8 @@ impl BenchApp {
             "user": v(&f.f_user),
             "password": if password.is_empty() { Value::Null } else { json!(password) },
             "path": if path.is_empty() { Value::Null } else { json!(path) },
-            // Made in a project's thread: that project's.
-            "project": self.thread_project,
+            // Made in a project's thread or its settings: that project's.
+            "project": self.form_project(),
         });
         let profile = self.current_profile();
         self.background(
@@ -255,7 +254,9 @@ impl BenchApp {
                 Ok(v) => {
                     this.files_remote.form = false;
                     this.load_remote_hosts(window, cx);
-                    if let Some(id) = v["host"]["id"].as_str() {
+                    if this.panel == crate::app::Panel::Project {
+                        this.reload_env(window, cx);
+                    } else if let Some(id) = v["host"]["id"].as_str() {
                         // Into the thread's file host insert (put in if there is none).
                         this.put_insert(format!("files:{id}"), window, cx);
                     }

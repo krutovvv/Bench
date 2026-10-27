@@ -294,11 +294,9 @@ deploy@{alias}:~$ "
 
 /// A thread about something (`tasks:today`, `ssh:web-1`…): one turn, done.
 fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {
-    let mut row = session(id, title, 2, false, "desktop");
-    // An environment is the thread's top; a tool, an insert before the first message.
-    if subject.starts_with("env:") {
-        row.subject = subject.into();
-    } else if !subject.is_empty() {
+    let row = session(id, title, 2, false, "desktop");
+    // A tool: an insert before the first message.
+    if !subject.is_empty() {
         let spec = match subject.split_once(':') {
             Some(("tool", t)) => format!("tools:{t}"),
             Some(("browser", _)) => "browser".into(),
@@ -350,13 +348,14 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Jou
     app.demo_threads.insert(id.into(), t);
 }
 
-/// The blog project's environment, for its environment thread.
+/// The blog project's environment, for its settings.
 pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
     let Some(e) = app.project_env.as_mut() else {
         return;
     };
     let v = serde_json::json!({
         "dir": "~/.bench/projects/p-blog",
+        "project": {"name": "Northwind blog"},
         "soul": "The Northwind blog: product news and guides for our customers, published on Ghost.\n\nWrite plainly, for people who use the product, not for engineers. Every post gets a cover and two tags; drafts first, publish only when asked.",
         "mcp": [
             {"name": "ghost", "kind": "http", "enabled": true, "connected": true, "tools": 12},
@@ -390,20 +389,23 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
         ]
     });
     crate::env::apply(e, &v, window, cx);
-    // `BENCH_DEMO=env-open`: a skill's card open, as when it is being edited.
-    if std::env::var("BENCH_DEMO").as_deref() == Ok("env-open") && e.card.is_none() {
+    // `BENCH_ENV_TAB=general|instructions|tools|schedule|access`: that tab; `BENCH_DEMO=env-open`:
+    // a skill open in Instructions, as when it is being edited.
+    if e.card.is_some() {
+        return;
+    }
+    let open = std::env::var("BENCH_DEMO").as_deref() == Ok("env-open");
+    let tab = match std::env::var("BENCH_ENV_TAB").as_deref() {
+        Ok("instructions") => crate::env::Tab::Instructions,
+        Ok("tools") => crate::env::Tab::Tools,
+        Ok("schedule") => crate::env::Tab::Schedule,
+        Ok("access") => crate::env::Tab::Access,
+        _ if open => crate::env::Tab::Instructions,
+        _ => crate::env::Tab::General,
+    };
+    app.env_tab(tab, window, cx);
+    if open {
         app.env_card("skill", "release-notes".into(), window, cx);
-        if let Some(e) = app.project_env.as_mut() {
-            e.folded.extend([
-                "Project",
-                "Model",
-                "MCP servers",
-                "Skills",
-                "Prompts",
-                "Schedule",
-                "Accesses",
-            ]);
-        }
     }
 }
 
@@ -495,19 +497,6 @@ is published.\n\nThe page is right here — click and type in it if something ne
     );
     app.sites.demo_frame =
         crate::inserts::browser::gateway::image_of(include_bytes!("../assets/demo/site.jpg"));
-    thread(
-        app,
-        "d-env",
-        "Northwind blog: environment",
-        "env:p-blog",
-        done(
-            "Add the Ghost admin API, so you can publish without the browser.",
-            vec![tool("edit", "~/.bench/projects/p-blog/mcp.json")],
-            "Added **ghost** (12 tools: posts, tags, images) with the admin key as `${GHOST_ADMIN_KEY}`; \
-the key itself is in the agent's env. New threads of the blog can draft and publish through it.",
-            14.0,
-        ),
-    );
     thread(
         app,
         "d-tool",
@@ -712,7 +701,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
     ];
     for s in app.sessions.iter_mut() {
         s.project = match s.id.as_str() {
-            "d-site" | "d-env" => "p-blog",
+            "d-site" => "p-blog",
             "d-landing" | "d-api" | "d-tests" | "d-web1" | "d-web1-tls" => "p-store",
             "d-audit-1" | "d-audit-2" => "p-audit",
             "d-today" | "d-tool" | "d-notes" => "p-me",
@@ -740,7 +729,6 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Ok("tasks") => Some("d-today"),
         Ok("server") => Some("d-web1"),
         Ok("tool") => Some("d-tool"),
-        Ok("env") | Ok("env-open") => Some("d-env"),
         Ok("landing") | Ok("top") | Ok("new") | Ok("long") => None,
         _ => Some("d-site"),
     };
@@ -815,6 +803,13 @@ fewer form fields. Then check what it did to signups and give me a short summary
             ],
             multi_select: std::env::var("BENCH_CLARIFY_MULTI").is_ok(),
         });
+    }
+    // `BENCH_DEMO=env|env-open`: the blog's settings over the thread (`env` below fills them).
+    if matches!(
+        std::env::var("BENCH_DEMO").as_deref(),
+        Ok("env") | Ok("env-open")
+    ) {
+        app.panel = crate::app::Panel::Project;
     }
     if std::env::var("BENCH_PANEL").as_deref() == Ok("providers") {
         app.gear_tab = std::env::var("BENCH_GEAR_TAB")

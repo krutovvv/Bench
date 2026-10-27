@@ -1,27 +1,62 @@
-//! `Section`: one part of a project's environment (its soul, its MCP servers, …) — its rows in
-//! the environment's blocks, the card under them, and how that card saves, reverts and removes.
-//! The drivers in `mod.rs` and `view.rs` call it through `SECTIONS`; the pieces below are what
-//! every section's rows and card are made of.
+//! `Section`: one part of a project's settings (its soul, its MCP servers, …) — the tab and the
+//! group it is drawn in, drawn as a form of fields or as a list of rows whose click opens a card
+//! under the list, and how that saves, reverts and removes. The drivers in `mod.rs`, `page.rs`
+//! and `ide.rs` call it through `SECTIONS`; the pieces below are what every section is made of.
 
 use gpui_kit::component::input::EditorState;
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::Value;
 
 use super::ProjectEnv;
 use crate::app::BenchApp;
+use crate::icons::Ico;
 
 /// A save's REST call: method, path, JSON body.
 pub type Request = (&'static str, String, Value);
 
+/// The tabs of a project's settings, in their order.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Tab {
+    /// Its name, where it lives, how it runs, its Telegram bot.
+    #[default]
+    General,
+    /// What the agent reads as text: the soul, prompts, skills (`ide.rs`).
+    Instructions,
+    /// MCP and language servers.
+    Tools,
+    Schedule,
+    /// Machines and file hosts.
+    Access,
+}
+
+impl Tab {
+    pub const ALL: [Tab; 5] = [
+        Tab::General,
+        Tab::Instructions,
+        Tab::Tools,
+        Tab::Schedule,
+        Tab::Access,
+    ];
+
+    pub fn label(self) -> (Ico, &'static str) {
+        match self {
+            Tab::General => (Ico::Settings, "General"),
+            Tab::Instructions => (Ico::FileText, "Instructions"),
+            Tab::Tools => (Ico::Wrench, "Tools"),
+            Tab::Schedule => (Ico::Clock, "Schedule"),
+            Tab::Access => (Ico::Server, "Access"),
+        }
+    }
+}
+
 /// A section's card, as its `card` gives it: the head's title and actions (Close is added), the
-/// body, and the cards that follow it (a skill's open file).
+/// body.
 pub struct Card {
     pub title: String,
     pub body: AnyElement,
     pub actions: Vec<AnyElement>,
-    pub follow: Vec<AnyElement>,
 }
 
 impl Card {
@@ -30,29 +65,40 @@ impl Card {
             title: title.into(),
             body,
             actions,
-            follow: vec![],
         }
     }
 }
 
 pub trait Section: Sync {
-    /// Its card's kind, and what `env_save` / `env_revert` / `env_remove` are called with:
-    /// "name", "soul", "telegram", "model", "mcp", "skill", "prompt", "cron", "host".
+    /// What `env_card`, `env_save`, `env_revert` and `env_remove` are called with: "name",
+    /// "place", "soul", "telegram", "model", "mcp", "lsp", "skill", "prompt", "cron", "host".
     fn key(&self) -> &'static str;
-    /// The block its rows sit in (sections next to each other in `SECTIONS` may share one).
+    /// The tab it is on.
+    fn tab(&self) -> Tab;
+    /// The group it is drawn under on its tab (sections next to each other in `SECTIONS` may
+    /// share one).
     fn block(&self, general: bool) -> &'static str;
     /// Whether it is shown for this project.
     fn shown(&self, _app: &BenchApp) -> bool {
         true
     }
-    /// What it adds to its block's head after the title (one section of a block has it).
+    /// What it adds to its group's heading, on the right ("+ Add", "Check").
     fn head(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         None
     }
-    /// Its rows in the block.
-    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement>;
-    /// The card of the row `name` (None: nothing to show).
-    fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card>;
+    /// Drawn as a form: its fields (`settings_field` rows, then `form_actions` once something
+    /// changed). None: it is a list (`rows`).
+    fn form(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
+        None
+    }
+    /// A list's rows, in a bordered block.
+    fn rows(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+        vec![]
+    }
+    /// The card of the row `name`, under the list (None: nothing to show).
+    fn card(&self, _app: &BenchApp, _name: &str, _cx: &mut Context<BenchApp>) -> Option<Card> {
+        None
+    }
     /// Its part of the agent's answer (`/api/projects/<id>/env`); fields being typed in keep
     /// their text.
     fn apply(&self, _e: &mut ProjectEnv, _v: &Value, _window: &mut Window, _cx: &mut App) {}
@@ -88,7 +134,7 @@ pub trait Section: Sync {
     fn saved(&self, _e: &mut ProjectEnv) {}
     /// After a save, besides the environment: what else to read again.
     fn reload(&self, _app: &mut BenchApp, _window: &mut Window, _cx: &mut Context<BenchApp>) {}
-    /// Revert: the saved text back. True when it opened its card again itself; false: the
+    /// Revert: the saved text back. True when it opened its text again itself; false: the
     /// environment is read again.
     fn revert(
         &self,
@@ -104,12 +150,7 @@ pub trait Section: Sync {
     }
 }
 
-/// The block of the project's own rows (its name, soul, Telegram).
-pub fn project_block(general: bool) -> &'static str {
-    if general { "Host" } else { "Project" }
-}
-
-/// A quiet text action in a block's head: muted, the foreground on hover.
+/// A quiet text action in a heading: muted, the foreground on hover.
 pub fn head_act(id: SharedString, label: &'static str, cx: &App) -> Stateful<Div> {
     let theme = cx.theme();
     let (muted, fg) = (theme.muted_foreground, theme.foreground);
@@ -122,22 +163,11 @@ pub fn head_act(id: SharedString, label: &'static str, cx: &App) -> Stateful<Div
         .child(label)
 }
 
-/// "+ Add": a new one's card (paste it, or ask the agent from there); with no `kind`, the request
-/// `ask` starts in the composer (accesses are the agent's to add).
-pub fn add(
-    id: &'static str,
-    kind: &'static str,
-    ask: &'static str,
-    cx: &mut Context<BenchApp>,
-) -> Stateful<Div> {
+/// "+ Add": a new one's card under the list.
+pub fn add(id: &'static str, kind: &'static str, cx: &mut Context<BenchApp>) -> Stateful<Div> {
     head_act(id.into(), "+ Add", cx).on_click(cx.listener(move |this, _, window, cx| {
-        this.click_claimed = true;
         cx.stop_propagation();
-        if kind.is_empty() {
-            this.ask_in_composer(ask, window, cx)
-        } else {
-            this.env_card(kind, "new".into(), window, cx)
-        }
+        this.env_card(kind, "new".into(), window, cx)
     }))
 }
 
@@ -193,10 +223,9 @@ pub fn row_with(
                 .group_hover(group.clone(), |s| s.opacity(1.))
                 .child(a)
         }))
-        .on_click(cx.listener(move |this, _, window, cx| {
-            this.click_claimed = true;
-            this.env_card(kind, name.clone(), window, cx)
-        }))
+        .on_click(
+            cx.listener(move |this, _, window, cx| this.env_card(kind, name.clone(), window, cx)),
+        )
         .into_any_element()
 }
 
@@ -215,7 +244,7 @@ pub fn row(
     row_with(e, kind, name, None, label, note, bad, first, vec![], cx)
 }
 
-/// A block with nothing in it: one muted line.
+/// A list with nothing in it: one muted line.
 pub fn empty(text: &'static str, cx: &App) -> AnyElement {
     div()
         .px_3()
@@ -248,10 +277,7 @@ pub fn save(what: &'static str, dirty: bool, cx: &mut Context<BenchApp>) -> AnyE
             d.cursor_pointer()
                 .bg(theme.primary)
                 .text_color(theme.primary_foreground)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
-                    this.env_save(what, window, cx)
-                }))
+                .on_click(cx.listener(move |this, _, window, cx| this.env_save(what, window, cx)))
         })
         .when(!dirty, |d| d.text_color(theme.muted_foreground))
         .child("Save")
@@ -263,15 +289,12 @@ pub fn revert(what: &'static str, dirty: bool, cx: &mut Context<BenchApp>) -> Op
     let muted = cx.theme().muted_foreground;
     dirty.then(|| {
         card_act(format!("env-card-revert-{what}"), "Revert".into(), muted)
-            .on_click(cx.listener(move |this, _, window, cx| {
-                this.click_claimed = true;
-                this.env_revert(what, window, cx)
-            }))
+            .on_click(cx.listener(move |this, _, window, cx| this.env_revert(what, window, cx)))
             .into_any_element()
     })
 }
 
-/// A card's Remove: the first click arms it ("Remove?"), the second does it.
+/// A Remove: the first click arms it ("Remove?"), the second does it.
 pub fn remove(
     e: &ProjectEnv,
     what: &'static str,
@@ -289,10 +312,9 @@ pub fn remove(
         },
         cx.theme().danger,
     )
-    .on_click(cx.listener(move |this, _, window, cx| {
-        this.click_claimed = true;
-        this.env_remove(what, target.clone(), window, cx)
-    }))
+    .on_click(
+        cx.listener(move |this, _, window, cx| this.env_remove(what, target.clone(), window, cx)),
+    )
     .into_any_element()
 }
 
@@ -301,7 +323,7 @@ pub fn pad(d: Div) -> AnyElement {
     d.px_3().py_2().gap_2().into_any_element()
 }
 
-/// A text: a code editor as tall as its wrapped text (the thread scrolls, not it).
+/// A text: a code editor as tall as its wrapped text (the page scrolls, not it).
 pub fn code(state: &Entity<EditorState>, cx: &App) -> AnyElement {
     // As tall as the lines it shows: a folded block's lines do not count.
     let s = state.read(cx);
@@ -323,25 +345,16 @@ pub fn code(state: &Entity<EditorState>, cx: &App) -> AnyElement {
         .into_any_element()
 }
 
-/// A new MCP server's, skill's or prompt's card: its name (when `named`), its text, Save, and
-/// "Ask the agent instead" (`ask` starts in the composer).
+/// A new MCP server's or language server's card: its name (when `named`), its text, Save.
 pub fn new_card(
     e: &ProjectEnv,
     kind: &'static str,
     title: &'static str,
-    ask: &'static str,
     editor: &Entity<EditorState>,
     named: bool,
     cx: &mut Context<BenchApp>,
 ) -> Card {
-    let muted = cx.theme().muted_foreground;
-    let ask = card_act("env-card-ask".into(), "Ask the agent instead".into(), muted)
-        .on_click(cx.listener(move |this, _, window, cx| {
-            this.click_claimed = true;
-            this.ask_in_composer(ask, window, cx)
-        }))
-        .into_any_element();
-    let actions = vec![ask, save(kind, true, cx)];
+    let actions = vec![save(kind, true, cx)];
     let body = v_flex()
         .when(named, |d| {
             d.child(
@@ -357,6 +370,88 @@ pub fn new_card(
         .child(code(editor, cx))
         .into_any_element();
     Card::new(title, body, actions)
+}
+
+/// A form's Revert and Save, under its fields, while something in it changed.
+pub fn form_actions(
+    what: &'static str,
+    dirty: bool,
+    cx: &mut Context<BenchApp>,
+) -> Option<AnyElement> {
+    dirty.then(|| {
+        h_flex()
+            .w_full()
+            .py_2()
+            .gap_2()
+            .justify_end()
+            .child(
+                crate::ui::form_action(
+                    SharedString::from(format!("env-form-revert-{what}")),
+                    "Revert",
+                    false,
+                    cx,
+                )
+                .on_click(
+                    cx.listener(move |this, _, window, cx| this.env_revert(what, window, cx)),
+                ),
+            )
+            .child(
+                crate::ui::form_action(
+                    SharedString::from(format!("env-form-save-{what}")),
+                    "Save",
+                    true,
+                    cx,
+                )
+                .on_click(cx.listener(move |this, _, window, cx| this.env_save(what, window, cx))),
+            )
+            .into_any_element()
+    })
+}
+
+/// A setting that is only read: its text (in the danger color when `bad`).
+pub fn text(t: impl Into<SharedString>, bad: bool, cx: &App) -> AnyElement {
+    let theme = cx.theme();
+    div()
+        .when(bad, |d| d.text_color(theme.danger))
+        .child(t.into())
+        .into_any_element()
+}
+
+/// Pick one of a few, shown as a list (each a line of its own, the current one checked); a
+/// click calls `pick` with its index.
+pub fn choices(
+    id: &'static str,
+    items: Vec<(String, bool)>,
+    pick: std::rc::Rc<dyn Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>)>,
+    cx: &mut Context<BenchApp>,
+) -> AnyElement {
+    let theme = cx.theme().clone();
+    v_flex()
+        .w_full()
+        .rounded_md()
+        .border_1()
+        .border_color(theme.border)
+        .overflow_hidden()
+        .children(items.into_iter().enumerate().map(|(k, (label, on))| {
+            let pick = pick.clone();
+            h_flex()
+                .id((id, k))
+                .px_3()
+                .py_1()
+                .gap_2()
+                .cursor_pointer()
+                .when(k > 0, |d| {
+                    d.border_t_1().border_color(theme.border.opacity(0.5))
+                })
+                .when(on, |d| d.bg(theme.list_active))
+                .hover(|s| s.bg(theme.list_hover))
+                .child(div().flex_1().min_w_0().truncate().child(label))
+                .when(on, |d| {
+                    d.child(Ico::Check.icon().xsmall().text_color(theme.foreground))
+                })
+                .on_click(cx.listener(move |this, _, window, cx| pick(this, k, window, cx)))
+        }))
+        .into_any_element()
 }
 
 /// A run's time as read: "today 18:00", "tomorrow 09:00", "Mon 2 Nov 09:00".

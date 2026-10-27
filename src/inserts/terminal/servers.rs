@@ -426,26 +426,35 @@ impl BenchApp {
         }
         self.ssh.form = None;
         self.reload_servers(cx);
-        // Added in a project's thread: the project's server (its row in the agent's store).
-        if !self.thread_project.is_empty() {
+        // Added in a project's thread or its settings: the project's server (its row in the
+        // agent's store).
+        let project = self.form_project();
+        let page = self.panel == crate::app::Panel::Project;
+        if !project.is_empty() {
             if let Some(conn) = self.local_conn() {
                 let body = serde_json::json!({
                     "name": s.alias, "kind": "ssh", "host": if s.hostname.is_empty() { s.alias.clone() } else { s.hostname.clone() },
-                    "user": s.user, "source": format!("ssh_config:{}", s.alias), "project": self.thread_project,
+                    "user": s.user, "source": format!("ssh_config:{}", s.alias), "project": project,
                 });
-                self.ssh_projects
-                    .insert(s.alias.clone(), self.thread_project.clone());
+                self.ssh_projects.insert(s.alias.clone(), project.clone());
                 let profile = self.current_profile();
                 self.background(
                     window,
                     cx,
                     move || crate::rest::send_json(&conn, "POST", "/api/hosts", &profile, body),
-                    |_, _, _, _| {},
+                    // The settings page lists it once the agent has it.
+                    move |this, _, window, cx| {
+                        if page {
+                            this.reload_env(window, cx);
+                        }
+                    },
                 );
             }
         }
-        // Into the thread it was added from.
-        self.attach_tool(format!("ssh:{}", s.alias), window, cx);
+        // Into the thread it was added from (the settings page lists it instead).
+        if !page {
+            self.attach_tool(format!("ssh:{}", s.alias), window, cx);
+        }
     }
 
     /// "Choose…" beside the key field: the system file picker; a key in the home folder is

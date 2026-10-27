@@ -75,7 +75,7 @@ export default ({ rt }: Ctx): Module => ({
 				return { ok: true };
 			},
 		],
-		// Everything the environment thread shows, in one read.
+		// Everything a project's Settings show, in one read.
 		[
 			"GET",
 			/^\/api\/projects\/([^/]+)\/env$/,

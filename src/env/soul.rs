@@ -1,11 +1,11 @@
-//! The project's soul (SYSTEM.md): what the project is and how to work in it. A row of the
-//! project's block; its card is the text.
+//! The project's soul (SYSTEM.md): what the project is and how to work in it. The first text of
+//! Instructions (`ide.rs`).
 
 use gpui_kit::component::input::EditorState;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Card, Request, Section, code, project_block, revert, row, save};
+use super::section::{Request, Section, Tab};
 use super::{ProjectEnv, editor, on_change};
 use crate::app::BenchApp;
 
@@ -33,42 +33,11 @@ impl Section for Soul {
     fn key(&self) -> &'static str {
         "soul"
     }
-    fn block(&self, general: bool) -> &'static str {
-        project_block(general)
+    fn tab(&self) -> Tab {
+        Tab::Instructions
     }
-    /// Its row says the soul's first line.
-    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
-        let Some(e) = app.project_env.as_ref() else {
-            return vec![];
-        };
-        let text = e.soul.text.read(cx).value().to_string();
-        let first = text
-            .lines()
-            .map(|l| l.trim_start_matches('#').trim())
-            .find(|l| !l.is_empty())
-            .unwrap_or("not described yet")
-            .to_string();
-        let general = e.id == "general";
-        vec![row(
-            e,
-            "soul",
-            String::new(),
-            "Soul".into(),
-            first,
-            false,
-            general,
-            cx,
-        )]
-    }
-    fn card(&self, app: &BenchApp, _name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
-        let e = app.project_env.as_ref()?;
-        let mut actions = vec![save("soul", e.soul.dirty, cx)];
-        actions.extend(revert("soul", e.soul.dirty, cx));
-        Some(Card::new(
-            "Soul: what the project is, how to work in it",
-            code(&e.soul.text, cx),
-            actions,
-        ))
+    fn block(&self, _general: bool) -> &'static str {
+        "Instructions"
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         if !e.soul.dirty {

@@ -56,8 +56,19 @@ export function environment(s: SessionInfo): string {
 		// The tools for code, said once: a long thread spent most of its steps reading files through
 		// bash in small windows and editing them with scripts.
 		"Files: find with grep (text), glob (names) and ls (a folder's tree); read a file whole with read (up to 2000 lines at once, not in small pieces); change it with edit, all its changes in one call (edits[]); new files with write. bash is for running things — builds, tests, git — not for reading or editing files.",
+		settings(s),
 		PLATFORM[s.source] ?? PLATFORM.local,
-	].join("\n");
+	]
+		.filter(Boolean)
+		.join("\n");
+}
+
+/** Where the thread's project keeps its settings, which the person edits in the project's
+ * Settings in Bench, and the agent when asked. */
+function settings(s: SessionInfo): string | undefined {
+	if (!s.project) return undefined;
+	const dir = path.join(path.dirname(agentDir("project:x")), s.project);
+	return `This project's settings live in ${dir}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them). Servers and file hosts of the project are added or taken out with the hosts tool.`;
 }
 
 /** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory, read where
@@ -123,11 +134,6 @@ export function subject(s: SessionInfo): string | undefined {
 	if (kind === "files") {
 		const h = hosts.get(value);
 		return `# This thread\nIt is about the files of ${h ? `${h.name} (${h.kind})` : `the host ${value}`}, shown live above the conversation. Work with them with remote_files.${block}`;
-	}
-	if (kind === "env") {
-		const p = projects.get(value);
-		const dir = path.join(path.dirname(agentDir("project:x")), value);
-		return `# This thread\nIt is about the environment of the project "${p?.name ?? value}", shown above the conversation: what every thread of this project gets on top of the general agent. It lives in ${dir}: SYSTEM.md (the project's soul: what it is, for whom, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}, optional "exposure": "direct" | "deferred" | "hidden"}}), skills/<name>/SKILL.md (front matter with name and description), prompts/. Its accesses (servers, file hosts) are added or taken out with the hosts tool: a file host belongs to the project that made it, and taking it out deletes it (an SSH access is the machine's, it only loses the tag). Change the rest there with read, write and edit when the person asks: describe the project, add or remove a server or a skill. Keys and passwords go into mcp.json as \${NAME} references, the values into the agent's env (ask for them). New threads of the project see the changes; a changed mcp.json reconnects its servers.${block}`;
 	}
 	if (kind === "folder")
 		return `# This thread\nIt is about the folder ${value}, shown above the conversation. Work in it with read, write, edit and bash.`;

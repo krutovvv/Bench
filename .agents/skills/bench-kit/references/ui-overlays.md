@@ -21,7 +21,7 @@ Button::new(("row-menu", i)).ghost().xsmall().icon(Ico::Ellipsis.icon())
   still adds the label's padding and gap). A right-click menu (`.context_menu`) goes on any element.
 - Item closures are `'static`: clone the view entity (`let view = cx.entity();`) into each and
   call `view.update(cx, |this, cx| …)`.
-- Separate unrelated groups of items with `.separator()` (Environment, Open in Zed | Pin, Rename |
+- Separate unrelated groups of items with `.separator()` (Settings, Open in Zed | Pin, Rename |
   colours | Delete).
 - A custom row (color swatches): `PopupMenuItem::element(move |_window, cx| …)`; it is
   re-rendered, so read live state inside (`view.read(cx).…`) — a captured value leaves the check
@@ -32,7 +32,7 @@ Button::new(("row-menu", i)).ghost().xsmall().icon(Ico::Ellipsis.icon())
 
 `.context_menu(move |menu, _, _| menu.item(…))` on the row element. Bench builds one menu,
 `item_menu` in `src/ui/sidebar.rs`, and gives it to both the row's hover "⋯" (`dropdown_menu`)
-and its right-click (`context_menu`): Environment, Open in Zed (projects), Pin, Rename (threads),
+and its right-click (`context_menu`): Settings, Open in Zed (projects), Pin, Rename (threads),
 colours, Delete.
 
 ## Popover (a panel on click)

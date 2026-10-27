@@ -11,7 +11,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Card, Request, Section, add, code, empty, remove, revert, row, save};
+use super::section::{Card, Request, Section, Tab, add, code, empty, remove, revert, row, save};
 use super::{ProjectEnv, editor, on_change};
 use crate::app::BenchApp;
 use crate::rest;
@@ -50,11 +50,14 @@ impl Section for Lsp {
     fn key(&self) -> &'static str {
         "lsp"
     }
+    fn tab(&self) -> Tab {
+        Tab::Tools
+    }
     fn block(&self, _general: bool) -> &'static str {
         "Language servers"
     }
     fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-        Some(add("env-lsp-add", "lsp", "", cx).into_any_element())
+        Some(add("env-lsp-add", "lsp", cx).into_any_element())
     }
     fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         let Some(e) = app.project_env.as_ref() else {

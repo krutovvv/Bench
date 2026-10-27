@@ -105,6 +105,7 @@ icons! {
     // Not Lucide: a Z in Lucide's style, for "open in Zed".
     Zed => "zed",
     BookCheck => "book-check",
+    Wrench => "wrench",
     CalendarDays => "calendar-days",
     Check => "check",
     Flag => "flag",

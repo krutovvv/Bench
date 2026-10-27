@@ -151,8 +151,14 @@ impl Render for Story {
             .child(settings_row(
                 "Appearance",
                 "Light, dark or as the system",
-                segmented("seg", &["Light", "Dark", "System"], self.picked, cx, pick)
-                    .into_any_element(),
+                segmented(
+                    "seg",
+                    &["Light".into(), "Dark".into(), "System".into()],
+                    self.picked,
+                    cx,
+                    pick,
+                )
+                .into_any_element(),
                 cx,
             ))
             .child(
