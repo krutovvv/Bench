@@ -23,7 +23,12 @@ places that every view fills in its own way:
   around the center by `workspace/layout.rs`, each panel by its own module
   (`BenchApp::render_panel`).
 - **The left dock** shows one panel at a time: `Panel::Threads` (projects and their threads)
-  or `Panel::Explorer` (one project's tree). The Explorer is opened from a project (its menu's Explorer, ⌘E on the open thread's project) and takes the window: tree, documents, the thread beside on demand; its pressed button atop the sidebar (or ⌘E) closes it and brings the thread back. A new
+  or `Panel::Explorer` (one project's tree). The Explorer is opened on the project of the thread
+  open now — the window's top-right button (pressed while its tree is shown), ⌘E, a project's
+  menu, a thread's context menu — and takes the window: tree, documents, the thread beside on
+  demand. The same button, still in that corner and pressed, closes it and brings the thread back;
+  the strip over the sidebar keeps its "+" and the fold under either panel.
+  A new
   way to look at things (search across threads, git, tasks) is a new `Panel` in the left dock's
   list, nothing else changes.
 - **The center** is `Center` (`src/workspace/mod.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a

@@ -10,13 +10,15 @@ use crate::app::BenchApp;
 use crate::workspace::Center;
 
 impl BenchApp {
-    /// The header's right end, the window's top-right corner: with a document in the center, the
-    /// button that shows the thread beside it (⌘J). Shown, the thread's own head takes this corner
-    /// with its + and ×.
+    /// The header's right end, the window's top-right corner: the Explorer's button — it opens
+    /// the project of the thread open now, and is pressed while that tree is shown (⌘E) — and,
+    /// with a document in the center, the button that shows the thread beside it (⌘J). Shown,
+    /// the thread's own head takes this corner with its + and ×.
     fn render_header_tail(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let shown = self
             .shown_panel(crate::workspace::DockPosition::Right)
             .is_some();
+        let ide = self.left_dock.shows(crate::workspace::Panel::Explorer);
         h_flex()
             .flex_none()
             .gap_1()
@@ -35,6 +37,22 @@ impl BenchApp {
                     ),
                 )
             })
+            // The extreme corner, there whatever the center shows: one hop from a thread to its
+            // project's files, and back by the same pressed button.
+            .child(
+                bench_ui::icon_button(
+                    "ide-toggle",
+                    bench_ui::icons::Ico::FolderTree,
+                    if ide {
+                        "Close the Explorer  ⌘E"
+                    } else {
+                        "The project's files  ⌘E"
+                    },
+                    ide,
+                    cx,
+                )
+                .on_click(cx.listener(|this, _, window, cx| this.toggle_side(window, cx))),
+            )
             .into_any_element()
     }
 
@@ -94,6 +112,7 @@ impl BenchApp {
                 .child(self.render_header_tail(cx))
                 .into_any_element();
         }
+        // Settings and the new project's page: their own close sits here.
         if !self.center.is_settings() {
             let title: SharedString = self
                 .thread(cx)

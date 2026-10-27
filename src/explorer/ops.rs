@@ -59,8 +59,9 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// The IDE closed (its pressed button atop the sidebar, ⌘E): the threads again, the thread
-    /// that was open in the center, nothing beside it. Its documents stay for the next time.
+    /// The IDE closed (its pressed button in the window's top-right corner, ⌘E): the threads
+    /// again, the thread that was open in the center, nothing beside it. Its documents stay for
+    /// the next time.
     pub fn close_explorer(&mut self, cx: &mut Context<Self>) {
         self.left_dock.activate(Panel::Threads);
         self.center = crate::workspace::Center::Chat;
