@@ -39,6 +39,11 @@ impl BenchApp {
             self.subject_opened = true;
             self.new_project_form(window, cx);
         }
+        // `BENCH_DEMO_BESIDE=<thread id>`: that thread beside the open one.
+        static BESIDE: std::sync::Once = std::sync::Once::new();
+        if let Ok(id) = std::env::var("BENCH_DEMO_BESIDE") {
+            BESIDE.call_once(|| self.open_beside(id, window, cx));
+        }
         // `BENCH_DEMO_RENAME=<thread id>`: that thread being renamed.
         static RENAME: std::sync::Once = std::sync::Once::new();
         if let Ok(id) = std::env::var("BENCH_DEMO_RENAME") {

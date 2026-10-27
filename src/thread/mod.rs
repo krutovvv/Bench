@@ -12,12 +12,13 @@
 //! `answer.rs` (the agent's question and plan), `composer.rs` (the input) with `slash.rs` (its
 //! pop-up), `prompts.rs`, `attachments.rs` and `drafts.rs`; `send.rs` (sending, the reasoning
 //! level), `open.rs` (opening, creating and deleting threads: the app's), `panel.rs` (the right
-//! dock's thread panel: its head over a view).
+//! dock's thread panel: its head over a view), `beside.rs` (a second thread beside the open one).
 
 mod active;
 mod answer;
 mod asks;
 pub(crate) mod attachments;
+mod beside;
 mod changed_files;
 mod composer;
 pub(crate) mod diff;

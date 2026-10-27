@@ -117,7 +117,18 @@ pub(super) fn item_menu(
                 })
                 .separator()
             }
-            Item::Thread(_) => menu,
+            // A second thread beside the open one (or beside the document in the center).
+            Item::Thread(id) => {
+                let id = id.clone();
+                menu.item(
+                    PopupMenuItem::new("Open beside")
+                        .icon(Ico::PanelRight.icon())
+                        .on_click(act(Box::new(move |this, window, cx| {
+                            this.open_beside(id.clone(), window, cx)
+                        }))),
+                )
+                .separator()
+            }
         };
         // This Mac's Host is always first: no pin. An agent's Host is never removed (a server's
         // agent leaves Bench in the gear).

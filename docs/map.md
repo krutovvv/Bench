@@ -23,6 +23,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change what happens on an agent event | `src/app/events.rs` |
 | open, delete or search threads | `src/thread/open.rs` |
 | change what a thread on screen keeps (its composer, its run, its events) | `src/thread/view.rs` (`ThreadView`), its state `src/thread/active.rs` (`ActiveThread`, `ThreadRef`) |
+| change the second thread beside the open one ("Open beside") or the right dock's thread head | `src/thread/beside.rs`, `src/thread/panel.rs`; the menu item in `src/sidebar/menu.rs` |
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
 | change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu, `top.rs` the strip over it; loading projects: `project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
 | change the status bar | `src/statusbar/` (`mod.rs` the bar, `agent.rs` the agent's item, `context.rs` the context and speed panels) |

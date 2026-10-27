@@ -36,16 +36,17 @@ impl Center {
 }
 
 impl BenchApp {
-    /// The panel a dock shows now. The thread is beside something else than itself only: with
-    /// the center showing it, the right dock has nothing to show.
+    /// The panel a dock shows now. Beside a thread the right dock's thread is a second one
+    /// (`beside_thread`): with none opened, it has nothing to show.
     pub fn shown_panel(&self, dock: DockPosition) -> Option<Panel> {
         let d = match dock {
             DockPosition::Left => &self.left_dock,
             DockPosition::Right => &self.right_dock,
             DockPosition::Bottom => &self.bottom_dock,
         };
-        d.active_panel()
-            .filter(|p| !(*p == Panel::Thread && self.center == Center::Chat))
+        d.active_panel().filter(|p| {
+            !(*p == Panel::Thread && self.center == Center::Chat && self.beside_thread.is_none())
+        })
     }
 
     /// A panel drawn, by its own module.
@@ -64,9 +65,13 @@ impl BenchApp {
     }
 
     /// ⌘J, a document's thread button: the thread beside the code, or not. The center showing
-    /// the thread itself, there is nothing to put beside it.
+    /// a thread, the second thread beside it (`open_beside`), when one was opened.
     pub fn toggle_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.center == Center::Chat {
+            if self.beside_thread.is_some() {
+                self.right_dock.toggle_panel(Panel::Thread);
+                cx.notify();
+            }
             return;
         }
         self.right_dock.toggle_panel(Panel::Thread);

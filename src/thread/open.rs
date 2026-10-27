@@ -83,6 +83,7 @@ impl BenchApp {
         }
         self.confirm_delete = None;
         self.project_form = None;
+        self.unbeside(&id, cx);
         let prev = self.active_thread.update(cx, |v, _| {
             let journal = std::mem::take(&mut v.thread.journal);
             v.thread.session.clone().map(|s| (s, journal))

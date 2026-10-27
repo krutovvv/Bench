@@ -1,6 +1,6 @@
 //! A dock, as Zed's: a side of the window holding panels, one shown at a time, open or folded, at
 //! a size of its own. The left dock holds the threads and the Explorer's tree; the right one the
-//! thread beside a document; the bottom one what runs under the center (the project's terminal). A new panel is a `Panel` variant, its dock's list, and its drawing in
+//! thread beside a document or a second thread beside the open one; the bottom one what runs under the center (the project's terminal). A new panel is a `Panel` variant, its dock's list, and its drawing in
 //! `BenchApp::render_panel` — nothing else changes.
 
 use gpui_kit::*;
@@ -31,8 +31,8 @@ pub enum Panel {
     Threads,
     /// One project's tree (`src/explorer/tree.rs`).
     Explorer,
-    /// The open thread, beside a document (`src/thread/mod.rs` `render_thread_panel`; the
-    /// center's own when it shows the thread).
+    /// A thread beside the center (`src/thread/panel.rs`): beside a document, the open thread;
+    /// beside the open thread, a second one (`src/thread/beside.rs`).
     Thread,
     /// A terminal on the project's machine, in its folder (`src/inserts/terminal/panel.rs`).
     Terminal,
