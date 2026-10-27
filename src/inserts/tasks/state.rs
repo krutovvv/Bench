@@ -27,6 +27,8 @@ pub struct TasksMode {
     /// filter when the thread opens, one click to drop; new tasks get the filter's tag.
     pub project: String,
     pub items: Vec<Task>,
+    /// The rows scroll inside the thread, with their own offset.
+    pub rows_scroll: ScrollHandle,
     pub loaded: bool,
     pub error: Option<String>,
     pub selected: Option<String>,
@@ -99,6 +101,7 @@ impl TasksMode {
             }),
         );
         Self {
+            rows_scroll: ScrollHandle::default(),
             list: List::Today,
             items: vec![],
             loaded: false,

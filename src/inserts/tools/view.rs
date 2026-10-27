@@ -49,19 +49,14 @@ impl BenchApp {
                 .child("Copy part of a web page, a Word document or a note, then press ⌘V")
                 .into_any_element()
         } else {
-            div()
-                .id("tool-html")
-                .flex_1()
-                .min_h_0()
-                .overflow_y_scroll()
-                .px_4()
-                .py_3()
-                .text_base()
-                .child(
+            crate::inserts::scroll_pane(
+                "tool-html",
+                &self.tools.html_scroll,
+                div().px_4().py_3().text_base().child(
                     TextView::html("tool-html-view-body", self.tools.preview.clone())
                         .selectable(true),
-                )
-                .into_any_element()
+                ),
+            )
         };
         v_flex()
             .flex_1()
@@ -152,12 +147,10 @@ impl BenchApp {
                     .flex_1()
                     .min_w_0()
                     .child(pane_bar("Preview", None, vec![], cx))
-                    .child(
+                    .child(crate::inserts::scroll_pane(
+                        "tool-preview",
+                        &self.tools.preview_scroll,
                         div()
-                            .id("tool-preview")
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
                             .px_4()
                             .py_3()
                             .text_base()
@@ -166,7 +159,7 @@ impl BenchApp {
                                 self.tools.preview.clone(),
                                 cx,
                             )),
-                    )
+                    ))
                     .into_any_element();
                 split(left, right)
             }

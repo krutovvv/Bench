@@ -33,6 +33,9 @@ pub struct Tools {
     /// Markdown Preview: the text being rendered; Rich Text to Markdown: the pasted HTML,
     /// shown as it looked on the page unless `html_source` asks for the code.
     pub preview: String,
+    /// The panes that scroll inside the thread: their own scroll, each remembered.
+    pub preview_scroll: ScrollHandle,
+    pub html_scroll: ScrollHandle,
     pub html_source: bool,
     _subscriptions: Vec<Subscription>,
 }
@@ -66,6 +69,8 @@ impl Tools {
             }),
         ];
         Self {
+            preview_scroll: ScrollHandle::default(),
+            html_scroll: ScrollHandle::default(),
             tool: Tool::HtmlToMarkdown,
             input,
             output,

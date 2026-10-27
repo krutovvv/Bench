@@ -123,6 +123,33 @@ pub fn kind_of(key: &str) -> Option<&'static dyn InsertKind> {
     KINDS.iter().copied().find(|k| k.owns(key))
 }
 
+/// A pane that scrolls inside the thread: the wheel over it moves the pane, and the thread only
+/// gets the wheel when the pane cannot go further (the mask's own rule, CSS
+/// `overscroll-behavior: auto`). The mask is a sibling of the scrolled element, not its child:
+/// a child is painted with the scroll offset applied, so a mask inside the pane would slide off
+/// the viewport as the pane scrolls and leave its bottom to the thread.
+pub(crate) fn scroll_pane(
+    id: impl Into<ElementId>,
+    handle: &ScrollHandle,
+    body: impl IntoElement,
+) -> AnyElement {
+    div()
+        .relative()
+        .flex_1()
+        .min_h_0()
+        .child(
+            div()
+                .id(id)
+                .absolute()
+                .inset_0()
+                .overflow_y_scroll()
+                .track_scroll(handle)
+                .child(body),
+        )
+        .child(gpui_base::ScrollableMask::new(Axis::Vertical, handle))
+        .into_any_element()
+}
+
 /// The words of the bare "/" list: each puts its insert in at once (the insert itself offers
 /// what to show: a list, a tool).
 pub fn words() -> Vec<SlashCommand> {

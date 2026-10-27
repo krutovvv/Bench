@@ -240,24 +240,24 @@ impl BenchApp {
                 .into_any_element();
         }
         let list_pane = v_flex().flex_1().min_w_0().h_full().children(strip).child(
-            v_flex()
-                .id("tasks-rows")
-                .flex_1()
-                .min_h_0()
-                .overflow_y_scroll()
-                .pt_1()
-                .pb_4()
-                .children(rows)
-                .when_some(note, |d, (text, color)| {
-                    d.child(
-                        div()
-                            .px_6()
-                            .py_3()
-                            .text_base()
-                            .text_color(color)
-                            .child(text),
-                    )
-                }),
+            crate::inserts::scroll_pane(
+                "tasks-rows",
+                &self.tasks.rows_scroll,
+                v_flex()
+                    .pt_1()
+                    .pb_4()
+                    .children(rows)
+                    .when_some(note, |d, (text, color)| {
+                        d.child(
+                            div()
+                                .px_6()
+                                .py_3()
+                                .text_base()
+                                .text_color(color)
+                                .child(text),
+                        )
+                    }),
+            ),
         );
         h_flex()
             .size_full()

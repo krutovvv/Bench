@@ -155,7 +155,12 @@ is published.\n\nThe page is right here — click and type in it if something ne
         app,
         "d-tool",
         "Cron for work hours",
-        "tool:cron-parser",
+        &match std::env::var("BENCH_DEMO_TOOL").as_deref() {
+            Ok("html") => "tool:rich-text-to-markdown",
+            Ok("preview") => "tool:markdown-preview",
+            _ => "tool:cron-parser",
+        }
+        .to_string(),
         done(
             "Is this right for every 15 minutes during work hours on weekdays?",
             vec![],
@@ -167,6 +172,24 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
     app.tools
         .inputs
         .insert(devtools::Tool::Cron, "*/15 9-18 * * 1-5".into());
+    // `BENCH_DEMO_TOOL=html|preview`: the insert shows the pane that scrolls inside the thread
+    // (the clipboard's rich text, a Markdown preview), with lines enough to scroll.
+    match std::env::var("BENCH_DEMO_TOOL").as_deref() {
+        Ok("html") | Ok("preview") => {
+            let lines = (1..=40)
+                .map(|n| format!("{n}. A line of the page, long enough to fill the pane's width."))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let tool = if std::env::var("BENCH_DEMO_TOOL").unwrap() == "html" {
+                devtools::Tool::HtmlToMarkdown
+            } else {
+                devtools::Tool::MarkdownPreview
+            };
+            app.tools.inputs.insert(tool, lines.clone());
+            app.tools.preview = lines;
+        }
+        _ => {}
+    }
 }
 
 /// The landing page thread's dev server, still running.

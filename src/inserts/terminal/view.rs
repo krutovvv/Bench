@@ -486,6 +486,9 @@ impl BenchApp {
                 }
             }))
             .on_scroll_wheel(cx.listener(move |this, ev: &ScrollWheelEvent, _, cx| {
+                // The wheel over a terminal is the terminal's: the thread behind it must not
+                // run away while the person reads its output.
+                cx.stop_propagation();
                 let line_h = px(s_wheel.layout().line_h.max(1.));
                 let dy = f32::from(ev.delta.pixel_delta(line_h).y);
                 let acc = this.ssh.scroll_acc + dy / f32::from(line_h);
