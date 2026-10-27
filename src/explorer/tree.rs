@@ -12,7 +12,7 @@ use gpui_kit::*;
 
 use super::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
-use crate::env::{Home, SECTIONS};
+use crate::env::PARTS;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -69,11 +69,9 @@ impl BenchApp {
             return out;
         };
         let mut groups: Vec<&'static str> = vec![];
-        for s in SECTIONS.iter().filter(|s| s.shown(self, e)) {
-            if let Home::Explorer(g) = s.home() {
-                if !groups.contains(&g) {
-                    groups.push(g);
-                }
+        for s in PARTS.iter().filter(|s| s.shown(self, e)) {
+            if !groups.contains(&s.group()) {
+                groups.push(s.group());
             }
         }
         let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
@@ -81,9 +79,9 @@ impl BenchApp {
             let node = format!("g:{g}");
             // A group of one section named as it (Schedule): its actions on the group's heading,
             // its parts right under it.
-            let only: Vec<_> = SECTIONS
+            let only: Vec<_> = PARTS
                 .iter()
-                .filter(|s| s.home() == Home::Explorer(g) && s.shown(self, e))
+                .filter(|s| s.group() == g && s.shown(self, e))
                 .collect();
             let alone = only.len() == 1 && only[0].block(general) == g;
             let acts = if alone {

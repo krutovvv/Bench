@@ -13,7 +13,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, Home, Item, Request, Section, add, code, new_card, remove, revert, save,
+    Card, ExplorerParts, Item, Request, Section, add, code, new_card, remove, revert, save,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
@@ -96,12 +96,86 @@ impl Section for Lsp {
     fn key(&self) -> &'static str {
         "lsp"
     }
-    fn home(&self) -> Home {
-        Home::Explorer("Tools")
+
+    fn apply(&self, e: &mut ProjectEnv, v: &Value, _window: &mut Window, _cx: &mut App) {
+        let l = &v["lsp"];
+        let states = &l["states"];
+        e.lsp.servers = l["servers"]
+            .as_object()
+            .map(|o| {
+                o.iter()
+                    .map(|(name, s)| LspRow {
+                        name: name.clone(),
+                        extensions: s["extensions"]
+                            .as_array()
+                            .into_iter()
+                            .flatten()
+                            .filter_map(|x| x.as_str().map(str::to_string))
+                            .collect(),
+                        state: states[name].as_str().unwrap_or_default().to_string(),
+                        spec: serde_json::to_string_pretty(s).unwrap_or_default(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
     }
+
+    fn save(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        eid: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Request> {
+        let e = app.envs.get(id)?;
+        let mut name = e.lsp.open.clone()?;
+        if name == "new" {
+            name = e.new_name.read(cx).value().trim().to_string();
+            if name.is_empty() {
+                app.toast(NotificationType::Error, "Name it first", window, cx);
+                return None;
+            }
+        }
+        Some((
+            "PUT",
+            format!("/api/projects/{eid}/lsp/{}", enc(&name)),
+            json!({"text": e.lsp.json.read(cx).value().to_string()}),
+        ))
+    }
+
+    fn saved(&self, e: &mut ProjectEnv) {
+        e.lsp.dirty = false;
+    }
+
+    /// Its saved entry back in the editor.
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> bool {
+        let Some(e) = app.envs.get_mut(id) else {
+            return false;
+        };
+        let Some(name) = e.lsp.open.clone().filter(|n| n != "new") else {
+            return false;
+        };
+        app.env_open_lsp(id, name, window, cx);
+        true
+    }
+}
+
+impl ExplorerParts for Lsp {
+    fn group(&self) -> &'static str {
+        "Tools"
+    }
+
     fn block(&self, _general: bool) -> &'static str {
         "Language servers"
     }
+
     fn head(
         &self,
         _app: &BenchApp,
@@ -110,6 +184,7 @@ impl Section for Lsp {
     ) -> Option<AnyElement> {
         Some(add("env-lsp-add", &e.id, "lsp", cx).into_any_element())
     }
+
     /// A row per server with its sign; each opens its own entry.
     fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<Item> {
         let theme = cx.theme().clone();
@@ -132,6 +207,7 @@ impl Section for Lsp {
             })
             .collect()
     }
+
     /// "new": the presets to add, or one written by hand; a server: its entry, its state.
     fn card(
         &self,
@@ -172,35 +248,16 @@ impl Section for Lsp {
             actions,
         ))
     }
-    fn apply(&self, e: &mut ProjectEnv, v: &Value, _window: &mut Window, _cx: &mut App) {
-        let l = &v["lsp"];
-        let states = &l["states"];
-        e.lsp.servers = l["servers"]
-            .as_object()
-            .map(|o| {
-                o.iter()
-                    .map(|(name, s)| LspRow {
-                        name: name.clone(),
-                        extensions: s["extensions"]
-                            .as_array()
-                            .into_iter()
-                            .flatten()
-                            .filter_map(|x| x.as_str().map(str::to_string))
-                            .collect(),
-                        state: states[name].as_str().unwrap_or_default().to_string(),
-                        spec: serde_json::to_string_pretty(s).unwrap_or_default(),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-    }
+
     fn dirty(&self, e: &ProjectEnv) -> bool {
         e.lsp.open.is_some() && e.lsp.dirty
     }
+
     fn close(&self, e: &mut ProjectEnv) {
         e.lsp.open = None;
         e.lsp.dirty = false;
     }
+
     fn open(
         &self,
         app: &mut BenchApp,
@@ -211,6 +268,7 @@ impl Section for Lsp {
     ) {
         app.env_open_lsp(id, name, w, cx);
     }
+
     fn new_one(&self, e: &mut ProjectEnv) -> Option<(Entity<EditorState>, &'static str)> {
         e.lsp.open = Some("new".into());
         Some((
@@ -218,53 +276,12 @@ impl Section for Lsp {
             "{\n  \"command\": \"\",\n  \"args\": [\"--stdio\"],\n  \"extensions\": []\n}\n",
         ))
     }
-    fn save(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        eid: &str,
-        window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
-        let e = app.envs.get(id)?;
-        let mut name = e.lsp.open.clone()?;
-        if name == "new" {
-            name = e.new_name.read(cx).value().trim().to_string();
-            if name.is_empty() {
-                app.toast(NotificationType::Error, "Name it first", window, cx);
-                return None;
-            }
-        }
-        Some((
-            "PUT",
-            format!("/api/projects/{eid}/lsp/{}", enc(&name)),
-            json!({"text": e.lsp.json.read(cx).value().to_string()}),
-        ))
-    }
+
     /// A new server, saved, is its name's part.
     fn made(&self, e: &ProjectEnv, cx: &App) -> Option<String> {
         Some(e.new_name.read(cx).value().trim().to_string())
     }
-    fn saved(&self, e: &mut ProjectEnv) {
-        e.lsp.dirty = false;
-    }
-    /// Its saved entry back in the editor.
-    fn revert(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> bool {
-        let Some(e) = app.envs.get_mut(id) else {
-            return false;
-        };
-        let Some(name) = e.lsp.open.clone().filter(|n| n != "new") else {
-            return false;
-        };
-        app.env_open_lsp(id, name, window, cx);
-        true
-    }
+
     fn remove_path(&self, eid: &str, name: &str) -> Option<String> {
         Some(format!("/api/projects/{eid}/lsp/{}", enc(name)))
     }

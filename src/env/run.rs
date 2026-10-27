@@ -6,7 +6,7 @@
 use gpui_kit::*;
 use serde_json::json;
 
-use super::section::{Home, Section, choices};
+use super::section::{SettingsForm, Section, choices};
 use super::{ProjectEnv, env_agent};
 use crate::app::BenchApp;
 use crate::client::rest;
@@ -60,16 +60,18 @@ impl Section for Run {
     fn key(&self) -> &'static str {
         "model"
     }
-    fn home(&self) -> Home {
-        Home::Settings
-    }
-    fn block(&self, _general: bool) -> &'static str {
-        "Model"
-    }
+
     fn apply(&self, e: &mut ProjectEnv, v: &serde_json::Value, _w: &mut Window, _cx: &mut App) {
         e.run.compaction = v["compaction"].as_f64();
         e.run.window = v["window"].as_u64().unwrap_or(0);
     }
+}
+
+impl SettingsForm for Run {
+    fn block(&self, _general: bool) -> &'static str {
+        "Model"
+    }
+
     /// Choices, not texts: a click sets one for the project at once (a choice has no draft to
     /// save). The reasoning levels and the compaction shares are the presets' (the gear).
     fn form(

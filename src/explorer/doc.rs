@@ -405,7 +405,7 @@ impl BenchApp {
         {
             if let Some(e) = self.envs.get_mut(project) {
                 if e.card.as_ref().is_some_and(|(k, n)| k == kind && n == name) {
-                    for s in crate::env::SECTIONS {
+                    for s in crate::env::PARTS {
                         s.close(e);
                     }
                     e.card = None;

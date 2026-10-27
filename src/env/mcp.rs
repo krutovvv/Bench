@@ -9,7 +9,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, Home, Item, Request, Section, add, card_act, code, head_act, new_card, remove, revert,
+    Card, ExplorerParts, Item, Request, Section, add, card_act, code, head_act, new_card, remove, revert,
     save,
 };
 use super::{ProjectEnv, editor, enc, on_change};
@@ -100,12 +100,62 @@ impl Section for Mcp {
     fn key(&self) -> &'static str {
         "mcp"
     }
-    fn home(&self) -> Home {
-        Home::Explorer("Tools")
+
+    fn apply(&self, e: &mut ProjectEnv, v: &Value, _window: &mut Window, _cx: &mut App) {
+        apply_mcp(e, v);
     }
+
+    fn save(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        eid: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Request> {
+        let e = app.envs.get(id)?;
+        let mut name = e.mcp.open.clone()?;
+        if name == "new" {
+            name = e.new_name.read(cx).value().trim().to_string();
+            if name.is_empty() {
+                app.toast(NotificationType::Error, "Name it first", window, cx);
+                return None;
+            }
+        }
+        Some((
+            "PUT",
+            format!("/api/projects/{eid}/mcp/{}/spec", enc(&name)),
+            json!({"text": e.mcp.json.read(cx).value().to_string()}),
+        ))
+    }
+
+    fn saved(&self, e: &mut ProjectEnv) {
+        e.mcp.dirty = false;
+    }
+
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _: &mut Window,
+        _: &mut Context<BenchApp>,
+    ) -> bool {
+        if let Some(e) = app.envs.get_mut(id) {
+            e.mcp.dirty = false;
+        }
+        false
+    }
+}
+
+impl ExplorerParts for Mcp {
+    fn group(&self) -> &'static str {
+        "Tools"
+    }
+
     fn block(&self, _general: bool) -> &'static str {
         "MCP servers"
     }
+
     /// The head says how the set stands, so a block of unchecked servers cannot read as calm.
     /// Asking is one action for the project, in the head, because a check reconnects the
     /// project's servers together, not one at a time.
@@ -170,6 +220,7 @@ impl Section for Mcp {
                 .into_any_element(),
         )
     }
+
     /// Each server carries a sign of what the agent knows of it. A server says nothing until
     /// something asks it for its tools, so "not tried yet" is its own state and says so out
     /// loud — it is not a working server.
@@ -197,6 +248,7 @@ impl Section for Mcp {
             })
             .collect()
     }
+
     fn card(
         &self,
         app: &BenchApp,
@@ -276,16 +328,16 @@ impl Section for Mcp {
             actions,
         ))
     }
-    fn apply(&self, e: &mut ProjectEnv, v: &Value, _window: &mut Window, _cx: &mut App) {
-        apply_mcp(e, v);
-    }
+
     fn dirty(&self, e: &ProjectEnv) -> bool {
         e.mcp.open.is_some() && e.mcp.dirty
     }
+
     fn close(&self, e: &mut ProjectEnv) {
         e.mcp.open = None;
         e.mcp.dirty = false;
     }
+
     fn open(
         &self,
         app: &mut BenchApp,
@@ -296,52 +348,17 @@ impl Section for Mcp {
     ) {
         app.env_open_mcp(id, name, w, cx);
     }
+
     fn new_one(&self, e: &mut ProjectEnv) -> Option<(Entity<EditorState>, &'static str)> {
         e.mcp.open = Some("new".into());
         Some((e.mcp.json.clone(), "{\n  \"url\": \"https://\"\n}\n"))
     }
-    fn save(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        eid: &str,
-        window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
-        let e = app.envs.get(id)?;
-        let mut name = e.mcp.open.clone()?;
-        if name == "new" {
-            name = e.new_name.read(cx).value().trim().to_string();
-            if name.is_empty() {
-                app.toast(NotificationType::Error, "Name it first", window, cx);
-                return None;
-            }
-        }
-        Some((
-            "PUT",
-            format!("/api/projects/{eid}/mcp/{}/spec", enc(&name)),
-            json!({"text": e.mcp.json.read(cx).value().to_string()}),
-        ))
-    }
+
     /// A new server, saved, is its name's part.
     fn made(&self, e: &ProjectEnv, cx: &App) -> Option<String> {
         Some(e.new_name.read(cx).value().trim().to_string())
     }
-    fn saved(&self, e: &mut ProjectEnv) {
-        e.mcp.dirty = false;
-    }
-    fn revert(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        _: &mut Window,
-        _: &mut Context<BenchApp>,
-    ) -> bool {
-        if let Some(e) = app.envs.get_mut(id) {
-            e.mcp.dirty = false;
-        }
-        false
-    }
+
     fn remove_path(&self, eid: &str, name: &str) -> Option<String> {
         Some(format!("/api/projects/{eid}/mcp/{}", enc(name)))
     }

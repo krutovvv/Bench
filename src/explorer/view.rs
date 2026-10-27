@@ -183,7 +183,7 @@ impl BenchApp {
         name: &str,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let card = match (crate::env::section(kind), self.envs.get(project)) {
+        let card = match (crate::env::part(kind), self.envs.get(project)) {
             (Some(s), Some(e)) => s.card(self, e, name, cx),
             (_, None) => return note("Reading…", cx),
             _ => None,

@@ -5,7 +5,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Home, Request, Section, form_actions};
+use super::section::{SettingsForm, Request, Section, form_actions};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use bench_ui::settings_field;
@@ -43,46 +43,7 @@ impl Section for Telegram {
     fn key(&self) -> &'static str {
         "telegram"
     }
-    fn home(&self) -> Home {
-        Home::Settings
-    }
-    fn block(&self, _general: bool) -> &'static str {
-        "Telegram"
-    }
-    fn form(
-        &self,
-        _app: &BenchApp,
-        e: &ProjectEnv,
-        cx: &mut Context<BenchApp>,
-    ) -> Option<Vec<AnyElement>> {
-        let bot = match &e.telegram.bot {
-            Some((name, _, token)) if !token.is_empty() && !name.is_empty() => {
-                format!("@{name}: its chats become this project's threads")
-            }
-            Some((_, _, token)) if !token.is_empty() => {
-                "Its chats become this project's threads".to_string()
-            }
-            _ => "No bot of its own yet: a token from @BotFather".to_string(),
-        };
-        let mut out = vec![
-            settings_field(
-                "Bot token",
-                bot,
-                Input::new(&e.telegram.token).into_any_element(),
-                cx,
-            )
-            .into_any_element(),
-            settings_field(
-                "Who may write",
-                "Telegram user ids, comma-separated",
-                Input::new(&e.telegram.users).into_any_element(),
-                cx,
-            )
-            .into_any_element(),
-        ];
-        out.extend(form_actions(&e.id, "telegram", e.telegram.dirty, cx));
-        Some(out)
-    }
+
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
         e.telegram.bot = v["telegram"].as_object().map(|t| {
             (
@@ -125,6 +86,7 @@ impl Section for Telegram {
                 .update(cx, |s, cx| s.set_value(token, window, cx));
         }
     }
+
     /// An empty token keeps the saved one.
     fn save(
         &self,
@@ -151,9 +113,11 @@ impl Section for Telegram {
         }
         Some(("PUT", format!("/api/projects/{eid}/telegram"), body))
     }
+
     fn saved(&self, e: &mut ProjectEnv) {
         e.telegram.dirty = false;
     }
+
     fn revert(
         &self,
         app: &mut BenchApp,
@@ -165,5 +129,46 @@ impl Section for Telegram {
             e.telegram.dirty = false;
         }
         false
+    }
+}
+
+impl SettingsForm for Telegram {
+    fn block(&self, _general: bool) -> &'static str {
+        "Telegram"
+    }
+
+    fn form(
+        &self,
+        _app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Vec<AnyElement>> {
+        let bot = match &e.telegram.bot {
+            Some((name, _, token)) if !token.is_empty() && !name.is_empty() => {
+                format!("@{name}: its chats become this project's threads")
+            }
+            Some((_, _, token)) if !token.is_empty() => {
+                "Its chats become this project's threads".to_string()
+            }
+            _ => "No bot of its own yet: a token from @BotFather".to_string(),
+        };
+        let mut out = vec![
+            settings_field(
+                "Bot token",
+                bot,
+                Input::new(&e.telegram.token).into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+            settings_field(
+                "Who may write",
+                "Telegram user ids, comma-separated",
+                Input::new(&e.telegram.users).into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        ];
+        out.extend(form_actions(&e.id, "telegram", e.telegram.dirty, cx));
+        Some(out)
     }
 }

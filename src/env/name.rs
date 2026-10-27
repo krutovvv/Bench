@@ -6,7 +6,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use serde_json::Value;
 
-use super::section::{Home, Request, Section, form_actions, remove};
+use super::section::{SettingsForm, Request, Section, form_actions, remove};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::app::model::ProjectKey;
@@ -35,16 +35,66 @@ impl Section for Name {
     fn key(&self) -> &'static str {
         "name"
     }
-    fn home(&self) -> Home {
-        Home::Settings
-    }
-    fn block(&self, _general: bool) -> &'static str {
-        "Project"
-    }
+
     fn shown(&self, _app: &BenchApp, e: &ProjectEnv) -> bool {
         let key = ProjectKey::parse(&e.id);
         !(key.agent.is_empty() && key.is_host())
     }
+
+    fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
+        if !e.name.dirty {
+            let name = v["project"]["name"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            e.name
+                .field
+                .update(cx, |s, cx| s.set_value(name, window, cx));
+        }
+    }
+
+    /// A name is the project's, wherever it lives: `BenchApp::rename_project` renames it there
+    /// (a server's Host in this Mac's list of agents); nothing is sent from here.
+    fn save(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _eid: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Request> {
+        let e = app.envs.get_mut(id)?;
+        let name = e.name.field.read(cx).value().trim().to_string();
+        e.name.dirty = false;
+        if !name.is_empty() {
+            app.rename_project(id.to_string(), name, window, cx);
+        }
+        None
+    }
+
+    fn saved(&self, e: &mut ProjectEnv) {
+        e.name.dirty = false;
+    }
+
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _: &mut Window,
+        _: &mut Context<BenchApp>,
+    ) -> bool {
+        if let Some(e) = app.envs.get_mut(id) {
+            e.name.dirty = false;
+        }
+        false
+    }
+}
+
+impl SettingsForm for Name {
+    fn block(&self, _general: bool) -> &'static str {
+        "Project"
+    }
+
     fn form(
         &self,
         _app: &BenchApp,
@@ -69,50 +119,6 @@ impl Section for Name {
         out.extend(form_actions(&e.id, "name", e.name.dirty, cx));
         Some(out)
     }
-    fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
-        if !e.name.dirty {
-            let name = v["project"]["name"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-            e.name
-                .field
-                .update(cx, |s, cx| s.set_value(name, window, cx));
-        }
-    }
-    /// A name is the project's, wherever it lives: `BenchApp::rename_project` renames it there
-    /// (a server's Host in this Mac's list of agents); nothing is sent from here.
-    fn save(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        _eid: &str,
-        window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
-        let e = app.envs.get_mut(id)?;
-        let name = e.name.field.read(cx).value().trim().to_string();
-        e.name.dirty = false;
-        if !name.is_empty() {
-            app.rename_project(id.to_string(), name, window, cx);
-        }
-        None
-    }
-    fn saved(&self, e: &mut ProjectEnv) {
-        e.name.dirty = false;
-    }
-    fn revert(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        _: &mut Window,
-        _: &mut Context<BenchApp>,
-    ) -> bool {
-        if let Some(e) = app.envs.get_mut(id) {
-            e.name.dirty = false;
-        }
-        false
-    }
 }
 
 /// The last group of General: the project removed (asked once); an agent's Host is not removed
@@ -123,15 +129,17 @@ impl Section for Danger {
     fn key(&self) -> &'static str {
         "project"
     }
-    fn home(&self) -> Home {
-        Home::Settings
-    }
-    fn block(&self, _general: bool) -> &'static str {
-        "Remove"
-    }
+
     fn shown(&self, _app: &BenchApp, e: &ProjectEnv) -> bool {
         !ProjectKey::parse(&e.id).is_host()
     }
+}
+
+impl SettingsForm for Danger {
+    fn block(&self, _general: bool) -> &'static str {
+        "Remove"
+    }
+
     fn form(
         &self,
         _app: &BenchApp,
@@ -158,6 +166,7 @@ impl Section for Danger {
             .into_any_element(),
         ])
     }
+
     /// The project goes (asked already, in its form): its documents close, a new thread starts.
     fn remove_here(
         &self,

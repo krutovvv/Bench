@@ -10,7 +10,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Home, Request, Section, form_actions, text};
+use super::section::{SettingsForm, Request, Section, form_actions, text};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::app::model::ProjectKey;
@@ -43,12 +43,75 @@ impl Section for Place {
     fn key(&self) -> &'static str {
         "place"
     }
-    fn home(&self) -> Home {
-        Home::Settings
+
+    fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
+        if !e.place.dirty {
+            let folder = v["project"]["folder"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string();
+            e.place.confined = v["project"]["confined"].as_bool().unwrap_or(false);
+            e.place
+                .folder
+                .update(cx, |s, cx| s.set_value(folder, window, cx));
+        }
     }
+
+    fn save(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        eid: &str,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Request> {
+        let e = app.envs.get(id)?;
+        let folder = e.place.folder.read(cx).value().trim().to_string();
+        Some((
+            "PUT",
+            format!("/api/projects/{eid}"),
+            json!({"folder": (!folder.is_empty()).then_some(folder), "confined": e.place.confined}),
+        ))
+    }
+
+    fn saved(&self, e: &mut ProjectEnv) {
+        e.place.dirty = false;
+    }
+
+    /// The sidebar knows the folder too (Zed, the icon).
+    fn reload(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
+        app.load_projects(window, cx);
+        let agent = ProjectKey::parse(id).agent;
+        if !agent.is_empty() {
+            app.load_server_projects(agent, window, cx);
+        }
+    }
+
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _: &mut Window,
+        _: &mut Context<BenchApp>,
+    ) -> bool {
+        if let Some(e) = app.envs.get_mut(id) {
+            e.place.dirty = false;
+        }
+        false
+    }
+}
+
+impl SettingsForm for Place {
     fn block(&self, _general: bool) -> &'static str {
         "Project"
     }
+
     /// Its agent and the machine it works on (chosen when it was made, read here), its folder and
     /// whether the agent is kept in it.
     fn form(
@@ -147,63 +210,6 @@ impl Section for Place {
         );
         out.extend(form_actions(&e.id, "place", e.place.dirty, cx));
         Some(out)
-    }
-    fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
-        if !e.place.dirty {
-            let folder = v["project"]["folder"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
-            e.place.confined = v["project"]["confined"].as_bool().unwrap_or(false);
-            e.place
-                .folder
-                .update(cx, |s, cx| s.set_value(folder, window, cx));
-        }
-    }
-    fn save(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        eid: &str,
-        _window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
-        let e = app.envs.get(id)?;
-        let folder = e.place.folder.read(cx).value().trim().to_string();
-        Some((
-            "PUT",
-            format!("/api/projects/{eid}"),
-            json!({"folder": (!folder.is_empty()).then_some(folder), "confined": e.place.confined}),
-        ))
-    }
-    fn saved(&self, e: &mut ProjectEnv) {
-        e.place.dirty = false;
-    }
-    /// The sidebar knows the folder too (Zed, the icon).
-    fn reload(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) {
-        app.load_projects(window, cx);
-        let agent = ProjectKey::parse(id).agent;
-        if !agent.is_empty() {
-            app.load_server_projects(agent, window, cx);
-        }
-    }
-    fn revert(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        _: &mut Window,
-        _: &mut Context<BenchApp>,
-    ) -> bool {
-        if let Some(e) = app.envs.get_mut(id) {
-            e.place.dirty = false;
-        }
-        false
     }
 }
 

@@ -8,7 +8,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, Home, Item, Request, Section, card_act, code, head_act, pad, remove, revert, save, when,
+    Card, ExplorerParts, Item, Request, Section, card_act, code, head_act, pad, remove, revert, save, when,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
@@ -68,12 +68,100 @@ impl Section for Schedule {
     fn key(&self) -> &'static str {
         "cron"
     }
-    fn home(&self) -> Home {
-        Home::Explorer("Schedule")
+
+    fn apply(&self, e: &mut ProjectEnv, v: &Value, _window: &mut Window, _cx: &mut App) {
+        e.cron.jobs = v["cron"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|j| {
+                let s = |k: &str| j[k].as_str().unwrap_or_default().to_string();
+                let o = |k: &str| j[k].as_str().filter(|s| !s.is_empty()).map(str::to_string);
+                CronJob {
+                    id: s("id"),
+                    name: s("name"),
+                    prompt: s("prompt"),
+                    schedule: j["schedule"]["expr"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_string(),
+                    display: s("schedule_display"),
+                    enabled: j["enabled"].as_bool().unwrap_or(true),
+                    next_run: o("next_run_at"),
+                    last_run: o("last_run_at"),
+                    last_status: o("last_status"),
+                    last_output: s("last_output"),
+                }
+            })
+            .collect();
     }
+
+    /// A new job is POSTed to the project; a job's change is PUT to it.
+    fn save(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        eid: &str,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Request> {
+        let e = app.envs.get(id)?;
+        let job = e.cron.open.clone()?;
+        let fields = json!({
+            "name": e.cron.name.read(cx).value().trim(),
+            "schedule": e.cron.schedule.read(cx).value().trim(),
+            "prompt": e.cron.prompt.read(cx).value().trim(),
+        });
+        Some(if job == "new" {
+            ("POST", format!("/api/projects/{eid}/cron"), fields)
+        } else {
+            (
+                "PUT",
+                format!("/api/cron/jobs/{}", enc(&job)),
+                json!({ "updates": fields }),
+            )
+        })
+    }
+
+    fn saved(&self, e: &mut ProjectEnv) {
+        e.cron.dirty = false;
+        // A new job: its form closes, the job is in the list.
+        if e.cron.open.as_deref() == Some("new") {
+            e.cron.open = None;
+            e.card = None;
+        }
+    }
+
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> bool {
+        let Some(e) = app.envs.get_mut(id) else {
+            return true;
+        };
+        e.cron.dirty = false;
+        if let Some(job) = e.cron.open.take() {
+            if job != "new" {
+                app.env_open_cron(id, job, window, cx);
+                return true;
+            }
+        }
+        false
+    }
+}
+
+impl ExplorerParts for Schedule {
+    fn group(&self) -> &'static str {
+        "Schedule"
+    }
+
     fn block(&self, _general: bool) -> &'static str {
         "Schedule"
     }
+
     fn head(
         &self,
         _app: &BenchApp,
@@ -91,6 +179,7 @@ impl Section for Schedule {
                 .into_any_element(),
         )
     }
+
     /// What runs on its own, each run a thread of the project.
     fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<Item> {
         let theme = cx.theme().clone();
@@ -130,6 +219,7 @@ impl Section for Schedule {
             })
             .collect()
     }
+
     fn card(
         &self,
         _app: &BenchApp,
@@ -211,39 +301,16 @@ impl Section for Schedule {
             actions,
         ))
     }
-    fn apply(&self, e: &mut ProjectEnv, v: &Value, _window: &mut Window, _cx: &mut App) {
-        e.cron.jobs = v["cron"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|j| {
-                let s = |k: &str| j[k].as_str().unwrap_or_default().to_string();
-                let o = |k: &str| j[k].as_str().filter(|s| !s.is_empty()).map(str::to_string);
-                CronJob {
-                    id: s("id"),
-                    name: s("name"),
-                    prompt: s("prompt"),
-                    schedule: j["schedule"]["expr"]
-                        .as_str()
-                        .unwrap_or_default()
-                        .to_string(),
-                    display: s("schedule_display"),
-                    enabled: j["enabled"].as_bool().unwrap_or(true),
-                    next_run: o("next_run_at"),
-                    last_run: o("last_run_at"),
-                    last_status: o("last_status"),
-                    last_output: s("last_output"),
-                }
-            })
-            .collect();
-    }
+
     fn dirty(&self, e: &ProjectEnv) -> bool {
         e.cron.open.is_some() && e.cron.dirty
     }
+
     fn close(&self, e: &mut ProjectEnv) {
         e.cron.open = None;
         e.cron.dirty = false;
     }
+
     fn open(
         &self,
         app: &mut BenchApp,
@@ -254,59 +321,7 @@ impl Section for Schedule {
     ) {
         app.env_open_cron(id, job, w, cx);
     }
-    /// A new job is POSTed to the project; a job's change is PUT to it.
-    fn save(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        eid: &str,
-        _window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
-        let e = app.envs.get(id)?;
-        let job = e.cron.open.clone()?;
-        let fields = json!({
-            "name": e.cron.name.read(cx).value().trim(),
-            "schedule": e.cron.schedule.read(cx).value().trim(),
-            "prompt": e.cron.prompt.read(cx).value().trim(),
-        });
-        Some(if job == "new" {
-            ("POST", format!("/api/projects/{eid}/cron"), fields)
-        } else {
-            (
-                "PUT",
-                format!("/api/cron/jobs/{}", enc(&job)),
-                json!({ "updates": fields }),
-            )
-        })
-    }
-    fn saved(&self, e: &mut ProjectEnv) {
-        e.cron.dirty = false;
-        // A new job: its form closes, the job is in the list.
-        if e.cron.open.as_deref() == Some("new") {
-            e.cron.open = None;
-            e.card = None;
-        }
-    }
-    fn revert(
-        &self,
-        app: &mut BenchApp,
-        id: &str,
-        window: &mut Window,
-        cx: &mut Context<BenchApp>,
-    ) -> bool {
-        let Some(e) = app.envs.get_mut(id) else {
-            return true;
-        };
-        e.cron.dirty = false;
-        if let Some(job) = e.cron.open.take() {
-            if job != "new" {
-                app.env_open_cron(id, job, window, cx);
-                return true;
-            }
-        }
-        false
-    }
+
     fn remove_path(&self, _eid: &str, name: &str) -> Option<String> {
         Some(format!("/api/cron/jobs/{}", enc(name)))
     }

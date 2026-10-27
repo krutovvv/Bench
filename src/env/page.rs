@@ -1,12 +1,12 @@
-//! A project's settings: its `Home::Settings` sections as groups under headings — name and where
+//! A project's settings: its `FORMS` as groups under headings — name and where
 //! it lives, how it runs, its Telegram bot, its removal — fields in rows, scrolling as a page. A
 //! document of the Explorer (`DocKey::Settings`), the last row of its tree.
 
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 
-use super::SECTIONS;
-use super::section::{Home, Section};
+use super::FORMS;
+use super::section::SettingsForm;
 use crate::app::BenchApp;
 
 impl BenchApp {
@@ -55,11 +55,11 @@ impl BenchApp {
             return vec![];
         };
         let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
-        let mut groups: Vec<(&'static str, Vec<&'static dyn Section>)> = vec![];
-        for s in SECTIONS
+        let mut groups: Vec<(&'static str, Vec<&'static dyn SettingsForm>)> = vec![];
+        for s in FORMS
             .iter()
             .copied()
-            .filter(|s| s.home() == Home::Settings && s.shown(self, e))
+            .filter(|s| s.shown(self, e))
         {
             let title = s.block(general);
             match groups.last_mut() {
@@ -69,9 +69,8 @@ impl BenchApp {
         }
         let mut out = vec![];
         for (title, group) in groups {
-            let heads: Vec<AnyElement> = group.iter().filter_map(|s| s.head(self, e, cx)).collect();
             out.push(
-                bench_ui::settings_heading(title, heads, cx)
+                bench_ui::settings_heading(title, vec![], cx)
                     .flex_none()
                     .into_any_element(),
             );

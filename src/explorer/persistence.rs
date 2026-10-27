@@ -85,7 +85,7 @@ impl Tab {
                 name,
             } => DocKey::Part {
                 project,
-                kind: crate::env::section(&section)?.key(),
+                kind: crate::env::part(&section)?.key(),
                 name,
             },
             Tab::Problems { project } => DocKey::Problems { project },

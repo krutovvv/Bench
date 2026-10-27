@@ -52,7 +52,7 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 - **The window's places** → `src/workspace/dock.rs` (`Dock`, `Panel`) and `mod.rs` (`Center`), as Zed's workspace;
   **the Explorer** (a project's files and the agent's texts as an IDE shows them) →
   `src/explorer/`, `docs/explorer.md`.
-- **A project's Settings or parts** → a file in `src/env/` implementing `Section` (its `Home`), a line in `SECTIONS`
+- **A project's Settings or parts** → a file in `src/env/` implementing `Section` and `SettingsForm` (a line in `FORMS`) or `ExplorerParts` (a line in `PARTS`)
   (`src/env/mod.rs`); where it lives: `place.rs`; its data from `/api/projects/<id>/env`.
 - **The sidebar** → `src/sidebar/mod.rs` draws; what is done to a thread or project (menu, pin,
   color, rename, ⌫⌫, ↑↓) is `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs`.

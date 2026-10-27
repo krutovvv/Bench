@@ -146,7 +146,7 @@ changed (`form_actions`). What a project contains — files, soul, prompts, skil
 language servers, jobs — is the Explorer (`docs/explorer.md`): a tree in the sidebar
 (`tree_row`, `tree_heading`), documents in the center with tabs (`doc_tab`, `ide_head`), a file
 beside in the right dock; documents fill their pane and scroll inside, as in an IDE. A section is
-a `Section` in `src/env/` with its `Home`.
+a `Section` in `src/env/`, a `SettingsForm` or `ExplorerParts`.
 
 ## The thread's column
 

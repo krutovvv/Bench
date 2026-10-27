@@ -34,7 +34,7 @@ Bench после нас, в том числе для небольшой лока
 
 | Ядро | Что это для человека | Где в коде | Как расширяется |
 |---|---|---|---|
-| **Проекты и агенты** | где живёт работа: агент этого Mac или сервера, машина, папка | `src/app/places.rs`, `src/app/agents.rs`, `src/client/`, `src/env/` | новая часть окружения — `Section` в `src/env/` |
+| **Проекты и агенты** | где живёт работа: агент этого Mac или сервера, машина, папка | `src/app/places.rs`, `src/app/agents.rs`, `src/client/`, `src/env/` | новая часть окружения — `Section` в `src/env/`: `SettingsForm` (поля настроек, `FORMS`) или `ExplorerParts` (части в Explorer, `PARTS`) |
 | **Треды** | разговор с агентом, его работа, вставки `/terminal`, `/tasks`, `/tools`, `/browser` | `crates/thread`, `src/thread/`, `src/inserts/` | новая вставка — `InsertKind` в `src/inserts/<вид>/` |
 | **Explorer** | проект глазами IDE: дерево, документы во вкладках, тред рядом | `src/explorer/`, `src/workspace/` | новый вид документа — `DocKey` и его отрисовка; новая панель дока — вариант `Panel` в списке своего `Dock` (`workspace/dock.rs`) |
 

@@ -8,7 +8,7 @@ use gpui_kit::*;
 use super::tree::quiet;
 use super::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
-use crate::env::{Home, SECTIONS};
+use crate::env::PARTS;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -171,9 +171,9 @@ impl BenchApp {
     ) -> Vec<AnyElement> {
         let mut out = vec![];
         let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
-        for s in SECTIONS
+        for s in PARTS
             .iter()
-            .filter(|s| s.home() == Home::Explorer(group) && s.shown(self, e))
+            .filter(|s| s.group() == group && s.shown(self, e))
         {
             let node = format!("s:{}", s.key());
             let depth = if alone { 0 } else { 1 };

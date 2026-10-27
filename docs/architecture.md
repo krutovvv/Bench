@@ -137,7 +137,7 @@ agent/src/server.ts   только собирает модули из списк
   правила порядка — тесты); тред рисуется на `gpui::list` (`src/thread/`).
 - Старые режимы (Tasks, Tools, SSH) и мост к Apple Reminders удалены.
 - Вставки — по папке на вид (`src/inserts/<вид>/`), утилиты — `crates/devtools`.
-- Окружение проекта — `src/env/`, типаж `Section` и реестр `SECTIONS`.
+- Окружение проекта — `src/env/`, типаж `Section` и два его вида: `SettingsForm` (реестр `FORMS`, страница настроек) и `ExplorerParts` (реестр `PARTS`, части в дереве Explorer).
 - `app.rs` разрезан по областям (`src/app/`); агент — модули (`agent/src/modules/`).
 
 Осталось:

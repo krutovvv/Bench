@@ -5,15 +5,17 @@
 //! changes all of it too, from any thread, with its tools. Each section is a file here:
 //!
 //! ```text
-//! env/section.rs      the `Section` trait, `Home`, `Item`, and the pieces sections are made of
-//! env/page.rs         the Settings page: the `Home::Settings` sections' forms
+//! env/section.rs      `Section`, `SettingsForm`, `ExplorerParts`, `Item`, and the pieces sections
+//!                     are made of
+//! env/page.rs         the Settings page: the `FORMS`
 //! env/instructions.rs the prompts and skills the environment lists (their texts are files)
 //! env/<section>.rs    a section: its state (a part of `ProjectEnv`), form or items, card, save
 //! settings/new_project.rs the new project's page (the sidebar's "+")
 //! ```
 //!
-//! A new section: a file like `telegram.rs`, its state in `ProjectEnv` (and `new_env`), a line in
-//! `SECTIONS` (its `home`), and its part of the agent's `/api/projects/<id>/env`.
+//! A new section: a file like `telegram.rs`, its state in `ProjectEnv` (and `new_env`), its
+//! `Section` and either `SettingsForm` (a line in `FORMS`) or `ExplorerParts` (a line in
+//! `PARTS`), and its part of the agent's `/api/projects/<id>/env`.
 
 pub mod instructions;
 pub mod lsp;
@@ -34,7 +36,7 @@ use serde_json::Value;
 
 use crate::app::BenchApp;
 use crate::client::rest;
-pub use section::{Home, Section};
+pub use section::{ExplorerParts, Section, SettingsForm};
 
 pub struct ProjectEnv {
     pub id: String,
@@ -59,22 +61,35 @@ pub struct ProjectEnv {
     pub error: Option<String>,
 }
 
-/// The sections, in the order they are drawn where they live; neighbours with the same `block`
-/// share its heading.
-pub static SECTIONS: &[&dyn Section] = &[
+/// What the project is set to: its Settings page's sections, in order; neighbours with the same
+/// `block` share its heading.
+pub static FORMS: &[&dyn SettingsForm] = &[
     &name::Name,
     &place::Place,
     &run::Run,
     &telegram::Telegram,
     &name::Danger,
-    &mcp::Mcp,
-    &lsp::Lsp,
-    &schedule::Schedule,
 ];
+
+/// What it contains that is not a file: the Explorer's parts, in the order of its tree.
+pub static PARTS: &[&dyn ExplorerParts] = &[&mcp::Mcp, &lsp::Lsp, &schedule::Schedule];
+
+/// Every section, the forms' first.
+pub fn sections() -> impl Iterator<Item = &'static dyn Section> {
+    FORMS
+        .iter()
+        .map(|s| *s as &dyn Section)
+        .chain(PARTS.iter().map(|s| *s as &dyn Section))
+}
 
 /// The section whose key is `key`.
 pub fn section(key: &str) -> Option<&'static dyn Section> {
-    SECTIONS.iter().copied().find(|s| s.key() == key)
+    sections().find(|s| s.key() == key)
+}
+
+/// The Explorer's parts whose key is `key`.
+pub fn part(key: &str) -> Option<&'static dyn ExplorerParts> {
+    PARTS.iter().copied().find(|s| s.key() == key)
 }
 
 /// The agent a project's threads run with: its own (`project:<id>`), or this machine's for the
@@ -295,8 +310,9 @@ impl BenchApp {
                             .card
                             .as_ref()
                             .is_some_and(|(k, n)| *k == what && n == "new");
-                        if let Some(name) = new.then(|| section.made(e, cx)).flatten() {
-                            section.close(e);
+                        let made_as = part(what).filter(|_| new).and_then(|p| p.made(e, cx).map(|n| (p, n)));
+                        if let Some((p, name)) = made_as {
+                            p.close(e);
                             e.card = None;
                             made = Some(name);
                         }
@@ -358,16 +374,18 @@ impl BenchApp {
             return;
         }
         e.armed = None;
-        let Some(section) = section(what) else {
-            return;
-        };
-        if section.remove_here(self, id, window, cx) {
+        // The project itself is removed by its form; a part by a DELETE to the agent.
+        if let Some(form) = FORMS.iter().find(|s| s.key() == what) {
+            form.remove_here(self, id, window, cx);
             return;
         }
+        let Some(p) = part(what) else {
+            return;
+        };
         let Some((conn, eid)) = self.env_target(id) else {
             return;
         };
-        let Some(path) = section.remove_path(&eid, &name) else {
+        let Some(path) = p.remove_path(&eid, &name) else {
             return;
         };
         let profile = self.current_profile();
@@ -412,12 +430,12 @@ impl BenchApp {
         {
             return;
         }
-        for s in SECTIONS {
+        for s in PARTS {
             s.close(e);
         }
         e.armed = None;
         e.card = Some((kind, name.clone()));
-        let sec = section(kind);
+        let sec = part(kind);
         if name == "new" {
             if let Some((editor, template)) = sec.and_then(|s| s.new_one(e)) {
                 editor.update(cx, |s, cx| s.set_value(template, window, cx));
@@ -434,10 +452,10 @@ impl BenchApp {
     }
 
     /// The open part of the project `id`, when its draft is not saved: its section.
-    pub fn env_dirty_card(&self, id: &str) -> Option<(&'static dyn Section, String)> {
+    pub fn env_dirty_card(&self, id: &str) -> Option<(&'static dyn ExplorerParts, String)> {
         let e = self.envs.get(id)?;
         let (kind, name) = e.card.clone()?;
-        let s = section(kind).filter(|s| s.dirty(e))?;
+        let s = part(kind).filter(|s| s.dirty(e))?;
         Some((s, name))
     }
 
@@ -457,7 +475,7 @@ impl BenchApp {
 pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
     e.dir = v["dir"].as_str().unwrap_or_default().to_string();
     e.instructions.apply(v);
-    for s in SECTIONS {
+    for s in sections() {
         s.apply(e, v, window, cx);
     }
 }

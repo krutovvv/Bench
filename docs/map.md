@@ -82,5 +82,5 @@ docs/            architecture.md (why), map.md (where), thread-rewrite.md (the t
 - **Row** (`crates/thread`): one line of the thread — User, Work, Answer, Insert, Fail, Writing, Queued.
 - **Work**: the agent's steps between two messages; counted per message, never per run.
 - **Insert** / **InsertKind** (`src/inserts/mod.rs`): a live tool in the thread and its kind.
-- **Section** (`src/env/section.rs`): one part of a project's Settings, on a `Tab`.
+- **Section** (`src/env/section.rs`): one part of a project's environment; a `SettingsForm` (fields on its Settings page) or `ExplorerParts` (parts in the Explorer's tree).
 - **Journal**: Pi's entries of a conversation; Bench's thread is read from it, nothing else.
