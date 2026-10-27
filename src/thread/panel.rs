@@ -2,8 +2,8 @@
 //! a document it is the open thread; beside the open thread it is a second one (`beside_thread`,
 //! `beside.rs`).
 
-use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::component::v_flex;
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, v_flex};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
@@ -66,24 +66,22 @@ impl BenchApp {
                 .child(div().flex_1().min_h_0().child(view))
                 .into_any_element();
         }
-        // A document in the middle: "+" starts a new thread here, in this panel — the
-        // document keeps the middle (`new_thread_here`).
+        // A document in the middle: the new thread is spelled out, as "New project" is —
+        // a bare plus said nothing. Closing is the status bar's sparkle pressed off (⌘J),
+        // not a cross of this panel's own.
         let head = bench_ui::ide_head(
             title,
             None,
-            vec![
-                bench_ui::icon_button("thread-new", Ico::Plus, "New thread  ⌘N", false, cx)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.new_thread_here(cx);
-                        this.focus_composer(window, cx);
-                    }))
-                    .into_any_element(),
-                bench_ui::icon_button("thread-close", Ico::X, "Close  ⌘J", false, cx)
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
-                    )
-                    .into_any_element(),
-            ],
+            vec![Button::new("thread-new")
+                .ghost()
+                .small()
+                .child(div().text_xs().child("New Thread"))
+                .text_color(theme.muted_foreground)
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.new_thread_here(cx);
+                    this.focus_composer(window, cx);
+                }))
+                .into_any_element()],
             cx,
         )
         .h(bench_ui::bar_h(cx))

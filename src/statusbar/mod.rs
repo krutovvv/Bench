@@ -304,27 +304,29 @@ impl BenchApp {
                 ))
             })
             // The thread beside, whenever a document fills the center: the agent's sparkle,
-            // before the terminal — it appears and goes, the terminal stays put. Out of the
-            // window's top corner, where it pushed the header around.
-            .when(
-                self.center == Center::Doc
-                    && self
-                        .shown_panel(crate::workspace::DockPosition::Right)
-                        .is_none(),
-                |d| {
-                    d.child(
-                        button(
-                            "thread-beside",
-                            Ico::Sparkles,
-                            "The thread beside  ⌘J",
-                            false,
-                        )
-                        .on_click(
-                            cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
-                        ),
+            // before the terminal. It never hides while the thread is open — like the Explorer
+            // and the terminal it is pressed while shown, and the second press closes it
+            // (⌘J); the thread's own head keeps no cross of its own.
+            .when(self.center == Center::Doc, |d| {
+                let open = self
+                    .shown_panel(crate::workspace::DockPosition::Right)
+                    .is_some();
+                d.child(
+                    button(
+                        "thread-beside",
+                        Ico::Sparkles,
+                        if open {
+                            "Close the thread beside  ⌘J"
+                        } else {
+                            "The thread beside  ⌘J"
+                        },
+                        open,
                     )
-                },
-            )
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
+                    ),
+                )
+            })
             // The bottom dock's terminal, on the project's machine (⌃`).
             .child({
                 let open = self.bottom_dock.shows(crate::workspace::Panel::Terminal);
