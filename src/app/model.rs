@@ -227,39 +227,25 @@ pub struct SlashCommand {
     pub key: String,
 }
 
-/// The agent asks before running something (approval mode manual/smart).
+/// The agent asks before running something (approval mode manual/smart): which pending
+/// prompt it is. The card — command and choices — is the journal's (`AskCard`).
 #[derive(Clone, Debug)]
 pub struct ApprovalReq {
     pub session: String,
     pub prompt_id: String,
-    pub command: String,
-    pub description: String,
-    /// Offered answers: "once", "session", "always", "deny".
-    pub choices: Vec<String>,
 }
 
 pub const APPROVAL_MODES: &[&str] = &["off", "smart", "manual"];
 
-/// The agent asks the user a question (the `clarify` tool): pick a choice or answer freely.
+/// The agent asks the user a question (the `clarify` tool): the live prompt, so an answer
+/// reaches it. The question itself is the journal's (`AskCard`); these choices are what a
+/// multi-select answer picks from, by index.
 #[derive(Clone, Debug)]
 pub struct ClarifyReq {
     pub session: String,
     pub prompt_id: String,
     pub generation: Option<i64>,
-    pub question: String,
     pub choices: Vec<String>,
-    /// Several choices may be picked (sent comma-separated).
-    pub multi_select: bool,
-}
-
-/// One step of the agent's plan (the `todo` tool).
-#[derive(Clone, Debug, PartialEq)]
-pub struct Todo {
-    pub content: String,
-    /// "pending", "in_progress", "completed" or "cancelled".
-    pub status: String,
-    /// Nesting (sub-steps of a step).
-    pub depth: usize,
 }
 
 /// Context/usage readout for the status bar.

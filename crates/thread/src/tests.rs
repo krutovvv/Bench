@@ -1,4 +1,4 @@
-use protocol::{QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
+use protocol::{PlanStep, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
 use serde_json::json;
 
 use crate::{Row, Step, Thread};
@@ -51,20 +51,74 @@ fn queued(sub: u64, t: &str) -> QueuedItem {
         text: t.into(),
     }
 }
+fn plan(seq: u64, id: &str, steps: &[(&str, &str, &str)]) -> ThreadItem {
+    ThreadItem::Plan {
+        key: seq.to_string(),
+        seq,
+        id: id.into(),
+        todos: steps
+            .iter()
+            .map(|(i, c, s)| PlanStep {
+                id: i.to_string(),
+                content: c.to_string(),
+                status: s.to_string(),
+                parent: None,
+            })
+            .collect(),
+    }
+}
+fn ask(seq: u64, id: &str, question: &str, choices: &[&str], multi: bool) -> ThreadItem {
+    ThreadItem::Ask {
+        key: seq.to_string(),
+        seq,
+        id: id.into(),
+        ask_kind: "clarify".into(),
+        question: question.into(),
+        detail: None,
+        choices: choices.iter().map(|c| c.to_string()).collect(),
+        multi,
+    }
+}
+fn asked(seq: u64, id: &str, answer: Option<&str>) -> ThreadItem {
+    ThreadItem::Asked {
+        key: seq.to_string(),
+        seq,
+        id: id.into(),
+        answer: answer.map(|a| a.to_string()),
+    }
+}
 fn kinds(rows: &[Row]) -> Vec<String> {
     rows.iter()
         .map(|r| match r {
             Row::User { text, .. } => format!("user:{text}"),
-            Row::Work { steps, live, .. } => format!(
-                "work:{}{}",
-                steps.iter().filter(|s| s.is_tool()).count(),
-                if *live { "+" } else { "" }
-            ),
+            Row::Work {
+                steps,
+                live,
+                plan,
+                asks,
+                ..
+            } => {
+                let mut s = format!(
+                    "work:{}{}",
+                    steps.iter().filter(|s| s.is_tool()).count(),
+                    if *live { "+" } else { "" }
+                );
+                if !plan.is_empty() {
+                    s += &format!("·p{}", plan.len());
+                }
+                if !asks.is_empty() {
+                    s += &format!(
+                        "·a{}q{}",
+                        asks.len(),
+                        asks.iter().filter(|a| a.answer.is_some()).count()
+                    );
+                }
+                s
+            }
             Row::Answer { text, .. } => format!("answer:{text}"),
             Row::Insert { id, .. } => format!("insert:{id}"),
             Row::Fail { text, .. } => format!("fail:{text}"),
             Row::Writing { text, .. } => format!("writing:{text}"),
-            Row::Plan { .. } => "plan".into(),
             Row::Queued { text, .. } => format!("queued:{text}"),
         })
         .collect()
@@ -104,121 +158,134 @@ fn a_turn_is_message_work_answer() {
     assert_eq!((*from, *to), (Some(2000.), Some(5000.)));
 }
 
-/// The plan belongs to the turn that made it: the agent dates it, and the row stands in that
-/// turn as newer messages come — above what waits, wherever the run has gone since. By the rule
-/// of order, not by nailing it to a place.
+/// The plan lives in the work that wrote it: journal items, merged by id into one card that
+/// ticks in place as newer snapshots come. No dates, no floating row, nothing to move.
 #[test]
-fn rule_1_the_plan_stands_in_the_turn_it_was_made_for() {
+fn rule_1_the_plan_lives_in_the_work_that_wrote_it() {
     let mut t = Thread::open(ThreadOpen {
-        items: vec![user(1, "go"), tool(2, 0, "a")],
+        items: vec![
+            user(1, "go"),
+            tool(2, 0, "a"),
+            plan(3, "p", &[("1", "dig", "in_progress")]),
+            tool(4, 0, "b"),
+        ],
         running: true,
         queue: vec![queued(9, "later")],
         ..Default::default()
     });
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "work:1+", "queued:later"],
-        "no plan, no row"
+        ["user:go", "work:2+·p1", "queued:later"],
+        "the plan is part of its work, not a row of its own"
     );
-    // Dated inside the turn going on now: right after its work, above what waits.
-    t.set_plan(Some(2000.));
+    // Ticking: a newer snapshot of the same plan stamps the same card, in place.
+    t.apply(ThreadEvent::Append(vec![plan(
+        5,
+        "p",
+        &[("1", "dig", "completed"), ("2", "haul", "in_progress")],
+    )]));
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:2+·p1", "queued:later"]);
+    let Row::Work { plan: cards, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(cards[0].1.len(), 2, "the card shows the newest snapshot");
+    // A message taken up mid-run splits the work: the plan keeps living on the card it was
+    // born on, ticking there — it does not repeat below.
+    t.apply(ThreadEvent::Append(vec![
+        user(7, "and hurry"),
+        tool(8, 0, "c"),
+        plan(
+            9,
+            "p",
+            &[("1", "dig", "completed"), ("2", "haul", "completed")],
+        ),
+    ]));
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "work:1+", "plan", "queued:later"]
+        ["user:go", "work:2·p1", "user:and hurry", "work:1+", "queued:later"],
+        "one plan, one card, where it was born"
     );
-    // A message sent while the run is live waits like a queued one: under the plan too.
-    t.sent("and one more thing".into());
+    let Row::Work { plan: cards, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(cards[0].1[1].status, "completed");
+    // Another plan, sharing no steps: a card of its own, on the work going on now.
+    t.apply(ThreadEvent::Append(vec![plan(10, "q", &[("1", "another", "pending")])]));
     assert_eq!(
         kinds(&t.rows()),
         [
             "user:go",
-            "work:1+",
-            "plan",
-            "user:and one more thing",
+            "work:2·p1",
+            "user:and hurry",
+            "work:1+·p1",
             "queued:later"
         ]
     );
-    // The agent takes up the next message: the plan stays where it was made, above it.
-    t.apply(ThreadEvent::Append(vec![user(7, "next"), tool(8, 0, "b")]));
+    // The run ends: the cards stay — they say what those turns worked through.
+    t.apply(ThreadEvent::Run(false));
     assert_eq!(
         kinds(&t.rows()),
         [
             "user:go",
-            "work:1",
-            "plan",
-            "user:next",
-            "work:1+",
-            "user:and one more thing",
+            "work:2·p1",
+            "user:and hurry",
+            "work:1·p1",
             "queued:later"
         ]
-    );
-    // A plan of an older turn is placed in it at once (the thread came back to it, or the date
-    // arrived with the plan).
-    let mut t = Thread::open(ThreadOpen {
-        items: vec![
-            user(1, "go"),
-            text(2, 0, "Done."),
-            user(3, "next"),
-            text(4, 0, "Again."),
-        ],
-        running: true,
-        ..Default::default()
-    });
-    t.set_plan(Some(1500.));
-    assert_eq!(
-        kinds(&t.rows()),
-        [
-            "user:go",
-            "answer:Done.",
-            "plan",
-            "user:next",
-            "answer:Again."
-        ],
-        "a plan dated in an older turn is placed in it, not at the bottom"
     );
 }
 
-/// A plan is the plan of work being done: no run, no plan — the steps the agent left behind
-/// tell nothing the thread does not already say. Its date is its own and survives a payload
-/// that repeats the steps without one.
+/// The agent's question is part of the work that asked it: the card waits there and the
+/// answer settles it in place — on reopen the journal says the same thing.
 #[test]
-fn a_plan_lives_with_its_run_and_keeps_its_date() {
+fn rule_1_the_question_lives_in_the_work_that_asked_it() {
     let mut t = Thread::open(ThreadOpen {
-        items: vec![user(1, "go"), tool(2, 0, "a")],
+        items: vec![
+            user(1, "go"),
+            tool(2, 0, "ask"),
+            ask(3, "q1", "Which?", &["a", "b"], false),
+        ],
         running: true,
         ..Default::default()
     });
-    t.set_plan(Some(2000.));
-    let v = t.version();
-    t.set_plan(Some(2000.));
-    assert_eq!(t.version(), v, "the same plan says nothing new");
-    // The run ends: the row goes, the date stays for the next run.
-    t.apply(ThreadEvent::Run(false));
-    assert_eq!(kinds(&t.rows()), ["user:go", "work:1"]);
-    t.apply(ThreadEvent::Run(true));
-    assert_eq!(kinds(&t.rows()), ["user:go", "work:1+", "plan"]);
-    // A tool's completion repeats the steps but carries no date: the plan keeps its place.
-    t.apply(ThreadEvent::Append(vec![user(7, "next")]));
-    t.set_plan(Some(0.));
-    assert_eq!(
-        kinds(&t.rows()),
-        ["user:go", "work:1", "plan", "user:next", "work:0+"],
-        "the plan of the older turn stayed in it"
-    );
-    // An agent that does not date its plans: the plan goes at the end of the journal.
-    let mut t = Thread::open(ThreadOpen {
-        items: vec![user(1, "go"), user(2, "next")],
-        running: true,
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:1+·a1q0"]);
+    let Row::Work { asks, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(asks[0].answer, None, "the agent still waits");
+    // The answer settles the card where it stands; the work below it never moves.
+    t.apply(ThreadEvent::Append(vec![
+        asked(4, "q1", Some("a")),
+        tool(5, 0, "b"),
+    ]));
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:2+·a1q1"]);
+    let Row::Work { asks, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(asks[0].answer.as_deref(), Some("a"));
+    // The same thread reopened: the settled card is back, not a fresh question.
+    let t2 = Thread::open(ThreadOpen {
+        items: vec![
+            user(1, "go"),
+            tool(2, 0, "ask"),
+            ask(3, "q1", "Which?", &["a", "b"], false),
+            asked(4, "q1", Some("a")),
+            tool(5, 0, "b"),
+        ],
         ..Default::default()
     });
-    t.set_plan(Some(0.));
-    assert_eq!(
-        kinds(&t.rows()),
-        ["user:go", "user:next", "work:0+", "plan"]
-    );
-    // The plan over: the row goes, the waiting rows do not move.
-    t.set_plan(None);
-    assert_eq!(kinds(&t.rows()), ["user:go", "user:next", "work:0+"]);
+    assert_eq!(kinds(&t2.rows()), ["user:go", "work:2·a1q1"]);
+    // A declined question keeps its card too: the answer is the empty one.
+    let t3 = Thread::open(ThreadOpen {
+        items: vec![
+            user(1, "go"),
+            tool(2, 0, "ask"),
+            ask(3, "q1", "Which?", &[], false),
+            asked(4, "q1", Some("")),
+        ],
+        ..Default::default()
+    });
+    assert_eq!(kinds(&t3.rows()), ["user:go", "work:1·a1q1"]);
 }
 
 #[test]

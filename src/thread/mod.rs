@@ -148,18 +148,26 @@ impl ThreadView {
                 },
             ]));
             // A queue like this means a live run: the plan of that run shows, and it shows in
-            // the turn it was made for — a date past the last message is the turn going on now.
+            // the work it belongs to — a journal item, as any plan is.
             self.thread.journal.apply(protocol::ThreadEvent::Run(true));
-            self.thread.todos = ["done", "doing", "next"]
-                .into_iter()
-                .zip(["completed", "in_progress", "pending"])
-                .map(|(c, s)| crate::app::model::Todo {
-                    content: format!("{c}: the step the agent wrote for itself").into(),
-                    status: s.into(),
-                    depth: 0,
-                })
-                .collect();
-            self.thread.journal.set_plan(Some(f64::MAX));
+            self.thread.journal.apply(protocol::ThreadEvent::Append(vec![
+                protocol::ThreadItem::Plan {
+                    key: "demo-plan".into(),
+                    seq: u64::MAX - 1,
+                    id: "demo-plan".into(),
+                    todos: ["done", "doing", "next"]
+                        .into_iter()
+                        .zip(["completed", "in_progress", "pending"])
+                        .enumerate()
+                        .map(|(k, (c, s))| protocol::PlanStep {
+                            id: format!("{k}"),
+                            content: format!("{c}: the step the agent wrote for itself"),
+                            status: s.into(),
+                            parent: None,
+                        })
+                        .collect(),
+                },
+            ]));
         }
     }
 
@@ -373,7 +381,19 @@ impl ThreadView {
                 from,
                 to,
                 live,
-            } => self.render_work(&key, &steps, from, to, live, cx),
+                plan,
+                asks,
+            } => self.render_work(
+                &key,
+                &steps,
+                from,
+                to,
+                live,
+                &plan,
+                &asks,
+                live && !self.thread.processes.is_empty(),
+                cx,
+            ),
             Row::Answer { key, text, error } => {
                 self.render_agent_answer(k, &key, &text, error.as_deref(), after_work, cx)
             }
@@ -389,7 +409,6 @@ impl ThreadView {
                 mode,
                 text,
             } => self.render_queued(&key, &sub, &mode, &text, window, cx),
-            Row::Plan { .. } => self.render_plan_row(cx),
         }
     }
 
@@ -473,18 +492,10 @@ impl ThreadView {
         cx.notify();
     }
 
-    /// After the last row: what waits for the person, the live status blocks, the composer.
+    /// After the last row: the composer. Everything the agent produced stands in the journal —
+    /// its plans, questions and background processes inside the work that wrote them.
     fn render_tail(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let approval = self.render_approval(cx);
-        let clarify = self.render_clarify(cx);
-        let procs = self.render_processes(cx);
         let composer = self.render_composer(cx);
-        v_flex()
-            .w_full()
-            .children(procs)
-            .children(approval)
-            .children(clarify)
-            .child(composer)
-            .into_any_element()
+        v_flex().w_full().child(composer).into_any_element()
     }
 }

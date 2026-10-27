@@ -1,7 +1,7 @@
 //! The agent's work between two messages: one line "N actions · time · Done", the steps under
 //! it when opened. Plus what tool calls say about the outside world: the pages they touched.
 
-use ::thread::Step;
+use ::thread::{AskCard, PlanStep, Step};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -22,6 +22,9 @@ impl ThreadView {
         from: Option<f64>,
         to: Option<f64>,
         live: bool,
+        plan: &[(String, Vec<PlanStep>)],
+        asks: &[AskCard],
+        procs: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
@@ -111,9 +114,21 @@ impl ThreadView {
                 .border_color(theme.border)
                 .children(items)
         });
+        // The plan and the questions this work wrote, under its steps; the live work also
+        // carries the background processes it started.
+        let mut artifacts = self.render_work_artifacts(plan, asks, cx);
+        if procs {
+            artifacts.extend(self.processes_frame(cx));
+        }
+        // Work that only asked or only planned has no "N actions" line to open: the cards are it.
+        let no_steps = steps.is_empty() && !live;
         speaker_row(
             Some(true),
-            v_flex().gap_3().child(summary).children(list),
+            v_flex()
+                .gap_3()
+                .when(!no_steps, |d| d.child(summary))
+                .children(list)
+                .children(artifacts),
             cx,
         )
         .into_any_element()

@@ -52,17 +52,25 @@ Never send to "the" agent: there are several.
 
 ## Questions and plans
 
-- **Questions** (the `clarify` tool): event `clarify.request` {prompt_id, execution_generation,
-  question, choices[], multi_select}; answer `clarify.respond` {session_id, execution_generation,
-  prompt_id, answer} (multi-select: choices joined with ", "; empty answer = declined);
-  `clarify.settled` closes it. The agent times a question out (`clarify_timeout`, 600 s, `runtime.ts`) — unanswered ones
-  used to vanish into the step list; the app shows a card (choices, own answer, Decline).
-- **Plan** (the `todo` tool): `todo.updated` {todos: [{id, content, status, parent?}], revision},
-  also merged into the todo tool's `tool.complete`; statuses pending / in_progress / completed /
-  cancelled. Shown as a foldable strip over the input ("PLAN · 2/5 · current step").
-- **Reopening a thread**: `session.resume` returns `prompts` (open approvals and questions) and
-  `todo_state`; the gateway replays them as events once the thread is open
-  (`Pending::Thread {replay}`), otherwise a pending approval/question is lost when you switch threads.
+They are **journal items**, so they stand in the thread where the agent made them and come back
+exactly so on reopen; the live events only say what is answerable *now*.
+
+- **Questions** (the `clarify` tool, and approvals): the agent writes `bench.ask`
+  {id, ask_kind: "clarify"|"approve", question, detail?, choices[], multi} into the conversation
+  when it asks, and `bench.asked` {id, answer} when it settles (empty answer = declined or timed
+  out). `clarify.request` {prompt_id, execution_generation, question, choices[], multi_select}
+  (+ `approval.request`) still marks the live prompt: only the matching card takes an answer
+  (`clarify.respond` / `approval.respond`; multi-select: choices joined with ", "), and
+  `clarify.settled` closes it. The card — choices, own answer, Decline — renders inside the work
+  row that asked; settled cards say what was answered.
+- **Plan** (the `todo` tool): `todo.updated` {todos: [{id, content, status, parent?}], revision}
+  still fires, but what Bench shows is the journal: the agent writes `bench.plan`
+  {id, todos} on every revision. One card per plan id, stamped in the work that made it, merged
+  in place by newer snapshots of the same id; a second plan sharing no steps gets its own card.
+  Statuses pending / in_progress / completed / cancelled; the card folds its steps ("PLAN · 2/5").
+- **Reopening a thread**: the journal carries all of the above; `session.resume` returns `prompts`
+  (open approvals and questions) and the gateway replays them (`Pending::Thread {replay}`) so a
+  pending prompt is still answerable after a thread switch — its card is already in place.
 
 ## The agent's lifecycle
 

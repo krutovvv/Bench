@@ -97,7 +97,7 @@ impl ThreadView {
             && self.thread.tv.rows[k + 1..].iter().all(|r| {
                 matches!(
                     r,
-                    Row::Queued { .. } | Row::Insert { .. } | Row::Plan { .. }
+                    Row::Queued { .. } | Row::Insert { .. }
                 )
             });
         let sources = self.render_sources(k, cx);

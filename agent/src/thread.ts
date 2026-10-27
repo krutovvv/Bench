@@ -59,6 +59,19 @@ export function itemsOf(entry: any): ThreadItem[] {
 		out.push({ key: `${seq}`, seq, kind: "fail", text: String(entry.data?.text ?? "") });
 		return out;
 	}
+	if (entry.kind === "bench.plan") {
+		const todos = Array.isArray(entry.data?.todos) ? entry.data.todos : [];
+		out.push({ key: `${seq}`, seq, kind: "plan", id: String(entry.data?.id ?? ""), todos: todos.map((t: any) => ({ id: String(t?.id ?? ""), content: String(t?.content ?? ""), status: String(t?.status ?? "pending"), ...(typeof t?.parent === "string" ? { parent: t.parent } : {}) })) });
+		return out;
+	}
+	if (entry.kind === "bench.ask") {
+		out.push({ key: `${seq}`, seq, kind: "ask", id: String(entry.data?.id ?? ""), ask_kind: String(entry.data?.ask_kind ?? "clarify"), question: String(entry.data?.question ?? ""), ...(entry.data?.detail ? { detail: String(entry.data.detail) } : {}), choices: (Array.isArray(entry.data?.choices) ? entry.data.choices : []).map(String), multi: Boolean(entry.data?.multi) });
+		return out;
+	}
+	if (entry.kind === "bench.asked") {
+		out.push({ key: `${seq}`, seq, kind: "asked", id: String(entry.data?.id ?? ""), ...(entry.data?.answer == null ? {} : { answer: String(entry.data.answer) }) });
+		return out;
+	}
 	if (entry.kind === COMPACTION_KIND || entry.kind === "pi.system") return out;
 	let n = 0;
 	const key = () => `${seq}.${n++}`;

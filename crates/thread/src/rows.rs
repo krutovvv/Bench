@@ -1,8 +1,9 @@
-//! The journal as rows: messages, pieces of work, answers, inserts, the queue.
+//! The journal as rows: messages, pieces of work (with the plan and the questions that grew
+//! inside them), answers, inserts, the queue.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use protocol::{QueuedItem, ThreadItem};
+use protocol::{PlanStep, QueuedItem, ThreadItem};
 use serde_json::{Map, Value};
 
 /// One line of the thread. `key` is stable: a view keeps a row's state (folded, measured) by it.
@@ -14,15 +15,21 @@ pub enum Row {
         text: String,
         at: Option<f64>,
     },
-    /// The agent's steps between two messages: folded into "N actions · time".
+    /// The agent's steps between two messages: folded into "N actions · time". The plan it kept
+    /// and the questions it put to the person live here, as journal items of the same turn: they
+    /// are born in this work, tick and settle in it, and never stand on their own in the list.
     Work {
         key: String,
         steps: Vec<Step>,
         from: Option<f64>,
         to: Option<f64>,
         live: bool,
+        /// The agent's plans written in this work: (id, the newest snapshot of its steps).
+        plan: Vec<(String, Vec<PlanStep>)>,
+        /// The agent's questions put in this work, settled or still waiting.
+        asks: Vec<AskCard>,
     },
-    /// What the agent said: an answer, a plan, a question — each its own message.
+    /// What the agent said: its answer.
     Answer {
         key: String,
         text: String,
@@ -35,10 +42,6 @@ pub enum Row {
     },
     /// Why a run stopped.
     Fail { key: String, text: String },
-    /// The plan the agent is working through. Its steps are the thread view's, not the
-    /// journal's: the row only says a plan is open, and it stands in the turn the agent dated it
-    /// in — before the next message and before what waits. Folded or not, it is the same row.
-    Plan { key: String },
     /// The answer being written now (its text; the model's reasoning is not shown while it streams).
     Writing { text: String },
     /// A message waiting for the agent.
@@ -50,6 +53,21 @@ pub enum Row {
     },
 }
 
+/// The agent's question (the `clarify` tool, an approval) as the thread shows it. `answer` is
+/// the person's once an `asked` item settled it; `None` means the agent still waits.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AskCard {
+    pub id: String,
+    /// "clarify" or "approve".
+    pub ask_kind: String,
+    pub question: String,
+    /// Extra text under the question: the command an approval wants to run.
+    pub detail: Option<String>,
+    pub choices: Vec<String>,
+    pub multi: bool,
+    pub answer: Option<String>,
+}
+
 impl Row {
     pub fn key(&self) -> &str {
         match self {
@@ -58,7 +76,6 @@ impl Row {
             | Row::Answer { key, .. }
             | Row::Insert { key, .. }
             | Row::Fail { key, .. }
-            | Row::Plan { key, .. }
             | Row::Queued { key, .. } => key,
             Row::Writing { .. } => "writing",
         }
@@ -87,15 +104,14 @@ impl Step {
     }
 }
 
-/// `plan` is the plan the agent is working through, dated when it wrote it (`todos_at`): its row
-/// stands in that turn. `None` is no plan.
+/// The plan and the questions are journal items of the turn that wrote them; no side state,
+/// no dates: the journal alone says where they stand.
 pub(crate) fn rows_of(
     log: &[ThreadItem],
     inserts: &Map<String, Value>,
     running: bool,
     stream: &(String, String),
     sent: &[String],
-    plan: Option<f64>,
     queue: &[QueuedItem],
 ) -> Vec<Row> {
     // An assistant entry with tool calls is work: its text is a note on the way, not an answer.
@@ -104,6 +120,27 @@ pub(crate) fn rows_of(
         .filter(|i| matches!(i, ThreadItem::Tool { .. }))
         .map(|i| i.seq())
         .collect();
+    // Each plan lives once: its place is its first snapshot, its steps the newest one. Each
+    // question too, with the answer the journal has for it.
+    let mut plan_first: HashMap<&str, u64> = HashMap::new();
+    let mut plan_latest: HashMap<&str, Vec<PlanStep>> = HashMap::new();
+    let mut ask_first: HashMap<&str, u64> = HashMap::new();
+    let mut asked: HashMap<&str, Option<&String>> = HashMap::new();
+    for it in log {
+        match it {
+            ThreadItem::Plan { id, seq, todos, .. } => {
+                plan_first.entry(id).or_insert(*seq);
+                plan_latest.insert(id, todos.clone());
+            }
+            ThreadItem::Ask { id, seq, .. } => {
+                ask_first.entry(id).or_insert(*seq);
+            }
+            ThreadItem::Asked { id, answer, .. } => {
+                asked.insert(id, answer.as_ref());
+            }
+            _ => {}
+        }
+    }
     let mut rows = Vec::new();
     let mut work: Option<Row> = None;
     // An insert moved after the n-th message (put while that message waited in the composer):
@@ -122,6 +159,8 @@ pub(crate) fn rows_of(
             from: at,
             to: at,
             live: false,
+            plan: vec![],
+            asks: vec![],
         });
         if let Row::Work {
             steps, from, to, ..
@@ -135,6 +174,20 @@ pub(crate) fn rows_of(
                 *to = at;
             }
         }
+    };
+    // The plan and the questions join the work that wrote them: the newest snapshot ticks the
+    // card at its birth place; nothing here is placed by a clock.
+    let attach = |work: &mut Option<Row>, key: &str, put: &dyn Fn(&mut Row)| {
+        let w = work.get_or_insert_with(|| Row::Work {
+            key: key.to_string(),
+            steps: vec![],
+            from: None,
+            to: None,
+            live: false,
+            plan: vec![],
+            asks: vec![],
+        });
+        put(w);
     };
     for it in log {
         match it {
@@ -260,6 +313,46 @@ pub(crate) fn rows_of(
                     text: text.clone(),
                 });
             }
+            // The plan and the questions are parts of the work that wrote them: the card stands
+            // where its first snapshot was written and ticks from the newest one.
+            ThreadItem::Plan { key, seq, id, .. } if plan_first.get(id.as_str()) == Some(seq) => {
+                let todos = plan_latest.get(id.as_str()).cloned().unwrap_or_default();
+                let key = key.clone();
+                let id = id.clone();
+                attach(&mut work, &key, &|w| {
+                    if let Row::Work { plan, .. } = w {
+                        plan.push((id.clone(), todos.clone()));
+                    }
+                });
+            }
+            ThreadItem::Ask {
+                key,
+                seq,
+                id,
+                ask_kind,
+                question,
+                detail,
+                choices,
+                multi,
+                ..
+            } if ask_first.get(id.as_str()) == Some(seq) => {
+                let card = AskCard {
+                    id: id.clone(),
+                    ask_kind: ask_kind.clone(),
+                    question: question.clone(),
+                    detail: detail.clone(),
+                    choices: choices.clone(),
+                    multi: *multi,
+                    answer: asked.get(id.as_str()).copied().flatten().cloned(),
+                };
+                let key = key.clone();
+                attach(&mut work, &key, &|w| {
+                    if let Row::Work { asks, .. } = w {
+                        asks.push(card.clone());
+                    }
+                });
+            }
+            ThreadItem::Plan { .. } | ThreadItem::Ask { .. } | ThreadItem::Asked { .. } => {}
         }
     }
     // What the model is thinking now: a step of the work in progress, folded with it like the
@@ -286,26 +379,14 @@ pub(crate) fn rows_of(
             from: None,
             to: None,
             live: true,
+            plan: vec![],
+            asks: vec![],
         });
     }
     if running && !stream.1.is_empty() {
         rows.push(Row::Writing {
             text: stream.1.clone(),
         });
-    }
-    // The plan stands in the turn it was made for: the agent dated it, so it goes after the last
-    // row of that turn — before the next message and before what waits, wherever the run has
-    // come to since. While the turn that made it is the live one, that is right after its work.
-    if let Some(at) = plan {
-        // No date to go by (an agent that does not date its plans): the end of the journal.
-        let after = if at > 0. {
-            rows.iter()
-                .position(|r| matches!(r, Row::User { at: Some(a), .. } if *a > at))
-                .unwrap_or(rows.len())
-        } else {
-            rows.len()
-        };
-        rows.insert(after, Row::Plan { key: "plan".into() });
     }
     rows.extend(sent.iter().enumerate().map(|(k, t)| Row::User {
         key: format!("sent-{k}"),

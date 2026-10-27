@@ -154,10 +154,6 @@ pub enum Evt {
     Clarify(crate::app::model::ClarifyReq),
     /// The pending question was answered, timed out or withdrawn.
     ClarifyDone(String),
-    /// The session's plan, whole: (runtime session, steps).
-    /// The agent's plan and the moment (unix seconds) it began; 0 = the agent did not say
-    /// (an older agent), so Bench keeps the block where it already had it.
-    Todos(String, Vec<crate::app::model::Todo>, f64),
     /// What the thread keeps of the speed of its last answer (its chart and its last speeds).
     Speed(String, crate::statusbar::speed::Stat),
     /// The pending approval was answered or withdrawn.
@@ -221,7 +217,6 @@ impl Evt {
         match self {
             Evt::Processes(s, _)
             | Evt::ClarifyDone(s)
-            | Evt::Todos(s, _, _)
             | Evt::Speed(s, _)
             | Evt::ApprovalDone(s)
             | Evt::Effort(s, _)

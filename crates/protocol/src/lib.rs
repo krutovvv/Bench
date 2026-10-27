@@ -86,6 +86,56 @@ pub enum ThreadItem {
         seq: u64,
         text: String,
     },
+    /// The agent's plan (the `todo` tool): a whole snapshot every time it is rewritten. The rows
+    /// merge snapshots of one `id` into the plan of the work that wrote them.
+    Plan {
+        key: String,
+        #[ts(type = "number")]
+        seq: u64,
+        id: String,
+        todos: Vec<PlanStep>,
+    },
+    /// The agent puts a question (the `clarify` tool) or an approval: a card of its own, in the
+    /// work that asked. `id` is the prompt's, so the answer can be brought back to it.
+    Ask {
+        key: String,
+        #[ts(type = "number")]
+        seq: u64,
+        id: String,
+        /// "clarify" or "approve".
+        ask_kind: String,
+        question: String,
+        /// Extra text under the question: the command an approval wants to run.
+        #[ts(optional)]
+        #[serde(default)]
+        detail: Option<String>,
+        #[serde(default)]
+        choices: Vec<String>,
+        #[serde(default)]
+        multi: bool,
+    },
+    /// A question's answer ("" is a decline): it settles the [`ThreadItem::Ask`] of the same id.
+    Asked {
+        key: String,
+        #[ts(type = "number")]
+        seq: u64,
+        id: String,
+        #[ts(optional)]
+        #[serde(default)]
+        answer: Option<String>,
+    },
+}
+
+/// One step of the agent's plan.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+pub struct PlanStep {
+    pub id: String,
+    pub content: String,
+    /// "pending", "in_progress", "completed", "cancelled".
+    pub status: String,
+    #[ts(optional)]
+    #[serde(default)]
+    pub parent: Option<String>,
 }
 
 impl ThreadItem {
@@ -97,7 +147,10 @@ impl ThreadItem {
             | ThreadItem::Tool { key, .. }
             | ThreadItem::Result { key, .. }
             | ThreadItem::Insert { key, .. }
-            | ThreadItem::Fail { key, .. } => key,
+            | ThreadItem::Fail { key, .. }
+            | ThreadItem::Plan { key, .. }
+            | ThreadItem::Ask { key, .. }
+            | ThreadItem::Asked { key, .. } => key,
         }
     }
 
@@ -109,7 +162,10 @@ impl ThreadItem {
             | ThreadItem::Tool { seq, .. }
             | ThreadItem::Result { seq, .. }
             | ThreadItem::Insert { seq, .. }
-            | ThreadItem::Fail { seq, .. } => *seq,
+            | ThreadItem::Fail { seq, .. }
+            | ThreadItem::Plan { seq, .. }
+            | ThreadItem::Ask { seq, .. }
+            | ThreadItem::Asked { seq, .. } => *seq,
         }
     }
 
@@ -121,7 +177,11 @@ impl ThreadItem {
             | ThreadItem::Text { at, .. }
             | ThreadItem::Tool { at, .. }
             | ThreadItem::Result { at, .. } => *at,
-            ThreadItem::Insert { .. } | ThreadItem::Fail { .. } => None,
+            ThreadItem::Insert { .. }
+            | ThreadItem::Fail { .. }
+            | ThreadItem::Plan { .. }
+            | ThreadItem::Ask { .. }
+            | ThreadItem::Asked { .. } => None,
         }
     }
 
@@ -258,6 +318,7 @@ pub fn typescript() -> String {
     );
     for decl in [
         ThreadItem::decl(),
+        PlanStep::decl(),
         QueuedItem::decl(),
         ThreadOpen::decl(),
         StreamKind::decl(),

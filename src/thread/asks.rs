@@ -1,177 +1,68 @@
-//! What the agent puts to the user beyond its answer: a question with choices (the `clarify`
-//! tool) as a card at the end of the chat, and its plan (the `todo` tool) as a foldable strip
-//! over the input, steps ticked off as it goes.
+//! The agent's cards that grow inside its work: the plan it keeps (the `todo` tool) and the
+//! questions it puts to the person (`clarify`, an approval). They are journal items of the turn
+//! that wrote them — the cards stand in the work row, tick and settle there, and come back
+//! exactly so on reopen.
+
+use std::collections::HashSet;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use thread::{AskCard, PlanStep};
 
 use super::ThreadView;
 use bench_ui::icons::Ico;
 
 impl ThreadView {
-    /// The question card: choices (one click answers; with multi-select, tick then Send), an
-    /// answer of your own, or Decline.
-    pub(crate) fn render_clarify(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let req = self.thread.clarify.clone()?;
-        let theme = cx.theme().clone();
-        let picked = self.thread.clarify_picked.clone();
-        let choices: Vec<AnyElement> = req
-            .choices
-            .iter()
-            .enumerate()
-            .map(|(k, choice)| {
-                let label = choice.clone();
-                if req.multi_select {
-                    let on = picked.contains(&k);
-                    h_flex()
-                        .id(("clarify-pick", k))
-                        .gap_2()
-                        .py_1()
-                        .items_start()
-                        .text_base()
-                        .cursor_pointer()
-                        .hover(|s| s.text_color(theme.foreground))
-                        .child(
-                            div()
-                                .size(px(14.))
-                                .flex_none()
-                                .mt(px(2.))
-                                .border_1()
-                                .rounded_md()
-                                .border_color(if on { theme.primary } else { theme.input })
-                                .when(on, |d| d.bg(theme.primary)),
-                        )
-                        .child(div().flex_1().min_w_0().child(label))
-                        .on_click(
-                            cx.listener(move |this, _, _, cx| this.toggle_clarify_choice(k, cx)),
-                        )
-                        .into_any_element()
-                } else {
-                    // A row as wide as the card, its text wrapped: a Button is one line as long
-                    // as the choice and ran past the card.
-                    bench_ui::choice_row(("clarify-choice", k), cx)
-                        .child(label.clone())
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.answer_clarify(label.clone(), window, cx)
-                        }))
-                        .into_any_element()
-                }
-            })
-            .collect();
-        let any_picked = !picked.is_empty();
-        Some(
-            v_flex()
-                .min_w_0()
-                .ml(px(bench_ui::CHAT_TEXT))
-                .mr(px(bench_ui::CHAT_RIGHT))
-                .mt_2()
-                .p_3()
-                .gap_2()
-                .border_1()
-                .rounded_md()
-                .border_color(theme.primary)
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .items_start()
-                        .text_base()
-                        .child(
-                            Ico::CircleHelp
-                                .icon()
-                                .small()
-                                .text_color(theme.primary)
-                                .mt(px(2.)),
-                        )
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .font_weight(FontWeight::MEDIUM)
-                                .child(req.question.clone()),
-                        ),
-                )
-                .when(!choices.is_empty(), |d| {
-                    if req.multi_select {
-                        d.child(v_flex().pl_6().children(choices))
-                    } else {
-                        d.child(v_flex().pl_6().gap_2().children(choices))
-                    }
-                })
-                .child(
-                    h_flex()
-                        .pl_6()
-                        .gap_2()
-                        .items_center()
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .child(Input::new(&self.clarify_input).small()),
-                        )
-                        .when(req.multi_select, |d| {
-                            d.child(
-                                Button::new("clarify-send")
-                                    .small()
-                                    .primary()
-                                    .label("Send selected")
-                                    .when(!any_picked, |b| b.ghost())
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.send_clarify_picks(window, cx)
-                                    })),
-                            )
-                        })
-                        .child(
-                            Button::new("clarify-decline")
-                                .small()
-                                .ghost()
-                                .label("Decline")
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.answer_clarify(String::new(), window, cx)
-                                })),
-                        ),
-                )
-                .into_any_element(),
-        )
+    /// The work row's cards, under its steps: one frame per plan, one per question.
+    pub(crate) fn render_work_artifacts(
+        &mut self,
+        plan: &[(String, Vec<PlanStep>)],
+        asks: &[AskCard],
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
+        let mut els: Vec<AnyElement> = Vec::new();
+        for (id, todos) in plan {
+            els.push(self.render_plan_frame(id, todos, cx));
+        }
+        for card in asks {
+            els.push(self.render_ask_card(card, cx));
+        }
+        els
     }
 
-    /// The plan as a row of the thread, the agent's: a block like an insert's (its avatar, its
-    /// `block_head`) with the chevron, "PLAN · 3/7" and, folded, the step in progress; the steps
-    /// under the head when open. It goes when no step is left to do (`Evt::Todos`), so an ended
-    /// plan never lingers, and it stands where the work it plans is — above what waits.
-    pub(crate) fn render_plan_row(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        if self.thread.todos.is_empty() {
-            // The row and the steps move on the same event, so this is not expected: an empty
-            // row asks for nothing rather than a block of "0/0".
-            return div().into_any_element();
-        }
+    /// The plan: a block with the chevron, "PLAN · 3/7" and, folded, the step in progress; the
+    /// steps under the head when open. Folded per plan, by its id.
+    fn render_plan_frame(
+        &mut self,
+        id: &str,
+        todos: &[PlanStep],
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let open = self.thread.plan_open;
-        let done = self
-            .thread
-            .todos
-            .iter()
-            .filter(|t| t.status == "completed")
-            .count();
-        let total = self
-            .thread
-            .todos
+        let open = self.thread.plan_open.contains(id);
+        let done = todos.iter().filter(|t| t.status == "completed").count();
+        let total = todos
             .iter()
             .filter(|t| t.status != "cancelled")
             .count();
-        let current = self
-            .thread
-            .todos
+        let current = todos
             .iter()
             .find(|t| t.status == "in_progress")
-            .or_else(|| self.thread.todos.iter().find(|t| t.status == "pending"))
+            .or_else(|| todos.iter().find(|t| t.status == "pending"))
             .map(|t| t.content.clone());
+        let depth = |t: &PlanStep| {
+            usize::from(
+                t.parent
+                    .as_deref()
+                    .is_some_and(|p| todos.iter().any(|x| x.id == *p)),
+            )
+        };
         let steps: Vec<AnyElement> = if open {
-            self.thread
-                .todos
+            todos
                 .iter()
                 .map(|t| {
                     let (icon, color, strike) = match t.status.as_str() {
@@ -183,7 +74,7 @@ impl ThreadView {
                     h_flex()
                         .gap_2()
                         .py_0p5()
-                        .pl(px(16. * t.depth as f32))
+                        .pl(px(16. * depth(t) as f32))
                         .items_center()
                         .text_base()
                         .child(icon.icon().xsmall().text_color(color))
@@ -210,7 +101,7 @@ impl ThreadView {
             Ico::ChevronRight
         };
         let head = bench_ui::block_head(&theme, open)
-            .id("plan-head")
+            .id(SharedString::from(format!("plan-head-{id}")))
             // As short as the thread's other small rows, not as tall as a block's head.
             .h(px(bench_ui::CHIP_H))
             .gap_1p5()
@@ -230,14 +121,17 @@ impl ThreadView {
                 )
             })
             .when(!open, |d| d.child(div().flex_1()))
-            .on_click(cx.listener(|this, _, _, cx| {
-                // Folding is the thread's own click: it must not pull the focus to the composer.
-                this.claim_click(cx);
-                this.thread.plan_open = !this.thread.plan_open;
-                cx.notify();
+            .on_click(cx.listener({
+                let id = id.to_string();
+                move |this, _, _, cx| {
+                    // Folding is the thread's own click: it must not pull the focus to the composer.
+                    this.claim_click(cx);
+                    toggle(&mut this.thread.plan_open, &id);
+                    cx.notify();
+                }
             }));
-        let frame = v_flex()
-            .id("plan-block")
+        v_flex()
+            .id(SharedString::from(format!("plan-block-{id}")))
             .w_full()
             .min_w_0()
             .flex_none()
@@ -250,27 +144,236 @@ impl ThreadView {
             .when(open, |d| {
                 d.child(
                     v_flex()
-                        .id("plan-steps")
                         .px_3()
                         .py_2()
                         .gap_0p5()
                         .children(steps),
                 )
-            });
-        // The agent's row, as an insert's or an answer's: its avatar, the block in the text column.
-        h_flex()
-            .w_full()
-            .flex_none()
-            .id("plan-row")
-            .pl(px(bench_ui::CHAT_LEFT))
-            .pr(px(bench_ui::CHAT_RIGHT))
-            .py(px(bench_ui::TURN_Y))
-            .gap(px(bench_ui::CHAT_TEXT
-                - bench_ui::CHAT_LEFT
-                - bench_ui::AVATAR))
-            .items_start()
-            .child(bench_ui::avatar(true, &theme))
-            .child(div().flex_1().min_w_0().child(frame))
+            })
             .into_any_element()
+    }
+
+    /// The question, in the work that asked it. Waiting and live, it is a card one can answer
+    /// (choices, one's own words, or Decline; an approval offers its choices). Once settled —
+    /// or waiting on an agent that no longer asks — it says what was asked and what was answered.
+    fn render_ask_card(&mut self, card: &AskCard, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let approve = card.ask_kind == "approve";
+        let accent = if approve { theme.warning } else { theme.primary };
+        let settled = card.answer.is_some();
+        // Only the question the agent is waiting for right now takes answers: the journal also
+        // shows settled ones and, after a restart, ones nobody waits for.
+        let live = !settled
+            && if approve {
+                self.thread
+                    .approval
+                    .as_ref()
+                    .is_some_and(|a| a.prompt_id == card.id)
+            } else {
+                self.thread
+                    .clarify
+                    .as_ref()
+                    .is_some_and(|c| c.prompt_id == card.id)
+            };
+        let head = h_flex()
+            .gap_2()
+            .items_start()
+            .text_base()
+            .child(
+                if approve {
+                    Ico::CircleAlert
+                } else {
+                    Ico::CircleHelp
+                }
+                .icon()
+                .small()
+                .text_color(if settled { muted } else { accent })
+                .mt(px(2.)),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .font_weight(FontWeight::MEDIUM)
+                    .when(settled, |d| d.text_color(muted))
+                    .child(card.question.clone()),
+            );
+        let body = if settled {
+            v_flex().pl_6().when_some(card.answer.clone(), |d, a| {
+                if a.is_empty() {
+                    d.child(div().text_color(muted).child("No answer"))
+                } else {
+                    d.child(
+                        h_flex()
+                            .gap_2()
+                            .items_start()
+                            .child(
+                                Ico::CircleCheck
+                                    .icon()
+                                    .xsmall()
+                                    .text_color(theme.success)
+                                    .mt(px(4.)),
+                            )
+                            .child(div().flex_1().min_w_0().child(a)),
+                    )
+                }
+            })
+        } else if !live {
+            v_flex().pl_6().child(div().text_color(muted).child(format!(
+                "Waiting for your answer…{}",
+                if card.choices.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({})", card.choices.join(", "))
+                }
+            )))
+        } else if approve {
+            // An approval: its choices as buttons, the first primary, "deny" ghost.
+            let label = |c: &str| match c {
+                "once" => "Allow once",
+                "session" => "Allow for this chat",
+                "always" => "Always allow",
+                "deny" => "Deny",
+                _ => "OK",
+            };
+            v_flex().gap_2().child(
+                h_flex()
+                    .flex_wrap()
+                    .gap_2()
+                    .children(card.choices.iter().enumerate().map(|(k, c)| {
+                        let choice = c.clone();
+                        let b = Button::new(("approve", k)).small().label(label(c));
+                        let b = if k == 0 {
+                            b.primary()
+                        } else if c == "deny" {
+                            b.ghost()
+                        } else {
+                            b.outline()
+                        };
+                        b.on_click(cx.listener(move |this, _, _, cx| {
+                            this.answer_approval(choice.clone(), cx)
+                        }))
+                    })),
+            )
+        } else {
+            // A clarify: choices (one click answers; with multi-select, tick then Send), an
+            // answer of your own, or Decline.
+            let picked = self.thread.clarify_picked.clone();
+            let choices: Vec<AnyElement> = card
+                .choices
+                .iter()
+                .enumerate()
+                .map(|(k, choice)| {
+                    let label = choice.clone();
+                    if card.multi {
+                        let on = picked.contains(&k);
+                        h_flex()
+                            .id(("clarify-pick", k))
+                            .gap_2()
+                            .py_1()
+                            .items_start()
+                            .text_base()
+                            .cursor_pointer()
+                            .hover(|s| s.text_color(theme.foreground))
+                            .child(
+                                div()
+                                    .size(px(14.))
+                                    .flex_none()
+                                    .mt(px(2.))
+                                    .border_1()
+                                    .rounded_md()
+                                    .border_color(if on { theme.primary } else { theme.input })
+                                    .when(on, |d| d.bg(theme.primary)),
+                            )
+                            .child(div().flex_1().min_w_0().child(label))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.toggle_clarify_choice(k, cx)
+                            }))
+                            .into_any_element()
+                    } else {
+                        // A row as wide as the card, its text wrapped: a Button is one line as long
+                        // as the choice and ran past the card.
+                        bench_ui::choice_row(("clarify-choice", k), cx)
+                            .child(label.clone())
+                            .on_click(cx.listener(move |this, _, window, cx| {
+                                this.answer_clarify(label.clone(), window, cx)
+                            }))
+                            .into_any_element()
+                    }
+                })
+                .collect();
+            let any_picked = !picked.is_empty();
+            v_flex()
+                .gap_2()
+                .when(!choices.is_empty(), |d| {
+                    if card.multi {
+                        d.child(v_flex().pl_6().children(choices))
+                    } else {
+                        d.child(v_flex().pl_6().gap_2().children(choices))
+                    }
+                })
+                .child(
+                    h_flex()
+                        .pl_6()
+                        .gap_2()
+                        .items_center()
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .child(Input::new(&self.clarify_input).small()),
+                        )
+                        .when(card.multi, |d| {
+                            d.child(
+                                Button::new("clarify-send")
+                                    .small()
+                                    .primary()
+                                    .label("Send selected")
+                                    .when(!any_picked, |b| b.ghost())
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.send_clarify_picks(window, cx)
+                                    })),
+                            )
+                        })
+                        .child(
+                            Button::new("clarify-decline")
+                                .small()
+                                .ghost()
+                                .label("Decline")
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    this.answer_clarify(String::new(), window, cx)
+                                })),
+                        ),
+                )
+        };
+        v_flex()
+            .id(SharedString::from(format!("ask-card-{}", card.id)))
+            .w_full()
+            .min_w_0()
+            .p_3()
+            .gap_2()
+            .border_1()
+            .rounded_md()
+            .border_color(if settled { theme.border } else { accent })
+            .child(head)
+            .when_some(card.detail.clone(), |d, cmd| {
+                d.child(
+                    div()
+                        .p_2()
+                        .bg(theme.secondary)
+                        .font_family(bench_ui::theme::MONO)
+                        .text_base()
+                        .child(cmd),
+                )
+            })
+            .child(body)
+            .into_any_element()
+    }
+}
+
+fn toggle(set: &mut HashSet<String>, id: &str) {
+    if !set.remove(id) {
+        set.insert(id.to_string());
     }
 }

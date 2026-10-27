@@ -1,9 +1,8 @@
-//! What hangs around the conversation: an approval the agent waits for and the pages
-//! a piece of work touched. Its background processes are `processes.rs`, the files it changed
+//! What hangs around the conversation: the pages a piece of work touched. Its questions and
+//! plan are `asks.rs`, its background processes `processes.rs`, the files it changed
 //! `changed_files.rs`.
 
 use ::thread::{Row, Step};
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -13,67 +12,6 @@ use super::work::{host_of, tool_urls};
 use bench_ui::icons::Ico;
 
 impl ThreadView {
-    /// The agent waits: what it wants to run, and the answers it accepts.
-    pub(crate) fn render_approval(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let req = self.thread.approval.clone()?;
-        let theme = cx.theme().clone();
-        let label = |c: &str| match c {
-            "once" => "Allow once",
-            "session" => "Allow for this chat",
-            "always" => "Always allow",
-            "deny" => "Deny",
-            _ => "OK",
-        };
-        let buttons = req.choices.iter().enumerate().map(|(k, c)| {
-            let choice = c.clone();
-            let b = Button::new(("approve", k)).small().label(label(c));
-            let b = if k == 0 {
-                b.primary()
-            } else if c == "deny" {
-                b.ghost()
-            } else {
-                b.outline()
-            };
-            b.on_click(cx.listener(move |this, _, _, cx| this.answer_approval(choice.clone(), cx)))
-        });
-        Some(
-            v_flex()
-                .ml(px(bench_ui::CHAT_TEXT))
-                .mr(px(bench_ui::CHAT_RIGHT))
-                .mt_2()
-                .p_3()
-                .gap_2()
-                .border_1()
-                .rounded_md()
-                .border_color(theme.warning)
-                .child(
-                    h_flex()
-                        .gap_2()
-                        .items_center()
-                        .text_base()
-                        .font_weight(FontWeight::MEDIUM)
-                        .child(Ico::CircleAlert.icon().small().text_color(theme.warning))
-                        .child(if req.description.is_empty() {
-                            "The agent asks to run this".to_string()
-                        } else {
-                            req.description.clone()
-                        }),
-                )
-                .when(!req.command.is_empty(), |d| {
-                    d.child(
-                        div()
-                            .p_2()
-                            .bg(theme.secondary)
-                            .font_family(bench_ui::theme::MONO)
-                            .text_base()
-                            .child(req.command.clone()),
-                    )
-                })
-                .child(h_flex().gap_2().children(buttons))
-                .into_any_element(),
-        )
-    }
-
     /// The pages the work right above answer `k` touched: one chip per site.
     pub(crate) fn render_sources(&self, k: usize, cx: &mut Context<Self>) -> Option<AnyElement> {
         let Some(Row::Work { key, steps, .. }) = k.checked_sub(1).map(|j| &self.thread.tv.rows[j])

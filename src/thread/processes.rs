@@ -1,6 +1,6 @@
 //! The agent's background processes in the open session (`process.list`): polled every few
-//! seconds while a session is open, shown as a card under the last answer, each one stoppable
-//! (`process.kill`) and with its latest output a click away.
+//! seconds while a session is open, shown as a card inside the live work that started them,
+//! each one stoppable (`process.kill`) and with its latest output a click away.
 
 use gpui_kit::*;
 
@@ -63,10 +63,10 @@ impl ThreadView {
 }
 
 impl ThreadView {
-    /// The background processes the agent started in this session, as a row of its own where the
-    /// work began: running or finished, each with Stop (while it runs) and its latest output a
-    /// click away.
-    pub(crate) fn render_processes(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// The background processes the agent started in this session, as a card of the work going
+    /// on: running or finished, each with Stop (while it runs) and its latest output a click
+    /// away. `None` when there are none, so the work row shows nothing.
+    pub(crate) fn processes_frame(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         if self.thread.processes.is_empty() {
             return None;
         }
@@ -261,22 +261,7 @@ impl ThreadView {
             .overflow_hidden()
             .child(head)
             .when(open, |d| d.children(rows));
-        // The agent's row, as its plan's: its avatar, the block in the text column.
-        Some(
-            h_flex()
-                .w_full()
-                .flex_none()
-                .id("procs-row")
-                .pl(px(bench_ui::CHAT_LEFT))
-                .pr(px(bench_ui::CHAT_RIGHT))
-                .py(px(bench_ui::TURN_Y))
-                .gap(px(bench_ui::CHAT_TEXT
-                    - bench_ui::CHAT_LEFT
-                    - bench_ui::AVATAR))
-                .items_start()
-                .child(bench_ui::avatar(true, &theme))
-                .child(div().flex_1().min_w_0().child(frame))
-                .into_any_element(),
-        )
+        // It stands in the work row, beside the plan and the questions: no avatar of its own.
+        Some(frame.into_any_element())
     }
 }

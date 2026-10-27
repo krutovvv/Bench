@@ -588,11 +588,23 @@ export class Runtime {
 
 	private prompt(live: Live, kind: "clarify" | "approval", payload: Record<string, unknown>, timeoutS: number): Promise<string> {
 		const promptId = randomUUID();
+		// The question lives in the journal, where Bench puts its card: an entry at ask time and
+		// one at the answer, so the card keeps its place in the work that asked, on every reopen.
+		const askKind = kind === "approval" ? "approve" : "clarify";
+		void live.conversation.submit({ type: "write", entry: { kind: "bench.ask", data: {
+			id: promptId,
+			ask_kind: askKind,
+			question: String(payload.question ?? payload.command ?? (kind === "approval" ? "The agent asks to run this" : "")),
+			detail: kind === "approval" && payload.command ? String(payload.command) : undefined,
+			choices: (Array.isArray(payload.choices) ? payload.choices : []).map(String),
+			multi: Boolean(payload.multi_select),
+		} } } as any, ctx);
 		return new Promise<string>((resolve) => {
 			const timer = setTimeout(() => done(""), timeoutS * 1000);
 			const done = (answer: string) => {
 				clearTimeout(timer);
 				if (!live.prompts.delete(promptId)) return;
+				void live.conversation.submit({ type: "write", entry: { kind: "bench.asked", data: { id: promptId, answer } } } as any, ctx);
 				this.emit(live.row.id, `${kind}.settled`, { prompt_id: promptId });
 				resolve(answer);
 			};
@@ -722,10 +734,18 @@ export class Runtime {
 				const prev = this.store.get(sessionId)?.todos ?? [];
 				const fresh = planFresh(prev, todos);
 				const now = Date.now() / 1000;
-				this.store.update(sessionId, fresh ? { todos, todos_at: now } : { todos });
-				const at = fresh ? now : this.store.get(sessionId)?.todos_at ?? 0;
+				// One plan, one id: it begins when its steps share nothing with the plan before.
+				const cur = this.store.get(sessionId);
+				const planId = fresh || !cur?.plan_id ? randomUUID() : cur.plan_id;
+				this.store.update(sessionId, { todos, ...(fresh ? { todos_at: now, plan_id: planId } : {}) });
+				const at = fresh ? now : cur?.todos_at ?? 0;
 				const live = this.live.get(sessionId);
-				if (live) live.row.todos = todos;
+				if (live) {
+					live.row.todos = todos;
+					// The plan's snapshots join the journal at the turn that wrote them; Bench merges
+					// them by id into one card that ticks in place, nowhere else.
+					void live.conversation.submit({ type: "write", entry: { kind: "bench.plan", data: { id: planId, todos } } } as any, ctx);
+				}
 				this.emit(sessionId, "todo.updated", { todos, at });
 			},
 			todos: (sessionId) => this.store.get(sessionId)?.todos ?? [],

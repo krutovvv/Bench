@@ -12,7 +12,11 @@ diff?: string, at?: number, } | { "kind": "insert", key: string, seq: number, id
 /**
  * "clarify" or "approve".
  */
-ask_kind: string, question: string, choices: Array<string>, multi: boolean, } | { "kind": "asked", key: string, seq: number, id: string, answer?: string, };
+ask_kind: string, question: string, 
+/**
+ * Extra text under the question: the command an approval wants to run.
+ */
+detail?: string, choices: Array<string>, multi: boolean, } | { "kind": "asked", key: string, seq: number, id: string, answer?: string, };
 
 export type PlanStep = { id: string, content: string, 
 /**

@@ -57,6 +57,18 @@ test("a tool result, an insert, a fail note; compaction and system entries are n
 	assert.deepEqual(itemsOf({ id: 14, kind: "pi.system", model: [{ role: "user", content: "x" }] }), []);
 });
 
+test("the plan, the questions and their answers are journal items of their own", () => {
+	assert.deepEqual(itemsOf({ id: 12, kind: "bench.plan", data: { id: "p1", todos: [{ id: "1", content: "a", status: "in_progress" }, { id: "2", content: "b", status: "pending", parent: "1" }] } }), [
+		{ key: "12", seq: 12, kind: "plan", id: "p1", todos: [{ id: "1", content: "a", status: "in_progress" }, { id: "2", content: "b", status: "pending", parent: "1" }] },
+	]);
+	assert.deepEqual(itemsOf({ id: 13, kind: "bench.ask", data: { id: "q1", ask_kind: "clarify", question: "Which?", choices: ["a", "b"], multi: false } }), [
+		{ key: "13", seq: 13, kind: "ask", id: "q1", ask_kind: "clarify", question: "Which?", choices: ["a", "b"], multi: false },
+	]);
+	assert.deepEqual(itemsOf({ id: 14, kind: "bench.asked", data: { id: "q1", answer: "a" } }), [{ key: "14", seq: 14, kind: "asked", id: "q1", answer: "a" }]);
+	// a decline is an empty answer, kept as it is
+	assert.deepEqual(itemsOf({ id: 15, kind: "bench.asked", data: { id: "q1", answer: "" } }), [{ key: "15", seq: 15, kind: "asked", id: "q1", answer: "" }]);
+});
+
 test("how often the thread was compacted comes from its journal", () => {
 	// The name the journal uses is the name the count looks for; a rename must not quietly
 	// return the status bar's zero.

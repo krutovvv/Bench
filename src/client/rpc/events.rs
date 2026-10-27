@@ -139,12 +139,9 @@ pub(super) fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             detail: payload["context"].as_str().unwrap_or_default().to_string(),
             session: sid,
         }),
-        "tool.complete" => {
-            if payload["todos"].is_array() {
-                emit(Evt::Todos(sid.clone(), todos(payload), todo_at(payload)));
-            }
-            emit(Evt::ToolDone { session: sid })
-        }
+        // A todo `tool.complete` repeats the plan: it needs no notice — the plan is journal
+        // items now (`bench.plan`), and the commit already carried them to the thread.
+        "tool.complete" => emit(Evt::ToolDone { session: sid }),
         kind if kind.starts_with("thread.") => {
             if let Some(e) = protocol::ThreadEvent::parse(kind, payload) {
                 emit(Evt::Thread(sid, e))
@@ -156,29 +153,6 @@ pub(super) fn on_event(p: &Value, emit: &impl Fn(Evt)) {
                 .or(payload["request_id"].as_str())
                 .unwrap_or_default()
                 .to_string(),
-            command: payload["command"].as_str().unwrap_or_default().to_string(),
-            description: payload["description"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string(),
-            choices: payload["choices"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|c| c.as_str().map(str::to_string))
-                        .collect()
-                })
-                .unwrap_or_else(|| {
-                    let mut c = vec!["once".to_string()];
-                    if payload["allow_session"].as_bool() != Some(false) {
-                        c.push("session".into());
-                    }
-                    if payload["allow_permanent"].as_bool() != Some(false) {
-                        c.push("always".into());
-                    }
-                    c.push("deny".into());
-                    c
-                }),
             session: sid,
         })),
         "approval.settled" | "approval.cancelled" | "approval.received" => {
@@ -199,14 +173,11 @@ pub(super) fn on_event(p: &Value, emit: &impl Fn(Evt)) {
                     .unwrap_or_default()
                     .to_string(),
                 generation: payload["execution_generation"].as_i64(),
-                question: payload["question"].as_str().unwrap_or_default().to_string(),
                 choices: strings(&payload["choices"]),
-                multi_select: payload["multi_select"].as_bool().unwrap_or(false),
                 session: sid,
             }))
         }
         "clarify.settled" | "clarify.cancelled" => emit(Evt::ClarifyDone(sid)),
-        "todo.updated" => emit(Evt::Todos(sid, todos(payload), todo_at(payload))),
         "sessions.changed" => emit(Evt::SessionsChanged),
         "session.inserts" => emit(Evt::Inserts(sid, inserts(&payload["inserts"]))),
         "session.usage" => emit(Evt::Usage(sid, Usage::from_json(&payload["usage"]))),
@@ -276,38 +247,6 @@ pub(super) fn log_error(method: &str, err: &str) {
         use std::io::Write as _;
         let _ = writeln!(f, "{} {method}: {err}", crate::app::now_secs() as u64);
     }
-}
-
-/// The plan steps of a `todo.updated` / todo `tool.complete` payload, sub-steps indented.
-/// When this plan began, as the agent dated it.
-fn todo_at(payload: &Value) -> f64 {
-    payload["at"].as_f64().unwrap_or(0.)
-}
-
-fn todos(payload: &Value) -> Vec<crate::app::model::Todo> {
-    let items = payload["todos"].as_array().cloned().unwrap_or_default();
-    let parent_of = |id: &str| {
-        items
-            .iter()
-            .find(|t| t["id"].as_str() == Some(id))
-            .and_then(|t| t["parent"].as_str().map(str::to_string))
-    };
-    items
-        .iter()
-        .map(|t| {
-            let mut depth = 0;
-            let mut up = t["parent"].as_str().map(str::to_string);
-            while let Some(p) = up.filter(|_| depth < 4) {
-                depth += 1;
-                up = parent_of(&p);
-            }
-            crate::app::model::Todo {
-                content: t["content"].as_str().unwrap_or_default().to_string(),
-                status: t["status"].as_str().unwrap_or("pending").to_string(),
-                depth,
-            }
-        })
-        .collect()
 }
 
 /// `process.list`'s rows (the process id rides in `session_id`).

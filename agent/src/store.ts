@@ -29,6 +29,10 @@ export interface SessionRow {
 	/** When the plan in `todos` started (unix seconds): where Bench puts its block in the
 	 *  thread. 0 = no plan of note. */
 	todos_at: number;
+	/** Identity of the plan in `todos` (the `todo` tool): one id while a plan lives, a new one
+	 *  when its steps share nothing with the plan before. Bench merges the journal's snapshots
+	 *  of one id into a single card. "" = no plan written yet. */
+	plan_id: string;
 	chat_id?: string;
 	display_name?: string;
 	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:local", "folder:<path>"; "" = a plain chat. */
@@ -72,6 +76,9 @@ export class Store {
 		try {
 			this.db.exec("ALTER TABLE sessions ADD COLUMN todos_at REAL DEFAULT 0");
 		} catch {}
+		try {
+			this.db.exec("ALTER TABLE sessions ADD COLUMN plan_id TEXT DEFAULT ''");
+		} catch {}
 		// Pi's conversation ids are integers; early rows kept them as "125.0".
 		this.db.exec("UPDATE sessions SET conversation = CAST(CAST(conversation AS REAL) AS INTEGER) WHERE conversation LIKE '%.%'");
 	}
@@ -89,11 +96,11 @@ export class Store {
 		} catch {
 			speed = speedOf(null);
 		}
-		return { ...r, todos: JSON.parse(r.todos || "[]"), todos_at: r.todos_at ?? 0, usage, speed };
+		return { ...r, todos: JSON.parse(r.todos || "[]"), todos_at: r.todos_at ?? 0, plan_id: r.plan_id ?? "", usage, speed };
 	}
 
 	create(
-		s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "todos_at" | "title" | "usage" | "speed"> & { title?: string },
+		s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "todos_at" | "plan_id" | "title" | "usage" | "speed"> & { title?: string },
 	): SessionRow {
 		const now = Date.now() / 1000;
 		this.db

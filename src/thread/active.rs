@@ -49,9 +49,9 @@ pub struct ActiveThread {
     /// A question the agent asks, the choices ticked so far (multi-select), the free answer.
     pub clarify: Option<crate::app::model::ClarifyReq>,
     pub clarify_picked: Vec<usize>,
-    /// The agent's plan for this chat, and whether its list is unfolded.
-    pub todos: Vec<crate::app::model::Todo>,
-    pub plan_open: bool,
+    /// Which plans of the open thread are unfolded, by their journal id (the cards themselves
+    /// are rows' data: `crates/thread`).
+    pub plan_open: HashSet<String>,
     /// The open session's project (None for chats that touch no repo).
     pub project: Option<crate::app::model::Project>,
     /// The project the open thread belongs to (a new one is created in it); "" = none.
@@ -84,8 +84,7 @@ impl Default for ActiveThread {
             approval: None,
             clarify: None,
             clarify_picked: Vec::new(),
-            todos: Vec::new(),
-            plan_open: false,
+            plan_open: Default::default(),
             project: None,
             thread_project: String::new(),
         }
@@ -186,17 +185,6 @@ impl ActiveThread {
                     self.clarify = None;
                 }
             }
-            // The plan row shows work still ahead: once no step is pending or in progress (the
-            // agent finished the plan, or dropped it as wrong), the row goes by itself — a plan
-            // that is over tells nothing the thread does not already say. The date the agent gave
-            // the plan is where its row stands: the turn it was made for.
-            Evt::Todos(_, todos, at) => {
-                let ahead = todos
-                    .iter()
-                    .any(|t| t.status == "pending" || t.status == "in_progress");
-                self.todos = if ahead { todos.clone() } else { Vec::new() };
-                self.journal.set_plan(ahead.then(|| *at));
-            }
             Evt::Usage(_, usage) => self.usage = Some(usage.clone()),
             // Running ones first, then the newest.
             Evt::Processes(_, list) => {
@@ -245,16 +233,7 @@ impl ActiveThread {
 #[cfg(test)]
 mod tests {
     use super::ActiveThread;
-    use crate::app::model::Todo;
     use crate::client::rpc::Evt;
-
-    fn todo(status: &str) -> Todo {
-        Todo {
-            content: "step".into(),
-            status: status.into(),
-            depth: 0,
-        }
-    }
 
     #[test]
     fn a_thread_follows_its_own_run() {
@@ -269,10 +248,6 @@ mod tests {
             t.live.as_ref().map(|l| l.label.to_string()).as_deref(),
             Some("Writing…")
         );
-        t.on_event(&Evt::Todos("r".into(), vec![todo("in_progress")], 0.));
-        assert_eq!(t.todos.len(), 1);
-        t.on_event(&Evt::Todos("r".into(), vec![todo("completed")], 0.));
-        assert!(t.todos.is_empty(), "a plan that is over goes");
         t.on_event(&Evt::Complete {
             session: "r".into(),
             text: "done".into(),

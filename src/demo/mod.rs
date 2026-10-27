@@ -362,22 +362,46 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // `BENCH_PANEL=providers` (+ `BENCH_GEAR_TAB=<0|1|2>`): the gear open, for screenshots.
     // The new project's page has its own hook: `BENCH_DEMO=new-project` (thread/mod.rs).
     // `BENCH_CLARIFY=1` (with `BENCH_CLARIFY_MULTI=1`) over a demo thread: the agent's question
-    // card, its choices long enough to show they wrap.
+    // — its journal item and the live prompt that lets it be answered — inside the work that
+    // asked it, its choices long enough to show they wrap.
     if std::env::var("BENCH_CLARIFY").is_ok() {
         let session = app.thread(cx).session.clone().unwrap_or_default();
-        open_thread(app, cx, |t| {
+        let multi = std::env::var("BENCH_CLARIFY_MULTI").is_ok();
+        let question = "Как оформить разделы шестерни (Settings)?";
+        let choices: Vec<String> = vec![
+            "Навигация слева, как в System Settings: колонка ~180px с иконками и названиями разделов (Agents, Presets, Appearance), активный подсвечен акцентной полоской.".into(),
+            "Настоящие табы сверху: иконка + название, активный с акцентным подчёркиванием, без рамок-кнопок. Меньше менять, но это всё ещё горизонтальная навигация.".into(),
+            "Тихая боковая навигация как у сайдбара: те же строки, что в списке проектов (иконка + имя, акцентная полоска 2px у активного), отделена тонкой линией.".into(),
+        ];
+        let journal_choices = choices.clone();
+        open_thread(app, cx, move |t| {
+            t.journal.apply(protocol::ThreadEvent::Append(vec![
+                protocol::ThreadItem::Tool {
+                    key: "demo-ask-t".into(),
+                    seq: 9990,
+                    call_id: "demo-ask-t".into(),
+                    name: "ask".into(),
+                    args: serde_json::json!({}),
+                    preview: "ask".into(),
+                    at: None,
+                },
+                protocol::ThreadItem::Ask {
+                    key: "demo-ask".into(),
+                    seq: 9991,
+                    id: "demo".into(),
+                    ask_kind: "clarify".into(),
+                    question: question.into(),
+                    detail: None,
+                    choices: journal_choices,
+                    multi,
+                },
+            ]));
             t.clarify = Some(crate::app::model::ClarifyReq {
-            session,
-            prompt_id: "demo".into(),
-            generation: None,
-            question: "Как оформить разделы шестерни (Settings)?".into(),
-            choices: vec![
-                "Навигация слева, как в System Settings: колонка ~180px с иконками и названиями разделов (Agents, Presets, Appearance), активный подсвечен акцентной полоской.".into(),
-                "Настоящие табы сверху: иконка + название, активный с акцентным подчёркиванием, без рамок-кнопок. Меньше менять, но это всё ещё горизонтальная навигация.".into(),
-                "Тихая боковая навигация как у сайдбара: те же строки, что в списке проектов (иконка + имя, акцентная полоска 2px у активного), отделена тонкой линией.".into(),
-            ],
-            multi_select: std::env::var("BENCH_CLARIFY_MULTI").is_ok(),
-        })
+                session,
+                prompt_id: "demo".into(),
+                generation: None,
+                choices,
+            });
         });
     }
     // `BENCH_DEMO=explorer`: the blog in the Explorer (`env` opens its documents); `BENCH_DEMO=env`:
