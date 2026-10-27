@@ -52,6 +52,16 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         ]
     });
     crate::env::apply(e, &v, window, cx);
+    // The presets the gear would have read from the agent (there is none in a demo copy).
+    if app.presets.lsp.is_empty() {
+        app.presets.lsp = vec![
+            ("typescript".into(), "typescript-language-server".into(), serde_json::json!({"extensions": ["ts", "tsx", "js", "jsx"]})),
+            ("pyright".into(), "pyright".into(), serde_json::json!({"extensions": ["py"]})),
+            ("basedpyright".into(), "basedpyright".into(), serde_json::json!({"extensions": ["py"]})),
+            ("rust-analyzer".into(), "rust-analyzer".into(), serde_json::json!({"extensions": ["rs"]})),
+            ("php".into(), "intelephense".into(), serde_json::json!({"extensions": ["php", "inc"]})),
+        ];
+    }
     // `BENCH_ENV=telegram`: the page scrolls to the Telegram block a beat after opening.
     if std::env::var("BENCH_ENV").as_deref() == Ok("telegram") {
         let scroll = app.env_scroll.clone();
@@ -66,7 +76,8 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
     }
     // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
     // `BENCH_EXPLORER=settings` its settings, `=part` an MCP server, `=lsp` a language
-    // server that failed, `=thread` the thread beside it
+    // server that failed, `=lsp-new` the "Add a server" card with its preset chips, `=thread` the
+    // thread beside it
     // with lines sent to it. `BENCH_DEMO=env` is `explorer` with its settings open.
     let mode = std::env::var("BENCH_DEMO").unwrap_or_default();
     if !matches!(mode.as_str(), "explorer" | "env") || !app.explorer.tabs.is_empty() {
@@ -121,7 +132,10 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
             cx,
         ),
         "part" => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
-        "lsp" => app.open_part("p-blog".into(), "lsp", "pyright".into(), window, cx),
+        "lsp" | "lsp-new" => {
+            let name = if explorer == "lsp-new" { "new" } else { "pyright" };
+            app.open_part("p-blog".into(), "lsp", name.into(), window, cx)
+        }
         // The release post's changes since the last commit, beside it.
         "diff" => {
             let post = root.join("content/posts/release-2-4.md");

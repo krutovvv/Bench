@@ -7,7 +7,7 @@
 
 use gpui_kit::component::input::EditorState;
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::{ActiveTheme as _, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
@@ -287,17 +287,17 @@ impl ExplorerParts for Lsp {
     }
 }
 
-/// "+ Add": the person's presets (the gear's Presets tab), each added with a click; under them a
-/// server written by hand — its name and its entry.
+/// "+ Add": the person's presets (the gear's Presets tab) as chips, each added with a click —
+/// the same shape the MCP card uses; under them a server written by hand — its name and its entry.
 fn new_lsp_card(app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Card {
     let theme = cx.theme().clone();
     let have: Vec<&str> = e.lsp.servers.iter().map(|s| s.name.as_str()).collect();
-    let items: Vec<AnyElement> = app
+    let chips: Vec<AnyElement> = app
         .presets
         .lsp
         .iter()
+        .filter(|(key, _, _)| !have.contains(&key.as_str()))
         .map(|(key, title, spec)| {
-            let added = have.contains(&key.as_str());
             let exts: Vec<String> = spec["extensions"]
                 .as_array()
                 .into_iter()
@@ -305,43 +305,41 @@ fn new_lsp_card(app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> C
                 .filter_map(|x| x.as_str().map(str::to_string))
                 .collect();
             let (key, spec, id) = (key.clone(), spec.clone(), e.id.clone());
-            gpui_kit::component::h_flex()
+            div()
                 .id(SharedString::from(format!("env-lsp-preset-{key}")))
-                .px_3()
-                .py_1p5()
-                .gap_2()
-                .when(!added, |d| {
-                    d.cursor_pointer().hover(|s| s.bg(theme.list_hover))
-                })
-                .child(div().flex_none().child(title.clone()))
+                .px_2()
+                .py_0p5()
+                .rounded_md()
+                .border_1()
+                .border_color(theme.border)
+                .cursor_pointer()
+                .hover(|s| s.bg(theme.list_hover))
                 .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .truncate()
-                        .text_color(theme.muted_foreground)
-                        .child(if added {
-                            "added".to_string()
-                        } else {
-                            exts.join(", ")
+                    h_flex()
+                        .gap_1()
+                        .child(title.clone())
+                        .when(!exts.is_empty(), |d| {
+                            d.child(
+                                div()
+                                    .text_color(theme.muted_foreground)
+                                    .child(exts.join(", ")),
+                            )
                         }),
                 )
-                .when(!added, |d| {
-                    d.on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
-                        cx.stop_propagation();
-                        this.env_add_lsp(id.clone(), key.clone(), spec.clone(), window, cx)
-                    }))
-                })
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.click_claimed = true;
+                    cx.stop_propagation();
+                    this.env_add_lsp(id.clone(), key.clone(), spec.clone(), window, cx)
+                }))
                 .into_any_element()
         })
         .collect();
     let mut card = new_card(e, "lsp", "Add a language server", &e.lsp.json, true, cx);
     let form = std::mem::replace(&mut card.body, div().into_any_element());
     card.body = v_flex()
-        .w_full()
-        .py_1()
-        .children(items)
+        .when(!chips.is_empty(), |d| {
+            d.child(h_flex().flex_wrap().gap_1p5().px_3().pt_2().children(chips))
+        })
         .child(
             div()
                 .px_3()
