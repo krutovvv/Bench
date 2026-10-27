@@ -141,10 +141,15 @@ fn source() -> Result<(PathBuf, String)> {
 fn install() -> Result<(PathBuf, String)> {
     let (src, hash) = source()?;
     let app = agent_home().join("app");
-    if source_hash(&app) != hash || !app.join("node_modules").exists() {
+    // Its packages count as installed only once `npm ci` went through to the end: it writes the
+    // lock it installed (`.lock-installed`), as the server's install does. An install cut short
+    // (Bench quit while it ran) left node_modules half full and was never tried again — the agent
+    // then died at every start on a missing module.
+    let marker = app.join(".lock-installed");
+    let installed = std::fs::read(&marker).ok();
+    if source_hash(&app) != hash || installed != std::fs::read(src.join("package-lock.json")).ok() {
         std::fs::create_dir_all(&app)?;
-        let lock_changed = std::fs::read(src.join("package-lock.json")).ok()
-            != std::fs::read(app.join("package-lock.json")).ok();
+        let lock_changed = installed != std::fs::read(src.join("package-lock.json")).ok();
         for part in PARTS {
             let _ = std::fs::remove_dir_all(app.join(part));
             let _ = std::fs::remove_file(app.join(part));
@@ -177,6 +182,7 @@ fn install() -> Result<(PathBuf, String)> {
                         .unwrap_or("")
                 );
             }
+            std::fs::copy(app.join("package-lock.json"), &marker)?;
         }
     }
     Ok((app, hash))
