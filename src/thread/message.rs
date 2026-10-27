@@ -39,7 +39,8 @@ impl ThreadView {
     }
 
     /// The person's own row: their text, the files that went with it. `muted`: not gone out yet
-    /// (queued); `actions` sit at its right; `field` replaces the text while it is being fixed.
+    /// (queued); `actions` go under the text, at its indent (the thread's width is precious in the
+    /// Explorer, so nothing takes it from the side); `field` replaces the text while it is fixed.
     pub(crate) fn user_row(
         &mut self,
         key: String,
@@ -73,9 +74,8 @@ impl ThreadView {
                         .children(attached),
                 )
             });
-        speaker_row(Some(false), body, cx)
-            .children(actions)
-            .into_any_element()
+        let body = body.when_some(actions, |d, a| d.child(div().pt_2().child(a)));
+        speaker_row(Some(false), body, cx).into_any_element()
     }
 
     /// What the agent said. `k` is the row's place (the last answer gets Regenerate);

@@ -110,10 +110,11 @@ impl ThreadView {
                     .update(cx, |s, cx| s.set_value(text, window, cx));
             }
         }
-        // `BENCH_DEMO_SCROLL=end`: the thread scrolled as far down as it goes.
-        if !self.demo_scrolled && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end") {
+        // `BENCH_DEMO_SCROLL=end`: the thread keeps to its end (a tail shot: what grows after the
+        // first frame — the queue, an answer — is still in the picture).
+        if std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end") {
             self.demo_scrolled = true;
-            self.thread.tv.list.scroll_to_end();
+            self.thread.tv.to_end();
         }
         // `BENCH_DEMO_SCROLL=<item>:<px>`: the thread scrolled to there (a reader in the middle).
         if !self.demo_scrolled {
@@ -127,6 +128,24 @@ impl ThreadView {
                     offset_in_item: px(o),
                 });
             }
+        }
+        // `BENCH_DEMO_QUEUE=1`: two messages waiting after the last row, one the agent will take
+        // up next, one a follow-up.
+        if std::env::var("BENCH_DEMO_QUEUE").is_ok() && self.thread.journal.queue().is_empty() {
+            self.thread.journal.apply(protocol::ThreadEvent::Queue(vec![
+                protocol::QueuedItem {
+                    key: "q-1".into(),
+                    sub: "q-1".into(),
+                    mode: "steer".into(),
+                    text: "And the cover: the one from the spring shoot.".into(),
+                },
+                protocol::QueuedItem {
+                    key: "q-2".into(),
+                    sub: "q-2".into(),
+                    mode: "follow-up".into(),
+                    text: "Skip the pricing table for now, it goes in the next release.".into(),
+                },
+            ]));
         }
     }
 
