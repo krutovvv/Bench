@@ -79,6 +79,8 @@ interface Turn {
 	/** The answer as it is being written: its last line is what the status says — the model's
 	 * own words read better in one line than a list of tool calls, and stay until new words. */
 	text?: string;
+	/** What the newest call is doing, in one word — until the model writes something. */
+	word?: string;
 	started: number;
 	dirty: boolean;
 	lastEdit: number;
@@ -93,6 +95,21 @@ function liveLine(text: string | undefined): string {
 	if (!text) return "";
 	const lines = text.split("\n").map((l) => l.replace(/^[#>\-*+\d.\s]+/, "").trim()).filter(Boolean);
 	return (lines[lines.length - 1] ?? "").slice(0, 120);
+}
+
+/** One word for what a kind of tool is doing, for the status line. */
+function activityWord(name: string): string {
+	if (name.startsWith("mcp__browser")) return "browsing…";
+	const base = name.startsWith("mcp__") ? name.split("__").slice(2).join(" ").replace(/_/g, " ") : name.replace(/_/g, " ");
+	const words: Record<string, string> = {
+		bash: "running a command…", ssh_run: "running a command…",
+		read: "reading…", edit: "editing…", write: "editing…", search_replace: "editing…",
+		grep: "searching…", glob: "searching…", ls: "searching…", session_search: "searching…", tool_search: "searching…",
+		web_fetch: "checking the web…", web_search: "checking the web…",
+		delegate: "delegating…", todo: "planning…", memory: "taking notes…", tasks: "the task list…",
+		cron: "the schedule…", clarify: "asking you…", skill_view: "a skill…", skill_manage: "a skill…",
+	};
+	return words[name] ?? `using ${base}…`;
 }
 
 /** The bots running: "" the general one, else a project's id → its settings and how to stop it. */
@@ -177,7 +194,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	const statusText = (t: Turn, done?: string) => {
 		const secs = Math.round((Date.now() - t.started) / 1000);
 		if (done) return `${done} · ${t.steps} ${t.steps === 1 ? "step" : "steps"} · ${secs} s`;
-		const line = liveLine(t.text);
+		const line = liveLine(t.text) || t.word || "";
 		return line ? `⏳ ${line} · ${secs} s` : `⏳ Working… ${secs} s`;
 	};
 	const editStatus = async (t: Turn, done?: string) => {
@@ -238,12 +255,15 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			const t = turns.get(sessionId);
 			if (!t) return;
 			t.text = (t.text ?? "") + String(payload.text ?? "");
+			// Words win the line over the newest call's word.
+			t.word = undefined;
 			schedule(t);
 		} else if (type === "tool.start") {
 			const t = turns.get(sessionId);
 			if (!t) return;
-			// Counted, not shown: the status line is the model's words, not its commands.
+			// Counted, not listed: the status line says the kind of the newest call, in a word.
 			t.steps++;
+			t.word = activityWord(String(payload.name ?? ""));
 			schedule(t);
 		} else if (type === "subagent.start") {
 			const t = turns.get(sessionId);

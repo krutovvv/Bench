@@ -52,10 +52,10 @@ impl ThreadView {
             parts.push((clock(s as u64), muted));
         }
         let has_parts = !parts.is_empty();
-        // What the agent is doing now: its newest words, in a line. A command preview reads as
-        // noise in a status; the words the model writes between its calls carry the sense of the
-        // work — so the last thing it said stays on the line until it says something new, and
-        // until it has said anything, the neutral word.
+        // What the agent is doing now: its newest signal, in a line. Words the model wrote
+        // beat everything until the next thing happens; while a call is the newest thing, a
+        // short word for its kind reads better than a command; before anything, the neutral
+        // word. A finished piece says Done.
         let doing = live.then(|| {
             steps
                 .iter()
@@ -67,7 +67,8 @@ impl ThreadView {
                         .map(str::trim)
                         .find(|l| !l.is_empty() && !l.starts_with('#'))
                         .map(|l| clip(l, 160)),
-                    _ => None,
+                    Step::Thought(_) => Some("Thinking…".to_string()),
+                    Step::Tool { name, preview, .. } => Some(activity_word(name, preview)),
                 })
                 .unwrap_or_else(|| "Thinking…".to_string())
         });
@@ -396,6 +397,56 @@ pub fn tool_label(name: &str, detail: &str) -> String {
         name
     } else {
         format!("{name}: {detail}")
+    }
+}
+
+/// The one word for what a kind of tool is doing, for the live line: a person reads words
+/// faster than command lines, and the opened step list still holds the exact command.
+fn activity_word(name: &str, preview: &str) -> String {
+    // A file's own name, not its path: the line is about the thing, not where it lives.
+    let target = || {
+        preview
+            .lines()
+            .find(|l| !l.trim().is_empty())
+            .map(|l| l.trim())
+            .map(|l| {
+                std::path::Path::new(l)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(str::to_string)
+                    .unwrap_or_else(|| clip(l, 40))
+            })
+            .unwrap_or_default()
+    };
+    let with = |verb: &str| {
+        let t = target();
+        if t.is_empty() {
+            format!("{verb}…")
+        } else {
+            format!("{verb} {t}…")
+        }
+    };
+    if name.starts_with("mcp__browser") {
+        return "browsing…".to_string();
+    }
+    match name {
+        "bash" | "ssh_run" => "running a command…".to_string(),
+        "read" => with("reading"),
+        "edit" | "write" | "search_replace" => with("editing"),
+        "grep" | "glob" | "ls" | "session_search" | "tool_search" => "searching…".to_string(),
+        "web_fetch" | "web_search" => "checking the web…".to_string(),
+        "delegate" => "delegating…".to_string(),
+        "todo" => "planning…".to_string(),
+        "memory" => "taking notes…".to_string(),
+        "tasks" => "the task list…".to_string(),
+        "cron" => "the schedule…".to_string(),
+        "clarify" => "asking you…".to_string(),
+        "skill_view" | "skill_manage" => "a skill…".to_string(),
+        _ if name.starts_with("mcp__") => {
+            let tool = name.rsplit("__").next().unwrap_or(name).replace('_', " ");
+            format!("using {tool}…")
+        }
+        _ => format!("using {}…", name.replace('_', " ")),
     }
 }
 
