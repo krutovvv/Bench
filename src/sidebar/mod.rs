@@ -59,7 +59,7 @@ impl BenchApp {
                 list.extend(self.render_project(g + 1, &p, rows, cx));
             }
             if self.projects.is_empty() && !self.connecting {
-                list.push(self.sidebar_note("No projects yet. “+” above starts one.", cx));
+                list.push(self.sidebar_note("No projects yet. “New project” above starts one.", cx));
             }
         }
 
