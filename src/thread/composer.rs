@@ -165,7 +165,10 @@ impl ThreadView {
         };
         let tools = h_flex()
             .absolute()
-            .right_0()
+            // The messages' right column, not the window's edge: the icons end where the
+            // thread's text ends (`right_0` measured from the row's border box, past its
+            // right padding).
+            .right(px(bench_ui::CHAT_RIGHT))
             .top(px(top))
             .h(px(bench_ui::AVATAR))
             .items_center()
