@@ -154,8 +154,10 @@ impl Render for BenchApp {
             .size_full()
             .child(base)
             .when(self.project_form.is_some(), |d| {
-                // Its right edge under the button's, in the strip's corner.
-                let left = (self.left_dock.size() - px(406.)).max(px(8.));
+                // Its right edge under the strip's, where the button stands.
+                let left = (self.left_dock.size()
+                    - px(bench_ui::POPOVER_CARD_W + bench_ui::SIDEBAR_STRIP_PR))
+                .max(px(bench_ui::SIDEBAR_STRIP_PR));
                 d.child(
                     div()
                         .id("project-mask")

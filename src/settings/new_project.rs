@@ -7,9 +7,9 @@
 //!
 //! Creating it starts its first thread; its environment is set up in its environment thread.
 
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::json;
@@ -177,13 +177,9 @@ impl BenchApp {
             form.folder.clone(),
             form.server_folder.clone(),
         );
-        let label = |text: &'static str| {
-            div()
-                .text_xs()
-                .text_color(muted)
-                .child(text)
-                .into_any_element()
-        };
+        // One size for everything in the card, the fields' own (`text_sm`, set on the card):
+        // a label, a choice, a folder and an action read as one form.
+        let label = |text: &'static str| div().text_color(muted).child(text).into_any_element();
         // Who runs it: this Mac's agent, or a server's (added in the gear). With one agent
         // there is nothing to choose, and no row to show.
         let hosts = self.agent_hosts();
@@ -246,10 +242,9 @@ impl BenchApp {
             v_flex()
                 .gap_1p5()
                 .child(label("Folder on it, optional"))
-                .child(Input::new(&server_folder).xsmall().into_any_element())
+                .child(bench_ui::field(&server_folder).into_any_element())
                 .child(
                     div()
-                        .text_xs()
                         .text_color(muted)
                         .child(format!("Empty: {who}'s home directory.")),
                 )
@@ -268,7 +263,6 @@ impl BenchApp {
                                 .flex_1()
                                 .min_w_0()
                                 .truncate()
-                                .text_sm()
                                 .text_color(if has { theme.foreground } else { muted })
                                 .child(folder.clone().unwrap_or_else(|| "No folder".into())),
                         )
@@ -299,7 +293,8 @@ impl BenchApp {
                 .into_any_element()
         };
         v_flex()
-            .w(px(400.))
+            .w(px(bench_ui::POPOVER_CARD_W))
+            .text_sm()
             .gap_3()
             .p_4()
             .rounded_lg()
@@ -334,7 +329,7 @@ impl BenchApp {
                 v_flex()
                     .gap_1p5()
                     .child(label("Name"))
-                    .child(Input::new(&name).xsmall().into_any_element()),
+                    .child(bench_ui::field(&name).into_any_element()),
             )
             .children(agent_row)
             .children(machine_row)

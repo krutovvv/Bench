@@ -74,6 +74,9 @@ pub const WINDOW_BUTTONS_W: f32 = 78.;
 /// (an icon's 4 px box padding + this).
 pub const SIDEBAR_STRIP_PR: f32 = 12.;
 
+/// A card hung under a bar's button (the new project): wide enough for its fields' labels.
+pub const POPOVER_CARD_W: f32 = 400.;
+
 /// A row under a group header starts where the header's name does.
 pub fn nest_pl(cx: &App) -> Pixels {
     cx.theme().font_size * 2.375 - px(4.)

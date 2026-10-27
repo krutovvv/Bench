@@ -11,18 +11,26 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 
 impl BenchApp {
-    /// The strip beside the window buttons over the sidebar: the fold and "New project".
-    /// The fold takes the place the window buttons leave, and the new project is spelled out
-    /// in the far corner — where the old lone plus stood: a bare plus there says nothing about
-    /// what it adds. Same ghost button as the status bar's items.
-    /// 35 + the search band's top rule = the header's 36: the two rules are one line.
+    /// The strip beside the window buttons over the sidebar: "New project", then the fold, both
+    /// in its right corner — the left is the window buttons', and nothing lines up with them.
+    /// Same ghost button as the status bar's items. Its icons end at the sidebar's inset.
     pub(crate) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
         h_flex()
             .h(bench_ui::bar_h(cx))
             .flex_none()
             .items_center()
-            // Past the traffic lights, which overlay this strip.
-            .pl(px(76.))
+            .justify_end()
+            .gap_1()
+            .pr(px(bench_ui::SIDEBAR_STRIP_PR))
+            .child(
+                Button::new("new-item")
+                    .ghost()
+                    .small()
+                    .icon(bench_ui::icons::Ico::FolderPlus.icon())
+                    .child(div().text_xs().child("New project"))
+                    .text_color(cx.theme().muted_foreground)
+                    .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx))),
+            )
             .child(
                 bench_ui::icon_button(
                     "sidebar-hide",
@@ -32,17 +40,6 @@ impl BenchApp {
                     cx,
                 )
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
-            )
-            .child(
-                Button::new("new-item")
-                    .ghost()
-                    .small()
-                    .icon(bench_ui::icons::Ico::FolderPlus.icon())
-                    .child(div().text_xs().child("New project"))
-                    .text_color(cx.theme().muted_foreground)
-                    .ml_auto()
-                    .mr(px(6.))
-                    .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx))),
             )
             .into_any_element()
     }
