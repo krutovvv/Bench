@@ -50,7 +50,8 @@ bottom, and the same air over their tabs; their content fills that width, no max
 |---|---|---|
 | A new tool (tasks, a server, files, a utility) | an insert put in with `/` (`build-insert.md`) | a sidebar group, a mode, a side panel |
 | A form a tool needs (a new server, a new host) | an agent-message card under the insert that asked for it | a dialog, a settings page |
-| A project's settings (MCP, skills, schedule…) | its Settings page (`Panel::Project`, `src/env/page.rs`), tabs like the gear's | a thread, a dialog |
+| A project's settings (name, where, model, Telegram) | its Settings page (`Center::Project`, `src/env/page.rs`) | a thread, a dialog |
+| What a project contains (files, soul, prompts, skills, MCP, schedule) | the Explorer (`src/explorer/`, `docs/explorer.md`) | a thread, a settings tab |
 | The sidebar's own buttons (new project, hide) | top strip, right | the status bar |
 | New window | the header's right end (`render_header_tail`) | — |
 | Settings (the gear), attach, dictate, Stop | status bar, right; Stop last | the composer |

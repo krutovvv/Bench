@@ -11,7 +11,7 @@ export interface SessionInfo {
 	source: string;
 	/** Telegram sessions: their chat. */
 	chat_id?: string;
-	/** What the thread is about ("tasks:today", "ssh:<host>", "files:<host id>", "folder:<path>"). */
+	/** What the thread is about ("tasks:today", "ssh:local", "folder:<path>"). */
 	subject?: string;
 	/** The project the thread belongs to; "" = none. */
 	project?: string;

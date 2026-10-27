@@ -9,7 +9,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::compact;
-use crate::app::{BenchApp, Panel};
+use crate::app::{BenchApp, Center};
 use crate::icons::Ico;
 use ::thread::{Row, Step};
 
@@ -342,14 +342,14 @@ impl BenchApp {
                     "settings",
                     Ico::Settings,
                     "Settings",
-                    self.panel == Panel::Providers,
+                    self.center == Center::Providers,
                 )
                 .on_click(cx.listener(|this, _, window, cx| {
-                    if this.panel == Panel::Providers {
-                        this.panel = Panel::Chat;
+                    if this.center == Center::Providers {
+                        this.center = Center::Chat;
                         cx.notify();
                     } else {
-                        this.open_panel(Panel::Providers, window, cx);
+                        this.open_center(Center::Providers, window, cx);
                     }
                 })),
             )

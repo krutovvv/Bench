@@ -98,7 +98,7 @@ impl BenchApp {
     /// An agent came up: what waited for it is asked now — the gear showing it, the servers this
     /// Mac knows (this Mac's), a server's own projects.
     pub fn agent_up(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.panel == super::Panel::Providers && self.gear_agent == host && !self.pv.loaded {
+        if self.center == super::Center::Providers && self.gear_agent == host && !self.pv.loaded {
             self.load_providers(window, cx);
         }
         if host.is_empty() {

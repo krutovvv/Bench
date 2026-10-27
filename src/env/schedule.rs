@@ -8,8 +8,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, Request, Section, Tab, card_act, code, empty, head_act, pad, remove, revert, row, save,
-    when,
+    Card, Home, Item, Request, Section, card_act, code, head_act, pad, remove, revert, save, when,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
@@ -69,11 +68,8 @@ impl Section for Schedule {
     fn key(&self) -> &'static str {
         "cron"
     }
-    fn tab(&self) -> Tab {
-        Tab::Schedule
-    }
-    fn first(&self, e: &ProjectEnv) -> Option<String> {
-        e.cron.jobs.first().map(|j| j.id.clone())
+    fn home(&self) -> Home {
+        Home::Explorer("Schedule")
     }
     fn block(&self, _general: bool) -> &'static str {
         "Schedule"
@@ -84,46 +80,52 @@ impl Section for Schedule {
                 .on_click(cx.listener(|this, _, window, cx| {
                     this.click_claimed = true;
                     cx.stop_propagation();
-                    this.env_card("cron", "new".into(), window, cx)
+                    this.open_part("cron", "new".into(), window, cx)
                 }))
                 .into_any_element(),
         )
     }
     /// What runs on its own, each run a thread of the project.
-    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn items(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<Item> {
         let Some(e) = app.project_env.as_ref() else {
             return vec![];
         };
-        let mut rows = vec![];
-        if e.cron.jobs.is_empty() {
-            rows.push(empty("Nothing runs on its own yet: a job runs its prompt in a new thread of the project, on a schedule.", cx));
-        }
-        for j in e.cron.jobs.iter().cloned() {
-            let next = j
-                .next_run
-                .as_deref()
-                .map(when)
-                .unwrap_or_else(|| "no next run".into());
-            let mut note = if j.enabled {
-                format!("{} · next {next}", j.display)
-            } else {
-                format!("{} · paused", j.display)
-            };
-            if let Some(st) = &j.last_status {
-                note.push_str(&format!(" · last: {st}"));
-            }
-            let failed = j.last_status.as_deref().is_some_and(|s| s != "ok");
-            rows.push(row(
-                e,
-                "cron",
-                j.id.clone(),
-                j.name.clone(),
-                note,
-                failed,
-                cx,
-            ));
-        }
-        rows
+        let theme = cx.theme().clone();
+        e.cron
+            .jobs
+            .iter()
+            .map(|j| {
+                let next = j
+                    .next_run
+                    .as_deref()
+                    .map(when)
+                    .unwrap_or_else(|| "no next run".into());
+                let mut note = if j.enabled {
+                    format!("{} · next {next}", j.display)
+                } else {
+                    format!("{} · paused", j.display)
+                };
+                if let Some(st) = &j.last_status {
+                    note.push_str(&format!(" · last: {st}"));
+                }
+                let failed = j.last_status.as_deref().is_some_and(|s| s != "ok");
+                Item {
+                    name: j.id.clone(),
+                    label: j.name.clone(),
+                    note,
+                    icon: (
+                        crate::icons::Ico::Clock,
+                        if failed {
+                            theme.danger
+                        } else if j.enabled {
+                            theme.foreground
+                        } else {
+                            theme.muted_foreground
+                        },
+                    ),
+                }
+            })
+            .collect()
     }
     fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
         let e = app.project_env.as_ref()?;

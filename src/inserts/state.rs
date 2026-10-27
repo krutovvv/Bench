@@ -1,5 +1,5 @@
-//! The person's inserts: tools put into a thread with "/" (a server's terminal, a file host, the
-//! task lists, the utilities, the browser's tab). A thread is a document of messages and inserts;
+//! The person's inserts: tools put into a thread with "/" (the terminal, the task lists, the
+//! utilities, the browser's tab). A thread is a document of messages and inserts;
 //! an insert is the person's, sits where it was put, and stays live. The agent keeps them (a Pi
 //! entry where each was put, a document of their state: agent/src/inserts.ts); Bench shows its
 //! list, changes it through the agent, and takes the agent's answer as the truth. Each kind's
@@ -25,16 +25,12 @@ impl BenchApp {
             .unwrap_or_default()
     }
 
-    /// What a "/" row puts in: "files:<id>" → files on that host, "tasks:<list>", "tools:<tool>";
-    /// the rest as they are ("ssh:<alias>", "ssh", "files", "browser"…).
+    /// What a "/" row puts in: "tasks:<list>", "tools:<tool>"; the rest as they are
+    /// ("ssh:local", "browser"…).
     pub fn insert_spec(slash_key: &str) -> (String, Map<String, Value>) {
         let mut state = Map::new();
         let (kind, value) = slash_key.split_once(':').unwrap_or((slash_key, ""));
         let key = match (kind, value) {
-            ("files", v) if !v.is_empty() => {
-                state.insert("host".into(), json!(v));
-                "files"
-            }
             ("tasks", v) if !v.is_empty() => {
                 state.insert("list".into(), json!(v));
                 "tasks"
@@ -161,24 +157,6 @@ impl BenchApp {
             });
         }
         cx.notify();
-    }
-
-    /// An insert's state as it is on screen now (the folder a file host shows…): sent when it
-    /// differs from what the agent has.
-    pub fn sync_insert_state(
-        &mut self,
-        id: &str,
-        state: Map<String, Value>,
-        cx: &mut Context<Self>,
-    ) {
-        let same = self
-            .inserts
-            .get(&self.thread_key())
-            .and_then(|v| v.iter().find(|i| i.id == id))
-            .is_none_or(|i| i.state == state);
-        if !same {
-            self.patch_insert(id, json!({ "state": state }), cx);
-        }
     }
 
     pub fn remove_insert(&mut self, id: &str, cx: &mut Context<Self>) {

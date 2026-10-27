@@ -174,6 +174,77 @@ impl Render for Story {
                     tab_pick,
                 )
                 .w(px(560.)),
+            )
+            // The Explorer's pieces: a tree's heading and rows, a document's head and tabs.
+            .child(
+                v_flex()
+                    .w(px(280.))
+                    .bg(cx.theme().sidebar)
+                    .child(tree_heading("Instructions", vec![], cx))
+                    .child(tree_row(
+                        "t1",
+                        0,
+                        None,
+                        (Ico::FileText, cx.theme().muted_foreground),
+                        "SYSTEM.md",
+                        Some("the soul".into()),
+                        true,
+                        vec![],
+                        cx,
+                    ))
+                    .child(tree_row(
+                        "t2",
+                        0,
+                        Some(true),
+                        (Ico::FolderOpen, cx.theme().blue),
+                        "Skills",
+                        None,
+                        false,
+                        vec![],
+                        cx,
+                    ))
+                    .child(tree_row(
+                        "t3",
+                        1,
+                        Some(false),
+                        (Ico::Folder, cx.theme().blue),
+                        "release-notes",
+                        None,
+                        false,
+                        vec![],
+                        cx,
+                    )),
+            )
+            .child(
+                ide_head(
+                    "SKILL.md",
+                    Some("~/.bench/projects/p-blog/skills/release-notes".into()),
+                    vec![],
+                    cx,
+                )
+                .w(px(560.)),
+            )
+            .child(
+                gpui_kit::component::h_flex()
+                    .h(px(BLOCK_HEAD_H))
+                    .child(doc_tab(
+                        "d1",
+                        (Ico::FileCode, cx.theme().red),
+                        "main.rs",
+                        true,
+                        false,
+                        icon_button("x1", Ico::X, "Close", false, cx),
+                        cx,
+                    ))
+                    .child(doc_tab(
+                        "d2",
+                        (Ico::FileText, cx.theme().muted_foreground),
+                        "README.md",
+                        false,
+                        true,
+                        icon_button("x2", Ico::X, "Close", false, cx),
+                        cx,
+                    )),
             );
 
         let lists_view = cx.entity();

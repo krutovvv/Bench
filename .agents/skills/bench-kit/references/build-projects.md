@@ -29,7 +29,7 @@ In Bench:
 - A conversation's environment: `Runtime.envFor` — the project's machine (`SshExecutionEnv` or
   `NodeExecutionEnv`), wrapped by `confined-env.ts` when the project is kept in its folder. Pi's
   tools and ours (grep, glob, ls) work through it and never know where they are.
-- `/api/fs/*` take `machine`: the same environment, so Bench's /files and a thread's media reach
+- `/api/fs/*` take `machine`: the same environment, so Bench's file views and a thread's media reach
   the project's machine through its agent (`agent/src/modules/files.ts`).
 - Attachments of such a project go to its machine's `/tmp/bench-attachments/` (one-off, gone with
   a reboot): `attach::prepare` with `files_machine()`, `/api/files/upload` with `machine`.

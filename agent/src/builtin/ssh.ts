@@ -1,6 +1,6 @@
-// `ssh_run`: a command on the server a thread is about (its subject "ssh:<alias>"), through the
-// system's ssh and ~/.ssh/config, like the terminal Bench shows above the conversation. In a
-// thread about this machine's terminal ("ssh:local") it runs here.
+// `ssh_run`: a command in the thread's terminal ("ssh:local", the insert Bench shows in the
+// conversation) — here — or, when the person names one, on a ~/.ssh/config host through the
+// system's ssh.
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";

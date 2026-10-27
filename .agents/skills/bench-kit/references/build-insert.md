@@ -5,7 +5,7 @@ agent's answers, and the person's **inserts** — small live apps put into the c
 `/`, part of what the person says, right where they put them (2026-10-25, the person: "this is
 the only approach in this app now; the only classic settings left are the gear"). An insert
 never switches the thread or renames it; a thread can hold several; coming back to a thread
-brings them back as they were. Bench has six kinds, and each is a worked example of this page.
+brings them back as they were. Bench has four kinds, and each is a worked example of this page.
 **The browser is the centrepiece** — the thread's own tab, live, instead of a screenshot — so
 read it first; the others are simpler cases of the same shape.
 
@@ -13,13 +13,11 @@ read it first; the others are simpler cases of the same shape.
 |---|---|---|---|---|
 | `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`src/inserts/browser/`: `mod.rs` the kind, `state.rs` a tab per thread, `gateway.rs` the stream) | the browser MCP (Playwright on the server: browser-server-mcp, its own project) | the tab's address and title, and "work only in it" |
 | `tasks` {list} | `/tasks` | every list a click apart; in a project its tasks only (`src/inserts/tasks/`) | `tasks` (`agent/src/builtin/tasks.ts`) | which list is shown |
-| `ssh:<alias>` (`ssh:local` the thread's machine, `thread_machine()`: this Mac or the project's server; `ssh` alone: pick one) | `/terminal`, `/ssh` | the terminal, as tall as its text (`src/inserts/terminal/`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
-| `dir` {path, file} | `/files` | the project's folder on its machine (through its agent's `/api/fs/…` with `machine`): folders open in place, a file opens under the insert, Save writes it back (`src/inserts/files/`; shared as `dir`) | Pi's `read`/`write`/`edit`/`bash` + `grep`/`glob`/`ls` (`builtin/search.ts`), diagnostics after each edit (`lsp.ts`) — on the project's machine (`ssh-env.ts`), refused outside the folder when it is kept in it (`confined-env.ts`) | the folder and the open file |
-| `files` {host, path, file} | `/ftp` | the hosts (and a new one), the folder, the open file in an editor (`src/inserts/ftp/`; shared as `files`) | `remote_files` (`builtin/remote.ts`) | the folder, its entries, the open file |
+| `ssh:local` (on the thread's machine, `thread_machine()`: this Mac or the project's server) | `/terminal` | the terminal, as tall as its text (`src/inserts/terminal/`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
 | `tools` {tool} | `/tools` | every utility in its title's menu, the tool's input → output (`src/inserts/tools/`, the utilities themselves in `crates/devtools`) | none: `read`/`bash` on what it is sent | the tool's input and output |
 
 What belongs to a **project** rather than to a thread (its soul, MCP servers, skills, prompts,
-accesses, Telegram bot, scheduled jobs) is not an insert: it is the project's Settings page
+Telegram bot, scheduled jobs) is not an insert: it is the project's Settings page
 (`src/env/`, one file per section).
 
 ## How it is kept: Pi's terms
@@ -40,39 +38,39 @@ its first insert comes, not with the first message. Tests: `agent/test/inserts.t
 
 ## The pieces of a new kind
 
-**1. A key and its state.** A key names the kind (and, for terminals, which one: several can sit
-in a thread); everything that changes as the person works is `state` (a JSON object). Map the `/`
-row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "files:<id>" → files {host}.
+**1. A key and its state.** A key names the kind (several inserts of a kind can sit in a
+thread); everything that changes as the person works is `state` (a JSON object). Map the `/`
+row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "tasks:<list>" → tasks {list}.
 
 **2. An `InsertKind`** — a folder `src/inserts/<kind>/`: `mod.rs` holds the unit struct, a line in
 `KINDS` (`src/inserts/mod.rs`) registers it:
 - `owns(key)`; `shared` — a name when its live state is one for the whole app (`tasks`,
-  `tools`, `dir`, `files`): of several such inserts one is live (the last clicked, else the
+  `tools`): of several such inserts one is live (the last clicked, else the
   newest), the others say "click to show it here". The browser has none: its tab is the thread's;
-- `title`; `switches` — the title's menu (another server, host, tool; "New …" runs a form);
+- `title`; `switches` — the title's menu (another list, another tool): each a patch of the insert;
 - `controls` — the head's own buttons; the frame adds fold and remove;
 - `body` — what it shows, under the head (None: the head alone). Its height fits what it shows
   (editors at `editor_height`, never scrolling inside; no scroll inside the thread's scroll except
-  the terminal). While it renders, it restores its state (the files insert shows its host and
-  folder again) and syncs what changed back with `sync_insert_state`;
+  the terminal). While it renders, it restores its state (the tools insert shows its utility
+  again); what the person changes goes back with `patch_insert`;
 - `follow` — what it opened (the open file, the open task) as the next row of the thread, while
   it is live and unfolded;
 - `context` — what it shows now, as text for the agent (cut long text at 6000 characters);
-- `opened` (put in, or brought back: start a terminal, load the hosts), `removed`.
+- `opened` (put in, or brought back: start a terminal), `removed`.
 The frame is the same for every kind (`render_insert`): the person's avatar, a light ground, a
 thin border, round corners, `block_head` on top (one height and look for every block's head).
 State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`, a field on
-`BenchApp` (`ssh`, `tools`, `tasks`, `files_remote`, `local_files`, `sites` for the browser); a long body goes to `view.rs` beside it. Build it from `bench_ui`
+`BenchApp` (`ssh`, `tools`, `tasks`, `sites` for the browser); a long body goes to `view.rs` beside it. Build it from `bench_ui`
 elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`.
 
 **3. Its `/` word.** A line in `words()` (`src/inserts/mod.rs`); rows for `/word <query>` in
-`tool_slash` (`app/subjects.rs`) when picking straight away helps (`/ssh web-1`).
+`tool_slash` (`app/subjects.rs`) when picking straight away helps (`/tasks today`).
 
 **4. The agent's side**, in `agent/`:
 - **A tool** for its work: `defineTool` in `agent/src/builtin/<kind>.ts`, in the assistant's
   `tools` (`agent/src/extensions/assistant.ts`). It finds what the thread has inserted in
-  `sessionOf(api.conversationId).inserts` (see `ssh.ts`, `remote.ts` `hostFor`), so the agent never
-  has to name the server or host. When an MCP server already does the job, use it (the browser).
+  `sessionOf(api.conversationId).inserts` (see `ssh.ts`), so the agent never has to name what
+  the thread shows. When an MCP server already does the job, use it (the browser).
 - **A prompt line**: its case in `inserted()` (`agent/src/prompt.ts`): what it is, which tool works
   on it, what not to do ("never look for the tasks in files"; "don't take screenshots to show the
   page"). The `inserts` section is built from the document, so it changes only when an insert
@@ -104,9 +102,9 @@ The pattern for anything live from elsewhere:
 ## Where the data lives
 
 The tool's records live where the agent can reach them with Bench closed: in `~/.bench`
-(`bench.sqlite`, through the agent's REST API: tasks and hosts, `/api/tasks`, `/api/hosts`) or
-where they already live (`~/.ssh/config`, a server's files, a website behind the browser). A
-project's accesses are its own (`project` on the row). Never only in Bench's memory.
+(`bench.sqlite`, through the agent's REST API: the tasks, `/api/tasks`) or where they already
+live (`~/.ssh/config`, a server's files, a website behind the browser). Never only in Bench's
+memory.
 `build-native-data.md`.
 
 ## Patterns for a body

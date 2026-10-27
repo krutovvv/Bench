@@ -13,9 +13,11 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change a queued message's row or its buttons | `src/ui/thread/queued.rs` (actions in `src/app/send.rs`: `queued`, `queue_edit_*`) |
 | change the ticks on the right of the thread | `src/ui/thread/rail.rs` |
 | change the composer | `src/ui/composer.rs`, sending in `src/app/send.rs` (`send`) |
-| change an insert (`/terminal`, `/files`, `/ftp`, `/tasks`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
+| change an insert (`/terminal`, `/tasks`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
 | add an insert | `.agents/skills/bench-kit/references/build-insert.md` |
-| change a project's Settings (soul, MCP, skills, prompts, accesses, Telegram, schedule) | `src/env/<section>.rs` (`mcp.rs`, `skills.rs`, `schedule.rs`…); the tabs `src/env/page.rs`, Instructions' tree and editor `src/env/ide.rs`; a new section: `src/env/mod.rs` header |
+| change a project's Settings (name, where, model, Telegram) or its parts (MCP, language servers, schedule) | `src/env/<section>.rs` (`mcp.rs`, `schedule.rs`, `telegram.rs`…); the page `src/env/page.rs`; a new section: `src/env/mod.rs` header |
+| change the Explorer (the tree, documents, tabs, the file beside, ⌘P, ⌘⇧F) | `src/explorer/` (`tree.rs`, `doc.rs`, `view.rs`, `ops.rs`); its pieces `crates/ui/src/ide.rs`; the agent's `/api/fs/*` in `agent/src/modules/files.ts`; why: `docs/explorer.md` |
+| change what the window's sidebar or center shows | `src/app/workspace.rs` (`SidebarPanel`, `Center`), the layout in `src/ui/mod.rs` |
 | change what happens on an agent event | `src/app/events.rs` |
 | open, delete or search threads | `src/app/sessions.rs` |
 | change the sidebar | `src/ui/sidebar.rs` (projects: `src/app/project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/app/sidebar_items.rs`, marks in `src/app/marks.rs` |
@@ -57,7 +59,7 @@ src/
   connection.rs, pi_agent.rs   where the agent runs, starting it (here or over SSH)
 agent/src/
   server.ts      starts the agent, collects modules/
-  modules/       threads, commands, projects (environment), agents, presets, hosts, tasks, cron, files, audio, settings
+  modules/       threads, commands, projects (environment), agents, presets, tasks, cron, files, audio, settings
   runtime.ts     Pi conversations, the queue, inserts
   thread.ts      Pi's journal → the items Bench shows
   builtin/       the agent's tools

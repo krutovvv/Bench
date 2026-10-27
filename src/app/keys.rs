@@ -4,7 +4,7 @@
 
 use gpui_kit::*;
 
-use super::{BenchApp, Panel};
+use super::{BenchApp, Center};
 use crate::theme::Size;
 
 impl BenchApp {
@@ -31,11 +31,7 @@ impl BenchApp {
                 self.composer.update(cx, |s, cx| s.focus(window, cx));
             }
             ("n", true) => self.open_new_window(cx),
-            ("2", false) if crate::bench::SSH => self.open_server_thread(
-                crate::inserts::terminal::session::LOCAL.to_string(),
-                window,
-                cx,
-            ),
+            ("2", false) if crate::bench::SSH => self.open_terminal_thread(window, cx),
             ("3", false) if crate::bench::TOOLS => {
                 let tool = self.tools.tool;
                 self.open_tool_thread(tool, window, cx)
@@ -47,7 +43,7 @@ impl BenchApp {
             // ⌘⌫ / ⌘⌦: delete the open thread — asked once, as ⌫ ⌫ in the sidebar
             // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's.
             ("backspace" | "delete", false)
-                if self.panel == Panel::Chat && self.session.is_some() =>
+                if self.center == Center::Chat && self.session.is_some() =>
             {
                 let id = self.session.clone().unwrap_or_default();
                 if self.confirm_delete.as_deref() == Some(id.as_str()) {
@@ -59,13 +55,24 @@ impl BenchApp {
             // Dictation without its button: start, and again to stop and transcribe.
             ("d", true) => self.toggle_mic(window, cx),
             ("f", false) => self.open_search(window, cx),
+            // The Explorer (`src/explorer/`): the sidebar's panel, a file by name, a text in the
+            // folder; a document saved, its tab closed.
+            ("e", false) => self.toggle_side(window, cx),
+            ("p", false) => self.open_quick(window, cx),
+            ("f", true) => self.open_find(window, cx),
+            ("s", false) => return self.save_active_doc(window, cx),
+            ("w", false) if self.center == Center::Doc => {
+                if let Some(key) = self.explorer.active.clone() {
+                    self.close_doc(key, cx);
+                }
+            }
             (",", false) => {
-                let panel = if self.panel == Panel::Providers {
-                    Panel::Chat
+                let panel = if self.center == Center::Providers {
+                    Center::Chat
                 } else {
-                    Panel::Providers
+                    Center::Providers
                 };
-                self.open_panel(panel, window, cx);
+                self.open_center(panel, window, cx);
             }
             (".", false) if self.live.is_some() => self.stop(cx),
             ("=" | "+", _) => self.step_size(1, window, cx),
@@ -82,13 +89,17 @@ impl BenchApp {
             self.cancel_rename(cx);
             return true;
         }
+        // The Explorer's ⌘P, a name being typed in its tree, ⌘⇧F's results: the latest first.
+        let ex = &mut self.explorer;
+        if ex.quick.take().is_some() || ex.naming.take().is_some() || ex.find.take().is_some() {
+            cx.notify();
+            return true;
+        }
         if self.recorder.take().is_some() {
             self.wave_ticker = None;
             self.send_after_transcribe = false;
-        } else if self.ssh.form.is_some() {
-            self.ssh.form = None;
-        } else if self.panel.is_settings() {
-            self.panel = Panel::Chat;
+        } else if self.center.is_settings() {
+            self.center = Center::Chat;
         } else {
             return false;
         }

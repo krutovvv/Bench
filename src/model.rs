@@ -32,7 +32,7 @@ pub struct SessionRow {
     pub running: bool,
     /// Where the session lives: "local" (desktop/CLI), "telegram", "cron", …
     pub source: String,
-    /// What the thread is about, its live block: "tasks:today", "ssh:<host>"; "" = a plain chat.
+    /// What the thread is about, its live block: "tasks:today", "ssh:local"; "" = a plain chat.
     pub subject: String,
     /// The project the thread belongs to (its id); "" = none.
     pub project: String,
@@ -40,16 +40,16 @@ pub struct SessionRow {
     pub host: String,
 }
 
-/// A piece the person put into a thread with "/" (a server's terminal, a file host, the tasks,
-/// the utilities, the browser's tab): kept by the agent as a Pi entry where it was put and a
+/// A piece the person put into a thread with "/" (the terminal, the tasks, the utilities, the
+/// browser's tab): kept by the agent as a Pi entry where it was put and a
 /// document of its state (agent/src/inserts.ts). Its look and behaviour: `crate::inserts`.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Insert {
     pub id: String,
-    /// What it is: "ssh:<alias>" (a terminal; "ssh:local" this Mac's), "files", "tasks",
-    /// "tools", "browser".
+    /// What it is: "ssh:local" (the terminal on the thread's machine), "tasks", "tools",
+    /// "browser".
     pub key: String,
-    /// Its own state (the host and folder a file browser is on, the list, the tool).
+    /// Its own state (the list, the tool, the browser's tab).
     pub state: serde_json::Map<String, Value>,
     pub folded: bool,
     /// After how many of the person's messages it sits.
@@ -216,14 +216,14 @@ pub struct BgProcess {
 }
 
 /// A slash command from the gateway's catalog, a saved prompt, or a tool to attach to the
-/// thread (`/ssh web-1`).
+/// thread (`/tasks today`).
 #[derive(Clone, Debug, Default)]
 pub struct SlashCommand {
     /// "/goal".
     pub name: String,
     pub desc: String,
     pub category: String,
-    /// A tool's subject key ("ssh:web-1"); empty for commands and prompts.
+    /// A tool's subject key ("tasks:today"); empty for commands and prompts.
     pub key: String,
 }
 

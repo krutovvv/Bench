@@ -11,7 +11,7 @@ use serde_json::json;
 
 use crate::app::BenchApp;
 use crate::app::subjects::tool_key;
-use crate::inserts::{InsertKind, Switch, SwitchTo, clip};
+use crate::inserts::{InsertKind, Switch, clip};
 use crate::model::Insert;
 use devtools::{GROUPS, Tool};
 
@@ -51,7 +51,7 @@ impl InsertKind for Tools {
                 label: t.name().to_string(),
                 detail: g.to_string(),
                 chosen: t == now,
-                to: SwitchTo::Patch(json!({ "state": { "tool": tool_key(t) } })),
+                to: json!({ "state": { "tool": tool_key(t) } }),
             })
             .collect()
     }

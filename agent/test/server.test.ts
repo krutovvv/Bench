@@ -58,25 +58,6 @@ test("the server starts and answers /api/projects", async () => {
 		await call("DELETE", `/api/cron/jobs/${job.id}`);
 		listed = (await call("GET", `/api/projects/${made.project.id}/env`)).cron;
 		assert.deepEqual(listed, []);
-		// A file host made in /ftp can be deleted there: the row and its password go.
-		const host = (await call("POST", "/api/hosts", { name: "Site FTP", kind: "ftp", host: "ftp.example.com", user: "vlad", password: "pw" })).host;
-		assert.ok(host.id);
-		await call("DELETE", `/api/hosts/${host.id}`);
-		const left = (await call("GET", "/api/hosts")).hosts;
-		assert.ok(!left.some((h: any) => h.id === host.id));
-		const gone = await call("DELETE", `/api/hosts/${host.id}`);
-		assert.match(String(gone.detail ?? ""), /no such host/);
-		// A file host is the project's own: taking it out of the project deletes it, it does not
-		// drift into a shared pool.
-		const ph = (await call("POST", "/api/hosts", { name: "Site SFTP", kind: "sftp", host: "sftp.example.com", user: "vlad", project: made.project.id })).host;
-		assert.equal(ph.project, made.project.id);
-		await call("DELETE", `/api/projects/${made.project.id}/hosts/${ph.id}`);
-		assert.ok(!(await call("GET", "/api/hosts")).hosts.some((h: any) => h.id === ph.id));
-		// An SSH access mirrors ~/.ssh/config, which is the machine's: it only loses the tag.
-		const sh = (await call("POST", "/api/hosts", { name: "Box", kind: "ssh", host: "box.example.com", user: "v", source: "ssh_config:box", project: made.project.id })).host;
-		await call("DELETE", `/api/projects/${made.project.id}/hosts/${sh.id}`);
-		const kept = (await call("GET", "/api/hosts")).hosts.find((h: any) => h.id === sh.id);
-		assert.equal(kept.project, "");
 		// A project's reasoning level and approvals are its own: they go into its agent's folder (a
 		// thread of the project runs with it), not into the machine's settings. The model and its
 		// fallback are one for every thread: they go to the general agent, from wherever they come.
@@ -88,7 +69,7 @@ test("the server starts and answers /api/projects", async () => {
 		// A remote project shows the server agent's general environment.
 		const general = await call("GET", "/api/projects/general/env");
 		assert.equal(general.project.name, "Host");
-		assert.ok(Array.isArray(general.skills) && Array.isArray(general.hosts));
+		assert.ok(Array.isArray(general.skills));
 		// The machine's own agent kept its approvals, and has the model for everyone.
 		const hostOwn = JSON.parse(fs.readFileSync(path.join(home, "agents", "default", "settings.json"), "utf8"));
 		assert.notEqual(hostOwn.approvals, "smart");

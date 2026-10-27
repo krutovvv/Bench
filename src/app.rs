@@ -31,6 +31,7 @@ mod sessions;
 pub(crate) mod sidebar_items;
 mod telegram;
 mod voice;
+mod workspace;
 pub use crate::env::ProjectEnv;
 pub use crate::env::project_form::ProjectForm;
 mod prompts;
@@ -51,22 +52,7 @@ pub type Choice = SelectState<Vec<SharedString>>;
 /// after the machine. A server's is a project named after it ("Dev"); Host is first in the sidebar.
 pub const LOCAL_HOST: &str = "Host";
 
-#[derive(Clone, Copy, PartialEq)]
-pub enum Panel {
-    Chat,
-    /// Model providers, fallback, voice, service keys.
-    Providers,
-    /// A new project: a page of its own, not a thread (a project is not a conversation).
-    NewProject,
-    /// A project's settings (`project_env`): its environment's tabs (`env/page.rs`).
-    Project,
-}
-
-impl Panel {
-    pub fn is_settings(self) -> bool {
-        self != Panel::Chat
-    }
-}
+pub use workspace::{Center, SidebarPanel};
 
 /// The open thread's run, as the status says it: what the agent is doing.
 pub struct Live {
@@ -87,9 +73,7 @@ pub struct BenchApp {
     /// Inserts put while a message still waited in the composer: they belong after that message,
     /// whose place in the thread is not there yet. Their ids; `send` fixes the place as it sends.
     pub insert_draft: Vec<String>,
-    /// The insert a form was opened from (a new server, a new host): it shows under it.
-    pub form_after: Option<String>,
-    /// Of the inserts whose state is app-wide (tasks, tools, files), the live one per kind.
+    /// Of the inserts whose state is app-wide (tasks, tools), the live one per kind.
     pub insert_live: HashMap<String, String>,
     /// The waiting message whose words the person is fixing, and the field they fix them in.
     pub queue_edit: Option<(String, Entity<TextareaState>)>,
@@ -103,8 +87,6 @@ pub struct BenchApp {
     pub project_form: Option<ProjectForm>,
     /// The open environment thread's project environment (its block).
     pub project_env: Option<ProjectEnv>,
-    /// ~/.ssh/config servers that belong to a project: alias → project id (the rest are shared).
-    pub ssh_projects: HashMap<String, String>,
     /// The project whose prompts `prompts` holds (they follow the open thread's project).
     pub prompts_for: Option<String>,
     /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
@@ -268,7 +250,11 @@ pub struct BenchApp {
     search_seq: u64,
     effort_pending: bool,
 
-    pub panel: Panel,
+    /// What the middle of the window shows (`workspace.rs`).
+    pub center: Center,
+    /// What the sidebar lists, and the Explorer's state (`src/explorer/`).
+    pub sidebar_panel: SidebarPanel,
+    pub explorer: crate::explorer::Explorer,
     pub skills: Vec<SkillRow>,
     pub skill_open: Option<String>,
     /// Settings → Prompts.
@@ -315,16 +301,12 @@ pub struct BenchApp {
     /// Markdown files shown in full rather than their first lines.
     pub media_open: HashSet<String>,
 
-    /// /terminal and /ssh: servers of ~/.ssh/config and their terminals.
+    /// /terminal: the servers of ~/.ssh/config and the terminals' shells.
     pub ssh: crate::inserts::terminal::servers::Ssh,
     /// /tools: the utilities of `devtools`.
     pub tools: crate::inserts::tools::state::Tools,
     /// The tasks the /tasks insert shows, and its card.
     pub tasks: crate::inserts::tasks::state::TasksMode,
-    /// The files of an FTP / SFTP host, shown in its thread.
-    pub files_remote: crate::inserts::ftp::state::RemoteFiles,
-    /// The project's own folder in a thread (`/files`).
-    pub local_files: crate::inserts::files::state::LocalFiles,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
     /// width, kept by the app across the two layouts that show it (`ui/mod.rs`).
     pub sidebar_w: Pixels,
@@ -589,11 +571,9 @@ impl BenchApp {
         let mut tasks = vec![events, ticker, processes, backend];
 
         // The gateway list keeps the SSH hosts that can run the agent (asked again when the menu opens).
-        let ssh = crate::inserts::terminal::servers::Ssh::new(window, cx);
+        let ssh = crate::inserts::terminal::servers::Ssh::new();
         let tools = crate::inserts::tools::state::Tools::new(window, cx);
         let tasks_mode = crate::inserts::tasks::state::TasksMode::new(window, cx);
-        let files_remote = crate::inserts::ftp::state::RemoteFiles::new(window, cx);
-        let local_files = crate::inserts::files::state::LocalFiles::new(window, cx);
         for host in targets.iter().filter_map(|t| match t {
             Target::Ssh(h) => Some(h.clone()),
             Target::Local => None,
@@ -610,8 +590,6 @@ impl BenchApp {
         let mut app = Self {
             ssh,
             tools,
-            files_remote,
-            local_files,
             tasks: tasks_mode,
             sidebar_w: px(280.),
             layout_state: cx.new(|_| Default::default()),
@@ -625,13 +603,11 @@ impl BenchApp {
             insert_draft: Vec::new(),
             queue_edit: None,
             insert_live: HashMap::new(),
-            form_after: None,
             thread_project: String::new(),
             projects: vec![],
             host_browser: false,
             project_form: None,
             project_env: None,
-            ssh_projects: HashMap::new(),
             prompts_for: None,
             agents: HashMap::new(),
             gear_agent: String::new(),
@@ -721,7 +697,9 @@ impl BenchApp {
             search_hits: None,
             search_seq: 0,
             effort_pending: false,
-            panel: Panel::Chat,
+            center: Center::Chat,
+            sidebar_panel: SidebarPanel::Threads,
+            explorer: Default::default(),
             skills: vec![],
             skill_open: None,
             prompts: vec![],
@@ -872,18 +850,6 @@ impl BenchApp {
         crate::theme::save(&a);
         crate::theme::apply(a, Some(window), cx);
         self.repaint_terminals(cx);
-        cx.notify();
-    }
-
-    // ---- panels ----------------------------------------------------------
-
-    pub fn open_panel(&mut self, panel: Panel, window: &mut Window, cx: &mut Context<Self>) {
-        self.panel = panel;
-        match panel {
-            Panel::Chat => {}
-            Panel::Providers => self.load_providers(window, cx),
-            Panel::NewProject | Panel::Project => {}
-        }
         cx.notify();
     }
 

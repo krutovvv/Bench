@@ -97,8 +97,8 @@ Dated where it changed. The person's later decisions win over earlier ones: a ru
   agent working on a server as a project's machine (over SSH). A server's own agent (added in
   the gear) and a project's language servers are installed there by Bench
   (`docs/remote-projects.md`).
-- Lightweight first, the heavy tool one click away: a file opens in the thread (the `/files`
-  insert); the whole project opens in Zed from the project's ⋯ menu (only where it has a folder).
+- Lightweight first, the heavy tool one click away: the whole project opens in Zed from the
+  project's ⋯ menu (only where it has a folder).
 
 - **The Bench aggregates; data stays native** (servers in `~/.ssh/config`). The user rejected a JSON store, then SQLite, then a
   third-party app (Things) as the store, then an MCP built into the Bench: the agents' MCP lives

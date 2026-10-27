@@ -78,9 +78,9 @@ impl BenchApp {
             self.save_place();
         }
         self.cmd(Cmd::Sessions(name));
-        if self.panel != Panel::Chat {
-            let panel = self.panel;
-            self.open_panel(panel, window, cx);
+        if self.center != Center::Chat {
+            let panel = self.center;
+            self.open_center(panel, window, cx);
         }
         cx.notify();
     }
@@ -89,7 +89,7 @@ impl BenchApp {
         let Some(profile) = self.profile.clone() else {
             return;
         };
-        self.panel = Panel::Chat;
+        self.center = Center::Chat;
         // Asking again for the thread already on screen (its inserts fell out of step, a retry):
         // keep what the person has — the turns they are reading, the draft, the messages waiting
         // in the queue — and only fetch the history afresh. Resetting it first was felt as the
@@ -103,8 +103,6 @@ impl BenchApp {
             return;
         }
         self.confirm_delete = None;
-        self.ssh.form = None;
-        self.files_remote.form = false;
         self.project_form = None;
         if let Some(prev) = self.session.clone() {
             self.thread_cache
@@ -141,7 +139,7 @@ impl BenchApp {
     }
 
     pub fn new_session(&mut self, cx: &mut Context<Self>) {
-        self.panel = Panel::Chat;
+        self.center = Center::Chat;
         self.reset_chat(cx);
         self.save_place();
         cx.notify();

@@ -1,12 +1,12 @@
 // A thread is a document: the person's messages, the agent's answers, and the person's inserts —
-// tools put into the conversation with "/" (a server's terminal, a file host, the task lists, the
-// utilities, the browser's tab). Each insert is a piece of the person's side of the thread, in
+// tools put into the conversation with "/" (the terminal, the task lists, the utilities, the
+// browser's tab). Each insert is a piece of the person's side of the thread, in
 // Pi's terms:
 //
 // - an entry `bench.insert` {id, key} in the transcript, written where it was put (a write: the
 //   model doesn't see it, it is never queued, so it lands at once even mid-run);
-// - its live state in the conversation's document `bench.inserts` (which folder a file host shows,
-//   which list, which tool; folded; removed), changed in commits.
+// - its live state in the conversation's document `bench.inserts` (which list, which
+//   tool, which tab; folded; removed), changed in commits.
 //
 // The entry fixes where it is; the document what it is now. A removed insert keeps its entry (the
 // transcript is immutable) and is marked removed in the document. The model learns what is
@@ -83,7 +83,7 @@ export function patchInsert(doc: { items: Record<string, InsertState> }, id: str
 	return true;
 }
 
-/** The kind of an insert's key: "ssh:web-1" → "ssh". */
+/** The kind of an insert's key: "ssh:local" → "ssh". */
 export const kindOf = (key: string) => key.split(":")[0];
 
 export type { JsonValue };

@@ -1,7 +1,7 @@
-//! `Section`: one part of a project's settings (its soul, its MCP servers, …) — the tab and the
-//! group it is drawn in, drawn as a form of fields or as a list of rows whose click opens a card
-//! under the list, and how that saves, reverts and removes. The drivers in `mod.rs`, `page.rs`
-//! and `ide.rs` call it through `SECTIONS`; the pieces below are what every section is made of.
+//! `Section`: one part of a project's environment (its name, its MCP servers, …) — where it is
+//! shown (`Home`: a form on the Settings page, or parts in the Explorer's tree whose `card` opens
+//! in the middle), and how that saves, reverts and removes. The drivers in `mod.rs`, `page.rs`
+//! and `src/explorer/` call it through `SECTIONS`; the pieces below are what sections are made of.
 
 use gpui_kit::component::input::EditorState;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -16,43 +16,26 @@ use crate::icons::Ico;
 /// A save's REST call: method, path, JSON body.
 pub type Request = (&'static str, String, Value);
 
-/// The tabs of a project's settings, in their order.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Tab {
-    /// Its name, where it lives, how it runs, its Telegram bot.
-    #[default]
-    General,
-    /// What the agent reads as text: the soul, prompts, skills (`ide.rs`).
-    Instructions,
-    /// MCP and language servers.
-    Tools,
-    Schedule,
-    /// Machines and file hosts.
-    Access,
+/// Where a section is shown: on the project's Settings page (a form of fields), or in the
+/// Explorer (`src/explorer/`) as a group of parts — each part a row of the tree, opened as a
+/// document in the middle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Home {
+    Settings,
+    /// The Explorer's group it goes under ("Tools", "Schedule").
+    Explorer(&'static str),
 }
 
-impl Tab {
-    pub const ALL: [Tab; 5] = [
-        Tab::General,
-        Tab::Instructions,
-        Tab::Tools,
-        Tab::Schedule,
-        Tab::Access,
-    ];
-
-    pub fn label(self) -> (Ico, &'static str) {
-        match self {
-            Tab::General => (Ico::Settings, "General"),
-            Tab::Instructions => (Ico::FileText, "Instructions"),
-            Tab::Tools => (Ico::Wrench, "Tools"),
-            Tab::Schedule => (Ico::Clock, "Schedule"),
-            Tab::Access => (Ico::Server, "Access"),
-        }
-    }
+/// A part of a section shown in the Explorer's tree: its name (what `card` is called with), what
+/// the row says, a muted note after it, its icon.
+pub struct Item {
+    pub name: String,
+    pub label: String,
+    pub note: String,
+    pub icon: (Ico, Hsla),
 }
 
-/// What a list's row opens on the right of the list, as its `card` gives it: the head's title and
-/// actions, the body.
+/// A part opened in the middle, as its `card` gives it: the head's title and actions, the body.
 pub struct Card {
     pub title: String,
     pub body: AnyElement,
@@ -73,16 +56,16 @@ pub trait Section: Sync {
     /// What `env_card`, `env_save`, `env_revert` and `env_remove` are called with: "name",
     /// "place", "soul", "telegram", "model", "mcp", "lsp", "skill", "prompt", "cron", "host".
     fn key(&self) -> &'static str;
-    /// The tab it is on.
-    fn tab(&self) -> Tab;
-    /// The group it is drawn under on its tab (sections next to each other in `SECTIONS` may
-    /// share one).
+    /// Where it is shown.
+    fn home(&self) -> Home;
+    /// Its heading: the group of Settings it is drawn under (neighbours in `SECTIONS` may share
+    /// one), or its node in the Explorer's group.
     fn block(&self, general: bool) -> &'static str;
     /// Whether it is shown for this project.
     fn shown(&self, _app: &BenchApp) -> bool {
         true
     }
-    /// What it adds to its group's heading, on the right ("+ Add", "Check").
+    /// What it adds to its heading, on the right ("+ Add", "Check").
     fn head(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         None
     }
@@ -91,15 +74,11 @@ pub trait Section: Sync {
     fn form(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
         None
     }
-    /// A list's rows, on the left of the tab; a click opens one's `card` on the right.
-    fn rows(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    /// Its parts, in the Explorer.
+    fn items(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Vec<Item> {
         vec![]
     }
-    /// A list's first row, opened when its tab is chosen.
-    fn first(&self, _e: &ProjectEnv) -> Option<String> {
-        None
-    }
-    /// What the row `name` opens on the right: its fields, its actions (None: nothing to show).
+    /// What the part `name` opens in the middle: its fields, its actions (None: nothing to show).
     fn card(&self, _app: &BenchApp, _name: &str, _cx: &mut Context<BenchApp>) -> Option<Card> {
         None
     }
@@ -167,100 +146,12 @@ pub fn head_act(id: SharedString, label: &'static str, cx: &App) -> Stateful<Div
         .child(label)
 }
 
-/// "+ Add": a new one's form, on the right of the list.
+/// "+ Add": a new one's form, opened in the middle.
 pub fn add(id: &'static str, kind: &'static str, cx: &mut Context<BenchApp>) -> Stateful<Div> {
     head_act(id.into(), "+ Add", cx).on_click(cx.listener(move |this, _, window, cx| {
         cx.stop_propagation();
-        this.env_open(kind, "new".into(), window, cx)
+        this.open_part(kind, "new".into(), window, cx)
     }))
-}
-
-/// A row of a list: its name and under it a one-line note, its actions on hover; lit when it is
-/// open on the right. `mark` is a status sign before the name (MCP servers have one).
-#[allow(clippy::too_many_arguments)]
-pub fn row_with(
-    e: &ProjectEnv,
-    kind: &'static str,
-    name: String,
-    mark: Option<AnyElement>,
-    label: String,
-    note: String,
-    bad: bool,
-    actions: Vec<AnyElement>,
-    cx: &mut Context<BenchApp>,
-) -> AnyElement {
-    let theme = cx.theme().clone();
-    let note = note.split_whitespace().collect::<Vec<_>>().join(" ");
-    let on = e
-        .card
-        .as_ref()
-        .is_some_and(|(k, n)| *k == kind && *n == name);
-    let group = SharedString::from(format!("env-g-{kind}-{name}"));
-    h_flex()
-        .id(SharedString::from(format!("env-{kind}-{name}")))
-        .group(group.clone())
-        .flex_none()
-        .px_3()
-        .py_1p5()
-        .gap_2()
-        .cursor_pointer()
-        .when(on, |d| d.bg(theme.list_active))
-        .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
-        .children(mark)
-        .child(
-            v_flex()
-                .flex_1()
-                .min_w_0()
-                .child(div().truncate().child(label))
-                .when(!note.is_empty(), |d| {
-                    d.child(
-                        div()
-                            .truncate()
-                            .text_sm()
-                            .text_color(if bad {
-                                theme.danger
-                            } else {
-                                theme.muted_foreground
-                            })
-                            .child(note),
-                    )
-                }),
-        )
-        .children(actions.into_iter().map(|a| {
-            div()
-                .flex_none()
-                .opacity(0.)
-                .group_hover(group.clone(), |s| s.opacity(1.))
-                .child(a)
-        }))
-        .on_click(
-            cx.listener(move |this, _, window, cx| this.env_open(kind, name.clone(), window, cx)),
-        )
-        .into_any_element()
-}
-
-/// `row_with` with no sign and no actions.
-#[allow(clippy::too_many_arguments)]
-pub fn row(
-    e: &ProjectEnv,
-    kind: &'static str,
-    name: String,
-    label: String,
-    note: String,
-    bad: bool,
-    cx: &mut Context<BenchApp>,
-) -> AnyElement {
-    row_with(e, kind, name, None, label, note, bad, vec![], cx)
-}
-
-/// A list with nothing in it: one muted line.
-pub fn empty(text: &'static str, cx: &App) -> AnyElement {
-    div()
-        .px_3()
-        .py_2()
-        .text_color(cx.theme().muted_foreground)
-        .child(text)
-        .into_any_element()
 }
 
 /// A text action in a card's head.

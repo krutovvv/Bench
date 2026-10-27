@@ -31,7 +31,7 @@ export interface SessionRow {
 	todos_at: number;
 	chat_id?: string;
 	display_name?: string;
-	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:<host id>", "folder:<path>"; "" = a plain chat. */
+	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:local", "folder:<path>"; "" = a plain chat. */
 	subject?: string;
 	/** The project the thread belongs to (`projects.id`); "" = none. */
 	project?: string;

@@ -5,7 +5,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Request, Section, Tab, form_actions};
+use super::section::{Home, Request, Section, form_actions};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use bench_ui::settings_field;
@@ -43,8 +43,8 @@ impl Section for Telegram {
     fn key(&self) -> &'static str {
         "telegram"
     }
-    fn tab(&self) -> Tab {
-        Tab::General
+    fn home(&self) -> Home {
+        Home::Settings
     }
     fn block(&self, _general: bool) -> &'static str {
         "Telegram"

@@ -49,7 +49,10 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 - **What the thread shows, its order** → `crates/thread` (rules as tests), drawn by `src/ui/thread/`.
 - **Where a project lives, a new kind of place** → `src/app/places.rs` + the agent's project row.
 - **A new insert** → a folder in `src/inserts/` (`references/build-insert.md`).
-- **A project's Settings** → a file in `src/env/` implementing `Section` (its `Tab`), a line in `SECTIONS`
+- **The window's places** → `src/app/workspace.rs` (`SidebarPanel`, `Center`), as Zed's workspace;
+  **the Explorer** (a project's files and the agent's texts as an IDE shows them) →
+  `src/explorer/`, `docs/explorer.md`.
+- **A project's Settings or parts** → a file in `src/env/` implementing `Section` (its `Home`), a line in `SECTIONS`
   (`src/env/mod.rs`); where it lives: `place.rs`; its data from `/api/projects/<id>/env`.
 - **The sidebar** → `src/ui/sidebar.rs` draws; what is done to a thread or project (menu, pin,
   color, rename, ⌫⌫, ↑↓) is `src/app/sidebar_items.rs`, marks in `src/app/marks.rs`.

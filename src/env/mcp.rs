@@ -9,8 +9,8 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, Request, Section, Tab, add, card_act, code, empty, head_act, new_card, remove, revert,
-    row_with, save,
+    Card, Home, Item, Request, Section, add, card_act, code, head_act, new_card, remove, revert,
+    save,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
@@ -100,11 +100,8 @@ impl Section for Mcp {
     fn key(&self) -> &'static str {
         "mcp"
     }
-    fn tab(&self) -> Tab {
-        Tab::Tools
-    }
-    fn first(&self, e: &ProjectEnv) -> Option<String> {
-        e.mcp.servers.first().map(|m| m.name.clone())
+    fn home(&self) -> Home {
+        Home::Explorer("Tools")
     }
     fn block(&self, _general: bool) -> &'static str {
         "MCP servers"
@@ -168,67 +165,35 @@ impl Section for Mcp {
                 .into_any_element(),
         )
     }
-    /// Each row carries a sign of what the agent knows of it. A server says nothing until
+    /// Each server carries a sign of what the agent knows of it. A server says nothing until
     /// something asks it for its tools, so "not tried yet" is its own state and says so out
     /// loud — it is not a working server.
-    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn items(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<Item> {
         let Some(e) = app.project_env.as_ref() else {
             return vec![];
         };
         let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let mut rows = vec![];
-        if e.mcp.servers.is_empty() {
-            rows.push(empty(
-                "None of its own: the general ones work here too.",
-                cx,
-            ));
-        }
-        for m in e.mcp.servers.iter().cloned() {
-            let tone = mcp_tone(&m);
-            let name = m.name.clone();
-            let bad = matches!(tone, McpTone::Error | McpTone::Dead);
-            let mark = {
-                let (ico, color) = match tone {
+        e.mcp
+            .servers
+            .iter()
+            .map(|m| {
+                let icon = match mcp_tone(m) {
                     McpTone::Live => (crate::icons::Ico::CircleCheck, theme.success),
                     McpTone::Error => (crate::icons::Ico::CircleAlert, theme.danger),
                     McpTone::Dead => (crate::icons::Ico::CircleHelp, theme.danger),
                     McpTone::Auth => (crate::icons::Ico::CircleAlert, theme.warning),
-                    McpTone::Off | McpTone::Untested => (crate::icons::Ico::CircleEmpty, muted),
+                    McpTone::Off | McpTone::Untested => {
+                        (crate::icons::Ico::CircleEmpty, theme.muted_foreground)
+                    }
                 };
-                div()
-                    .flex_none()
-                    .flex()
-                    .items_center()
-                    .child(ico.icon().small().text_color(color))
-                    .into_any_element()
-            };
-            let mut actions: Vec<AnyElement> = Vec::new();
-            if m.needs_auth {
-                let who = name.clone();
-                actions.push(
-                    head_act(format!("env-mcp-auth-{name}").into(), "Authorize", cx)
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.click_claimed = true;
-                            cx.stop_propagation();
-                            this.env_authorize(who.clone(), window, cx)
-                        }))
-                        .into_any_element(),
-                );
-            }
-            rows.push(row_with(
-                e,
-                "mcp",
-                m.name.clone(),
-                Some(mark),
-                name,
-                mcp_note(&m),
-                bad,
-                actions,
-                cx,
-            ));
-        }
-        rows
+                Item {
+                    name: m.name.clone(),
+                    label: m.name.clone(),
+                    note: mcp_note(m),
+                    icon,
+                }
+            })
+            .collect()
     }
     fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
         let e = app.project_env.as_ref()?;

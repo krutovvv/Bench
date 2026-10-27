@@ -11,7 +11,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Card, Request, Section, Tab, add, code, empty, remove, revert, row, save};
+use super::section::{Card, Home, Item, Request, Section, add, code, remove, revert, save};
 use super::{ProjectEnv, editor, on_change};
 use crate::app::BenchApp;
 use crate::rest;
@@ -50,11 +50,8 @@ impl Section for Lsp {
     fn key(&self) -> &'static str {
         "lsp"
     }
-    fn tab(&self) -> Tab {
-        Tab::Tools
-    }
-    fn first(&self, e: &ProjectEnv) -> Option<String> {
-        e.lsp.servers.first().map(|s| s.name.clone())
+    fn home(&self) -> Home {
+        Home::Explorer("Tools")
     }
     fn block(&self, _general: bool) -> &'static str {
         "Language servers"
@@ -62,16 +59,11 @@ impl Section for Lsp {
     fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
         Some(add("env-lsp-add", "lsp", cx).into_any_element())
     }
-    fn rows(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
+    fn items(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<Item> {
         let Some(e) = app.project_env.as_ref() else {
             return vec![];
         };
-        if e.lsp.servers.is_empty() {
-            return vec![empty(
-                "None: + Add takes the usual ones (TypeScript, PHP and WordPress, CSS, Tailwind…).",
-                cx,
-            )];
-        }
+        let theme = cx.theme().clone();
         e.lsp
             .servers
             .iter()
@@ -82,15 +74,19 @@ impl Section for Lsp {
                     s.state.clone()
                 };
                 let bad = s.state.starts_with("failed");
-                row(
-                    e,
-                    "lsp",
-                    s.name.clone(),
-                    s.name.clone(),
-                    format!("{} · {state}", s.extensions.join(", ")),
-                    bad,
-                    cx,
-                )
+                Item {
+                    name: s.name.clone(),
+                    label: s.name.clone(),
+                    note: format!("{} · {state}", s.extensions.join(", ")),
+                    icon: (
+                        crate::icons::Ico::FileCog,
+                        if bad {
+                            theme.danger
+                        } else {
+                            theme.muted_foreground
+                        },
+                    ),
+                }
             })
             .collect()
     }

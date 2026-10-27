@@ -5,24 +5,21 @@ from another machine — and readable by Bench. So they never live only in Bench
 Bench's view state. Two places, in this order:
 
 1. **Where they already live**, when that place is the person's long-lived one: servers in
-   `~/.ssh/config`, files in their folders and on their hosts, sign-ins in the browser's profile,
+   `~/.ssh/config`, files in their folders, sign-ins in the browser's profile,
    a service's records behind its API or MCP server. Bench shows them there; the agent reaches
    them with its own tool or MCP server.
-2. **`~/.bench/bench.sqlite`**, Bench's one home, owned by the agent: tasks, hosts (SSH and
-   FTP/SFTP accesses), projects, cron jobs, providers, settings (among them `agents`, the
+2. **`~/.bench/bench.sqlite`**, Bench's one home, owned by the agent: tasks, projects, cron jobs, providers, settings (among them `agents`, the
    servers' agents, `servers.ts`; `presets`, the person's own, `presets.ts`). Bench reads and
-   writes it **through the agent's REST API** (`/api/tasks`, `/api/hosts`, `/api/projects`,
-   `/api/agents`; routes in `agent/src/modules/<area>.ts`, e.g. `tasks.ts`, `hosts.ts`), never
-   by opening the file; the agent through its tool (`agent/src/builtin/tasks.ts`, `hosts.ts`).
+   writes it **through the agent's REST API** (`/api/tasks`, `/api/projects`, `/api/agents`;
+   routes in `agent/src/modules/<area>.ts`, e.g. `tasks.ts`), never by opening the file; the
+   agent through its tool (`agent/src/builtin/tasks.ts`).
    One store, two clients.
 3. **`~/.bench/projects/<id>/`**, a project's environment as files (an agent directory in Pi's
    terms): `SYSTEM.md`, `mcp.json`, `lsp.json`, `skills/`, `prompts/`, and `files/`, where a
    project without a folder works (`projects.dir`, `agent/src/builtin/projects.ts`).
 
 Not: a JSON or SQLite file of Bench's own, a third-party app as the store, a database inside
-Bench. Passwords for hosts are kept in `bench.sqlite` as the person chose (plain text is fine for
-them); a "from Keychain" button can fill one in (`security find-internet-password`,
-`src/inserts/ftp/state.rs`).
+Bench.
 
 ## Who else writes there
 

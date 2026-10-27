@@ -150,10 +150,8 @@ Limits to tell the person honestly (do not try to "fix" them by writing your own
 editor is smooth up to a few MB of text. Open the first 2 MB of a bigger file and say the rest
 is not shown. Anything heavier opens in Zed (the project's ⋯ menu, Open in Zed).
 
-The finished editors in Bench are the file inserts: `/files` (`src/inserts/files/mod.rs`,
-`state.rs`: `local_files.editor`) and `/ftp` (`src/inserts/ftp/view.rs`, `state.rs`:
-`files_remote.editor`) — a file opens under the insert at its full height, Save writes it back.
-A project's environment texts use `section::code` (`src/env/section.rs`). Copy from them.
+The finished editors in Bench are a project's environment texts: `section::code`
+(`src/env/section.rs`) and Instructions' editor (`src/env/ide.rs`). Copy from them.
 
 ### "Open…" with the macOS dialog
 

@@ -20,19 +20,21 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::{BenchApp, Panel};
+use crate::app::{BenchApp, Center};
 
 pub use bench_ui::{
     AVATAR, BAR_CONTROL_REMS, BLOCK_HEAD_H, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, CHIP_H, FIELD_H,
     LEAD, RING_CLEAR, STATUS_H, THUMB, TURN_Y, avatar, block_head, choice_row, clip, clock,
     compact, editor_height, editor_line, file_icon, form_action, group_chevron, head_icon_in,
-    head_plus_slot, inline_form, nest_guide, nest_pl, plural, search_band,
+    head_plus_slot, nest_guide, nest_pl, plural, search_band,
 };
 
 impl BenchApp {
-    /// The strip beside the window buttons over the sidebar: "+" (a new project) and the fold.
-    /// 35 + the search band's top rule = the header's 36: the two rules are one line.
+    /// The strip beside the window buttons over the sidebar: which panel the sidebar shows
+    /// (threads, Explorer ⌘E), "+" (a new project) and the fold. 35 + the search band's top rule =
+    /// the header's 36: the two rules are one line.
     pub(crate) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let explorer = self.sidebar_panel == crate::app::SidebarPanel::Explorer;
         h_flex()
             .h(px(35.))
             .flex_none()
@@ -41,6 +43,35 @@ impl BenchApp {
             .gap_1()
             // The icon's 4 px box padding + 12 = the sidebar's 16 px inset.
             .pr(px(12.))
+            .child(
+                bench_ui::icon_button(
+                    "side-threads",
+                    crate::icons::Ico::MessagesSquare,
+                    "Threads  ⌘E",
+                    !explorer,
+                    cx,
+                )
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    if explorer {
+                        this.toggle_side(window, cx)
+                    }
+                })),
+            )
+            .child(
+                bench_ui::icon_button(
+                    "side-explorer",
+                    crate::icons::Ico::FolderTree,
+                    "Explorer  ⌘E",
+                    explorer,
+                    cx,
+                )
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    if !explorer {
+                        this.toggle_side(window, cx)
+                    }
+                })),
+            )
+            .child(div().w(bench_ui::Gap::M.px()))
             .child(
                 bench_ui::icon_button(
                     "new-item",
@@ -124,7 +155,20 @@ impl BenchApp {
             .border_b_1()
             .border_color(theme.border);
 
-        if !self.panel.is_settings() {
+        // Documents: a tab each, in place of the thread's title.
+        if self.center == Center::Doc {
+            return bar
+                .child(
+                    div()
+                        .flex_1()
+                        .min_w_0()
+                        .h_full()
+                        .child(self.render_doc_tabs(cx)),
+                )
+                .child(div().pr_2().child(self.render_header_tail(cx)))
+                .into_any_element();
+        }
+        if !self.center.is_settings() {
             let title: SharedString = self
                 .session
                 .as_ref()
@@ -152,9 +196,9 @@ impl BenchApp {
                 .into_any_element();
         }
 
-        let title: SharedString = match self.panel {
-            Panel::NewProject => "New project".into(),
-            Panel::Project => {
+        let title: SharedString = match self.center {
+            Center::NewProject => "New project".into(),
+            Center::Project => {
                 let id = self
                     .project_env
                     .as_ref()
@@ -190,7 +234,7 @@ impl BenchApp {
                 .hover(|s| s.text_color(theme.foreground))
                 .child(crate::icons::Ico::X.icon().small())
                 .on_click(cx.listener(|this, _, _, cx| {
-                    this.panel = Panel::Chat;
+                    this.center = Center::Chat;
                     this.project_form = None;
                     cx.notify();
                 })),
@@ -208,7 +252,7 @@ impl Render for BenchApp {
         let fresh = self.thread.is_empty() && self.session.is_none();
         if fresh != self.composer_fresh {
             self.composer_fresh = fresh;
-            if fresh && self.panel == Panel::Chat {
+            if fresh && self.center == Center::Chat {
                 self.composer.update(cx, |s, cx| s.focus(window, cx));
             }
         }
@@ -216,9 +260,9 @@ impl Render for BenchApp {
         #[cfg(not(target_family = "wasm"))]
         self.update_browser_stream();
         let theme = cx.theme().clone();
-        let body = match self.panel {
+        let body = match self.center {
             // Files dropped anywhere on the chat or the input are attached.
-            Panel::Chat => v_flex()
+            Center::Chat => v_flex()
                 .id("chat-drop")
                 .size_full()
                 .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
@@ -227,9 +271,10 @@ impl Render for BenchApp {
                 }))
                 .child(div().flex_1().min_h_0().child(self.render_chat(window, cx)))
                 .into_any_element(),
-            Panel::Providers => self.render_providers(cx),
-            Panel::NewProject => self.render_project_form(cx),
-            Panel::Project => self.render_project_settings(window, cx),
+            Center::Providers => self.render_providers(cx),
+            Center::NewProject => self.render_project_form(cx),
+            Center::Project => self.render_project_settings(window, cx),
+            Center::Doc => self.render_doc(cx),
         };
 
         // The sidebar folded away: its corner joins the header — room for the window's buttons
@@ -292,8 +337,8 @@ impl Render for BenchApp {
 }
 
 impl BenchApp {
-    /// Sidebar | main, the sidebar resizable (its width kept). Code opens in Zed: no panel of
-    /// files here.
+    /// The workspace's docks around the center (`app/workspace.rs`): the sidebar | the center |
+    /// the file kept beside, the docks resizable and their widths kept.
     fn render_layout(
         &mut self,
         main: Div,
@@ -301,13 +346,13 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let hidden = self.sidebar_hidden;
-        let shape = (false, false, hidden);
+        let beside = self.render_beside(cx);
+        let shape = (false, beside.is_some(), hidden);
         if self.layout_synced != Some(shape) {
             self.layout_synced = Some(shape);
             self.layout_state = cx.new(|_| Default::default());
         }
         let state = self.layout_state.clone();
-        let _ = window;
         // Every drag of the divider is the sidebar's width from now on.
         let view = cx.entity();
         let remember = move |state: &Entity<gpui_kit::component::resizable::ResizableState>,
@@ -317,6 +362,11 @@ impl BenchApp {
             view.update(cx, |this, _| {
                 if let (Some(w), false) = (sizes.first(), this.sidebar_hidden) {
                     this.sidebar_w = *w;
+                }
+                if let (Some(w), Some(_)) = (sizes.last(), this.explorer.beside.as_ref()) {
+                    if sizes.len() > 1 {
+                        this.explorer.beside_w = Some(*w);
+                    }
                 }
             });
         };
@@ -329,8 +379,27 @@ impl BenchApp {
             .with_state(&state)
             .with_handle_appearance(quiet_divider())
             .on_resize(remember)
-            .when(!hidden, |d| d.child(left.child(self.render_sidebar(cx))))
+            .when(!hidden, |d| {
+                d.child(left.child(self.render_sidebar(window, cx)))
+            })
             .child(resizable_panel().child(main))
+            .when_some(beside, |d, pane| {
+                let w = self.explorer.beside_w.unwrap_or(px(bench_ui::BESIDE_W));
+                d.child(
+                    resizable_panel()
+                        .size(w)
+                        .size_range(px(bench_ui::BESIDE_MIN_W)..px(bench_ui::BESIDE_MAX_W))
+                        .fixed()
+                        .child(
+                            div()
+                                .size_full()
+                                .border_l_1()
+                                .border_color(cx.theme().border)
+                                .bg(cx.theme().background)
+                                .child(pane),
+                        ),
+                )
+            })
             .into_any_element()
     }
 }

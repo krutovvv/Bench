@@ -14,8 +14,6 @@
 //! the agent's `inserted()` prompt (agent/src/prompt.ts).
 
 pub mod browser;
-pub mod files;
-pub mod ftp;
 pub mod state;
 pub mod tasks;
 pub mod terminal;
@@ -25,7 +23,6 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::Value;
 
@@ -33,26 +30,21 @@ use crate::app::BenchApp;
 use crate::icons::Ico;
 use crate::model::{Insert, SlashCommand};
 
-/// What the title's menu offers: show something else (a patch of the insert: its key, its
-/// state), or start something (a form for a new server…).
+/// What the title's menu offers: show something else (`to`, a patch of the insert: its key, its
+/// state).
 pub struct Switch {
     pub label: String,
     pub detail: String,
     pub chosen: bool,
-    pub to: SwitchTo,
-}
-
-pub enum SwitchTo {
-    Patch(Value),
-    Run(fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)),
+    pub to: Value,
 }
 
 pub trait InsertKind: Sync {
     /// Whether `key` is this kind's.
     fn owns(&self, key: &str) -> bool;
-    /// Kinds whose live state is one for the whole app (the task list, the tool, the file
-    /// browser): their name. Of several such inserts one is live — the last clicked, else the
-    /// newest in the thread; the others offer to show it there.
+    /// Kinds whose live state is one for the whole app (the task list, the tool): their
+    /// name. Of several such inserts one is live — the last clicked, else the newest in the
+    /// thread; the others offer to show it there.
     fn shared(&self) -> Option<&'static str> {
         None
     }
@@ -106,8 +98,6 @@ pub trait InsertKind: Sync {
 
 static KINDS: &[&dyn InsertKind] = &[
     &terminal::Terminal,
-    &files::Dir,
-    &ftp::Files,
     &tasks::Tasks,
     &tools::Tools,
     &browser::Browser,
@@ -118,13 +108,10 @@ pub fn kind_of(key: &str) -> Option<&'static dyn InsertKind> {
 }
 
 /// The words of the bare "/" list: each puts its insert in at once (the insert itself offers
-/// what to show: a server, a host, a list, a tool).
+/// what to show: a list, a tool).
 pub fn words() -> Vec<SlashCommand> {
     [
         ("/terminal", "This Mac's terminal", "ssh:local"),
-        ("/ssh", "A server's terminal", "ssh"),
-        ("/files", "The project's folder: open, edit, save", "dir"),
-        ("/ftp", "A file host: folders and files, edit them", "files"),
         ("/tasks", "The task lists", "tasks"),
         (
             "/tools",
@@ -161,7 +148,7 @@ impl BenchApp {
         }
     }
 
-    /// One insert where the journal puts it: its block, what it opened, a form it opened.
+    /// One insert where the journal puts it: its block, then what it opened.
     pub(crate) fn render_insert_by_id(
         &mut self,
         id: &str,
@@ -177,18 +164,6 @@ impl BenchApp {
         let mut out = vec![self.render_insert(kind, &ins, window, cx)];
         if !ins.folded && self.insert_is_live(kind, &ins) {
             if let Some(f) = kind.follow(self, &ins, window, cx) {
-                out.push(self.agent_row(f, cx));
-            }
-        }
-        if self.form_after.as_deref() == Some(ins.id.as_str()) {
-            let form = if self.files_remote.form {
-                Some(self.render_host_form(cx))
-            } else if self.ssh.form.is_some() {
-                Some(self.render_server_form(cx))
-            } else {
-                None
-            };
-            if let Some(f) = form {
                 out.push(self.agent_row(f, cx));
             }
         }
@@ -296,9 +271,9 @@ impl BenchApp {
         } else {
             let view = cx.entity();
             let ins_id = ins.id.clone();
-            let items: Vec<(String, String, bool, std::rc::Rc<SwitchTo>)> = switches
+            let items: Vec<(String, String, bool, Value)> = switches
                 .into_iter()
-                .map(|s| (s.label, s.detail, s.chosen, std::rc::Rc::new(s.to)))
+                .map(|s| (s.label, s.detail, s.chosen, s.to))
                 .collect();
             Button::new(SharedString::from(format!("{id}-switch")))
                 .ghost()
@@ -316,22 +291,14 @@ impl BenchApp {
                             move |_, window, cx| {
                                 let to = to.clone();
                                 let ins_id = ins_id.clone();
-                                view.update(cx, |this, cx| match &*to {
-                                    SwitchTo::Patch(p) => {
-                                        this.patch_insert(&ins_id, p.clone(), cx);
-                                        if let Some(ins) = this
-                                            .thread_inserts()
-                                            .into_iter()
-                                            .find(|i| i.id == ins_id)
-                                        {
-                                            if let Some(k) = kind_of(&ins.key) {
-                                                k.opened(this, &ins, window, cx);
-                                            }
+                                view.update(cx, |this, cx| {
+                                    this.patch_insert(&ins_id, to, cx);
+                                    if let Some(ins) =
+                                        this.thread_inserts().into_iter().find(|i| i.id == ins_id)
+                                    {
+                                        if let Some(k) = kind_of(&ins.key) {
+                                            k.opened(this, &ins, window, cx);
                                         }
-                                    }
-                                    SwitchTo::Run(f) => {
-                                        this.form_after = Some(ins_id.clone());
-                                        f(this, window, cx)
                                     }
                                 })
                             },
@@ -417,105 +384,6 @@ pub(crate) fn icon_button(
         .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }
 
-/// A row of a picker inside an insert (a server, a host): a click picks it.
-pub(crate) fn pick_row(
-    id: String,
-    ico: Ico,
-    label: String,
-    detail: String,
-    cx: &mut Context<BenchApp>,
-    on: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
-) -> AnyElement {
-    let theme = cx.theme().clone();
-    h_flex()
-        .id(SharedString::from(id))
-        .px_2()
-        .py_1()
-        .gap_2()
-        .items_center()
-        .text_base()
-        .cursor_pointer()
-        .hover(|s| s.bg(theme.list_hover))
-        .child(ico.icon().small().text_color(theme.muted_foreground))
-        .child(div().flex_none().child(label))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .text_sm()
-                .text_color(theme.muted_foreground)
-                .child(detail),
-        )
-        .on_click(cx.listener(move |this, _, window, cx| {
-            this.click_claimed = true;
-            on(this, window, cx)
-        }))
-        .into_any_element()
-}
-
-/// `pick_row` with a trash on hover: the first click arms it ("Delete?"), the second removes
-/// the server or host (`remove`).
-pub(crate) fn pick_row_removable(
-    id: String,
-    ico: Ico,
-    label: String,
-    detail: String,
-    armed: bool,
-    cx: &mut Context<BenchApp>,
-    on: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
-    remove: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
-) -> AnyElement {
-    let theme = cx.theme().clone();
-    let group = SharedString::from(format!("{id}-g"));
-    h_flex()
-        .id(SharedString::from(id.clone()))
-        .group(group.clone())
-        .px_2()
-        .py_1()
-        .gap_2()
-        .items_center()
-        .text_base()
-        .cursor_pointer()
-        .hover(|s| s.bg(theme.list_hover))
-        .child(ico.icon().small().text_color(theme.muted_foreground))
-        .child(div().flex_none().child(label))
-        .child(
-            div()
-                .flex_1()
-                .min_w_0()
-                .truncate()
-                .text_sm()
-                .text_color(theme.muted_foreground)
-                .child(detail),
-        )
-        .child(
-            div()
-                .id(SharedString::from(format!("{id}-rm")))
-                .flex_none()
-                .px_1()
-                .text_sm()
-                .when(!armed, |d| {
-                    d.opacity(0.)
-                        .group_hover(group, |s| s.opacity(1.))
-                        .text_color(theme.muted_foreground)
-                        .hover(|s| s.text_color(theme.danger))
-                        .child(Ico::Trash.icon().small())
-                })
-                .when(armed, |d| d.text_color(theme.danger).child("Delete?"))
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.click_claimed = true;
-                    cx.stop_propagation();
-                    remove(this, window, cx)
-                })),
-        )
-        .on_click(cx.listener(move |this, _, window, cx| {
-            this.click_claimed = true;
-            on(this, window, cx)
-        }))
-        .into_any_element()
-}
-
 /// Shorten text for the agent.
 pub(crate) fn clip(s: &str, n: usize) -> String {
     if s.chars().count() <= n {
@@ -538,109 +406,5 @@ pub(crate) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::The
         .bg(theme.background)
         .child(head)
         .child(body)
-        .into_any_element()
-}
-
-/// "New file" and "New folder" on the head of a files insert (`/files`, `/ftp`): a card under it
-/// names the new one.
-pub(crate) fn file_buttons(
-    ins_id: &str,
-    remote: bool,
-    cx: &mut Context<BenchApp>,
-) -> Vec<AnyElement> {
-    let theme = cx.theme().clone();
-    [
-        (false, Ico::FilePlus, "New file"),
-        (true, Ico::FolderPlus, "New folder"),
-    ]
-    .into_iter()
-    .map(|(folder, ico, tip)| {
-        let id = ins_id.to_string();
-        icon_button(&format!("{ins_id}-new-{folder}"), ico, tip, &theme)
-            .on_click(cx.listener(move |this, _, window, cx| {
-                this.click_claimed = true;
-                this.open_file_form(id.clone(), remote, folder, window, cx)
-            }))
-            .into_any_element()
-    })
-    .collect()
-}
-
-/// The card naming a new file or folder, under the insert that asked for it.
-pub(crate) fn file_form(
-    app: &BenchApp,
-    ins_id: &str,
-    cx: &mut Context<BenchApp>,
-) -> Option<AnyElement> {
-    let f = app
-        .local_files
-        .form
-        .as_ref()
-        .filter(|f| f.insert == ins_id)?;
-    let mut rows = vec![(
-        "Name",
-        gpui_kit::component::input::Input::new(&f.name).into_any_element(),
-    )];
-    if !f.folder {
-        rows.push((
-            "Content",
-            gpui_kit::component::input::Textarea::new(&f.content).into_any_element(),
-        ));
-    }
-    let actions = vec![
-        crate::ui::form_action("file-form-create", "Create", true, cx)
-            .on_click(cx.listener(|this, _, window, cx| {
-                this.click_claimed = true;
-                this.create_from_form(window, cx)
-            }))
-            .into_any_element(),
-        crate::ui::form_action("file-form-cancel", "Cancel", false, cx)
-            .on_click(cx.listener(|this, _, _, cx| {
-                this.click_claimed = true;
-                this.local_files.form = None;
-                cx.notify();
-            }))
-            .into_any_element(),
-    ];
-    Some(crate::ui::inline_form(
-        if f.folder { "New folder" } else { "New file" },
-        rows,
-        None,
-        actions,
-        cx,
-    ))
-}
-
-/// A file row's trash, on the row's hover; the first click arms it ("Delete?" stays shown), the
-/// second removes the file or folder.
-pub(crate) fn row_trash(
-    app: &BenchApp,
-    id: SharedString,
-    group: SharedString,
-    remote: bool,
-    path: String,
-    cx: &mut Context<BenchApp>,
-) -> AnyElement {
-    let theme = cx.theme().clone();
-    let armed = app.confirm_delete.as_deref() == Some(format!("entry:{path}").as_str());
-    div()
-        .id(id)
-        .flex_none()
-        .px_1()
-        .cursor_pointer()
-        .text_sm()
-        .when(!armed, |d| {
-            d.opacity(0.)
-                .group_hover(group, |s| s.opacity(1.))
-                .text_color(theme.muted_foreground)
-                .hover(|s| s.text_color(theme.danger))
-                .child(Ico::Trash.icon().small())
-        })
-        .when(armed, |d| d.text_color(theme.danger).child("Delete?"))
-        .on_click(cx.listener(move |this, _, window, cx| {
-            this.click_claimed = true;
-            cx.stop_propagation();
-            this.delete_entry(remote, path.clone(), window, cx)
-        }))
         .into_any_element()
 }

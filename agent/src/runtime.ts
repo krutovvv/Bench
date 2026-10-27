@@ -81,12 +81,11 @@ export interface QueuedMessage {
 }
 
 
-/** An old thread's subject as an insert: "files:<id>" → files {host}, "tasks:today" → tasks {list}… */
+/** An old thread's subject as an insert: "tasks:today" → tasks {list}, "tool:<name>" → tools {tool}… */
 function legacyInsert(subject: string): { key: string; state: JsonObject } | undefined {
 	const [kind, ...rest] = subject.split(":");
 	const value = rest.join(":");
-	if (kind === "ssh") return { key: `ssh:${value || "local"}`, state: {} };
-	if (kind === "files" && value) return { key: "files", state: { host: value } };
+	if (kind === "ssh" && (!value || value === "local")) return { key: "ssh:local", state: {} };
 	if (kind === "tasks") return { key: "tasks", state: { list: value || "today" } };
 	if (kind === "tool" && value) return { key: "tools", state: { tool: value } };
 	if (kind === "browser") return { key: "browser", state: {} };

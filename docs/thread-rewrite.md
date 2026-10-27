@@ -80,8 +80,8 @@ key = (seq, sub)
 | Работа агента | `pi.assistant` с вызовами + `pi.tool-result` между двумя ответами | свёрнутая строка «N шагов · 12 с», считается **на это сообщение** |
 | Ответ агента | `pi.assistant` с текстом | отдельное сообщение |
 | Следующее сообщение агента (план, вопрос, карточка) | своя запись | отдельное сообщение, как в Telegram-боте |
-| Вставка (`/files`, `/terminal`…) | `bench.insert` | там, где поставлена; × убирает |
-| Открытый файл из `/files` | новая запись-карточка | новое сообщение под вставкой |
+| Вставка (`/terminal`, `/tasks`…) | `bench.insert` | там, где поставлена; × убирает |
+| Открытая задача из `/tasks` | новая запись-карточка | новое сообщение под вставкой |
 
 Правила, которые станут тестами (`cargo test`), а не комментариями:
 
@@ -174,7 +174,7 @@ crates/agent_client/   протокол к агенту (thread.open, thread.app
 crates/thread_view/    тред на gpui::list: message.rs, work.rs, queue_item.rs
 crates/composer/       поле ввода, вложения, диктовка
 crates/sidebar/        проекты и треды
-crates/inserts/        по крейту на вставку: terminal, files, ftp, tasks, tools, browser
+crates/inserts/        по крейту на вставку: terminal, tasks, tools, browser
 crates/bench/          main.rs: собирает окно из крейтов выше, своего кода почти нет
 agent/src/thread.ts    журнал Pi → протокол
 ```

@@ -41,7 +41,7 @@ A thread is not a list of chat bubbles. It is a **document** made of two kinds o
 - **inserts**: small live tools you put into the thread by typing `/`, right where the
   conversation is.
 
-An insert is part of what you say. Type `/ssh dev` and the server's terminal appears in the
+An insert is part of what you say. Type `/terminal` and the project's terminal appears in the
 thread, live. Ask "why is the site slow?" and the agent sees what that terminal shows. It runs
 commands there, and you see them run in the same terminal. A thread can hold several inserts.
 Every `/` adds a new one; the thread never switches mode or gets renamed for it. Come back to a
@@ -50,13 +50,11 @@ thread tomorrow and its inserts are where you left them, in the same state.
 | Insert | What you see, live | What the agent does with it |
 |---|---|---|
 | **`/browser`** | this thread's own tab in a real browser on a server; you click and type in it | drives that tab (Playwright), only that tab; you watch, step in, say "continue" |
-| **`/terminal`**, **`/ssh`** | a terminal on this Mac or a `~/.ssh/config` server, as tall as its text | runs commands there and reads the screen |
-| **`/files`** | the project's own folder; a file opens under it in an editor | reads and edits the files with you |
-| **`/ftp`** | an FTP, FTPS or SFTP host: its folders and the open file | lists, reads, edits, renames |
+| **`/terminal`** | a terminal on the project's machine (this Mac or its server), as tall as its text | runs commands there and reads the screen |
 | **`/tasks`** | Today, Upcoming, Anytime, Logbook, a click apart; one list for everything, a project is a tag (in a project it opens filtered by it) | adds, moves, completes, sums the hours ("how long did I work for this client in October?") |
 | **`/tools`** | Base64, regex, cron, JSON, a web page as Markdown… with input and output | explains, fixes, works with what's in it |
 
-When something needs a form (a new server, a new task, an MCP server's settings), the form
+When something needs a form (a new task, an MCP server's settings), the form
 appears as a card in the thread, under the insert that asked for it, not in a settings window.
 
 ## Projects
@@ -71,7 +69,6 @@ Each project carries its **environment**, the way Claude Code reads a repository
 - its soul (what the project is and how to work in it);
 - its MCP servers (with OAuth sign-in where a server needs it);
 - its skills and prompts;
-- its server and FTP accesses;
 - its Telegram bot;
 - its schedule (jobs that run a prompt in a new thread on their own).
 

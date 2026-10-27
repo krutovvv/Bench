@@ -3,7 +3,7 @@
 // works on a server (`ssh-env.ts`) has its files there. Either way they go through Pi's
 // `ExecutionEnv` — this machine's, or that one's over SSH.
 
-import { execFileSync } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -47,6 +47,29 @@ function tree(root: string): { path: string; dir: boolean }[] {
 	};
 	walk("", 0);
 	return out;
+}
+
+/** Folders the Explorer's search leaves out, as the agent's grep and glob do (`builtin/search.ts`). */
+const SKIP = [".git", "node_modules", "target", "dist", "build", ".next", "vendor", ".venv", "__pycache__"];
+const skipRg = SKIP.map((d) => `-g '!${d}'`).join(" ");
+const skipGrep = SKIP.map((d) => `--exclude-dir=${d}`).join(" ");
+const skipFind = SKIP.map((d) => `-name ${d} -prune -o`).join(" ");
+
+/** A POSIX script run in `dir` with its arguments as $1, $2…, on `machine` (over SSH) or here;
+ * what it printed, at most `cap` lines. */
+async function shIn(machine: string | null, dir: string, script: string, args: string[], cap: number): Promise<string[]> {
+	const full = `cd "$1" || exit 1; shift; ${script}`;
+	const m = await onMachine(machine, dir);
+	let out = "";
+	if (m) {
+		const r = await m.env.exec(["sh", "-c", full, "sh", m.path, ...args], { onOutput: (t: string) => (out += t) }, ctx);
+		if (!r.ok) throw new HttpError(400, r.error.message);
+	} else {
+		out = await new Promise<string>((resolve) =>
+			execFile("sh", ["-c", full, "sh", expand(dir), ...args], { maxBuffer: 64 << 20 }, (_e, stdout) => resolve(String(stdout ?? ""))),
+		);
+	}
+	return out.split("\n").filter(Boolean).slice(0, cap);
 }
 
 export default (): Module => ({
@@ -144,6 +167,24 @@ export default (): Module => ({
 			} catch (e) {
 				return { entries: [], error: String((e as Error).message) };
 			}
+		},
+		// The Explorer's ⌘P: every file under a folder (paths relative to it), ripgrep when it is
+		// there, find otherwise.
+		"GET /api/fs/files": async (req) => {
+			const script = `if command -v rg >/dev/null 2>&1; then rg --files --hidden --color never ${skipRg}; else find . ${skipFind} -type f -print | sed 's|^\\./||'; fi 2>/dev/null`;
+			const files = await shIn(req.query.get("machine"), required(req.query.get("path"), "path"), script, [], 20000);
+			return { files };
+		},
+		// The Explorer's ⌘⇧F: lines holding a text (not a pattern), as path:line:text.
+		"GET /api/fs/grep": async (req) => {
+			const q = required(req.query.get("q"), "q");
+			const script = `if command -v rg >/dev/null 2>&1; then rg -n -F -i --no-heading --color never --max-columns 300 ${skipRg} -e "$1" .; else grep -rnIF -i ${skipGrep} -e "$1" .; fi 2>/dev/null`;
+			const lines = await shIn(req.query.get("machine"), required(req.query.get("path"), "path"), script, [q], 500);
+			const hits = lines.flatMap((l) => {
+				const m = /^(?:\.\/)?(.+?):(\d+):(.*)$/.exec(l);
+				return m ? [{ path: m[1], line: Number(m[2]), text: m[3].slice(0, 300) }] : [];
+			});
+			return { hits };
 		},
 		"GET /api/fs/default-cwd": async (req) => ({ cwd: (await onMachine(req.query.get("machine"), "~"))?.path ?? os.homedir() }),
 		// A branch in its own folder, <repo>/.worktrees/<name>.

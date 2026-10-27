@@ -375,7 +375,7 @@ fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
         key: seq.to_string(),
         seq,
         id: id.into(),
-        insert_key: "files".into(),
+        insert_key: "tools".into(),
     };
     // Put while "b" was still in the composer: its entry is before "b", its place after it.
     let mut t = Thread::open(ThreadOpen {
@@ -387,7 +387,7 @@ fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
             text(5, 0, "B"),
             user(6, "c"),
         ],
-        inserts: json!({"i1": {"key": "files", "after": 2}})
+        inserts: json!({"i1": {"key": "tools", "after": 2}})
             .as_object()
             .unwrap()
             .clone(),
@@ -407,7 +407,7 @@ fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
     // Until "b" is in the journal, it waits at the end.
     t = Thread::open(ThreadOpen {
         items: vec![user(1, "a"), ins(3, "i1")],
-        inserts: json!({"i1": {"key": "files", "after": 2}})
+        inserts: json!({"i1": {"key": "tools", "after": 2}})
             .as_object()
             .unwrap()
             .clone(),

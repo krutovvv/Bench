@@ -16,6 +16,7 @@ mod connection;
 mod demo;
 mod diff;
 mod env;
+mod explorer;
 mod gateway;
 mod icons;
 mod inserts;

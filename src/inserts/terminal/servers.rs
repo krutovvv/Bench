@@ -1,13 +1,12 @@
-//! SSH mode: the servers of `~/.ssh/config` in the sidebar, a terminal per server in the main
-//! area — only a terminal. The same file feeds the gateway list: the servers there that can
-//! run the agent (Node 22.18+) show up as gateways by themselves; Bench installs and starts the
-//! agent there on connect.
+//! The servers of `~/.ssh/config` (a new project picks its machine from them) and the shells of
+//! the terminal inserts. The same file feeds the gateway list: the servers there that can run the
+//! agent (Node 22.18+) show up as gateways by themselves; Bench installs and starts the agent
+//! there on connect.
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use gpui_kit::component::ActiveTheme as _;
-use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
@@ -35,84 +34,30 @@ pub struct Tab {
 
 pub struct Ssh {
     pub servers: Vec<Server>,
-    /// alias -> `user@hostname` (`ssh -G`).
-    pub resolved: HashMap<String, String>,
     /// alias -> whether the agent can run there (for the gateway list only); None while checking.
     pub status: HashMap<String, Option<HostCheck>>,
     pub tabs: Vec<Tab>,
     next_tab: usize,
-    /// The server form: Some(None) = new, Some(Some(alias)) = editing.
-    pub form: Option<Option<String>>,
-    pub f_alias: Entity<InputState>,
-    pub f_host: Entity<InputState>,
-    pub f_user: Entity<InputState>,
-    pub f_port: Entity<InputState>,
-    pub f_folder: Entity<InputState>,
-    pub f_path: Entity<InputState>,
-    pub f_key: Entity<InputState>,
-    pub armed_delete: Option<String>,
     /// Collapsed sidebar groups, both modes ("s:<group>" sessions, "srv:<folder>" servers);
     /// remembered in `collapsed.json`.
     pub collapsed: std::collections::HashSet<String>,
     /// Fractional wheel lines not yet scrolled.
     pub scroll_acc: f32,
-    _subscriptions: Vec<Subscription>,
 }
 
 impl Ssh {
-    pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
-        let input = |ph: &'static str, window: &mut Window, cx: &mut Context<BenchApp>| {
-            cx.new(|cx| InputState::new(window, cx).placeholder(ph))
-        };
-        let f_alias = input("prod-web-1", window, cx);
-        let f_host = input("203.0.113.10 or host.example.com", window, cx);
-        let f_user = input("root", window, cx);
-        let f_port = input("22", window, cx);
-        let f_folder = input("Production", window, cx);
-        let f_path = input("/var/www", window, cx);
-        let f_key = input("~/.ssh/id_ed25519", window, cx);
-        let mut subscriptions = vec![];
-        for field in [
-            &f_alias, &f_host, &f_user, &f_port, &f_key, &f_folder, &f_path,
-        ] {
-            subscriptions.push(cx.subscribe_in(
-                field,
-                window,
-                |this, _, ev: &InputEvent, window, cx| {
-                    if let InputEvent::PressEnter { .. } = ev {
-                        this.save_server(window, cx);
-                    }
-                },
-            ));
-        }
+    pub fn new() -> Self {
         Self {
             servers: sshconfig::load(),
-            resolved: HashMap::new(),
             status: HashMap::new(),
             tabs: vec![],
             next_tab: 0,
-            form: None,
-            f_alias,
-            f_host,
-            f_user,
-            f_port,
-            f_folder,
-            f_path,
-            f_key,
-            armed_delete: None,
             collapsed: std::fs::read(collapsed_path())
                 .ok()
                 .and_then(|b| serde_json::from_slice(&b).ok())
                 .unwrap_or_default(),
             scroll_acc: 0.,
-            _subscriptions: subscriptions,
         }
-    }
-
-    pub fn tab_for(&self, alias: &str) -> Option<usize> {
-        self.tabs
-            .iter()
-            .position(|t| t.alias == alias && t.insert.is_empty())
     }
 
     /// The shell of a terminal insert.
@@ -152,45 +97,13 @@ impl BenchApp {
         }
     }
 
-    /// A server's trash in a picker: the first click arms it, the second takes its Host block
-    /// out of ~/.ssh/config (kept as config.bak).
-    pub fn remove_server(&mut self, alias: String, window: &mut Window, cx: &mut Context<Self>) {
-        let key = format!("server:{alias}");
-        if self.confirm_delete.as_deref() != Some(key.as_str()) {
-            self.confirm_delete = Some(key);
-            cx.notify();
-            return;
-        }
-        self.confirm_delete = None;
-        match sshconfig::remove(&alias) {
-            Ok(()) => self.reload_servers(cx),
-            Err(e) => self.toast(NotificationType::Error, format!("{e:#}"), window, cx),
-        }
-    }
-
-    /// Re-read `~/.ssh/config` (edited elsewhere too) and resolve the targets.
+    /// Re-read `~/.ssh/config` (edited elsewhere too).
     pub fn reload_servers(&mut self, cx: &mut Context<Self>) {
         // The demo shows made-up servers, never the person's ~/.ssh/config.
         if self.demo {
             return;
         }
         self.ssh.servers = sshconfig::load();
-        let aliases: Vec<String> = self.ssh.servers.iter().map(|s| s.alias.clone()).collect();
-        cx.spawn(async move |this, cx| {
-            let found = cx
-                .background_spawn(async move {
-                    aliases
-                        .into_iter()
-                        .filter_map(|a| sshconfig::resolve(&a).map(|r| (a, r)))
-                        .collect::<Vec<_>>()
-                })
-                .await;
-            let _ = this.update(cx, |this, cx| {
-                this.ssh.resolved.extend(found);
-                cx.notify();
-            });
-        })
-        .detach();
         cx.notify();
     }
 
@@ -356,128 +269,5 @@ impl BenchApp {
     /// Another window of Bench.
     pub fn open_new_window(&mut self, cx: &mut Context<Self>) {
         self.open_window(None, cx);
-    }
-
-    // ---- the server form -----------------------------------------------------
-
-    pub fn edit_server(
-        &mut self,
-        alias: Option<String>,
-        folder: Option<String>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let s = alias
-            .as_ref()
-            .and_then(|a| self.ssh.servers.iter().find(|s| &s.alias == a))
-            .cloned()
-            .unwrap_or(Server {
-                folder: folder.unwrap_or_default(),
-                ..Default::default()
-            });
-        for (field, value) in [
-            (&self.ssh.f_alias, s.alias),
-            (&self.ssh.f_host, s.hostname),
-            (&self.ssh.f_user, s.user),
-            (&self.ssh.f_port, s.port),
-            (&self.ssh.f_folder, s.folder),
-            (&self.ssh.f_path, s.path),
-            (&self.ssh.f_key, s.identity),
-        ] {
-            field.update(cx, |st, cx| st.set_value(value, window, cx));
-        }
-        self.ssh.form = Some(alias);
-        self.ssh.armed_delete = None;
-        self.ssh.f_alias.update(cx, |st, cx| st.focus(window, cx));
-        cx.notify();
-    }
-
-    pub fn save_server(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(old) = self.ssh.form.clone() else {
-            return;
-        };
-        let v = |e: &Entity<InputState>, cx: &App| e.read(cx).value().trim().to_string();
-        let s = Server {
-            alias: v(&self.ssh.f_alias, cx),
-            hostname: v(&self.ssh.f_host, cx),
-            user: v(&self.ssh.f_user, cx),
-            port: v(&self.ssh.f_port, cx),
-            folder: v(&self.ssh.f_folder, cx),
-            path: v(&self.ssh.f_path, cx),
-            identity: v(&self.ssh.f_key, cx),
-            shared: false,
-        };
-        if let Err(e) = sshconfig::save(old.as_deref(), &s) {
-            self.toast(
-                NotificationType::Error,
-                format!("~/.ssh/config: {e:#}"),
-                window,
-                cx,
-            );
-            return;
-        }
-        self.ssh.form = None;
-        self.ssh.resolved.remove(&s.alias);
-        self.reload_servers(cx);
-        if let Some(old) = old.filter(|o| *o != s.alias) {
-            if let Some(t) = self.ssh.tab_for(&old) {
-                self.ssh.tabs[t].alias = s.alias.clone();
-            }
-        }
-        self.ssh.form = None;
-        self.reload_servers(cx);
-        // Added in a project's thread or its settings: the project's server (its row in the
-        // agent's store).
-        let project = self.form_project();
-        let page = self.panel == crate::app::Panel::Project;
-        if !project.is_empty() {
-            if let Some(conn) = self.local_conn() {
-                let body = serde_json::json!({
-                    "name": s.alias, "kind": "ssh", "host": if s.hostname.is_empty() { s.alias.clone() } else { s.hostname.clone() },
-                    "user": s.user, "source": format!("ssh_config:{}", s.alias), "project": project,
-                });
-                self.ssh_projects.insert(s.alias.clone(), project.clone());
-                let profile = self.current_profile();
-                self.background(
-                    window,
-                    cx,
-                    move || crate::rest::send_json(&conn, "POST", "/api/hosts", &profile, body),
-                    // The settings page lists it once the agent has it.
-                    move |this, _, window, cx| {
-                        if page {
-                            this.reload_env(window, cx);
-                        }
-                    },
-                );
-            }
-        }
-        // Into the thread it was added from (the settings page lists it instead).
-        if !page {
-            self.attach_tool(format!("ssh:{}", s.alias), window, cx);
-        }
-    }
-
-    /// "Choose…" beside the key field: the system file picker; a key in the home folder is
-    /// written as `~/…`.
-    pub fn pick_key_file(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let picked = cx.prompt_for_paths(PathPromptOptions {
-            files: true,
-            directories: false,
-            multiple: false,
-            prompt: Some("Choose key".into()),
-        });
-        cx.spawn_in(window, async move |this, cx| {
-            let Ok(Ok(Some(paths))) = picked.await else {
-                return;
-            };
-            let Some(p) = paths.first() else { return };
-            let value = sshconfig::tilde(p);
-            let _ = this.update_in(cx, |this, window, cx| {
-                this.ssh
-                    .f_key
-                    .update(cx, |s, cx| s.set_value(value, window, cx));
-            });
-        })
-        .detach();
     }
 }

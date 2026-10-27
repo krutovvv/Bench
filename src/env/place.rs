@@ -10,7 +10,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Request, Section, Tab, form_actions, text};
+use super::section::{Home, Request, Section, form_actions, text};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::model::ProjectKey;
@@ -43,8 +43,8 @@ impl Section for Place {
     fn key(&self) -> &'static str {
         "place"
     }
-    fn tab(&self) -> Tab {
-        Tab::General
+    fn home(&self) -> Home {
+        Home::Settings
     }
     fn block(&self, _general: bool) -> &'static str {
         "Project"

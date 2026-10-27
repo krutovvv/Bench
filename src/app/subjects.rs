@@ -1,5 +1,5 @@
-//! What a thread is opened with: the `/` list that puts inserts into it (`app::inserts`). A server, a tool
-//! or the tasks opened from the keyboard are a new thread with that insert in it.
+//! What a thread is opened with: the `/` list that puts inserts into it (`app::inserts`). The
+//! terminal, a tool or the tasks opened from the keyboard are a new thread with that insert in it.
 
 use gpui_kit::*;
 
@@ -14,12 +14,12 @@ impl BenchApp {
 
     /// A new thread with one insert in it (its session is made at once).
     pub fn new_thread_with(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.panel = super::Panel::Chat;
+        self.center = super::Center::Chat;
         self.new_session(cx);
         self.put_insert(key, window, cx);
     }
 
-    /// `/ssh`, `/ftp`, `/browser`, `/tasks`, `/tool` and what follows: the tools that can be
+    /// `/terminal`, `/browser`, `/tasks`, `/tools` and what follows: the tools that can be
     /// attached to this thread, filtered by the rest of the line. None when the line is not one.
     pub fn tool_slash(&self, text: &str) -> Option<Vec<crate::model::SlashCommand>> {
         let rest = text.strip_prefix('/')?;
@@ -27,10 +27,6 @@ impl BenchApp {
             Some((w, q)) => (w, q.trim().to_lowercase()),
             None => return None,
         };
-        // A project's thread offers the project's own accesses only (a thread outside projects:
-        // those of no project). This Mac's terminal is /terminal.
-        let proj = self.thread_project.clone();
-        let ours = |p: &str| p == proj;
         let row = |name: String, desc: String, key: String| crate::model::SlashCommand {
             name,
             desc,
@@ -46,56 +42,6 @@ impl BenchApp {
                     format!("the terminal on {host}, where this project runs")
                 };
                 vec![row("/terminal".into(), desc, "ssh:local".into())]
-            }
-            "ssh" => {
-                let mut v = vec![];
-                v.extend(
-                    self.ssh
-                        .servers
-                        .iter()
-                        .filter(|s| {
-                            ours(
-                                self.ssh_projects
-                                    .get(&s.alias)
-                                    .map(String::as_str)
-                                    .unwrap_or(""),
-                            )
-                        })
-                        .map(|s| {
-                            row(
-                                format!("/ssh {}", s.alias),
-                                s.hostname.clone(),
-                                format!("ssh:{}", s.alias),
-                            )
-                        }),
-                );
-                v.push(row(
-                    "/ssh New server…".into(),
-                    "add one to ~/.ssh/config".into(),
-                    "new:ssh".into(),
-                ));
-                v
-            }
-            "ftp" => {
-                let mut v: Vec<_> = self
-                    .files_remote
-                    .hosts
-                    .iter()
-                    .filter(|h| ours(&h.project))
-                    .map(|h| {
-                        row(
-                            format!("/ftp {}", h.name),
-                            format!("{}@{}", h.user, h.host),
-                            format!("files:{}", h.id),
-                        )
-                    })
-                    .collect();
-                v.push(row(
-                    "/ftp New host…".into(),
-                    "FTP, FTPS or SFTP".into(),
-                    "new:ftp".into(),
-                ));
-                v
             }
             "browser" => vec![row(
                 "/browser".into(),
@@ -138,41 +84,12 @@ impl BenchApp {
         crate::inserts::words()
     }
 
-    /// A row picked from the `/` list: a form (a new server or host), or an insert.
-    pub fn attach_tool(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        match key.as_str() {
-            // From the composer: the form shows at the thread's end.
-            "new:ssh" => {
-                self.form_after = None;
-                return self.edit_server(None, None, window, cx);
-            }
-            "new:ftp" => {
-                self.form_after = None;
-                return self.new_host_form(window, cx);
-            }
-            _ => {}
-        }
-        // Everything else is an insert, put where the conversation is now.
-        self.put_insert(key, window, cx);
+    /// This machine's terminal (the thread's: its project's machine) in a new thread.
+    pub fn open_terminal_thread(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.new_thread_with("ssh:local".into(), window, cx);
     }
 
-    /// A server's terminal in a new thread.
-    pub fn open_server_thread(
-        &mut self,
-        alias: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let key = if alias.is_empty() {
-            "ssh:local".to_string()
-        } else {
-            format!("ssh:{alias}")
-        };
-        self.new_thread_with(key, window, cx);
-    }
-
-    /// A terminal insert's own shell on `alias`, started if there is none, it ended, or the
-    /// insert switched to another server.
+    /// A terminal insert's own shell on `alias`, started if there is none or it ended.
     pub fn insert_terminal(
         &mut self,
         insert: &str,
@@ -210,7 +127,7 @@ impl BenchApp {
             .thread_inserts()
             .into_iter()
             .rev()
-            .find(|i| i.key.starts_with("ssh:"));
+            .find(|i| i.key == "ssh:local");
         let (ins, fresh) = match last {
             Some(i) => (i, false),
             None => {
@@ -226,10 +143,7 @@ impl BenchApp {
                 }
             }
         };
-        let alias = match &ins.key[4..] {
-            "local" | "" => self.thread_machine(),
-            a => a.to_string(),
-        };
+        let alias = self.thread_machine();
         if let Some(t) = self.insert_terminal(&ins.id, &alias, window, cx) {
             // Start where the thread works.
             if fresh {
@@ -259,8 +173,7 @@ impl BenchApp {
     }
 
     /// What the thread's live block shows right now, for the agent (sent with each message, not
-    /// shown): the terminal's last lines, the folder and open file of a host, the tool's input
-    /// and output. Task lists need none: the agent reads them with its tool.
+    /// shown): the terminal's last lines, the tool's input and output. Task lists need none: the agent reads them with its tool.
     pub fn block_context(&self, cx: &App) -> String {
         self.inserts_context(cx)
     }

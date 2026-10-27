@@ -1,11 +1,10 @@
-// Projects and their environment: the soul, MCP servers, skills, prompts, accesses, the
-// Telegram bot, the schedule. "general" is the Host project: the agent's own environment.
+// Projects and their environment: the soul, MCP servers, skills, prompts, the Telegram
+// bot, the schedule. "general" is the Host project: the agent's own environment.
 
 import fs from "node:fs";
 import path from "node:path";
 import { agentDir, agentMcp, compactionAt, getSetting, resolveModel, setSetting, writeAgentMcp } from "../config.ts";
 import { arm, jobs, newJob, type Job } from "../builtin/cron.ts";
-import { hosts } from "../builtin/hosts.ts";
 import { projects } from "../builtin/projects.ts";
 import { listSkills } from "../builtin/skills.ts";
 import { readSkill, skillsFor } from "../repo.ts";
@@ -99,7 +98,6 @@ export default ({ rt }: Ctx): Module => ({
 					skills: (await skillsOf(agent)).map((k) => ({ name: k.name, description: k.description, scope: k.scope, dir: k.dir })),
 					prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 					mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
-					hosts: hosts.list().filter((h) => h.project === (id === "general" ? "" : id)).map((h) => ({ id: h.id, name: h.name, kind: h.kind, host: h.host, user: h.user, port: h.port, path: h.path })),
 					cron: jobs.list(agent).map(cronView),
 					// The bot's token is shown whole (the person's own machine and bot).
 					telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token, token: p.telegram.token ?? "" } : null,
@@ -316,22 +314,6 @@ export default ({ rt }: Ctx): Module => ({
 			/^\/api\/projects\/([^/]+)\/prompts\/([^/]+)$/,
 			(_req, m) => {
 				fs.rmSync(path.join(envOf(id1(m)).dir, "prompts", `${path.basename(decodeURIComponent(m[2]))}.md`), { force: true });
-				return { ok: true };
-			},
-		],
-		// An access taken out of the project. A file host belongs to the project that made it, so it
-		// is deleted with its password; an SSH row mirrors ~/.ssh/config and only loses the tag.
-		[
-			"DELETE",
-			/^\/api\/projects\/([^/]+)\/hosts\/([^/]+)$/,
-			(_req, m) => {
-				const h = hosts.get(decodeURIComponent(m[2]));
-				// The Host project's env is "general"; its accesses are the ones with no project tag.
-				const want = id1(m) === "general" ? "" : id1(m);
-				if (h && h.project === want) {
-					if (h.kind === "ssh") hosts.save({ ...h, project: "" });
-					else hosts.remove(h.id);
-				}
 				return { ok: true };
 			},
 		],

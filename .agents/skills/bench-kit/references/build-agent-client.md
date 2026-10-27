@@ -134,7 +134,7 @@ notification replaces the older one for the same thread.
 
 - The status bar shows approvals / reasoning / model only after the agent's defaults arrived
   (`rest::profile_defaults`, the `profile_ready` flag), never placeholder defaults.
-- A project's soul (SYSTEM.md), MCP and language servers, skills, prompts, accesses, model,
+- A project's soul (SYSTEM.md), MCP and language servers, skills, prompts, model,
   Telegram bot and schedule are its environment: its Settings page (`open_project_settings`,
   `src/env/mod.rs`), a section per file (`src/env/`), data from `/api/projects/<id>/env`.
 
@@ -146,10 +146,10 @@ This Mac's agent always; a server's when the person adds it in the gear (Agents 
 over SSH (`pi_agent::ensure_remote`, Node 22.18+ on the server) and links to it
 (`src/app/agents.rs`). A project = its agent + its machine (the agent's own, or a server this Mac's
 agent works on over SSH) + an optional folder; `src/app/places.rs` answers where
-(`build-projects.md`). Servers, file hosts and the project's folder come into a thread as inserts
-(`/ssh`, `/ftp`, `/files`, `build-insert.md`); the agent reaches them with `ssh_run`,
-`remote_files` and its coding tools, Bench with the agent's REST (`/api/hosts`, `/api/fs/…`). A
-project opens in Zed from its ⋯ menu.
+(`build-projects.md`). The terminal on the project's machine comes into a thread as an insert
+(`/terminal`, `build-insert.md`); the agent works there with `ssh_run` and its coding tools,
+Bench reads the project's files with the agent's REST (`/api/fs/…`). A project opens in Zed from
+its ⋯ menu.
 
 ## Shipping changes to the person
 

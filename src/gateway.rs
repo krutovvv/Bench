@@ -22,7 +22,7 @@ pub enum Cmd {
         profile: String,
         /// The working folder (a project, or a branch folder of one); None = the agent's default.
         cwd: Option<String>,
-        /// What the thread is about ("tasks:today", "ssh:<host>"); "" = a plain chat.
+        /// What the thread is about ("tasks:today", "ssh:local"); "" = a plain chat.
         subject: String,
         /// The project it belongs to (its id); "" = none.
         project: String,

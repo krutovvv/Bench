@@ -958,13 +958,7 @@ impl BenchApp {
                         .text_color(theme.muted_foreground)
                         .child(icon.icon().xsmall()),
                 )
-                .child(div().min_w_0().truncate().child(
-                    // A server file's local copy names the server file it stands for.
-                    match crate::inserts::ftp::remote::origin(path) {
-                        Some((alias, remote)) => format!("{alias}: {remote}"),
-                        None => name,
-                    },
-                ))
+                .child(div().min_w_0().truncate().child(name))
                 .map(|d| match remove {
                     Some(k) => d.child(close(id.clone(), k, false)),
                     None if here => d

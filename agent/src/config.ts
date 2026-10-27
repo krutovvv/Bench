@@ -1,6 +1,6 @@
 // Bench's own home: ~/.bench (BENCH_HOME).
 //
-//   bench.sqlite          settings, keys (env), model providers, the session index; later notes, hosts
+//   bench.sqlite          settings, keys (env), model providers, the session index
 //   pi.sqlite             Pi Durable's conversations
 //   agents/<name>/        an agent, laid out like Pi's agent directory (see below)
 //   cron/, attachments/, cache/, server.json, server.log, app/ (the installed server)

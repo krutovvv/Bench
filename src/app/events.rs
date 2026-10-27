@@ -21,7 +21,6 @@ impl BenchApp {
                 // Tasks live with the agent: another machine, its own tasks.
                 self.restart_tasks(cx);
                 self.reload_servers(cx);
-                self.load_remote_hosts(window, cx);
                 self.load_projects(window, cx);
             }
             Evt::Error(e) => {
@@ -94,7 +93,7 @@ impl BenchApp {
                         .ok()
                         .and_then(|t| t.parse().ok())
                         .unwrap_or(0);
-                    self.open_panel(Panel::Providers, window, cx);
+                    self.open_center(Center::Providers, window, cx);
                     // `BENCH_AGENT_FORM=1`: with "+ Agent on a server" open.
                     if std::env::var("BENCH_AGENT_FORM").is_ok() {
                         self.open_agent_form(window, cx);

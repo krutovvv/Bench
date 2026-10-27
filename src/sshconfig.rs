@@ -4,7 +4,6 @@
 //! server's default directory: files and Zed open there; the terminal still starts at home). Every write keeps a backup and the file's 0600 mode.
 
 use std::path::PathBuf;
-use std::process::Command;
 
 use anyhow::{Context as _, Result, bail};
 
@@ -207,51 +206,10 @@ pub fn expand_home(p: &str) -> PathBuf {
     }
 }
 
-/// `$HOME/x` → `~/x` (what ssh configs usually say).
-pub fn tilde(p: &std::path::Path) -> String {
-    let home = path().parent().unwrap().parent().unwrap().to_path_buf();
-    match p.strip_prefix(&home) {
-        Ok(rest) => format!("~/{}", rest.display()),
-        Err(_) => p.display().to_string(),
-    }
-}
-
 /// Add a new Host block (`old` = None) or rewrite the server's own lines of an existing one;
 /// other options in that block (IdentityFile, ProxyJump, …) stay as they are.
 pub fn save(old: Option<&str>, s: &Server) -> Result<()> {
     save_in(&path(), old, s)
-}
-
-/// Take a server's Host block out of ~/.ssh/config (the file as it was is kept as config.bak).
-pub fn remove(alias: &str) -> Result<()> {
-    let file = path();
-    let text = std::fs::read_to_string(&file).unwrap_or_default();
-    std::fs::write(file.with_extension("bak"), &text)?;
-    std::fs::write(&file, remove_from(&text, alias)?)?;
-    Ok(())
-}
-
-fn remove_from(text: &str, alias: &str) -> Result<String> {
-    let lines: Vec<&str> = text.lines().collect();
-    let bl = blocks(&lines);
-    let Some((start, end, names)) = bl.iter().find(|b| b.2.iter().any(|n| n == alias)) else {
-        bail!("“{alias}” is not in ~/.ssh/config");
-    };
-    if names.len() > 1 {
-        bail!("this Host line names several hosts; edit ~/.ssh/config by hand");
-    }
-    // The block, and the blank line after it.
-    let mut end = *end;
-    if lines.get(end).is_some_and(|l| l.trim().is_empty()) {
-        end += 1;
-    }
-    let mut out: Vec<&str> = lines[..*start].to_vec();
-    out.extend(&lines[end..]);
-    let mut s = out.join("\n");
-    if !s.is_empty() {
-        s.push('\n');
-    }
-    Ok(s)
 }
 
 fn save_in(file: &std::path::Path, old: Option<&str>, s: &Server) -> Result<()> {
@@ -325,31 +283,6 @@ fn write(p: &std::path::Path, lines: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// `user@hostname` as ssh resolves the alias (`ssh -G`: reads config only, no network).
-pub fn resolve(alias: &str) -> Option<String> {
-    let out = Command::new("/usr/bin/ssh")
-        .arg("-G")
-        .arg(alias)
-        .output()
-        .ok()?;
-    if !out.status.success() {
-        return None;
-    }
-    let (mut user, mut host) = (String::new(), String::new());
-    for line in String::from_utf8_lossy(&out.stdout).lines() {
-        match line.split_once(' ') {
-            Some(("user", v)) => user = v.to_string(),
-            Some(("hostname", v)) => host = v.to_string(),
-            _ => {}
-        }
-    }
-    Some(if user.is_empty() {
-        host
-    } else {
-        format!("{user}@{host}")
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,20 +299,6 @@ mod tests {
     }
 
     const SAMPLE: &str = "Include ~/.orbstack/ssh/config\n\nHost web\n  HostName 10.0.0.5\n  User deploy\n  IdentityFile ~/.ssh/web\n  IdentityFile ~/.ssh/web-old\n  # folder: Prod\n  # path: /srv/www\n\nHost a b\n  User x\n";
-
-    #[test]
-    fn removes_one_block() {
-        let text = "Host a\n  HostName 1.1.1.1\n\nHost b\n  HostName 2.2.2.2\n  # folder: X\n\nHost c\n  User u\n";
-        assert_eq!(
-            remove_from(text, "b").unwrap(),
-            "Host a\n  HostName 1.1.1.1\n\nHost c\n  User u\n"
-        );
-        assert_eq!(
-            remove_from(text, "c").unwrap(),
-            "Host a\n  HostName 1.1.1.1\n\nHost b\n  HostName 2.2.2.2\n  # folder: X\n\n"
-        );
-        assert!(remove_from(text, "zz").is_err());
-    }
 
     #[test]
     fn reads_fields_and_comments() {

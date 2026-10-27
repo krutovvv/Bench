@@ -32,9 +32,7 @@ pub struct ProjectForm {
 impl BenchApp {
     /// The sidebar's "+": the new project's page, in place of the thread (the thread stays as it was).
     pub fn new_project_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.panel = crate::app::Panel::NewProject;
-        self.ssh.form = None;
-        self.files_remote.form = false;
+        self.center = crate::app::Center::NewProject;
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
         name.update(cx, |s, cx| s.focus(window, cx));
         let server_folder =
@@ -124,7 +122,7 @@ impl BenchApp {
             move |this, r, window, cx| match r {
                 Ok(v) => {
                     this.project_form = None;
-                    this.panel = crate::app::Panel::Chat;
+                    this.center = crate::app::Center::Chat;
                     let Some(id) = v["project"]["id"].as_str().map(str::to_string) else {
                         return;
                     };
@@ -325,7 +323,7 @@ impl BenchApp {
                     crate::ui::form_action("project-cancel", "Cancel", false, cx).on_click(
                         cx.listener(|this, _, _, cx| {
                             this.project_form = None;
-                            this.panel = crate::app::Panel::Chat;
+                            this.center = crate::app::Center::Chat;
                             cx.notify();
                         }),
                     ),

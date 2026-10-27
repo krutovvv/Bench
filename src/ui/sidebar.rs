@@ -11,16 +11,38 @@ use gpui_kit::*;
 
 use super::plural;
 use crate::app::sidebar_items::Item;
-use crate::app::{BenchApp, Panel};
+use crate::app::{BenchApp, Center};
 use crate::icons::Ico;
 
 /// A session title: the sidebar's 14px.
 pub(crate) const SESSION_TITLE: f32 = 14.;
 
 impl BenchApp {
-    pub(crate) fn render_sidebar(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_sidebar(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        // The left dock's other panel: the Explorer's tree (`src/explorer/tree.rs`).
+        if self.sidebar_panel == crate::app::SidebarPanel::Explorer {
+            let rows = self.render_explorer(window, cx);
+            return v_flex()
+                .size_full()
+                .bg(theme.sidebar)
+                .child(self.render_sidebar_top(cx))
+                .child(
+                    v_flex()
+                        .id("explorer")
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_y_scroll()
+                        .pb_1()
+                        .children(rows),
+                )
+                .into_any_element();
+        }
         let mut list: Vec<AnyElement> = vec![];
         let searching = !self.search_query.is_empty();
         if searching {
@@ -406,7 +428,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(id);
+        let selected = self.center == Center::Chat && self.session.as_deref() == Some(id);
         let title = self
             .sessions
             .iter()
@@ -449,7 +471,7 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let s = &self.sessions[i];
-        let selected = self.panel == Panel::Chat && self.session.as_deref() == Some(&s.id);
+        let selected = self.center == Center::Chat && self.session.as_deref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
         let count = if s.running {
             "working…".to_string()
@@ -732,6 +754,15 @@ fn item_menu(
                             this.open_project_settings(env_id.clone(), window, cx)
                         }))),
                 )
+                // Its files, prompts, skills and tools in the Explorer, here.
+                .item({
+                    let id = id.clone();
+                    PopupMenuItem::new("Explorer")
+                        .icon(Ico::FolderTree.icon())
+                        .on_click(act(Box::new(move |this, window, cx| {
+                            this.show_explorer(id.clone(), window, cx)
+                        })))
+                })
                 // A project with a folder opens in Zed (a server's over SSH).
                 .when_some(zed.clone(), |menu, (folder, host)| {
                     menu.item(

@@ -6,7 +6,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use serde_json::Value;
 
-use super::section::{Section, Tab, form_actions, remove};
+use super::section::{Home, Section, form_actions, remove};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::model::ProjectKey;
@@ -35,8 +35,8 @@ impl Section for Name {
     fn key(&self) -> &'static str {
         "name"
     }
-    fn tab(&self) -> Tab {
-        Tab::General
+    fn home(&self) -> Home {
+        Home::Settings
     }
     fn block(&self, _general: bool) -> &'static str {
         "Project"
@@ -99,8 +99,8 @@ impl Section for Danger {
     fn key(&self) -> &'static str {
         "project"
     }
-    fn tab(&self) -> Tab {
-        Tab::General
+    fn home(&self) -> Home {
+        Home::Settings
     }
     fn block(&self, _general: bool) -> &'static str {
         "Remove"

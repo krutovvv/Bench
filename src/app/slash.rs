@@ -45,7 +45,7 @@ impl BenchApp {
                 })
                 .collect();
         }
-        // `/ssh web`, `/ftp`, `/tasks today`…: the tools this thread can attach.
+        // `/tasks today`, `/tools json`…: the tools this thread can attach.
         if let Some(rows) = self.tool_slash(&text) {
             return rows;
         }
@@ -109,7 +109,7 @@ impl BenchApp {
             self.composer
                 .update(cx, |s, cx| s.set_value("", window, cx));
             self.note_draft(cx);
-            self.attach_tool(key, window, cx);
+            self.put_insert(key, window, cx);
             return true;
         }
         let text = self.composer.read(cx).value().to_string();

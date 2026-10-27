@@ -105,11 +105,10 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   (`createConversation({ownership: {kind: "task", taskId}})`), found again by `ownerTaskId` on a
   replay, so a rerun after a crash reuses them; up to 4 run in parallel, without `delegate`;
   `host().adopt(child, parent)` makes them act for the parent's session.
-- **tasks, ssh_run, remote_files, hosts** (`builtin/*.ts`): plain `defineTool`s. Their data is in
-  `bench.sqlite` (tasks, hosts with a `project` column) or where it lives (`~/.ssh/config`, the
-  host's files); Bench reads the same through REST (`/api/tasks`, `/api/hosts`, …). Without an
-  explicit `host` argument they use what the thread has inserted (`sessionOf(id).inserts`: the
-  last terminal for `ssh_run`, the last file host for `remote_files`, `hostFor`).
+- **tasks, ssh_run** (`builtin/*.ts`): plain `defineTool`s. Their data is in `bench.sqlite`
+  (tasks) or where it lives (`~/.ssh/config`); Bench reads the same through REST (`/api/tasks`,
+  …). Without an explicit `host` argument `ssh_run` uses what the thread has inserted
+  (`sessionOf(id).inserts`: its last terminal).
 - **Browser**: the Playwright MCP on the browser server, an ordinary MCP server in the agent's
   `mcp.json` (`url` + `Authorization: ${BROWSER_MCP_AUTH}`, browser-server-mcp's README), connected
   through `@earendil-works/pi-mcp`. One tab per thread: the prompt line says to work only in the

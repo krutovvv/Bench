@@ -6,7 +6,7 @@
 use gpui_kit::*;
 use serde_json::json;
 
-use super::section::{Section, Tab, choices};
+use super::section::{Home, Section, choices};
 use super::{ProjectEnv, env_agent};
 use crate::app::BenchApp;
 use crate::rest;
@@ -60,8 +60,8 @@ impl Section for Run {
     fn key(&self) -> &'static str {
         "model"
     }
-    fn tab(&self) -> Tab {
-        Tab::General
+    fn home(&self) -> Home {
+        Home::Settings
     }
     fn block(&self, _general: bool) -> &'static str {
         "Model"

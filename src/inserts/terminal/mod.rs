@@ -1,6 +1,6 @@
-//! `/terminal`, `/ssh`: a terminal in the thread — this Mac's ("ssh:local") or a server's
-//! ("ssh:<alias>"); "ssh" alone lists the servers to pick from. As tall as its text (its program
-//! still sees a whole screen); "to the background" leaves its head, and the status bar lists it.
+//! `/terminal`: a terminal in the thread ("ssh:local"), on the machine the thread's project runs
+//! on (`thread_machine()`). As tall as its text (its program still sees a whole screen); "to the
+//! background" leaves its head, and the status bar lists it.
 
 pub mod form;
 pub mod servers;
@@ -15,13 +15,12 @@ pub mod view;
 #[path = "view_web.rs"]
 pub mod view;
 
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
-use serde_json::json;
 
 use crate::app::BenchApp;
 use crate::icons::Ico;
-use crate::inserts::{InsertKind, Switch, SwitchTo, icon_button, pick_row};
+use crate::inserts::{InsertKind, icon_button};
 use crate::model::Insert;
 
 /// The tallest a terminal gets in a thread; its program's screen is this many rows.
@@ -29,84 +28,27 @@ const MAX_H: f32 = 280.;
 
 pub struct Terminal;
 
-/// The terminal's alias, None until one is picked. "ssh:local" is the machine the thread's
-/// project runs on: this Mac's shell, or its server's (a remote project works there).
-fn alias_of(app: &BenchApp, key: &str) -> Option<String> {
-    match key.strip_prefix("ssh:")? {
-        "local" | "" => Some(app.thread_machine()),
-        a => Some(a.to_string()),
-    }
-}
-
-/// The servers a thread may open: its project's.
-fn servers(app: &BenchApp) -> Vec<(String, String)> {
-    let proj = app.thread_project.clone();
-    app.ssh
-        .servers
-        .iter()
-        // A project's own servers; outside projects, the servers of no project.
-        .filter(|s| {
-            app.ssh_projects
-                .get(&s.alias)
-                .map(String::as_str)
-                .unwrap_or("")
-                == proj
-        })
-        .map(|s| (s.alias.clone(), s.hostname.clone()))
-        .collect()
-}
-
-fn new_server(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
-    app.edit_server(None, None, window, cx);
-}
-
 impl InsertKind for Terminal {
     fn owns(&self, key: &str) -> bool {
-        key == "ssh" || key.starts_with("ssh:")
+        key == "ssh:local"
     }
 
     fn title(&self, app: &BenchApp, ins: &Insert) -> String {
-        match alias_of(app, &ins.key) {
-            None => "SSH".into(),
-            Some(a) => {
-                let name = if a.is_empty() {
-                    "Terminal".to_string()
-                } else {
-                    a.clone()
-                };
-                match app.ssh.tab_of_insert(&ins.id) {
-                    Some(t) => app.ssh.tabs[t]
-                        .session
-                        .title()
-                        .filter(|t| !t.trim().is_empty())
-                        .map(|t| format!("{name} · {t}"))
-                        .unwrap_or(name),
-                    None => name,
-                }
-            }
+        let a = app.thread_machine();
+        let name = if a.is_empty() {
+            "Terminal".to_string()
+        } else {
+            a
+        };
+        match app.ssh.tab_of_insert(&ins.id) {
+            Some(t) => app.ssh.tabs[t]
+                .session
+                .title()
+                .filter(|t| !t.trim().is_empty())
+                .map(|t| format!("{name} · {t}"))
+                .unwrap_or(name),
+            None => name,
         }
-    }
-
-    fn switches(&self, app: &BenchApp, ins: &Insert) -> Vec<Switch> {
-        let now = alias_of(app, &ins.key);
-        // The project's own machine is /terminal; /ssh is for servers.
-        if ins.key == "ssh:local" {
-            return vec![];
-        }
-        let mut v = vec![];
-        v.extend(servers(app).into_iter().map(|(alias, host)| Switch {
-            chosen: now.as_deref() == Some(alias.as_str()),
-            to: SwitchTo::Patch(json!({ "key": format!("ssh:{alias}") })),
-            label: alias,
-            detail: host,
-        }));
-        v.push(Switch {
-            label: "New server…".into(),
-            detail: String::new(),
-            chosen: false,
-            to: SwitchTo::Run(new_server),
-        });
-        v
     }
 
     fn controls(
@@ -116,10 +58,6 @@ impl InsertKind for Terminal {
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Vec<AnyElement> {
-        let Some(alias) = alias_of(app, &ins.key) else {
-            return vec![];
-        };
-        let _ = alias;
         let Some(t) = app.ssh.tab_of_insert(&ins.id) else {
             return vec![];
         };
@@ -174,48 +112,7 @@ impl InsertKind for Terminal {
         window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
-        let Some(alias) = alias_of(app, &ins.key) else {
-            // Which one: this Mac, a server, or a new one.
-            let id = ins.id.clone();
-            let mut rows = vec![];
-            let pick = |key: String| {
-                let id = id.clone();
-                move |this: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>| {
-                    this.patch_insert(&id, json!({ "key": key }), cx);
-                    if let Some(a) = alias_of(this, &key) {
-                        this.insert_terminal(&id, &a, window, cx);
-                    }
-                }
-            };
-            for (k, (alias, host)) in servers(app).into_iter().enumerate() {
-                let armed =
-                    app.confirm_delete.as_deref() == Some(format!("server:{alias}").as_str());
-                let gone = alias.clone();
-                rows.push(crate::inserts::pick_row_removable(
-                    format!("{id}-s{k}"),
-                    Ico::Server,
-                    alias.clone(),
-                    host,
-                    armed,
-                    cx,
-                    pick(format!("ssh:{alias}")),
-                    move |this, window, cx| this.remove_server(gone.clone(), window, cx),
-                ));
-            }
-            let from = id.clone();
-            rows.push(pick_row(
-                format!("{id}-new"),
-                Ico::Plus,
-                "New server…".into(),
-                "add one to ~/.ssh/config".into(),
-                cx,
-                move |this, window, cx| {
-                    this.form_after = Some(from.clone());
-                    new_server(this, window, cx)
-                },
-            ));
-            return Some(v_flex().children(rows).into_any_element());
-        };
+        let alias = app.thread_machine();
         if app.demo {
             return Some(
                 div()
@@ -256,13 +153,11 @@ impl InsertKind for Terminal {
     }
 
     fn context(&self, app: &BenchApp, ins: &Insert, _cx: &App) -> String {
-        let Some(alias) = alias_of(app, &ins.key) else {
-            return String::new();
-        };
+        let alias = app.thread_machine();
         let name = if alias.is_empty() {
             "this Mac".to_string()
         } else {
-            alias.clone()
+            alias
         };
         match app.ssh.tab_of_insert(&ins.id) {
             Some(t) => format!(
@@ -280,11 +175,10 @@ impl InsertKind for Terminal {
         window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) {
-        if let Some(a) = alias_of(app, &ins.key) {
-            if let Some(t) = app.insert_terminal(&ins.id, &a, window, cx) {
-                app.ssh.tabs[t].background = false;
-                app.ssh.tabs[t].focus.focus(window, cx);
-            }
+        let a = app.thread_machine();
+        if let Some(t) = app.insert_terminal(&ins.id, &a, window, cx) {
+            app.ssh.tabs[t].background = false;
+            app.ssh.tabs[t].focus.focus(window, cx);
         }
     }
 

@@ -1,35 +1,30 @@
-//! A project's settings (its environment), a page like the gear's (`Panel::Project`): tabs of
-//! General (name, where it lives, model, Telegram), Instructions (its soul, prompts and skills in
-//! a small editor with a tree), Tools (MCP and language servers), Schedule and Access (machines,
-//! file hosts). The agent can change all of it too, from any thread, with its tools. Each section
-//! is a file here:
+//! A project's environment: what its agent works with. Its Settings page (`Center::Project`,
+//! `page.rs`) holds the fields — name, where it lives, how it runs, its Telegram bot; the
+//! Explorer (`src/explorer/`) holds what it contains — its soul, prompts and skills as files,
+//! its MCP and language servers and scheduled jobs as parts opened in the middle. The agent
+//! changes all of it too, from any thread, with its tools. Each section is a file here:
 //!
 //! ```text
-//! env/section.rs      the `Section` trait, `Tab`, and the pieces forms, lists and cards are made of
-//! env/page.rs         the page: its tabs, each tab's groups drawn through `SECTIONS`
-//! env/ide.rs          Instructions: the tree of texts and the editor
-//! env/<section>.rs    a section: its state (a part of `ProjectEnv`), form or rows, card, save
+//! env/section.rs      the `Section` trait, `Home`, `Item`, and the pieces sections are made of
+//! env/page.rs         the Settings page: the `Home::Settings` sections' forms
+//! env/instructions.rs the prompts and skills the environment lists (their texts are files)
+//! env/<section>.rs    a section: its state (a part of `ProjectEnv`), form or items, card, save
 //! env/project_form.rs the new project's page (the sidebar's "+")
 //! ```
 //!
 //! A new section: a file like `telegram.rs`, its state in `ProjectEnv` (and `new_env`), a line in
-//! `SECTIONS` (its tab and group), and its part of the agent's `/api/projects/<id>/env`.
+//! `SECTIONS` (its `home`), and its part of the agent's `/api/projects/<id>/env`.
 
-pub mod accesses;
-mod ide;
+pub mod instructions;
 pub mod lsp;
 pub mod mcp;
 pub mod name;
 mod page;
 pub mod place;
 pub mod project_form;
-pub mod prompts;
 pub mod run;
 pub mod schedule;
 pub mod section;
-pub mod skills;
-mod skills_tree;
-pub mod soul;
 pub mod telegram;
 
 use gpui_kit::component::input::{EditorState, InputEvent, InputState};
@@ -39,7 +34,7 @@ use serde_json::Value;
 
 use crate::app::BenchApp;
 use crate::rest;
-pub use section::{Section, Tab};
+pub use section::{Home, Section};
 
 pub struct ProjectEnv {
     pub id: String,
@@ -47,44 +42,33 @@ pub struct ProjectEnv {
     pub dir: String,
     pub name: name::NameEnv,
     pub place: place::PlaceEnv,
-    pub soul: soul::SoulEnv,
     pub lsp: lsp::LspEnv,
     pub telegram: telegram::TelegramEnv,
     pub run: run::RunEnv,
     pub mcp: mcp::McpEnv,
-    pub prompts: prompts::PromptsEnv,
-    pub skills: skills::SkillsEnv,
-    pub hosts: accesses::AccessesEnv,
+    pub instructions: instructions::InstructionsEnv,
     pub cron: schedule::ScheduleEnv,
-    /// A new MCP server's or prompt's name (a new skill names itself in its front matter).
+    /// A new MCP server's name.
     pub new_name: Entity<InputState>,
-    /// The tab shown.
-    pub tab: Tab,
-    /// What is open: a list's card under its list, or the text in Instructions' editor —
-    /// (kind, name), the kind a `Section::key` ("new" for a new one).
+    /// The part open in the middle (the Explorer's `DocKey::Part`): (kind, name), the kind a
+    /// `Section::key` ("new" for a new one). One at a time: its fields are its section's.
     pub card: Option<(&'static str, String)>,
-    /// A remove asked once ("mcp:<name>", "skill:<name>", "host:<id>", "project:"): the
-    /// second click does it.
+    /// A remove asked once ("mcp:<name>", "project:"): the second click does it.
     pub armed: Option<String>,
     pub error: Option<String>,
 }
 
-/// The sections, in the order they are drawn on their tabs; neighbours with the same `block`
-/// share its group.
+/// The sections, in the order they are drawn where they live; neighbours with the same `block`
+/// share its heading.
 pub static SECTIONS: &[&dyn Section] = &[
     &name::Name,
     &place::Place,
     &run::Run,
     &telegram::Telegram,
     &name::Danger,
-    &soul::Soul,
     &mcp::Mcp,
     &lsp::Lsp,
-    &skills::Skills,
-    &prompts::Prompts,
     &schedule::Schedule,
-    &accesses::Machines,
-    &accesses::Accesses,
 ];
 
 /// The section whose key is `key`.
@@ -148,85 +132,26 @@ pub(crate) fn is_remote(_app: &BenchApp, id: &str) -> bool {
 }
 
 impl BenchApp {
-    /// A project's Settings (the sidebar's menu): its page, on General ("general": this Mac's
-    /// Host).
+    /// A project's Settings (the sidebar's menu): its page ("general": this Mac's Host).
     pub fn open_project_settings(
         &mut self,
         id: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let fresh = self.project_env.as_ref().is_none_or(|e| e.id != id);
         self.load_env(&id, window, cx);
-        if fresh {
-            if let Some(e) = self.project_env.as_mut() {
-                e.tab = Tab::General;
-            }
-        }
-        self.ssh.form = None;
-        self.files_remote.form = false;
-        self.open_panel(crate::app::Panel::Project, window, cx);
+        self.open_center(crate::app::Center::Project, window, cx);
     }
 
-    /// The project a new server or file host goes to: the settings page's when it is open
-    /// (this Mac's Host: none), else the open thread's.
-    pub fn form_project(&self) -> String {
-        match self.project_env.as_ref() {
-            Some(e) if self.panel == crate::app::Panel::Project && e.id != "general" => {
-                e.id.clone()
-            }
-            Some(_) if self.panel == crate::app::Panel::Project => String::new(),
-            _ => self.thread_project.clone(),
-        }
-    }
-
-    /// The open page's environment read again.
-    pub fn reload_env(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) {
-            self.load_env(&id, window, cx);
-        }
-    }
-
-    /// A tab of the page chosen: what was open on the last one shuts (its text is kept);
-    /// Instructions opens on the soul.
-    pub fn env_tab(&mut self, tab: Tab, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(e) = self.project_env.as_mut() else {
-            return;
-        };
-        if e.tab == tab {
-            return;
-        }
-        e.tab = tab;
-        e.armed = None;
-        let on_tab = e
-            .card
-            .as_ref()
-            .and_then(|(k, _)| section(k))
-            .is_some_and(|s| s.tab() == tab);
-        if !on_tab {
-            for s in SECTIONS {
-                s.close(e);
-            }
-            e.card = None;
-        }
-        self.ssh.form = None;
-        self.files_remote.form = false;
-        // The right pane is never empty when there is something to show: Instructions opens on
-        // the soul, a list on its first row.
-        if !on_tab && tab == Tab::Instructions {
-            self.env_card("soul", String::new(), window, cx);
-        } else if !on_tab && tab != Tab::General {
-            let first = self.project_env.as_ref().and_then(|e| {
-                SECTIONS
-                    .iter()
-                    .filter(|s| s.tab() == tab && s.shown(self))
-                    .find_map(|s| Some((s.key(), s.first(e)?)))
-            });
-            if let Some((kind, name)) = first {
-                self.env_card(kind, name, window, cx);
-            }
-        }
-        cx.notify();
+    /// A part of the shown project's environment opened in the middle (`DocKey::Part`).
+    pub fn open_part(
+        &mut self,
+        kind: &'static str,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.open_doc(crate::explorer::DocKey::Part { kind, name }, window, cx);
     }
 
     fn new_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) -> ProjectEnv {
@@ -236,17 +161,13 @@ impl BenchApp {
             dir: String::new(),
             name: name::NameEnv::new(window, cx),
             place: place::PlaceEnv::new(window, cx),
-            soul: soul::SoulEnv::new(window, cx),
             lsp: lsp::LspEnv::new(window, cx),
             telegram: telegram::TelegramEnv::new(window, cx),
             run: Default::default(),
             mcp: mcp::McpEnv::new(window, cx),
-            prompts: prompts::PromptsEnv::new(window, cx),
-            skills: skills::SkillsEnv::new(window, cx),
-            hosts: accesses::AccessesEnv::new(window, cx),
+            instructions: Default::default(),
             cron: schedule::ScheduleEnv::new(window, cx),
             new_name,
-            tab: Tab::General,
             card: None,
             armed: None,
             error: None,
@@ -352,21 +273,26 @@ impl BenchApp {
             move || rest::send_json(&conn, method, &path, &profile, body),
             move |this, r, window, cx| match r {
                 Ok(_) => {
+                    // A new one is made: its form's tab gives way to it (an MCP server is named
+                    // in its form; a job keeps its form open as itself).
+                    let mut made = None;
                     if let Some(e) = this.project_env.as_mut() {
-                        // A new one is made: its form closes, it is in the list; a new prompt
-                        // stays open in the editor, under its name.
                         if e.card.as_ref().is_some_and(|(_, n)| n == "new") && what != "cron" {
                             e.card = None;
                             e.mcp.open = None;
-                            e.skills.open = None;
-                            e.prompts.open = None;
-                            if what == "prompt" {
-                                let name = e.new_name.read(cx).value().trim().to_string();
-                                e.prompts.open = Some(name.clone());
-                                e.card = Some(("prompt", name));
-                            }
+                            made = Some(e.new_name.read(cx).value().trim().to_string());
                         }
                         section.saved(e);
+                    }
+                    if let Some(name) = made {
+                        let new = crate::explorer::DocKey::Part {
+                            kind: what,
+                            name: "new".into(),
+                        };
+                        this.close_doc(new, cx);
+                        if what == "mcp" && !name.is_empty() {
+                            this.open_part(what, name, window, cx);
+                        }
                     }
                     this.load_env(&id, window, cx);
                     section.reload(this, window, cx);
@@ -390,8 +316,8 @@ impl BenchApp {
         self.load_env(&id, window, cx);
     }
 
-    /// A Remove, twice: armed, then done. `what`: a section's key ("mcp", "skill", "prompt",
-    /// "cron", "host"), or "project" (the project itself: its page closes).
+    /// A Remove, twice: armed, then done. `what`: a section's key ("mcp", "lsp", "cron"), or
+    /// "project" (the project itself: its page closes).
     pub fn env_remove(
         &mut self,
         what: &'static str,
@@ -415,7 +341,7 @@ impl BenchApp {
             // Asked already, in its card.
             self.confirm_delete = Some(format!("p:{id}"));
             self.delete_project(id, window, cx);
-            self.panel = crate::app::Panel::Chat;
+            self.center = crate::app::Center::Chat;
             self.new_session(cx);
             self.thread_project = String::new();
             return;
@@ -433,20 +359,17 @@ impl BenchApp {
             move || rest::send_json(&conn, "DELETE", &path, &profile, Value::Null),
             move |this, r, window, cx| match r {
                 Ok(_) => {
-                    // What was removed had its card open.
-                    if let Some(e) = this.project_env.as_mut() {
-                        e.card = None;
-                    }
+                    // What was removed was open: its tab closes.
+                    this.close_doc(crate::explorer::DocKey::Part { kind: what, name }, cx);
                     this.load_env(&id, window, cx);
-                    this.load_remote_hosts(window, cx);
                 }
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
             },
         );
     }
 
-    /// A row's click: its card opens under its list (again: it closes); a text of Instructions
-    /// opens in the editor. One at a time.
+    /// A part made the open one: what had another open shuts, its section fills its fields
+    /// ("new": an empty form, its text to paste or write, then Save).
     pub fn env_card(
         &mut self,
         kind: &'static str,
@@ -457,22 +380,18 @@ impl BenchApp {
         let Some(e) = self.project_env.as_mut() else {
             return;
         };
-        let again = e
-            .card
+        if e.card
             .as_ref()
-            .is_some_and(|(k, n)| *k == kind && *n == name);
+            .is_some_and(|(k, n)| *k == kind && *n == name)
+        {
+            return;
+        }
         for s in SECTIONS {
             s.close(e);
         }
         e.armed = None;
-        if again {
-            e.card = None;
-            cx.notify();
-            return;
-        }
         e.card = Some((kind, name.clone()));
         let sec = section(kind);
-        // A new one: an empty form, its text pasted (or written), then Save.
         if name == "new" {
             if let Some((editor, template)) = sec.and_then(|s| s.new_one(e)) {
                 editor.update(cx, |s, cx| s.set_value(template, window, cx));
@@ -486,44 +405,6 @@ impl BenchApp {
             s.open(self, name, window, cx);
         }
         cx.notify();
-    }
-
-    /// Something chosen on the left of a tab — a text of Instructions, a row of a list: it opens
-    /// on the right, unless an open text has unsaved changes (the editors are shared, so they
-    /// would be lost). The open one chosen again stays; the open skill shuts its folder.
-    pub fn env_open(
-        &mut self,
-        kind: &'static str,
-        name: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let Some(e) = self.project_env.as_ref() else {
-            return;
-        };
-        let same = e
-            .card
-            .as_ref()
-            .is_some_and(|(k, n)| *k == kind && *n == name);
-        if same && kind != "skill" {
-            return;
-        }
-        let dirty = match e.card.as_ref().map(|(k, _)| *k) {
-            Some("soul") => e.soul.dirty,
-            Some("prompt") => e.prompts.dirty,
-            Some("skill") => e.skills.dirty,
-            _ => false,
-        };
-        if dirty && !same {
-            self.toast(
-                NotificationType::Info,
-                "Save or revert the open text first",
-                window,
-                cx,
-            );
-            return;
-        }
-        self.env_card(kind, name, window, cx);
     }
 
     /// A folder or file shown in Finder (this Mac's projects only).
@@ -541,6 +422,7 @@ impl BenchApp {
 /// The agent's answer into the sections; fields being typed in keep their text.
 pub fn apply(e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
     e.dir = v["dir"].as_str().unwrap_or_default().to_string();
+    e.instructions.apply(v);
     for s in SECTIONS {
         s.apply(e, v, window, cx);
     }

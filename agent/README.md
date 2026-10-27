@@ -54,7 +54,6 @@ The agent picks its extensions in `~/.bench/agents/default/settings.json`:
 | `session_search` | the text of past sessions |
 | `tasks` | the person's tasks (in `bench.sqlite`): list, add, change, complete, sum the time spent |
 | `ssh_run` | a command on this Mac or a `~/.ssh/config` server; without a host, the thread's terminal insert |
-| `remote_files`, `hosts` | ls, read, write, delete, mkdir, rename on a file host (FTP, FTPS, SFTP); the project's hosts |
 | `tool_search` + `mcp__<server>__<tool>` | MCP servers; a server with many tools is deferred behind tool_search |
 
 Web search comes from the official MCP servers of Tavily or Brave, added to an agent's `mcp.json`.
@@ -85,7 +84,7 @@ credentials in `~/.bench/mcp-oauth/`).
 
 ## Its home: `~/.bench`
 
-`bench.sqlite` (settings, keys, providers, projects, sessions, tasks, hosts, cron jobs),
+`bench.sqlite` (settings, keys, providers, projects, sessions, tasks, cron jobs),
 `pi.sqlite` (the conversations), `agents/default/` and `projects/<id>/` (laid out like Pi's agent
 directory, plus `memories/`), `app/` (the installed server), `server.json` (port, token),
 `server.log`, `backups/`.

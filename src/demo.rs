@@ -215,7 +215,7 @@ fn task(
     }
 }
 
-/// Made-up servers (SSH mode) and tasks (Tasks mode), so every mode has something to show.
+/// Made-up ~/.ssh/config servers and tasks, so the demo never shows the person's own.
 fn other_modes(app: &mut BenchApp) {
     app.ssh.servers = vec![
         server("web-1", "203.0.113.10", "Production"),
@@ -292,7 +292,7 @@ deploy@{alias}:~$ "
     )
 }
 
-/// A thread about something (`tasks:today`, `ssh:web-1`…): one turn, done.
+/// A thread about something (`tasks:today`, `ssh:local`…): one turn, done.
 fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {
     let row = session(id, title, 2, false, "desktop");
     // A tool: an insert before the first message.
@@ -348,7 +348,7 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Jou
     app.demo_threads.insert(id.into(), t);
 }
 
-/// The blog project's environment, for its settings.
+/// The blog project's environment, for its settings and the Explorer.
 pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
     let Some(e) = app.project_env.as_mut() else {
         return;
@@ -379,33 +379,104 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
             {"name": "ghost-theme", "description": "How the blog's Ghost theme is built and changed.", "scope": "repo", "dir": "~/Projects/blog/.agents/skills/ghost-theme"},
             {"name": "humanizer", "description": "Make a text read as written by a person.", "scope": "general", "dir": "~/.bench/agents/default/skills/humanizer"}
         ],
-        "hosts": [
-            {"id": "h-blog", "name": "blog-files", "kind": "sftp", "user": "deploy", "host": "203.0.113.30"},
-            {"id": "h-web1", "name": "web1", "kind": "ssh", "user": "deploy", "host": "203.0.113.21"}
-        ],
         "cron": [
             {"id": "c-digest", "name": "Weekly digest", "prompt": "Draft the weekly digest from this week's posts and comments; save it as a draft.", "schedule": {"expr": "0 9 * * 1"}, "schedule_display": "0 9 * * 1", "enabled": true, "next_run_at": "2026-10-26T09:00:00+03:00", "last_run_at": "2026-10-19T09:00:00+03:00", "last_status": "ok", "last_output": "The digest draft is saved: 4 posts, 2 top comments."},
             {"id": "c-links", "name": "Broken links", "prompt": "Check every post's links; list the broken ones with the post.", "schedule": {"expr": "every 1d"}, "schedule_display": "every 1d", "enabled": false, "next_run_at": null, "last_status": null}
         ]
     });
     crate::env::apply(e, &v, window, cx);
-    // `BENCH_ENV_TAB=general|instructions|tools|schedule|access`: that tab; `BENCH_DEMO=env-open`:
-    // a skill open in Instructions, as when it is being edited.
-    if e.card.is_some() {
+    // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
+    // `BENCH_EXPLORER=beside` another beside it, `=part` an MCP server open instead.
+    if std::env::var("BENCH_DEMO").as_deref() != Ok("explorer") || !app.explorer.tabs.is_empty() {
         return;
     }
-    let open = std::env::var("BENCH_DEMO").as_deref() == Ok("env-open");
-    let tab = match std::env::var("BENCH_ENV_TAB").as_deref() {
-        Ok("instructions") => crate::env::Tab::Instructions,
-        Ok("tools") => crate::env::Tab::Tools,
-        Ok("schedule") => crate::env::Tab::Schedule,
-        Ok("access") => crate::env::Tab::Access,
-        _ if open => crate::env::Tab::Instructions,
-        _ => crate::env::Tab::General,
+    let dir = "~/.bench/projects/p-blog".to_string();
+    let root = crate::explorer::FileRef {
+        project: "p-blog".into(),
+        machine: None,
+        path: "/Users/demo/code/blog".into(),
     };
-    app.env_tab(tab, window, cx);
-    if open {
-        app.env_card("skill", "release-notes".into(), window, cx);
+    let skill = app.agent_file(format!("{dir}/skills/release-notes"));
+    for f in [
+        root.clone(),
+        root.join("content"),
+        root.join("content/posts"),
+        skill.clone(),
+    ] {
+        app.explorer.open.insert(format!("d:{}", f.listing_key()));
+        app.list_folder(f, window, cx);
+    }
+    app.explorer.open.extend(
+        [
+            "files",
+            "instructions",
+            "skills",
+            "g:Tools",
+            "s:mcp",
+            "g:Schedule",
+            "s:cron",
+        ]
+        .map(String::from),
+    );
+    let post = crate::explorer::DocKey::File(root.join("content/posts/release-2-4.md"));
+    app.open_doc(
+        crate::explorer::DocKey::File(app.agent_file(format!("{dir}/SYSTEM.md"))),
+        window,
+        cx,
+    );
+    app.open_doc(post, window, cx);
+    match std::env::var("BENCH_EXPLORER").as_deref() {
+        Ok("beside") => app.open_beside(skill.join("SKILL.md"), window, cx),
+        Ok("part") => app.open_part("mcp", "ghost".into(), window, cx),
+        _ => {}
+    }
+}
+
+/// The demo's folders, as the agent would list them: (name, is a folder).
+pub fn listing(path: &str) -> Vec<(String, String, bool)> {
+    let names: &[(&str, bool)] = match path.trim_end_matches('/') {
+        "/Users/demo/code/blog" => &[
+            ("content", true),
+            ("theme", true),
+            (".gitignore", false),
+            ("package.json", false),
+            ("README.md", false),
+        ],
+        "/Users/demo/code/blog/content" => &[("posts", true), ("pages", true)],
+        "/Users/demo/code/blog/content/posts" => &[
+            ("release-2-4.md", false),
+            ("search-that-understands.md", false),
+            ("welcome.md", false),
+        ],
+        "/Users/demo/code/blog/theme" => &[
+            ("default.hbs", false),
+            ("post.hbs", false),
+            ("style.css", false),
+        ],
+        p if p.ends_with("skills/release-notes") => &[("references", true), ("SKILL.md", false)],
+        p if p.ends_with("references") => &[("style.md", false)],
+        _ => &[],
+    };
+    names
+        .iter()
+        .map(|(n, d)| {
+            (
+                n.to_string(),
+                format!("{}/{n}", path.trim_end_matches('/')),
+                *d,
+            )
+        })
+        .collect()
+}
+
+/// A demo file's text.
+pub fn file_text(path: &str) -> String {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    match name {
+        "SYSTEM.md" => "# Northwind blog\n\nProduct news and guides for our customers, published on Ghost.\n\nWrite plainly, for people who use the product, not for engineers. Every post gets a cover and two tags; drafts first, publish only when asked.\n".into(),
+        "release-2-4.md" => "---\ntitle: \"Northwind 2.4: search that understands you\"\ntags: [releases, search]\ncover: /images/2-4-cover.png\nstatus: draft\n---\n\nSearch now reads what you mean, not only what you type. Ask for\n\"invoices from last spring\" and it finds them, even when none of them says *spring*.\n\n## What changed\n\n- Results understand dates, people and places.\n- Typos no longer hide what you were after.\n- The search box remembers your last five questions.\n\n## Why it matters\n\nMost of you search the same few things every day. Now it takes one try.\n".into(),
+        "SKILL.md" => "---\nname: release-notes\ndescription: Turn a changelog into a post: what changed for the reader, not the commit list.\n---\n\n1. Read the changelog since the last release.\n2. Keep what a customer notices; drop refactors.\n3. Write the post in `content/posts/`, a draft, with a cover and two tags.\n".into(),
+        _ => String::new(),
     }
 }
 
@@ -440,7 +511,7 @@ The RFC moved to tomorrow.",
         app,
         "d-web1-tls",
         "Renew the TLS certificates",
-        "ssh:web-1",
+        "ssh:local",
         done(
             "Renew the certificates before they expire on Friday.",
             vec![
@@ -456,7 +527,7 @@ the new ones.",
         app,
         "d-web1",
         "Why is the site slow",
-        "ssh:web-1",
+        "ssh:local",
         done(
             "The site got slow this morning. What's going on?",
             vec![
@@ -693,16 +764,23 @@ fewer form fields. Then check what it did to signups and give me a short summary
         machine: None,
         browser: true,
     };
+    // The production site: worked on over SSH, on web-1 (its terminal is that server's).
+    let web = crate::model::ProjectEntry {
+        machine: Some("web-1".into()),
+        ..project("p-web", "Production site", Some("/var/www/storefront"))
+    };
     app.projects = vec![
-        project("p-blog", "Northwind blog", None),
+        project("p-blog", "Northwind blog", Some("/Users/demo/code/blog")),
         project("p-store", "Storefront", Some("/Users/demo/code/storefront")),
+        web,
         project("p-audit", "Competitor audit", None),
         project("p-me", "Personal", None),
     ];
     for s in app.sessions.iter_mut() {
         s.project = match s.id.as_str() {
             "d-site" => "p-blog",
-            "d-landing" | "d-api" | "d-tests" | "d-web1" | "d-web1-tls" => "p-store",
+            "d-landing" | "d-api" | "d-tests" => "p-store",
+            "d-web1" | "d-web1-tls" => "p-web",
             "d-audit-1" | "d-audit-2" => "p-audit",
             "d-today" | "d-tool" | "d-notes" => "p-me",
             _ => "",
@@ -735,6 +813,12 @@ fewer form fields. Then check what it did to signups and give me a short summary
     if let Some(id) = open {
         app.session = Some(id.into());
         app.thread = app.demo_threads.get(id).cloned().unwrap_or_default();
+        app.thread_project = app
+            .sessions
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.project.clone())
+            .unwrap_or_default();
     }
     // `BENCH_DEMO=long`: a thread of sixty exchanges, opened at its top.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("long") {
@@ -804,19 +888,22 @@ fewer form fields. Then check what it did to signups and give me a short summary
             multi_select: std::env::var("BENCH_CLARIFY_MULTI").is_ok(),
         });
     }
-    // `BENCH_DEMO=env|env-open`: the blog's settings over the thread (`env` below fills them).
-    if matches!(
-        std::env::var("BENCH_DEMO").as_deref(),
-        Ok("env") | Ok("env-open")
-    ) {
-        app.panel = crate::app::Panel::Project;
+    // `BENCH_DEMO=env`: the blog's settings over the thread (`env` below fills them);
+    // `BENCH_DEMO=explorer`: the blog in the Explorer (`env` opens its documents).
+    match std::env::var("BENCH_DEMO").as_deref() {
+        Ok("env") => app.center = crate::app::Center::Project,
+        Ok("explorer") => {
+            app.sidebar_panel = crate::app::SidebarPanel::Explorer;
+            app.explorer.project = "p-blog".into();
+        }
+        _ => {}
     }
     if std::env::var("BENCH_PANEL").as_deref() == Ok("providers") {
         app.gear_tab = std::env::var("BENCH_GEAR_TAB")
             .ok()
             .and_then(|t| t.parse().ok())
             .unwrap_or(0);
-        app.panel = crate::app::Panel::Providers;
+        app.center = crate::app::Center::Providers;
     }
     cx.notify();
 }

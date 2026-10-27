@@ -587,22 +587,4 @@ impl BenchApp {
         }
         out
     }
-
-    /// A form opened from the thread (a new server or file host) that is not under an insert.
-    pub(crate) fn render_tail_form(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let under_insert = self
-            .form_after
-            .as_ref()
-            .is_some_and(|id| self.thread_inserts().iter().any(|i| &i.id == id));
-        let form = if under_insert {
-            None
-        } else if self.files_remote.form {
-            Some(self.render_host_form(cx))
-        } else if self.ssh.form.is_some() {
-            Some(self.render_server_form(cx))
-        } else {
-            None
-        }?;
-        Some(self.agent_row(form, cx))
-    }
 }

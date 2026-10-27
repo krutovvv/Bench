@@ -21,8 +21,7 @@ Sizes are `bench_ui` names (`crates/ui/src/metrics.rs`); the numbers below are w
 `src/ui/mod.rs` `render_layout`: `h_resizable` with the sidebar a fixed `resizable_panel`
 (`sidebar_w`, 200–480, its width kept) and the main column; the status bar under both
 (`render_statusbar`). The column divider is `quiet_divider`: transparent at rest, an accent line
-on hover. No right panel: files open in a thread's `/files` insert, a whole project in Zed from
-its menu. The title bar is transparent: the sidebar starts with a 35px strip beside the traffic
+on hover. A whole project opens in Zed from its menu. The title bar is transparent: the sidebar starts with a 35px strip beside the traffic
 lights (`render_sidebar_top`: + New project, Hide sidebar ⌘\); the header (36) tops the main
 column.
 
@@ -139,15 +138,14 @@ cap, no centering.
 
 ## A project's Settings, the gear
 
-Two settings pages, one look: the gear (the app's) and a project's Settings
-(`open_project_settings`, `Panel::Project`, `src/env/page.rs`). Both have `settings_tabs` on top
-and groups under `settings_heading`: a form is `settings_field` rows (Save / Revert under them once
-something changed, `form_actions`). A project's other tabs are two panes filling the page
-(`bench_ui::ide`): on the left what there is — Instructions' tree of texts (`src/env/ide.rs`), or
-the lists of servers, jobs and accesses (a name and a line under it, `section::row`) — and on the
-right the one chosen: a text in the code editor, or a row's fields with its actions in the head.
-Choosing a tab opens its first item, so the right pane is never empty. Each pane scrolls on its
-own. A section is a `Section` in `src/env/` with its `Tab`.
+Two settings pages, one look: the gear (the app's, `settings_tabs` on top) and a project's
+Settings (`open_project_settings`, `Center::Project`, `src/env/page.rs`): groups under
+`settings_heading`, fields in `settings_field` rows, Save / Revert under them once something
+changed (`form_actions`). What a project contains — files, soul, prompts, skills, MCP and
+language servers, jobs — is the Explorer (`docs/explorer.md`): a tree in the sidebar
+(`tree_row`, `tree_heading`), documents in the center with tabs (`doc_tab`, `ide_head`), a file
+beside in the right dock; documents fill their pane and scroll inside, as in an IDE. A section is
+a `Section` in `src/env/` with its `Home`.
 
 ## The thread's column
 

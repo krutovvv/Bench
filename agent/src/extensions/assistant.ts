@@ -1,6 +1,6 @@
 // The assistant: Bench's default extension. Pi's own coding tools (read, write, edit, bash) and
 // tool search, plus the person-facing tools (clarify, todo, memory, skills, cron, delegate,
-// session_search) and the inserts' tools (tasks, ssh_run, remote_files, hosts). Its prompt is a
+// session_search) and the inserts' tools (tasks, ssh_run). Its prompt is a
 // few short sections (src/prompt.ts). An agent can select other extensions next to it or instead
 // of it (its settings.json "extensions").
 
@@ -18,9 +18,7 @@ import { memoryTool } from "../builtin/memory.ts";
 import { skillManage, skillView } from "../builtin/skills.ts";
 import { delegate } from "../builtin/subagent.ts";
 import { compactWithoutReasoning } from "../builtin/compaction.ts";
-import { remoteFiles } from "../builtin/remote.ts";
 import { sshRun } from "../builtin/ssh.ts";
-import { hostsTool } from "../builtin/hosts.ts";
 import { tasksTool } from "../builtin/tasks.ts";
 import { host } from "../host.ts";
 import { environment, inserted, notes, projectContext, skills, soul, subject } from "../prompt.ts";
@@ -89,7 +87,7 @@ const Coding = createCodingTools({ images });
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, remoteFiles, hostsTool],
+	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun],
 	tasks: [CronTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),

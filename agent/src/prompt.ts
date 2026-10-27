@@ -12,7 +12,6 @@ import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
 import { machineOf, repoOf, skillsFor } from "./repo.ts";
 import { projects } from "./builtin/projects.ts";
-import { hosts } from "./builtin/hosts.ts";
 import type { SessionInfo } from "./host.ts";
 
 const IDENTITY = "You are a capable assistant working on the person's own computer through tools.";
@@ -52,7 +51,7 @@ export function environment(s: SessionInfo): string {
 	return [
 		`Today is ${day} (${timezone()}). For the exact time, run date.`,
 		`Machine: ${os.type() === "Darwin" ? "macOS" : os.type()}, home ${os.homedir()}. Working directory: ${s.cwd}.`,
-		"Bench's own data (tasks, hosts, sessions, settings) is reached through your tools, not files.",
+		"Bench's own data (tasks, sessions, settings) is reached through your tools, not files.",
 		// The tools for code, said once: a long thread spent most of its steps reading files through
 		// bash in small windows and editing them with scripts.
 		"Files: find with grep (text), glob (names) and ls (a folder's tree); read a file whole with read (up to 2000 lines at once, not in small pieces); change it with edit, all its changes in one call (edits[]); new files with write. bash is for running things — builds, tests, git — not for reading or editing files.",
@@ -68,7 +67,7 @@ export function environment(s: SessionInfo): string {
 function settings(s: SessionInfo): string | undefined {
 	if (!s.project) return undefined;
 	const dir = path.join(path.dirname(agentDir("project:x")), s.project);
-	return `This project's settings live in ${dir}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them). Servers and file hosts of the project are added or taken out with the hosts tool.`;
+	return `This project's settings live in ${dir}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them).`;
 }
 
 /** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory, read where
@@ -131,10 +130,6 @@ export function subject(s: SessionInfo): string | undefined {
 		return `# This thread\nIt is about the ${value} tool, shown live above the conversation (its input and output come with each message). Do what is asked with the tool's content yourself (read, bash), and give the result in your answer.${block}`;
 	if (kind === "ssh")
 		return `# This thread\n${value === "local" || value === "" ? "It is about this machine's terminal, shown live above the conversation." : `It is about the server "${value}" (a ~/.ssh/config host), whose terminal is shown live above the conversation.`} Run commands there with ssh_run. Say what you will run before anything that changes it.${block}`;
-	if (kind === "files") {
-		const h = hosts.get(value);
-		return `# This thread\nIt is about the files of ${h ? `${h.name} (${h.kind})` : `the host ${value}`}, shown live above the conversation. Work with them with remote_files.${block}`;
-	}
 	if (kind === "folder")
 		return `# This thread\nIt is about the folder ${value}, shown above the conversation. Work in it with read, write, edit and bash.`;
 	return undefined;
@@ -143,21 +138,14 @@ export function subject(s: SessionInfo): string | undefined {
 /**
  * What the person inserted into the thread with "/" (src/inserts.ts), each as live as a window
  * next to the conversation. Built from the thread's `bench.inserts` document, so it changes only
- * when an insert comes, goes or switches (another server, another host): the prompt cache keeps.
+ * when an insert comes, goes or switches (another list, another tool): the prompt cache keeps.
  */
 export function inserted(items: { key: string; state: Record<string, unknown> }[]): string | undefined {
 	if (!items.length) return undefined;
 	const lines = items.map(({ key, state }) => {
 		const [kind, ...rest] = key.split(":");
 		const value = rest.join(":");
-		if (kind === "ssh")
-			return value === "local" || !value
-				? "- This machine's terminal. Run commands on it with ssh_run (host \"local\")."
-				: `- The terminal of the server "${value}" (a ~/.ssh/config host). Run commands there with ssh_run (host "${value}").`;
-		if (kind === "files") {
-			const h = hosts.get(String(state.host ?? ""));
-			return `- A file host's browser, now on ${h ? `${h.name} (${h.kind}, id ${h.id})` : "no host"}${state.path ? `, in ${state.path}` : ""}${state.file ? `, with ${state.file} open in its editor` : ""}. Work with its files with remote_files (host "${h?.id ?? ""}").`;
-		}
+		if (kind === "ssh") return "- This machine's terminal. Run commands on it with ssh_run (host \"local\").";
 		if (kind === "tasks")
 			return `- The person's tasks, the "${state.list ?? "today"}" list. One list for every project; a project is a tag (its name as a slug), and in a project's thread the tasks tool works on that tag unless told "all". Read and change them with the tasks tool — the only place they live; the list updates by itself, so don't repeat it back unless asked. Time spent: list status "completed" with done_since / done_until and a tag; the result sums it.`;
 		if (kind === "tools") return `- The everyday utilities, now on "${state.tool ?? ""}" (its input and output come with each message). Do what is asked with its content yourself (read, bash) and give the result in your answer.`;

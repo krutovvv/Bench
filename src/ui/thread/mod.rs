@@ -550,7 +550,6 @@ impl BenchApp {
         let clarify = self.render_clarify(cx);
         let plan = self.render_plan(cx);
         let procs = self.render_processes(cx);
-        let form = self.render_tail_form(cx);
         let composer = self.render_composer(cx);
         v_flex()
             .w_full()
@@ -558,7 +557,6 @@ impl BenchApp {
             .children(procs)
             .children(approval)
             .children(clarify)
-            .children(form)
             .child(composer)
             .into_any_element()
     }

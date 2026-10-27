@@ -44,12 +44,13 @@ takes them again).
   `pick_row_removable` (a server or host to pick, trash on hover), `card` (a block an insert
   opened: a file, a task), `file_form` (naming a new file or folder), `row_trash` (a file row's
   two-click delete). Use them inside an insert; never copy them into one.
-- **Settings sections** — `src/env/section.rs`: `row` / `row_with` (a list's row, lit when its
-  card is open), `add` ("+ Add"), `save`, `revert`, `remove` (two clicks), `form_actions` (a
-  form's Save / Revert), `choices` (one of a list), `text` (a value only read), `new_card`, `code`
-  (an editor as tall as its text). In `crates/ui`: `settings_tabs`, `settings_heading`,
-  `settings_field`, `segmented`, and `ide`, `tree_row`, `tree_heading`, `ide_head` (a tree beside
-  an editor). Every `Section` uses these.
+- **Environment sections** — `src/env/section.rs`: `Item` (a part in the Explorer's tree),
+  `add` ("+ Add"), `save`, `revert`, `remove` (two clicks), `form_actions` (a form's Save /
+  Revert), `choices` (one of a list), `text` (a value only read), `new_card`, `code` (an editor as
+  tall as its text). In `crates/ui`: `settings_heading`, `settings_field`, `segmented`.
+- **The Explorer** — `crates/ui/src/ide.rs`: `tree_heading`, `tree_row`, `tree_pl` (a tree's
+  indent), `ide_head` (an open document's head), `doc_tab` (its tab), `QUICK_W` (⌘P),
+  `BESIDE_W` (the right dock).
 
 A piece that is not here: add it to `crates/ui` (and to the storybook), then use it — not in the
 screen that needs it. Ask the person before inventing a new kind of control.
