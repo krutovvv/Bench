@@ -71,7 +71,7 @@ h_flex().id(("session", i)).group(group)          // unique group name per row!
     .hover(move |h| match stripe { Some(c) => h.bg(Hsla { a: if selected { 0.30 } else { 0.20 }, ..c }), None => h.bg(theme.sidebar_accent) })
 ```
 
-**The menu** is one function, `item_menu` (`sidebar.rs`), shown two ways: the hover "⋯"
+**The menu** is one function, `item_menu` (`sidebar/menu.rs`), shown two ways: the hover "⋯"
 (`Button…dropdown_menu`, wrapped in a div that stops `MouseButton::Left` so the row doesn't open)
 and a right click (`.context_menu(item_menu(…))`). Items: a project — Environment, Open in Zed
 (with a folder; a server's over SSH), separator; then Pin/Unpin (not on this Mac's Host), Rename
@@ -83,7 +83,7 @@ a row's: New window is the header's.
 
 ## Header strip
 
-`h(36).bg(title_bar).border_b_1().pl_4().pr_2().gap_1()` (`workspace/layout.rs` `render_header`): the
+`h(36).bg(title_bar).border_b_1().pl_4().pr_2().gap_1()` (`titlebar/mod.rs` `render_header`): the
 title (`flex_1 min_w_0 text_sm` medium, truncate), the project chip (repo · branch when the
 thread works in git, `render_project_chip`), then `render_header_tail`
 (`src/inserts/terminal/form.rs`): New window ⌘⇧N as a `bench_ui::icon_button`. Tasks, servers,

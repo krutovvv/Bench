@@ -8,7 +8,7 @@ method and route is the agent's module that declares it, `agent/src/modules/<are
 
 ## Authentication
 
-`connection.rs`: `pi_agent::ensure()` (this Mac) or `pi_agent::ensure_remote(host)` (over an
+`client/connection.rs`: `launch::ensure()` (this Mac) or `launch::ensure_remote(host)` (over an
 `ssh -L` tunnel) gives a port and a session token. The WebSocket opens
 `ws://127.0.0.1:<port>/api/ws?token=<token>`; every REST call sends the token header that
 `Connection::rest_auth` returns. There are no tickets or purposes in the auth. Which agent dir a
@@ -35,7 +35,7 @@ Never send to "the" agent: there are several.
   `thread.run {running}`. Parsed in `crates/protocol` (`ThreadEvent::parse`), applied by
   `crates/thread/src/state.rs` (`Thread::open`, `apply`). The rest: `build-thread.md`.
 
-## Sessions over JSON-RPC (`gateway.rs`)
+## Sessions over JSON-RPC (`client/rpc/`)
 
 - Frames and `session.info` carry the run's `execution_generation`; the gateway keeps the last
   per session (`Rpc::fences: HashMap<String, i64>`, set by `note_fence`). **Stop** =
@@ -66,7 +66,7 @@ Never send to "the" agent: there are several.
 
 ## The agent's lifecycle
 
-Restart (status bar) restarts the agent (`connection::restart_gateway` → `pi_agent::restart()`
+Restart (status bar) restarts the agent (`connection::restart_gateway` → `launch::restart()`
 on this Mac, the server's pid from `~/.bench/server.json` over SSH). Its runs are durable: an
 unfinished answer continues after the start, so nothing is refused (`Restart::Busy` stays for a
 backend that would refuse). Still, don't restart the user's agent yourself without a reason.
@@ -80,14 +80,14 @@ completion_reason, output_tail | output_preview}]}`. Shown as a row of its own a
 beside Changed files: a folded line "PROCESSES · 2 running", rows with the command
 (mono, truncated), a live clock or the exit code, **Stop** (`process.kill {session_id, process_id,
 profile}`, then poll again), and a click that unfolds the output tail. Running first, then newest.
-Bench `src/thread/processes.rs`, `gateway.rs` `processes()`, `src/thread/extras.rs` `render_processes`.
+Bench `src/thread/processes.rs`, `src/client/rpc/events.rs` `processes()`, `render_processes` in the same `src/thread/processes.rs`.
 
 ## Voice: dictation and reading aloud
 
 - **Dictate**: `cpal` records the default input as mono f32 (`audio.rs` `Recorder`), the level
   feeds the waveform; Stop → WAV bytes → `POST /api/audio/transcribe` `{data_url:
   "data:audio/wav;base64,…", mime_type: "audio/wav"}` (180 s timeout) → `{transcript}`, appended
-  to the composer (`rest.rs` `transcribe`). The STT engine is the agent's (`stt.openai.base_url /
+  to the composer (`client/rest/` `transcribe`). The STT engine is the agent's (`stt.openai.base_url /
   model / language` in the agent's settings — editable in the gear's Agents tab, per agent).
 - **Send while recording** = stop + transcribe + send in one press: `send()` sets
   `send_after_transcribe = true` and stops the mic; the transcription's callback sends. Esc
@@ -143,7 +143,7 @@ notification replaces the older one for the same thread.
 This Mac's agent always; a server's when the person adds it in the gear (Agents tab,
 `src/settings/agent_form.rs`). The list of servers' agents is kept by this Mac's agent
 (`agent/src/builtin/servers.ts`, setting `agents`, `/api/agents`); Bench installs and starts each
-over SSH (`pi_agent::ensure_remote`, Node 22.18+ on the server) and links to it
+over SSH (`launch::ensure_remote`, Node 22.18+ on the server) and links to it
 (`src/app/agents.rs`). A project = its agent + its machine (the agent's own, or a server this Mac's
 agent works on over SSH) + an optional folder; `src/app/places.rs` answers where
 (`build-projects.md`). The terminal on the project's machine comes into a thread as an insert

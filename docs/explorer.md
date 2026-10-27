@@ -57,7 +57,7 @@ its state and sign-in, a job with its schedule — is a **part**: a `Section`'s 
 tree and its `card()` in the middle (`DocKey::Part`). A new kind of thing in a project is one of
 the two: files need nothing new; a part is a `Section` with `home() == Explorer(<group>)`.
 
-The tree's work (`explorer/ops.rs`): folders are listed when they open (`/api/fs/list`), a name
+The tree's work (`explorer/ops.rs`; ⌘P `file_finder.rs`, ⌘⇧F `project_search.rs`): folders are listed when they open (`/api/fs/list`), a name
 is typed in place for a new file, folder, prompt, skill or a rename, a delete is asked once.
 ⌘P opens a file by name (`/api/fs/files`: ripgrep's list of the folder), ⌘⇧F finds a text in it
 (`/api/fs/grep`), ⌘S saves, ⌘W closes the tab.

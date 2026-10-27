@@ -29,7 +29,7 @@ Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()`, `media
 
 - Files may live on another machine (a server's agent, or a project's machine this Mac's agent
   works on over SSH). Read them through the agent's `/api/fs/…` — with `machine` for a project's
-  machine (`media::fetch(…, machine, …)`, `rest.rs` `on(machine)`; the thread's is
+  machine (`media::fetch(…, machine, …)`, `client/rest/files.rs` `on(machine)`; the thread's is
   `files_machine()`) — into the state dir's media cache (keep the file name: `open` and players
   use it). A file on this Mac is used in place — no copy.
 - **Lay out at the final size in the first frame** or the view jumps (the user notices every

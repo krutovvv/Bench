@@ -34,8 +34,8 @@ takes them again).
 | A head's icon, its "+" room | `head_icon`, `head_icon_in(icon, color, cx)` (a marked project's colour), `head_plus_slot()` | `list.rs` |
 | A file's icon | `file_icon(name, dir, theme)` | `list.rs` |
 | Bars | `header_bar`, `pane_bar`, `status_text`, `status_button`, `search_band` | `bars.rs` |
-| Icons | `Ico::…` (Lucide, `assets/icons/`) | `icons.rs` |
-| Theme | `theme::apply`, `Appearance` | `theme.rs` |
+| Icons | `Ico::…` (Lucide, `assets/icons/`) | `crates/ui/src/icons.rs` |
+| Theme | `theme::apply`, `Appearance` | `crates/ui/src/theme.rs` (the choice kept: `src/settings/appearance.rs`) |
 | Numbers as text | `plural`, `clock`, `compact`, `clip` | `fmt.rs` |
 
 ## Local helpers (one area's, built from the above)

@@ -30,10 +30,10 @@ y ┌─────────────────────────
 
 | Area | Height | Inside | Inset | Code |
 |---|---|---|---|---|
-| Top strip (over the sidebar) | 35 | icon buttons, right-aligned: + (New project), Hide sidebar | right 16 (`pr 12` + the icon's 4) | `render_sidebar_top`, `src/workspace/layout.rs` |
+| Top strip (over the sidebar) | 35 | icon buttons, right-aligned: + (New project), Hide sidebar | right 16 (`pr 12` + the icon's 4) | `render_sidebar_top`, `src/sidebar/top.rs` |
 | Search band | `bar_h + 1` | the search input, no frame | magnifier over the head icons (measured) | `bench_ui::search_band` (`crates/ui/src/bars.rs`), used in `src/sidebar/mod.rs` |
 | Sidebar list | rest | projects only: Host's threads first, then each project (pinned first) with its threads | nested rows `nest_pl` | `src/sidebar/mod.rs` (`render_loose`, `render_project`); order and acts `src/sidebar/items.rs` |
-| Header | 36 incl. its rule | the thread's title, the project chip; at the right end New window | left 16 (`pl_4`), right 8 (`pr_2`) | `render_header`, `src/workspace/layout.rs`; its right end `render_header_tail`, `src/inserts/terminal/form.rs` |
+| Header | 36 incl. its rule | the thread's title, the project chip; at the right end New window | left 16 (`pl_4`), right 8 (`pr_2`) | `render_header`, `src/titlebar/mod.rs`; its right end `render_header_tail`, `src/inserts/terminal/form.rs` |
 | The thread | rest | rows from `crates/thread`; inserts where the journal puts them; the tail | `CHAT_TEXT` / `CHAT_RIGHT`, rows `TURN_Y` | `render_chat`, `src/thread/mod.rs`; inserts `render_insert_by_id`, `src/inserts/mod.rs` |
 | Cards under an answer / the tail | — | Changed files, sources, processes, approval, plan; code, audio, video | the answer's column | `src/thread/extras.rs`, `src/media/view.rs` |
 | Composer | its text | text only, no buttons (⌘Enter sends); attachment chips over it | text at `CHAT_TEXT` | `src/thread/composer.rs` |

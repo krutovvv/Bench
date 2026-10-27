@@ -21,9 +21,9 @@ errors after each edit come from the project's language servers (rust-analyzer i
   `div().size_full().child(h_resizable("split").child(resizable_panel().child(a)).child(resizable_panel().child(b)))`
 - **`.into()` inside a tuple** (E0283, "type annotations needed"): name the types.
   `let (title, right): (SharedString, AnyElement) = ("Settings".into(), div().into_any_element());`
-- **A `src/` module named like a crate module** (E0255/E0425): `src/tools.rs` and
-  `src/ui/tools.rs` clash once both are imported. Name views after what they show:
-  `src/ui/tool_view.rs`.
+- **A `src/` module named like a crate** (E0659 "ambiguous"): `src/thread/` (the open thread on
+  screen) and the `thread` crate (`crates/thread`, its rows) share a name. In Bench write
+  `::thread::Row` for the crate and `crate::thread::…` for the module.
 
 ## A `Button` is not a row of text
 
