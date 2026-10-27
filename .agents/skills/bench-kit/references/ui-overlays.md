@@ -30,10 +30,13 @@ Button::new(("row-menu", i)).ghost().xsmall().icon(Ico::Ellipsis.icon())
 
 ## Right-click menu
 
-`.context_menu(move |menu, _, _| menu.item(…))` on the row element. Bench builds one menu,
-`item_menu` in `src/sidebar/mod.rs`, and gives it to both the row's hover "⋯" (`dropdown_menu`)
-and its right-click (`context_menu`): Settings, Open in Zed (projects), Pin, Rename (threads),
-colours, Delete.
+.`context_menu(move |menu, _, _| menu.item(…))` on the row element. Bench builds one menu,
+`item_menu` in `src/sidebar/menu.rs`, and gives it to both the row's hover "⋯"
+(`dropdown_menu`) and its right-click (`context_menu`): Explorer (projects), Open beside
+(threads), Pin, Rename (threads), colours, Delete. Controls that must be found are **on the
+row, on hover**, not in the menu: the project's gear (its environment, in the Explorer) and its
+"+" sit beside the "⋯"; the fold chevron is always shown. Settings is deliberately not a menu
+item -- a door that only opens on a right click is a door nobody finds.
 
 ## Popover (a panel on click)
 

@@ -59,7 +59,11 @@ impl BenchApp {
                     let fence = if code.contains("```") { "~~~~" } else { "```" };
                     // A patch without a language on the fence: its query colours deletions as
                     // keywords and additions as strings. Its head still says `diff` (`lang` below).
-                    let fence_lang = if lang == "diff" || lang == "patch" { "" } else { lang.as_str() };
+                    let fence_lang = if lang == "diff" || lang == "patch" {
+                        ""
+                    } else {
+                        lang.as_str()
+                    };
                     let md = format!("{fence}{fence_lang}\n{code}{fence}");
                     let body = TextView::new(&texts.state(&format!("code-{key}-{k}"), &md, cx));
                     render_code(body, key, k, lang, code, cx)

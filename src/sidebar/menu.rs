@@ -64,7 +64,8 @@ pub(super) fn color_row(
 }
 
 /// The menu of a sidebar item (its "⋯" and a right click), the same for a thread and a
-/// project: a project's own entries (settings, Explorer), then pin, color, rename, delete.
+/// project: a project's own entry (the Explorer), then pin, color, rename, delete. Settings is
+/// not here: the gear on the project's row is its door, and a right click hides a door.
 pub(super) fn item_menu(
     view: Entity<BenchApp>,
     item: Item,
@@ -87,16 +88,8 @@ pub(super) fn item_menu(
         let (rename, del) = (item.clone(), item.clone());
         let menu = match &item {
             Item::Project(id) => {
-                let env_id = id.clone();
-                menu.item(
-                    PopupMenuItem::new("Settings")
-                        .icon(Ico::Settings.icon())
-                        .on_click(act(Box::new(move |this, window, cx| {
-                            this.open_project_settings(env_id.clone(), window, cx)
-                        }))),
-                )
                 // Its files, prompts, skills and tools in the Explorer, here.
-                .item({
+                menu.item({
                     let id = id.clone();
                     PopupMenuItem::new("Explorer")
                         .icon(Ico::FolderTree.icon())

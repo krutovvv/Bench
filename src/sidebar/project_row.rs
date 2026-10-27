@@ -1,5 +1,6 @@
-//! A project in the sidebar: its head (an icon for what it is, the name, the fold, "+" for a new
-//! thread in it), then its threads on the head's guide.
+//! A project in the sidebar: its head (an icon for what it is, the name, and on hover "⋯", the
+//! gear (its environment in the Explorer) and "+" for a new thread in it; the fold is always
+//! shown), then its threads on the head's guide.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
@@ -15,8 +16,8 @@ use crate::sidebar::items::Item;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
-    /// A project: its head (an icon for what it is, the name, the fold, "+" for a new thread in
-    /// it), then its threads on the head's guide.
+    /// A project: its head and its threads on the head's guide (the controls of the head are in
+    /// `menu.rs`'s notes: hover "⋯", gear, "+", and the fold always shown).
     pub(super) fn render_project(
         &mut self,
         g: usize,
@@ -52,7 +53,7 @@ impl BenchApp {
                     ),
                     None => Some(format!("{h}: not connected")),
                 });
-        let (new_id, menu_id) = (p.id.clone(), p.id.clone());
+        let (new_id, menu_id, set_id) = (p.id.clone(), p.id.clone(), p.id.clone());
         let mark = self.mark_of(&format!("p:{}", p.id));
         let pinned = mark.pinned;
         // A chosen color is the project's icon and name, no background: it marks the group.
@@ -143,6 +144,27 @@ impl BenchApp {
                                     Item::Project(menu_id.clone()),
                                     pinned,
                                 )),
+                        ),
+                )
+                // The gear (on hover): the project's environment, in the Explorer. On the row, not
+                // in the menu — a door to Settings that only shows on a right click is a door
+                // nobody finds; the gear says settings, and what it opens says there is more.
+                .child(
+                    div()
+                        .flex_none()
+                        .opacity(0.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            Button::new(("pset", g))
+                                .ghost()
+                                .xsmall()
+                                .icon(Ico::Settings.icon())
+                                .tooltip("Settings")
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.open_project_settings(set_id.clone(), window, cx)
+                                })),
                         ),
                 )
                 .child(

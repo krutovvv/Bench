@@ -233,13 +233,13 @@ pub(super) fn render_code(
             gpui_kit::component::text::TextViewStyle::default()
                 .inline_code(code_span(&theme))
                 .code_block(
-                StyleRefinement::default()
-                    .text_size(rems(0.8125))
-                    .line_height(relative(bench_ui::LEAD))
-                    .border_0()
-                    // No fill, like the audio, video and changed-files cards: the frame alone.
-                    .bg(gpui_kit::transparent_black()),
-            ),
+                    StyleRefinement::default()
+                        .text_size(rems(0.8125))
+                        .line_height(relative(bench_ui::LEAD))
+                        .border_0()
+                        // No fill, like the audio, video and changed-files cards: the frame alone.
+                        .bg(gpui_kit::transparent_black()),
+                ),
         );
     let copy = code.trim_end_matches('\n').to_string();
     v_flex()
