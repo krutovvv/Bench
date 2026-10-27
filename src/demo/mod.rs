@@ -332,6 +332,34 @@ fewer form fields. Then check what it did to signups and give me a short summary
         })
         .detach();
     }
+    // `BENCH_DEMO_TYPE=1` writes a line into the composer two seconds in (with
+    // `BENCH_TOOLS_SHOWN=1` it shows the composer's hover tools where they sit with text).
+    if std::env::var("BENCH_DEMO_TYPE").is_ok() {
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(2))
+                .await;
+            this.update_in(cx, |app, window, cx| {
+                app.focus_composer(window, cx);
+                app.active_thread
+                    .update(cx, |v, cx| {
+                        v.composer.update(cx, |s, cx| {
+                            s.set_value(
+                                "Check the staging deploy and tell me whether it is healthy.\n\
+                                 \n\
+                                 Second paragraph, long enough to reach the very right of the \
+                                 field, where the tools' gutter keeps the paperclip and the mic \
+                                 clear of every word.",
+                                window,
+                                cx,
+                            );
+                        })
+                    });
+            })
+            .ok();
+        })
+        .detach();
+    }
     // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {
         open_thread(app, cx, |t| {

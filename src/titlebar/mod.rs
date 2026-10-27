@@ -6,7 +6,6 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
@@ -14,32 +13,15 @@ use crate::workspace::Center;
 
 impl BenchApp {
     /// The header's right end, the window's top-right corner: the Explorer's button — it opens
-    /// the project of the thread open now, and is pressed while that tree is shown (⌘E) — and,
-    /// with a document in the center, the button that shows the thread beside it (⌘J). Shown,
+    /// the project of the thread open now, and is pressed while that tree is shown (⌘E).
+    /// The thread-beside toggle lives by the terminal, in the status bar. Shown,
     /// the thread's own head takes this corner with its + and ×.
     fn render_header_tail(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let shown = self
-            .shown_panel(crate::workspace::DockPosition::Right)
-            .is_some();
         let ide = self.left_dock.shows(crate::workspace::Panel::Explorer);
         h_flex()
             .flex_none()
             .gap_1()
             .items_center()
-            .when(self.center == Center::Doc && !shown, |d| {
-                d.child(
-                    bench_ui::icon_button(
-                        "thread-beside",
-                        bench_ui::icons::Ico::MessagesSquare,
-                        "The thread beside  ⌘J",
-                        false,
-                        cx,
-                    )
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
-                    ),
-                )
-            })
             // The extreme corner, there whatever the center shows: one hop from a thread to its
             // project's files, and back by the same pressed button.
             .child(

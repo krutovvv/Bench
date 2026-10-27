@@ -107,6 +107,7 @@ icons! {
     Server => "server",
     Settings => "settings",
     Square => "square",
+    Sparkles => "sparkles",
     Terminal => "square-terminal",
     Trash => "trash",
     FilePlus => "file-plus",

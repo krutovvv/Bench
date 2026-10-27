@@ -14,6 +14,7 @@ use gpui_kit::*;
 
 use self::context::speed_panel;
 use crate::app::BenchApp;
+use crate::workspace::Center;
 use bench_ui::compact;
 use bench_ui::icons::Ico;
 
@@ -302,6 +303,28 @@ impl BenchApp {
                     background_terms,
                 ))
             })
+            // The thread beside, whenever a document fills the center: the agent's sparkle,
+            // before the terminal — it appears and goes, the terminal stays put. Out of the
+            // window's top corner, where it pushed the header around.
+            .when(
+                self.center == Center::Doc
+                    && self
+                        .shown_panel(crate::workspace::DockPosition::Right)
+                        .is_none(),
+                |d| {
+                    d.child(
+                        button(
+                            "thread-beside",
+                            Ico::Sparkles,
+                            "The thread beside  ⌘J",
+                            false,
+                        )
+                        .on_click(
+                            cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
+                        ),
+                    )
+                },
+            )
             // The bottom dock's terminal, on the project's machine (⌃`).
             .child({
                 let open = self.bottom_dock.shows(crate::workspace::Panel::Terminal);
@@ -309,58 +332,8 @@ impl BenchApp {
                     cx.listener(|this, _, window, cx| this.toggle_terminal_panel(window, cx)),
                 )
             })
-            .child(
-                button("attach", Ico::Paperclip, "Attach files", false)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.active_thread
-                            .update(cx, |v, cx| v.pick_attachments(window, cx))
-                    })),
-            )
-            // Dictation: the mic stays the mic while it records — a small bar on its edge shows
-            // the level (⌘⇧D or the same button stops). The typed text is never hidden: a
-            // thought is often dictated in pieces, with pauses and typing between them. A
-            // spinner while transcribing.
-            .child({
-                let recording = self.recorder.is_some();
-                if self.transcribing {
-                    item("mic")
-                        .text_color(muted)
-                        .child(
-                            gpui_kit::component::spinner::Spinner::new()
-                                .icon(Ico::Loader.icon())
-                                .small(),
-                        )
-                        .tooltip(|window, cx| Tooltip::new("Transcribing…").build(window, cx))
-                } else if recording {
-                    let level = self
-                        .recorder
-                        .as_ref()
-                        .map(|r| r.level())
-                        .unwrap_or(0.)
-                        .min(1.);
-                    item("mic")
-                        .text_color(theme.danger)
-                        .child(
-                            div().relative().child(Ico::Mic.icon().small()).child(
-                                div()
-                                    .absolute()
-                                    .right(px(-2.))
-                                    .bottom(px(1.))
-                                    .w(px(2.))
-                                    .h(px(2. + level * 9.))
-                                    .rounded(px(1.))
-                                    .bg(theme.danger),
-                            ),
-                        )
-                        .tooltip(|window, cx| {
-                            Tooltip::new("Stop and transcribe  ⌘⇧D").build(window, cx)
-                        })
-                        .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
-                } else {
-                    button("mic", Ico::Mic, "Dictate  ⌘⇧D", false)
-                        .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
-                }
-            })
+            // Attach and dictate left the status bar for the composer itself — they belong to
+            // the message being written, not to the window's furniture.
             // No Stop here anymore: the hold and the stop ride the actions' own line in the
             // thread — where the minutes go, there the answers belong too (⌘. still works).
     }

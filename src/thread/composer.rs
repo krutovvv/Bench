@@ -3,9 +3,12 @@
 //! files are dropped); stopping the agent is the status bar's control.
 
 use gpui_kit::component::input::Textarea;
+use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+
+use bench_ui::icons::Ico;
 
 use super::ThreadView;
 
@@ -136,6 +139,99 @@ impl ThreadView {
         }));
 
         let view = cx.entity();
+        // Attach and dictate, the writer's own two: while the field is empty they ride the
+        // text's opposite edge, centred on the avatar; once words come they step down to the
+        // last line's side, under the text. The field reserves their gutter always, so they
+        // never cover a word and nothing jumps when they move. Hidden until the composer is
+        // hovered — but a live recording or transcription stays on show, in quiet colours:
+        // the moving level bar already says "recording", red would only shout it twice.
+        let app = self.app.upgrade();
+        let muted = theme.muted_foreground;
+        let rec = app.as_ref().is_some_and(|a| a.read(cx).recorder.is_some());
+        let trans = app.as_ref().is_some_and(|a| a.read(cx).transcribing);
+        let level = app
+            .as_ref()
+            .and_then(|a| a.read(cx).recorder.as_ref().map(|r| r.level().min(1.)))
+            .unwrap_or(0.);
+        let empty = self.composer.read(cx).value().trim().is_empty();
+        // Empty: level with the avatar. Words: under them, at the last line's side. The
+        // bottom is computed from the composer's measured height rather than anchored
+        // with `bottom`, whose stretch semantics fought the fixed height.
+        let row_h = self.composer_h.max(2. * bench_ui::TURN_Y + bench_ui::AVATAR);
+        let top = if empty {
+            bench_ui::TURN_Y
+        } else {
+            (row_h - bench_ui::TURN_Y - bench_ui::AVATAR).max(bench_ui::TURN_Y)
+        };
+        let tools = h_flex()
+            .absolute()
+            .right_0()
+            .top(px(top))
+            .h(px(bench_ui::AVATAR))
+            .items_center()
+            .gap_1()
+            .when(!(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(), |d| {
+                d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.))
+            })
+            .child(
+                bench_ui::icon_button("composer-attach", Ico::Paperclip, "Attach files", false, cx)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.pick_attachments(window, cx)
+                    })),
+            )
+            .child(if trans {
+                div()
+                    .id("composer-mic")
+                    .flex_none()
+                    .p_1()
+                    .text_color(muted)
+                    .child(
+                        gpui_kit::component::spinner::Spinner::new()
+                            .icon(Ico::Loader.icon())
+                            .small(),
+                    )
+                    .tooltip(|window, cx| {
+                        Tooltip::new("Transcribing…").build(window, cx)
+                    })
+                    .into_any_element()
+            } else if rec {
+                div()
+                    .id("composer-mic")
+                    .flex_none()
+                    .p_1()
+                    .rounded_md()
+                    .cursor_pointer()
+                    .text_color(muted)
+                    .child(
+                        div().relative().child(Ico::Mic.icon().small()).child(
+                            div()
+                                .absolute()
+                                .right(px(-2.))
+                                .bottom(px(1.))
+                                .w(px(2.))
+                                .h(px(2. + level * 9.))
+                                .rounded(px(1.))
+                                .bg(theme.foreground),
+                        ),
+                    )
+                    .tooltip(|window, cx| {
+                        Tooltip::new("Stop and transcribe  ⌘⇧D").build(window, cx)
+                    })
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        if let Some(app) = this.app.upgrade() {
+                            app.update(cx, |app, cx| app.toggle_mic(window, cx));
+                        }
+                    }))
+                    .into_any_element()
+            } else {
+                bench_ui::icon_button("composer-mic", Ico::Mic, "Dictate  ⌘⇧D", false, cx)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        if let Some(app) = this.app.upgrade() {
+                            app.update(cx, |app, cx| app.toggle_mic(window, cx));
+                        }
+                    }))
+                    .into_any_element()
+            });
         v_flex()
             .id("composer")
             .relative()
@@ -190,6 +286,7 @@ impl ThreadView {
                 h_flex()
                     .id("composer-row")
                     .group("composer-row")
+                    .relative()
                     .w_full()
                     .pl(px(bench_ui::CHAT_LEFT))
                     .pr(px(bench_ui::CHAT_RIGHT))
@@ -221,7 +318,11 @@ impl ThreadView {
                                     // the font's own 1.41 em, which set typed lines 3 px
                                     // tighter than the thread's. 1.5rem is the thread's leading
                                     // exactly, since the thread's prose is 1rem.
-                                    div().ml(px(-12.)).my(px(-10.)).child(
+                                    div()
+                                        .ml(px(-12.))
+                                        .mr(px(56.))
+                                        .my(px(-10.))
+                                        .child(
                                         Textarea::new(&self.composer)
                                             .appearance(false)
                                             .large()
@@ -232,9 +333,17 @@ impl ThreadView {
                             // Files waiting to go, under the text — where they sit once sent,
                             // so the same message never flips while it is being written.
                             .when(!chips.is_empty(), |d| {
-                                d.child(h_flex().flex_wrap().gap_2().pb(px(6.)).children(chips))
+                                d.child(
+                                    h_flex()
+                                        .flex_wrap()
+                                        .gap_2()
+                                        .pr(px(56.))
+                                        .pb(px(6.))
+                                        .children(chips),
+                                )
                             }),
-                    ),
+                    )
+                    .child(tools),
             )
             // Last and deferred: painted over the rows under it.
             .children(slash.map(|s| deferred(s).with_priority(1)))
