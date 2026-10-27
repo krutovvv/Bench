@@ -11,6 +11,8 @@ export interface Totals {
 	cached?: number;
 	tps?: number;
 	started?: number;
+	/** How often Pi compacted the thread (its journal's summaries, `compactionsOf`). */
+	compactions?: number;
 }
 
 export const EMPTY_TOTALS: Totals = { input: 0, output: 0, calls: 0 };
@@ -24,12 +26,14 @@ export function totalsOf(v: unknown): Totals {
 	};
 	const cached = (v as any).cached;
 	const tps = (v as any).tps;
+	const compactions = (v as any).compactions;
 	return {
 		input: n("input"),
 		output: n("output"),
 		calls: n("calls"),
 		...(typeof cached === "number" ? { cached } : {}),
 		...(typeof tps === "number" ? { tps } : {}),
+		...(typeof compactions === "number" && isFinite(compactions) && compactions >= 0 ? { compactions } : {}),
 		...((v as any).started ? { started: (v as any).started } : {}),
 	};
 }
@@ -40,7 +44,7 @@ export function usagePayload(model: string, u: Totals, max: number): Record<stri
 		model,
 		context_used: u.input,
 		context_max: max,
-		compressions: 0,
+		compressions: u.compactions ?? 0,
 		cache_hit_pct: u.input ? Math.round(((u.cached ?? 0) / u.input) * 100) : 0,
 		input: u.input,
 		output: u.output,

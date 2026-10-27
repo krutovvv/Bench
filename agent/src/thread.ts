@@ -22,6 +22,9 @@ export type { QueuedItem, ThreadItem };
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
 export const FAIL_KIND = "bench.fail";
 
+/** Pi's compaction summary: a new context, with the older entries left out of what the model reads. */
+export const COMPACTION_KIND = "pi.compaction";
+
 export const INBOX_KIND = (InboxDoc as any).kind ?? "pi.inbox";
 export const INSERTS_KIND = (Inserts as any).kind ?? "bench.inserts";
 
@@ -56,7 +59,7 @@ export function itemsOf(entry: any): ThreadItem[] {
 		out.push({ key: `${seq}`, seq, kind: "fail", text: String(entry.data?.text ?? "") });
 		return out;
 	}
-	if (entry.kind === "pi.compaction" || entry.kind === "pi.system") return out;
+	if (entry.kind === COMPACTION_KIND || entry.kind === "pi.system") return out;
 	let n = 0;
 	const key = () => `${seq}.${n++}`;
 	for (const m of entry.model ?? []) {
@@ -83,6 +86,12 @@ export function itemsOf(entry: any): ThreadItem[] {
 /** The items of many entries, in journal order. */
 export function itemsOfAll(entries: readonly any[]): ThreadItem[] {
 	return [...entries].sort((a, b) => Number(a.id) - Number(b.id)).flatMap(itemsOf);
+}
+
+/** How often this thread was summarized: one for each summary in its journal. The journal keeps
+ *  them even though they are not rows, so the count is there again after a restart. */
+export function compactionsOf(entries: readonly any[]): number {
+	return entries.reduce((n, e) => n + (e?.kind === COMPACTION_KIND ? 1 : 0), 0);
 }
 
 /** The queue as Bench shows it: the inbox's own order, writes (inserts, notes) left out. */

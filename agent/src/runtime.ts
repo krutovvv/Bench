@@ -22,7 +22,7 @@ import { AGENT_HOME, agents, compactionAt, compactionPolicy, getSetting, readCon
 import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
-import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, FAIL_KIND, itemsOfAll, preview, queueOf, stripBlock, textOf } from "./thread.ts";
+import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, compactionsOf, FAIL_KIND, itemsOfAll, preview, queueOf, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { noThinking } from "./thinking.ts";
@@ -849,6 +849,14 @@ export class Runtime {
 			case "usage_changed":
 				this.emitUsage(live);
 				break;
+			// The summary itself is the count's source (the journal), but it arrived now: the bar
+			// moves without waiting for the thread to be read again. A failed compaction is not one.
+			case "compaction_end":
+				if (!e.error) {
+					live.usage.compactions = (live.usage.compactions ?? 0) + 1;
+					this.emitUsage(live);
+				}
+				break;
 			case "run_end":
 				this.finish(live);
 				this.queueChanged(live);
@@ -1009,6 +1017,14 @@ export class Runtime {
 			cursor = page.next;
 		} while (cursor);
 		const head = entries.reduce((m, e) => Math.max(m, Number(e.id)), since);
+		// How often the thread was compacted is a fact of its journal, and the journal is read
+		// here anyway: settle the number so a long thread's status bar says 22, not 0.
+		const compactions = compactionsOf(entries);
+		if (live.usage.compactions !== compactions) {
+			live.usage.compactions = compactions;
+			this.store.update(id, { usage: { ...live.usage } });
+			this.emitUsage(live);
+		}
 		const doc = (await this.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
 		const inbox = await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx);
 		return {

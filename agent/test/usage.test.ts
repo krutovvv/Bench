@@ -46,4 +46,15 @@ test("the counters of a turn are saved and read back after a restart", async () 
 	assert.equal(frame.context_used, saved.input);
 	assert.equal(frame.output, saved.output);
 	assert.equal(frame.calls, saved.calls);
+
+	// Reading the thread settles how often it was compacted (its journal is read there anyway).
+	await rt.thread(id);
+	assert.equal(totalsOf(new Store().get(id)!.usage).compactions, 0, "never compacted says 0, and is saved");
+});
+
+test("the bar's compactions are the thread's number, not a written zero", () => {
+	const frame = usagePayload("m", totalsOf({ input: 10, output: 5, calls: 2, compactions: 22 }), 128000);
+	assert.equal(frame.compressions, 22);
+	assert.equal(usagePayload("m", totalsOf({ input: 1 }), 1).compressions, 0, "a thread that never had one");
+	assert.equal(totalsOf({ input: 1, compactions: -3 }).compactions, undefined, "junk is nothing");
 });

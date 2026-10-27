@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { changesOf, FAIL_KIND, INBOX_KIND, INSERTS_KIND, itemsOf, itemsOfAll, queueOf } from "../src/thread.ts";
+import { changesOf, compactionsOf, COMPACTION_KIND, FAIL_KIND, INBOX_KIND, INSERTS_KIND, itemsOf, itemsOfAll, queueOf } from "../src/thread.ts";
 
 const user = (id: number, text: string) => ({ id, conversationId: 7, kind: "pi.user", model: [{ role: "user", content: text, timestamp: 1000 + id }] });
 const assistant = (id: number, content: any[], extra: any = {}) => ({ id, conversationId: 7, kind: "pi.assistant", model: [{ role: "assistant", content, timestamp: 1000 + id, ...extra }] });
@@ -55,6 +55,15 @@ test("a tool result, an insert, a fail note; compaction and system entries are n
 	assert.deepEqual(itemsOf({ id: 12, kind: FAIL_KIND, data: { text: "no model" } }), [{ key: "12", seq: 12, kind: "fail", text: "no model" }]);
 	assert.deepEqual(itemsOf({ id: 13, kind: "pi.compaction", data: {} }), []);
 	assert.deepEqual(itemsOf({ id: 14, kind: "pi.system", model: [{ role: "user", content: "x" }] }), []);
+});
+
+test("how often the thread was compacted comes from its journal", () => {
+	// The name the journal uses is the name the count looks for; a rename must not quietly
+	// return the status bar's zero.
+	assert.equal(COMPACTION_KIND, "pi.compaction");
+	const journal = [user(1, "a"), { id: 2, kind: COMPACTION_KIND }, assistant(3, [{ type: "text", text: "b" }]), { id: 4, kind: COMPACTION_KIND }, { id: 5, kind: "pi.system" }];
+	assert.equal(compactionsOf(journal), 2);
+	assert.equal(compactionsOf([]), 0);
 });
 
 test("items follow the journal's ids whatever order the entries came in", () => {
