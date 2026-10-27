@@ -100,15 +100,19 @@ impl InsertKind for Tools {
         if app.tools.tool != tool {
             app.select_tool(tool, window, cx);
         }
-        // As tall as its longer side (input or output): the thread scrolls, not the tool.
+        // As tall as its longer side (input or output): the thread scrolls, not the tool. But
+        // never taller than half the window — a pasted page would otherwise blow the row up to
+        // thousands of pixels; what doesn't fit, the editor scrolls inside its pane.
         let lines = |e: &Entity<gpui_kit::component::input::EditorState>| {
             e.read(cx).value().lines().count()
         };
         let n = lines(&app.tools.input).max(lines(&app.tools.output)) + 2;
-        let h = (n as f32 * bench_ui::editor_line(cx) + bench_ui::BLOCK_HEAD_H + 24.).max(MIN_H);
+        let want = px(n as f32 * bench_ui::editor_line(cx) + bench_ui::BLOCK_HEAD_H + 24.);
+        let cap = window.bounds().size.height * 0.5;
+        let h = want.max(px(MIN_H)).min(cap.max(px(MIN_H)));
         Some(
             div()
-                .h(px(h))
+                .h(h)
                 .mx(px(-12.))
                 .my(px(-8.))
                 .child(app.render_tools_body(cx))

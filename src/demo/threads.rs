@@ -158,6 +158,7 @@ is published.\n\nThe page is right here — click and type in it if something ne
         &match std::env::var("BENCH_DEMO_TOOL").as_deref() {
             Ok("html") => "tool:rich-text-to-markdown",
             Ok("preview") => "tool:markdown-preview",
+            Ok("long") => "tool:base64",
             _ => "tool:cron-parser",
         }
         .to_string(),
@@ -175,6 +176,15 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
     // `BENCH_DEMO_TOOL=html|preview`: the insert shows the pane that scrolls inside the thread
     // (the clipboard's rich text, a Markdown preview), with lines enough to scroll.
     match std::env::var("BENCH_DEMO_TOOL").as_deref() {
+        Ok("long") => {
+            // A pasted page: 120 lines of markup, the tallest thing a pane is asked to hold.
+            let one = (0..120)
+                .map(|n| format!("<div class=\"post\">{n} <!DOCTYPE html><h1>413 Request Entity Too Large</h1> openresty/1.15.8.2</div>"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            app.tools.inputs.insert(devtools::Tool::Base64, one.clone());
+            app.tools.preview = one;
+        }
         Ok("html") | Ok("preview") => {
             let lines = (1..=40)
                 .map(|n| format!("{n}. A line of the page, long enough to fill the pane's width."))
