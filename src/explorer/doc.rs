@@ -1,7 +1,7 @@
 //! What the Explorer opens: a file — on the project's machine, or the agent's own (its soul,
 //! prompts, skills are files there) — in an editor of its own, or a part of the project's
 //! environment that is not a file (an MCP server, a language server, a scheduled job), drawn by
-//! its `Section` (`env/`). A file opens in the middle as a tab, or beside; a part in the middle.
+//! its `Section` (`env/`). Each opens in the middle as a tab.
 
 use gpui_kit::component::input::{EditorState, InputEvent};
 use gpui_kit::component::notification::NotificationType;
@@ -65,7 +65,7 @@ impl FileRef {
     }
 }
 
-/// What a tab, or the pane beside, holds.
+/// What a tab holds.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DocKey {
     File(FileRef),

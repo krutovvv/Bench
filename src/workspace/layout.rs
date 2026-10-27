@@ -129,7 +129,7 @@ impl Render for BenchApp {
 
 impl BenchApp {
     /// The workspace's docks around the center (`workspace/mod.rs`): the sidebar | the center |
-    /// the file kept beside, the docks resizable and their widths kept.
+    /// the right dock's panel (the thread beside a document), the docks resizable and their widths kept.
     fn render_layout(
         &mut self,
         main: Div,

@@ -9,11 +9,11 @@ places that every view fills in its own way:
 │ Sidebar      │ The middle                    │ Beside         │
 │ (SidebarPanel) │ (Center)                        │ (optional)     │
 │              │                               │                │
-│ Threads      │ Chat — the open thread        │ a file kept    │
-│ Explorer     │ Doc — the open document, tabs │ next to the    │
-│              │ Providers — the gear          │ middle, for    │
-│              │ Project — a project's Settings│ reading while  │
-│              │ NewProject                    │ talking        │
+│ Threads      │ Chat — the open thread        │ the thread     │
+│ Explorer     │ Doc — the open document, tabs │ beside a       │
+│              │ Providers — the gear          │ document       │
+│              │ Project — a project's Settings│ (RightPanel::  │
+│              │ NewProject                    │  Thread)       │
 └──────────────┴───────────────────────────────┴────────────────┘
 ```
 
@@ -22,8 +22,8 @@ places that every view fills in its own way:
   way to look at things (search across threads, git, tasks) is a new `SidebarPanel` with its own
   list, nothing else changes.
 - **The center** is `Center` (`src/workspace/mod.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
-  file's click shows `Doc` with a tab per open document (the header holds the tabs instead of
-  the thread's title). Leaving the Explorer does not close documents: their tabs come back.
+  file's click shows `Doc` with a tab per open document (the tabs are the center's own bar,
+  under the window's title bar). Leaving the Explorer does not close documents: their tabs come back.
 - **The right dock** shows the thread beside a document (`RightPanel::Thread`, ⌘J or the
   button in the window's top-right corner) — the same thread the center shows in the threads
   view, so the IDE needs no chat of its own.
@@ -75,8 +75,8 @@ one click away) and grows by putting the same parts in more places, not by new c
 
 - **Docks hold panels, the center holds items** — as in Zed. The right dock shows one panel at
   a time (`RightPanel`): the open **thread** beside the code (the same `render_chat` the center
-  shows, so the IDE costs no second chat), or a **file** kept beside. In the threads view the
-  right dock shows only a file (the thread is the center).
+  shows, so the IDE costs no second chat). Files are never kept beside: they open as tabs. In
+  the threads view the right dock is empty (the thread is the center).
 - **Code goes to the thread as references.** ⌘L sends the selection (or the whole file) to the
   composer as a chip naming the file and lines; a tab dragged onto the thread, or its menu's
   "Add to thread", sends the file. A message carries them under its words as fenced blocks with
@@ -86,7 +86,7 @@ one click away) and grows by putting the same parts in more places, not by new c
 Phases, each a thing of its own:
 
 1. **Tabs and the thread beside** (done): tabs drag to reorder and have a menu (close others,
-   to the left, to the right, saved, all; copy the path; open beside; add to the thread); the
+   to the left, to the right, saved, all; copy the path; add to the thread); the
    right dock's panels; references from the code to the thread.
 2. **Language servers through the agent.** The agent already runs a project's servers
    (`agent/src/lsp.ts`); the editor already takes LSP providers (gpui's `Lsp`: diagnostics,

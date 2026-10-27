@@ -1,5 +1,5 @@
 //! The Explorer: a project seen as an editor sees it — a panel of the left dock (its tree), its
-//! documents in the center with tabs, a file kept in the right dock (`docs/explorer.md`,
+//! documents in the center with tabs, the thread in the right dock (`docs/explorer.md`,
 //! `src/workspace/mod.rs`). The tree has the project's folder (on its
 //! machine), what its agent reads as text (the soul, prompts, skills), its tools (MCP and
 //! language servers) and its schedule.
@@ -11,7 +11,7 @@
 //! explorer/tabs.rs  the tabs' drag and menu; code sent to the thread (⌘L)
 //! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder, Zed)
 //! explorer/tree.rs  the sidebar's tree
-//! explorer/view.rs  a document in the middle and beside, the tabs, ⌘P's list
+//! explorer/view.rs  a document in the middle, the tabs, the thread beside, ⌘P's list
 //! ```
 
 pub mod doc;

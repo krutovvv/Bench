@@ -1,6 +1,6 @@
 //! Documents drawn: the open one in the middle (a file in the code editor, a part of the
-//! environment as its `Section` draws it, a project's settings), the tabs in the header, the
-//! thread in the right dock, ⌘P's list over the middle. An editor fills its pane and scrolls itself, as in an IDE.
+//! environment as its `Section` draws it, a project's settings), the tabs in their own bar under the
+//! title bar, the thread in the right dock, ⌘P's list over the middle. An editor fills its pane and scrolls itself, as in an IDE.
 
 use gpui_kit::component::input::{Editor, Input};
 use gpui_kit::component::menu::ContextMenuExt as _;
