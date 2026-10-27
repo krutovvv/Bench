@@ -227,6 +227,27 @@ pub struct SlashCommand {
     pub key: String,
 }
 
+/// What the title bar's repository chip opens: the few things worth knowing about the repo the
+/// thread works in, read with git where it lives (this Mac, or over SSH).
+#[derive(Clone, Debug)]
+pub struct RepoInfo {
+    /// Files the working tree has changed since the last commit.
+    pub dirty: usize,
+    /// The newest commits, newest first.
+    pub commits: Vec<CommitBrief>,
+    /// The `origin` URL, when the repo has one.
+    pub remote: Option<String>,
+}
+
+/// One commit as the chip's menu shows it.
+#[derive(Clone, Debug)]
+pub struct CommitBrief {
+    pub sha: String,
+    pub subject: String,
+    /// "2 hours ago", git's own reckoning.
+    pub age: String,
+}
+
 /// The agent asks before running something (approval mode manual/smart): which pending
 /// prompt it is. The card — command and choices — is the journal's (`AskCard`).
 #[derive(Clone, Debug)]

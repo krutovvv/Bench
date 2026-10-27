@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::app::model::Project;
+use crate::app::model::{CommitBrief, Project, RepoInfo, Target};
 use crate::client::connection;
 use crate::client::rest;
 
@@ -140,6 +140,8 @@ impl BenchApp {
                         this.active_thread.update(cx, |v, _| {
                             v.thread.project = Some(Project::from_top(&top, &branch))
                         });
+                        // The branch may have moved: the chip reads the repo again.
+                        this.git_info.remove(&top);
                     }
                     // The folder is gone or not a repo: keep what the agent recorded, if anything.
                     Err(_) => {}
@@ -147,6 +149,58 @@ impl BenchApp {
                 cx.notify();
             },
         );
+    }
+
+    /// Read what the repo chip shows for one repo folder: uncommitted count, newest commits,
+    /// origin URL. Once per folder until it is dropped again (a run ending, a new branch).
+    pub(crate) fn refresh_git(&mut self, target: Target, dir: String, cx: &mut Context<Self>) {
+        if self.git_info.contains_key(&dir) || !self.git_reading.insert(dir.clone()) {
+            return;
+        }
+        cx.spawn(async move |this, cx| {
+            let at = dir.clone();
+            let r = cx
+                .background_spawn(async move {
+                    let dirty = connection::git(&target, &at, &["status", "--porcelain"])
+                        .unwrap_or_default()
+                        .lines()
+                        .count();
+                    let log = connection::git(
+                        &target,
+                        &at,
+                        &["log", "-n", "8", "--pretty=format:%h\x1f%s\x1f%ar"],
+                    )
+                    .unwrap_or_default();
+                    let commits = log
+                        .lines()
+                        .filter_map(|l| {
+                            let mut f = l.split('\x1f');
+                            Some(CommitBrief {
+                                sha: f.next()?.to_string(),
+                                subject: f.next()?.to_string(),
+                                age: f.next().unwrap_or_default().to_string(),
+                            })
+                        })
+                        .collect();
+                    let remote =
+                        connection::git(&target, &at, &["config", "--get", "remote.origin.url"])
+                        .ok()
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty());
+                    RepoInfo {
+                        dirty,
+                        commits,
+                        remote,
+                    }
+                })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.git_reading.remove(&dir);
+                this.git_info.insert(dir, r);
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     /// Off-thread work that does not need the gateway connection (git over SSH, etc.).

@@ -2,6 +2,9 @@
 //! (their tabs are the center's own bar, `explorer/view.rs`) with the thread-beside button, or a
 //! settings page's title and its close.
 
+use gpui_kit::component::button::{Button, ButtonVariants as _};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -56,8 +59,9 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// "app · main": the thread works in a git repository (its folder's name and branch). Git
-    /// itself is the agent's: ask it to commit, or to undo.
+    /// "app · main": the thread works in a git repository (its folder's name and branch). A
+    /// click opens what the repo is: uncommitted changes, the newest commits (a click copies
+    /// the sha), its origin. Git itself stays the agent's: ask it to commit, or to undo.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let p = self.thread(cx).project.clone()?;
         let label = if p.branch.is_empty() {
@@ -65,17 +69,69 @@ impl BenchApp {
         } else {
             format!("{} · {}", p.name(), p.branch)
         };
+        let at = self.thread_ref(cx);
+        let dir = p.dir.clone();
+        if !self.git_info.contains_key(&dir) {
+            let target = self.thread_target(&at);
+            self.refresh_git(target, dir.clone(), cx);
+        }
         let theme = cx.theme();
+        let info = self.git_info.get(&dir).cloned();
+        let app = cx.entity().downgrade();
+        let copy = |app: gpui::WeakEntity<BenchApp>, what: String| {
+            PopupMenuItem::new(what.clone()).on_click(move |_, window, cx| {
+                let what = what.clone();
+                let _ = app.update(cx, |this, cx| {
+                    cx.write_to_clipboard(ClipboardItem::new_string(what.clone()));
+                    this.toast(
+                        NotificationType::Info,
+                        format!("Copied {what}"),
+                        window,
+                        cx,
+                    );
+                });
+            })
+        };
         Some(
-            h_flex()
-                .flex_none()
-                .gap_1()
-                .px_1()
-                .items_center()
-                .text_sm()
+            Button::new("repo-chip")
+                .ghost()
+                .small()
                 .text_color(theme.muted_foreground)
-                .child(bench_ui::icons::Ico::GitBranch.icon().small())
-                .child(label)
+                .icon(bench_ui::icons::Ico::GitBranch.icon().small())
+                .label(label)
+                .dropdown_menu(move |menu, _, _| {
+                    let mut menu = menu.item(PopupMenuItem::label(dir.clone()));
+                    let Some(info) = info.clone() else {
+                        return menu.item(PopupMenuItem::new("Reading the repo…").disabled(true));
+                    };
+                    menu = menu.item(
+                        PopupMenuItem::new(if info.dirty == 0 {
+                            "Nothing uncommitted".to_string()
+                        } else {
+                            format!("{} uncommitted", info.dirty)
+                        })
+                        .icon(bench_ui::icons::Ico::CircleDot.icon())
+                        .disabled(true),
+                    );
+                    if !info.commits.is_empty() {
+                        menu = menu.separator();
+                        for c in info.commits {
+                            menu = menu.item(
+                                copy(
+                                    app.clone(),
+                                    format!("{}  {} · {}", c.sha, c.subject, c.age),
+                                )
+                                .disabled(false),
+                            );
+                        }
+                    }
+                    if let Some(url) = info.remote {
+                        menu = menu
+                            .separator()
+                            .item(copy(app.clone(), url).icon(bench_ui::icons::Ico::Globe.icon()));
+                    }
+                    menu
+                })
                 .into_any_element(),
         )
     }

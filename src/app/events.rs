@@ -30,6 +30,8 @@ impl BenchApp {
                 let label = self.thread_target(&view.read(cx).thread_ref()).label();
                 self.media
                     .retain(|k, _| !k.starts_with(&format!("{label}\0")));
+                // It may also have committed in any repo the windows show: the chips re-read.
+                self.git_info.clear();
             }
             // A command that expanded into a prompt (skills, /goal, …) runs as a turn of its
             // thread, whichever it is.
