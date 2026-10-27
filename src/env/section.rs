@@ -407,13 +407,16 @@ pub fn choices(
         .border_1()
         .border_color(theme.border)
         .overflow_hidden()
+        // A field's text: the choices read as the fields around them.
+        .text_sm()
         .children(items.into_iter().enumerate().map(|(k, (label, on))| {
             let pick = pick.clone();
             h_flex()
                 .id((id, k))
+                .h(px(bench_ui::FIELD_H))
                 .px_3()
-                .py_1()
                 .gap_2()
+                .items_center()
                 .cursor_pointer()
                 .when(k > 0, |d| {
                     d.border_t_1().border_color(theme.border.opacity(0.5))
