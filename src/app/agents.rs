@@ -8,10 +8,10 @@ use std::sync::Arc;
 
 use gpui_kit::*;
 
-use super::BenchApp;
-use crate::connection::Connection;
-use crate::gateway::{Cmd, Evt, Gateway};
-use crate::model::{ProjectKey, Target};
+use crate::app::BenchApp;
+use crate::app::model::{ProjectKey, Target};
+use crate::client::connection::Connection;
+use crate::client::rpc::{Cmd, Evt, Gateway};
 
 /// One agent: its command channel, its REST connection once up, why it is not up.
 pub struct AgentLink {
@@ -118,7 +118,7 @@ impl BenchApp {
         cx.spawn(async move |this, cx| {
             let build = cx
                 .background_spawn(async move {
-                    crate::rest::get_json(&conn, "/api/status")
+                    crate::client::rest::get_json(&conn, "/api/status")
                         .ok()
                         .and_then(|v| v["build"].as_str().map(str::to_string))
                 })
@@ -176,7 +176,9 @@ impl BenchApp {
         let target = Target::Ssh(host.clone());
         cx.spawn_in(window, async move |this, cx| {
             let _ = cx
-                .background_spawn(async move { crate::connection::restart_gateway(&target, true) })
+                .background_spawn(async move {
+                    crate::client::connection::restart_gateway(&target, true)
+                })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| {
                 this.agents.remove(&host);

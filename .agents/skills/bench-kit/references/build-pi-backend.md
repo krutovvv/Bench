@@ -9,9 +9,9 @@ lists what is Pi's, what is a package and what is ours.
 
 - **Protocol** (ours): JSON-RPC 2.0 over `ws://…/api/ws?token=`, REST under `/api/` with the
   token in a header (`Connection::rest_auth`, `connection.rs`; checked in `server.ts`). Bench's
-  client code speaks it in `src/gateway.rs` / `src/rest.rs`. Its calls still name the agent dir
+  client code speaks it in `src/client/rpc/` / `src/client/rest/`. Its calls still name the agent dir
   `profile` (a wire name only: there are no profiles in the UI).
-- **Start**: `src/pi_agent.rs`. On this Mac `ensure()` copies the sources the app carries
+- **Start**: `src/client/launch.rs`. On this Mac `ensure()` copies the sources the app carries
   (`Contents/Resources/agent`, or the repo's `agent/` for a dev build) to `~/.bench/app`, runs
   `npm ci` when `package-lock.json` changed, starts `node src/server.ts`, reads `~/.bench/server.json`.
   Over SSH `ensure_remote(host)` ships the sources as a tar over ssh, installs, starts, and Bench

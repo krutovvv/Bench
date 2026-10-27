@@ -182,7 +182,7 @@ impl Session {
             cmd.arg("-l");
         } else {
             // The shared connection: this terminal reuses it, or opens it for the IDE and the agent.
-            cmd.args(crate::ssh::share_args());
+            cmd.args(crate::system::ssh::share_args());
             cmd.arg(host);
         }
         cmd.env("TERM", "xterm-256color");

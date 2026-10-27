@@ -31,7 +31,7 @@ Button::new(("row-menu", i)).ghost().xsmall().icon(Ico::Ellipsis.icon())
 ## Right-click menu
 
 `.context_menu(move |menu, _, _| menu.item(…))` on the row element. Bench builds one menu,
-`item_menu` in `src/ui/sidebar.rs`, and gives it to both the row's hover "⋯" (`dropdown_menu`)
+`item_menu` in `src/sidebar/mod.rs`, and gives it to both the row's hover "⋯" (`dropdown_menu`)
 and its right-click (`context_menu`): Settings, Open in Zed (projects), Pin, Rename (threads),
 colours, Delete.
 
@@ -44,7 +44,7 @@ Popover::new("stats").anchor(gpui_kit::Anchor::BottomRight)
 ```
 
 `trigger` must be selectable (a `Button` is). Anchor `BottomRight` for things in the status bar.
-Bench: the context-usage, speed and agent readouts in `src/ui/statusbar.rs`.
+Bench: the context-usage, speed and agent readouts in `src/statusbar/mod.rs`.
 
 ## Tooltip
 
@@ -61,13 +61,13 @@ in `src/app.rs`.
 
 ## A list attached to a field (the `/` commands)
 
-`render_slash` in `src/ui/composer.rs`: an absolute panel (`bg(theme.popover)`, `border_1`,
+`render_slash` in `src/thread/composer.rs`: an absolute panel (`bg(theme.popover)`, `border_1`,
 `rounded_md`) at the text's column, under the line being typed — the composer is the thread's
 last row and the thread scrolls on past it, so there is room. When the window has none below
 (`viewport_h` against `composer_y` and the list's own height), it opens above the line. The
 parent is `.relative()`; the list scrolls inside itself (`max_h`, `track_scroll`) — a popover,
 not the thread. Keys (↑ ↓ Tab Esc) are caught with `.capture_key_down` on the
-composer before the text field gets them (`ui-gotchas.md`, "Keyboard"). Bench `src/ui/composer.rs`.
+composer before the text field gets them (`ui-gotchas.md`, "Keyboard"). Bench `src/thread/composer.rs`.
 
 ## Loading
 
@@ -80,7 +80,7 @@ composer before the text field gets them (`ui-gotchas.md`, "Keyboard"). Bench `s
 
 A small bordered block under a chat answer for things the answer produced: changed files,
 sources, background processes (status, output, Stop). Same indent as the answer, actions on
-the right of each line. Bench `render_processes` in `src/ui/thread/extras.rs`.
+the right of each line. Bench `render_processes` in `src/thread/extras.rs`.
 
 ## No dialogs for simple choices
 

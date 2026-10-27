@@ -21,9 +21,9 @@ errors after each edit come from the project's language servers (rust-analyzer i
   `div().size_full().child(h_resizable("split").child(resizable_panel().child(a)).child(resizable_panel().child(b)))`
 - **`.into()` inside a tuple** (E0283, "type annotations needed"): name the types.
   `let (title, right): (SharedString, AnyElement) = ("Settings".into(), div().into_any_element());`
-- **A `ui/` module named like a crate module** (E0255/E0425): `src/tools.rs` and
-  `src/ui/tools.rs` clash once both are imported. Name views after what they show:
-  `src/ui/tool_view.rs`.
+- **A `src/` module named like a crate** (E0659 "ambiguous"): `src/thread/` (the open thread on
+  screen) and the `thread` crate (`crates/thread`, its rows) share a name. In Bench write
+  `::thread::Row` for the crate and `crate::thread::…` for the module.
 
 ## A `Button` is not a row of text
 
@@ -31,7 +31,7 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
 - **Its label's font comes from its size, not from the parent.** `.small()` sets the label's
   size inside the button (`button_text_size`), so a `.text_xs()` on the bar or on the button
   itself changes nothing. A label of another size is a child: `Button::new(id).ghost().small()
-  .child(div().text_xs().child(label))` (the status bar, `src/ui/statusbar.rs`).
+  .child(div().text_xs().child(label))` (the status bar, `src/statusbar/mod.rs`).
 - **Its label is one line** (`whitespace_nowrap` + `text_ellipsis`) and the button is as wide
   as it: a long label pushes it past its card. Text that must wrap (a choice of the agent's
   question) is a row, not a button: `choice_row(id, cx).child(text)` (`crates/ui/src/list.rs`).
@@ -49,7 +49,7 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
 
 ## Scrolling
 
-- **Only the thread scrolls.** It is a `gpui::list` (`ListState`, `src/ui/thread/mod.rs`), not
+- **Only the thread scrolls.** It is a `gpui::list` (`ListState`, `src/thread/mod.rs`), not
   a scrolling `v_flex`: rows that changed are `remeasure_items`d in place; the count changes
   by `splice` at the end only — splicing a range in the middle resets the offset inside it (the
   jitter). Never ask the list (`viewport_bounds`, `bounds_for_item`) inside `render_item`: it is

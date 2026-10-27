@@ -15,6 +15,7 @@
 
 pub mod browser;
 pub mod state;
+pub mod subjects;
 pub mod tasks;
 pub mod terminal;
 pub mod tools;
@@ -26,8 +27,8 @@ use gpui_kit::*;
 use serde_json::Value;
 
 use crate::app::BenchApp;
-use crate::icons::Ico;
-use crate::model::{Insert, SlashCommand};
+use crate::app::model::{Insert, SlashCommand};
+use bench_ui::icons::Ico;
 
 /// What the title's menu offers: show something else (`to`, a patch of the insert: its key, its
 /// state).
@@ -174,14 +175,14 @@ impl BenchApp {
         let theme = cx.theme().clone();
         h_flex()
             .w_full()
-            .pl(px(crate::ui::CHAT_LEFT))
-            .pr(px(crate::ui::CHAT_RIGHT))
-            .py(px(crate::ui::TURN_Y))
-            .gap(px(crate::ui::CHAT_TEXT
-                - crate::ui::CHAT_LEFT
-                - crate::ui::AVATAR))
+            .pl(px(bench_ui::CHAT_LEFT))
+            .pr(px(bench_ui::CHAT_RIGHT))
+            .py(px(bench_ui::TURN_Y))
+            .gap(px(bench_ui::CHAT_TEXT
+                - bench_ui::CHAT_LEFT
+                - bench_ui::AVATAR))
             .items_start()
-            .child(crate::ui::avatar(true, &theme))
+            .child(bench_ui::avatar(true, &theme))
             .child(
                 div()
                     .flex_1()
@@ -307,7 +308,7 @@ impl BenchApp {
                 })
                 .into_any_element()
         };
-        let head = crate::ui::block_head(&theme, body.is_some())
+        let head = bench_ui::block_head(&theme, body.is_some())
             .gap_1()
             .child(fold)
             .child(title_el)
@@ -339,14 +340,14 @@ impl BenchApp {
             .children(body.map(|b| div().px_3().py_2().child(b)));
         h_flex()
             .w_full()
-            .pl(px(crate::ui::CHAT_LEFT))
-            .pr(px(crate::ui::CHAT_RIGHT))
-            .py(px(crate::ui::TURN_Y))
-            .gap(px(crate::ui::CHAT_TEXT
-                - crate::ui::CHAT_LEFT
-                - crate::ui::AVATAR))
+            .pl(px(bench_ui::CHAT_LEFT))
+            .pr(px(bench_ui::CHAT_RIGHT))
+            .py(px(bench_ui::TURN_Y))
+            .gap(px(bench_ui::CHAT_TEXT
+                - bench_ui::CHAT_LEFT
+                - bench_ui::AVATAR))
             .items_start()
-            .child(crate::ui::avatar(false, &theme))
+            .child(bench_ui::avatar(false, &theme))
             .child(
                 div()
                     .flex_1()

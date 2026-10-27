@@ -8,7 +8,7 @@ use anyhow::{Result, anyhow};
 use chrono::NaiveDate;
 use serde_json::{Value, json};
 
-use crate::connection::Connection;
+use crate::client::connection::Connection;
 use crate::inserts::tasks::model::Task;
 
 /// What the window asks of the store.
@@ -47,7 +47,7 @@ impl TaskStore {
                     Cmd::Save { task, token } => {
                         save(&conn, &profile, &task).map(|id| Some(Evt::Created { token, id }))
                     }
-                    Cmd::Delete(id) => crate::rest::send_json(
+                    Cmd::Delete(id) => crate::client::rest::send_json(
                         &conn,
                         "DELETE",
                         &format!("/api/tasks/{id}"),
@@ -116,7 +116,7 @@ fn to_json(t: &Task) -> Value {
 }
 
 fn load(conn: &Connection, profile: &str, done_since: NaiveDate) -> Result<Vec<Task>> {
-    let v = crate::rest::get_raw(
+    let v = crate::client::rest::get_raw(
         conn,
         profile,
         &format!("/api/tasks?done_since={}", done_since.format("%Y-%m-%d")),
@@ -133,9 +133,9 @@ fn load(conn: &Connection, profile: &str, done_since: NaiveDate) -> Result<Vec<T
 
 fn save(conn: &Connection, profile: &str, t: &Task) -> Result<String> {
     let v = if t.id.is_empty() {
-        crate::rest::send_json(conn, "POST", "/api/tasks", profile, to_json(t))?
+        crate::client::rest::send_json(conn, "POST", "/api/tasks", profile, to_json(t))?
     } else {
-        crate::rest::send_json(
+        crate::client::rest::send_json(
             conn,
             "PUT",
             &format!("/api/tasks/{}", t.id),

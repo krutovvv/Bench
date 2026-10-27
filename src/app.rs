@@ -1,59 +1,45 @@
-//! Application state, gateway events and user actions. Rendering lives in `ui/`.
+//! Application state, gateway events and user actions. Rendering lives with each area of the window
+//! (`workspace/`, `titlebar/`, `sidebar/`, `thread/`, `settings/`, `statusbar/`).
 
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 
 use web_time::Instant;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
+use gpui_kit::component::input::{InputState, TextareaState};
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::select::{SelectEvent, SelectState};
+use gpui_kit::component::select::SelectState;
 use gpui_kit::*;
 
-pub(crate) mod agent_form;
 pub(crate) mod agents;
-mod asks;
-pub mod attachments;
 mod backend;
+mod connect;
 mod events;
 mod keys;
-pub mod marks;
-pub(crate) mod mcp_status;
 pub mod menu;
+pub(crate) mod model;
 pub(crate) mod places;
-pub(crate) mod presets;
-mod processes;
-pub(crate) mod project_list;
 pub(crate) mod projects;
-mod send;
-mod sessions;
-pub(crate) mod sidebar_items;
-mod telegram;
-mod voice;
-mod workspace;
-pub use crate::env::ProjectEnv;
-pub use crate::env::project_form::ProjectForm;
-mod prompts;
-pub(crate) mod providers;
-mod slash;
-pub(crate) mod subjects;
+pub(crate) mod shortcuts;
+mod subscriptions;
 
-use crate::audio::{Playback, Recorder};
-use crate::connection::{self, Connection};
-use crate::gateway::{Cmd, Evt, Gateway};
+use crate::env::ProjectEnv;
+use crate::settings::new_project::ProjectForm;
+use crate::workspace::{Center, RightPanel, SidebarPanel};
+
+use crate::app::model::{EFFORTS, Profile, SessionRow, SkillRow, Target, Usage};
+use crate::client::connection::{self};
+use crate::client::rest;
+use crate::client::rpc::Evt;
+use crate::media::audio::{Playback, Recorder};
 use crate::media::{self, Loaded};
-use crate::model::{EFFORTS, Profile, SessionRow, SkillRow, Target, Usage};
-use crate::rest;
 
 pub type Choice = SelectState<Vec<SharedString>>;
 
 /// This machine's own project (the agent's general environment): installing, building, looking
 /// after the machine. A server's is a project named after it ("Dev"); Host is first in the sidebar.
 pub const LOCAL_HOST: &str = "Host";
-
-pub use workspace::{Center, RightPanel, SidebarPanel};
 
 /// The open thread's run, as the status says it: what the agent is doing.
 pub struct Live {
@@ -64,11 +50,11 @@ pub struct BenchApp {
     pub targets: Vec<Target>,
     pub target: Target,
     /// The gateway list as a Select (kept for its subscription; the status bar has its own menu).
-    _target_choice: Entity<Choice>,
+    pub(crate) _target_choice: Entity<Choice>,
     /// The subject of the chat about to be created ("tasks:today"): it goes with session.create.
     pub new_subject: String,
     /// Each thread's inserts (by session id; "draft" for a new chat): `app::inserts`.
-    pub inserts: HashMap<String, Vec<crate::model::Insert>>,
+    pub inserts: HashMap<String, Vec<crate::app::model::Insert>>,
     /// A new chat's session is being made (an insert came before any message).
     pub creating: bool,
     /// Inserts put while a message still waited in the composer: they belong after that message,
@@ -81,7 +67,7 @@ pub struct BenchApp {
     /// The project the open thread belongs to (a new one is created in it); "" = none.
     pub thread_project: String,
     /// The person's projects: the sidebar.
-    pub projects: Vec<crate::model::ProjectEntry>,
+    pub projects: Vec<crate::app::model::ProjectEntry>,
     /// The machine's own agent (Host) has the watchable server browser.
     pub host_browser: bool,
     /// The new project's form, in the chat area while open (the sidebar's "+").
@@ -96,23 +82,23 @@ pub struct BenchApp {
     /// The agent whose models and voice the gear shows ("" = this Mac's).
     pub gear_agent: String,
     /// The person's presets (this Mac's agent's) and the kind open to edit in the gear.
-    pub presets: presets::Presets,
-    pub preset_editor: Option<presets::PresetEditor>,
+    pub presets: crate::settings::presets::Presets,
+    pub preset_editor: Option<crate::settings::presets::PresetEditor>,
     /// The reasoning levels offered (the presets'; `EFFORTS` until they are read).
     pub efforts: Vec<String>,
     /// The gear's tab: agents, presets, look.
     pub gear_tab: usize,
     /// The gear's "+ Agent on a server" form, while open (`agent_form.rs`).
-    pub agent_form: Option<agent_form::AgentForm>,
+    pub agent_form: Option<crate::settings::agent_form::AgentForm>,
     /// A thread or project being renamed in the sidebar (`sidebar_items.rs`).
-    pub renaming: Option<sidebar_items::Renaming>,
+    pub renaming: Option<crate::sidebar::items::Renaming>,
     /// The sidebar's keys (↑ ↓ ⌫) while it has the focus, after a click on a thread.
     pub sidebar_focus: FocusHandle,
     /// The sources of `projects` (`places.rs`): this Mac's agent's projects, the servers' agents
     /// this Mac knows, and each server's own projects as its agent last listed them.
-    pub local_projects: Vec<crate::model::ProjectEntry>,
+    pub local_projects: Vec<crate::app::model::ProjectEntry>,
     pub server_agents: Vec<places::ServerAgent>,
-    pub server_projects: HashMap<String, Vec<crate::model::ProjectEntry>>,
+    pub server_projects: HashMap<String, Vec<crate::app::model::ProjectEntry>>,
     /// BENCH_SUBJECT was opened (once).
     pub subject_opened: bool,
     /// Sites on the server's browser: each turn's tab, live or as its last frame.
@@ -125,7 +111,7 @@ pub struct BenchApp {
     pub click_at: Option<Point<Pixels>>,
     /// The composer shows a new chat (no placeholder) — what render last set.
     pub composer_fresh: bool,
-    evt_tx: async_channel::Sender<Evt>,
+    pub(crate) evt_tx: async_channel::Sender<Evt>,
     pub connecting: bool,
 
     pub profiles: Vec<Profile>,
@@ -138,9 +124,9 @@ pub struct BenchApp {
     pub runtime: Option<String>,
     pub confirm_delete: Option<String>,
     /// Stored id -> runtime id for sessions this client has opened (to close before delete).
-    opened: HashMap<String, String>,
+    pub(crate) opened: HashMap<String, String>,
     /// Telegram: session id -> owner user id; known people; whose sessions to show (None = all).
-    tg_owner: HashMap<String, String>,
+    pub(crate) tg_owner: HashMap<String, String>,
     pub tg_people: Vec<(String, String)>,
     pub tg_visible: Option<HashSet<String>>,
 
@@ -149,11 +135,11 @@ pub struct BenchApp {
     /// Each thread opened in this run, as last shown: switching back shows it at once.
     pub thread_cache: HashMap<String, ::thread::Thread>,
     /// The open thread on screen: its list and rows (`ui::thread`).
-    pub tv: crate::ui::thread::View,
+    pub tv: crate::thread::View,
     /// Opened pieces of work and steps, by the work row's key.
     pub open_work: HashSet<String>,
     /// The open thread's texts, parsed once (`ui::media::Texts`).
-    pub texts: crate::ui::media::Texts,
+    pub texts: crate::media::text::Texts,
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
     pub history_error: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer.
@@ -161,21 +147,21 @@ pub struct BenchApp {
     /// `BENCH_DEMO_SCROLL=end` was done.
     pub demo_scrolled: bool,
     pub live: Option<Live>,
-    queued: Option<String>,
+    pub(crate) queued: Option<String>,
     /// Send was pressed while dictating: send once the speech is recognized.
     pub send_after_transcribe: bool,
     /// The "Changed files" list under the last turn is unfolded (folded by default).
     pub files_open: bool,
-    /// The open session's background processes (`app/processes.rs`), the card's fold, and
+    /// The open session's background processes (`thread/processes.rs`), the card's fold, and
     /// the process whose output is shown.
-    pub processes: Vec<crate::model::BgProcess>,
+    pub processes: Vec<crate::app::model::BgProcess>,
     pub processes_open: bool,
     pub process_open: Option<String>,
     /// Files waiting in the composer to go with the next message.
     pub attachments: Vec<std::path::PathBuf>,
     /// The project's code sent to a thread from the Explorer, waiting with its message, by
     /// `thread_key` (each thread its own, as its draft).
-    pub references: HashMap<String, Vec<attachments::CodeRef>>,
+    pub references: HashMap<String, Vec<crate::thread::attachments::CodeRef>>,
     /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
     pub sidebar_hidden: bool,
     pub usage: Option<Usage>,
@@ -186,36 +172,36 @@ pub struct BenchApp {
     /// provider's default): shown as it is, nothing checked.
     pub effort_other: Option<String>,
     /// The profile's `agent.reasoning_effort`: where a new chat starts.
-    profile_effort: usize,
+    pub(crate) profile_effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
     pub profile_models: Vec<rest::ModelChoice>,
     /// Settings → Providers and Messages.
-    pub pv: providers::Providers,
+    pub pv: crate::settings::providers::Providers,
     /// The gateway's state for the status bar's backend item (refreshed every 10 s):
     /// None before the first answer, Err when the gateway didn't answer.
     pub gw_status: Option<Result<rest::GatewayStatus, String>>,
     /// The last lines of the agent's log, from where it runs (its own status item shows them).
     pub gw_log: Vec<String>,
     /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
-    pub catalog: Vec<crate::model::SlashCommand>,
+    pub catalog: Vec<crate::app::model::SlashCommand>,
     pub slash_sel: usize,
     pub slash_closed: bool,
     pub slash_scroll: ScrollHandle,
     /// The agent waits for an answer (approval mode manual/smart).
-    pub approval: Option<crate::model::ApprovalReq>,
+    pub approval: Option<crate::app::model::ApprovalReq>,
     /// A question the agent asks, the choices ticked so far (multi-select), the free answer.
-    pub clarify: Option<crate::model::ClarifyReq>,
+    pub clarify: Option<crate::app::model::ClarifyReq>,
     pub clarify_picked: Vec<usize>,
     pub clarify_input: Entity<InputState>,
     /// The agent's plan for this chat, and whether its list is unfolded.
-    pub todos: Vec<crate::model::Todo>,
+    pub todos: Vec<crate::app::model::Todo>,
     pub plan_open: bool,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
     /// The profile's own approvals, effort and model have arrived: until then the status bar
     /// shows none of them (defaults there would only mislead).
     pub profile_ready: bool,
-    /// A made-up session for screenshots (`BENCH_DEMO=1`, src/demo.rs): nothing is connected.
+    /// A made-up session for screenshots (`BENCH_DEMO=1`, src/demo/mod.rs): nothing is connected.
     pub demo: bool,
     /// The demo's threads by session id (opening one shows its turns; nothing is fetched).
     pub demo_threads: HashMap<String, ::thread::Thread>,
@@ -225,18 +211,18 @@ pub struct BenchApp {
     /// `model.context_length` of the profile (0 when not set).
     pub profile_context: u64,
     /// Colors and pins of sessions (this Mac).
-    pub marks: HashMap<String, marks::Mark>,
+    pub marks: HashMap<String, crate::sidebar::marks::Mark>,
     /// This window was opened for a given profile/session (else: where the app was last).
-    start_place: Option<(Option<String>, Option<String>)>,
+    pub(crate) start_place: Option<(Option<String>, Option<String>)>,
     /// Session folders/repos as the agent recorded them, and repos inferred from edited files.
-    pub places: HashMap<String, crate::model::Place>,
+    pub places: HashMap<String, crate::app::model::Place>,
     pub inferred: HashMap<String, String>,
     /// The open session's project (None for chats that touch no repo).
-    pub project: Option<crate::model::Project>,
+    pub project: Option<crate::app::model::Project>,
     /// The agent's default working folder (sessions started there have no folder of their own).
     pub default_cwd: Option<String>,
     /// Reopen this session once the list arrives (where the app was last closed).
-    resume_session: Option<String>,
+    pub(crate) resume_session: Option<String>,
     /// For the next new chat: work in this folder.
     pub new_project: Option<String>,
     /// The chosen folder is a git repo (so "in a new branch" applies).
@@ -246,14 +232,14 @@ pub struct BenchApp {
     pub project_path: Entity<InputState>,
     /// New chat: a group to put it in (`~/Research/<name>`) when it has no project.
     pub group_name: Entity<InputState>,
-    pub appearance: crate::theme::Appearance,
-    pub speed: crate::speed::Meter,
+    pub appearance: bench_ui::theme::Appearance,
+    pub speed: crate::statusbar::speed::Meter,
     /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
     pub search: Entity<InputState>,
     pub search_query: String,
     pub search_hits: Option<Vec<(String, String)>>,
-    search_seq: u64,
-    effort_pending: bool,
+    pub(crate) search_seq: u64,
+    pub(crate) effort_pending: bool,
 
     /// What the middle of the window shows (`workspace.rs`).
     pub center: Center,
@@ -266,15 +252,15 @@ pub struct BenchApp {
     pub skills: Vec<SkillRow>,
     pub skill_open: Option<String>,
     /// Settings → Prompts.
-    pub prompts: Vec<crate::model::Prompt>,
+    pub prompts: Vec<crate::app::model::Prompt>,
     pub prompt_open: Option<usize>,
     pub effort_choice: Entity<Choice>,
 
     pub composer: Entity<TextareaState>,
     /// Unsent text per chat ("" = the new chat), kept on disk: switching chats or restarting
     /// keeps it. `draft_key` is the chat whose draft the composer shows.
-    drafts: std::collections::HashMap<String, String>,
-    draft_key: Option<String>,
+    pub(crate) drafts: std::collections::HashMap<String, String>,
+    pub(crate) draft_key: Option<String>,
     /// The next change of the thread brings the composer into view (a message sent, an insert put).
     pub follow: bool,
     /// Keeps the `/`-list keystroke interceptor alive (main.rs).
@@ -291,7 +277,7 @@ pub struct BenchApp {
     pub open_source: Option<(String, String)>,
     pub recorder: Option<Recorder>,
     /// Repaints the waveform while recording.
-    wave_ticker: Option<Task<()>>,
+    pub(crate) wave_ticker: Option<Task<()>>,
     pub transcribing: bool,
     /// The answer read aloud (its row key), and the one whose audio is being made.
     pub playing: Option<(String, Playback)>,
@@ -303,7 +289,7 @@ pub struct BenchApp {
     pub media_playing: Option<(String, Playback)>,
     pub media_since: Instant,
     /// The video playing in the chat, the one starting, and the loop that shows its frames.
-    pub video: Option<crate::video::Player>,
+    pub video: Option<crate::media::video::Player>,
     pub video_loading: Option<String>,
     pub video_task: Option<Task<()>>,
     /// Markdown files shown in full rather than their first lines.
@@ -316,28 +302,28 @@ pub struct BenchApp {
     /// The tasks the /tasks insert shows, and its card.
     pub tasks: crate::inserts::tasks::state::TasksMode,
     /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
-    /// width, kept by the app across the two layouts that show it (`ui/mod.rs`).
+    /// width, kept by the app across the two layouts that show it (`workspace/layout.rs`).
     pub sidebar_w: Pixels,
     pub layout_state: Entity<gpui_kit::component::resizable::ResizableState>,
     /// The layout shape (maximized IDE, IDE on the right) the left width was last applied to;
     /// a new shape gets it again.
     pub layout_synced: Option<(bool, bool, bool)>,
 
-    _subscriptions: Vec<Subscription>,
-    _tasks: Vec<Task<()>>,
+    pub(crate) _subscriptions: Vec<Subscription>,
+    pub(crate) _tasks: Vec<Task<()>>,
 }
 
 impl BenchApp {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // "The agent finished" notifications: macOS asks once.
-        crate::notify::request();
+        crate::system::notify::request();
         let (evt_tx, evt_rx) = async_channel::unbounded();
 
         let mut targets = vec![Target::Local];
         targets.extend(connection::ssh_hosts().into_iter().map(Target::Ssh));
         let labels: Vec<SharedString> = targets.iter().map(|t| t.label().into()).collect();
         // A window opened from another one starts where it was asked to; else where we were last.
-        let next = marks::NEXT_WINDOW.lock().unwrap().take();
+        let next = crate::sidebar::marks::NEXT_WINDOW.lock().unwrap().take();
         let last = match &next {
             Some((target, _, _)) => target.clone(),
             None => std::fs::read_to_string(connection::state_dir().join("last-target"))
@@ -377,206 +363,19 @@ impl BenchApp {
                 cx,
             )
         });
-        let subs = vec![
-            // "System" follows macOS light/dark as it changes.
-            cx.observe_window_appearance(window, |this, window, cx| {
-                if this.appearance.mode == crate::theme::Mode::System {
-                    crate::theme::apply(this.appearance, Some(window), cx);
-                    this.repaint_terminals(cx);
-                }
-            }),
-            // Enter in the question card's field sends that text as the answer.
-            cx.subscribe_in(
-                &clarify_input,
-                window,
-                |this, state, ev: &InputEvent, window, cx| {
-                    if let InputEvent::PressEnter { .. } = ev {
-                        let text = state.read(cx).value().trim().to_string();
-                        if !text.is_empty() {
-                            this.answer_clarify(text, window, cx);
-                        }
-                    }
-                },
-            ),
-            cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
-                match ev {
-                    // Enter is a new line; ⌘Enter sends.
-                    InputEvent::PressEnter {
-                        secondary: true, ..
-                    } => this.send(window, cx),
-                    // New text: the command list starts over at its first row.
-                    InputEvent::Change => {
-                        this.note_draft(cx);
-                        this.slash_sel = 0;
-                        // Esc hides the list for the current word; a new word may open it again.
-                        let text = this.composer.read(cx).value();
-                        if text.is_empty() || text.ends_with(char::is_whitespace) {
-                            this.slash_closed = false;
-                        }
-                        cx.notify();
-                    }
-                    _ => {}
-                }
-            }),
-            cx.subscribe_in(
-                &search,
-                window,
-                |this, state, ev: &InputEvent, window, cx| {
-                    if matches!(ev, InputEvent::Change) {
-                        let q = state.read(cx).value().trim().to_string();
-                        this.search_sessions(q, window, cx);
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &project_path,
-                window,
-                |this, state, ev: &InputEvent, window, cx| {
-                    if let InputEvent::PressEnter { .. } = ev {
-                        let path = state.read(cx).value().trim().to_string();
-                        if !path.is_empty() {
-                            this.path_entry = false;
-                            this.set_new_project(path, window, cx);
-                        }
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &effort_choice,
-                window,
-                |this, _, ev: &SelectEvent<Vec<SharedString>>, _, cx| {
-                    let SelectEvent::Confirm(Some(label)) = ev else {
-                        return;
-                    };
-                    if let Some(i) = this.efforts.iter().position(|e| e == label.as_ref()) {
-                        this.set_effort(i, cx);
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &target_choice,
-                window,
-                |this, _, ev: &SelectEvent<Vec<SharedString>>, window, cx| {
-                    let SelectEvent::Confirm(Some(label)) = ev else {
-                        return;
-                    };
-                    if let Some(t) = this
-                        .targets
-                        .iter()
-                        .find(|t| t.label() == label.as_ref())
-                        .cloned()
-                    {
-                        if t != this.target || this.local_conn().is_none() {
-                            this.connect(t, window, cx);
-                        }
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                &profile_choice,
-                window,
-                |this, _, ev: &SelectEvent<Vec<SharedString>>, window, cx| {
-                    let SelectEvent::Confirm(Some(label)) = ev else {
-                        return;
-                    };
-                    if let Some(p) = this.profiles.iter().find(|p| p.label == label.as_ref()) {
-                        let name = p.name.clone();
-                        this.select_profile(name, window, cx);
-                    }
-                },
-            ),
-        ];
+        let subs = Self::subscriptions(
+            &clarify_input,
+            &composer,
+            &search,
+            &project_path,
+            &effort_choice,
+            &target_choice,
+            &profile_choice,
+            window,
+            cx,
+        );
 
-        let events = cx.spawn_in(window, async move |this, cx| {
-            while let Ok(evt) = evt_rx.recv().await {
-                if this
-                    .update_in(cx, |this, window, cx| this.on_event(evt, window, cx))
-                    .is_err()
-                {
-                    break;
-                }
-            }
-        });
-        // Live clock + playback end detection.
-        let ticker = cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor()
-                    .timer(Duration::from_millis(500))
-                    .await;
-                let alive = this.update(cx, |this, cx| {
-                    if this.playing.as_ref().is_some_and(|(_, p)| p.is_done()) {
-                        this.playing = None;
-                        cx.notify();
-                    }
-                    if this
-                        .media_playing
-                        .as_ref()
-                        .is_some_and(|(_, p)| p.is_done())
-                    {
-                        this.media_playing = None;
-                    }
-                    if this.media_playing.is_some() {
-                        cx.notify(); // the elapsed time
-                    }
-                    if this.live.is_some() {
-                        this.speed.tick();
-                    }
-                    if this.live.is_some() || this.recorder.is_some() {
-                        cx.notify();
-                    }
-                    this.tick_tasks(cx);
-                });
-                if alive.is_err() {
-                    break;
-                }
-            }
-        });
-        // The open session's background processes, every 3 s (the gateway has no event for them).
-        let processes = cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor().timer(Duration::from_secs(3)).await;
-                if this.update(cx, |this, _| this.poll_processes()).is_err() {
-                    break;
-                }
-            }
-        });
-        // The gateway item in the status bar: its state and the last lines of its log, every 10 s
-        // while connected. Both come from where this project's agent runs, so a project on a
-        // server shows that server's gateway.
-        let backend = cx.spawn(async move |this, cx| {
-            loop {
-                let Ok(job) = this.update(cx, |this, _| {
-                    this.thread_conn()
-                        .map(|c| (c, this.current_profile(), this.thread_target()))
-                }) else {
-                    break;
-                };
-                if let Some((conn, profile, target)) = job {
-                    let r = cx
-                        .background_spawn(async move {
-                            (
-                                rest::gateway_status(&conn, &profile),
-                                connection::gateway_log(&target, 12),
-                            )
-                        })
-                        .await;
-                    if this
-                        .update(cx, |this, cx| {
-                            this.gw_status = Some(r.0.map_err(|e| format!("{e:#}")));
-                            this.gw_log = r.1;
-                            cx.notify();
-                        })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-                cx.background_executor()
-                    .timer(Duration::from_secs(10))
-                    .await;
-            }
-        });
-        let mut tasks = vec![events, ticker, processes, backend];
+        let mut tasks = Self::timers(evt_rx, window, cx);
 
         // The gateway list keeps the SSH hosts that can run the agent (asked again when the menu opens).
         let ssh = crate::inserts::terminal::servers::Ssh::new();
@@ -687,7 +486,7 @@ impl BenchApp {
             plan_open: false,
             approval_mode: None,
             profile_context: 0,
-            marks: marks::load(),
+            marks: crate::sidebar::marks::load(),
             start_place: next.as_ref().map(|(_, p, s)| (p.clone(), s.clone())),
             places: HashMap::new(),
             inferred: HashMap::new(),
@@ -699,8 +498,8 @@ impl BenchApp {
             path_entry: false,
             project_path,
             group_name,
-            appearance: crate::theme::load(),
-            speed: crate::speed::Meter::fresh(),
+            appearance: crate::settings::appearance::load(),
+            speed: crate::statusbar::speed::Meter::fresh(),
             search,
             search_query: String::new(),
             search_hits: None,
@@ -717,7 +516,7 @@ impl BenchApp {
             prompt_open: None,
             effort_choice,
             composer,
-            drafts: send::load_drafts(),
+            drafts: crate::thread::drafts::load_drafts(),
             draft_key: None,
             follow: false,
             _slash_keys: None,
@@ -771,100 +570,6 @@ impl BenchApp {
     }
 
     // ---- connection ------------------------------------------------------
-
-    pub fn connect(&mut self, target: Target, _window: &mut Window, cx: &mut Context<Self>) {
-        self.agents.remove(""); // drops the old thread
-        self.target = target.clone();
-        self.connecting = true;
-        self.profile_ready = false;
-        self.approval_mode = None;
-        self.opened.clear();
-        self.profiles.clear();
-        self.profile = None;
-        self.sessions.clear();
-        self.skills.clear();
-        self.reset_chat(cx);
-        self.pv = Default::default();
-        self.gw_status = None;
-        self.gw_log.clear();
-        let dir = connection::state_dir();
-        let _ = std::fs::create_dir_all(&dir)
-            .and_then(|_| std::fs::write(dir.join("last-target"), target.label()));
-        self.agents.insert(
-            String::new(),
-            agents::AgentLink::new(Gateway::start(target, self.evt_tx.clone())),
-        );
-        cx.notify();
-    }
-
-    /// To the agent the command concerns (`agents.rs`): this Mac's, or a remote project's.
-    pub(crate) fn cmd(&self, cmd: Cmd) {
-        self.route(cmd);
-    }
-
-    pub fn current_profile(&self) -> String {
-        self.profile.clone().unwrap_or_default()
-    }
-
-    /// Events carry the runtime id.
-    fn is_current(&self, sid: &str) -> bool {
-        self.runtime.as_deref() == Some(sid)
-    }
-
-    pub(crate) fn refresh_sessions(&self) {
-        if let Some(p) = self.profile.clone() {
-            self.cmd(Cmd::Sessions(p));
-        }
-    }
-
-    // ---- events ----------------------------------------------------------
-
-    // ---- chat ------------------------------------------------------------
-
-    // ---- background REST helpers -------------------------------------------
-
-    /// Run `job` off the UI thread with the current connection, then `done` on it.
-    fn rest<T: Send + 'static>(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-        job: impl FnOnce(&Connection, &str) -> anyhow::Result<T> + Send + 'static,
-        done: impl FnOnce(&mut Self, anyhow::Result<T>, &mut Window, &mut Context<Self>) + 'static,
-    ) {
-        let Some(conn) = self.local_conn() else {
-            return;
-        };
-        let profile = self.current_profile();
-        cx.spawn_in(window, async move |this, cx| {
-            let result = cx
-                .background_spawn(async move { job(&conn, &profile) })
-                .await;
-            let _ = this.update_in(cx, |this, window, cx| {
-                done(this, result, window, cx);
-                cx.notify();
-            });
-        })
-        .detach();
-    }
-
-    // ---- profile defaults & telegram filter ---------------------------------
-
-    // ---- right panel: changed files, tree, viewer --------------------------
-
-    pub fn set_appearance(
-        &mut self,
-        a: crate::theme::Appearance,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        self.appearance = a;
-        crate::theme::save(&a);
-        crate::theme::apply(a, Some(window), cx);
-        self.repaint_terminals(cx);
-        cx.notify();
-    }
-
-    // ---- voice -----------------------------------------------------------
 }
 
 pub fn now_secs() -> f64 {
@@ -872,56 +577,4 @@ pub fn now_secs() -> f64 {
         .duration_since(web_time::UNIX_EPOCH)
         .map(|d| d.as_secs_f64())
         .unwrap_or_default()
-}
-
-///  ("session search"; an MCP tool
-/// `mcp__<server>__<tool>` as "<server> · <tool>"), then what it worked on.
-pub fn tool_label(name: &str, detail: &str) -> String {
-    let name = match name.strip_prefix("mcp__").and_then(|n| n.split_once("__")) {
-        Some((server, tool)) => format!("{server} · {}", tool.replace('_', " ")),
-        None => name.replace('_', " "),
-    };
-    // One line: a command with a heredoc, a patch, a quoted page — the running line is one row
-    // tall whatever the tool was handed, or the thread jumps in height as the work changes.
-    let detail = clip_line(detail);
-    if detail.is_empty() {
-        name
-    } else {
-        format!("{name}: {detail}")
-    }
-}
-
-/// One line of at most 160 characters.
-fn clip_line(s: &str) -> String {
-    let line = s
-        .lines()
-        .find(|l| !l.trim().is_empty())
-        .unwrap_or_default()
-        .trim();
-    if line.chars().count() > 160 {
-        format!("{}…", line.chars().take(159).collect::<String>())
-    } else {
-        line.to_string()
-    }
-}
-
-impl BenchApp {}
-
-#[cfg(test)]
-mod tool_label_tests {
-    #[test]
-    fn labels() {
-        assert_eq!(super::tool_label("bash", "ls"), "bash: ls");
-        assert_eq!(super::tool_label("session_search", ""), "session search");
-        assert_eq!(
-            super::tool_label("bash", "python3 - <<'PY'\nimport re\np='src/app.rs'"),
-            "bash: python3 - <<'PY'",
-            "a multiline command stays one line"
-        );
-        assert_eq!(super::tool_label("bash", "\n\n   \n"), "bash");
-        assert_eq!(
-            super::tool_label("mcp__reminders__list_items", "Today"),
-            "reminders · list items: Today"
-        );
-    }
 }

@@ -15,12 +15,12 @@ build time: check with `grep -A1 '^name = "<crate>"' Cargo.lock` first.
 | Async channels | `async-channel = "2"` | thread → UI events |
 | Errors | `anyhow = "1"` | `Result<T>` in I/O code |
 | Terminal | `portable-pty = "0.9"` + `alacritty_terminal = "0.26"` | a PTY and a VT parser (Bench `src/inserts/terminal/session.rs`) |
-| Text diff | `similar = "2"` | changed files' +/- (Bench `src/diff.rs`) |
+| Text diff | `similar = "2"` | changed files' +/- (Bench `src/thread/diff.rs`) |
 | IDs | `uuid = { version = "1", features = ["v4"] }` | `Uuid::new_v4()` |
 | Base64 | `base64 = "0.22"` | `STANDARD.encode(bytes)` / `.decode(s)` |
 | Images | `imagesize = "0.13"` (size without decoding), `image = { version = "0.25", default-features = false }` | previews, sizes (Bench decodes nothing itself: gpui's `img()` does) |
 | Image processing (crop, resize, convert) | `image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }` | **with codecs** — without them `image::open` fails. Recipe below; checked with gpui-kit 0.8 |
-| macOS notifications | `objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }` | "the agent finished" (Bench `src/notify.rs`); only inside the .app |
+| macOS notifications | `objc2-user-notifications = { version = "0.3", default-features = false, features = ["std", "block2", "UNNotificationContent", "UNNotificationRequest", "UNNotificationSound", "UNNotificationTrigger", "UNUserNotificationCenter"] }` | "the agent finished" (Bench `src/system/notify.rs`); only inside the .app |
 | SQL highlighting | gpui-kit feature `tree-sitter-sql` (grammar `tree-sitter-sequel`) | needs `cc` 1.2.x: keep Bench's `Cargo.lock`; after a `cargo update`, run `cargo update -p cc --precise 1.2.67` |
 | Audio | `cpal = "0.15"` (mic), `hound = "3.5"` (WAV), `rodio = "0.20"` (playback) | dictation, TTS playback |
 | Diagrams | `mermaid-rs-renderer = { version = "0.3", default-features = false }` | Mermaid → SVG, no browser |
@@ -80,7 +80,7 @@ Some jobs need no crate — the system already does them (rung 3 of the engineer
   (gpui's clipboard gives plain text only.) Code: `crates/devtools/src/markdown.rs`.
 - Open a file or URL with its app: `cx.open_with_system(path)` / `/usr/bin/open`.
 - File pickers: `cx.prompt_for_paths(..)`, `cx.prompt_for_new_path(dir, Some(name))`.
-- SSH: `/usr/bin/ssh` with the user's config and a ControlMaster socket (Bench `src/ssh.rs`).
+- SSH: `/usr/bin/ssh` with the user's config and a ControlMaster socket (Bench `src/system/ssh.rs`).
 
 ## Finding a crate that isn't here
 

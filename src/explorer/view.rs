@@ -10,7 +10,7 @@ use gpui_kit::*;
 
 use super::{DocKey, FileRef};
 use crate::app::BenchApp;
-use crate::icons::Ico;
+use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// The middle in `Center::Doc`: the active document.
@@ -61,7 +61,7 @@ impl BenchApp {
         if dirty {
             let r = f.clone();
             actions.push(
-                crate::ui::form_action("doc-revert", "Revert", false, cx)
+                bench_ui::form_action("doc-revert", "Revert", false, cx)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.revert_doc(r.clone(), window, cx)
                     }))
@@ -185,7 +185,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         Some(match self.right_shown()? {
-            crate::app::RightPanel::Thread => self.render_thread_panel(window, cx),
+            crate::workspace::RightPanel::Thread => self.render_thread_panel(window, cx),
         })
     }
 
@@ -198,7 +198,7 @@ impl BenchApp {
             let (name, icon, dirty) = match &key {
                 DocKey::File(f) => (
                     f.name().to_string(),
-                    crate::ui::file_icon(f.name(), false, &theme),
+                    bench_ui::file_icon(f.name(), false, &theme),
                     self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
                 ),
                 DocKey::Settings { project } => (
@@ -276,7 +276,7 @@ impl BenchApp {
         let matches = self.quick_matches(cx);
         let rows = matches.into_iter().enumerate().map(|(n, rel)| {
             let name = rel.rsplit('/').next().unwrap_or(&rel).to_string();
-            let (ico, color) = crate::ui::file_icon(&name, false, &theme);
+            let (ico, color) = bench_ui::file_icon(&name, false, &theme);
             let pick = n;
             h_flex()
                 .id(("quick", n))

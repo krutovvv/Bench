@@ -17,7 +17,7 @@ use super::section::{
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
-use crate::rest;
+use crate::client::rest;
 
 /// A server of lsp.json as its row says it.
 #[derive(Clone, Debug)]
@@ -118,10 +118,10 @@ impl Section for Lsp {
             .iter()
             .map(|s| {
                 let icon = match lsp_tone(s) {
-                    LspTone::Running => (crate::icons::Ico::CircleCheck, theme.success),
-                    LspTone::Failed => (crate::icons::Ico::CircleAlert, theme.danger),
-                    LspTone::Starting => (crate::icons::Ico::Loader, theme.muted_foreground),
-                    LspTone::Idle => (crate::icons::Ico::CircleEmpty, theme.muted_foreground),
+                    LspTone::Running => (bench_ui::icons::Ico::CircleCheck, theme.success),
+                    LspTone::Failed => (bench_ui::icons::Ico::CircleAlert, theme.danger),
+                    LspTone::Starting => (bench_ui::icons::Ico::Loader, theme.muted_foreground),
+                    LspTone::Idle => (bench_ui::icons::Ico::CircleEmpty, theme.muted_foreground),
                 };
                 Item {
                     name: s.name.clone(),

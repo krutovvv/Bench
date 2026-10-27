@@ -7,7 +7,7 @@ use web_time::Instant;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use crate::connection::{self};
+use crate::client::connection::{self};
 
 use super::*;
 
@@ -19,13 +19,13 @@ impl BenchApp {
     /// send one — the way to see for oneself that Bench can say it is done from the background.
     pub fn notif(&mut self, test: bool, cx: &mut Context<Self>) {
         if test {
-            crate::notify::post(
+            crate::system::notify::post(
                 "bench.test",
                 "Bench",
                 "This is a test: Bench says it is done.",
             );
         }
-        crate::notify::check();
+        crate::system::notify::check();
         cx.notify();
     }
 

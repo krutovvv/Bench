@@ -8,7 +8,7 @@ use gpui_kit::*;
 
 use super::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
-use crate::icons::Ico;
+use bench_ui::icons::Ico;
 
 type Act = Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>;
 

@@ -97,7 +97,7 @@ state, each with its own hook.
 ## 5. A temporary hook to reach the state (when needed)
 
 First try `BENCH_DEMO=…` / `BENCH_HOME=<copy>` (step 3); a state they lack is better added to
-`src/demo.rs` for good. Otherwise one line, marked, at the end of the app's `new()` (or where the
+`src/demo/mod.rs` for good. Otherwise one line, marked, at the end of the app's `new()` (or where the
 data arrives):
 ```rust
 if std::env::var("DEBUG_UPCOMING").is_ok() { app.open_task_list(List::Upcoming, window, cx); } // DEBUG-TMP
@@ -107,7 +107,7 @@ Call the same methods the buttons call: never post clicks.
 **Where the hook goes matters.** At the end of `new()` it runs before anything has loaded; data
 that arrives later (the sessions list, a chat's history, the tasks) **overwrites** what the hook
 did. Then put it where that data arrives (right after `self.sessions = rows;`). Fake content in
-the thread is a demo thread, not a hook: a `Journal` in `src/demo.rs` (`j.turn(user, thought,
+the thread is a demo thread, not a hook: a `Journal` in `src/demo/mod.rs` (`j.turn(user, thought,
 calls, answer, at, secs)` with `tool("bash", "ls -la")` or `edit(path, diff)` calls), shown with
 `thread(app, id, title, subject, j)` under its own `BENCH_DEMO=<name>`.
 

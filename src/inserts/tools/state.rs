@@ -188,7 +188,7 @@ impl BenchApp {
                 } else {
                     match devtools::decode_image(&input) {
                         Ok((bytes, ext)) => {
-                            let dir = crate::connection::state_dir().join("tools");
+                            let dir = crate::client::connection::state_dir().join("tools");
                             let file =
                                 dir.join(format!("image-{}.{ext}", uuid::Uuid::new_v4().simple()));
                             match std::fs::create_dir_all(&dir)

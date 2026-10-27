@@ -11,10 +11,10 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::connection::{self, HostCheck};
+use crate::app::model::Target;
+use crate::client::connection::{self, HostCheck};
 use crate::inserts::terminal::session::Session;
-use crate::model::Target;
-use crate::sshconfig::{self, Server};
+use crate::system::sshconfig::{self, Server};
 
 /// An open terminal: one ssh connection.
 pub struct Tab {
@@ -91,7 +91,7 @@ impl BenchApp {
 
     /// Terminals answer color queries (vim's background check) in the current theme.
     pub fn repaint_terminals(&mut self, cx: &mut Context<Self>) {
-        let palette = crate::ui::terminal_palette(cx.theme());
+        let palette = crate::inserts::terminal::view::palette(cx.theme());
         for t in &self.ssh.tabs {
             t.session.set_palette(palette);
         }
@@ -142,7 +142,7 @@ impl BenchApp {
             return None;
         }
         let (tx, rx) = async_channel::bounded::<()>(1);
-        let palette = crate::ui::terminal_palette(cx.theme());
+        let palette = crate::inserts::terminal::view::palette(cx.theme());
         match Session::spawn(alias, palette, tx) {
             Ok(session) => {
                 let wake = cx.spawn(async move |this, cx| {
@@ -215,12 +215,12 @@ impl BenchApp {
             window,
             cx,
             move || {
-                let out = crate::ssh::run(
+                let out = crate::system::ssh::run(
                     &a,
                     &format!(
                         "p={}; case \"$p\" in \"~\") p=\"$HOME\";; \"~/\"*) p=\"$HOME/${{p#??}}\";; esac; \
                          if [ -d \"$p\" ]; then echo \"d $p\"; elif [ -f \"$p\" ]; then echo \"f $p\"; fi",
-                        crate::ssh::q(&l)
+                        crate::system::ssh::q(&l)
                     ),
                     None,
                     std::time::Duration::from_secs(15),

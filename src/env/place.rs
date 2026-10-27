@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 use super::section::{Home, Request, Section, form_actions, text};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
-use crate::model::ProjectKey;
+use crate::app::model::ProjectKey;
 use bench_ui::settings_field;
 
 pub struct PlaceEnv {
@@ -110,7 +110,7 @@ impl Section for Place {
                     .child(div().flex_1().child(Input::new(&e.place.folder)))
                     .when(local, |d| {
                         d.child(
-                            crate::ui::form_action("env-folder-pick", "Choose…", false, cx)
+                            bench_ui::form_action("env-folder-pick", "Choose…", false, cx)
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     this.env_pick_folder(pid.clone(), window, cx)
                                 })),

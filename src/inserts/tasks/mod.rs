@@ -11,9 +11,9 @@ use gpui_kit::*;
 use serde_json::json;
 
 use crate::app::BenchApp;
+use crate::app::model::Insert;
 use crate::inserts::InsertKind;
 use crate::inserts::tasks::model::{LISTS, List};
-use crate::model::Insert;
 
 pub struct Tasks;
 
@@ -120,12 +120,12 @@ impl InsertKind for Tasks {
         } else {
             task.title.clone()
         };
-        let head = crate::ui::block_head(&theme, true)
+        let head = bench_ui::block_head(&theme, true)
             .child(div().flex_1().min_w_0().truncate().child(title))
             .child(
                 bench_ui::head_icon_button(
                     &format!("{}-task-close", ins.id),
-                    crate::icons::Ico::X,
+                    bench_ui::icons::Ico::X,
                     "Close",
                     cx,
                 )

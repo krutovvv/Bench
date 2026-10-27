@@ -9,9 +9,9 @@ use gpui_kit::*;
 use serde_json::{Map, Value, json};
 
 use crate::app::BenchApp;
-use crate::gateway::Cmd;
+use crate::app::model::Insert;
+use crate::client::rpc::Cmd;
 use crate::inserts::kind_of;
-use crate::model::Insert;
 
 /// A new chat's inserts until its session exists.
 const DRAFT: &str = "draft";

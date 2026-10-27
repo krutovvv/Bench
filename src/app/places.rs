@@ -8,10 +8,10 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::BenchApp;
-use crate::gateway::Cmd;
-use crate::model::{Location, ProjectEntry, ProjectKey};
-use crate::rest;
+use crate::app::BenchApp;
+use crate::app::model::{Location, ProjectEntry, ProjectKey};
+use crate::client::rest;
+use crate::client::rpc::Cmd;
 
 /// A server's agent this Mac knows: its ~/.ssh/config alias and its Host project's name.
 #[derive(Clone, Debug, PartialEq)]
@@ -201,7 +201,10 @@ impl BenchApp {
     pub fn env_target(
         &self,
         project: &str,
-    ) -> Option<(std::sync::Arc<crate::connection::Connection>, String)> {
+    ) -> Option<(
+        std::sync::Arc<crate::client::connection::Connection>,
+        String,
+    )> {
         let key = ProjectKey::parse(project);
         self.conn_of(&key.agent).map(|c| (c, key.id))
     }

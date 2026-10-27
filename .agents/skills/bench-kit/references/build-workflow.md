@@ -16,7 +16,7 @@ the same on every side and in every place that shares it.
 
 ## The steps
 
-1. **Read the code around the piece you build** before writing new code (`src/ui/*.rs` for the
+1. **Read the code around the piece you build** before writing new code (`src/*/*.rs` for the
    frame, `crates/ui/src/` for elements, `crates/ui/src/icons.rs`). Copy its idioms.
 2. **Protocol work: probe it headless first.** `bench --probe [local|<ssh-host>]` (`src/main.rs`)
    connects without a window and prints what the agent has; verify protocols there, not by

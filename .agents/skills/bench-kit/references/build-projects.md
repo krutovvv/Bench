@@ -13,10 +13,10 @@ built and how to grow it without patches.
 
 In Bench:
 
-- `ProjectKey` (`src/model.rs`): a project's agent and its id there. `ProjectKey::HOST` is an
+- `ProjectKey` (`src/app/model.rs`): a project's agent and its id there. `ProjectKey::HOST` is an
   agent's own environment (its Host project). As a string: the id for this Mac's projects,
   `<agent>:<id>` for a server's (sessions, marks and folds are keyed by it).
-- `Location` (`src/model.rs`): agent, machine (None: the agent's own), folder;
+- `Location` (`src/app/model.rs`): agent, machine (None: the agent's own), folder;
   `machine_here()` — the machine as this Mac reaches it; `files_machine()` — what the agent is
   asked with (`/api/fs?machine=`) when it works on another machine.
 - `src/app/places.rs` is the only place that says where things live: it puts `projects`
@@ -41,7 +41,7 @@ In Bench:
 - What a machine lacks for a project's language servers (Node, a program) is the server's
   "failed: …" state before any starts (`lsp.ts` `lspNeeds`), red in the Language servers section.
 - The prompt says where the work is (`prompt.ts` `soul`: the server, the folder, kept in it).
-- A server's agent is installed and updated by Bench (`pi_agent.rs` `ensure_remote`; an older
+- A server's agent is installed and updated by Bench (`client/launch.rs` `ensure_remote`; an older
   idle one is replaced on connecting).
 
 ## Growing it

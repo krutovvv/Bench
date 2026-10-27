@@ -2,42 +2,31 @@
 //! (terminal over SSH), their files (a mini IDE), everyday tools and tasks. Crate, binary and
 //! bundle id (local.bench.app) are "bench"; its state lives in `~/.bench/ui` (copied over from
 //! `~/Library/Application Support/bench` or `…/hermes-gpui` on the first start,
-//! `connection::migrate_state`).
+//! `client::connection::migrate_state`).
 
 // The browser build (web/) leaves out what needs a real system (terminals, probes, the state
 // folder); what only the desktop calls is unused there.
 #![cfg_attr(target_family = "wasm", allow(dead_code, unused_imports))]
 
 mod app;
-mod attach;
-mod audio;
-mod bench;
-mod connection;
+mod client;
 mod demo;
-mod diff;
 mod env;
 mod explorer;
-mod gateway;
-mod icons;
 mod inserts;
-mod lang;
 mod media;
-mod model;
-#[cfg(target_os = "macos")]
-mod notify;
-#[cfg(not(target_os = "macos"))]
-#[path = "notify_other.rs"]
-mod notify;
-mod pi_agent;
-mod rest;
-mod speed;
-mod ssh;
-mod sshconfig;
-mod theme;
-mod ui;
-mod video;
+mod settings;
+mod sidebar;
+mod statusbar;
+mod system;
+mod thread;
+mod titlebar;
+mod workspace;
 
 use gpui_kit::*;
+
+use crate::app::model;
+use crate::client::{connection, rest, rpc};
 
 /// `bench --probe [local|<ssh-host>]`: connect without a window and print what the gateway has.
 #[cfg(not(target_family = "wasm"))]
@@ -48,13 +37,13 @@ fn probe(target: &str) -> anyhow::Result<()> {
         model::Target::Ssh(target.into())
     };
     let (tx, rx) = async_channel::unbounded();
-    let gw = gateway::Gateway::start(target, tx);
+    let gw = rpc::Gateway::start(target, tx);
     let mut conn = None;
     while let Ok(evt) = rx.recv_blocking() {
         match evt {
-            gateway::Evt::Connected(c) => conn = Some(c),
-            gateway::Evt::Error(e) => anyhow::bail!(e),
-            gateway::Evt::Profiles(p) => {
+            rpc::Evt::Connected(c) => conn = Some(c),
+            rpc::Evt::Error(e) => anyhow::bail!(e),
+            rpc::Evt::Profiles(p) => {
                 println!(
                     "profiles: {:?}",
                     p.iter().map(|p| &p.name).collect::<Vec<_>>()
@@ -62,16 +51,16 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 let want = std::env::var("PROBE_PROFILE").ok();
                 let name =
                     want.unwrap_or_else(|| p.first().map(|p| p.name.clone()).unwrap_or_default());
-                gw.send(gateway::Cmd::Sessions(name));
+                gw.send(rpc::Cmd::Sessions(name));
             }
-            gateway::Evt::Created { session, runtime } => {
+            rpc::Evt::Created { session, runtime } => {
                 println!("created {session} (runtime {runtime}); setting effort");
-                gw.send(gateway::Cmd::SetEffort {
+                gw.send(rpc::Cmd::SetEffort {
                     session: runtime.clone(),
                     effort: "low".into(),
                 });
                 std::thread::sleep(std::time::Duration::from_secs(3));
-                gw.send(gateway::Cmd::Delete {
+                gw.send(rpc::Cmd::Delete {
                     profile: std::env::var("PROBE_PROFILE").unwrap_or_default(),
                     session: session.clone(),
                     runtime: Some(runtime),
@@ -79,7 +68,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 std::thread::sleep(std::time::Duration::from_secs(3));
                 return Ok(());
             }
-            gateway::Evt::Catalog(list) => {
+            rpc::Evt::Catalog(list) => {
                 println!("catalog: {} commands", list.len());
                 for c in list
                     .iter()
@@ -91,7 +80,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     return Ok(());
                 }
             }
-            gateway::Evt::Dispatched { output, send, .. } => {
+            rpc::Evt::Dispatched { output, send, .. } => {
                 println!(
                     "dispatched: output={:?} send={:?}",
                     output.map(|o| o.chars().take(300).collect::<String>()),
@@ -99,10 +88,10 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 );
                 return Ok(());
             }
-            gateway::Evt::Sessions(p, rows) => {
+            rpc::Evt::Sessions(p, rows) => {
                 println!("sessions[{p}]: {}", rows.len());
                 if std::env::var("PROBE_NEWSESSION").is_ok() {
-                    gw.send(gateway::Cmd::Create {
+                    gw.send(rpc::Cmd::Create {
                         profile: p.clone(),
                         cwd: None,
                         subject: String::new(),
@@ -111,7 +100,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     continue;
                 }
                 if std::env::var("PROBE_CATALOG").is_ok() {
-                    gw.send(gateway::Cmd::Catalog { profile: p.clone() });
+                    gw.send(rpc::Cmd::Catalog { profile: p.clone() });
                 }
                 if let Some(c) = &conn {
                     println!("skills[{p}]: {}", rest::skills(c, &p)?.len());
@@ -150,12 +139,12 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     }
                     return Ok(());
                 };
-                gw.send(gateway::Cmd::Open {
+                gw.send(rpc::Cmd::Open {
                     profile: p,
                     session: first.id.clone(),
                 });
             }
-            gateway::Evt::History {
+            rpc::Evt::History {
                 session,
                 runtime,
                 open,
@@ -168,7 +157,7 @@ fn probe(target: &str) -> anyhow::Result<()> {
                 );
                 // PROBE_SEND: one prompt into this session, printing the events Bench reads.
                 if let Ok(text) = std::env::var("PROBE_SEND") {
-                    gw.send(gateway::Cmd::Send {
+                    gw.send(rpc::Cmd::Send {
                         profile: std::env::var("PROBE_PROFILE").unwrap_or_default(),
                         session: runtime.clone(),
                         text,
@@ -177,26 +166,26 @@ fn probe(target: &str) -> anyhow::Result<()> {
                     });
                     while let Ok(evt) = rx.recv_blocking() {
                         match evt {
-                            gateway::Evt::Delta(_, t) => print!("{t}"),
-                            gateway::Evt::ToolStart { name, detail, .. } => {
+                            rpc::Evt::Delta(_, t) => print!("{t}"),
+                            rpc::Evt::ToolStart { name, detail, .. } => {
                                 println!("\n[tool] {name}: {detail}")
                             }
-                            gateway::Evt::Thread(_, e) => println!("[thread] {e:?}"),
-                            gateway::Evt::Usage(_, u) => {
+                            rpc::Evt::Thread(_, e) => println!("[thread] {e:?}"),
+                            rpc::Evt::Usage(_, u) => {
                                 println!("\n[usage] {}/{}", u.context_used, u.context_max)
                             }
-                            gateway::Evt::Complete { text, .. } => {
+                            rpc::Evt::Complete { text, .. } => {
                                 println!("\n[complete] {} chars", text.len());
                                 return Ok(());
                             }
-                            gateway::Evt::Error(e) => anyhow::bail!(e),
+                            rpc::Evt::Error(e) => anyhow::bail!(e),
                             _ => {}
                         }
                     }
                 }
                 if let Ok(cmd) = std::env::var("PROBE_DISPATCH") {
                     let (name, arg) = cmd.split_once(' ').unwrap_or((&cmd, ""));
-                    gw.send(gateway::Cmd::Dispatch {
+                    gw.send(rpc::Cmd::Dispatch {
                         profile: std::env::var("PROBE_PROFILE").unwrap_or_default(),
                         session: runtime.clone(),
                         name: name.into(),
@@ -230,7 +219,7 @@ fn main() {
         .with_assets(gpui_kit::assets::Assets)
         .run(|cx| {
             gpui_kit::init(cx);
-            theme::apply(theme::load(), None, cx);
+            bench_ui::theme::apply(settings::appearance::load(), None, cx);
             app::menu::install(cx);
 
             open_main_window(cx);
@@ -264,7 +253,7 @@ fn main() {
             if let Err(e) = cx.text_system().add_fonts(fonts) {
                 log_error(&format!("fonts: {e:#}"));
             }
-            theme::apply(theme::load(), None, cx);
+            bench_ui::theme::apply(settings::appearance::load(), None, cx);
             open_main_window(cx);
         });
 }

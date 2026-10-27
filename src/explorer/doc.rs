@@ -7,8 +7,9 @@ use gpui_kit::component::input::{EditorState, InputEvent};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use crate::app::{BenchApp, Center};
-use crate::rest;
+use crate::app::BenchApp;
+use crate::client::rest;
+use crate::workspace::Center;
 
 /// A file as the Explorer reaches it: through the agent of `project`, on `machine` when that is
 /// not the agent's own (a project this Mac's agent works on over SSH).
@@ -200,7 +201,7 @@ impl BenchApp {
         if self.demo {
             if let Some(d) = self.explorer.docs.get_mut(&DocKey::File(f.clone())) {
                 let text = crate::demo::file_text(&f.path);
-                let language = crate::lang::language_for_text(&f.path, &text);
+                let language = crate::explorer::lang::language_for_text(&f.path, &text);
                 d.editor.update(cx, |s, cx| {
                     s.set_highlighter(language, cx);
                     s.set_value(text.clone(), window, cx)
@@ -228,7 +229,7 @@ impl BenchApp {
                     Ok(t) => {
                         d.binary = t.binary || t.truncated;
                         d.loading = true;
-                        let language = crate::lang::language_for_text(&f.path, &t.text);
+                        let language = crate::explorer::lang::language_for_text(&f.path, &t.text);
                         d.editor.update(cx, |s, cx| {
                             s.set_highlighter(language, cx);
                             s.set_value(t.text.clone(), window, cx)

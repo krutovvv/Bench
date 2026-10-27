@@ -64,7 +64,7 @@ State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`
 elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`.
 
 **3. Its `/` word.** A line in `words()` (`src/inserts/mod.rs`); rows for `/word <query>` in
-`tool_slash` (`app/subjects.rs`) when picking straight away helps (`/tasks today`).
+`tool_slash` (`inserts/subjects.rs`) when picking straight away helps (`/tasks today`).
 
 **4. The agent's side**, in `agent/`:
 - **A tool** for its work: `defineTool` in `agent/src/builtin/<kind>.ts`, in the assistant's
@@ -80,7 +80,7 @@ elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claim
   `stripBlock`).
 
 Then: `cargo build`; put it into a thread; ask the agent something about "this" and watch which
-tool it calls; screenshot (`build-verification.md`). Add a demo thread with it in `src/demo.rs`
+tool it calls; screenshot (`build-verification.md`). Add a demo thread with it in `src/demo/mod.rs`
 (`thread(…, "<key>", …)` makes the insert), so the web demo and the README show it.
 
 ## How the browser insert works, end to end
@@ -139,7 +139,7 @@ In order, `cargo build` after each line:
 4. `src/inserts/<kind>/mod.rs` — its `InsertKind`; `pub mod <kind>;` and a line in `KINDS`
    (`src/inserts/mod.rs`). A long body in `view.rs`.
 5. `src/inserts/mod.rs` `words()` — its `/` word; `src/inserts/state.rs` `insert_spec` when a row
-   carries state; `src/app/subjects.rs` `tool_slash` for its rows.
+   carries state; `src/inserts/subjects.rs` `tool_slash` for its rows.
 6. `agent/src/prompt.ts` — its line in `inserted()`.
 7. Icons: SVGs in `assets/icons/`, lines in `crates/ui/src/icons.rs` (`design-icons.md`).
-8. `src/demo.rs` — a demo thread with it (`Journal` builds made-up journal items).
+8. `src/demo/mod.rs` — a demo thread with it (`Journal` builds made-up journal items).

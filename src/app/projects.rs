@@ -8,10 +8,10 @@ use std::collections::HashMap;
 
 use gpui_kit::*;
 
-use super::BenchApp;
-use crate::connection;
-use crate::model::Project;
-use crate::rest;
+use crate::app::BenchApp;
+use crate::app::model::Project;
+use crate::client::connection;
+use crate::client::rest;
 
 impl BenchApp {
     fn projects_path(&self) -> std::path::PathBuf {

@@ -18,7 +18,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
-        let inset = px(crate::ui::CHAT_LEFT);
+        let inset = px(bench_ui::CHAT_LEFT);
         let id = id.to_string();
         if !self.envs.contains_key(&id) {
             self.load_env(&id, window, cx);
@@ -54,7 +54,7 @@ impl BenchApp {
         let Some(e) = self.envs.get(id) else {
             return vec![];
         };
-        let general = crate::model::ProjectKey::parse(&e.id).is_host();
+        let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
         let mut groups: Vec<(&'static str, Vec<&'static dyn Section>)> = vec![];
         for s in SECTIONS
             .iter()

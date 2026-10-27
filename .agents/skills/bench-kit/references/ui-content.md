@@ -10,7 +10,7 @@ An insert's body (`build-insert.md`) or a card under it shows the thing being wo
 | A web page / pasted rich text as it looked | `TextView::html(id, html)` | "Text views" |
 | Plain text that can be selected and copied (a message, a log) | Markdown of the escaped text | "Text views" |
 | An image | `img(path)` | "Images" |
-| Changes to a file | open it in Zed; counts from `src/diff.rs` | "Diff" |
+| Changes to a file | open it in Zed; counts from `src/thread/diff.rs` | "Diff" |
 | A terminal | Bench `src/inserts/terminal/session.rs` + `view.rs`, whole | "Terminal" |
 | Nothing selected yet | `bench_ui::empty_state` | "Empty state" |
 | Images, video, audio, Mermaid, LaTeX, attachments, drag and drop | `build-media.md` | — |
@@ -58,14 +58,14 @@ insert (`src/inserts/tools/{mod,state,view}.rs`, the utilities in `crates/devtoo
 ## Text views
 
 - **Markdown**: `TextView::markdown(id, text)`, selectable out of the box (the Root draws the
-  selection and binds ⌘C). Code blocks the size of the text: Bench `src/ui/media.rs`
+  selection and binds ⌘C). Code blocks the size of the text: Bench `src/media/view.rs`
   `markdown()` (a `TextViewStyle` with a `code_block` refinement). Long texts are kept and
   parsed once (`ui::media::Texts`, `kept_markdown`) — never a new `TextView` per frame.
 - **Code blocks with a header** (an agent's answer): the language on the left, **Copy** on the
   right, the code under it, one 1px frame, no fill. gpui-kit's own block only puts the language
   in its corner and lets `code_block_actions` float over the first line — no header. So split
-  closed fences out of the answer before rendering (Bench `src/media.rs` `segments()`,
-  `src/ui/media.rs` `answer_segments` → `Segment::Code { lang, code }`; an unclosed fence, still
+  closed fences out of the answer before rendering (Bench `src/media/mod.rs` `segments()`,
+  `src/media/view.rs` `answer_segments` → `Segment::Code { lang, code }`; an unclosed fence, still
   streaming, stays text) and draw each:
   ```rust
   v_flex().w_full().border_1().rounded_md().border_color(theme.border)
@@ -86,13 +86,13 @@ insert (`src/inserts/tools/{mod,state,view}.rs`, the utilities in `crates/devtoo
               .border_0().bg(transparent_black()))))    // no fill: the frame alone
   ```
   `window.push_notification` needs `use gpui_kit::component::WindowExt as _;`. Full code:
-  Bench `src/ui/media.rs` `render_code`.
+  Bench `src/media/view.rs` `render_code`.
 - **HTML as it looked**: `TextView::html(id, html)` — headings, lists, links, bordered tables,
   images; `<script>`/`<style>` skipped. Bench shows a pasted web page with it
   (`render_rich_input` in `src/inserts/tools/view.rs`), with a `Rendered | HTML` segmented switch.
 - **Plain text to select and copy** (a person's message, a log): not `SelectableText` (its
   copy needs keyboard focus, which stays in the composer) — a `TextView::markdown` of the
-  escaped text: Bench `src/ui/media.rs` `plain_text`.
+  escaped text: Bench `src/media/view.rs` `plain_text`.
 - Import: `use gpui_kit::component::text::TextView;`.
 
 ## Images
@@ -105,8 +105,8 @@ folder each time (the image cache keys on the path), delete the previous one.
 ## Diff
 
 Bench draws no diffs: "Changed files" under an answer lists the files the agent edited with
-their +/− counts (`src/diff.rs` `stats` over the tools' unified diffs; the card in
-`src/ui/thread/extras.rs` `render_session_files`), a click opens the file in Zed. If a diff
+their +/− counts (`src/thread/diff.rs` `stats` over the tools' unified diffs; the card in
+`src/thread/extras.rs` `render_session_files`), a click opens the file in Zed. If a diff
 view is asked for: gpui-kit's `DiffFile::parse(patch)`, `DiffState::new(files, cx)`,
 `Diff::new(&state)` — not a hand-drawn one.
 
@@ -136,7 +136,7 @@ keys, copy / cut / paste, undo ⌘Z / redo ⌘⇧Z, several cursors (⌘⌥↑ /
 
 Builder: `EditorState::new(window, cx).line_number(true).soft_wrap(false)`; `.folding(true)`
 for fold arrows; `set_highlighter(lang, cx)` with `crate::lang::language_for(path)` /
-`language_for_text` (`src/lang.rs`; only grammars enabled in `Cargo.toml`); `set_value`,
+`language_for_text` (`src/explorer/lang.rs`; only grammars enabled in `Cargo.toml`); `set_value`,
 `value()`. In a thread an editor never scrolls inside: give it the height of its text,
 `bench_ui::editor_height(lines, cx)` (`crates/ui/src/metrics.rs`), and let the thread scroll.
 

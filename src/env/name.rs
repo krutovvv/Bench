@@ -9,7 +9,7 @@ use serde_json::Value;
 use super::section::{Home, Request, Section, form_actions, remove};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
-use crate::model::ProjectKey;
+use crate::app::model::ProjectKey;
 use bench_ui::settings_field;
 
 pub struct NameEnv {
@@ -181,7 +181,7 @@ impl Section for Danger {
         }
         app.confirm_delete = Some(format!("p:{id}"));
         app.delete_project(id.to_string(), window, cx);
-        app.center = crate::app::Center::Chat;
+        app.center = crate::workspace::Center::Chat;
         app.new_session(cx);
         app.thread_project = String::new();
         true

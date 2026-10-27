@@ -14,8 +14,8 @@ use super::section::{
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
-use crate::app::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
-use crate::rest;
+use crate::client::rest;
+use crate::env::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 
 /// One MCP server of the project. `checked` is the field that matters most: the agent only knows
 /// a server once something has asked for its tools, so without it "no answer yet" and "answers
@@ -122,14 +122,14 @@ impl Section for Mcp {
         if !e.mcp.servers.is_empty() {
             let (state, text) = mcp_tally(&e.mcp.servers, checking);
             let (ico, color) = match state {
-                McpSet::Checking => (crate::icons::Ico::Loader, muted),
-                McpSet::Trouble => (crate::icons::Ico::CircleAlert, theme.danger),
-                McpSet::Untested => (crate::icons::Ico::CircleEmpty, muted),
-                McpSet::AllOff => (crate::icons::Ico::CircleEmpty, muted),
-                McpSet::Answering => (crate::icons::Ico::CircleCheck, theme.success),
+                McpSet::Checking => (bench_ui::icons::Ico::Loader, muted),
+                McpSet::Trouble => (bench_ui::icons::Ico::CircleAlert, theme.danger),
+                McpSet::Untested => (bench_ui::icons::Ico::CircleEmpty, muted),
+                McpSet::AllOff => (bench_ui::icons::Ico::CircleEmpty, muted),
+                McpSet::Answering => (bench_ui::icons::Ico::CircleCheck, theme.success),
             };
             let sign = if state == McpSet::Checking {
-                crate::icons::Ico::Loader.live(true)
+                bench_ui::icons::Ico::Loader.live(true)
             } else {
                 div()
                     .flex()
@@ -180,12 +180,12 @@ impl Section for Mcp {
             .iter()
             .map(|m| {
                 let icon = match mcp_tone(m) {
-                    McpTone::Live => (crate::icons::Ico::CircleCheck, theme.success),
-                    McpTone::Error => (crate::icons::Ico::CircleAlert, theme.danger),
-                    McpTone::Dead => (crate::icons::Ico::CircleHelp, theme.danger),
-                    McpTone::Auth => (crate::icons::Ico::CircleAlert, theme.warning),
+                    McpTone::Live => (bench_ui::icons::Ico::CircleCheck, theme.success),
+                    McpTone::Error => (bench_ui::icons::Ico::CircleAlert, theme.danger),
+                    McpTone::Dead => (bench_ui::icons::Ico::CircleHelp, theme.danger),
+                    McpTone::Auth => (bench_ui::icons::Ico::CircleAlert, theme.warning),
                     McpTone::Off | McpTone::Untested => {
-                        (crate::icons::Ico::CircleEmpty, theme.muted_foreground)
+                        (bench_ui::icons::Ico::CircleEmpty, theme.muted_foreground)
                     }
                 };
                 Item {

@@ -70,7 +70,7 @@ impl BenchApp {
         let Some(b) = self.sites.browser.clone() else {
             return;
         };
-        let open = self.center == crate::app::Center::Chat && self.thread_has_browser();
+        let open = self.center == crate::workspace::Center::Chat && self.thread_has_browser();
         let recent = self.sites.touched.is_some_and(|t| t.elapsed() < IDLE);
         b.set_paused(!(open && (self.live.is_some() || recent)));
         if let Some(tab) = self.thread_tab() {

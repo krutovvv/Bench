@@ -21,7 +21,7 @@ places that every view fills in its own way:
   or `SidebarPanel::Explorer` (one project's tree). The Explorer is opened from a project (its menu's Explorer, ⌘E on the open thread's project) and takes the window: tree, documents, the thread beside on demand; its pressed button atop the sidebar (or ⌘E) closes it and brings the thread back. A new
   way to look at things (search across threads, git, tasks) is a new `SidebarPanel` with its own
   list, nothing else changes.
-- **The center** is `Center` (`src/app/workspace.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
+- **The center** is `Center` (`src/workspace/mod.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
   file's click shows `Doc` with a tab per open document (the header holds the tabs instead of
   the thread's title). Leaving the Explorer does not close documents: their tabs come back.
 - **The right dock** shows the thread beside a document (`RightPanel::Thread`, ⌘J or the
@@ -56,7 +56,7 @@ its state and sign-in, a job with its schedule — is a **part**: a `Section`'s 
 tree and its `card()` in the middle (`DocKey::Part`). A new kind of thing in a project is one of
 the two: files need nothing new; a part is a `Section` with `home() == Explorer(<group>)`.
 
-The tree's work (`explorer/ops.rs`): folders are listed when they open (`/api/fs/list`), a name
+The tree's work (`explorer/ops.rs`; ⌘P `file_finder.rs`, ⌘⇧F `project_search.rs`): folders are listed when they open (`/api/fs/list`), a name
 is typed in place for a new file, folder, prompt, skill or a rename, a delete is asked once.
 ⌘P opens a file by name (`/api/fs/files`: ripgrep's list of the folder), ⌘⇧F finds a text in it
 (`/api/fs/grep`), ⌘S saves, ⌘W closes the tab.
@@ -105,7 +105,8 @@ Phases, each a thing of its own:
   the kind of file (`Doc::binary` already says "not text").
 - Several panels in a dock, a bottom dock, a split middle: `RightPanel` becomes a dock's list of
   panels; documents are already shared by key.
-- A thread opening a file (a changed file in its answer) beside itself: `open_beside`.
+- A thread opening a file (a changed file in its answer) in the editor, itself beside it: done in
+  `thread/changed_files.rs` (`open_doc` + `RightPanel::Thread`).
 
 ## What the person sees, briefly
 

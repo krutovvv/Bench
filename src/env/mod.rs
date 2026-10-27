@@ -9,7 +9,7 @@
 //! env/page.rs         the Settings page: the `Home::Settings` sections' forms
 //! env/instructions.rs the prompts and skills the environment lists (their texts are files)
 //! env/<section>.rs    a section: its state (a part of `ProjectEnv`), form or items, card, save
-//! env/project_form.rs the new project's page (the sidebar's "+")
+//! settings/new_project.rs the new project's page (the sidebar's "+")
 //! ```
 //!
 //! A new section: a file like `telegram.rs`, its state in `ProjectEnv` (and `new_env`), a line in
@@ -18,10 +18,10 @@
 pub mod instructions;
 pub mod lsp;
 pub mod mcp;
+pub mod mcp_status;
 pub mod name;
 mod page;
 pub mod place;
-pub mod project_form;
 pub mod run;
 pub mod schedule;
 pub mod section;
@@ -33,7 +33,7 @@ use gpui_kit::*;
 use serde_json::Value;
 
 use crate::app::BenchApp;
-use crate::rest;
+use crate::client::rest;
 pub use section::{Home, Section};
 
 pub struct ProjectEnv {
@@ -81,7 +81,7 @@ pub fn section(key: &str) -> Option<&'static dyn Section> {
 /// Host project. Its model, reasoning level and approvals live in that agent's folder, so a
 /// project thinks and asks as it was set to, not as the machine was.
 pub(crate) fn env_agent(id: &str) -> String {
-    if id == crate::model::ProjectKey::HOST {
+    if id == crate::app::model::ProjectKey::HOST {
         "default".into()
     } else {
         format!("project:{id}")
@@ -132,7 +132,7 @@ pub(crate) fn on_change<T: EventEmitter<InputEvent>>(
 
 /// Whether the project lives on a server (its agent runs there).
 pub(crate) fn is_remote(_app: &BenchApp, id: &str) -> bool {
-    !crate::model::ProjectKey::parse(id).agent.is_empty()
+    !crate::app::model::ProjectKey::parse(id).agent.is_empty()
 }
 
 impl BenchApp {
@@ -272,7 +272,7 @@ impl BenchApp {
         }
         // The project as its agent knows it (`env_target`'s); a section that saves elsewhere
         // (the name) needs no link to the agent.
-        let eid = crate::model::ProjectKey::parse(id).id;
+        let eid = crate::app::model::ProjectKey::parse(id).id;
         let Some((method, path, body)) = section.save(self, id, &eid, window, cx) else {
             return;
         };

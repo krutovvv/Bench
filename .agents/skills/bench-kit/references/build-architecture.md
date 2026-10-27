@@ -16,15 +16,16 @@ and projects on servers: `docs/remote-projects.md` (and `build-projects.md`). In
   - `app/places.rs` — the only place that says where a project lives; it puts the sidebar's
     projects together from their sources;
   - `app/agents.rs` — the links to agents (this Mac's, key `""`, and servers'), `conn_of`,
-    `route`; `app/agent_form.rs` adds and removes a server's agent in the gear;
-  - `app/sidebar_items.rs` — what is done to a thread or project in the sidebar (pin, color,
-    rename, ⌫⌫, ↑↓); `app/marks.rs` the pins and colors, kept on this Mac;
-  - `app/presets.rs` — the person's presets, edited in the gear;
-  - `ui/` — the frame: sidebar, header, status bar, composer, the gear (`providers.rs`), the
-    thread view in `ui/thread/`;
+    `route`; `settings/agent_form.rs` adds and removes a server's agent in the gear;
+  - `sidebar/items.rs` — what is done to a thread or project in the sidebar (pin, color,
+    rename, ⌫⌫, ↑↓); `sidebar/marks.rs` the pins and colors, kept on this Mac;
+  - `settings/presets.rs` — the person's presets, edited in the gear;
+  - the window by area: `workspace/` (docks and center, the layout), `titlebar/`, `sidebar/`,
+    `thread/` (the open thread, the composer), `settings/` (the gear), `statusbar/`;
+    `media/` an answer's media; `system/` ssh and notifications; `demo/` the made-up session;
   - `inserts/` — one folder per insert kind; `env/` — a project's environment, one file per section;
-  - `gateway.rs` and `rest.rs` — the protocol to the agent (WebSocket JSON-RPC, REST);
-    `connection.rs` and `pi_agent.rs` — where an agent runs, installing and starting it here or
+  - `client/` — the protocol to the agent: `rpc/` (WebSocket JSON-RPC) and `rest/` (REST);
+    `connection.rs` and `launch.rs` — where an agent runs, installing and starting it here or
     over SSH (`ensure`, `ensure_remote`) and its tunnel.
 - **The agent** (`agent/src/`):
   - `server.ts` collects `modules/*.ts` (each declares its RPC methods and REST routes);
