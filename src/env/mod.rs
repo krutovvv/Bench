@@ -109,7 +109,8 @@ pub(crate) fn enc(s: &str) -> String {
 }
 
 /// The code editor every text of the environment is edited in: highlighted (Markdown, JSON),
-/// wrapped, line numbers, no room under the last line; its height follows the text.
+/// line numbers, no room under the last line; its height follows the text. Lines are never
+/// wrapped — a long one is read by scrolling sideways (the editor draws its own scrollbar).
 pub(crate) fn editor(
     language: &'static str,
     window: &mut Window,
@@ -118,7 +119,7 @@ pub(crate) fn editor(
     let e = cx.new(|cx| {
         EditorState::new(window, cx)
             .line_number(true)
-            .soft_wrap(true)
+            .soft_wrap(false)
             .scroll_beyond_last_line(Some(0))
     });
     e.update(cx, |s, cx| s.set_highlighter(language, cx));
