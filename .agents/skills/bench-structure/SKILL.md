@@ -36,7 +36,7 @@ Bench после нас, в том числе для небольшой лока
 |---|---|---|---|
 | **Проекты и агенты** | где живёт работа: агент этого Mac или сервера, машина, папка | `src/app/places.rs`, `src/app/agents.rs`, `src/client/`, `src/env/` | новая часть окружения — `Section` в `src/env/`: `SettingsForm` (поля настроек, `FORMS`) или `ExplorerParts` (части в Explorer, `PARTS`) |
 | **Треды** | разговор с агентом, его работа, вставки `/terminal`, `/tasks`, `/tools`, `/browser` | `crates/thread`, `src/thread/`, `src/inserts/` | новая вставка — `InsertKind` в `src/inserts/<вид>/` |
-| **Explorer** | проект глазами IDE: дерево, документы во вкладках, тред рядом | `src/explorer/`, `src/workspace/` | новый вид документа — `DocKey` и его отрисовка; новая панель дока — вариант `Panel` в списке своего `Dock` (`workspace/dock.rs`) |
+| **Explorer** | проект глазами IDE: дерево, документы во вкладках, тред рядом | `src/explorer/`, `src/workspace/` | новый вид документа — вариант `DocKey` и его `Item` (`src/explorer/item.rs`, как `Item` в Zed); новая панель дока — вариант `Panel` в списке своего `Dock` (`workspace/dock.rs`) |
 
 Окно устроено как workspace в Zed: левый док (панель тредов или Explorer), центр (тред,
 документ, страница настроек), правый док (тред рядом с кодом). Общие элементы — `crates/ui`.

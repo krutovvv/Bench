@@ -1,14 +1,13 @@
-//! Documents drawn: the open one in the middle (a file in the code editor, a part of the
-//! environment as its `Section` draws it, a project's settings), the tabs in their own bar under the
-//! title bar, the thread in the right dock, ⌘P's list over the middle. An editor fills its pane and scrolls itself, as in an IDE.
+//! The middle in `Center::Doc`: the open document as its `Item` draws it (`item.rs`), the tabs in
+//! their own bar under the title bar, ⌘P's list over the middle. An editor fills its pane and
+//! scrolls itself, as in an IDE.
 
-use gpui_kit::component::input::{Editor, Input};
+use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::ContextMenuExt as _;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::{DocKey, FileRef};
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
@@ -16,15 +15,7 @@ impl BenchApp {
     /// The middle in `Center::Doc`: the active document.
     pub(crate) fn render_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let body = match self.explorer.active.clone() {
-            Some(DocKey::File(f)) => self.file_pane(&f, cx),
-            Some(DocKey::Settings { project }) => self.settings_pane(&project, window, cx),
-            Some(DocKey::Part {
-                project,
-                kind,
-                name,
-            }) => self.part_pane(&project, kind, &name, cx),
-            Some(DocKey::Problems { project }) => self.problems_pane(&project, cx),
-            Some(DocKey::Diff(f)) => self.diff_pane(&f, cx),
+            Some(key) => key.item().render(self, window, cx),
             None => note("Open a file from the tree, or find one with ⌘P", cx),
         };
         let theme = cx.theme().clone();
@@ -52,218 +43,15 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// A file: its head (where it is; Revert and Save while changed; Finder, Zed) and its editor.
-    fn file_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
-        let key = DocKey::File(f.clone());
-        let Some(d) = self.explorer.docs.get(&key) else {
-            return div().into_any_element();
-        };
-        let (dirty, editor, binary, loading) = (d.dirty, d.editor.clone(), d.binary, d.loading);
-        let mut actions: Vec<AnyElement> = vec![];
-        if dirty {
-            let r = f.clone();
-            actions.push(
-                bench_ui::form_action("doc-revert", "Revert", false, cx)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.revert_doc(r.clone(), window, cx)
-                    }))
-                    .into_any_element(),
-            );
-        }
-        let s = key.clone();
-        actions.push(
-            save_button("doc-save".into(), dirty, cx)
-                .on_click(
-                    cx.listener(move |this, _, window, cx| this.save_doc(s.clone(), window, cx)),
-                )
-                .into_any_element(),
-        );
-        // Its changes since HEAD, when it is in a repository.
-        if d.head.is_some() {
-            let g = f.clone();
-            actions.push(
-                bench_ui::head_icon_button("doc-diff", Ico::FileDiff, "Changes since HEAD", cx)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.open_diff(g.clone(), window, cx)
-                    }))
-                    .into_any_element(),
-            );
-        }
-        // Where else it opens: Zed (on its machine), Finder on this Mac.
-        let at = self.location(&f.project);
-        let host = f
-            .machine
-            .clone()
-            .or_else(|| (!at.agent.is_empty()).then(|| at.agent.clone()));
-        let (zed, finder) = (f.path.clone(), f.path.clone());
-        if host.is_none() {
-            actions.push(
-                bench_ui::head_icon_button("doc-finder", Ico::FolderOpen, "Show in Finder", cx)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.reveal_in_finder(&finder, window, cx)
-                    }))
-                    .into_any_element(),
-            );
-        }
-        actions.push(
-            bench_ui::head_icon_button("doc-zed", Ico::Zed, "Open in Zed", cx)
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.open_in_zed(&zed, None, host.as_deref(), cx)
-                }))
-                .into_any_element(),
-        );
-        let where_ = match &f.machine {
-            Some(m) => format!("{m}:{}", f.path),
-            None => f.path.clone(),
-        };
-        let head = bench_ui::ide_head(f.name().to_string(), Some(where_.into()), actions, cx);
-        let body = if binary {
-            note("Not text, or too large to edit here: Zed opens it", cx)
-        } else if loading {
-            note("Reading…", cx)
-        } else {
-            Editor::new(&editor)
-                .appearance(false)
-                .h_full()
-                .into_any_element()
-        };
-        v_flex()
-            .size_full()
-            .child(head)
-            .child(div().flex_1().min_h_0().child(body))
-            .into_any_element()
-    }
-
-    /// A file's changes against HEAD: where it is, Open the file, and the diff read only.
-    fn diff_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
-        let Some(d) = self.explorer.docs.get(&DocKey::Diff(f.clone())) else {
-            return div().into_any_element();
-        };
-        let editor = d.editor.clone();
-        let known = self
-            .explorer
-            .docs
-            .get(&DocKey::File(f.clone()))
-            .map(|d| (d.loading, d.head.is_some()));
-        let file = f.clone();
-        let actions = vec![
-            bench_ui::form_action("diff-open", "Open the file", false, cx)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.open_doc(DocKey::File(file.clone()), window, cx)
-                }))
-                .into_any_element(),
-        ];
-        let head = bench_ui::ide_head(
-            format!("{} · changes since HEAD", f.name()),
-            Some(f.path.clone().into()),
-            actions,
-            cx,
-        );
-        let body = match known {
-            Some((true, _)) | None => note("Reading…", cx),
-            Some((false, false)) => note("Not in a repository, or not committed yet", cx),
-            Some((false, true)) => Editor::new(&editor)
-                .appearance(false)
-                .h_full()
-                .into_any_element(),
-        };
-        v_flex()
-            .size_full()
-            .child(head)
-            .child(div().flex_1().min_h_0().child(body))
-            .into_any_element()
-    }
-
-    /// A part of the project `project`'s environment: its `Section`'s card, the head's actions
-    /// its own.
-    fn part_pane(
-        &mut self,
-        project: &str,
-        kind: &'static str,
-        name: &str,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let card = match (crate::env::part(kind), self.envs.get(project)) {
-            (Some(s), Some(e)) => s.card(self, e, name, cx),
-            (_, None) => return note("Reading…", cx),
-            _ => None,
-        };
-        let Some(card) = card else {
-            return note("It is no longer there", cx);
-        };
-        let actions = card.actions;
-        v_flex()
-            .size_full()
-            .child(bench_ui::ide_head(card.title, None, actions, cx))
-            .child(
-                div()
-                    .id("doc-part")
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .child(card.body),
-            )
-            .into_any_element()
-    }
-
-    /// A project's settings as a document: its fields, the page `env/page.rs` draws.
-    fn settings_pane(
-        &mut self,
-        project: &str,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let name = self.project_name(project);
-        v_flex()
-            .size_full()
-            .child(bench_ui::ide_head(
-                format!("{name} · Settings"),
-                None,
-                vec![],
-                cx,
-            ))
-            .child(
-                div()
-                    .flex_1()
-                    .min_h_0()
-                    .child(self.render_project_settings(project, window, cx)),
-            )
-            .into_any_element()
-    }
-
     /// The header in `Center::Doc`: a tab per open document.
     pub(crate) fn render_doc_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let mut tabs = vec![];
         for (n, key) in self.explorer.tabs.clone().into_iter().enumerate() {
             let open = self.explorer.active.as_ref() == Some(&key);
-            let (name, icon, dirty) = match &key {
-                DocKey::File(f) => (
-                    f.name().to_string(),
-                    bench_ui::file_icon(f.name(), false, &theme),
-                    self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
-                ),
-                DocKey::Settings { project } => (
-                    format!("{} · Settings", self.project_name(project)),
-                    (Ico::Settings, theme.muted_foreground),
-                    false,
-                ),
-                DocKey::Part { kind, name, .. } => (
-                    name.clone(),
-                    (part_icon(kind), theme.muted_foreground),
-                    self.part_dirty(&key),
-                ),
-                DocKey::Diff(f) => (
-                    format!("{} (changes)", f.name()),
-                    (Ico::FileDiff, theme.muted_foreground),
-                    false,
-                ),
-                DocKey::Problems { .. } => (
-                    "Problems".to_string(),
-                    (Ico::CircleAlert, theme.muted_foreground),
-                    false,
-                ),
-            };
+            let item = key.item();
+            let (name, icon) = item.tab(self, cx);
+            let dirty = item.dirty(self, cx);
             let armed = self.explorer.armed.as_deref() == Some(format!("close:{key:?}").as_str());
             let (k1, k2) = (key.clone(), key.clone());
             let close = bench_ui::head_icon_button(
@@ -400,30 +188,6 @@ impl BenchApp {
                 .into_any_element(),
         )
     }
-}
-
-/// A part's icon in its tab, by its section.
-fn part_icon(kind: &str) -> Ico {
-    match kind {
-        "cron" => Ico::Clock,
-        _ => Ico::Wrench,
-    }
-}
-
-/// A document's Save (⌘S): filled once something changed.
-fn save_button(id: SharedString, dirty: bool, cx: &App) -> Stateful<Div> {
-    let theme = cx.theme();
-    div()
-        .id(id)
-        .flex_none()
-        .px_2()
-        .rounded_md()
-        .cursor_pointer()
-        .when(dirty, |d| {
-            d.bg(theme.primary).text_color(theme.primary_foreground)
-        })
-        .when(!dirty, |d| d.text_color(theme.muted_foreground))
-        .child("Save")
 }
 
 /// One muted line, padded.

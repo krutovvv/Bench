@@ -145,7 +145,10 @@ pub fn root_menu(
             .item(
                 PopupMenuItem::new("Problems  ⌘⇧M")
                     .icon(Ico::CircleAlert.icon())
-                    .on_click(act(&view, Box::new(|this, w, cx| this.open_problems(w, cx)))),
+                    .on_click(act(
+                        &view,
+                        Box::new(|this, w, cx| this.open_problems(w, cx)),
+                    )),
             )
             .item(
                 PopupMenuItem::new("Read it again")

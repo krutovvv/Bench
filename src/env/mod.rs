@@ -22,7 +22,7 @@ pub mod lsp;
 pub mod mcp;
 pub mod mcp_status;
 pub mod name;
-mod page;
+pub mod page;
 pub mod place;
 pub mod run;
 pub mod schedule;
@@ -310,7 +310,9 @@ impl BenchApp {
                             .card
                             .as_ref()
                             .is_some_and(|(k, n)| *k == what && n == "new");
-                        let made_as = part(what).filter(|_| new).and_then(|p| p.made(e, cx).map(|n| (p, n)));
+                        let made_as = part(what)
+                            .filter(|_| new)
+                            .and_then(|p| p.made(e, cx).map(|n| (p, n)));
                         if let Some((p, name)) = made_as {
                             p.close(e);
                             e.card = None;

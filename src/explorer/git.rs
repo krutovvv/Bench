@@ -3,12 +3,16 @@
 //! a tab of its own (`DocKey::Diff`), read only. HEAD's text comes from the agent
 //! (`/api/git/head`, on the file's machine); the comparison is made here, as the file is typed.
 
+use bench_ui::icons::Ico;
 use gpui_base::input::LineMark;
-use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::component::input::Editor;
+use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 use similar::{DiffOp, TextDiff};
 
-use super::{DocKey, FileRef};
+use super::item::Item;
+use super::view::note;
+use super::{Doc, DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::rest;
 
@@ -50,6 +54,45 @@ pub fn unified(path: &str, head: &str, now: &str) -> String {
         .to_string()
 }
 
+/// A file's diff tab.
+pub struct DiffItem(pub FileRef);
+
+impl Item for DiffItem {
+    fn tab(&self, _app: &BenchApp, cx: &App) -> (String, (Ico, Hsla)) {
+        (
+            format!("{} (changes)", self.0.name()),
+            (Ico::FileDiff, cx.theme().muted_foreground),
+        )
+    }
+
+    /// The file's own document holds the text and HEAD's; the diff is made from them.
+    fn open(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) -> bool {
+        let f = &self.0;
+        app.ensure_doc(f.clone(), window, cx);
+        let key = DocKey::Diff(f.clone());
+        if !app.explorer.docs.contains_key(&key) {
+            let editor = crate::env::editor("diff", window, cx);
+            editor.update(cx, |s, cx| {
+                s.set_disabled(true, cx);
+                // A diff's lines are not the file's: no numbers beside them.
+                s.set_line_number(false, window, cx);
+            });
+            app.explorer.docs.insert(key, Doc::new(editor));
+        }
+        app.mark_changes(f, window, cx);
+        true
+    }
+
+    fn render(
+        &self,
+        app: &mut BenchApp,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> AnyElement {
+        app.diff_pane(&self.0, cx)
+    }
+}
+
 impl BenchApp {
     /// HEAD's text of an open file, read once it is open; then its changes are marked.
     pub(super) fn read_head(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
@@ -80,7 +123,12 @@ impl BenchApp {
     }
 
     /// The file's changed lines marked in its gutter, and its diff tab (when open) written anew.
-    pub(super) fn mark_changes(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn mark_changes(
+        &mut self,
+        f: &FileRef,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(d) = self.explorer.docs.get(&DocKey::File(f.clone())) else {
             return;
         };
@@ -117,8 +165,49 @@ impl BenchApp {
             } else {
                 diff
             };
-            view.editor.update(cx, |s, cx| s.set_value(text, window, cx));
+            view.editor
+                .update(cx, |s, cx| s.set_value(text, window, cx));
         }
+    }
+
+    /// A file's changes against HEAD: where it is, Open the file, and the diff read only.
+    fn diff_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
+        let Some(d) = self.explorer.docs.get(&DocKey::Diff(f.clone())) else {
+            return div().into_any_element();
+        };
+        let editor = d.editor.clone();
+        let known = self
+            .explorer
+            .docs
+            .get(&DocKey::File(f.clone()))
+            .map(|d| (d.loading, d.head.is_some()));
+        let file = f.clone();
+        let actions = vec![
+            bench_ui::form_action("diff-open", "Open the file", false, cx)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.open_doc(DocKey::File(file.clone()), window, cx)
+                }))
+                .into_any_element(),
+        ];
+        let head = bench_ui::ide_head(
+            format!("{} · changes since HEAD", f.name()),
+            Some(f.path.clone().into()),
+            actions,
+            cx,
+        );
+        let body = match known {
+            Some((true, _)) | None => note("Reading…", cx),
+            Some((false, false)) => note("Not in a repository, or not committed yet", cx),
+            Some((false, true)) => Editor::new(&editor)
+                .appearance(false)
+                .h_full()
+                .into_any_element(),
+        };
+        v_flex()
+            .size_full()
+            .child(head)
+            .child(div().flex_1().min_h_0().child(body))
+            .into_any_element()
     }
 
     /// A file's diff against HEAD in a tab of its own.
@@ -139,7 +228,10 @@ mod tests {
         assert_eq!(hunks(head, "a\nb\nx\ny\nc\nd\n"), vec![Hunk::Added(2..4)]);
         assert_eq!(hunks(head, "a\nd\n"), vec![Hunk::Removed(1)]);
         let d = unified("f.txt", head, "a\nB\nc\nd\n");
-        assert!(d.starts_with("--- a/f.txt\n+++ b/f.txt\n@@ -1,4 +1,4 @@\n"), "{d}");
+        assert!(
+            d.starts_with("--- a/f.txt\n+++ b/f.txt\n@@ -1,4 +1,4 @@\n"),
+            "{d}"
+        );
         assert!(d.contains("-b\n+B\n"));
     }
 }

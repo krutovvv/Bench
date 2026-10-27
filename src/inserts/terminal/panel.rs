@@ -57,7 +57,10 @@ impl BenchApp {
         let t = self.insert_terminal(&key, &alias, window, cx)?;
         if fresh {
             if let Some(dir) = self.location(&project).folder.filter(|f| !f.is_empty()) {
-                let cd = format!("cd {} && clear\r", crate::inserts::subjects::shell_quote(&dir));
+                let cd = format!(
+                    "cd {} && clear\r",
+                    crate::inserts::subjects::shell_quote(&dir)
+                );
                 self.ssh.tabs[t].session.write(cd.as_bytes());
             }
         }
@@ -83,12 +86,19 @@ impl BenchApp {
                 .unwrap_or_else(|| s.screen_text(SENT_LINES))
         };
         if text.trim().is_empty() {
-            self.toast(NotificationType::Info, "The terminal shows nothing yet", window, cx);
+            self.toast(
+                NotificationType::Info,
+                "The terminal shows nothing yet",
+                window,
+                cx,
+            );
             return;
         }
         self.add_reference(Reference::Terminal(TerminalRef { machine, text }), cx);
         // The thread to send it in: the center's, or beside a document.
-        if self.shown_panel(DockPosition::Right).is_none() && self.center != crate::workspace::Center::Chat {
+        if self.shown_panel(DockPosition::Right).is_none()
+            && self.center != crate::workspace::Center::Chat
+        {
             self.right_dock.activate(Panel::Thread);
         }
         self.composer.update(cx, |s, cx| s.focus(window, cx));
@@ -110,14 +120,26 @@ impl BenchApp {
         };
         let actions = vec![
             bench_ui::form_action("term-send", "Send to the thread", false, cx)
-                .on_click(cx.listener(|this, _, window, cx| this.send_terminal_to_thread(window, cx)))
+                .on_click(
+                    cx.listener(|this, _, window, cx| this.send_terminal_to_thread(window, cx)),
+                )
                 .into_any_element(),
             bench_ui::head_icon_button("term-close", Ico::X, "Hide  ⌃`", cx)
                 .on_click(cx.listener(|this, _, window, cx| this.toggle_terminal_panel(window, cx)))
                 .into_any_element(),
         ];
         let title = format!("Terminal · {}", self.project_name(&project));
-        let head = bench_ui::ide_head(title, Some(format!("{machine} {}", at.folder.unwrap_or_default()).trim().to_string().into()), actions, cx);
+        let head = bench_ui::ide_head(
+            title,
+            Some(
+                format!("{machine} {}", at.folder.unwrap_or_default())
+                    .trim()
+                    .to_string()
+                    .into(),
+            ),
+            actions,
+            cx,
+        );
         let body = if self.demo {
             let alias = machine.clone();
             div()

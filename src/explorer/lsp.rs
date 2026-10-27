@@ -51,7 +51,11 @@ impl HoverProvider for Servers {
         _: &mut Window,
         cx: &mut App,
     ) -> Task<anyhow::Result<Option<lsp_types::Hover>>> {
-        let (s, at, text) = (self.clone(), text.offset_to_position(offset), text.to_string());
+        let (s, at, text) = (
+            self.clone(),
+            text.offset_to_position(offset),
+            text.to_string(),
+        );
         cx.background_spawn(async move {
             let md = lsp::hover(&s.conn, &s.profile, &s.asked(&text), at)?;
             Ok((!md.is_empty()).then(|| lsp_types::Hover {
@@ -73,7 +77,11 @@ impl DefinitionProvider for Servers {
         _: &mut Window,
         cx: &mut App,
     ) -> Task<anyhow::Result<Vec<lsp_types::LocationLink>>> {
-        let (s, at, text) = (self.clone(), text.offset_to_position(offset), text.to_string());
+        let (s, at, text) = (
+            self.clone(),
+            text.offset_to_position(offset),
+            text.to_string(),
+        );
         cx.background_spawn(async move {
             let places = lsp::definition(&s.conn, &s.profile, &s.asked(&text), at)?;
             Ok(places
@@ -202,7 +210,12 @@ impl BenchApp {
     }
 
     /// Typing in a file: its check waits for a pause.
-    pub(super) fn check_doc_soon(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn check_doc_soon(
+        &mut self,
+        f: &FileRef,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.check_doc(f, CHECK_AFTER, window, cx);
     }
 }

@@ -121,7 +121,10 @@ mod tests {
         left.toggle();
         assert_eq!(left.active_panel(), None);
         left.toggle();
-        assert!(left.shows(Panel::Explorer), "folded and back, the same panel");
+        assert!(
+            left.shows(Panel::Explorer),
+            "folded and back, the same panel"
+        );
 
         let mut right = Dock::new(DockPosition::Right, &[Panel::Thread], false);
         right.toggle_panel(Panel::Thread);

@@ -1,11 +1,12 @@
 //! The project's parts in the tree that are not its folder: the agent's texts (soul, prompts,
 //! skills) and each environment section's items (MCP servers, jobs…), as nodes that fold.
 
-use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::menu::ContextMenuExt as _;
+use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 
 use super::tree::quiet;
+use super::view::note;
 use super::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
 use crate::env::PARTS;
@@ -226,5 +227,154 @@ impl BenchApp {
             }
         }
         out
+    }
+}
+
+/// A part of a project's environment as a tab: its section (`ExplorerParts`) draws and saves it.
+pub struct PartItem {
+    pub project: String,
+    pub kind: &'static str,
+    pub name: String,
+}
+
+impl PartItem {
+    fn key(&self) -> DocKey {
+        DocKey::Part {
+            project: self.project.clone(),
+            kind: self.kind,
+            name: self.name.clone(),
+        }
+    }
+}
+
+impl super::item::Item for PartItem {
+    fn tab(&self, _app: &BenchApp, cx: &App) -> (String, (Ico, Hsla)) {
+        (
+            self.name.clone(),
+            (part_icon(self.kind), cx.theme().muted_foreground),
+        )
+    }
+
+    fn dirty(&self, app: &BenchApp, _cx: &App) -> bool {
+        app.part_dirty(&self.key())
+    }
+
+    /// A project has one open part (its fields are its section's): another one's unsaved draft
+    /// is not dropped for it, and the project's other part gives way.
+    fn open(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) -> bool {
+        let (project, kind, name) = (&self.project, self.kind, &self.name);
+        if !app.envs.contains_key(project) {
+            app.load_env(project, window, cx);
+        }
+        if let Some((s, open)) = app.env_dirty_card(project) {
+            if (s.key(), open.as_str()) != (kind, name.as_str()) {
+                let what = if open == "new" {
+                    "the new one".to_string()
+                } else {
+                    open
+                };
+                app.toast(
+                    gpui_kit::component::notification::NotificationType::Warning,
+                    format!("Save or revert {what} first"),
+                    window,
+                    cx,
+                );
+                return false;
+            }
+        }
+        let key = self.key();
+        if let Some(old) =
+            app.explorer.tabs.iter().position(|t| {
+                matches!(t, DocKey::Part { project: p, .. } if p == project) && *t != key
+            })
+        {
+            app.explorer.tabs.remove(old);
+        }
+        app.env_card(project, kind, name.clone(), window, cx);
+        true
+    }
+
+    fn render(
+        &self,
+        app: &mut BenchApp,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> AnyElement {
+        app.part_pane(&self.project, self.kind, &self.name, cx)
+    }
+
+    fn save(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
+        app.env_save(&self.project, self.kind, window, cx);
+    }
+
+    /// Its section's card shuts with its tab, its draft with it.
+    fn closed(&self, app: &mut BenchApp, _cx: &mut Context<BenchApp>) {
+        if let Some(e) = app.envs.get_mut(&self.project) {
+            if e.card
+                .as_ref()
+                .is_some_and(|(k, n)| *k == self.kind && *n == self.name)
+            {
+                for s in crate::env::PARTS {
+                    s.close(e);
+                }
+                e.card = None;
+            }
+        }
+    }
+}
+
+impl BenchApp {
+    /// A part of the project `project`'s environment: its `Section`'s card, the head's actions
+    /// its own.
+    fn part_pane(
+        &mut self,
+        project: &str,
+        kind: &'static str,
+        name: &str,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let card = match (crate::env::part(kind), self.envs.get(project)) {
+            (Some(s), Some(e)) => s.card(self, e, name, cx),
+            (_, None) => return note("Reading…", cx),
+            _ => None,
+        };
+        let Some(card) = card else {
+            return note("It is no longer there", cx);
+        };
+        let actions = card.actions;
+        v_flex()
+            .size_full()
+            .child(bench_ui::ide_head(card.title, None, actions, cx))
+            .child(
+                div()
+                    .id("doc-part")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .child(card.body),
+            )
+            .into_any_element()
+    }
+
+    /// Whether `key` is a part whose draft is not saved (it is its project's open part).
+    pub fn part_dirty(&self, key: &DocKey) -> bool {
+        let DocKey::Part {
+            project,
+            kind,
+            name,
+        } = key
+        else {
+            return false;
+        };
+        self.env_dirty_card(project)
+            .is_some_and(|(s, open)| s.key() == *kind && open == *name)
+    }
+}
+
+/// A part's icon in its tab, by its section.
+fn part_icon(kind: &str) -> Ico {
+    match kind {
+        "cron" => Ico::Clock,
+        _ => Ico::Wrench,
     }
 }

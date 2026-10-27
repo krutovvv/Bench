@@ -8,6 +8,7 @@ use gpui_kit::*;
 use super::FORMS;
 use super::section::SettingsForm;
 use crate::app::BenchApp;
+use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// `project`'s settings, filling the document.
@@ -56,11 +57,7 @@ impl BenchApp {
         };
         let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
         let mut groups: Vec<(&'static str, Vec<&'static dyn SettingsForm>)> = vec![];
-        for s in FORMS
-            .iter()
-            .copied()
-            .filter(|s| s.shown(self, e))
-        {
+        for s in FORMS.iter().copied().filter(|s| s.shown(self, e)) {
             let title = s.block(general);
             match groups.last_mut() {
                 Some((t, group)) if *t == title => group.push(s),
@@ -90,5 +87,62 @@ impl BenchApp {
             );
         }
         out
+    }
+}
+
+/// A project's settings as a tab of the Explorer (`DocKey::Settings`). Each group has its own
+/// Save; its typed fields stay in the environment until saved or reverted.
+pub struct SettingsItem(pub String);
+
+impl crate::explorer::item::Item for SettingsItem {
+    fn tab(&self, app: &BenchApp, cx: &App) -> (String, (Ico, Hsla)) {
+        (
+            format!("{} · Settings", app.project_name(&self.0)),
+            (Ico::Settings, cx.theme().muted_foreground),
+        )
+    }
+
+    /// Its fields are the environment's: read once, kept while typed in.
+    fn open(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) -> bool {
+        if !app.envs.contains_key(&self.0) {
+            app.load_env(&self.0, window, cx);
+        }
+        true
+    }
+
+    fn render(
+        &self,
+        app: &mut BenchApp,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> AnyElement {
+        app.settings_pane(&self.0, window, cx)
+    }
+}
+
+impl BenchApp {
+    /// A project's settings as a document: its fields, the page `env/page.rs` draws.
+    fn settings_pane(
+        &mut self,
+        project: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let name = self.project_name(project);
+        v_flex()
+            .size_full()
+            .child(bench_ui::ide_head(
+                format!("{name} · Settings"),
+                None,
+                vec![],
+                cx,
+            ))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .child(self.render_project_settings(project, window, cx)),
+            )
+            .into_any_element()
     }
 }

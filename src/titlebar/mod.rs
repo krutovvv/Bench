@@ -14,7 +14,9 @@ impl BenchApp {
     /// button that shows the thread beside it (⌘J). Shown, the thread's own head takes this corner
     /// with its + and ×.
     fn render_header_tail(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let shown = self.shown_panel(crate::workspace::DockPosition::Right).is_some();
+        let shown = self
+            .shown_panel(crate::workspace::DockPosition::Right)
+            .is_some();
         h_flex()
             .flex_none()
             .gap_1()

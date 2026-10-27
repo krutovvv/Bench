@@ -6,7 +6,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use serde_json::Value;
 
-use super::section::{SettingsForm, Request, Section, form_actions, remove};
+use super::section::{Request, Section, SettingsForm, form_actions, remove};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::app::model::ProjectKey;

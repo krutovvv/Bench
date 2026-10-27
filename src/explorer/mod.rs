@@ -6,7 +6,9 @@
 //!
 //! ```text
 //! explorer/mod.rs   the state: the project shown, folds, listings, open documents, tabs
-//! explorer/doc.rs   documents: a file (an editor of its own), or a part of the environment
+//! explorer/doc.rs   the tabs' keys and opening, closing, saving any of them
+//! explorer/item.rs  a document as Zed's `Item`: each kind's tab, open, draw, save
+//! explorer/file.rs  a file: read into an editor, saved, reverted, drawn
 //! explorer/ops.rs   the tree's work: listing a folder, new / rename / delete, ⌘P, ⌘⇧F
 //! explorer/tabs.rs  the tabs' drag and menu; code sent to the thread (⌘L)
 //! explorer/lsp.rs   the project's language servers in the editor: problems, hover, definition
@@ -15,12 +17,14 @@
 //! explorer/git.rs   lines changed since HEAD in the gutter, a file's diff as a tab
 //! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder, Zed)
 //! explorer/tree.rs  the sidebar's tree
-//! explorer/view.rs  a document in the middle, the tabs, the thread beside, ⌘P's list
+//! explorer/view.rs  the middle: the open document, the tabs, ⌘P's list
 //! ```
 
 pub mod doc;
+pub mod file;
 pub mod file_finder;
 pub mod git;
+pub mod item;
 pub mod lang;
 pub mod lsp;
 pub mod menus;

@@ -10,7 +10,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{SettingsForm, Request, Section, form_actions, text};
+use super::section::{Request, Section, SettingsForm, form_actions, text};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::app::model::ProjectKey;

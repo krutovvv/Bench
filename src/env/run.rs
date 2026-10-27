@@ -6,7 +6,7 @@
 use gpui_kit::*;
 use serde_json::json;
 
-use super::section::{SettingsForm, Section, choices};
+use super::section::{Section, SettingsForm, choices};
 use super::{ProjectEnv, env_agent};
 use crate::app::BenchApp;
 use crate::client::rest;

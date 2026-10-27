@@ -68,7 +68,10 @@ impl ProblemsRef {
     }
 
     pub fn message(&self) -> String {
-        let of = self.of.as_ref().map_or(String::new(), |p| format!(" in `{p}`"));
+        let of = self
+            .of
+            .as_ref()
+            .map_or(String::new(), |p| format!(" in `{p}`"));
         format!(
             "Problems from the language servers{of}:\n```\n{}\n```",
             self.lines.join("\n")
@@ -89,11 +92,19 @@ impl TerminalRef {
     /// `Terminal · dev (12 lines)`.
     pub fn label(&self) -> String {
         let n = self.text.lines().count();
-        format!("Terminal · {} ({n} line{})", self.machine, if n == 1 { "" } else { "s" })
+        format!(
+            "Terminal · {} ({n} line{})",
+            self.machine,
+            if n == 1 { "" } else { "s" }
+        )
     }
 
     pub fn message(&self) -> String {
-        format!("The terminal on {} shows:\n```\n{}\n```", self.machine, self.text.trim_end())
+        format!(
+            "The terminal on {} shows:\n```\n{}\n```",
+            self.machine,
+            self.text.trim_end()
+        )
     }
 }
 

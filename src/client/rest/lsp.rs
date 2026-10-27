@@ -38,7 +38,14 @@ pub fn diagnostics(
     profile: &str,
     a: &Asked,
 ) -> Result<Option<Vec<lsp_types::Diagnostic>>> {
-    let v = send(conn, "POST", "/api/lsp/diagnostics", profile, a.body(None), 30)?;
+    let v = send(
+        conn,
+        "POST",
+        "/api/lsp/diagnostics",
+        profile,
+        a.body(None),
+        30,
+    )?;
     if !v["known"].as_bool().unwrap_or(false) {
         return Ok(None);
     }
@@ -51,7 +58,14 @@ pub fn problems(
     profile: &str,
     project: &str,
 ) -> Result<Vec<(String, Vec<lsp_types::Diagnostic>)>> {
-    let v = send(conn, "POST", "/api/lsp/problems", profile, json!({ "project": project }), 30)?;
+    let v = send(
+        conn,
+        "POST",
+        "/api/lsp/problems",
+        profile,
+        json!({ "project": project }),
+        30,
+    )?;
     Ok(v["files"]
         .as_array()
         .into_iter()
@@ -70,7 +84,14 @@ pub fn hover(
     a: &Asked,
     at: lsp_types::Position,
 ) -> Result<String> {
-    let v = send(conn, "POST", "/api/lsp/hover", profile, a.body(Some(at)), 10)?;
+    let v = send(
+        conn,
+        "POST",
+        "/api/lsp/hover",
+        profile,
+        a.body(Some(at)),
+        10,
+    )?;
     Ok(v["markdown"].as_str().unwrap_or_default().to_string())
 }
 
@@ -81,7 +102,14 @@ pub fn definition(
     a: &Asked,
     at: lsp_types::Position,
 ) -> Result<Vec<(String, lsp_types::Range)>> {
-    let v = send(conn, "POST", "/api/lsp/definition", profile, a.body(Some(at)), 10)?;
+    let v = send(
+        conn,
+        "POST",
+        "/api/lsp/definition",
+        profile,
+        a.body(Some(at)),
+        10,
+    )?;
     Ok(v["places"]
         .as_array()
         .into_iter()

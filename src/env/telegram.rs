@@ -5,7 +5,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{SettingsForm, Request, Section, form_actions};
+use super::section::{Request, Section, SettingsForm, form_actions};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use bench_ui::settings_field;

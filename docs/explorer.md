@@ -54,12 +54,16 @@ Its tree:
 | Tools | MCP servers, language servers | the environment's parts (`Section`s whose `home()` is `Explorer("Tools")`) |
 | Schedule | scheduled jobs | the agent's cron (`Explorer("Schedule")`) |
 
-Everything that is a file is opened as one: an editor of its own (`explorer/doc.rs`, `Doc`),
+Every tab holds an `Item` (`explorer/item.rs`, as Zed's): its tab, unsaved changes, what
+opening it reads, how it is drawn, saved and closed; `DocKey` is the tab's identity and
+`DocKey::item` the one place that tells the kinds apart. Everything that is a file is opened as
+one: an editor of its own (`explorer/file.rs`, `Doc`),
 read and written through `/api/fs/read-text` and `write-text`; saving the agent's own text reads
 the environment again (the composer's @ list follows). What is not a file — an MCP server with
-its state and sign-in, a job with its schedule — is a **part**: a `Section`'s `items()` in the
-tree and its `card()` in the middle (`DocKey::Part`). A new kind of thing in a project is one of
-the two: files need nothing new; a part is a `Section` with `home() == Explorer(<group>)`.
+its state and sign-in, a job with its schedule — is a **part**: an `ExplorerParts` section's `items()` in
+the tree and its `card()` in the middle (`DocKey::Part`, `PartItem`). A new kind of thing in a
+project is one of the two: files need nothing new; a part is a `Section` and `ExplorerParts` in
+`PARTS` (its `group()` the tree's group).
 
 The tree's work (`explorer/ops.rs`; ⌘P `file_finder.rs`, ⌘⇧F `project_search.rs`): folders are listed when they open (`/api/fs/list`), a name
 is typed in place for a new file, folder, prompt, skill or a rename, a delete is asked once.
@@ -75,7 +79,7 @@ was left too.
 
 A project's Settings (`Center::Project`, `src/env/page.rs`) are its fields: name, where it lives,
 how it runs, its Telegram bot, its removal — `Section`s whose `home()` is `Settings` and that
-draw a `form()`. What a project *contains* is in the Explorer; what it *is set to* is in Settings.
+draw a `form()` (`SettingsForm`, in `FORMS`). What a project *contains* is in the Explorer; what it *is set to* is in Settings.
 
 ## Where the IDE goes
 

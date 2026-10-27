@@ -209,7 +209,9 @@ pub fn tab_menu(
             .item(
                 PopupMenuItem::new("Changes since HEAD")
                     .icon(Ico::FileDiff.icon().small())
-                    .on_click(act(Box::new(move |this, w, cx| this.open_diff(f4.clone(), w, cx)))),
+                    .on_click(act(Box::new(move |this, w, cx| {
+                        this.open_diff(f4.clone(), w, cx)
+                    }))),
             )
             .item(
                 PopupMenuItem::new("Send its problems to the thread")

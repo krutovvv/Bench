@@ -7,6 +7,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 
+use super::item::Item;
 use super::{DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::rest::lsp;
@@ -20,7 +21,10 @@ fn line_of(path: &str, d: &lsp_types::Diagnostic) -> String {
     } else {
         "error"
     };
-    let source = d.source.as_ref().map_or(String::new(), |s| format!(" ({s})"));
+    let source = d
+        .source
+        .as_ref()
+        .map_or(String::new(), |s| format!(" ({s})"));
     format!(
         "{path}:{}:{} {what}: {}{source}",
         d.range.start.line + 1,
@@ -34,6 +38,32 @@ fn counted(d: &lsp_types::Diagnostic) -> bool {
     d.severity.is_none_or(|s| {
         s == lsp_types::DiagnosticSeverity::ERROR || s == lsp_types::DiagnosticSeverity::WARNING
     })
+}
+
+/// The project's Problems tab.
+pub struct ProblemsItem(pub String);
+
+impl Item for ProblemsItem {
+    fn tab(&self, _app: &BenchApp, cx: &App) -> (String, (Ico, Hsla)) {
+        (
+            "Problems".into(),
+            (Ico::CircleAlert, cx.theme().muted_foreground),
+        )
+    }
+
+    fn open(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) -> bool {
+        app.read_problems(self.0.clone(), window, cx);
+        true
+    }
+
+    fn render(
+        &self,
+        app: &mut BenchApp,
+        _window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> AnyElement {
+        app.problems_pane(&self.0, cx)
+    }
 }
 
 impl BenchApp {
@@ -63,7 +93,10 @@ impl BenchApp {
             return;
         };
         let profile = self.current_profile();
-        self.explorer.problems.entry(project.clone()).or_insert(None);
+        self.explorer
+            .problems
+            .entry(project.clone())
+            .or_insert(None);
         self.background(
             window,
             cx,
@@ -81,7 +114,12 @@ impl BenchApp {
     }
 
     /// A file was checked: its project's Problems, when open, are read again.
-    pub(super) fn problems_changed(&mut self, project: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn problems_changed(
+        &mut self,
+        project: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let key = DocKey::Problems {
             project: project.to_string(),
         };
@@ -169,8 +207,13 @@ impl BenchApp {
             .map(|(p, ds)| (p, ds.into_iter().filter(counted).collect::<Vec<_>>()))
             .filter(|(_, ds)| !ds.is_empty())
             .collect();
-        let warning = |d: &lsp_types::Diagnostic| d.severity == Some(lsp_types::DiagnosticSeverity::WARNING);
-        let warnings = all.iter().flat_map(|(_, ds)| ds).filter(|d| warning(d)).count();
+        let warning =
+            |d: &lsp_types::Diagnostic| d.severity == Some(lsp_types::DiagnosticSeverity::WARNING);
+        let warnings = all
+            .iter()
+            .flat_map(|(_, ds)| ds)
+            .filter(|d| warning(d))
+            .count();
         let errors = all.iter().map(|(_, ds)| ds.len()).sum::<usize>() - warnings;
         let (p1, p2) = (project.to_string(), project.to_string());
         let actions = vec![
@@ -186,7 +229,11 @@ impl BenchApp {
                 .into_any_element(),
         ];
         let count = |n: usize, one: &str| format!("{n} {one}{}", if n == 1 { "" } else { "s" });
-        let note = format!("{} · {}", count(errors, "error"), count(warnings, "warning"));
+        let note = format!(
+            "{} · {}",
+            count(errors, "error"),
+            count(warnings, "warning")
+        );
         let head = bench_ui::ide_head("Problems", Some(note.into()), actions, cx);
         let root = self.project_root(project);
         let machine = self.location(project).files_machine();
@@ -213,9 +260,16 @@ impl BenchApp {
                 .into_any_element(),
             );
             for (k, d) in ds.iter().enumerate() {
-                let color = if warning(d) { theme.warning } else { theme.danger };
+                let color = if warning(d) {
+                    theme.warning
+                } else {
+                    theme.danger
+                };
                 let at = d.range.start;
-                let source = d.source.as_ref().map_or(String::new(), |s| format!(" · {s}"));
+                let source = d
+                    .source
+                    .as_ref()
+                    .map_or(String::new(), |s| format!(" · {s}"));
                 let f = FileRef {
                     project: project.to_string(),
                     machine: machine.clone(),

@@ -9,8 +9,8 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, ExplorerParts, Item, Request, Section, add, card_act, code, head_act, new_card, remove, revert,
-    save,
+    Card, ExplorerParts, Item, Request, Section, add, card_act, code, head_act, new_card, remove,
+    revert, save,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;

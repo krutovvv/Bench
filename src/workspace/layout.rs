@@ -206,7 +206,12 @@ impl BenchApp {
                 .size_full()
                 .bg(theme.sidebar)
                 .child(self.render_sidebar_top(cx))
-                .child(div().flex_1().min_h_0().child(self.render_panel(panel, window, cx)))
+                .child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .child(self.render_panel(panel, window, cx)),
+                )
         });
         let right = right.map(|panel| self.render_panel(panel, window, cx));
         // Fixed: a window resize goes to the center; the docks keep their sizes.
