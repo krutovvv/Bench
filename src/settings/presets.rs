@@ -5,6 +5,7 @@
 
 use gpui_kit::component::input::EditorState;
 use gpui_kit::component::notification::NotificationType;
+use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
 use serde_json::{Value, json};
 
@@ -151,5 +152,120 @@ impl BenchApp {
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
             },
         );
+    }
+}
+
+impl BenchApp {
+    /// The Presets tab: each kind as a few lines, Edit opens its JSON (Save, Built-in, Cancel).
+    pub(super) fn render_presets(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let muted = cx.theme().muted_foreground;
+        let p = self.presets.clone();
+        let mut out = vec![div()
+            .pt_4()
+            .text_sm()
+            .text_color(muted)
+            .child("What a project takes with one click (+ Add in its environment), and the choices of its Model section. Kept by This Mac's agent; a server's projects take them too. Keys can be written right into a preset.")
+            .into_any_element()];
+        for (kind, title) in crate::settings::presets::KINDS {
+            let lines: Vec<(String, String)> = match kind {
+                "mcp" => p
+                    .mcp
+                    .iter()
+                    .map(|(n, t, _)| (n.clone(), t.clone()))
+                    .collect(),
+                "lsp" => p
+                    .lsp
+                    .iter()
+                    .map(|(n, t, _)| (n.clone(), t.clone()))
+                    .collect(),
+                "compaction" => p
+                    .compaction
+                    .iter()
+                    .map(|(at, n)| (format!("{}%", (at * 100.).round()), n.clone()))
+                    .collect(),
+                _ => vec![(
+                    p.reasoning.join(", "),
+                    "offered in a project's Model section and the composer".into(),
+                )],
+            };
+            out.push(self.pv_heading(title.to_uppercase(), cx).into_any_element());
+            for (name, note) in lines {
+                out.push(
+                    h_flex()
+                        .gap_2()
+                        .py_1p5()
+                        .border_b_1()
+                        .border_color(cx.theme().border)
+                        .child(div().flex_none().child(name))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .truncate()
+                                .text_color(muted)
+                                .child(note),
+                        )
+                        .into_any_element(),
+                );
+            }
+            let open = self
+                .preset_editor
+                .as_ref()
+                .filter(|e| e.kind == kind)
+                .map(|e| e.text.clone());
+            match open {
+                Some(text) => {
+                    out.push(
+                        div()
+                            .pt_2()
+                            .child(crate::env::section::code(&text, cx))
+                            .into_any_element(),
+                    );
+                    out.push(
+                        h_flex()
+                            .py_2()
+                            .gap_2()
+                            .child(self.pv_button(
+                                SharedString::from(format!("preset-save-{kind}")),
+                                "Save",
+                                true,
+                                cx,
+                                Box::new(|this, w, cx| this.save_presets(false, w, cx)),
+                            ))
+                            .child(self.pv_button(
+                                SharedString::from(format!("preset-reset-{kind}")),
+                                "Built-in",
+                                false,
+                                cx,
+                                Box::new(|this, w, cx| this.save_presets(true, w, cx)),
+                            ))
+                            .child(self.pv_button(
+                                SharedString::from(format!("preset-cancel-{kind}")),
+                                "Cancel",
+                                false,
+                                cx,
+                                Box::new(|this, _, cx| {
+                                    this.preset_editor = None;
+                                    cx.notify();
+                                }),
+                            ))
+                            .into_any_element(),
+                    );
+                }
+                None => out.push(
+                    h_flex()
+                        .py_2()
+                        .child(self.pv_button(
+                            SharedString::from(format!("preset-edit-{kind}")),
+                            "Edit",
+                            false,
+                            cx,
+                            Box::new(move |this, w, cx| this.edit_presets(kind, w, cx)),
+                        ))
+                        .into_any_element(),
+                ),
+            }
+        }
+        out
     }
 }
