@@ -64,6 +64,7 @@ fn kinds(rows: &[Row]) -> Vec<String> {
             Row::Insert { id, .. } => format!("insert:{id}"),
             Row::Fail { text, .. } => format!("fail:{text}"),
             Row::Writing { text, .. } => format!("writing:{text}"),
+            Row::Plan { .. } => "plan".into(),
             Row::Queued { text, .. } => format!("queued:{text}"),
         })
         .collect()
@@ -101,6 +102,55 @@ fn a_turn_is_message_work_answer() {
         "the result joins its call"
     );
     assert_eq!((*from, *to), (Some(2000.), Some(5000.)));
+}
+
+/// The plan belongs to the work being done now, the queue to what comes after it: the row
+/// stands with its work, above every message that waits — by the rule of order, not by nailing
+/// it to a place.
+#[test]
+fn rule_1_the_plan_stands_with_its_work_not_after_what_waits() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go"), tool(2, 0, "a")],
+        running: true,
+        queue: vec![queued(9, "later")],
+        ..Default::default()
+    });
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:1+", "queued:later"],
+        "no plan, no row"
+    );
+    t.set_plan(true);
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:1+", "plan", "queued:later"]
+    );
+    // A message sent while the run is live waits like a queued one: under the plan too.
+    t.sent("and one more thing".into());
+    assert_eq!(
+        kinds(&t.rows()),
+        [
+            "user:go",
+            "work:1+",
+            "plan",
+            "user:and one more thing",
+            "queued:later"
+        ]
+    );
+    // The plan over: the row goes, the waiting rows stay where they were.
+    let v = t.version();
+    t.set_plan(true);
+    assert_eq!(t.version(), v, "the same plan says nothing new");
+    t.set_plan(false);
+    assert_eq!(
+        kinds(&t.rows()),
+        [
+            "user:go",
+            "work:1+",
+            "user:and one more thing",
+            "queued:later"
+        ]
+    );
 }
 
 #[test]

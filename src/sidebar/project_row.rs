@@ -176,11 +176,7 @@ impl BenchApp {
                     ),
                 )
                 .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
-                .context_menu(item_menu(
-                    cx.entity(),
-                    Item::Project(menu_id),
-                    pinned,
-                ))
+                .context_menu(item_menu(cx.entity(), Item::Project(menu_id), pinned))
                 .into_any_element(),
         ];
         if collapsed {

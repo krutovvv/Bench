@@ -140,10 +140,12 @@ impl ThreadView {
     /// The plan as a row of the thread, the agent's: a block like an insert's (its avatar, its
     /// `block_head`) with the chevron, "PLAN · 3/7" and, folded, the step in progress; the steps
     /// under the head when open. It goes when no step is left to do (`Evt::Todos`), so an ended
-    /// plan never lingers.
-    pub(crate) fn render_plan(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// plan never lingers, and it stands where the work it plans is — above what waits.
+    pub(crate) fn render_plan_row(&mut self, cx: &mut Context<Self>) -> AnyElement {
         if self.thread.todos.is_empty() {
-            return None;
+            // The row and the steps move on the same event, so this is not expected: an empty
+            // row asks for nothing rather than a block of "0/0".
+            return div().into_any_element();
         }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
@@ -256,21 +258,19 @@ impl ThreadView {
                 )
             });
         // The agent's row, as an insert's or an answer's: its avatar, the block in the text column.
-        Some(
-            h_flex()
-                .w_full()
-                .flex_none()
-                .id("plan-row")
-                .pl(px(bench_ui::CHAT_LEFT))
-                .pr(px(bench_ui::CHAT_RIGHT))
-                .py(px(bench_ui::TURN_Y))
-                .gap(px(bench_ui::CHAT_TEXT
-                    - bench_ui::CHAT_LEFT
-                    - bench_ui::AVATAR))
-                .items_start()
-                .child(bench_ui::avatar(true, &theme))
-                .child(div().flex_1().min_w_0().child(frame))
-                .into_any_element(),
-        )
+        h_flex()
+            .w_full()
+            .flex_none()
+            .id("plan-row")
+            .pl(px(bench_ui::CHAT_LEFT))
+            .pr(px(bench_ui::CHAT_RIGHT))
+            .py(px(bench_ui::TURN_Y))
+            .gap(px(bench_ui::CHAT_TEXT
+                - bench_ui::CHAT_LEFT
+                - bench_ui::AVATAR))
+            .items_start()
+            .child(bench_ui::avatar(true, &theme))
+            .child(div().flex_1().min_w_0().child(frame))
+            .into_any_element()
     }
 }

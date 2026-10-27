@@ -75,7 +75,16 @@ impl BenchApp {
             ("System", Mode::System),
         ]
         .into_iter()
-        .map(|(l, m)| (l, a.mode == m, bench_ui::theme::Appearance { mode: m, ..a.clone() }))
+        .map(|(l, m)| {
+            (
+                l,
+                a.mode == m,
+                bench_ui::theme::Appearance {
+                    mode: m,
+                    ..a.clone()
+                },
+            )
+        })
         .collect();
         let view = cx.entity();
         let look = a.clone();
@@ -99,7 +108,10 @@ impl BenchApp {
                     .map(|(k, (name, light, dark_c))| {
                         let on = a.accent == k;
                         let color: Hsla = rgb(if dark { *dark_c } else { *light }).into();
-                        let next = bench_ui::theme::Appearance { accent: k, ..a.clone() };
+                        let next = bench_ui::theme::Appearance {
+                            accent: k,
+                            ..a.clone()
+                        };
                         div()
                             .id(("accent", k))
                             .p(px(3.))

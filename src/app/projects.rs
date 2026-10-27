@@ -198,4 +198,3 @@ impl BenchApp {
             .unwrap_or_else(|| "Bench changes".into())
     }
 }
-

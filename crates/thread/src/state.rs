@@ -21,6 +21,9 @@ pub struct Thread {
     head: u64,
     /// Messages the person sent that the journal has not shown yet, in the order sent.
     sent: Vec<String>,
+    /// Whether the agent has a plan it is working through (its steps are the view's). Like
+    /// `sent`, it is a live fact beside the journal: it puts a row where the work is.
+    plan: bool,
     /// Grows with every change, so a view knows when to rebuild its rows.
     version: u64,
 }
@@ -116,6 +119,15 @@ impl Thread {
         self.version += 1;
     }
 
+    /// The agent's plan is open (or is over): the row comes or goes where the work in progress
+    /// is, above what waits. Only a change rebuilds the rows.
+    pub fn set_plan(&mut self, on: bool) {
+        if self.plan != on {
+            self.plan = on;
+            self.version += 1;
+        }
+    }
+
     /// Every sent message the journal has not shown: the send failed.
     pub fn clear_sent(&mut self) {
         self.sent.clear();
@@ -136,6 +148,7 @@ impl Thread {
             self.running,
             &self.stream,
             &self.sent,
+            self.plan,
             &self.queue,
         )
     }

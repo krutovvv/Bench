@@ -2,7 +2,7 @@
 //! the rows of `crate::thread` (the journal).
 //!
 //! The list holds: the head (a project's environment, a form, "Loading…"), one item per `Row`,
-//! the tail (approval, question, plan, processes, the composer), and the room past the end that
+//! the tail (approval, question, processes, the composer), and the room past the end that
 //! lets the last row reach the top, as in an editor. Only what is on screen is laid out.
 //!
 //! Files: `view.rs` (the view: its state, composer, events), `active.rs` (the thread's state, one
@@ -130,7 +130,8 @@ impl ThreadView {
             }
         }
         // `BENCH_DEMO_QUEUE=1`: two messages waiting after the last row, one the agent will take
-        // up next, one a follow-up.
+        // up next, one a follow-up, and the plan the agent is working through — which stands
+        // above them, with the work it plans.
         if std::env::var("BENCH_DEMO_QUEUE").is_ok() && self.thread.journal.queue().is_empty() {
             self.thread.journal.apply(protocol::ThreadEvent::Queue(vec![
                 protocol::QueuedItem {
@@ -146,6 +147,16 @@ impl ThreadView {
                     text: "Skip the pricing table for now, it goes in the next release.".into(),
                 },
             ]));
+            self.thread.todos = ["done", "doing", "next"]
+                .into_iter()
+                .zip(["completed", "in_progress", "pending"])
+                .map(|(c, s)| crate::app::model::Todo {
+                    content: format!("{c}: the step the agent wrote for itself").into(),
+                    status: s.into(),
+                    depth: 0,
+                })
+                .collect();
+            self.thread.journal.set_plan(true);
         }
     }
 
@@ -375,6 +386,7 @@ impl ThreadView {
                 mode,
                 text,
             } => self.render_queued(&key, &sub, &mode, &text, window, cx),
+            Row::Plan { .. } => self.render_plan_row(cx),
         }
     }
 
@@ -462,12 +474,10 @@ impl ThreadView {
     fn render_tail(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let approval = self.render_approval(cx);
         let clarify = self.render_clarify(cx);
-        let plan = self.render_plan(cx);
         let procs = self.render_processes(cx);
         let composer = self.render_composer(cx);
         v_flex()
             .w_full()
-            .children(plan)
             .children(procs)
             .children(approval)
             .children(clarify)

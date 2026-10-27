@@ -35,6 +35,10 @@ pub enum Row {
     },
     /// Why a run stopped.
     Fail { key: String, text: String },
+    /// The plan the agent is working through now. Its steps are the thread view's, not the
+    /// journal's: the row only says a plan is open, and stands with the work it plans — before
+    /// the messages that wait. Folded or not, it is the same row.
+    Plan { key: String },
     /// The answer being written now (its text; the model's reasoning is not shown while it streams).
     Writing { text: String },
     /// A message waiting for the agent.
@@ -54,6 +58,7 @@ impl Row {
             | Row::Answer { key, .. }
             | Row::Insert { key, .. }
             | Row::Fail { key, .. }
+            | Row::Plan { key, .. }
             | Row::Queued { key, .. } => key,
             Row::Writing { .. } => "writing",
         }
@@ -88,6 +93,7 @@ pub(crate) fn rows_of(
     running: bool,
     stream: &(String, String),
     sent: &[String],
+    plan: bool,
     queue: &[QueuedItem],
 ) -> Vec<Row> {
     // An assistant entry with tool calls is work: its text is a note on the way, not an answer.
@@ -284,6 +290,12 @@ pub(crate) fn rows_of(
         rows.push(Row::Writing {
             text: stream.1.clone(),
         });
+    }
+    // The plan of the work in progress goes where that work is: what the person sent since
+    // waits for it, so neither an optimistic row nor a queued one stands above the steps being
+    // taken now.
+    if plan {
+        rows.push(Row::Plan { key: "plan".into() });
     }
     rows.extend(sent.iter().enumerate().map(|(k, t)| Row::User {
         key: format!("sent-{k}"),
