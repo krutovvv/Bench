@@ -3,6 +3,7 @@
 //! right, ⌘P's list over the middle. An editor fills its pane and scrolls itself, as in an IDE.
 
 use gpui_kit::component::input::{Editor, Input};
+use gpui_kit::component::menu::ContextMenuExt as _;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -99,14 +100,14 @@ impl BenchApp {
                     &theme,
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.close_beside(cx);
+                    this.close_right(cx);
                     this.open_doc(DocKey::File(other.clone()), window, cx)
                 }))
                 .into_any_element(),
             );
             actions.push(
                 crate::inserts::icon_button("doc-beside-close", Ico::X, "Close", &theme)
-                    .on_click(cx.listener(|this, _, _, cx| this.close_beside(cx)))
+                    .on_click(cx.listener(|this, _, _, cx| this.close_right(cx)))
                     .into_any_element(),
             );
         } else {
@@ -169,10 +170,16 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// The pane on the right: the file kept beside.
-    pub(crate) fn render_beside(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let f = self.explorer.beside.clone()?;
-        Some(self.file_pane(&f, true, cx))
+    /// The right dock: the thread beside the code, or the file kept beside.
+    pub(crate) fn render_right(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        Some(match self.right_shown()? {
+            crate::app::RightPanel::File(f) => self.file_pane(&f, true, cx),
+            crate::app::RightPanel::Thread => self.render_thread_panel(window, cx),
+        })
     }
 
     /// The header in `Center::Doc`: a tab per open document.
@@ -210,6 +217,14 @@ impl BenchApp {
                 cx.stop_propagation();
                 this.close_doc(k1.clone(), cx)
             }));
+            let (drag, onto) = (
+                super::tabs::DraggedTab {
+                    key: key.clone(),
+                    name: name.clone().into(),
+                },
+                key.clone(),
+            );
+            let primary = theme.primary;
             tabs.push(
                 bench_ui::doc_tab(format!("doc-tab-{n}"), icon, name, open, dirty, close, cx)
                     .on_click(
@@ -217,6 +232,18 @@ impl BenchApp {
                             this.open_doc(k2.clone(), window, cx)
                         }),
                     )
+                    // Dragged onto another tab it takes that place; onto the thread, the file
+                    // goes to it.
+                    .on_drag(drag, |d, _, _, cx| cx.new(|_| d.clone()))
+                    .drag_over::<super::tabs::DraggedTab>(move |s, _, _, _| {
+                        s.border_l_2().border_color(primary)
+                    })
+                    .on_drop(
+                        cx.listener(move |this, d: &super::tabs::DraggedTab, _, cx| {
+                            this.move_tab(&d.key, &onto, cx)
+                        }),
+                    )
+                    .context_menu(super::tabs::tab_menu(cx.entity(), key.clone()))
                     .into_any_element(),
             );
         }

@@ -15,7 +15,7 @@ use gpui_kit::*;
 pub(crate) mod agent_form;
 pub(crate) mod agents;
 mod asks;
-mod attachments;
+pub mod attachments;
 mod backend;
 mod events;
 mod keys;
@@ -52,7 +52,7 @@ pub type Choice = SelectState<Vec<SharedString>>;
 /// after the machine. A server's is a project named after it ("Dev"); Host is first in the sidebar.
 pub const LOCAL_HOST: &str = "Host";
 
-pub use workspace::{Center, SidebarPanel};
+pub use workspace::{Center, RightPanel, SidebarPanel};
 
 /// The open thread's run, as the status says it: what the agent is doing.
 pub struct Live {
@@ -171,6 +171,8 @@ pub struct BenchApp {
     pub process_open: Option<String>,
     /// Files waiting in the composer to go with the next message.
     pub attachments: Vec<std::path::PathBuf>,
+    /// The project's code sent to the thread from the Explorer, waiting with the message.
+    pub references: Vec<attachments::CodeRef>,
     /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
     pub sidebar_hidden: bool,
     pub usage: Option<Usage>,
@@ -255,6 +257,9 @@ pub struct BenchApp {
     /// What the sidebar lists, and the Explorer's state (`src/explorer/`).
     pub sidebar_panel: SidebarPanel,
     pub explorer: crate::explorer::Explorer,
+    /// What the right dock shows, and its width once dragged.
+    pub right: Option<RightPanel>,
+    pub right_w: Option<Pixels>,
     pub skills: Vec<SkillRow>,
     pub skill_open: Option<String>,
     /// Settings → Prompts.
@@ -651,6 +656,7 @@ impl BenchApp {
             live: None,
             queued: None,
             attachments: vec![],
+            references: vec![],
             sidebar_hidden: false,
             files_open: false,
             processes: vec![],
@@ -700,6 +706,8 @@ impl BenchApp {
             center: Center::Chat,
             sidebar_panel: SidebarPanel::Threads,
             explorer: Default::default(),
+            right: None,
+            right_w: None,
             skills: vec![],
             skill_open: None,
             prompts: vec![],

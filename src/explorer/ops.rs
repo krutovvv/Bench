@@ -343,10 +343,10 @@ impl BenchApp {
                 *f = n;
             }
         }
-        if let Some(b) = ex.beside.as_mut() {
+        if let Some(crate::app::RightPanel::File(b)) = self.right.as_mut() {
             if let Some(n) = follow(b) {
-                if let Some(doc) = ex.docs.remove(&DocKey::File(b.clone())) {
-                    ex.docs.insert(DocKey::File(n.clone()), doc);
+                if let Some(doc) = self.explorer.docs.remove(&DocKey::File(b.clone())) {
+                    self.explorer.docs.insert(DocKey::File(n.clone()), doc);
                 }
                 *b = n;
             }
@@ -385,13 +385,8 @@ impl BenchApp {
                         this.explorer.docs.remove(&k);
                         this.close_doc(k, cx);
                     }
-                    if this
-                        .explorer
-                        .beside
-                        .as_ref()
-                        .is_some_and(|b| b.within(&f.path))
-                    {
-                        this.explorer.beside = None;
+                    if this.beside_file().is_some_and(|b| b.within(&f.path)) {
+                        this.right = None;
                     }
                     this.list_folder(f.parent(), window, cx);
                     this.after_write(&f, window, cx);

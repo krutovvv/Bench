@@ -67,6 +67,36 @@ A project's Settings (`Center::Project`, `src/env/page.rs`) are its fields: name
 how it runs, its Telegram bot, its removal — `Section`s whose `home()` is `Settings` and that
 draw a `form()`. What a project *contains* is in the Explorer; what it *is set to* is in Settings.
 
+## Where the IDE goes
+
+The Explorer is one of Bench's three cores, beside threads and projects: the person reads and
+checks the code here, the agent writes it in threads. It stays far smaller than Zed (which is
+one click away) and grows by putting the same parts in more places, not by new copies:
+
+- **Docks hold panels, the center holds items** — as in Zed. The right dock shows one panel at
+  a time (`RightPanel`): the open **thread** beside the code (the same `render_chat` the center
+  shows, so the IDE costs no second chat), or a **file** kept beside. In the threads view the
+  right dock shows only a file (the thread is the center).
+- **Code goes to the thread as references.** ⌘L sends the selection (or the whole file) to the
+  composer as a chip naming the file and lines; a tab dragged onto the thread, or its menu's
+  "Add to thread", sends the file. A message carries them under its words as fenced blocks with
+  `path:lines` — what the agent reads, what the thread shows. The same chips will carry a
+  language server's problems and a terminal's output.
+
+Phases, each a thing of its own:
+
+1. **Tabs and the thread beside** (done): tabs drag to reorder and have a menu (close others,
+   to the left, to the right, saved, all; copy the path; open beside; add to the thread); the
+   right dock's panels; references from the code to the thread.
+2. **Language servers through the agent.** The agent already runs a project's servers
+   (`agent/src/lsp.ts`); the editor already takes LSP providers (gpui's `Lsp`: diagnostics,
+   hover, go to definition, completion). A small REST bridge (`/api/lsp/{diagnostics,hover,
+   definition}`) and providers in `explorer/lsp.rs` give underlined problems, hover and ⌘-click
+   to the definition; a Problems list; "Send problems to the thread".
+3. **A terminal in the bottom dock** on the project's machine — the `/terminal` insert's session
+   (`src/inserts/terminal/session.rs`) in a dock instead of a thread; "Send output to the thread".
+4. **Git at a glance**: changed lines in the gutter against HEAD, a changed file's diff.
+
 ## Growing it
 
 - Another source of files in the tree (a second folder, a worktree): a group in `tree.rs` whose

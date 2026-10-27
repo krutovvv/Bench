@@ -8,12 +8,14 @@
 //! explorer/mod.rs   the state: the project shown, folds, listings, open documents, tabs
 //! explorer/doc.rs   documents: a file (an editor of its own), or a part of the environment
 //! explorer/ops.rs   the tree's work: listing a folder, new / rename / delete, ⌘P, ⌘⇧F
+//! explorer/tabs.rs  the tabs' drag and menu; code sent to the thread (⌘L)
 //! explorer/tree.rs  the sidebar's tree
 //! explorer/view.rs  a document in the middle and beside, the tabs, ⌘P's list
 //! ```
 
 pub mod doc;
 pub mod ops;
+pub mod tabs;
 pub mod tree;
 pub mod view;
 
@@ -77,9 +79,6 @@ pub struct Explorer {
     pub docs: HashMap<DocKey, Doc>,
     pub tabs: Vec<DocKey>,
     pub active: Option<DocKey>,
-    /// The file kept in the right dock, and the dock's width once dragged.
-    pub beside: Option<FileRef>,
-    pub beside_w: Option<Pixels>,
     pub naming: Option<Naming>,
     /// A delete or a close asked once: the second click does it.
     pub armed: Option<String>,

@@ -386,7 +386,8 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
     });
     crate::env::apply(e, &v, window, cx);
     // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
-    // `BENCH_EXPLORER=beside` another beside it, `=part` an MCP server open instead.
+    // `BENCH_EXPLORER=beside` another beside it, `=part` an MCP server open instead, `=thread` the
+    // thread beside it with lines sent to it.
     if std::env::var("BENCH_DEMO").as_deref() != Ok("explorer") || !app.explorer.tabs.is_empty() {
         return;
     }
@@ -428,6 +429,20 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
     match std::env::var("BENCH_EXPLORER").as_deref() {
         Ok("beside") => app.open_beside(skill.join("SKILL.md"), window, cx),
         Ok("part") => app.open_part("mcp", "ghost".into(), window, cx),
+        // The thread beside the post, lines of it sent to the composer (⌘L).
+        Ok("thread") => {
+            app.session = Some("d-site".into());
+            app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
+            app.right = Some(crate::app::RightPanel::Thread);
+            app.add_reference(
+                crate::app::attachments::CodeRef {
+                    path: "/Users/demo/code/blog/content/posts/release-2-4.md".into(),
+                    lines: Some((11, 15)),
+                    text: Some("## What changed".into()),
+                },
+                cx,
+            );
+        }
         _ => {}
     }
 }

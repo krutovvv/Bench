@@ -165,7 +165,24 @@ impl BenchApp {
                         .h_full()
                         .child(self.render_doc_tabs(cx)),
                 )
-                .child(div().pr_2().child(self.render_header_tail(cx)))
+                .child(
+                    h_flex()
+                        .pr_2()
+                        .gap_1()
+                        .child(
+                            bench_ui::icon_button(
+                                "doc-thread",
+                                crate::icons::Ico::MessagesSquare,
+                                "The thread beside  ⌘J",
+                                self.right == Some(crate::app::RightPanel::Thread),
+                                cx,
+                            )
+                            .on_click(cx.listener(
+                                |this, _, window, cx| this.toggle_thread_beside(window, cx),
+                            )),
+                        )
+                        .child(self.render_header_tail(cx)),
+                )
                 .into_any_element();
         }
         if !self.center.is_settings() {
@@ -346,7 +363,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let hidden = self.sidebar_hidden;
-        let beside = self.render_beside(cx);
+        let beside = self.render_right(window, cx);
         let shape = (false, beside.is_some(), hidden);
         if self.layout_synced != Some(shape) {
             self.layout_synced = Some(shape);
@@ -363,9 +380,9 @@ impl BenchApp {
                 if let (Some(w), false) = (sizes.first(), this.sidebar_hidden) {
                     this.sidebar_w = *w;
                 }
-                if let (Some(w), Some(_)) = (sizes.last(), this.explorer.beside.as_ref()) {
+                if let (Some(w), Some(_)) = (sizes.last(), this.right.as_ref()) {
                     if sizes.len() > 1 {
-                        this.explorer.beside_w = Some(*w);
+                        this.right_w = Some(*w);
                     }
                 }
             });
@@ -384,7 +401,7 @@ impl BenchApp {
             })
             .child(resizable_panel().child(main))
             .when_some(beside, |d, pane| {
-                let w = self.explorer.beside_w.unwrap_or(px(bench_ui::BESIDE_W));
+                let w = self.right_w.unwrap_or(px(bench_ui::BESIDE_W));
                 d.child(
                     resizable_panel()
                         .size(w)

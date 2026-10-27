@@ -374,6 +374,59 @@ impl BenchApp {
             .into_any_element()
     }
 
+    /// The thread as the right dock's panel, beside a document: its title and close over the same
+    /// thread the center shows in the threads view; a tab dropped on it sends its file.
+    pub(crate) fn render_thread_panel(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let title: SharedString = self
+            .session
+            .as_ref()
+            .and_then(|id| self.sessions.iter().find(|s| &s.id == id))
+            .map(|s| s.title.clone())
+            .filter(|t| !t.is_empty())
+            .unwrap_or_else(|| "New thread".into())
+            .into();
+        let head = bench_ui::ide_head(
+            title,
+            None,
+            vec![
+                bench_ui::icon_button("thread-new", Ico::Plus, "New thread  ⌘N", false, cx)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.new_session(cx);
+                        this.composer.update(cx, |s, cx| s.focus(window, cx));
+                    }))
+                    .into_any_element(),
+                bench_ui::icon_button("thread-close", Ico::X, "Close  ⌘J", false, cx)
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
+                    )
+                    .into_any_element(),
+            ],
+            cx,
+        )
+        .h(bench_ui::bar_h(cx))
+        .bg(theme.title_bar);
+        v_flex()
+            .size_full()
+            .drag_over::<crate::explorer::tabs::DraggedTab>(|s, _, _, cx| {
+                s.bg(cx.theme().list_active)
+            })
+            .on_drop(
+                cx.listener(|this, d: &crate::explorer::tabs::DraggedTab, window, cx| {
+                    if let crate::explorer::DocKey::File(f) = &d.key {
+                        this.send_file_to_thread(f, window, cx)
+                    }
+                }),
+            )
+            .child(head)
+            .child(div().flex_1().min_h_0().child(self.render_chat(window, cx)))
+            .into_any_element()
+    }
+
     pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
         self.tv.to_end();
         cx.notify();

@@ -114,16 +114,21 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// Keep `file` on the right, beside what the middle shows.
+    /// Keep `file` in the right dock, beside what the middle shows.
     pub fn open_beside(&mut self, file: FileRef, window: &mut Window, cx: &mut Context<Self>) {
         self.ensure_doc(file.clone(), window, cx);
-        self.explorer.beside = Some(file);
+        if let Some(old) = self.beside_file().cloned() {
+            self.right = Some(crate::app::RightPanel::File(file));
+            self.drop_unused(&DocKey::File(old));
+        } else {
+            self.right = Some(crate::app::RightPanel::File(file));
+        }
         cx.notify();
     }
 
-    /// The pane on the right closes (its file stays open if a tab has it).
-    pub fn close_beside(&mut self, cx: &mut Context<Self>) {
-        if let Some(f) = self.explorer.beside.take() {
+    /// The right dock closes (its file stays open if a tab has it).
+    pub fn close_right(&mut self, cx: &mut Context<Self>) {
+        if let Some(crate::app::RightPanel::File(f)) = self.right.take() {
             self.drop_unused(&DocKey::File(f));
         }
         cx.notify();
@@ -269,7 +274,7 @@ impl BenchApp {
 
     /// ⌘S: the document in the middle (or, with none, the one beside).
     pub fn save_active_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let key = match (&self.center, &self.explorer.active, &self.explorer.beside) {
+        let key = match (&self.center, &self.explorer.active, self.beside_file()) {
             (Center::Doc, Some(k), _) => k.clone(),
             (_, _, Some(f)) => DocKey::File(f.clone()),
             _ => return false,
@@ -327,9 +332,9 @@ impl BenchApp {
     }
 
     /// A file's editor goes when no tab and not the pane beside hold it, and nothing is unsaved.
-    fn drop_unused(&mut self, key: &DocKey) {
+    pub(super) fn drop_unused(&mut self, key: &DocKey) {
         let held = self.explorer.tabs.contains(key)
-            || matches!(key, DocKey::File(f) if self.explorer.beside.as_ref() == Some(f));
+            || matches!(key, DocKey::File(f) if self.beside_file() == Some(f));
         if !held && self.explorer.docs.get(key).is_some_and(|d| !d.dirty) {
             self.explorer.docs.remove(key);
         }

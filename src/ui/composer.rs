@@ -105,6 +105,35 @@ impl BenchApp {
                 cx,
             )
         }));
+        // The project's code sent from the Explorer (⌘L, a dropped tab): its file and lines.
+        chips.extend(self.references.clone().iter().enumerate().map(|(k, r)| {
+            let close = div()
+                .id(("ref-x", k))
+                .flex_none()
+                .cursor_pointer()
+                .text_color(theme.muted_foreground)
+                .hover(|s| s.text_color(theme.foreground))
+                .child(crate::icons::Ico::X.icon().xsmall())
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    cx.stop_propagation();
+                    this.remove_reference(k, cx)
+                }));
+            let (ico, color) = crate::ui::file_icon(&r.path, false, &theme);
+            h_flex()
+                .id(("ref", k))
+                .h(px(crate::ui::CHIP_H))
+                .px_1p5()
+                .gap_1()
+                .items_center()
+                .rounded_md()
+                .border_1()
+                .border_color(theme.border)
+                .text_sm()
+                .child(ico.icon().xsmall().text_color(color))
+                .child(r.label())
+                .child(close)
+                .into_any_element()
+        }));
 
         let view = cx.entity();
         v_flex()
