@@ -35,7 +35,9 @@ list re-read from its source": keep unsaved new items, don't overwrite a card be
   someday tasks show in Anytime; pure functions, tested).
 - **Bench's side**: `src/inserts/tasks/store.rs` — a worker thread that sends `Cmd::Load / Save /
   Delete` as REST calls and returns `Evt::Loaded / Created / Error` over an `async_channel`; the
-  `/tasks` insert shows them (`mod.rs`, `state.rs`, `view.rs` beside it).
+  `/tasks` insert shows them (`mod.rs`, `state.rs`, `view.rs` beside it). The open task card is
+  Things-shaped: title, notes (no frame), and one thin wrapped strip under a border — when-
+  segmented, day, project chips, tags, time + timer, Done, delete; never a stack of label rows.
 - **The agent's side**: the `tasks` tool (list with status, tag, `done_since` / `done_until`,
   sums `spent_minutes_total`; add; update; complete; delete). Its line in the `inserts` prompt
   section says "the only place they live, never look for them in files".

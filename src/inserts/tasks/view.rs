@@ -402,8 +402,8 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// The open task: title, when, important, tags, time (with the timer), the day it was done
-    /// (back-dating), notes; Delete at the bottom.
+    /// The open task, Things-style: the title, the notes, and one thin strip of quick controls
+    /// under them — not a stack of labelled form rows.
     pub(crate) fn render_task_card(&mut self, t: &Task, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
@@ -419,22 +419,6 @@ impl BenchApp {
         } else {
             usize::MAX
         };
-        let label = |text: &'static str| {
-            div()
-                .w(px(64.))
-                .flex_none()
-                .text_sm()
-                .text_color(muted)
-                .child(text)
-        };
-        let field = |name: &'static str, control: AnyElement| {
-            h_flex()
-                .gap_2()
-                .items_center()
-                .child(label(name))
-                .child(div().flex_1().min_w_0().child(control))
-                .into_any_element()
-        };
         let id = t.id.clone();
         let (i1, i2, i3, i4, i5) = (id.clone(), id.clone(), id.clone(), id.clone(), id.clone());
         let armed = self.tasks.delete_armed.as_deref() == Some(id.as_str());
@@ -444,9 +428,9 @@ impl BenchApp {
         v_flex()
             .id("task-card")
             .w_full()
-            .px_6()
-            .py_5()
-            .gap_3()
+            .px_4()
+            .py_3()
+            .gap_2()
             .child(
                 h_flex()
                     .gap_2()
@@ -471,170 +455,166 @@ impl BenchApp {
                             })),
                     ),
             )
-            .child(field(
-                "When",
-                crate::inserts::tools::view::segmented_tall(
-                    "task-when",
-                    &["Today", "Evening", "Tomorrow", "Anytime"],
-                    when,
-                    cx,
-                    move |this, k, window, cx| this.set_task_when(i2.clone(), k, window, cx),
-                ),
-            ))
-            .child(field("Day", Input::new(&self.tasks.day).into_any_element()))
-            // The projects as tags: a click puts the project's tag on the task (or takes it off).
-            .child(field("Project", {
-                let on: Vec<String> = t.tags.iter().map(|g| g.to_lowercase()).collect();
-                let chips: Vec<AnyElement> = self
-                    .projects
-                    .iter()
-                    .map(|p| tasks::slug(&p.name))
-                    .filter(|s| !s.is_empty())
-                    .enumerate()
-                    .map(|(k, tag)| {
-                        let chosen = on.contains(&tag);
-                        div()
-                            .id(("task-project", k))
-                            .flex_none()
-                            .h(px(bench_ui::FIELD_H))
-                            .px_2()
-                            .flex()
-                            .items_center()
-                            // As the fields' text: the chips are buttons in the same form.
-                            .text_sm()
-                            .rounded_md()
-                            .border_1()
-                            .cursor_pointer()
-                            .when(chosen, |d| {
-                                d.bg(theme.primary)
-                                    .border_color(theme.primary)
-                                    .text_color(theme.primary_foreground)
-                            })
-                            .when(!chosen, |d| {
-                                d.border_color(theme.border)
-                                    .hover(|s| s.bg(theme.list_hover))
-                            })
-                            .child(tag.clone())
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.click_claimed = true;
-                                this.toggle_task_tag(tag.clone(), window, cx)
-                            }))
-                            .into_any_element()
-                    })
-                    .collect();
-                h_flex()
-                    .flex_wrap()
-                    .gap_1()
-                    .children(chips)
-                    .into_any_element()
-            }))
-            .child(field(
-                "Tags",
-                Input::new(&self.tasks.tags).into_any_element(),
-            ))
-            .child(field(
-                "Time",
-                h_flex()
-                    .gap_2()
-                    .items_center()
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .child(Input::new(&self.tasks.spent)),
-                    )
-                    .child(
-                        div()
-                            .id("task-timer")
-                            .flex_none()
-                            // As tall as the fields beside it.
-                            .h(px(bench_ui::FIELD_H))
-                            .px_3()
-                            .gap_1()
-                            .flex()
-                            .items_center()
-                            .text_sm()
-                            .border_1()
-                            .rounded_md()
-                            .border_color(if running { theme.primary } else { theme.border })
-                            .text_color(if running {
-                                theme.primary
-                            } else {
-                                theme.foreground
-                            })
-                            .cursor_pointer()
-                            .hover(|s| s.bg(theme.list_hover))
-                            .child(
-                                if running { Ico::Square } else { Ico::Play }
-                                    .icon()
-                                    .xsmall(),
-                            )
-                            .child(if running {
-                                tasks::show_spent(spent_now)
-                            } else {
-                                "Start".to_string()
-                            })
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.toggle_task_timer(i3.clone(), window, cx)
-                            })),
-                    )
-                    .into_any_element(),
-            ))
-            .when(t.done(), |d| {
-                d.child(field(
-                    "Done on",
-                    Input::new(&self.tasks.completed).into_any_element(),
-                ))
-            })
-            .when_some(self.tasks.field_error.clone(), |d, e| {
-                d.child(div().text_sm().text_color(theme.danger).child(e))
-            })
+            // The notes are the body of the card: no frame, the field grows with them.
             .child(
                 div()
-                    .border_1()
-                    .rounded_md()
-                    .border_color(theme.border)
                     .px_1()
                     .child(Textarea::new(&self.tasks.notes).appearance(false)),
             )
+            .when_some(self.tasks.field_error.clone(), |d, e| {
+                d.child(div().px_1().text_sm().text_color(theme.danger).child(e))
+            })
             .child(
                 h_flex()
+                    .flex_wrap()
                     .gap_2()
                     .items_center()
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .pt_2()
+                    .child(crate::inserts::tools::view::segmented(
+                        "task-when",
+                        &["Today", "Evening", "Tomorrow", "Anytime"],
+                        when,
+                        cx,
+                        move |this, k, window, cx| this.set_task_when(i2.clone(), k, window, cx),
+                    ))
+                    .child(
+                        div()
+                            .w(px(150.))
+                            .flex_none()
+                            .child(Input::new(&self.tasks.day)),
+                    )
+                    .when(t.done(), |d| {
+                        d.child(
+                            div()
+                                .w(px(140.))
+                                .flex_none()
+                                .child(Input::new(&self.tasks.completed)),
+                        )
+                    })
+                    // The projects as tags: a click puts the project's tag on the task (or takes it off).
+                    .children({
+                        let on: Vec<String> = t.tags.iter().map(|g| g.to_lowercase()).collect();
+                        self.projects
+                            .iter()
+                            .map(|p| tasks::slug(&p.name))
+                            .filter(|s| !s.is_empty())
+                            .enumerate()
+                            .map(|(k, tag)| {
+                                let chosen = on.contains(&tag);
+                                div()
+                                    .id(("task-project", k))
+                                    .flex_none()
+                                    .h(px(bench_ui::FIELD_H))
+                                    .px_2()
+                                    .flex()
+                                    .items_center()
+                                    .text_sm()
+                                    .rounded_md()
+                                    .border_1()
+                                    .cursor_pointer()
+                                    .when(chosen, |d| {
+                                        d.bg(theme.primary)
+                                            .border_color(theme.primary)
+                                            .text_color(theme.primary_foreground)
+                                    })
+                                    .when(!chosen, |d| {
+                                        d.border_color(theme.border)
+                                            .hover(|s| s.bg(theme.list_hover))
+                                    })
+                                    .child(tag.clone())
+                                    .on_click(cx.listener(move |this, _, window, cx| {
+                                        this.click_claimed = true;
+                                        this.toggle_task_tag(tag.clone(), window, cx)
+                                    }))
+                                    .into_any_element()
+                            })
+                            .collect::<Vec<AnyElement>>()
+                    })
+                    .child(
+                        div()
+                            .w(px(140.))
+                            .flex_none()
+                            .child(Input::new(&self.tasks.tags)),
+                    )
+                    .child(
+                        h_flex()
+                            .flex_none()
+                            .gap_1()
+                            .items_center()
+                            .child(
+                                div()
+                                    .w(px(80.))
+                                    .child(Input::new(&self.tasks.spent)),
+                            )
+                            .child(
+                                div()
+                                    .id("task-timer")
+                                    .flex_none()
+                                    .h(px(bench_ui::FIELD_H))
+                                    .px_2()
+                                    .gap_1()
+                                    .flex()
+                                    .items_center()
+                                    .text_xs()
+                                    .border_1()
+                                    .rounded_md()
+                                    .border_color(if running { theme.primary } else { theme.border })
+                                    .text_color(if running { theme.primary } else { muted })
+                                    .cursor_pointer()
+                                    .hover(|s| s.bg(theme.list_hover))
+                                    .child(
+                                        if running { Ico::Square } else { Ico::Play }
+                                            .icon()
+                                            .xsmall(),
+                                    )
+                                    .when(running, |d| d.child(tasks::show_spent(spent_now)))
+                                    .tooltip(|window, cx| {
+                                        Tooltip::new("Start / stop the timer").build(window, cx)
+                                    })
+                                    .on_click(cx.listener(move |this, _, window, cx| {
+                                        this.toggle_task_timer(i3.clone(), window, cx)
+                                    })),
+                            ),
+                    )
+                    .child(div().flex_1())
                     .child(
                         div()
                             .id("task-done")
+                            .h(px(bench_ui::FIELD_H))
                             .px_2()
-                            .py_0p5()
+                            .flex()
+                            .items_center()
                             .text_sm()
                             .border_1()
                             .rounded_md()
                             .border_color(theme.border)
                             .cursor_pointer()
                             .hover(|s| s.bg(theme.list_hover))
-                            .child(if t.done() {
-                                "Mark not done"
-                            } else {
-                                "Mark done  ⌘K"
-                            })
+                            .child(if t.done() { "Not done" } else { "Done  ⌘K" })
                             .on_click(cx.listener(move |this, _, window, cx| {
                                 this.toggle_task_done(i4.clone(), window, cx)
                             })),
                     )
-                    .child(div().flex_1())
                     .child(
                         div()
                             .id("task-delete")
+                            .h(px(bench_ui::FIELD_H))
                             .px_2()
-                            .py_0p5()
-                            .text_sm()
-                            .border_1()
+                            .flex()
+                            .items_center()
+                            .text_xs()
                             .rounded_md()
-                            .border_color(if armed { theme.danger } else { theme.border })
-                            .text_color(if armed { theme.danger } else { muted })
                             .cursor_pointer()
-                            .hover(|s| s.bg(theme.list_hover))
-                            .child(if armed { "Confirm delete" } else { "Delete" })
+                            .text_color(if armed { theme.danger } else { muted })
+                            .hover(|s| s.bg(theme.list_hover).text_color(theme.danger))
+                            .when(armed, |d| d.child("Confirm delete"))
+                            .when(!armed, |d| {
+                                d.child(Ico::Trash.icon().small()).tooltip(|window, cx| {
+                                    Tooltip::new("Delete").build(window, cx)
+                                })
+                            })
                             .on_click(
                                 cx.listener(move |this, _, _, cx| this.delete_task(i5.clone(), cx)),
                             ),

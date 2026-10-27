@@ -432,24 +432,8 @@ pub(crate) fn segmented_owned(
         .into_any_element()
 }
 
-/// `segmented` as tall as a text field, for a form's row beside fields.
-pub(crate) fn segmented_tall(
-    id: &'static str,
-    labels: &[&'static str],
-    chosen: usize,
-    cx: &mut Context<BenchApp>,
-    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
-) -> AnyElement {
-    segmented_tall_owned(
-        id,
-        labels.iter().map(|s| s.to_string()).collect(),
-        chosen,
-        cx,
-        on,
-    )
-}
-
-/// `segmented_tall` with labels made at run time (a form's list of servers).
+/// `segmented` as tall as a text field, for a form's row beside fields; labels are made
+/// at run time (a form's list of servers).
 pub(crate) fn segmented_tall_owned(
     id: &'static str,
     labels: Vec<String>,

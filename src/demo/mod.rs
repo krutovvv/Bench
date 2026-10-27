@@ -252,9 +252,9 @@ fewer form fields. Then check what it did to signups and give me a short summary
         .collect();
     // The demo's own folds, not the person's: every group open but the long Tools.
     app.ssh.collapsed = ["s:Tools".to_string()].into_iter().collect();
-    // `BENCH_DEMO=tasks|server|browser|tool`: that thread open instead.
+    // `BENCH_DEMO=tasks|tasks-open|server|browser|tool`: that thread open instead.
     let open = match std::env::var("BENCH_DEMO").as_deref() {
-        Ok("tasks") => Some("d-today"),
+        Ok("tasks") | Ok("tasks-open") => Some("d-today"),
         Ok("server") => Some("d-web1"),
         Ok("tool") => Some("d-tool"),
         Ok("landing") | Ok("top") | Ok("new") | Ok("long") => None,
@@ -298,6 +298,19 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 .await;
             this.update(cx, |app, cx| {
                 app.active_thread.update(cx, |v, cx| v.jump_to_latest(cx))
+            })
+            .ok();
+        })
+        .detach();
+    }
+    // `BENCH_DEMO=tasks-open`: the API task's card opened a second in, as when it is being edited.
+    if std::env::var("BENCH_DEMO").as_deref() == Ok("tasks-open") {
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(1))
+                .await;
+            this.update_in(cx, |app, window, cx| {
+                app.select_task("t-api".into(), window, cx);
             })
             .ok();
         })
