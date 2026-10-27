@@ -11,9 +11,11 @@
 //!
 //! Live speed: while text streams, once a second the characters of that second are turned into
 //! tokens with a characters-per-token ratio calibrated on each finished call (the agent reports
-//! the exact token count only per call), and divided by the writing time of that second rather
-//! than by the second itself — otherwise every tool run inside a second reads as 1 tok/s.
-//! The per-second samples of the current answer feed a chart.
+//! the exact token count only per call), and divided by the writing span of that token train —
+//! first token to last — rather than by the whole second: the second a tool ran in says nothing
+//! about the model, and neither says the part before the train began. A train whose tokens came
+//! too fast to measure (one burst delivered together) waits for more tokens instead of reading
+//! as hundreds a second. The per-second samples of the current answer feed a chart.
 
 use std::time::Duration;
 
@@ -38,10 +40,11 @@ pub struct Meter {
     chars_call: usize,
     /// Characters per token, learned from finished calls.
     ratio: f64,
-    /// Characters since the last one-second sample, and when that sample was taken.
+    /// Characters of the open token train (since its first token, or since the last sample).
     window_chars: usize,
-    /// Seconds of that window the model spent writing (waits left out).
-    window_active: f64,
+    /// The train's first token, and the longest wait between its neighbours.
+    window_first: Option<Instant>,
+    window_gap: Duration,
     last_tick: Option<Instant>,
     last_token: Option<Instant>,
     /// Tokens/second over the last second while text is streaming; None between bursts.
@@ -102,26 +105,27 @@ impl Stat {
 /// Mixed Russian/English prose and code averages about this many characters per token.
 const DEFAULT_RATIO: f64 = 3.2;
 
-/// A gap in the stream longer than this is the model waiting — prefill of the next call, a tool
-/// running, arguments being built without being streamed — so it is not generation and is not
-/// counted at all. Shorter gaps are ordinary network and chunk jitter, and count as writing.
-const STALL: Duration = Duration::from_millis(250);
+/// The shortest wait between a train's tokens that makes the train a pause — the model waiting
+/// on something else (a tool, arguments, the next call) rather than writing. Its sample is
+/// skipped; the train after it measures on its own.
+const PAUSE: Duration = Duration::from_millis(1000);
 
-/// The seconds a token arrival adds to the window's generating time: the wait between two tokens
-/// counts while it is jitter, and nothing when it is the model waiting on something else. Measuring
-/// the window against wall time instead charges the wait to the model, and the chart dips to 1 tok/s
-/// every time a tool runs.
-pub fn active_added(gap: Duration) -> f64 {
-    if gap > STALL { 0. } else { gap.as_secs_f64() }
-}
+/// A train this short spans one burst of chunks delivered together: its span is delivery time,
+/// not writing time, so it proves nothing. The characters wait for more tokens instead.
+const MIN_SPAN: Duration = Duration::from_millis(150);
 
-/// Tokens per second over a window: its characters with the learned ratio, over the seconds the
-/// model was actually writing. A window with no measured writing has no rate to show.
-pub fn window_rate(chars: usize, active: f64, ratio: f64) -> Option<f64> {
-    if chars > 0 && active > 0. && ratio > 0. {
-        Some(chars as f64 / ratio / active)
-    } else {
+/// Below this many tokens a train is too short to read as a rate; they wait for more.
+const MIN_TOKENS: f64 = 8.;
+
+/// Tokens per second over a token train: its characters with the learned ratio, over the span
+/// from its first token to its last. None when the train cannot be read as writing: a wait
+/// inside it (a tool), a burst too short to time, or too few tokens to mean anything.
+pub fn train_rate(chars: usize, span: Duration, max_gap: Duration, ratio: f64) -> Option<f64> {
+    let tokens = chars as f64 / ratio;
+    if max_gap > PAUSE || span < MIN_SPAN || tokens < MIN_TOKENS || ratio <= 0. {
         None
+    } else {
+        Some(tokens / span.as_secs_f64())
     }
 }
 
@@ -158,7 +162,8 @@ impl Meter {
         self.samples.clear();
         self.live = None;
         self.window_chars = 0;
-        self.window_active = 0.;
+        self.window_first = None;
+        self.window_gap = Duration::ZERO;
         self.last_tick = None;
         self.last_token = None;
     }
@@ -166,12 +171,17 @@ impl Meter {
     /// Streamed text (answer or reasoning) of `chars` characters.
     pub fn token(&mut self, chars: usize) {
         let now = Instant::now();
-        self.window_chars += chars;
-        // The wait since the previous token counts as writing only when it is jitter.
-        if let Some(t) = self.last_token {
-            let wrote = active_added(now.duration_since(t));
-            self.window_active += wrote;
+        if self.window_first.is_some() {
+            // The wait inside the open train: the longest one makes it a pause.
+            if let Some(t) = self.last_token {
+                self.window_gap = self.window_gap.max(now.duration_since(t));
+            }
+        } else {
+            self.window_first = Some(now);
+            self.window_chars = 0;
+            self.window_gap = Duration::ZERO;
         }
+        self.window_chars += chars;
         self.last_token = Some(now);
         self.last_tick.get_or_insert(now);
         if self.closed {
@@ -194,18 +204,27 @@ impl Meter {
         let streaming = self
             .last_token
             .is_some_and(|t| now.duration_since(t) < Duration::from_millis(1500));
-        // The rate of the writing in this window, not of its wall time: a second with a tool run
-        // inside it says nothing about how fast the model writes.
-        self.live = if streaming {
-            window_rate(self.window_chars, self.window_active, self.ratio)
+        // The rate of the train, when it can be read: its own span, not the second around it.
+        // A train that is still too short, or held a pause, keeps its characters for the next
+        // reading instead of lying or charting a dip.
+        if streaming {
+            if let Some(first) = self.window_first {
+                // The train's own span, last token to first — not up to this tick, which can
+                // sit up to half a second after the writing stopped.
+                let span = self.last_token.unwrap_or(now).saturating_duration_since(first);
+                if let Some(rate) =
+                    train_rate(self.window_chars, span, self.window_gap, self.ratio)
+                {
+                    self.live = Some(rate);
+                    self.samples.push(rate);
+                    self.window_chars = 0;
+                    self.window_first = None;
+                    self.window_gap = Duration::ZERO;
+                }
+            }
         } else {
-            None
-        };
-        if let Some(rate) = self.live {
-            self.samples.push(rate);
+            self.live = None;
         }
-        self.window_chars = 0;
-        self.window_active = 0.;
         self.last_tick = streaming.then_some(now);
     }
 
@@ -215,7 +234,8 @@ impl Meter {
         self.last_tick = None;
         self.last_token = None;
         self.window_chars = 0;
-        self.window_active = 0.;
+        self.window_first = None;
+        self.window_gap = Duration::ZERO;
     }
 
     /// The thread's numbers as they stand: its chart's tail and the last measured speeds.
@@ -385,33 +405,26 @@ mod tests {
     }
 
     #[test]
-    fn a_wait_for_a_tool_is_not_charged_to_the_model() {
-        // A steady burst: 20 chunks of 10 chars, 50 ms apart, then a 3-second tool call, then the
-        // burst goes on. The wall time of such a second is 3+ seconds; the writing in it is not.
-        let mut active = 0.;
-        let mut chars = 0usize;
-        for k in 0..20 {
-            chars += 10;
-            if k > 0 {
-                // The first chunk of a burst has no wait before it.
-                active += active_added(Duration::from_millis(50));
-            }
-        }
-        active += active_added(Duration::from_secs(3)); // the tool ran
-        assert!(
-            (active - 0.95).abs() < 1e-9,
-            "the wait added nothing to the writing: {active}"
+    fn a_burst_train_reads_as_throughput_not_as_the_speed_of_light() {
+        // A second that holds one honest train: 300 tokens over its 0.9 s span, even though
+        // the chunks inside bursts arrived milliseconds apart.
+        let r = train_rate(960, Duration::from_millis(900), Duration::from_millis(40), 3.2)
+            .unwrap();
+        assert!((r - 333.3).abs() < 1., "960 chars / 3.2 / 0.9 s: {r}");
+        // One burst of chunks delivered together proves nothing: it waits for more tokens.
+        assert_eq!(
+            train_rate(400, Duration::from_millis(60), Duration::from_millis(3), 3.2),
+            None
         );
-        let rate = window_rate(chars, active, 3.2).unwrap();
-        // Against the wall time the same second would read 200/3.2/3.95 = 16 tok/s, and a window
-        // holding a single chunk would read nothing at all instead of 1 tok/s.
-        assert!(
-            (rate - 65.8).abs() < 0.5,
-            "the rate is of the writing: {rate}"
+        // Too few tokens to mean anything, same.
+        assert_eq!(
+            train_rate(20, Duration::from_millis(400), Duration::from_millis(50), 3.2),
+            None
         );
-        assert_eq!(window_rate(10, 0., 3.2), None);
-        assert_eq!(window_rate(0, 0.5, 3.2), None);
-        // Jitter still counts, so a genuinely slow model is not flattered.
-        assert!((active_added(Duration::from_millis(200)) - 0.2).abs() < 1e-9);
+        // A wait inside the train is the model waiting on something else: no reading.
+        assert_eq!(
+            train_rate(900, Duration::from_secs(3), Duration::from_millis(1200), 3.2),
+            None
+        );
     }
 }
