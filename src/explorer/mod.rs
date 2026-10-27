@@ -14,8 +14,11 @@
 //! ```
 
 pub mod doc;
+pub mod file_finder;
 pub mod lang;
 pub mod ops;
+pub mod parts;
+pub mod project_search;
 pub mod tabs;
 pub mod tree;
 pub mod view;

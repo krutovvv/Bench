@@ -704,7 +704,7 @@ impl BenchApp {
             prompt_open: None,
             effort_choice,
             composer,
-            drafts: crate::thread::send::load_drafts(),
+            drafts: crate::thread::drafts::load_drafts(),
             draft_key: None,
             follow: false,
             _slash_keys: None,

@@ -1,5 +1,5 @@
 //! A message waiting for the agent: the person's own row, lighter, with its controls — fix the
-//! words, send now (into the running work), take it back.
+//! words, send now (into the running work), take it back — and what those controls do.
 
 use gpui_kit::component::input::Textarea;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
@@ -8,6 +8,8 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
+use gpui_kit::component::input::{InputEvent, TextareaState};
+use crate::client::rpc::Cmd;
 
 impl BenchApp {
     pub(crate) fn render_queued(
@@ -136,5 +138,80 @@ impl BenchApp {
                 cx,
             ))
             .into_any_element()
+    }
+}
+
+impl BenchApp {
+    /// A waiting message (the thread's queue): sent now, into the running work, or taken back.
+    pub fn queued(&mut self, id: String, send_now: bool, cx: &mut Context<Self>) {
+        let Some(session) = self.runtime.clone() else {
+            return;
+        };
+        self.cmd(if send_now {
+            Cmd::QueueSend {
+                session: session.clone(),
+                id: id.clone(),
+            }
+        } else {
+            Cmd::QueueWithdraw {
+                session,
+                id: id.clone(),
+            }
+        });
+        cx.notify();
+    }
+
+    /// Fix the words of a waiting message. It has not gone anywhere, so a wrong word is cheap to
+    /// change; one the agent has already taken up cannot (Pi settles it) — that row is gone by then.
+    pub fn queue_edit_open(
+        &mut self,
+        id: String,
+        text: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let field = cx.new(|cx| {
+            TextareaState::new(window, cx)
+                .auto_grow(1, 100_000)
+                .submit_on_enter(false)
+        });
+        field.update(cx, |s, cx| s.set_value(text, window, cx));
+        cx.subscribe_in(&field, window, |this, _, ev: &InputEvent, window, cx| {
+            // Enter is a new line, as in the composer; ⌘Enter keeps the change.
+            if matches!(
+                ev,
+                InputEvent::PressEnter {
+                    secondary: true,
+                    ..
+                }
+            ) {
+                this.queue_edit_save(window, cx);
+            }
+        })
+        .detach();
+        self.queue_edit = Some((id, field.clone()));
+        // The click that opened this field is its own: the thread's bare-click rule (the composer
+        // takes the focus) must not undo the focus this field just took.
+        self.click_claimed = true;
+        field.update(cx, |s, cx| s.focus(window, cx));
+        cx.notify();
+    }
+
+    pub fn queue_edit_save(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        let Some((id, field)) = self.queue_edit.take() else {
+            return;
+        };
+        let text = field.read(cx).value().trim().to_string();
+        if let Some(session) = self.runtime.clone() {
+            if !text.is_empty() {
+                self.cmd(Cmd::QueueEdit { session, id, text });
+            }
+        }
+        cx.notify();
+    }
+
+    pub fn queue_edit_cancel(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        self.queue_edit = None;
+        cx.notify();
     }
 }
