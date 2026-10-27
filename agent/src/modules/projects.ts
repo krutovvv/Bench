@@ -11,14 +11,14 @@ import { readSkill, skillsFor } from "../repo.ts";
 import { HttpError, type Ctx, type Module } from "../http.ts";
 import { authorizeServer, connectMcp, mcpStatus } from "../mcp.ts";
 import { lspNeeds, lspStates, parseLspSpec, readLsp, writeLsp, writeLspServer } from "../lsp.ts";
-import { syncTelegram } from "../telegram.ts";
+import { reconnectTelegram, syncTelegram, telegramStatus } from "../telegram.ts";
 import { cronView } from "./cron.ts";
 
 /** A project's environment: the agent its threads run with, its folder, the project row. */
 function envOf(id: string): { agent: string; dir: string; project: { id: string; name: string; telegram?: { token: string; allowed_users: string[]; username?: string; proxy?: string } | null } } {
 	if (id === "general") {
 		const tg = getSetting("telegram");
-		return { agent: "default", dir: agentDir("default"), project: { id, name: "Host", telegram: tg?.token ? { token: tg.token, allowed_users: (tg.allowed_users ?? []).map(String) } : null } };
+		return { agent: "default", dir: agentDir("default"), project: { id, name: "Host", telegram: tg?.token ? { token: tg.token, allowed_users: (tg.allowed_users ?? []).map(String), proxy: tg.proxy } : null } };
 	}
 	const p = projects.get(id);
 	if (!p) throw new HttpError(404, "no such project");
@@ -99,8 +99,9 @@ export default ({ rt }: Ctx): Module => ({
 					prompts: fs.existsSync(path.join(dir, "prompts")) ? fs.readdirSync(path.join(dir, "prompts")).filter((f) => f.endsWith(".md")).map((f) => f.replace(/\.md$/, "")).sort() : [],
 					mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
 					cron: jobs.list(agent).map(cronView),
-					// The bot's token is shown whole (the person's own machine and bot).
-					telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token, token: p.telegram.token ?? "", proxy: p.telegram.proxy ?? "" } : null,
+					// The bot's token is shown whole (the person's own machine and bot). The state is
+					// this agent's live view of the connection (Settings shows and Check refreshes it).
+					telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token, token: p.telegram.token ?? "", proxy: p.telegram.proxy ?? "", status: telegramStatus.get(id === "general" ? "" : id) ?? null } : null,
 				};
 			},
 		],
@@ -125,6 +126,9 @@ export default ({ rt }: Ctx): Module => ({
 				// The general bot stays a setting; a project's is the project's.
 				if (p.id === "general") setSetting("telegram", token ? { ...(getSetting("telegram") ?? {}), token, allowed_users: allowed, proxy: proxy || undefined } : undefined);
 				else projects.save({ ...(projects.get(p.id) as any), telegram: token ? { token, allowed_users: allowed, proxy: proxy || undefined } : null });
+				// Check again: forget the bot so the sync below starts it anew and the state shows
+				// what the settings do now, not what they did at boot.
+				if (req.body?.retry) reconnectTelegram(p.id === "general" ? "" : p.id);
 				await syncTelegram(rt);
 				return { ok: true };
 			},

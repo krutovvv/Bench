@@ -38,7 +38,8 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
             "username": "northwind_blog_bot",
             "allowed_users": ["246813579"],
             "token": "4711:AAExampleTokenForScreenshots",
-            "proxy": "http://127.0.0.1:7890"
+            "proxy": "http://127.0.0.1:7890",
+            "status": { "state": "live", "detail": "@northwind_blog_bot", "at": 1780000000000i64 }
         },
         "skills": [
             {"name": "release-notes", "description": "Turn a changelog into a post: what changed for the reader, not the commit list.", "scope": "project", "dir": "~/.bench/projects/p-blog/skills/release-notes"},

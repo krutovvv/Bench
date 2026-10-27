@@ -2,6 +2,7 @@
 //! the bot's token and who may write to it.
 
 use gpui_kit::component::input::{Input, InputState};
+use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
 use serde_json::{Value, json};
 
@@ -13,6 +14,11 @@ use bench_ui::settings_field;
 pub struct TelegramEnv {
     /// Its bot: (@name, allowed user ids, its token, its proxy URL).
     pub bot: Option<(String, Vec<String>, String, String)>,
+    /// The agent's live view of the connection: state, detail (@name or the reason), the minute
+    /// it was last heard. Nothing to show until a bot with a token exists.
+    pub status: Option<(String, Option<String>, String)>,
+    /// Set by the Check button: the save says `retry`, and the agent starts the bot anew.
+    pub retry: bool,
     pub token: Entity<InputState>,
     pub users: Entity<InputState>,
     pub proxy: Entity<InputState>,
@@ -36,6 +42,8 @@ impl TelegramEnv {
         on_change(&proxy, id, cx, |e| e.telegram.dirty = true);
         Self {
             bot: None,
+            status: None,
+            retry: false,
             token,
             users,
             proxy,
@@ -74,6 +82,22 @@ impl Section for Telegram {
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_string(),
+            )
+        });
+        e.telegram.status = v["telegram"]["status"].as_object().map(|s| {
+            let at = s
+                .get("at")
+                .and_then(Value::as_i64)
+                .map(|ms| {
+                    chrono::DateTime::from_timestamp_millis(ms)
+                        .map(|d| d.with_timezone(&chrono::Local).format("%H:%M").to_string())
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+            (
+                s.get("state").and_then(Value::as_str).unwrap_or("").to_string(),
+                s.get("detail").and_then(Value::as_str).map(str::to_string),
+                at,
             )
         });
         if !e.telegram.dirty {
@@ -133,6 +157,13 @@ impl Section for Telegram {
         }
         // Sent always: blank clears it, and the bot falls back to the agent's env again.
         body["proxy"] = json!(e.telegram.proxy.read(cx).value().trim());
+        // The Check button: the same settings, but the agent starts the bot anew.
+        if e.telegram.retry {
+            body["retry"] = json!(true);
+            if let Some(e) = app.envs.get_mut(id) {
+                e.telegram.retry = false;
+            }
+        }
         Some(("PUT", format!("/api/projects/{eid}/telegram"), body))
     }
 
@@ -197,6 +228,68 @@ impl SettingsForm for Telegram {
             )
             .into_any_element(),
         ];
+        // The connection as the agent sees it, and a way to ask it again after a change —
+        // a dead proxy says nothing until a timeout, so the state is dated.
+        let theme = cx.theme();
+        let pid = e.id.clone();
+        let (dot, line) = match e.telegram.status.as_ref()
+            .map(|(s, d, at)| (s.as_str(), d.clone(), at.clone()))
+        {
+            Some(("live", detail, at)) => (
+                theme.success,
+                format!(
+                    "Connects{} · since {}",
+                    detail.map(|d| format!(" {d}")).unwrap_or_default(),
+                    at
+                ),
+            ),
+            Some(("error", detail, at)) => (
+                theme.danger,
+                format!("Fails: {} · {}", detail.unwrap_or_else(|| "unknown".into()), at),
+            ),
+            Some((_, _, _)) => (
+                theme.warning,
+                "Connecting… an unreachable proxy says nothing until it times out".into(),
+            ),
+            None => (
+                theme.muted_foreground,
+                "Not started since the agent last knew".into(),
+            ),
+        };
+        out.push(
+            settings_field(
+                "Connection",
+                "How the bot reaches Telegram now; Check starts it anew with the fields as they stand",
+                h_flex()
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        div()
+                            .size(px(7.))
+                            .flex_none()
+                            .rounded_full()
+                            .bg(dot),
+                    )
+                    .child(div().flex_1().min_w_0().child(line))
+                    .child(
+                        bench_ui::form_action(
+                            SharedString::from(format!("env-tg-check-{pid}")),
+                            "Check",
+                            false,
+                            cx,
+                        )
+                        .on_click(cx.listener(move |this, _, window, cx| {
+                            if let Some(env) = this.envs.get_mut(&pid) {
+                                env.telegram.retry = true;
+                            }
+                            this.env_save(&pid, "telegram", window, cx);
+                        })),
+                    )
+                    .into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+        );
         out.extend(form_actions(&e.id, "telegram", e.telegram.dirty, cx));
         Some(out)
     }

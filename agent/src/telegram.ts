@@ -97,6 +97,24 @@ function stepLine(name: string, detail: string): string {
 /** The bots running: "" the general one, else a project's id → its settings and how to stop it. */
 const running = new Map<string, { config: string; stop: () => void; send: (chat: number, text: string) => Promise<void> }>();
 
+/** How each bot is reaching Telegram now, for the person to see in Settings → Telegram:
+ * "connecting" from the start, "live" once getMe answered (a token and a proxy that work),
+ * "error" with the reason when it could not start or polling fell over. Saved bots that never
+ * answer read as a long "connecting": a dead proxy says nothing until it times out. */
+export const telegramStatus = new Map<string, { state: "connecting" | "live" | "error"; detail?: string; at: number }>();
+
+function noteStatus(key: string, state: "connecting" | "live" | "error", detail?: string): void {
+	telegramStatus.set(key, { state, ...(detail ? { detail } : {}), at: Date.now() });
+}
+
+/** Forget a bot so the next `syncTelegram` starts it anew (Settings → Telegram → Check). */
+export function reconnectTelegram(key: string): void {
+	running.get(key)?.stop();
+	running.delete(key);
+	telegramStatus.delete(key);
+}
+
+
 /** Start the bots whose settings exist, stop the ones whose settings went or changed. */
 export async function syncTelegram(rt: Runtime): Promise<void> {
 	const wanted = new Map<string, Config>();
@@ -107,10 +125,16 @@ export async function syncTelegram(rt: Runtime): Promise<void> {
 		if (JSON.stringify(wanted.get(key) ?? null) !== bot.config) {
 			bot.stop();
 			running.delete(key);
+			telegramStatus.delete(key);
 		}
 	for (const [key, cfg] of wanted)
-		if (!running.has(key))
-			await startBot(rt, cfg, key).catch((e) => console.error(`[telegram] ${key || "general"}: ${(e as Error).message}`));
+		if (!running.has(key)) {
+			noteStatus(key, "connecting");
+			await startBot(rt, cfg, key).catch((e) => {
+				console.error(`[telegram] ${key || "general"}: ${(e as Error).message}`);
+				noteStatus(key, "error", (e as Error).message ?? String(e));
+			});
+		}
 	// Scheduled answers to a chat ("<project>/<chat>" or "<chat>"): through that project's bot, else
 	// the general one, else the first that runs.
 	rt.deliverers.set("telegram", async (to, text) => {
@@ -405,12 +429,18 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		{ command: "stop", description: "Stop the running turn" },
 	]).catch(() => {});
 	const me = await bot.api.getMe();
+	noteStatus(project, "live", me.username ? `@${me.username}` : "");
 	console.log(`[telegram] @${me.username}${project ? ` (project ${project})` : ""}`);
 	// Stopping a bot (its settings changed) rejects its start: that is not a crash of the server.
-	bot.start({ allowed_updates: ["message", "callback_query"] }).catch((e) => console.error(`[telegram] @${me.username} stopped: ${(e as Error)?.message ?? e}`));
+	let stopping = false;
+	bot.start({ allowed_updates: ["message", "callback_query"] }).catch((e) => {
+		console.error(`[telegram] @${me.username} stopped: ${(e as Error)?.message ?? e}`);
+		if (!stopping) noteStatus(project, "error", (e as Error)?.message ?? String(e));
+	});
 	running.set(project, {
 		config: JSON.stringify(cfg),
 		stop: () => {
+			stopping = true;
 			rt.listeners.delete(listener);
 			void bot.stop().catch(() => {});
 		},
