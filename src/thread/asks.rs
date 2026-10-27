@@ -145,7 +145,7 @@ impl ThreadView {
     }
 
     /// The question, in the work that asked it. Waiting and live, it is a card one can answer
-    /// (choices, one's own words, or Decline; an approval offers its choices). Once settled —
+    /// (choices, one's own words, or its cross to decline; an approval offers its choices). Once settled —
     /// or waiting on an agent that no longer asks — it says what was asked and what was answered.
     fn render_ask_card(&mut self, card: &AskCard, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
@@ -193,7 +193,19 @@ impl ThreadView {
                     .font_weight(FontWeight::MEDIUM)
                     .when(settled, |d| d.text_color(muted))
                     .child(card.question.clone()),
-            );
+            )
+            // Declining is closing the question: its cross in the card's corner, not a button
+            // among the answers.
+            .when(live && !approve, |d| {
+                d.child(
+                    bench_ui::head_icon_button("clarify-decline", Ico::X, "Decline", cx)
+                        .flex_none()
+                        .on_click(cx.listener(|this, _, window, cx| {
+                            this.claim_click(cx);
+                            this.answer_clarify(String::new(), window, cx)
+                        })),
+                )
+            });
         let body =
             if settled {
                 v_flex().pl_6().when_some(card.answer.clone(), |d, a| {
@@ -253,7 +265,7 @@ impl ThreadView {
                     ))
             } else {
                 // A clarify: choices (one click answers; with multi-select, tick then Send), an
-                // answer of your own, or Decline.
+                // answer of your own; the head's cross declines.
                 let picked = self.thread.clarify_picked.clone();
                 let choices: Vec<AnyElement> = card
                     .choices
@@ -341,16 +353,7 @@ impl ThreadView {
                                             this.send_clarify_picks(window, cx)
                                         })),
                                 )
-                            })
-                            .child(
-                                Button::new("clarify-decline")
-                                    .small()
-                                    .ghost()
-                                    .label("Decline")
-                                    .on_click(cx.listener(|this, _, window, cx| {
-                                        this.answer_clarify(String::new(), window, cx)
-                                    })),
-                            ),
+                            }),
                     )
             };
         v_flex()
