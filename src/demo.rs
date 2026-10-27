@@ -368,9 +368,13 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         "lsp": {
             "servers": {
                 "typescript": {"command": "${LSP}/node_modules/.bin/typescript-language-server", "args": ["--stdio"], "extensions": ["ts", "tsx", "js", "jsx"]},
-                "php": {"command": "${LSP}/node_modules/.bin/intelephense", "args": ["--stdio"], "extensions": ["php"]}
+                "php": {"command": "${LSP}/node_modules/.bin/intelephense", "args": ["--stdio"], "extensions": ["php"]},
+                "pyright": {"command": "${LSP}/node_modules/.bin/pyright-langserver", "args": ["--stdio"], "extensions": ["py"], "npm": ["pyright"]}
             },
-            "states": {"typescript": "running"}
+            "states": {
+                "typescript": "running · 4 files checked, all answered · last 18:02, post.ts",
+                "pyright": "failed: no Node on this machine — install Node.js (with npm) there"
+            }
         },
         "compaction": 0.9,
         "window": 131072,
@@ -387,9 +391,11 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
     });
     crate::env::apply(e, &v, window, cx);
     // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
-    // `BENCH_EXPLORER=beside` another beside it, `=part` an MCP server open instead, `=thread` the
-    // thread beside it with lines sent to it.
-    if std::env::var("BENCH_DEMO").as_deref() != Ok("explorer") || !app.explorer.tabs.is_empty() {
+    // `BENCH_EXPLORER=settings` its settings, `=part` an MCP server, `=lsp` a language
+    // server that failed, `=thread` the thread beside it
+    // with lines sent to it. `BENCH_DEMO=env` is `explorer` with its settings open.
+    let mode = std::env::var("BENCH_DEMO").unwrap_or_default();
+    if !matches!(mode.as_str(), "explorer" | "env") || !app.explorer.tabs.is_empty() {
         return;
     }
     let dir = "~/.bench/projects/p-blog".to_string();
@@ -427,11 +433,23 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         cx,
     );
     app.open_doc(post, window, cx);
-    match std::env::var("BENCH_EXPLORER").as_deref() {
-        Ok("beside") => app.open_beside(skill.join("SKILL.md"), window, cx),
-        Ok("part") => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
+    let explorer = if mode == "env" {
+        "settings".to_string()
+    } else {
+        std::env::var("BENCH_EXPLORER").unwrap_or_default()
+    };
+    match explorer.as_str() {
+        "settings" => app.open_doc(
+            crate::explorer::DocKey::Settings {
+                project: "p-blog".into(),
+            },
+            window,
+            cx,
+        ),
+        "part" => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
+        "lsp" => app.open_part("p-blog".into(), "lsp", "pyright".into(), window, cx),
         // The thread beside the post, lines of it sent to the composer (⌘L).
-        Ok("thread") => {
+        "thread" => {
             app.session = Some("d-site".into());
             app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
             app.right = Some(crate::app::RightPanel::Thread);
@@ -904,14 +922,10 @@ fewer form fields. Then check what it did to signups and give me a short summary
             multi_select: std::env::var("BENCH_CLARIFY_MULTI").is_ok(),
         });
     }
-    // `BENCH_DEMO=env`: the blog's settings over the thread (`env` below fills them);
-    // `BENCH_DEMO=explorer`: the blog in the Explorer (`env` opens its documents).
+    // `BENCH_DEMO=explorer`: the blog in the Explorer (`env` opens its documents); `BENCH_DEMO=env`:
+    // the same, its settings open.
     match std::env::var("BENCH_DEMO").as_deref() {
-        Ok("env") => {
-            app.center = crate::app::Center::Project;
-            app.settings_project = "p-blog".into();
-        }
-        Ok("explorer") => {
+        Ok("explorer") | Ok("env") => {
             app.sidebar_panel = crate::app::SidebarPanel::Explorer;
             app.explorer.project = "p-blog".into();
         }

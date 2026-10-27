@@ -54,6 +54,32 @@ export function writeLsp(profile: string, servers: Record<string, LspSpec>): voi
 	for (const [key, c] of clients) if (key.startsWith(`${profile}|`)) (c.stop(), clients.delete(key));
 }
 
+/**
+ * One server's entry as the person wrote it (JSON text, or the object itself), checked enough
+ * that it can start: a command and the extensions it knows. Throws with what is wrong.
+ */
+export function parseLspSpec(input: unknown): LspSpec {
+	let spec: any = input;
+	if (typeof input === "string") {
+		try {
+			spec = JSON.parse(input);
+		} catch (e) {
+			throw new Error(`not JSON: ${(e as Error).message}`);
+		}
+	}
+	if (!spec || typeof spec !== "object" || Array.isArray(spec)) throw new Error("a server is an object: {\"command\", \"args\", \"extensions\"}");
+	if (typeof spec.command !== "string" || !spec.command.trim()) throw new Error("it needs a command");
+	if (!Array.isArray(spec.extensions) || !spec.extensions.length || !spec.extensions.every((x: unknown) => typeof x === "string"))
+		throw new Error("it needs extensions: the kinds of files it knows, as [\"ts\", \"tsx\"]");
+	if (spec.args !== undefined && (!Array.isArray(spec.args) || !spec.args.every((x: unknown) => typeof x === "string"))) throw new Error("args is a list of strings");
+	return spec as LspSpec;
+}
+
+/** One server of the project set anew (or added); the project's running servers stop, as `writeLsp`. */
+export function writeLspServer(profile: string, name: string, spec: LspSpec): void {
+	writeLsp(profile, { ...readLsp(profile), [name]: spec });
+}
+
 /** How the project's servers are doing: running, installing, or why they failed. */
 export function lspStates(profile: string): Record<string, string> {
 	const out: Record<string, string> = {};

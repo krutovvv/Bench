@@ -118,6 +118,32 @@ fn quiet_divider() -> gpui_kit::base::ResizeHandleRenderer {
 }
 
 impl BenchApp {
+    /// The header's right end, the window's top-right corner: with a document in the center, the
+    /// button that shows the thread beside it (⌘J). Shown, the thread's own head takes this corner
+    /// with its + and ×.
+    fn render_header_tail(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let shown = self.right_shown().is_some();
+        h_flex()
+            .flex_none()
+            .gap_1()
+            .items_center()
+            .when(self.center == Center::Doc && !shown, |d| {
+                d.child(
+                    bench_ui::icon_button(
+                        "thread-beside",
+                        crate::icons::Ico::MessagesSquare,
+                        "The thread beside  ⌘J",
+                        false,
+                        cx,
+                    )
+                    .on_click(
+                        cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
+                    ),
+                )
+            })
+            .into_any_element()
+    }
+
     /// "app · main": the thread works in a git repository (its folder's name and branch). Git
     /// itself is the agent's: ask it to commit, or to undo.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
@@ -155,33 +181,24 @@ impl BenchApp {
             .border_color(theme.border);
 
         // Documents: a tab each, in place of the thread's title.
+        // Documents: the header names the project they belong to; their tabs are the center's
+        // own bar under it (as Zed's pane), not the window's title bar, which drags the window.
         if self.center == Center::Doc {
+            let name = self.project_name(&self.explorer.project);
             return bar
+                .pl_4()
+                .pr_2()
+                .gap_1()
                 .child(
                     div()
                         .flex_1()
                         .min_w_0()
-                        .h_full()
-                        .child(self.render_doc_tabs(cx)),
+                        .text_sm()
+                        .font_weight(FontWeight::MEDIUM)
+                        .truncate()
+                        .child(name),
                 )
-                .child(
-                    h_flex()
-                        .pr_2()
-                        .gap_1()
-                        .child(
-                            bench_ui::icon_button(
-                                "doc-thread",
-                                crate::icons::Ico::MessagesSquare,
-                                "The thread beside  ⌘J",
-                                self.right == Some(crate::app::RightPanel::Thread),
-                                cx,
-                            )
-                            .on_click(cx.listener(
-                                |this, _, window, cx| this.toggle_thread_beside(window, cx),
-                            )),
-                        )
-                        .child(self.render_header_tail(cx)),
-                )
+                .child(self.render_header_tail(cx))
                 .into_any_element();
         }
         if !self.center.is_settings() {
@@ -214,16 +231,6 @@ impl BenchApp {
 
         let title: SharedString = match self.center {
             Center::NewProject => "New project".into(),
-            Center::Project => {
-                let id = self.settings_project.as_str();
-                let name = self
-                    .projects
-                    .iter()
-                    .find(|p| p.id == id)
-                    .map(|p| p.name.clone())
-                    .unwrap_or_else(|| crate::app::LOCAL_HOST.into());
-                format!("{name} · Settings").into()
-            }
             _ => "Settings".into(),
         };
         bar.child(
@@ -285,8 +292,7 @@ impl Render for BenchApp {
                 .into_any_element(),
             Center::Providers => self.render_providers(cx),
             Center::NewProject => self.render_project_form(cx),
-            Center::Project => self.render_project_settings(window, cx),
-            Center::Doc => self.render_doc(cx),
+            Center::Doc => self.render_doc(window, cx),
         };
 
         // The sidebar folded away: its corner joins the header — room for the window's buttons
@@ -337,6 +343,9 @@ impl Render for BenchApp {
             .size_full()
             .bg(theme.background)
             .text_color(theme.foreground)
+            // The app menu's Settings… (⌘,) acts on this window (`app/menu.rs`).
+            .on_action(cx.listener(BenchApp::on_open_settings))
+            .on_action(cx.listener(BenchApp::on_new_window))
             // Shortcuts for the whole window (app/keys.rs) see every key first.
             .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                 if this.global_key(&ev.keystroke, window, cx) {

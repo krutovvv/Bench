@@ -1,6 +1,6 @@
-//! A project's Settings page: its `Home::Settings` sections as groups under headings — name and
-//! where it lives, how it runs, its Telegram bot, its removal — fields in rows, scrolling as a
-//! page. What the project contains is in the Explorer (`src/explorer/`).
+//! A project's settings: its `Home::Settings` sections as groups under headings — name and where
+//! it lives, how it runs, its Telegram bot, its removal — fields in rows, scrolling as a page. A
+//! document of the Explorer (`DocKey::Settings`), the last row of its tree.
 
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
@@ -10,17 +10,17 @@ use super::section::{Home, Section};
 use crate::app::BenchApp;
 
 impl BenchApp {
-    /// The page of `Center::Project`.
+    /// `project`'s settings, filling the document.
     pub(crate) fn render_project_settings(
         &mut self,
+        id: &str,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let inset = px(crate::ui::CHAT_LEFT);
-        let id = self.settings_project.clone();
-        // The demo opens on the blog's settings (`demo::load`), read here once.
-        if self.demo && !self.envs.contains_key(&id) {
+        let id = id.to_string();
+        if !self.envs.contains_key(&id) {
             self.load_env(&id, window, cx);
         }
         let Some(e) = self.envs.get(&id) else {

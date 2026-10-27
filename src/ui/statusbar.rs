@@ -9,7 +9,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::compact;
-use crate::app::{BenchApp, Center};
+use crate::app::BenchApp;
 use crate::icons::Ico;
 use ::thread::{Row, Step};
 
@@ -337,22 +337,6 @@ impl BenchApp {
                         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
                 }
             })
-            .child(
-                button(
-                    "settings",
-                    Ico::Settings,
-                    "Settings",
-                    self.center == Center::Providers,
-                )
-                .on_click(cx.listener(|this, _, window, cx| {
-                    if this.center == Center::Providers {
-                        this.center = Center::Chat;
-                        cx.notify();
-                    } else {
-                        this.open_center(Center::Providers, window, cx);
-                    }
-                })),
-            )
             // Stop last, at the window's edge: a filled chip is the heaviest thing on the bar, so
             // it belongs at the end, not among the flat icons (⌘. does the same).
             .when(self.live.is_some(), |d| {

@@ -375,7 +375,7 @@ impl BenchApp {
                                 .child("written"),
                         )
                     })
-                    // Beside the thread, in the right dock (Zed from its head).
+                    // In the editor, the thread beside it (Zed from the file's head).
                     .on_click(cx.listener(move |this, _, window, cx| {
                         let project = this.thread_project_or_host();
                         let machine = this.location(&project).files_machine();
@@ -384,7 +384,8 @@ impl BenchApp {
                             machine,
                             path: open.clone(),
                         };
-                        this.open_beside(f, window, cx)
+                        this.open_doc(crate::explorer::DocKey::File(f), window, cx);
+                        this.right = Some(crate::app::RightPanel::Thread);
                     }))
                     .into_any_element()
             })

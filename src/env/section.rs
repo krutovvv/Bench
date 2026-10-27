@@ -33,8 +33,6 @@ pub struct Item {
     pub label: String,
     pub note: String,
     pub icon: (Ico, Hsla),
-    /// The file its row opens instead of a part (a language server: its project's lsp.json).
-    pub file: Option<crate::explorer::FileRef>,
 }
 
 /// A part opened in the middle, as its `card` gives it: the head's title and actions, the body.

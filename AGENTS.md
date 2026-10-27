@@ -53,7 +53,7 @@ person: there are projects.
   - Telegram bot;
   - schedule (cron).
 
-  What it *is set to* (name, where it lives, model, Telegram) is its **Settings** page; what it
+  What it *is set to* (name, where it lives, model, Telegram) is its **Settings** (the last row of its Explorer); what it
   *contains* (its folder, soul, prompts, skills, MCP and language servers, schedule) is the
   **Explorer** (`docs/explorer.md`). The agent changes the same files when asked, from any
   thread of the project. **Host** is an agent's own environment: this Mac's is always first in the
@@ -64,7 +64,7 @@ person: there are projects.
   the agent's texts as an IDE shows them (a tree in the sidebar, documents in tabs, a file
   beside). It does not replace Zed (still one click away); it is the familiar view of a project.
   The window is Zed's workspace: a left dock (threads or Explorer), the center, a right dock.
-- **The gear** holds the app's settings, in tabs: Agents (each one's models and voice;
+- **The gear** (Bench → Settings… in the macOS menu, ⌘,) holds the app's settings, in tabs: Agents (each one's models and voice;
   add and remove servers' agents), Presets (MCP and language servers a project takes with one
   click, compaction shares, reasoning levels), Appearance.
 
@@ -85,11 +85,11 @@ built this way: `docs/architecture.md`. In short:
 | `src/app/sidebar_items.rs`, `src/app/marks.rs`, `src/app/presets.rs` | What is done to a thread or project in the sidebar (pin, color, rename, ⌫⌫, ↑↓); the person's presets |
 | `src/ui/` | The frame: `mod.rs` (layout, header), `sidebar.rs`, `statusbar.rs`, `composer.rs`, `media.rs`, `providers.rs` (the gear's tabs); `ui/thread/` the open thread on `gpui::list` |
 | `src/inserts/` | **The insert registry** (`mod.rs`: `InsertKind`, `KINDS`, `words()`) and one folder per kind: `terminal`, `tasks`, `tools`, `browser` — each `mod.rs` + `state.rs` (+ `view.rs`) |
-| `src/app/workspace.rs` | The window as Zed's workspace: the left dock's panel (`SidebarPanel`: threads or Explorer), the `Center` (thread, document, settings), the right dock (`RightPanel`: the thread beside a document, or a file) |
+| `src/app/workspace.rs` | The window as Zed's workspace: the left dock's panel (`SidebarPanel`: threads or Explorer), the `Center` (thread, document, settings), the right dock (`RightPanel::Thread`: the thread beside a document) |
 | `src/explorer/` | **The Explorer**: a project as an IDE shows it — its tree in the left dock (`tree.rs`), documents in the center with tabs and beside (`doc.rs`, `view.rs`), new/rename/delete, ⌘P, ⌘⇧F (`ops.rs`) |
 | `src/env/` | A project's environment: `Section` + `SECTIONS` (`Home::Settings`: a form on the Settings page `page.rs`; `Home::Explorer`: parts in the Explorer's tree), one file per section |
 | `src/gateway.rs`, `src/rest.rs`, `src/connection.rs`, `src/pi_agent.rs` | The protocol to the agent (WebSocket JSON-RPC + REST), installing/starting it locally or over SSH |
-| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|tasks\|server\|tool\|env\|explorer`, `env` being the blog's Settings, `explorer` the blog in the Explorer with `BENCH_EXPLORER=beside\|part\|thread` for a file beside, an MCP server open, the thread beside; `BENCH_CLARIFY=1` [+`_MULTI=1`] puts the agent's question card over the thread; the other hooks in `.agents/skills/bench-kit/references/build-verification.md`) |
+| `src/demo.rs` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|tasks\|server\|tool\|env\|explorer`, `env` being the blog's Settings, `explorer` the blog in the Explorer with `BENCH_EXPLORER=settings\|part\|lsp\|thread` for its settings, an MCP server, a language server, the thread beside; `BENCH_CLARIFY=1` [+`_MULTI=1`] puts the agent's question card over the thread; the other hooks in `.agents/skills/bench-kit/references/build-verification.md`) |
 | `agent/src/server.ts`, `agent/src/modules/` | The agent's server: starts, collects the modules (each declares its RPC and REST routes) |
 | `agent/src/runtime.ts`, `agent/src/thread.ts` | Pi conversations, the queue, inserts; the journal as the items Bench shows |
 | `agent/src/inserts.ts` | The insert entry and document |

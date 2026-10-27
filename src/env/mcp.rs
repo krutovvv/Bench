@@ -193,7 +193,6 @@ impl Section for Mcp {
                     label: m.name.clone(),
                     note: mcp_note(m),
                     icon,
-                    file: None,
                 }
             })
             .collect()

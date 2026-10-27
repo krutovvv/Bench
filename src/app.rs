@@ -21,6 +21,7 @@ mod events;
 mod keys;
 pub mod marks;
 pub(crate) mod mcp_status;
+pub mod menu;
 pub(crate) mod places;
 pub(crate) mod presets;
 mod processes;
@@ -86,10 +87,8 @@ pub struct BenchApp {
     /// The new project's form, in the chat area while open (the sidebar's "+").
     pub project_form: Option<ProjectForm>,
     /// Projects' environments, by project id (`ProjectEnv::id`), each read once something shows
-    /// it: the Settings page (`settings_project`), the Explorer (`explorer.project`), a part's tab.
+    /// it: the Explorer (`explorer.project`), a settings or a part's tab (`DocKey`).
     pub envs: HashMap<String, ProjectEnv>,
-    /// The project whose Settings `Center::Project` shows.
-    pub settings_project: String,
     /// The project whose prompts `prompts` holds (they follow the open thread's project).
     pub prompts_for: Option<String>,
     /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
@@ -617,7 +616,6 @@ impl BenchApp {
             host_browser: false,
             project_form: None,
             envs: HashMap::new(),
-            settings_project: String::new(),
             prompts_for: None,
             agents: HashMap::new(),
             gear_agent: String::new(),

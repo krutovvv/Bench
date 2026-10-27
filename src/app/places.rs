@@ -156,6 +156,15 @@ impl BenchApp {
         }
     }
 
+    /// A project's name as the sidebar shows it (this Mac's Host when it is none of them).
+    pub fn project_name(&self, id: &str) -> String {
+        self.projects
+            .iter()
+            .find(|p| p.id == id)
+            .map(|p| p.name.clone())
+            .unwrap_or_else(|| crate::app::LOCAL_HOST.into())
+    }
+
     /// The open thread's project as the Explorer and the environment name it: its own, or the
     /// Host of this Mac when it has none.
     pub fn thread_project_or_host(&self) -> String {

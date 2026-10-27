@@ -1,7 +1,7 @@
 //! The window's layout, as Zed's workspace has it: a left dock (the sidebar) showing one panel —
-//! the threads or the Explorer —, the center showing a thread, a document or a settings page, and
-//! a right dock showing one panel — the thread beside the code, or a file beside whatever the
-//! center shows (`docs/explorer.md`). What fills each is the panel's or
+//! the threads or the Explorer —, the center showing a thread, a document (a project's settings
+//! among them) or a settings page, and a right dock showing one panel — today the thread beside the
+//! code (`docs/explorer.md`). What fills each is the panel's or
 //! item's own module (`src/ui/sidebar.rs`, `src/explorer/`, `src/ui/thread/`, `src/env/`); here
 //! is only which one is shown.
 
@@ -19,13 +19,11 @@ pub enum SidebarPanel {
     Explorer,
 }
 
-/// What the right dock shows.
+/// What the right dock shows (one panel at a time; more kinds come as Zed's docks have them).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RightPanel {
     /// The open thread, beside a document (`render_chat`, the center's own when it is `Chat`).
     Thread,
-    /// A file kept beside (`src/explorer/view.rs`).
-    File(crate::explorer::FileRef),
 }
 
 /// What the center shows.
@@ -39,17 +37,12 @@ pub enum Center {
     Providers,
     /// A new project: a page of its own, not a thread (a project is not a conversation).
     NewProject,
-    /// A project's Settings (`settings_project`, `src/env/page.rs`).
-    Project,
 }
 
 impl Center {
     /// A page with its own title and a close in the header (not a thread, not a document).
     pub fn is_settings(self) -> bool {
-        matches!(
-            self,
-            Center::Providers | Center::NewProject | Center::Project
-        )
+        matches!(self, Center::Providers | Center::NewProject)
     }
 }
 
@@ -62,16 +55,8 @@ impl BenchApp {
         }
     }
 
-    /// The file kept beside, if the right dock holds one.
-    pub fn beside_file(&self) -> Option<&crate::explorer::FileRef> {
-        match &self.right {
-            Some(RightPanel::File(f)) => Some(f),
-            _ => None,
-        }
-    }
-
-    /// ⌘J, the header's thread button: the thread beside the code, or not. The center showing
-    /// the thread itself, there is nothing to put beside it (a file kept there stays).
+    /// ⌘J, a document's thread button: the thread beside the code, or not. The center showing
+    /// the thread itself, there is nothing to put beside it.
     pub fn toggle_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.center == Center::Chat {
             return;

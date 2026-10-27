@@ -11,7 +11,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-lsp-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_SSH = path.join(import.meta.dirname, "fake-ssh.sh");
-const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates } = await import("../src/lsp.ts");
+const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates, parseLspSpec, writeLspServer } = await import("../src/lsp.ts");
 after(() => {
 	writeLsp("project:p1", {});
 	fs.rmSync(home, { recursive: true, force: true });
@@ -49,4 +49,17 @@ test("what the machine lacks for a server is said before it starts", async () =>
 	assert.deepEqual(Object.keys(needs), ["ra"], "node and npm are here; the fake's own program is");
 	assert.match(needs.ra!, /^failed: no no-such-program-bench on fake/);
 	writeLsp("project:p2", {});
+});
+
+test("one server's entry: checked before it is written, written beside the others", () => {
+	assert.throws(() => parseLspSpec("{nope"), /not JSON/);
+	assert.throws(() => parseLspSpec("[]"), /object/);
+	assert.throws(() => parseLspSpec({ extensions: ["ts"] }), /command/);
+	assert.throws(() => parseLspSpec({ command: "x", extensions: [] }), /extensions/);
+	assert.throws(() => parseLspSpec({ command: "x", extensions: ["ts"], args: "--stdio" }), /args/);
+	assert.equal(parseLspSpec('{"command": "x", "extensions": ["ts"]}').command, "x");
+	writeLsp("project:p3", { a: fake });
+	writeLspServer("project:p3", "b", { command: "y", extensions: ["php"] });
+	assert.deepEqual(Object.keys(readLsp("project:p3")), ["a", "b"]);
+	writeLsp("project:p3", {});
 });

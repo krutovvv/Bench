@@ -315,7 +315,7 @@ impl BenchApp {
         });
     }
 
-    /// A rename: the open tabs, the pane beside and the open folders follow the entry.
+    /// A rename: the open tabs follow the entry.
     fn moved(&mut self, from: &FileRef, to: &FileRef) {
         let follow = |f: &FileRef| -> Option<FileRef> {
             f.inside(from).then(|| FileRef {
@@ -338,14 +338,6 @@ impl BenchApp {
         if let Some(DocKey::File(f)) = ex.active.as_mut() {
             if let Some(n) = follow(f) {
                 *f = n;
-            }
-        }
-        if let Some(crate::app::RightPanel::File(b)) = self.right.as_mut() {
-            if let Some(n) = follow(b) {
-                if let Some(doc) = self.explorer.docs.remove(&DocKey::File(b.clone())) {
-                    self.explorer.docs.insert(DocKey::File(n.clone()), doc);
-                }
-                *b = n;
             }
         }
     }
@@ -381,9 +373,6 @@ impl BenchApp {
                     for k in gone {
                         this.explorer.docs.remove(&k);
                         this.close_doc(k, cx);
-                    }
-                    if this.beside_file().is_some_and(|b| b.inside(&f)) {
-                        this.close_right(cx);
                     }
                     this.list_folder(f.parent(), window, cx);
                     this.after_write(&f, window, cx);

@@ -126,7 +126,6 @@ impl Section for Schedule {
                             theme.muted_foreground
                         },
                     ),
-                    file: None,
                 }
             })
             .collect()

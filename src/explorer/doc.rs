@@ -68,6 +68,11 @@ impl FileRef {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DocKey {
     File(FileRef),
+    /// A project's settings: its name, where it lives, how it runs, its Telegram bot
+    /// (`src/env/page.rs`).
+    Settings {
+        project: String,
+    },
     /// A `Section`'s row in a project's environment: the project (`ProjectEnv::id`), the
     /// section's key and the row's name ("new": a new one's form).
     Part {
@@ -75,6 +80,16 @@ pub enum DocKey {
         kind: &'static str,
         name: String,
     },
+}
+
+impl DocKey {
+    /// The project it belongs to.
+    pub fn project(&self) -> &str {
+        match self {
+            DocKey::File(f) => &f.project,
+            DocKey::Settings { project } | DocKey::Part { project, .. } => project,
+        }
+    }
 }
 
 /// An open file: its editor, the text as saved, whether it changed since.
@@ -94,6 +109,12 @@ impl BenchApp {
     pub fn open_doc(&mut self, key: DocKey, window: &mut Window, cx: &mut Context<Self>) {
         match &key {
             DocKey::File(f) => self.ensure_doc(f.clone(), window, cx),
+            // Its fields are the environment's: read once, kept while typed in.
+            DocKey::Settings { project } => {
+                if !self.envs.contains_key(project) {
+                    self.load_env(project, window, cx);
+                }
+            }
             DocKey::Part {
                 project,
                 kind,
@@ -140,26 +161,6 @@ impl BenchApp {
         }
         self.explorer.active = Some(key);
         self.center = Center::Doc;
-        cx.notify();
-    }
-
-    /// Keep `file` in the right dock, beside what the middle shows.
-    pub fn open_beside(&mut self, file: FileRef, window: &mut Window, cx: &mut Context<Self>) {
-        self.ensure_doc(file.clone(), window, cx);
-        if let Some(old) = self.beside_file().cloned() {
-            self.right = Some(crate::app::RightPanel::File(file));
-            self.drop_unused(&DocKey::File(old));
-        } else {
-            self.right = Some(crate::app::RightPanel::File(file));
-        }
-        cx.notify();
-    }
-
-    /// The right dock closes (its file stays open if a tab has it).
-    pub fn close_right(&mut self, cx: &mut Context<Self>) {
-        if let Some(crate::app::RightPanel::File(f)) = self.right.take() {
-            self.drop_unused(&DocKey::File(f));
-        }
         cx.notify();
     }
 
@@ -255,6 +256,8 @@ impl BenchApp {
     pub fn save_doc(&mut self, key: DocKey, window: &mut Window, cx: &mut Context<Self>) {
         let f = match key {
             DocKey::Part { project, kind, .. } => return self.env_save(&project, kind, window, cx),
+            // Each group of the settings has its own Save.
+            DocKey::Settings { .. } => return,
             DocKey::File(f) => f,
         };
         let Some(d) = self
@@ -301,27 +304,17 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// The document a command means (⌘S, ⌘L): the file beside when its editor has the caret,
-    /// else the center's document, else the file beside.
-    pub fn focused_doc(&self, window: &Window, cx: &App) -> Option<DocKey> {
-        let beside = self.beside_file().cloned();
-        let has_caret = |f: &FileRef| {
-            self.explorer
-                .docs
-                .get(&DocKey::File(f.clone()))
-                .is_some_and(|d| d.editor.read(cx).focus_handle(cx).is_focused(window))
-        };
-        match (&beside, &self.center, &self.explorer.active) {
-            (Some(f), _, _) if has_caret(f) => Some(DocKey::File(f.clone())),
-            (_, Center::Doc, Some(k)) => Some(k.clone()),
-            (Some(f), _, _) => Some(DocKey::File(f.clone())),
-            _ => None,
-        }
+    /// The document a command means (⌘S, ⌘L): the center's.
+    pub fn focused_doc(&self) -> Option<DocKey> {
+        self.explorer
+            .active
+            .clone()
+            .filter(|_| self.center == Center::Doc)
     }
 
     /// ⌘S: the document the caret is in.
     pub fn save_active_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let Some(key) = self.focused_doc(window, cx) else {
+        let Some(key) = self.focused_doc() else {
             return false;
         };
         self.save_doc(key, window, cx);
@@ -334,6 +327,8 @@ impl BenchApp {
         let dirty = match &key {
             DocKey::File(_) => self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
             DocKey::Part { .. } => self.part_dirty(&key),
+            // Its typed fields stay in the environment until saved or reverted.
+            DocKey::Settings { .. } => false,
         };
         let armed = format!("close:{key:?}");
         if dirty && self.explorer.armed.as_deref() != Some(&armed) {
@@ -373,10 +368,8 @@ impl BenchApp {
                 }
             }
         }
-        // Unsaved changes asked for already: the next opening reads the file again (unless the
-        // same file stays open beside, with them).
-        let beside = matches!(&key, DocKey::File(f) if self.beside_file() == Some(f));
-        if dirty && !beside {
+        // Unsaved changes asked for already: the next opening reads the file again.
+        if dirty {
             self.explorer.docs.remove(&key);
         }
         self.drop_unused(&key);
@@ -397,10 +390,9 @@ impl BenchApp {
             .is_some_and(|(s, open)| s.key() == *kind && open == *name)
     }
 
-    /// A file's editor goes when no tab and not the pane beside hold it, and nothing is unsaved.
+    /// A file's editor goes when no tab holds it and nothing is unsaved.
     pub(super) fn drop_unused(&mut self, key: &DocKey) {
-        let held = self.explorer.tabs.contains(key)
-            || matches!(key, DocKey::File(f) if self.beside_file() == Some(f));
+        let held = self.explorer.tabs.contains(key);
         if !held && self.explorer.docs.get(key).is_some_and(|d| !d.dirty) {
             self.explorer.docs.remove(key);
         }

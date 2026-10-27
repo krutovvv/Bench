@@ -265,9 +265,4 @@ impl BenchApp {
             );
         }
     }
-
-    /// Another window of Bench.
-    pub fn open_new_window(&mut self, cx: &mut Context<Self>) {
-        self.open_window(None, cx);
-    }
 }

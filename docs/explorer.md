@@ -24,10 +24,9 @@ places that every view fills in its own way:
 - **The center** is `Center` (`src/app/workspace.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
   file's click shows `Doc` with a tab per open document (the header holds the tabs instead of
   the thread's title). Leaving the Explorer does not close documents: their tabs come back.
-- **The right dock** shows one panel (`RightPanel`): the thread beside a document (⌘J), or a
-  file next to whatever the middle shows: open one with the tree row's panel icon, ⌥-click, or a
-  document's own "Open beside". It is how a file is
-  read or fixed while the thread runs.
+- **The right dock** shows the thread beside a document (`RightPanel::Thread`, ⌘J or the
+  button in the window's top-right corner) — the same thread the center shows in the threads
+  view, so the IDE needs no chat of its own.
 
 Sizes come from `bench_ui` (`crates/ui/src/ide.rs`: the tree rows, a document's head, the tabs,
 ⌘P's list).
@@ -35,7 +34,7 @@ Sizes come from `bench_ui` (`crates/ui/src/ide.rs`: the tree rows, a document's 
 In Zed's words, which GPUI code follows (Bench is built on Zed's framework): the window is the
 **workspace**; the sidebar is its left **dock**, whose **panels** are Threads and Explorer (as
 Zed's project panel); the middle is the center **pane**, whose tabs are **items** (a document);
-Beside is the right dock. Shared pieces drawn the same everywhere are components in
+the right dock holds the thread. Shared pieces drawn the same everywhere are components in
 `crates/ui`, as Zed's `ui` crate. Use these words when naming new code.
 
 ## The Explorer (`src/explorer/`)
@@ -107,3 +106,14 @@ Phases, each a thing of its own:
 - Several panels in a dock, a bottom dock, a split middle: `RightPanel` becomes a dock's list of
   panels; documents are already shared by key.
 - A thread opening a file (a changed file in its answer) beside itself: `open_beside`.
+
+## What the person sees, briefly
+
+- The tree's work is in context menus (a file: open, add to the thread, rename, delete, copy the
+  path, Finder, Zed; a folder: new file, new folder and the same; the project's folder: also find
+  in it and read it again; Prompts and Skills: a new one). Rows carry no buttons.
+- The center's tabs are its own bar under the window's title bar (which drags the window).
+- The project's settings are the tree's last row, a document like the rest; MCP and language
+  servers each show their state and open as their own JSON entry.
+- The app's settings (the gear) and a new window are in the macOS menu: Bench → Settings… ⌘,,
+  New Window ⌘⇧N (`src/app/menu.rs`).

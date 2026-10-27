@@ -58,6 +58,21 @@ test("the server starts and answers /api/projects", async () => {
 		await call("DELETE", `/api/cron/jobs/${job.id}`);
 		listed = (await call("GET", `/api/projects/${made.project.id}/env`)).cron;
 		assert.deepEqual(listed, []);
+		// One language server of the project: written as its entry's text, read back with its state,
+		// refused when it cannot start (no command), removed.
+		const lsp = `/api/projects/${made.project.id}/lsp/ts`;
+		assert.deepEqual(await call("PUT", lsp, { text: JSON.stringify({ command: "tsls", args: ["--stdio"], extensions: ["ts"] }) }), { ok: true });
+		const one = await call("GET", lsp);
+		assert.deepEqual([one.name, one.spec.command], ["ts", "tsls"]);
+		// Its state says why it cannot run here, before it is ever started.
+		assert.match(one.state, /^failed: no tsls on this machine/);
+		assert.match(one.text, /"extensions"/);
+		assert.match(String((await call("PUT", lsp, { text: "{\"extensions\": [\"ts\"]}" })).detail ?? ""), /command/);
+		assert.match(String((await call("PUT", lsp, { text: "{nope" })).detail ?? ""), /not JSON/);
+		await call("PUT", `/api/projects/${made.project.id}/lsp/php`, { spec: { command: "php-ls", extensions: ["php"] } });
+		assert.deepEqual(Object.keys((await call("GET", `/api/projects/${made.project.id}/env`)).lsp.servers), ["ts", "php"]);
+		await call("DELETE", lsp);
+		assert.match(String((await call("GET", lsp)).detail ?? ""), /no such/);
 		// A project's reasoning level and approvals are its own: they go into its agent's folder (a
 		// thread of the project runs with it), not into the machine's settings. The model and its
 		// fallback are one for every thread: they go to the general agent, from wherever they come.

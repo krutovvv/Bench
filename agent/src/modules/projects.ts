@@ -10,7 +10,7 @@ import { listSkills } from "../builtin/skills.ts";
 import { readSkill, skillsFor } from "../repo.ts";
 import { HttpError, type Ctx, type Module } from "../http.ts";
 import { authorizeServer, connectMcp, mcpStatus } from "../mcp.ts";
-import { lspNeeds, lspStates, readLsp, writeLsp } from "../lsp.ts";
+import { lspNeeds, lspStates, parseLspSpec, readLsp, writeLsp, writeLspServer } from "../lsp.ts";
 import { syncTelegram } from "../telegram.ts";
 import { cronView } from "./cron.ts";
 
@@ -124,6 +124,38 @@ export default ({ rt }: Ctx): Module => ({
 				if (p.id === "general") setSetting("telegram", token ? { ...(getSetting("telegram") ?? {}), token, allowed_users: allowed } : undefined);
 				else projects.save({ ...(projects.get(p.id) as any), telegram: token ? { token, allowed_users: allowed } : null });
 				await syncTelegram(rt);
+				return { ok: true };
+			},
+		],
+		// One language server of lsp.json: its entry and how it is doing; its entry written
+		// (`{text}`: its JSON as edited, or `{spec}`: the object), new or changed.
+		[
+			"GET",
+			/^\/api\/projects\/([^/]+)\/lsp\/([^/]+)$/,
+			async (_req, m) => {
+				const id = id1(m);
+				const { agent } = envOf(id);
+				const name = decodeURIComponent(m[2]!);
+				const spec = readLsp(agent)[name];
+				if (!spec) throw new HttpError(404, "no such language server");
+				const states = { ...lspStates(agent), ...(await lspNeeds(agent, projects.get(id)?.machine ?? undefined)) };
+				return { name, spec, text: JSON.stringify(spec, null, 2), state: states[name] ?? "" };
+			},
+		],
+		[
+			"PUT",
+			/^\/api\/projects\/([^/]+)\/lsp\/([^/]+)$/,
+			(req, m) => {
+				const { agent } = envOf(id1(m));
+				const name = decodeURIComponent(m[2]!).trim();
+				if (!name) throw new HttpError(400, "name it first");
+				let spec;
+				try {
+					spec = parseLspSpec(req.body?.spec ?? String(req.body?.text ?? ""));
+				} catch (e) {
+					throw new HttpError(400, (e as Error).message);
+				}
+				writeLspServer(agent, name, spec);
 				return { ok: true };
 			},
 		],

@@ -1,6 +1,6 @@
-//! Documents drawn: the open one in the middle (a file in the code editor, or a part of the
-//! environment as its `Section` draws it), the tabs in the header, the file kept beside on the
-//! right, ⌘P's list over the middle. An editor fills its pane and scrolls itself, as in an IDE.
+//! Documents drawn: the open one in the middle (a file in the code editor, a part of the
+//! environment as its `Section` draws it, a project's settings), the tabs in the header, the
+//! thread in the right dock, ⌘P's list over the middle. An editor fills its pane and scrolls itself, as in an IDE.
 
 use gpui_kit::component::input::{Editor, Input};
 use gpui_kit::component::menu::ContextMenuExt as _;
@@ -14,9 +14,10 @@ use crate::icons::Ico;
 
 impl BenchApp {
     /// The middle in `Center::Doc`: the active document.
-    pub(crate) fn render_doc(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let body = match self.explorer.active.clone() {
-            Some(DocKey::File(f)) => self.file_pane(&f, false, cx),
+            Some(DocKey::File(f)) => self.file_pane(&f, cx),
+            Some(DocKey::Settings { project }) => self.settings_pane(&project, window, cx),
             Some(DocKey::Part {
                 project,
                 kind,
@@ -24,43 +25,52 @@ impl BenchApp {
             }) => self.part_pane(&project, kind, &name, cx),
             None => div().into_any_element(),
         };
-        div()
-            .relative()
+        let theme = cx.theme().clone();
+        v_flex()
             .size_full()
-            .child(body)
-            .children(self.render_quick(cx))
+            // The center's tab bar, as a Zed pane's: under the window's title bar, which drags
+            // the window (a tab dragged there moved it).
+            .child(
+                div()
+                    .flex_none()
+                    .h(bench_ui::bar_h(cx))
+                    .bg(theme.title_bar)
+                    .border_b_1()
+                    .border_color(theme.border)
+                    .child(self.render_doc_tabs(cx)),
+            )
+            .child(
+                div()
+                    .relative()
+                    .flex_1()
+                    .min_h_0()
+                    .child(body)
+                    .children(self.render_quick(cx)),
+            )
             .into_any_element()
     }
 
-    /// A file: its head (where it is, Revert and Save while changed, beside / back, Close when
-    /// beside) and its editor.
-    fn file_pane(&mut self, f: &FileRef, beside: bool, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
+    /// A file: its head (where it is; Revert and Save while changed; Finder, Zed) and its editor.
+    fn file_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
         let key = DocKey::File(f.clone());
         let Some(d) = self.explorer.docs.get(&key) else {
             return div().into_any_element();
         };
         let (dirty, editor, binary, loading) = (d.dirty, d.editor.clone(), d.binary, d.loading);
-        let tag = if beside { "beside" } else { "main" };
         let mut actions: Vec<AnyElement> = vec![];
         if dirty {
             let r = f.clone();
             actions.push(
-                crate::ui::form_action(
-                    SharedString::from(format!("doc-revert-{tag}")),
-                    "Revert",
-                    false,
-                    cx,
-                )
-                .on_click(
-                    cx.listener(move |this, _, window, cx| this.revert_doc(r.clone(), window, cx)),
-                )
-                .into_any_element(),
+                crate::ui::form_action("doc-revert", "Revert", false, cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.revert_doc(r.clone(), window, cx)
+                    }))
+                    .into_any_element(),
             );
         }
         let s = key.clone();
         actions.push(
-            save_button(SharedString::from(format!("doc-save-{tag}")), dirty, cx)
+            save_button("doc-save".into(), dirty, cx)
                 .on_click(
                     cx.listener(move |this, _, window, cx| this.save_doc(s.clone(), window, cx)),
                 )
@@ -75,58 +85,25 @@ impl BenchApp {
         let (zed, finder) = (f.path.clone(), f.path.clone());
         if host.is_none() {
             actions.push(
-                bench_ui::head_icon_button(
-                    &format!("doc-finder-{tag}"),
-                    Ico::FolderOpen,
-                    "Show in Finder",
-                    cx,
-                )
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.reveal_in_finder(&finder, window, cx)
-                }))
-                .into_any_element(),
+                bench_ui::head_icon_button("doc-finder", Ico::FolderOpen, "Show in Finder", cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.reveal_in_finder(&finder, window, cx)
+                    }))
+                    .into_any_element(),
             );
         }
         actions.push(
-            bench_ui::head_icon_button(&format!("doc-zed-{tag}"), Ico::Zed, "Open in Zed", cx)
+            bench_ui::head_icon_button("doc-zed", Ico::Zed, "Open in Zed", cx)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.open_in_zed(&zed, None, host.as_deref(), cx)
                 }))
                 .into_any_element(),
         );
-        let other = f.clone();
-        if beside {
-            actions.push(
-                bench_ui::head_icon_button("doc-to-main", Ico::PanelLeft, "Open in the middle", cx)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.close_right(cx);
-                        this.open_doc(DocKey::File(other.clone()), window, cx)
-                    }))
-                    .into_any_element(),
-            );
-            actions.push(
-                bench_ui::head_icon_button("doc-beside-close", Ico::X, "Close", cx)
-                    .on_click(cx.listener(|this, _, _, cx| this.close_right(cx)))
-                    .into_any_element(),
-            );
-        } else {
-            actions.push(
-                bench_ui::head_icon_button("doc-to-beside", Ico::PanelRight, "Open beside", cx)
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.open_beside(other.clone(), window, cx)
-                    }))
-                    .into_any_element(),
-            );
-        }
         let where_ = match &f.machine {
             Some(m) => format!("{m}:{}", f.path),
             None => f.path.clone(),
         };
-        let mut head = bench_ui::ide_head(f.name().to_string(), Some(where_.into()), actions, cx);
-        // The right dock reaches the window's top: its head is the header's height and ground.
-        if beside {
-            head = head.h(bench_ui::bar_h(cx)).bg(theme.title_bar);
-        }
+        let head = bench_ui::ide_head(f.name().to_string(), Some(where_.into()), actions, cx);
         let body = if binary {
             note("Not text, or too large to edit here: Zed opens it", cx)
         } else if loading {
@@ -161,9 +138,10 @@ impl BenchApp {
         let Some(card) = card else {
             return note("It is no longer there", cx);
         };
+        let actions = card.actions;
         v_flex()
             .size_full()
-            .child(bench_ui::ide_head(card.title, None, card.actions, cx))
+            .child(bench_ui::ide_head(card.title, None, actions, cx))
             .child(
                 div()
                     .id("doc-part")
@@ -175,14 +153,38 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// The right dock: the thread beside the code, or the file kept beside.
+    /// A project's settings as a document: its fields, the page `env/page.rs` draws.
+    fn settings_pane(
+        &mut self,
+        project: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let name = self.project_name(project);
+        v_flex()
+            .size_full()
+            .child(bench_ui::ide_head(
+                format!("{name} · Settings"),
+                None,
+                vec![],
+                cx,
+            ))
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .child(self.render_project_settings(project, window, cx)),
+            )
+            .into_any_element()
+    }
+
+    /// The right dock: the thread beside the code.
     pub(crate) fn render_right(
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<AnyElement> {
         Some(match self.right_shown()? {
-            crate::app::RightPanel::File(f) => self.file_pane(&f, true, cx),
             crate::app::RightPanel::Thread => self.render_thread_panel(window, cx),
         })
     }
@@ -198,6 +200,11 @@ impl BenchApp {
                     f.name().to_string(),
                     crate::ui::file_icon(f.name(), false, &theme),
                     self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
+                ),
+                DocKey::Settings { project } => (
+                    format!("{} · Settings", self.project_name(project)),
+                    (Ico::Settings, theme.muted_foreground),
+                    false,
                 ),
                 DocKey::Part { kind, name, .. } => (
                     name.clone(),

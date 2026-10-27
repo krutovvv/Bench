@@ -5,7 +5,7 @@
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
+use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -34,31 +34,12 @@ impl BenchApp {
         }
         if let Some(root) = self.explorer_root() {
             let name = root.name().to_string();
-            let (d1, d2) = (root.clone(), root.clone());
-            let acts = vec![
-                act(
-                    "ex-root-file",
-                    Ico::FilePlus,
-                    "New file",
-                    cx,
-                    move |this, w, cx| this.start_naming(Named::File(d1.clone()), w, cx),
-                ),
-                act(
-                    "ex-root-folder",
-                    Ico::FolderPlus,
-                    "New folder",
-                    cx,
-                    move |this, w, cx| this.start_naming(Named::Folder(d2.clone()), w, cx),
-                ),
-                act(
-                    "ex-find",
-                    Ico::Search,
-                    "Find in the folder  ⌘⇧F",
-                    cx,
-                    |this, w, cx| this.open_find(w, cx),
-                ),
-            ];
-            out.push(self.heading("files", &name, acts, cx));
+            let menu = super::menus::root_menu(cx.entity(), root.clone());
+            out.push(
+                self.heading_el("files", &name, vec![], cx)
+                    .context_menu(menu)
+                    .into_any_element(),
+            );
             if self.explorer.is_open("files") {
                 out.extend(self.folder_rows(&root, 0, cx));
             }
@@ -99,6 +80,29 @@ impl BenchApp {
                 out.extend(self.part_rows(e, g, alone, cx));
             }
         }
+        // Last, what the project is set to: its settings, a document like the rest.
+        let settings = DocKey::Settings {
+            project: self.explorer.project.clone(),
+        };
+        let theme = cx.theme().clone();
+        out.push(bench_ui::tree_heading("Project", vec![], cx).into_any_element());
+        out.push(
+            bench_ui::tree_row(
+                "ex-settings",
+                0,
+                None,
+                (Ico::Settings, theme.muted_foreground),
+                "Settings",
+                Some("name, folder, model, Telegram".into()),
+                self.explorer.active.as_ref() == Some(&settings),
+                vec![],
+                cx,
+            )
+            .on_click(
+                cx.listener(move |this, _, window, cx| this.open_doc(settings.clone(), window, cx)),
+            )
+            .into_any_element(),
+        );
         out
     }
 
@@ -136,28 +140,24 @@ impl BenchApp {
                 }
                 menu
             });
+        // Its buttons end where the strip's above do: the same buttons, the same inset.
         h_flex()
             .flex_none()
-            .px_2()
+            .pl_1()
+            .pr(px(bench_ui::SIDEBAR_STRIP_PR))
             .pb_1()
             .gap_1()
             .items_center()
             .child(div().min_w_0().child(picker))
             .child(div().flex_1())
-            .child(act(
-                "ex-refresh",
-                Ico::RefreshCw,
-                "Read it again",
-                cx,
-                |this, w, cx| this.refresh_explorer(w, cx),
-            ))
-            .child(act(
-                "ex-quick",
-                Ico::Search,
-                "Open a file  ⌘P",
-                cx,
-                |this, w, cx| this.open_quick(w, cx),
-            ))
+            .child(
+                bench_ui::icon_button("ex-refresh", Ico::RefreshCw, "Read it again", false, cx)
+                    .on_click(cx.listener(|this, _, w, cx| this.refresh_explorer(w, cx))),
+            )
+            .child(
+                bench_ui::icon_button("ex-quick", Ico::Search, "Open a file  ⌘P", false, cx)
+                    .on_click(cx.listener(|this, _, w, cx| this.open_quick(w, cx))),
+            )
             .into_any_element()
     }
 
@@ -169,12 +169,21 @@ impl BenchApp {
         actions: Vec<AnyElement>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        self.heading_el(node, title, actions, cx).into_any_element()
+    }
+
+    fn heading_el(
+        &self,
+        node: &str,
+        title: &str,
+        actions: Vec<AnyElement>,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
         let node = node.to_string();
         bench_ui::tree_heading(title.to_string(), actions, cx)
             .id(SharedString::from(format!("ex-h-{node}")))
             .cursor_pointer()
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_node(&node, cx)))
-            .into_any_element()
     }
 
     /// A folder's entries under it, `depth` deep; its open folders' entries under them.
@@ -206,7 +215,8 @@ impl BenchApp {
         out
     }
 
-    /// One file or folder of the tree; `editable`: new, rename and delete on hover.
+    /// One file or folder of the tree; its menu (`menus.rs`); `editable`: it can be renamed and
+    /// deleted.
     fn entry_row(
         &self,
         f: &FileRef,
@@ -225,45 +235,14 @@ impl BenchApp {
         } else {
             crate::ui::file_icon(f.name(), dir, &theme)
         };
-        let mut acts = vec![];
-        if dir && editable {
-            let (a, b) = (f.clone(), f.clone());
-            acts.push(act(
-                &format!("ex-nf-{key}"),
-                Ico::FilePlus,
-                "New file",
-                cx,
-                move |this, w, cx| this.start_naming(Named::File(a.clone()), w, cx),
-            ));
-            acts.push(act(
-                &format!("ex-nd-{key}"),
-                Ico::FolderPlus,
-                "New folder",
-                cx,
-                move |this, w, cx| this.start_naming(Named::Folder(b.clone()), w, cx),
-            ));
-        }
-        if !dir {
-            let b = f.clone();
-            acts.push(act(
-                &format!("ex-bs-{key}"),
-                Ico::PanelRight,
-                "Open beside",
-                cx,
-                move |this, w, cx| this.open_beside(b.clone(), w, cx),
-            ));
-        }
-        if editable {
-            let r = f.clone();
-            acts.push(act(
-                &format!("ex-mv-{key}"),
-                Ico::Pencil,
-                "Rename",
-                cx,
-                move |this, w, cx| this.start_naming(Named::Rename(r.clone()), w, cx),
-            ));
-            acts.push(self.trash(f, cx));
-        }
+        // Its work is in its menu; only a delete asked for shows here, to be confirmed.
+        let armed =
+            self.explorer.armed.as_deref() == Some(format!("del:{}", f.listing_key()).as_str());
+        let acts = if armed {
+            vec![self.trash(f, cx)]
+        } else {
+            vec![]
+        };
         let target = f.clone();
         bench_ui::tree_row(
             format!("ex-e-{key}"),
@@ -276,19 +255,23 @@ impl BenchApp {
             acts,
             cx,
         )
-        .on_click(cx.listener(move |this, ev: &ClickEvent, window, cx| {
+        .on_click(cx.listener(move |this, _, window, cx| {
             if dir {
                 this.toggle_folder(target.clone(), window, cx)
-            } else if ev.modifiers().alt {
-                this.open_beside(target.clone(), window, cx)
             } else {
                 this.open_doc(DocKey::File(target.clone()), window, cx)
             }
         }))
+        .context_menu(super::menus::entry_menu(
+            cx.entity(),
+            f.clone(),
+            dir,
+            editable,
+        ))
         .into_any_element()
     }
 
-    /// Delete, twice.
+    /// A delete asked for in the menu, to confirm (Esc drops it).
     fn trash(&self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let armed =
@@ -364,14 +347,15 @@ impl BenchApp {
             );
         }
         // Prompts: files of its own prompts folder.
-        let add = act(
-            "ex-prompt-add",
-            Ico::FilePlus,
-            "New prompt",
-            cx,
-            |this, w, cx| this.start_naming(Named::Prompt, w, cx),
+        out.push(
+            self.node_row("prompts", "Prompts", Ico::Folder, None, vec![], cx)
+                .context_menu(super::menus::new_menu(
+                    cx.entity(),
+                    Named::Prompt,
+                    "New prompt",
+                ))
+                .into_any_element(),
         );
-        out.push(self.node_row("prompts", "Prompts", Ico::Folder, None, vec![add], cx));
         if self.explorer.is_open("prompts") {
             out.extend(self.naming_row(&Named::Prompt, 0));
             if e.instructions.prompts.is_empty() {
@@ -383,14 +367,15 @@ impl BenchApp {
             }
         }
         // Skills, by where each lives; each its folder.
-        let add = act(
-            "ex-skill-add",
-            Ico::FolderPlus,
-            "New skill",
-            cx,
-            |this, w, cx| this.start_naming(Named::Skill, w, cx),
+        out.push(
+            self.node_row("skills", "Skills", Ico::Folder, None, vec![], cx)
+                .context_menu(super::menus::new_menu(
+                    cx.entity(),
+                    Named::Skill,
+                    "New skill",
+                ))
+                .into_any_element(),
         );
-        out.push(self.node_row("skills", "Skills", Ico::Folder, None, vec![add], cx));
         if self.explorer.is_open("skills") {
             out.extend(self.naming_row(&Named::Skill, 0));
             let general = crate::model::ProjectKey::parse(&e.id).is_host();
@@ -455,7 +440,7 @@ impl BenchApp {
         note: Option<AnyElement>,
         actions: Vec<AnyElement>,
         cx: &mut Context<Self>,
-    ) -> AnyElement {
+    ) -> Stateful<Div> {
         let theme = cx.theme().clone();
         let open = self.explorer.is_open(node);
         let n = node.to_string();
@@ -480,7 +465,6 @@ impl BenchApp {
             cx,
         )
         .on_click(cx.listener(move |this, _, _, cx| this.toggle_node(&n, cx)))
-        .into_any_element()
     }
 
     /// A group's parts: each section of it a node (its heading actions on it), its items under it.
@@ -501,14 +485,17 @@ impl BenchApp {
             let depth = if alone { 0 } else { 1 };
             if !alone {
                 let title = s.block(general);
-                out.push(self.node_row(
-                    &node,
-                    title,
-                    Ico::Folder,
-                    None,
-                    s.head(self, e, cx).into_iter().collect(),
-                    cx,
-                ));
+                out.push(
+                    self.node_row(
+                        &node,
+                        title,
+                        Ico::Folder,
+                        None,
+                        s.head(self, e, cx).into_iter().collect(),
+                        cx,
+                    )
+                    .into_any_element(),
+                );
                 if !self.explorer.is_open(&node) {
                     continue;
                 }
@@ -519,14 +506,10 @@ impl BenchApp {
             }
             let kind = s.key();
             for it in items {
-                // A part, or the file it is written in (a language server: lsp.json).
-                let key = match it.file {
-                    Some(f) => DocKey::File(f),
-                    None => DocKey::Part {
-                        project: e.id.clone(),
-                        kind,
-                        name: it.name.clone(),
-                    },
+                let key = DocKey::Part {
+                    project: e.id.clone(),
+                    kind,
+                    name: it.name.clone(),
                 };
                 let chosen = self.explorer.active.as_ref() == Some(&key);
                 out.push(

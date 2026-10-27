@@ -158,7 +158,7 @@ impl Section for Danger {
             .into_any_element(),
         ])
     }
-    /// The project goes (asked already, in its form): its page closes, a new thread starts.
+    /// The project goes (asked already, in its form): its documents close, a new thread starts.
     fn remove_here(
         &self,
         app: &mut BenchApp,
@@ -167,8 +167,17 @@ impl Section for Danger {
         cx: &mut Context<BenchApp>,
     ) -> bool {
         app.envs.remove(id);
-        if app.settings_project == id {
-            app.settings_project = String::new();
+        // Its documents go with it.
+        let gone: Vec<_> = app
+            .explorer
+            .tabs
+            .iter()
+            .filter(|t| t.project() == id)
+            .cloned()
+            .collect();
+        for key in gone {
+            app.explorer.docs.remove(&key);
+            app.close_doc(key, cx);
         }
         app.confirm_delete = Some(format!("p:{id}"));
         app.delete_project(id.to_string(), window, cx);

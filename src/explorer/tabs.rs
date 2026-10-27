@@ -1,6 +1,6 @@
 //! The center's tabs: dragged to another place (or onto the thread, which takes the file), a
-//! menu each (close this, others, to the left, to the right, the saved, all; copy the path; open
-//! beside; add to the thread), and what is sent from the code to the thread — the selection or
+//! menu each (close this, others, to the left, to the right, the saved, all; copy the path; add
+//! to the thread), and what is sent from the code to the thread — the selection or
 //! the whole file (⌘L) — as a reference (`app/attachments.rs` `CodeRef`).
 
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
@@ -91,7 +91,7 @@ impl BenchApp {
     /// ⌘L: the selection of the file with the caret (or the whole file) goes to the thread's
     /// composer, and the thread shows beside the code.
     pub fn send_selection_to_thread(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(DocKey::File(f)) = self.focused_doc(window, cx) else {
+        let Some(DocKey::File(f)) = self.focused_doc() else {
             return;
         };
         let Some(d) = self.explorer.docs.get(&DocKey::File(f.clone())) else {
@@ -138,19 +138,14 @@ impl BenchApp {
     /// The thread in the right dock (unless it is the center already), its composer focused.
     fn show_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.center != Center::Chat {
-            if let Some(RightPanel::File(f)) = self.right.take() {
-                self.right = Some(RightPanel::Thread);
-                self.drop_unused(&DocKey::File(f));
-            } else {
-                self.right = Some(RightPanel::Thread);
-            }
+            self.right = Some(RightPanel::Thread);
         }
         self.composer.update(cx, |s, cx| s.focus(window, cx));
         cx.notify();
     }
 
     /// The path copied, as the agent reaches it.
-    fn copy_path(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn copy_path(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
         cx.write_to_clipboard(ClipboardItem::new_string(f.path.clone()));
         self.toast(NotificationType::Info, "The path is copied", window, cx);
     }
@@ -190,20 +185,13 @@ pub fn tab_menu(
         let DocKey::File(f) = key.clone() else {
             return menu;
         };
-        let (f1, f2, f3) = (f.clone(), f.clone(), f);
+        let (f1, f3) = (f.clone(), f);
         menu.separator()
             .item(
                 PopupMenuItem::new("Add to the thread  ⌘L")
                     .icon(Ico::MessagesSquare.icon().small())
                     .on_click(act(Box::new(move |this, w, cx| {
                         this.send_file_to_thread(&f1, w, cx)
-                    }))),
-            )
-            .item(
-                PopupMenuItem::new("Open beside")
-                    .icon(Ico::PanelRight.icon().small())
-                    .on_click(act(Box::new(move |this, w, cx| {
-                        this.open_beside(f2.clone(), w, cx)
                     }))),
             )
             .item(

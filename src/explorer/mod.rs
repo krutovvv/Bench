@@ -9,11 +9,13 @@
 //! explorer/doc.rs   documents: a file (an editor of its own), or a part of the environment
 //! explorer/ops.rs   the tree's work: listing a folder, new / rename / delete, ⌘P, ⌘⇧F
 //! explorer/tabs.rs  the tabs' drag and menu; code sent to the thread (⌘L)
+//! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder, Zed)
 //! explorer/tree.rs  the sidebar's tree
 //! explorer/view.rs  a document in the middle and beside, the tabs, ⌘P's list
 //! ```
 
 pub mod doc;
+pub mod menus;
 pub mod ops;
 pub mod tabs;
 pub mod tree;

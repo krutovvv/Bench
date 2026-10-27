@@ -231,6 +231,7 @@ fn main() {
         .run(|cx| {
             gpui_kit::init(cx);
             theme::apply(theme::load(), None, cx);
+            app::menu::install(cx);
 
             open_main_window(cx);
             cx.activate(true);

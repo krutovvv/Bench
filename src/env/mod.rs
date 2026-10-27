@@ -1,4 +1,4 @@
-//! A project's environment: what its agent works with. Its Settings page (`Center::Project`,
+//! A project's environment: what its agent works with. Its settings (a document of the Explorer,
 //! `page.rs`) holds the fields — name, where it lives, how it runs, its Telegram bot; the
 //! Explorer (`src/explorer/`) holds what it contains — its soul, prompts and skills as files,
 //! its MCP and language servers and scheduled jobs as parts opened in the middle. The agent
@@ -136,16 +136,19 @@ pub(crate) fn is_remote(_app: &BenchApp, id: &str) -> bool {
 }
 
 impl BenchApp {
-    /// A project's Settings (the sidebar's menu): its page ("general": this Mac's Host).
+    /// A project's settings: the Explorer on it, its settings open as a document.
     pub fn open_project_settings(
         &mut self,
         id: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.load_env(&id, window, cx);
-        self.settings_project = id;
-        self.open_center(crate::app::Center::Project, window, cx);
+        self.show_explorer(id.clone(), window, cx);
+        self.open_doc(
+            crate::explorer::DocKey::Settings { project: id },
+            window,
+            cx,
+        );
     }
 
     /// A part of the project `project`'s environment opened in the middle (`DocKey::Part`).
@@ -172,7 +175,7 @@ impl BenchApp {
             dir: String::new(),
             name: name::NameEnv::new(id, window, cx),
             place: place::PlaceEnv::new(id, window, cx),
-            lsp: Default::default(),
+            lsp: lsp::LspEnv::new(id, window, cx),
             telegram: telegram::TelegramEnv::new(id, window, cx),
             run: Default::default(),
             mcp: mcp::McpEnv::new(id, window, cx),

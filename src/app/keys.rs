@@ -30,7 +30,6 @@ impl BenchApp {
                 self.new_session(cx);
                 self.composer.update(cx, |s, cx| s.focus(window, cx));
             }
-            ("n", true) => self.open_new_window(cx),
             ("2", false) if crate::bench::SSH => self.open_terminal_thread(window, cx),
             ("3", false) if crate::bench::TOOLS => {
                 let tool = self.tools.tool;
@@ -60,7 +59,7 @@ impl BenchApp {
             ("e", false) => self.toggle_side(window, cx),
             // The thread beside the code, and the code sent to it.
             ("j", false) => self.toggle_thread_beside(window, cx),
-            ("l", false) if self.focused_doc(window, cx).is_some() => {
+            ("l", false) if self.focused_doc().is_some() => {
                 self.send_selection_to_thread(window, cx)
             }
             ("p", false) => self.open_quick(window, cx),
@@ -70,14 +69,6 @@ impl BenchApp {
                 if let Some(key) = self.explorer.active.clone() {
                     self.close_doc(key, cx);
                 }
-            }
-            (",", false) => {
-                let panel = if self.center == Center::Providers {
-                    Center::Chat
-                } else {
-                    Center::Providers
-                };
-                self.open_center(panel, window, cx);
             }
             (".", false) if self.live.is_some() => self.stop(cx),
             ("=" | "+", _) => self.step_size(1, window, cx),
@@ -96,7 +87,11 @@ impl BenchApp {
         }
         // The Explorer's ⌘P, a name being typed in its tree, ⌘⇧F's results: the latest first.
         let ex = &mut self.explorer;
-        if ex.quick.take().is_some() || ex.naming.take().is_some() || ex.find.take().is_some() {
+        if ex.quick.take().is_some()
+            || ex.naming.take().is_some()
+            || ex.armed.take().is_some()
+            || ex.find.take().is_some()
+        {
             cx.notify();
             return true;
         }
