@@ -231,6 +231,8 @@ pub struct BenchApp {
 
     /// /terminal: the servers of ~/.ssh/config and the terminals' shells.
     pub ssh: crate::inserts::terminal::servers::Ssh,
+    /// The bottom dock's terminals (`inserts/terminal/panel.rs`): the tabs and the shown one.
+    pub dock_terms: crate::inserts::terminal::panel::DockTerms,
     /// /tools: the utilities of `devtools`.
     pub tools: crate::inserts::tools::state::Tools,
     /// The tasks the /tasks insert shows, and its card.
@@ -323,6 +325,7 @@ impl BenchApp {
 
         let mut app = Self {
             ssh,
+            dock_terms: Default::default(),
             tools,
             tasks: tasks_mode,
             layout_state: cx.new(|_| Default::default()),

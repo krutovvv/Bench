@@ -221,3 +221,50 @@ pub const BOTTOM_DOCK: DockSize = DockSize {
 
 /// A tab's name is cut past this.
 pub const TAB_MAX_W: f32 = 180.;
+
+/// A terminal tab's height in the bottom dock's head.
+pub const TERM_TAB_H: f32 = 22.;
+
+/// A tab of the bottom dock's terminals: its label, dimmed once its shell ended (a click starts
+/// it anew), its × on hover (always on the shown one); the shown one sits on lit ground.
+pub fn term_tab(
+    id: impl Into<SharedString>,
+    name: impl Into<SharedString>,
+    open: bool,
+    ended: bool,
+    close: Stateful<Div>,
+    cx: &App,
+) -> Stateful<Div> {
+    let theme = cx.theme().clone();
+    let id: SharedString = id.into();
+    let group: SharedString = format!("{id}-g").into();
+    h_flex()
+        .id(ElementId::Name(id))
+        .group(group.clone())
+        .flex_none()
+        .h(px(TERM_TAB_H))
+        .pl_2()
+        .pr_0p5()
+        .gap_1()
+        .items_center()
+        .rounded_md()
+        .text_sm()
+        .cursor_pointer()
+        .when(open, |d| d.bg(theme.list_active).text_color(theme.foreground))
+        .when(!open, |d| {
+            d.text_color(if ended {
+                theme.muted_foreground
+            } else {
+                theme.foreground
+            })
+            .hover(|s| s.bg(theme.list_hover))
+        })
+        .child(div().max_w(px(TAB_MAX_W)).truncate().child(name.into()))
+        .child(
+            div()
+                .when(!open, |d| {
+                    d.opacity(0.).group_hover(group, |s| s.opacity(1.))
+                })
+                .child(close),
+        )
+}

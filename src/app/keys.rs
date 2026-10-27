@@ -5,6 +5,7 @@
 use gpui_kit::*;
 
 use super::{BenchApp, Center};
+use crate::workspace::Panel;
 use bench_ui::theme::Size;
 
 impl BenchApp {
@@ -38,6 +39,10 @@ impl BenchApp {
                 self.focus_composer(window, cx);
             }
             ("2", false) if crate::app::shortcuts::SSH => self.open_terminal_thread(window, cx),
+            // ⌘T: another terminal below the center, when it shows.
+            ("t", false) if self.bottom_dock.shows(Panel::Terminal) => {
+                self.dock_term_add(window, cx)
+            }
             ("3", false) if crate::app::shortcuts::TOOLS => {
                 let tool = self.tools.tool;
                 self.open_tool_thread(tool, window, cx)

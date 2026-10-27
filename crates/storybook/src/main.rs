@@ -245,6 +245,38 @@ impl Render for Story {
                         icon_button("x2", Ico::X, "Close", false, cx),
                         cx,
                     )),
+            )
+            .child(
+                gpui_kit::component::h_flex()
+                    .h(px(BLOCK_HEAD_H))
+                    .gap_1()
+                    .items_center()
+                    .bg(cx.theme().muted.opacity(0.35))
+                    .px_2()
+                    .child(term_tab(
+                        "t1",
+                        "Northwind blog · 1",
+                        false,
+                        false,
+                        icon_button("tx1", Ico::X, "Close", false, cx),
+                        cx,
+                    ))
+                    .child(term_tab(
+                        "t2",
+                        "Dev",
+                        true,
+                        false,
+                        icon_button("tx2", Ico::X, "Close", false, cx),
+                        cx,
+                    ))
+                    .child(term_tab(
+                        "t3",
+                        "blog · 2",
+                        false,
+                        true,
+                        icon_button("tx3", Ico::X, "Close", false, cx),
+                        cx,
+                    )),
             );
 
         let lists_view = cx.entity();
