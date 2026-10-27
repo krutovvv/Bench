@@ -14,7 +14,8 @@ crates/protocol               the types (ThreadItem, QueuedItem, ThreadEvent); T
         ↓
 crates/thread                 Thread::open / apply / rows(): the rows — User, Work, Answer, Insert, Fail, Writing, Queued
         ↓                     the rules of order are tests (crates/thread/src/tests.rs)
-src/thread/                View (mod.rs) on gpui::list: sync rows by diff, render each row
+src/thread/                ThreadView (view.rs), an entity: its ActiveThread, composer, events;
+                              its list (list.rs) on gpui::list: sync rows by diff, render each row (mod.rs)
                               message.rs (user, answer), work.rs ("N actions"), queued.rs, rail.rs, extras.rs (tail)
 ```
 

@@ -4,6 +4,7 @@
 use gpui_kit::*;
 
 use crate::app::BenchApp;
+use crate::thread::{ThreadRef, ThreadView};
 use devtools::{GROUPS, Tool};
 
 impl BenchApp {
@@ -16,12 +17,17 @@ impl BenchApp {
     pub fn new_thread_with(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
         self.center = crate::workspace::Center::Chat;
         self.new_session(cx);
-        self.put_insert(key, window, cx);
+        let view = self.active_thread.clone();
+        self.put_insert(&view, key, window, cx);
     }
 
     /// `/terminal`, `/browser`, `/tasks`, `/tools` and what follows: the tools that can be
     /// attached to this thread, filtered by the rest of the line. None when the line is not one.
-    pub fn tool_slash(&self, text: &str) -> Option<Vec<crate::app::model::SlashCommand>> {
+    pub fn tool_slash(
+        &self,
+        at: &ThreadRef,
+        text: &str,
+    ) -> Option<Vec<crate::app::model::SlashCommand>> {
         let rest = text.strip_prefix('/')?;
         let (word, q) = match rest.split_once(char::is_whitespace) {
             Some((w, q)) => (w, q.trim().to_lowercase()),
@@ -35,7 +41,7 @@ impl BenchApp {
         };
         let mut rows: Vec<crate::app::model::SlashCommand> = match word.to_lowercase().as_str() {
             "terminal" => {
-                let host = self.thread_host();
+                let host = self.thread_host(at);
                 let desc = if host.is_empty() {
                     "this Mac's terminal".to_string()
                 } else {
@@ -115,28 +121,29 @@ impl BenchApp {
         self.new_thread_with(format!("tools:{}", tool_key(tool)), window, cx);
     }
 
-    /// The open thread's key for things kept per thread: its session id, or "draft".
-    pub fn thread_key(&self) -> String {
-        self.active_thread
-            .session
-            .clone()
-            .unwrap_or_else(|| "draft".into())
-    }
-
     /// "!command": typed into the thread's terminal (its last terminal insert); a thread with
-    /// none gets this Mac's, in the thread's folder.
-    pub fn run_bang(&mut self, command: String, window: &mut Window, cx: &mut Context<Self>) {
+    /// none gets this Mac's, in the thread's folder. Not called while `view` draws or handles a
+    /// key: `ThreadView::run_bang` defers it.
+    pub fn run_bang(
+        &mut self,
+        view: &Entity<ThreadView>,
+        command: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let at = view.read(cx).thread_ref();
         let last = self
-            .thread_inserts()
+            .inserts_of(&at)
             .into_iter()
             .rev()
             .find(|i| i.key == "ssh:local");
         let (ins, fresh) = match last {
             Some(i) => (i, false),
             None => {
-                self.put_insert("ssh:local".into(), window, cx);
+                self.put_insert(view, "ssh:local".into(), window, cx);
+                let at = view.read(cx).thread_ref();
                 match self
-                    .thread_inserts()
+                    .inserts_of(&at)
                     .into_iter()
                     .rev()
                     .find(|i| i.key == "ssh:local")
@@ -146,11 +153,11 @@ impl BenchApp {
                 }
             }
         };
-        let alias = self.thread_machine();
+        let alias = self.thread_machine(&at);
         if let Some(t) = self.insert_terminal(&ins.id, &alias, window, cx) {
             // Start where the thread works.
             if fresh {
-                if let Some(dir) = self.folder_of_current() {
+                if let Some(dir) = self.folder_of_thread(&at) {
                     self.ssh.tabs[t]
                         .session
                         .write(format!("cd {}\r", shell_quote(&dir)).as_bytes());
@@ -167,19 +174,12 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// The open thread's folder, when it works in one.
-    fn folder_of_current(&self) -> Option<String> {
-        self.active_thread
-            .session
+    /// A thread's folder, when it works in one.
+    fn folder_of_thread(&self, at: &ThreadRef) -> Option<String> {
+        at.session
             .as_ref()
             .and_then(|id| self.folder_of(id))
             .or_else(|| self.new_project.clone())
-    }
-
-    /// What the thread's live block shows right now, for the agent (sent with each message, not
-    /// shown): the terminal's last lines, the tool's input and output. Task lists need none: the agent reads them with its tool.
-    pub fn block_context(&self, cx: &App) -> String {
-        self.inserts_context(cx)
     }
 }
 
@@ -198,4 +198,16 @@ pub fn tool_key(tool: Tool) -> String {
 
 pub(crate) fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
+}
+
+impl ThreadView {
+    /// "!command" from this thread's composer: the app types it into the thread's terminal once
+    /// this view is done handling the key (`BenchApp::run_bang`).
+    pub fn run_bang(&mut self, command: String, window: &mut Window, cx: &mut Context<Self>) {
+        let (app, view) = (self.app.clone(), cx.entity());
+        window.defer(cx, move |window, cx| {
+            app.update(cx, |app, cx| app.run_bang(&view, command, window, cx))
+                .ok();
+        });
+    }
 }

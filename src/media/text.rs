@@ -1,7 +1,6 @@
 //! An answer's text: Markdown kept parsed while the thread is open (`Texts`), formulas as Unicode,
 //! code blocks with their head.
 
-use crate::app::BenchApp;
 use crate::media::{self, Segment, latex_text};
 use bench_ui::icons::Ico;
 use gpui_kit::component::notification::NotificationType;
@@ -104,10 +103,6 @@ pub(crate) fn answer_segments(text: &str) -> Vec<Segment> {
 }
 
 impl Texts {
-    pub fn clear(&mut self) {
-        self.0.clear();
-    }
-
     /// The states under ids starting `from` move to the same ids starting `to`: the answer that
     /// was being written keeps its parsed text when it becomes the journal's entry, instead of
     /// being parsed again (a long one in the background, blank meanwhile — the thread flickers).
@@ -141,21 +136,16 @@ impl Texts {
     }
 }
 
-impl BenchApp {
-    /// An answer's prose (Markdown, with formulas), from the thread's kept texts.
-    pub(crate) fn kept_markdown(
-        &mut self,
-        id: &str,
-        text: &str,
-        cx: &mut Context<Self>,
-    ) -> TextView {
-        let state = self.active_thread.texts.state(id, text, cx);
+impl Texts {
+    /// An answer's prose (Markdown, with formulas), kept under `id`.
+    pub(crate) fn markdown(&mut self, id: &str, text: &str, cx: &mut App) -> TextView {
+        let state = self.state(id, text, cx);
         answer_style(TextView::new(&state))
     }
 
-    /// The person's own words exactly as written, from the thread's kept texts.
-    pub(crate) fn kept_plain(&mut self, id: &str, text: &str, cx: &mut Context<Self>) -> TextView {
-        let state = self.active_thread.texts.state(id, &escape_plain(text), cx);
+    /// The person's own words exactly as written, kept under `id`.
+    pub(crate) fn plain(&mut self, id: &str, text: &str, cx: &mut App) -> TextView {
+        let state = self.state(id, &escape_plain(text), cx);
         TextView::new(&state)
     }
 }

@@ -8,12 +8,13 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::Value;
 
+use super::ThreadView;
 use super::message::speaker_row;
-use crate::app::{BenchApp, now_secs};
+use crate::app::now_secs;
 use bench_ui::icons::Ico;
 use bench_ui::{clip, clock, plural};
 
-impl BenchApp {
+impl ThreadView {
     pub(crate) fn render_work(
         &mut self,
         key: &str,
@@ -30,7 +31,7 @@ impl BenchApp {
             .iter()
             .filter(|s| matches!(s, Step::Tool { failed: true, .. }))
             .count();
-        let open = self.active_thread.open_work.contains(key);
+        let open = self.thread.open_work.contains(key);
         // A live piece of work counts on; a finished one keeps the time its steps took.
         let secs = match (from, to, live) {
             (Some(a), _, true) => Some((now_secs() * 1000. - a).max(0.) / 1000.),
@@ -87,9 +88,9 @@ impl BenchApp {
                 )),
             })
             .on_click(cx.listener(move |this, _, _, cx| {
-                this.click_claimed = true;
-                if !this.active_thread.open_work.remove(&work_key) {
-                    this.active_thread.open_work.insert(work_key.clone());
+                this.claim_click(cx);
+                if !this.thread.open_work.remove(&work_key) {
+                    this.thread.open_work.insert(work_key.clone());
                 }
                 cx.notify();
             }));
@@ -128,7 +129,7 @@ impl BenchApp {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let open = self.open_steps.contains(&(key.to_string(), k));
+        let open = self.thread.open_steps.contains(&(key.to_string(), k));
         let (icon, color, label, details): (Ico, Hsla, String, Vec<(&str, String)>) = match step {
             Step::Tool {
                 name,
@@ -172,7 +173,10 @@ impl BenchApp {
             details
                 .into_iter()
                 .map(|(title, body)| {
-                    let text = self.kept_plain(&format!("step-{key}-{k}-{title}"), &body, cx);
+                    let text =
+                        self.thread
+                            .texts
+                            .plain(&format!("step-{key}-{k}-{title}"), &body, cx);
                     (title, text.into_any_element())
                 })
                 .collect()
@@ -192,9 +196,9 @@ impl BenchApp {
                     .child(icon.icon().xsmall().mt(px(3.)))
                     .child(div().flex_1().min_w_0().child(label))
                     .on_click(cx.listener(move |this, _, _, cx| {
-                        this.click_claimed = true;
-                        if !this.open_steps.remove(&step_key) {
-                            this.open_steps.insert(step_key.clone());
+                        this.claim_click(cx);
+                        if !this.thread.open_steps.remove(&step_key) {
+                            this.thread.open_steps.insert(step_key.clone());
                         }
                         cx.notify();
                     })),

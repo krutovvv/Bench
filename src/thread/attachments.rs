@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use gpui_kit::*;
 
+use super::ThreadView;
 use crate::app::BenchApp;
 use crate::media::attach;
 
@@ -174,29 +175,38 @@ pub fn with_references(text: String, refs: &[Reference]) -> String {
 }
 
 impl BenchApp {
-    /// The open thread's references waiting in its composer.
-    pub fn thread_references(&self) -> Vec<Reference> {
-        self.references
-            .get(&self.thread_key())
-            .cloned()
-            .unwrap_or_default()
-    }
-
     /// A reference into the open thread's composer (once).
     pub fn add_reference(&mut self, r: Reference, cx: &mut Context<Self>) {
-        let list = self.references.entry(self.thread_key()).or_default();
+        let key = self.thread_ref(cx).key();
+        let list = self.references.entry(key).or_default();
         if !list.contains(&r) {
             list.push(r);
         }
         cx.notify();
     }
+}
+
+impl ThreadView {
+    /// This thread's references waiting in its composer (kept by the app per thread, as drafts).
+    pub fn thread_references(&self, cx: &App) -> Vec<Reference> {
+        let key = self.thread_ref().key();
+        self.app(cx)
+            .and_then(|a| a.references.get(&key).cloned())
+            .unwrap_or_default()
+    }
 
     pub fn remove_reference(&mut self, k: usize, cx: &mut Context<Self>) {
-        if let Some(list) = self.references.get_mut(&self.thread_key()) {
-            if k < list.len() {
-                list.remove(k);
-            }
-        }
+        let key = self.thread_ref().key();
+        self.app
+            .update(cx, |app, cx| {
+                if let Some(list) = app.references.get_mut(&key) {
+                    if k < list.len() {
+                        list.remove(k);
+                    }
+                }
+                cx.notify();
+            })
+            .ok();
         cx.notify();
     }
 

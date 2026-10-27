@@ -19,11 +19,11 @@ const SENT_LINES: usize = 60;
 impl BenchApp {
     /// The project the dock's terminal is of: the Explorer's while it is shown, else the open
     /// thread's.
-    fn terminal_project(&self) -> String {
+    fn terminal_project(&self, cx: &App) -> String {
         if self.left_dock.shows(Panel::Explorer) && !self.explorer.project.is_empty() {
             self.explorer.project.clone()
         } else {
-            self.thread_project_or_host()
+            self.thread_ref(cx).project_or_host()
         }
     }
 
@@ -45,7 +45,7 @@ impl BenchApp {
 
     /// The project's shell (started once, in its folder; again when it has ended).
     fn panel_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<usize> {
-        let project = self.terminal_project();
+        let project = self.terminal_project(cx);
         let key = format!("dock:{project}");
         let fresh = self.ssh.tab_of_insert(&key).is_none_or(|t| {
             self.ssh.tabs[t]
@@ -69,7 +69,7 @@ impl BenchApp {
 
     /// The selection of the dock's terminal, or its last lines, to the thread's composer.
     pub fn send_terminal_to_thread(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let project = self.terminal_project();
+        let project = self.terminal_project(cx);
         let machine = match self.terminal_machine(&project) {
             m if m.is_empty() => "this Mac".to_string(),
             m => m,
@@ -101,7 +101,7 @@ impl BenchApp {
         {
             self.right_dock.activate(Panel::Thread);
         }
-        self.composer.update(cx, |s, cx| s.focus(window, cx));
+        self.focus_composer(window, cx);
         cx.notify();
     }
 
@@ -112,7 +112,7 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let project = self.terminal_project();
+        let project = self.terminal_project(cx);
         let at = self.location(&project);
         let machine = match at.machine_here() {
             m if m.is_empty() => "this Mac".to_string(),

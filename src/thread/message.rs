@@ -5,7 +5,7 @@ use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::BenchApp;
+use super::ThreadView;
 use bench_ui::icons::Ico;
 use bench_ui::{AVATAR, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, TURN_Y, avatar};
 
@@ -27,7 +27,7 @@ pub(crate) fn speaker_row(agent: Option<bool>, body: impl IntoElement, cx: &App)
         .child(div().flex_1().min_w_0().child(body))
 }
 
-impl BenchApp {
+impl ThreadView {
     pub(crate) fn render_user(
         &mut self,
         key: &str,
@@ -56,7 +56,8 @@ impl BenchApp {
             .enumerate()
             .map(|(k, p)| self.attachment_chip(format!("{key}-{k}").into(), p, None, cx))
             .collect();
-        let said = (field.is_none() && !text.is_empty()).then(|| self.kept_plain(&key, text, cx));
+        let said =
+            (field.is_none() && !text.is_empty()).then(|| self.thread.texts.plain(&key, text, cx));
         let body = div()
             .whitespace_normal()
             .when(muted, |d| d.text_color(theme.muted_foreground))
@@ -91,17 +92,19 @@ impl BenchApp {
         let theme = cx.theme().clone();
         // The last answer: nothing the person or the agent said or did after it. What the person
         // put in since (a terminal, a tool) and what waits in the queue leave it the last.
-        let last = !self.active_thread.journal.running()
-            && self.active_thread.tv.rows[k + 1..]
+        let last = !self.thread.journal.running()
+            && self.thread.tv.rows[k + 1..]
                 .iter()
                 .all(|r| matches!(r, Row::Queued { .. } | Row::Insert { .. }));
         let sources = self.render_sources(k, cx);
         let files = last.then(|| self.render_session_files(cx)).flatten();
         let group: SharedString = format!("answer-{key}").into();
-        let (playing, speaking) = (
-            self.playing.as_ref().is_some_and(|(j, _)| j == key),
-            self.speaking.as_deref() == Some(key),
-        );
+        let (playing, speaking) = self.app(cx).map_or((false, false), |a| {
+            (
+                a.playing.as_ref().is_some_and(|(j, _)| j == key),
+                a.speaking.as_deref() == Some(key),
+            )
+        });
         let (copy_key, speak_key) = (key.to_string(), key.to_string());
         let actions = h_flex()
             .absolute()
@@ -133,11 +136,13 @@ impl BenchApp {
                     false,
                     cx,
                 )
-                .on_click(
-                    cx.listener(move |this, _, window, cx| {
-                        this.toggle_speak(&speak_key, window, cx)
-                    }),
-                ),
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    let text = this.answer_text(&speak_key).unwrap_or_default();
+                    let key = speak_key.clone();
+                    this.app
+                        .update(cx, |app, cx| app.toggle_speak(&key, text, window, cx))
+                        .ok();
+                })),
             )
             .when(last, |d| {
                 d.child(
@@ -147,7 +152,7 @@ impl BenchApp {
             });
         let body = v_flex()
             .gap_3()
-            .children(self.render_answer(key, text, cx))
+            .children(self.answer_body(key, text, cx))
             .when_some(error, |d, e| {
                 d.child(
                     div()
@@ -170,6 +175,17 @@ impl BenchApp {
             .into_any_element()
     }
 
+    /// An answer's text, delivered files, diagrams and code (`media/view.rs`, the app's: its
+    /// files and playback are the window's), parsed into this thread's texts.
+    fn answer_body(&mut self, key: &str, text: &str, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let at = self.thread_ref();
+        let Some(app) = self.app.upgrade() else {
+            return vec![];
+        };
+        let texts = &mut self.thread.texts;
+        app.update(cx, |app, cx| app.render_answer(&at, texts, key, text, cx))
+    }
+
     /// The answer being written: its reasoning so far, muted, then its text.
     pub(crate) fn render_writing(
         &mut self,
@@ -179,7 +195,7 @@ impl BenchApp {
     ) -> AnyElement {
         let body = v_flex()
             .gap_3()
-            .children(self.render_answer("writing", text, cx));
+            .children(self.answer_body("writing", text, cx));
         speaker_row(if after_work { None } else { Some(true) }, body, cx)
             .when(after_work, |d| d.pt_0())
             .into_any_element()

@@ -10,6 +10,7 @@ use crate::app::BenchApp;
 use crate::inserts::tasks::model::{self as tasks, List, Task, today};
 use crate::inserts::tasks::store::TaskStore;
 use crate::inserts::tasks::store::{Cmd, Evt};
+use crate::thread::ThreadRef;
 
 /// How far back the Logbook (and a tag's done tasks) reaches.
 pub const RANGES: [(&str, i64); 5] = [
@@ -282,7 +283,10 @@ impl BenchApp {
             self.save_selected();
         }
         // The list is read again while a /tasks insert shows it.
-        let shown = self.thread_inserts().iter().any(|i| i.key == "tasks");
+        let shown = self
+            .inserts_of(&self.thread_ref(cx))
+            .iter()
+            .any(|i| i.key == "tasks");
         if !shown || self.tasks.store.is_none() {
             return;
         }
@@ -343,8 +347,8 @@ impl BenchApp {
     }
 
     /// What the open thread is about: its session's subject, or the new chat's.
-    pub fn current_subject(&self) -> String {
-        match &self.active_thread.session {
+    pub fn current_subject(&self, cx: &App) -> String {
+        match &self.thread(cx).session {
             Some(id) => self
                 .sessions
                 .iter()
@@ -491,10 +495,10 @@ impl BenchApp {
 
     /// The tasks follow the open thread: in a project its tag filters the list (dropped with a
     /// click on "All"); in Host every task shows.
-    pub fn sync_task_project(&mut self) {
-        if self.tasks.project != self.active_thread.thread_project {
-            self.tasks.project = self.active_thread.thread_project.clone();
-            self.tasks.tag_filter = self.project_tag(&self.active_thread.thread_project);
+    pub fn sync_task_project(&mut self, at: &ThreadRef) {
+        if self.tasks.project != at.project {
+            self.tasks.project = at.project.clone();
+            self.tasks.tag_filter = self.project_tag(&at.project);
         }
     }
 

@@ -14,6 +14,7 @@ use crate::app::BenchApp;
 use crate::app::model::Insert;
 use crate::inserts::InsertKind;
 use crate::inserts::tasks::model::{LISTS, List};
+use crate::thread::ThreadRef;
 
 pub struct Tasks;
 
@@ -35,19 +36,20 @@ impl InsertKind for Tasks {
         Some("tasks")
     }
 
-    fn title(&self, _app: &BenchApp, _ins: &Insert) -> String {
+    fn title(&self, _app: &BenchApp, _at: &ThreadRef, _ins: &Insert) -> String {
         "Tasks".into()
     }
 
     fn controls(
         &self,
         app: &mut BenchApp,
+        at: &ThreadRef,
         ins: &Insert,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Vec<AnyElement> {
         let now = list_of(ins);
-        app.sync_task_project();
+        app.sync_task_project(at);
         // Only the lists that have something (and the one shown): an empty one needs no button.
         let lists: Vec<List> = LISTS
             .iter()
@@ -69,7 +71,7 @@ impl InsertKind for Tasks {
                 this.new_task(window, cx)
             }))
             .into_any_element();
-        let picks = lists.clone();
+        let (picks, at) = (lists.clone(), at.clone());
         vec![
             add,
             crate::inserts::tools::view::segmented_owned(
@@ -80,6 +82,7 @@ impl InsertKind for Tasks {
                 move |this, k, window, cx| {
                     let list = picks[k].clone();
                     this.patch_insert(
+                        &at,
                         &id,
                         json!({ "state": { "list": list.name().to_lowercase() } }),
                         cx,
@@ -93,6 +96,7 @@ impl InsertKind for Tasks {
     fn body(
         &self,
         app: &mut BenchApp,
+        at: &ThreadRef,
         ins: &Insert,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -101,7 +105,7 @@ impl InsertKind for Tasks {
         if app.tasks.list != list {
             app.select_task_list(list, window, cx);
         }
-        app.sync_task_project();
+        app.sync_task_project(at);
         Some(app.render_tasks_block(cx))
     }
 
@@ -109,6 +113,7 @@ impl InsertKind for Tasks {
     fn follow(
         &self,
         app: &mut BenchApp,
+        _at: &ThreadRef,
         ins: &Insert,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -138,13 +143,14 @@ impl InsertKind for Tasks {
         Some(crate::inserts::card(head, body, &theme))
     }
 
-    fn context(&self, _app: &BenchApp, ins: &Insert, _cx: &App) -> String {
+    fn context(&self, _app: &BenchApp, _at: &ThreadRef, ins: &Insert, _cx: &App) -> String {
         format!("The tasks insert shows the {} list.", list_of(ins).name())
     }
 
     fn opened(
         &self,
         app: &mut BenchApp,
+        _at: &ThreadRef,
         ins: &Insert,
         window: &mut Window,
         cx: &mut Context<BenchApp>,

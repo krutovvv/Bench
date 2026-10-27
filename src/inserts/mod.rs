@@ -2,12 +2,12 @@
 //!
 //! ```text
 //! inserts/<kind>/mod.rs    the kind: a unit struct implementing `InsertKind` (title, body, …)
-//! inserts/<kind>/state.rs  what it keeps and does (methods on BenchApp)
+//! inserts/<kind>/state.rs  what it keeps and does (methods on BenchApp: its state is app-wide)
 //! inserts/<kind>/view.rs   how its body is drawn, when it is more than a few lines
 //! ```
 //!
 //! This file has the trait, `KINDS`, the words of the "/" list and the block every insert sits
-//! in (title, its menu, controls, fold, remove). `state.rs` here keeps the thread's inserts in
+//! in (title, its menu, controls, fold, remove), drawn by the `ThreadView` it is in. `state.rs` here keeps the thread's inserts in
 //! step with the agent (agent/src/inserts.ts).
 //!
 //! A new kind: a folder like `tools/`, a line in `KINDS`, its word in `words()`, and a line in
@@ -28,6 +28,7 @@ use serde_json::Value;
 
 use crate::app::BenchApp;
 use crate::app::model::{Insert, SlashCommand};
+use crate::thread::{ThreadRef, ThreadView};
 use bench_ui::icons::Ico;
 
 /// What the title's menu offers: show something else (`to`, a patch of the insert: its key, its
@@ -39,6 +40,10 @@ pub struct Switch {
     pub to: Value,
 }
 
+/// A kind of insert. Its app-wide state (the terminals' shells, the browser, the task list, the
+/// tool) is `BenchApp`'s; the thread it sits in is `at` — any thread on screen, the open one or
+/// the one beside it — so every method is told which (`ThreadRef`). Its block is drawn inside that
+/// thread's `ThreadView` (`ThreadView::render_insert`); what the kind draws acts on the app.
 pub trait InsertKind: Sync {
     /// Whether `key` is this kind's.
     fn owns(&self, key: &str) -> bool;
@@ -48,15 +53,16 @@ pub trait InsertKind: Sync {
     fn shared(&self) -> Option<&'static str> {
         None
     }
-    fn title(&self, app: &BenchApp, ins: &Insert) -> String;
+    fn title(&self, app: &BenchApp, at: &ThreadRef, ins: &Insert) -> String;
     /// The title's menu.
-    fn switches(&self, _app: &BenchApp, _ins: &Insert) -> Vec<Switch> {
+    fn switches(&self, _app: &BenchApp, _at: &ThreadRef, _ins: &Insert) -> Vec<Switch> {
         vec![]
     }
     /// The head's own controls, left of "remove".
     fn controls(
         &self,
         _app: &mut BenchApp,
+        _at: &ThreadRef,
         _ins: &Insert,
         _window: &mut Window,
         _cx: &mut Context<BenchApp>,
@@ -67,6 +73,7 @@ pub trait InsertKind: Sync {
     fn body(
         &self,
         app: &mut BenchApp,
+        at: &ThreadRef,
         ins: &Insert,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -76,6 +83,7 @@ pub trait InsertKind: Sync {
     fn follow(
         &self,
         _app: &mut BenchApp,
+        _at: &ThreadRef,
         _ins: &Insert,
         _window: &mut Window,
         _cx: &mut Context<BenchApp>,
@@ -83,17 +91,25 @@ pub trait InsertKind: Sync {
         None
     }
     /// What it shows now, for the agent (sent with each message, never shown).
-    fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String;
+    fn context(&self, app: &BenchApp, at: &ThreadRef, ins: &Insert, cx: &App) -> String;
     /// Put in, or brought back: start what it needs (a terminal, a listing).
     fn opened(
         &self,
         _app: &mut BenchApp,
+        _at: &ThreadRef,
         _ins: &Insert,
         _window: &mut Window,
         _cx: &mut Context<BenchApp>,
     ) {
     }
-    fn removed(&self, _app: &mut BenchApp, _ins: &Insert, _cx: &mut Context<BenchApp>) {}
+    fn removed(
+        &self,
+        _app: &mut BenchApp,
+        _at: &ThreadRef,
+        _ins: &Insert,
+        _cx: &mut Context<BenchApp>,
+    ) {
+    }
 }
 
 static KINDS: &[&dyn InsertKind] = &[
@@ -132,12 +148,17 @@ pub fn words() -> Vec<SlashCommand> {
 
 impl BenchApp {
     /// Whether `ins` shows its kind's app-wide state (see `InsertKind::shared`).
-    fn insert_is_live(&self, kind: &dyn InsertKind, ins: &Insert) -> bool {
+    pub(crate) fn insert_is_live(
+        &self,
+        at: &ThreadRef,
+        kind: &dyn InsertKind,
+        ins: &Insert,
+    ) -> bool {
         let Some(name) = kind.shared() else {
             return true;
         };
         let same: Vec<String> = self
-            .thread_inserts()
+            .inserts_of(at)
             .into_iter()
             .filter(|i| kind.owns(&i.key))
             .map(|i| i.id)
@@ -148,6 +169,24 @@ impl BenchApp {
         }
     }
 
+    /// `ins` shown in its thread's block (a click on "show it here", a pick in its title's menu).
+    fn insert_opened(
+        &mut self,
+        at: &ThreadRef,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(ins) = self.inserts_of(at).into_iter().find(|i| i.id == id) {
+            if let Some(k) = kind_of(&ins.key) {
+                k.opened(self, at, &ins, window, cx);
+            }
+        }
+        cx.notify();
+    }
+}
+
+impl ThreadView {
     /// One insert where the journal puts it: its block, then what it opened.
     pub(crate) fn render_insert_by_id(
         &mut self,
@@ -155,15 +194,24 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
-        let Some(ins) = self.thread_inserts().into_iter().find(|i| i.id == id) else {
+        let at = self.thread_ref();
+        let Some(app) = self.app.upgrade() else {
+            return vec![];
+        };
+        let Some(ins) = app
+            .read(cx)
+            .inserts_of(&at)
+            .into_iter()
+            .find(|i| i.id == id)
+        else {
             return vec![];
         };
         let Some(kind) = kind_of(&ins.key) else {
             return vec![];
         };
-        let mut out = vec![self.render_insert(kind, &ins, window, cx)];
-        if !ins.folded && self.insert_is_live(kind, &ins) {
-            if let Some(f) = kind.follow(self, &ins, window, cx) {
+        let mut out = vec![self.render_insert(&app, &at, kind, &ins, window, cx)];
+        if !ins.folded && app.read(cx).insert_is_live(&at, kind, &ins) {
+            if let Some(f) = app.update(cx, |app, cx| kind.follow(app, &at, &ins, window, cx)) {
                 out.push(self.agent_row(f, cx));
             }
         }
@@ -189,8 +237,8 @@ impl BenchApp {
                     .min_w_0()
                     .on_mouse_down(
                         MouseButton::Left,
-                        cx.listener(|this, _, _, _| {
-                            this.click_claimed = true;
+                        cx.listener(|this, _, _, cx| {
+                            this.claim_click(cx);
                             this.follow = false;
                         }),
                     )
@@ -199,8 +247,12 @@ impl BenchApp {
             .into_any_element()
     }
 
+    /// The block an insert sits in — its head (fold, title and its menu, controls, remove), its
+    /// body — drawn here, in this thread; what the kind draws in it is the app's (`InsertKind`).
     fn render_insert(
         &mut self,
+        app: &Entity<BenchApp>,
+        at: &ThreadRef,
         kind: &'static dyn InsertKind,
         ins: &Insert,
         window: &mut Window,
@@ -208,20 +260,26 @@ impl BenchApp {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let title = kind.title(self, ins);
-        let switches = kind.switches(self, ins);
-        let live = self.insert_is_live(kind, ins);
+        let (title, switches, live) = {
+            let a = app.read(cx);
+            (
+                kind.title(a, at, ins),
+                kind.switches(a, at, ins),
+                a.insert_is_live(at, kind, ins),
+            )
+        };
         let controls = if live {
-            kind.controls(self, ins, window, cx)
+            app.update(cx, |a, cx| kind.controls(a, at, ins, window, cx))
         } else {
             vec![]
         };
         let body = if ins.folded {
             None
         } else if live {
-            kind.body(self, ins, window, cx)
+            app.update(cx, |a, cx| kind.body(a, at, ins, window, cx))
         } else {
             let (claim_id, name) = (ins.id.clone(), kind.shared().unwrap_or_default());
+            let at = at.clone();
             Some(
                 div()
                     .id(SharedString::from(format!("{}-claim", ins.id)))
@@ -229,23 +287,17 @@ impl BenchApp {
                     .cursor_pointer()
                     .hover(|s| s.text_color(theme.foreground))
                     .child("Shown in another insert of this thread — click to show it here")
-                    .on_click(cx.listener(move |this, _, window, cx| {
+                    .on_click(self.app_listener(move |this, _, window, cx| {
                         this.click_claimed = true;
                         this.insert_live.insert(name.to_string(), claim_id.clone());
-                        if let Some(ins) =
-                            this.thread_inserts().into_iter().find(|i| i.id == claim_id)
-                        {
-                            if let Some(k) = kind_of(&ins.key) {
-                                k.opened(this, &ins, window, cx);
-                            }
-                        }
-                        cx.notify();
+                        this.insert_opened(&at, &claim_id, window, cx);
                     }))
                     .into_any_element(),
             )
         };
         let id = SharedString::from(ins.id.clone());
         let (fold_id, rm_id) = (ins.id.clone(), ins.id.clone());
+        let (fold_at, rm_at) = (at.clone(), at.clone());
         let folded = ins.folded;
         let fold = div()
             .id(SharedString::from(format!("{id}-fold")))
@@ -262,15 +314,20 @@ impl BenchApp {
                 .icon()
                 .xsmall(),
             )
-            .on_click(cx.listener(move |this, _, _, cx| {
+            .on_click(self.app_listener(move |this, _, _, cx| {
                 this.click_claimed = true;
-                this.patch_insert(&fold_id, serde_json::json!({ "folded": !folded }), cx);
+                this.patch_insert(
+                    &fold_at,
+                    &fold_id,
+                    serde_json::json!({ "folded": !folded }),
+                    cx,
+                );
             }));
         let title_el: AnyElement = if switches.is_empty() {
             div().px_1().child(title).into_any_element()
         } else {
-            let view = cx.entity();
-            let ins_id = ins.id.clone();
+            let app = self.app.clone();
+            let (ins_id, at) = (ins.id.clone(), at.clone());
             let items: Vec<(String, String, bool, Value)> = switches
                 .into_iter()
                 .map(|s| (s.label, s.detail, s.chosen, s.to))
@@ -281,7 +338,7 @@ impl BenchApp {
                 .label(format!("{title}  ▾"))
                 .dropdown_menu(move |mut menu, _, _| {
                     for (label, detail, chosen, to) in items.iter().cloned() {
-                        let (view, ins_id) = (view.clone(), ins_id.clone());
+                        let (app, ins_id, at) = (app.clone(), ins_id.clone(), at.clone());
                         let text = if detail.is_empty() {
                             label
                         } else {
@@ -290,17 +347,11 @@ impl BenchApp {
                         menu = menu.item(PopupMenuItem::new(text).checked(chosen).on_click(
                             move |_, window, cx| {
                                 let to = to.clone();
-                                let ins_id = ins_id.clone();
-                                view.update(cx, |this, cx| {
-                                    this.patch_insert(&ins_id, to, cx);
-                                    if let Some(ins) =
-                                        this.thread_inserts().into_iter().find(|i| i.id == ins_id)
-                                    {
-                                        if let Some(k) = kind_of(&ins.key) {
-                                            k.opened(this, &ins, window, cx);
-                                        }
-                                    }
+                                app.update(cx, |this, cx| {
+                                    this.patch_insert(&at, &ins_id, to, cx);
+                                    this.insert_opened(&at, &ins_id, window, cx);
                                 })
+                                .ok();
                             },
                         ));
                     }
@@ -321,9 +372,9 @@ impl BenchApp {
                     "Remove from the thread",
                     cx,
                 )
-                .on_click(cx.listener(move |this, _, _, cx| {
+                .on_click(self.app_listener(move |this, _, _, cx| {
                     this.click_claimed = true;
-                    this.remove_insert(&rm_id, cx);
+                    this.remove_insert(&rm_at, &rm_id, cx);
                 })),
             );
         // Light, as the page: a thin border, round corners, the head on a faint strip.
@@ -356,8 +407,8 @@ impl BenchApp {
                     // to its end when it grows.
                     .on_mouse_down(
                         MouseButton::Left,
-                        cx.listener(|this, _, _, _| {
-                            this.click_claimed = true;
+                        cx.listener(|this, _, _, cx| {
+                            this.claim_click(cx);
                             this.follow = false;
                         }),
                     )

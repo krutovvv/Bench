@@ -78,7 +78,7 @@ impl BenchApp {
         if self.left_dock.shows(Panel::Explorer) {
             self.close_explorer(cx);
         } else {
-            let project = self.thread_project_or_host();
+            let project = self.thread_ref(cx).project_or_host();
             self.show_explorer(project, window, cx);
         }
     }

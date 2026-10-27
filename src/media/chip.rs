@@ -1,14 +1,14 @@
 //! A file going with a message, as a chip: a small picture or its icon, and its name.
 
-use crate::app::BenchApp;
 use crate::media::{self, Kind, file_name};
+use crate::thread::ThreadView;
 use bench_ui::icons::Ico;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-impl BenchApp {
+impl ThreadView {
     /// A file going with a message: a small picture for an image, else its icon, and the name.
     /// `remove`: its index in the composer (shows ×); otherwise a click opens it.
     pub(crate) fn attachment_chip(

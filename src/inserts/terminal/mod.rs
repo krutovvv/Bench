@@ -21,6 +21,7 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::app::model::Insert;
 use crate::inserts::InsertKind;
+use crate::thread::ThreadRef;
 use bench_ui::icons::Ico;
 
 /// The tallest a terminal gets in a thread; its program's screen is this many rows.
@@ -33,8 +34,8 @@ impl InsertKind for Terminal {
         key == "ssh:local"
     }
 
-    fn title(&self, app: &BenchApp, ins: &Insert) -> String {
-        let a = app.thread_machine();
+    fn title(&self, app: &BenchApp, at: &ThreadRef, ins: &Insert) -> String {
+        let a = app.thread_machine(at);
         let name = if a.is_empty() {
             "Terminal".to_string()
         } else {
@@ -54,6 +55,7 @@ impl InsertKind for Terminal {
     fn controls(
         &self,
         app: &mut BenchApp,
+        _at: &ThreadRef,
         ins: &Insert,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -108,11 +110,12 @@ impl InsertKind for Terminal {
     fn body(
         &self,
         app: &mut BenchApp,
+        at: &ThreadRef,
         ins: &Insert,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
-        let alias = app.thread_machine();
+        let alias = app.thread_machine(at);
         if app.demo {
             return Some(
                 div()
@@ -152,8 +155,8 @@ impl InsertKind for Terminal {
         )
     }
 
-    fn context(&self, app: &BenchApp, ins: &Insert, _cx: &App) -> String {
-        let alias = app.thread_machine();
+    fn context(&self, app: &BenchApp, at: &ThreadRef, ins: &Insert, _cx: &App) -> String {
+        let alias = app.thread_machine(at);
         let name = if alias.is_empty() {
             "this Mac".to_string()
         } else {
@@ -171,11 +174,12 @@ impl InsertKind for Terminal {
     fn opened(
         &self,
         app: &mut BenchApp,
+        at: &ThreadRef,
         ins: &Insert,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) {
-        let a = app.thread_machine();
+        let a = app.thread_machine(at);
         if let Some(t) = app.insert_terminal(&ins.id, &a, window, cx) {
             app.ssh.tabs[t].background = false;
             app.ssh.tabs[t].focus.focus(window, cx);
@@ -183,7 +187,13 @@ impl InsertKind for Terminal {
     }
 
     /// Its shell ends with it.
-    fn removed(&self, app: &mut BenchApp, ins: &Insert, _cx: &mut Context<BenchApp>) {
+    fn removed(
+        &self,
+        app: &mut BenchApp,
+        _at: &ThreadRef,
+        ins: &Insert,
+        _cx: &mut Context<BenchApp>,
+    ) {
         if let Some(t) = app.ssh.tab_of_insert(&ins.id) {
             app.ssh.tabs[t].session.kill();
             app.ssh.tabs.remove(t);

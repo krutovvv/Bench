@@ -12,6 +12,7 @@ use crate::app::BenchApp;
 use crate::app::model::{ProjectKey, Target};
 use crate::client::connection::Connection;
 use crate::client::rpc::{Cmd, Evt, Gateway};
+use crate::thread::ThreadRef;
 
 /// One agent: its command channel, its REST connection once up, why it is not up.
 pub struct AgentLink {
@@ -44,9 +45,9 @@ impl BenchApp {
         self.conn_of("")
     }
 
-    /// The agent keeping the open thread (or the new one).
-    pub fn thread_conn(&self) -> Option<Arc<Connection>> {
-        self.conn_of(&self.thread_host())
+    /// The agent keeping a thread (or the new one).
+    pub fn thread_conn(&self, t: &ThreadRef) -> Option<Arc<Connection>> {
+        self.conn_of(&self.thread_host(t))
     }
 
     /// Where the agent under `host` runs, as media and attachments reach its files.
@@ -58,14 +59,14 @@ impl BenchApp {
         }
     }
 
-    /// The machine the open thread's files are on, as media are fetched from it.
-    pub fn thread_target(&self) -> Target {
-        self.target_of(&self.thread_location().machine_here())
+    /// The machine a thread's files are on, as media are fetched from it.
+    pub fn thread_target(&self, t: &ThreadRef) -> Target {
+        self.target_of(&self.thread_location(t).machine_here())
     }
 
-    /// Where the open thread's shell runs: its project's machine, or this Mac (`term::LOCAL`).
-    pub fn thread_machine(&self) -> String {
-        let here = self.thread_location().machine_here();
+    /// Where a thread's shell runs: its project's machine, or this Mac (`term::LOCAL`).
+    pub fn thread_machine(&self, t: &ThreadRef) -> String {
+        let here = self.thread_location(t).machine_here();
         if here.is_empty() {
             crate::inserts::terminal::session::LOCAL.to_string()
         } else {
@@ -73,10 +74,10 @@ impl BenchApp {
         }
     }
 
-    /// The machine the open thread's files are on when its agent works on another one: its agent
-    /// is asked for them with this machine (`/api/fs?machine=`).
-    pub fn files_machine(&self) -> Option<String> {
-        self.thread_location().files_machine()
+    /// The machine a thread's files are on when its agent works on another one: its agent is
+    /// asked for them with this machine (`/api/fs?machine=`).
+    pub fn files_machine(&self, t: &ThreadRef) -> Option<String> {
+        self.thread_location(t).files_machine()
     }
 
     /// The agents in the order the gear lists them: this Mac's, then the servers' as listed.
@@ -278,16 +279,9 @@ impl BenchApp {
         }
     }
 
-    /// Send a command to the agent it concerns: the thread's own (a server's, or this Mac's).
-    pub fn route(&self, cmd: Cmd) {
-        let host = match &cmd {
-            Cmd::Sessions(_) | Cmd::Catalog { .. } => String::new(),
-            Cmd::Delete { session, .. } | Cmd::Rename { session, .. } => {
-                self.host_of_session(session)
-            }
-            _ => self.thread_host(),
-        };
-        if let Some(a) = self.agents.get(&host) {
+    /// Send a command to the agent under `host` ("" = this Mac's).
+    pub fn route(&self, host: &str, cmd: Cmd) {
+        if let Some(a) = self.agents.get(host) {
             a.gateway.send(cmd);
         }
     }

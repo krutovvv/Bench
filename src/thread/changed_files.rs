@@ -6,19 +6,20 @@ use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::BenchApp;
+use super::ThreadView;
 use bench_ui::icons::Ico;
 use bench_ui::plural;
 
-impl BenchApp {
+impl ThreadView {
     /// After the last turn: every file this session edited, with +/- counts.
     pub(crate) fn render_session_files(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let files = self.session_files();
-        if files.is_empty() || self.active_thread.journal.running() {
+        if files.is_empty() || self.thread.journal.running() {
             return None;
         }
         let theme = cx.theme().clone();
-        let open = self.active_thread.files_open;
+        let open = self.thread.files_open;
+        let at = self.thread_ref();
         let count = files.len();
         let (all_add, all_del) = files
             .iter()
@@ -43,7 +44,7 @@ impl BenchApp {
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_default();
                 let selected = false;
-                let open = path.clone();
+                let (open, at) = (path.clone(), at.clone());
                 h_flex()
                     .id(("file", k))
                     .gap_2()
@@ -95,8 +96,8 @@ impl BenchApp {
                         )
                     })
                     // In the editor, the thread beside it (Zed from the file's head).
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        let project = this.thread_project_or_host();
+                    .on_click(self.app_listener(move |this, _, window, cx| {
+                        let project = at.project_or_host();
                         let machine = this.location(&project).files_machine();
                         let f = crate::explorer::FileRef {
                             project,
@@ -135,7 +136,7 @@ impl BenchApp {
                         d.child(div().text_color(theme.danger).child(format!("−{all_del}")))
                     })
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.active_thread.files_open = !this.active_thread.files_open;
+                        this.thread.files_open = !this.thread.files_open;
                         cx.notify();
                     })),
                 )
@@ -145,11 +146,11 @@ impl BenchApp {
     }
 }
 
-impl BenchApp {
+impl ThreadView {
     /// Every file the thread's work edited or wrote: (path, its diffs).
     pub fn session_files(&self) -> Vec<(String, Vec<String>)> {
         let mut out: Vec<(String, Vec<String>)> = vec![];
-        for r in &self.active_thread.tv.rows {
+        for r in &self.thread.tv.rows {
             let Row::Work { steps, .. } = r else { continue };
             for s in steps {
                 let Step::Tool {

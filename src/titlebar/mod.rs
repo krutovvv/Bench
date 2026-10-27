@@ -41,7 +41,7 @@ impl BenchApp {
     /// "app · main": the thread works in a git repository (its folder's name and branch). Git
     /// itself is the agent's: ask it to commit, or to undo.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let p = self.active_thread.project.clone()?;
+        let p = self.thread(cx).project.clone()?;
         let label = if p.branch.is_empty() {
             p.name()
         } else {
@@ -96,7 +96,7 @@ impl BenchApp {
         }
         if !self.center.is_settings() {
             let title: SharedString = self
-                .active_thread
+                .thread(cx)
                 .session
                 .as_ref()
                 .and_then(|id| self.sessions.iter().find(|s| &s.id == id))

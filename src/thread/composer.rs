@@ -7,13 +7,13 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::BenchApp;
+use super::ThreadView;
 
 /// Rows the command list shows before it scrolls, and their height.
 const SLASH_ROWS: f32 = 8.;
 const SLASH_ROW: f32 = 30.;
 
-impl BenchApp {
+impl ThreadView {
     /// Commands matching a bare `/word`, in a small list right above the input.
     fn render_slash(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let matches = self.slash_matches(cx);
@@ -106,7 +106,7 @@ impl BenchApp {
             )
         }));
         // What the Explorer sent (⌘L, a dropped tab, problems): its file and lines, or the problems.
-        chips.extend(self.thread_references().iter().enumerate().map(|(k, r)| {
+        chips.extend(self.thread_references(cx).iter().enumerate().map(|(k, r)| {
             let close = div()
                 .id(("ref-x", k))
                 .flex_none()

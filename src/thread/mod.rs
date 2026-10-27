@@ -1,15 +1,18 @@
-//! The open thread on screen: `gpui::list` over the rows of `crate::thread` (the journal).
+//! A thread on screen: its `ThreadView` (`view.rs`, an entity of its own) draws `gpui::list` over
+//! the rows of `crate::thread` (the journal).
 //!
 //! The list holds: the head (a project's environment, a form, "Loading…"), one item per `Row`,
 //! the tail (approval, question, plan, processes, the composer), and the room past the end that
 //! lets the last row reach the top, as in an editor. Only what is on screen is laid out.
 //!
-//! Files: `active.rs` (the open thread's state, one struct), `list.rs` (the list's state and scroll), `message.rs` (the person's and the agent's
-//! rows), `work.rs` (the folded steps), `queued.rs` (a waiting message), `rail.rs` (the ticks on
+//! Files: `view.rs` (the view: its state, composer, events), `active.rs` (the thread's state, one
+//! struct, and `ThreadRef`), `list.rs` (the list's state and scroll), `message.rs` (the person's
+//! and the agent's rows), `work.rs` (the folded steps), `queued.rs` (a waiting message), `rail.rs` (the ticks on
 //! the right), `extras.rs` (approval, sources), `processes.rs`, `changed_files.rs`, `asks.rs` and
 //! `answer.rs` (the agent's question and plan), `composer.rs` (the input) with `slash.rs` (its
 //! pop-up), `prompts.rs`, `attachments.rs` and `drafts.rs`; `send.rs` (sending, the reasoning
-//! level), `open.rs` (opening, creating and deleting threads).
+//! level), `open.rs` (opening, creating and deleting threads: the app's), `panel.rs` (the right
+//! dock's thread panel: its head over a view).
 
 mod active;
 mod answer;
@@ -23,16 +26,19 @@ mod extras;
 mod list;
 mod message;
 mod open;
+mod panel;
 mod processes;
 mod prompts;
 mod queued;
 mod rail;
 pub(crate) mod send;
 mod slash;
+mod view;
 pub(crate) mod work;
 
-pub use active::ActiveThread;
+pub use active::{ActiveThread, ThreadRef};
 pub use list::View;
+pub use view::ThreadView;
 
 use std::time::Duration;
 
@@ -41,50 +47,49 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
-impl BenchApp {
-    /// The rows of the open thread into the list, if the thread changed since the last frame.
+impl ThreadView {
+    /// The rows of the thread into the list, if the thread changed since the last frame.
     fn sync_rows(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.active_thread.tv.reveal_after_send();
-        let version = self.active_thread.journal.version();
-        let owner = self.active_thread.session.clone();
-        if version != self.active_thread.tv.version || owner != self.active_thread.tv.owner {
-            self.active_thread.tv.version = version;
-            let rows = self.active_thread.journal.rows();
+        self.thread.tv.reveal_after_send();
+        let version = self.thread.journal.version();
+        let owner = self.thread.session.clone();
+        if version != self.thread.tv.version || owner != self.thread.tv.owner {
+            self.thread.tv.version = version;
+            let rows = self.thread.journal.rows();
             self.carry_over(&rows);
             let follow = std::mem::take(&mut self.follow);
-            let changed = self.active_thread.tv.sync(owner.as_deref(), rows, follow);
+            let changed = self.thread.tv.sync(owner.as_deref(), rows, follow);
             self.parse_ahead(changed, cx);
             // The tail's new height is known only after this frame's layout: look again then.
             window.request_animation_frame();
         }
         // The list keeps an item's first measured height: the room is measured again when it
         // changes (the composer shrank after sending, the window was resized).
-        let room = self.active_thread.tv.room_past_end(self.viewport_h);
-        if std::mem::take(&mut self.active_thread.tv.jump) {
+        let room = self.thread.tv.room_past_end(self.viewport_h);
+        if std::mem::take(&mut self.thread.tv.jump) {
             // `to_end`: this frame lays out without the room.
             window.request_animation_frame();
-        } else if (room - self.active_thread.tv.room).abs() > px(0.5) {
-            self.active_thread.tv.room = room;
-            let end = self.active_thread.tv.tail() + 1;
-            self.active_thread.tv.list.remeasure_items(end..end + 1);
+        } else if (room - self.thread.tv.room).abs() > px(0.5) {
+            self.thread.tv.room = room;
+            let end = self.thread.tv.tail() + 1;
+            self.thread.tv.list.remeasure_items(end..end + 1);
             window.request_animation_frame();
         }
         // A live run's clock moves once a second.
-        if self.active_thread.journal.running() && self.active_thread.tv.ticker.is_none() {
-            self.active_thread.tv.ticker = Some(cx.spawn(async move |this, cx| {
+        if self.thread.journal.running() && self.thread.tv.ticker.is_none() {
+            self.thread.tv.ticker = Some(cx.spawn(async move |this, cx| {
                 loop {
                     cx.background_executor().timer(Duration::from_secs(1)).await;
                     let Ok(running) = this.update(cx, |this, cx| {
                         cx.notify();
-                        this.active_thread.journal.running()
+                        this.thread.journal.running()
                     }) else {
                         break;
                     };
                     if !running {
-                        let _ = this.update(cx, |this, _| this.active_thread.tv.ticker = None);
+                        let _ = this.update(cx, |this, _| this.thread.tv.ticker = None);
                         break;
                     }
                 }
@@ -92,20 +97,9 @@ impl BenchApp {
         }
     }
 
-    pub(crate) fn render_chat(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        self.viewport_h = window.viewport_size().height;
-        if !self.demo
-            && self.local_conn().is_some()
-            && self.prompts_for.as_deref() != Some(self.active_thread.thread_project.as_str())
-        {
-            self.prompts_for = Some(self.active_thread.thread_project.clone());
-            self.load_prompts(window, cx);
-        }
-        if self.demo && self.composer.read(cx).value().is_empty() {
+    /// The demo's hooks on the thread (`BENCH_DEMO_DRAFT`, `BENCH_DEMO_SCROLL`, for screenshots).
+    fn demo_hooks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.composer.read(cx).value().is_empty() {
             if let Some(text) = std::env::var("BENCH_DEMO_DRAFT")
                 .ok()
                 .filter(|_| !self.demo_draft_done)
@@ -115,58 +109,44 @@ impl BenchApp {
                     .update(cx, |s, cx| s.set_value(text, window, cx));
             }
         }
-        if self.demo
-            && !self.subject_opened
-            && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project")
-        {
-            self.subject_opened = true;
-            self.new_project_form(window, cx);
-        }
-        self.sync_rows(window, cx);
-        // `BENCH_DEMO_RENAME=<thread id>`: that thread being renamed (for screenshots).
-        if self.demo {
-            static RENAME: std::sync::Once = std::sync::Once::new();
-            if let Ok(id) = std::env::var("BENCH_DEMO_RENAME") {
-                RENAME.call_once(|| {
-                    self.start_rename(crate::sidebar::items::Item::Thread(id), window, cx)
-                });
-            }
-        }
-        // `BENCH_DEMO_SCROLL=end`: the thread scrolled as far down as it goes (for screenshots).
-        if self.demo
-            && !self.demo_scrolled
-            && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end")
-        {
+        // `BENCH_DEMO_SCROLL=end`: the thread scrolled as far down as it goes.
+        if !self.demo_scrolled && std::env::var("BENCH_DEMO_SCROLL").as_deref() == Ok("end") {
             self.demo_scrolled = true;
-            self.active_thread.tv.list.scroll_to_end();
+            self.thread.tv.list.scroll_to_end();
         }
         // `BENCH_DEMO_SCROLL=<item>:<px>`: the thread scrolled to there (a reader in the middle).
-        if self.demo && !self.demo_scrolled {
+        if !self.demo_scrolled {
             if let Some((i, o)) = std::env::var("BENCH_DEMO_SCROLL").ok().and_then(|v| {
                 let (i, o) = v.split_once(':')?;
                 Some((i.parse::<usize>().ok()?, o.parse::<f32>().ok()?))
             }) {
                 self.demo_scrolled = true;
-                self.active_thread.tv.list.scroll_to(ListOffset {
+                self.thread.tv.list.scroll_to(ListOffset {
                     item_ix: i,
                     offset_in_item: px(o),
                 });
             }
         }
+    }
+
+    pub(crate) fn render_chat(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        self.viewport_h = window.viewport_size().height;
+        if self.app(cx).is_some_and(|a| a.demo) {
+            self.demo_hooks(window, cx);
+        }
+        self.sync_rows(window, cx);
         // `BENCH_TRACE_SCROLL=1`: where the thread's content stands each frame (a jerk shows).
         if std::env::var("BENCH_TRACE_SCROLL").is_ok() {
-            let top = self.active_thread.tv.list.logical_scroll_top();
-            let first = self
-                .active_thread
-                .tv
-                .list
-                .bounds_for_item(top.item_ix)
-                .map(|b| b.top());
-            let heights: Vec<i32> = (1..=self.active_thread.tv.tail())
+            let tv = &self.thread.tv;
+            let top = tv.list.logical_scroll_top();
+            let first = tv.list.bounds_for_item(top.item_ix).map(|b| b.top());
+            let heights: Vec<i32> = (1..=tv.tail())
                 .map(|i| {
-                    self.active_thread
-                        .tv
-                        .list
+                    tv.list
                         .bounds_for_item(i)
                         .map_or(-1, |b| f32::from(b.size.height) as i32)
                 })
@@ -176,31 +156,28 @@ impl BenchApp {
                 top.item_ix,
                 top.offset_in_item,
                 first,
-                self.active_thread.tv.rows.len(),
-                self.active_thread.tv.room,
-                self.active_thread
-                    .tv
-                    .list
-                    .bounds_for_item(self.active_thread.tv.tail())
-                    .map(|b| b.bottom()),
-                self.active_thread.tv.list.viewport_bounds().bottom(),
+                tv.rows.len(),
+                tv.room,
+                tv.list.bounds_for_item(tv.tail()).map(|b| b.bottom()),
+                tv.list.viewport_bounds().bottom(),
                 heights
             );
         }
         let theme = cx.theme().clone();
-        let tail = self.active_thread.tv.tail();
+        let tail = self.thread.tv.tail();
         // Unknown for the frame after rows were remeasured: the button stays as it was.
-        if let Some(b) = self.active_thread.tv.list.item_is_below_viewport(tail) {
-            self.active_thread.tv.below = b;
+        if let Some(b) = self.thread.tv.list.item_is_below_viewport(tail) {
+            self.thread.tv.below = b;
         }
-        let below = self.active_thread.tv.below;
+        let below = self.thread.tv.below;
         let rail = self.render_rail(cx);
         let list = list(
-            self.active_thread.tv.list.clone(),
+            self.thread.tv.list.clone(),
             cx.processor(|this, ix: usize, window, cx| this.render_item(ix, window, cx)),
         )
         .flex_1()
         .min_h_0();
+        let composer = self.composer.clone();
         div()
             .relative()
             .size_full()
@@ -210,20 +187,21 @@ impl BenchApp {
                     .size_full()
                     // A click anywhere in the thread means "I'm about to type": the composer takes
                     // the focus, unless the click went into something that types itself, or the
-                    // mouse moved (a drag selects text).
-                    .capture_any_mouse_down(cx.listener(|this, ev: &MouseDownEvent, _, _| {
-                        this.click_claimed = false;
-                        this.click_at = Some(ev.position);
+                    // mouse moved (a drag selects text). The click is the window's: whatever it
+                    // landed in — an insert's terminal, a field — claims it on the app.
+                    .capture_any_mouse_down(self.app_listener(|app, ev: &MouseDownEvent, _, _| {
+                        app.click_claimed = false;
+                        app.click_at = Some(ev.position);
                     }))
                     .on_mouse_up(
                         MouseButton::Left,
-                        cx.listener(|this, ev: &MouseUpEvent, window, cx| {
-                            let still = this.click_at.take().is_some_and(|p| {
+                        self.app_listener(move |app, ev: &MouseUpEvent, window, cx| {
+                            let still = app.click_at.take().is_some_and(|p| {
                                 (p.x - ev.position.x).abs() < px(4.)
                                     && (p.y - ev.position.y).abs() < px(4.)
                             });
-                            if still && !this.click_claimed {
-                                this.composer.update(cx, |s, cx| s.focus(window, cx));
+                            if still && !app.click_claimed {
+                                composer.update(cx, |s, cx| s.focus(window, cx));
                             }
                         }),
                     )
@@ -256,83 +234,34 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// The thread as the right dock's panel, beside a document: its title and close over the same
-    /// thread the center shows in the threads view; a tab dropped on it sends its file.
-    pub(crate) fn render_thread_panel(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let theme = cx.theme().clone();
-        let title: SharedString = self
-            .active_thread
-            .session
-            .as_ref()
-            .and_then(|id| self.sessions.iter().find(|s| &s.id == id))
-            .map(|s| s.title.clone())
-            .filter(|t| !t.is_empty())
-            .unwrap_or_else(|| "New thread".into())
-            .into();
-        let head = bench_ui::ide_head(
-            title,
-            None,
-            vec![
-                bench_ui::icon_button("thread-new", Ico::Plus, "New thread  ⌘N", false, cx)
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.new_session(cx);
-                        this.composer.update(cx, |s, cx| s.focus(window, cx));
-                    }))
-                    .into_any_element(),
-                bench_ui::icon_button("thread-close", Ico::X, "Close  ⌘J", false, cx)
-                    .on_click(
-                        cx.listener(|this, _, window, cx| this.toggle_thread_beside(window, cx)),
-                    )
-                    .into_any_element(),
-            ],
-            cx,
-        )
-        .h(bench_ui::bar_h(cx))
-        .bg(theme.title_bar);
-        v_flex()
-            .size_full()
-            .drag_over::<crate::explorer::tabs::DraggedTab>(|s, _, _, cx| {
-                s.bg(cx.theme().list_active)
-            })
-            .on_drop(
-                cx.listener(|this, d: &crate::explorer::tabs::DraggedTab, window, cx| {
-                    if let crate::explorer::DocKey::File(f) = &d.key {
-                        this.send_file_to_thread(f, window, cx)
-                    }
-                }),
-            )
-            .child(head)
-            .child(div().flex_1().min_h_0().child(self.render_chat(window, cx)))
-            .into_any_element()
+    pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
+        self.thread.tv.to_end();
+        cx.notify();
     }
 
-    pub fn jump_to_latest(&mut self, cx: &mut Context<Self>) {
-        self.active_thread.tv.to_end();
-        cx.notify();
+    /// A click inside the thread that is the thread's own (a fold, a button): it keeps the
+    /// focus where it is.
+    pub(crate) fn claim_click(&self, cx: &mut App) {
+        if let Some(app) = self.app.upgrade() {
+            app.update(cx, |app, _| app.click_claimed = true);
+        }
     }
 
     /// What the live rows had becomes their entries': the answer being written passes its parsed
     /// texts to the answer that replaces it, the live thinking its fold to its piece of work.
     /// Made anew, either would change on screen at the run's end.
     fn carry_over(&mut self, rows: &[Row]) {
-        for (k, old) in self.active_thread.tv.rows.iter().enumerate() {
+        let t = &mut self.thread;
+        for (k, old) in t.tv.rows.iter().enumerate() {
             match (old, rows.get(k)) {
                 (Row::Writing { .. }, Some(Row::Answer { key, .. })) => {
-                    self.active_thread
-                        .texts
-                        .rename("answer-writing-", &format!("answer-{key}-"));
-                    self.active_thread
-                        .texts
-                        .rename("code-writing-", &format!("code-{key}-"));
+                    t.texts.rename("answer-writing-", &format!("answer-{key}-"));
+                    t.texts.rename("code-writing-", &format!("code-{key}-"));
                 }
                 (Row::Work { key: was, .. }, Some(Row::Work { key, .. }))
-                    if was != key && self.active_thread.open_work.remove(was) =>
+                    if was != key && t.open_work.remove(was) =>
                 {
-                    self.active_thread.open_work.insert(key.clone());
+                    t.open_work.insert(key.clone());
                 }
                 _ => {}
             }
@@ -342,17 +271,14 @@ impl BenchApp {
     /// Start parsing the texts of the rows from `from` on, before they are on screen: a row
     /// scrolled into view then has its whole height in its first frame.
     fn parse_ahead(&mut self, from: usize, cx: &mut Context<Self>) {
-        for row in self.active_thread.tv.rows[from.min(self.active_thread.tv.rows.len())..].to_vec()
-        {
+        let t = &mut self.thread;
+        for row in t.tv.rows[from.min(t.tv.rows.len())..].to_vec() {
             match row {
                 Row::User { key, text, .. } => {
                     let (said, _) = crate::media::attach::split(&text);
                     if !said.is_empty() {
-                        self.active_thread.texts.state(
-                            &key,
-                            &crate::media::text::escape_plain(&said),
-                            cx,
-                        );
+                        t.texts
+                            .state(&key, &crate::media::text::escape_plain(&said), cx);
                     }
                 }
                 Row::Answer { key, text, .. } => {
@@ -360,10 +286,8 @@ impl BenchApp {
                         .into_iter()
                         .enumerate()
                     {
-                        if let crate::media::Segment::Text(t) = seg {
-                            self.active_thread
-                                .texts
-                                .state(&format!("answer-{key}-{k}"), &t, cx);
+                        if let crate::media::Segment::Text(t2) = seg {
+                            t.texts.state(&format!("answer-{key}-{k}"), &t2, cx);
                         }
                     }
                 }
@@ -379,7 +303,7 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let n = self.active_thread.tv.rows.len();
+        let n = self.thread.tv.rows.len();
         if ix == 0 {
             // The air above the first row: with the row's own, as much as between two rows.
             // Scrolled to the end, the row above the composer shows exactly its own air here.
@@ -392,14 +316,14 @@ impl BenchApp {
         } else if ix == n + 1 {
             self.render_tail(window, cx)
         } else {
-            div().h(self.active_thread.tv.room).into_any_element()
+            div().h(self.thread.tv.room).into_any_element()
         }
     }
 
     fn render_row(&mut self, k: usize, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let row = self.active_thread.tv.rows[k].clone();
+        let row = self.thread.tv.rows[k].clone();
         // An answer right after the work that led to it is that work's continuation: no avatar.
-        let after_work = k > 0 && matches!(self.active_thread.tv.rows[k - 1], Row::Work { .. });
+        let after_work = k > 0 && matches!(self.thread.tv.rows[k - 1], Row::Work { .. });
         match row {
             Row::User { key, text, .. } => self.render_user(&key, &text, cx),
             Row::Work {
@@ -427,15 +351,19 @@ impl BenchApp {
         }
     }
 
-    /// Before the first row: a form opened at the top, or why the thread is empty.
+    /// Before the first row: why the thread is empty, or the new chat's folder being typed.
     fn render_head(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let mut rows: Vec<AnyElement> = vec![];
-        let empty = self.active_thread.tv.rows.is_empty();
+        let empty = self.thread.tv.rows.is_empty();
+        let path_entry = self
+            .app(cx)
+            .filter(|a| a.path_entry)
+            .map(|a| a.project_path.clone());
         if empty {
-            if let (Some(id), Some(why)) = (
-                self.active_thread.session.clone(),
-                self.active_thread.history_error.clone(),
+            if let (Some(_), Some(why)) = (
+                self.thread.session.clone(),
+                self.thread.history_error.clone(),
             ) {
                 rows.push(
                     h_flex()
@@ -454,15 +382,12 @@ impl BenchApp {
                                 .child(format!("Could not open the thread: {why}")),
                         )
                         .child(
-                            bench_ui::form_action("history-retry", "Retry", false, cx).on_click(
-                                cx.listener(move |this, _, _, cx| {
-                                    this.open_session(id.clone(), cx)
-                                }),
-                            ),
+                            bench_ui::form_action("history-retry", "Retry", false, cx)
+                                .on_click(cx.listener(|this, _, _, cx| this.reopen(cx))),
                         )
                         .into_any_element(),
                 );
-            } else if self.active_thread.session.is_some() && self.active_thread.runtime.is_none() {
+            } else if self.thread.session.is_some() && self.thread.runtime.is_none() {
                 rows.push(
                     h_flex()
                         .w_full()
@@ -475,21 +400,35 @@ impl BenchApp {
                         )
                         .into_any_element(),
                 );
-            } else if self.path_entry {
+            } else if let Some(field) = path_entry {
                 rows.push(
                     h_flex()
                         .w_full()
                         .pl(px(bench_ui::CHAT_TEXT))
                         .pr(px(bench_ui::CHAT_RIGHT))
                         .py(px(bench_ui::TURN_Y))
-                        .child(div().w(px(360.)).child(
-                            gpui_kit::component::input::Input::new(&self.project_path).small(),
-                        ))
+                        .child(
+                            div()
+                                .w(px(360.))
+                                .child(gpui_kit::component::input::Input::new(&field).small()),
+                        )
                         .into_any_element(),
                 );
             }
         }
         v_flex().w_full().children(rows).into_any_element()
+    }
+
+    /// The thread's history asked again (Retry): what it shows stays until it comes.
+    fn reopen(&mut self, cx: &mut Context<Self>) {
+        let Some(session) = self.thread.session.clone() else {
+            return;
+        };
+        self.thread.history_error = None;
+        if let Some(profile) = self.profile(cx) {
+            self.cmd(crate::client::rpc::Cmd::Open { profile, session }, cx);
+        }
+        cx.notify();
     }
 
     /// After the last row: what waits for the person, the live status blocks, the composer.

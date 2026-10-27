@@ -24,17 +24,22 @@ impl BenchApp {
                             this.transcribing = false;
                             let send = std::mem::take(&mut this.send_after_transcribe);
                             match r {
+                                // Into the open thread's composer; sent by its view once
+                                // this is done (the view reads the app as it sends).
                                 Ok(text) if !text.is_empty() => {
-                                    let current = this.composer.read(cx).value().to_string();
+                                    let view = this.active_thread.clone();
+                                    let composer = view.read(cx).composer.clone();
+                                    let current = composer.read(cx).value().to_string();
                                     let joined = if current.trim().is_empty() {
                                         text
                                     } else {
                                         format!("{} {text}", current.trim_end())
                                     };
-                                    this.composer
-                                        .update(cx, |s, cx| s.set_value(joined, window, cx));
+                                    composer.update(cx, |s, cx| s.set_value(joined, window, cx));
                                     if send {
-                                        this.send(window, cx);
+                                        window.defer(cx, move |window, cx| {
+                                            view.update(cx, |v, cx| v.send(window, cx))
+                                        });
                                     }
                                 }
                                 Ok(_) => this.toast(
@@ -96,7 +101,14 @@ impl BenchApp {
         cx.notify();
     }
 
-    pub fn toggle_speak(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
+    /// Read the answer `key` (its `text`) aloud, or stop reading it.
+    pub fn toggle_speak(
+        &mut self,
+        key: &str,
+        text: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if self.playing.as_ref().is_some_and(|(j, _)| j == key) {
             self.playing = None;
             cx.notify();
@@ -104,9 +116,9 @@ impl BenchApp {
         }
         self.playing = None;
         self.media_playing = None;
-        let Some(text) = self.answer_text(key) else {
+        if text.is_empty() {
             return;
-        };
+        }
         let key = key.to_string();
         self.speaking = Some(key.clone());
         self.rest(

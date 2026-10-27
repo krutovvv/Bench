@@ -6,12 +6,12 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::app::BenchApp;
+use super::ThreadView;
 use crate::client::rpc::Cmd;
 use bench_ui::icons::Ico;
 use gpui_kit::component::input::{InputEvent, TextareaState};
 
-impl BenchApp {
+impl ThreadView {
     pub(crate) fn render_queued(
         &mut self,
         key: &str,
@@ -59,7 +59,7 @@ impl BenchApp {
                         cx,
                     )
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.click_claimed = true;
+                        this.claim_click(cx);
                         this.queue_edit_save(window, cx);
                     })),
                 )
@@ -74,7 +74,7 @@ impl BenchApp {
                         cx,
                     )
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
+                        this.claim_click(cx);
                         this.queue_edit_open(edit_id.clone(), edit_text.clone(), window, cx);
                     })),
                 )
@@ -88,7 +88,7 @@ impl BenchApp {
                             cx,
                         )
                         .on_click(cx.listener(move |this, _, _, cx| {
-                            this.click_claimed = true;
+                            this.claim_click(cx);
                             this.queued(send_id.clone(), true, cx);
                         })),
                     )
@@ -97,7 +97,7 @@ impl BenchApp {
             .child(
                 bench_ui::icon_button((id.clone(), 3), Ico::X, "Take it back", false, cx).on_click(
                     cx.listener(move |this, _, window, cx| {
-                        this.click_claimed = true;
+                        this.claim_click(cx);
                         if this.queue_edit.as_ref().is_some_and(|(e, _)| e == &rm_id) {
                             this.queue_edit_cancel(window, cx);
                         } else {
@@ -116,7 +116,7 @@ impl BenchApp {
                 .cursor_text()
                 .on_mouse_down(
                     MouseButton::Left,
-                    cx.listener(|this, _: &MouseDownEvent, _, _| this.click_claimed = true),
+                    cx.listener(|this, _: &MouseDownEvent, _, cx| this.claim_click(cx)),
                 )
                 .child(
                     Textarea::new(&st)
@@ -141,13 +141,13 @@ impl BenchApp {
     }
 }
 
-impl BenchApp {
+impl ThreadView {
     /// A waiting message (the thread's queue): sent now, into the running work, or taken back.
     pub fn queued(&mut self, id: String, send_now: bool, cx: &mut Context<Self>) {
-        let Some(session) = self.active_thread.runtime.clone() else {
+        let Some(session) = self.thread.runtime.clone() else {
             return;
         };
-        self.cmd(if send_now {
+        let cmd = if send_now {
             Cmd::QueueSend {
                 session: session.clone(),
                 id: id.clone(),
@@ -157,7 +157,8 @@ impl BenchApp {
                 session,
                 id: id.clone(),
             }
-        });
+        };
+        self.cmd(cmd, cx);
         cx.notify();
     }
 
@@ -192,7 +193,7 @@ impl BenchApp {
         self.queue_edit = Some((id, field.clone()));
         // The click that opened this field is its own: the thread's bare-click rule (the composer
         // takes the focus) must not undo the focus this field just took.
-        self.click_claimed = true;
+        self.claim_click(cx);
         field.update(cx, |s, cx| s.focus(window, cx));
         cx.notify();
     }
@@ -202,9 +203,9 @@ impl BenchApp {
             return;
         };
         let text = field.read(cx).value().trim().to_string();
-        if let Some(session) = self.active_thread.runtime.clone() {
+        if let Some(session) = self.thread.runtime.clone() {
             if !text.is_empty() {
-                self.cmd(Cmd::QueueEdit { session, id, text });
+                self.cmd(Cmd::QueueEdit { session, id, text }, cx);
             }
         }
         cx.notify();

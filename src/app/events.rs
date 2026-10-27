@@ -10,17 +10,51 @@ use super::*;
 
 impl BenchApp {
     pub(crate) fn on_event(&mut self, evt: Evt, window: &mut Window, cx: &mut Context<Self>) {
-        // An event of one thread goes to that thread's state; the rest of what it does (the status
+        // An event of one thread goes to that thread's view; the rest of what it does (the status
         // bar, a notification, a toast) is the open thread's only.
         if let Some(rt) = evt.runtime() {
-            if !self.is_current(rt) {
-                if let Some(t) = self.thread_beside_mut(rt) {
-                    t.on_event(&evt);
-                    cx.notify();
+            let open = self.is_current(rt, cx);
+            let view = if open {
+                Some(self.active_thread.clone())
+            } else {
+                self.view_of_runtime(rt, cx)
+            };
+            let Some(view) = view else {
+                return;
+            };
+            view.update(cx, |v, cx| v.on_event(&evt, window, cx));
+            // A command that expanded into a prompt (skills, /goal, …) runs as a turn of its
+            // thread, whichever it is.
+            if let Evt::Dispatched {
+                session,
+                send: Some(message),
+                ..
+            } = &evt
+            {
+                if let Some(profile) = self.profile.clone() {
+                    let at = view.read(cx).thread_ref();
+                    let context = self.inserts_context(&at, cx);
+                    self.cmd_at(
+                        &at,
+                        Cmd::Send {
+                            profile,
+                            session: session.clone(),
+                            text: message.clone(),
+                            effort: None,
+                            context,
+                        },
+                    );
+                    if open {
+                        self.speed.request();
+                    }
+                }
+            }
+            if !open {
+                if let Evt::Complete { .. } = evt {
+                    self.refresh_sessions();
                 }
                 return;
             }
-            self.active_thread.on_event(&evt);
         }
         match evt {
             Evt::Connected(conn) => {
@@ -38,9 +72,14 @@ impl BenchApp {
             Evt::Error(e) => {
                 self.connecting = false;
                 // A send that failed: no run started, and the message never reached the journal.
-                if self.active_thread.live.is_some() && !self.active_thread.journal.running() {
-                    self.active_thread.live = None;
-                    self.active_thread.journal.clear_sent();
+                for view in self.thread_views() {
+                    view.update(cx, |v, cx| {
+                        if v.thread.live.is_some() && !v.thread.journal.running() {
+                            v.thread.live = None;
+                            v.thread.journal.clear_sent();
+                            cx.notify();
+                        }
+                    });
                 }
                 self.toast(NotificationType::Error, e, window, cx);
             }
@@ -78,12 +117,12 @@ impl BenchApp {
                     let unknown_tg = rows
                         .iter()
                         .any(|s| s.source == "telegram" && !self.tg_owner.contains_key(&s.id));
-                    self.notify_finished(&rows);
+                    self.notify_finished(&rows, cx);
                     // The servers' threads stay (they come from their own agents).
                     self.sessions.retain(|s| !s.host.is_empty());
                     self.sessions.extend(rows);
                     if let Some(id) = self.resume_session.take() {
-                        if self.active_thread.session.is_none()
+                        if self.thread(cx).session.is_none()
                             && self.sessions.iter().any(|s| s.id == id)
                         {
                             self.open_session(id, cx);
@@ -135,48 +174,44 @@ impl BenchApp {
                 open,
             } => {
                 self.opened.insert(session.clone(), runtime.clone());
-                if self
-                    .active_thread
-                    .on_history(&session, runtime.clone(), open.clone())
-                {
+                let open_here = self.active_thread.update(cx, |v, cx| {
+                    cx.notify();
+                    v.thread.on_history(&session, runtime.clone(), open.clone())
+                });
+                if open_here {
                     self.resolve_project(window, cx);
-                } else if let Some(t) = self.beside_thread.as_mut() {
-                    t.on_history(&session, runtime, open);
-                }
-            }
-            Evt::Thread(_, e) => {
-                if let ::thread::ThreadEvent::Queue(items) = &e {
-                    // A message that left the queue (sent, taken back) has nothing left to fix.
-                    if self
-                        .queue_edit
-                        .as_ref()
-                        .is_some_and(|(id, _)| !items.iter().any(|q| &q.sub == id))
-                    {
-                        self.queue_edit = None;
-                    }
+                } else if let Some(view) = self.beside_thread.clone() {
+                    view.update(cx, |v, cx| {
+                        cx.notify();
+                        v.thread.on_history(&session, runtime, open)
+                    });
                 }
             }
             Evt::Effort(_, value) => {
                 // The session's own level replaces whatever the bar showed (the profile's default
                 // or the previous chat's).
-                self.effort_pending = false;
-                match self.efforts.iter().position(|e| *e == value) {
-                    Some(i) => {
-                        self.active_thread.effort = i;
-                        self.active_thread.effort_other = None;
-                        self.effort_choice.update(cx, |s, cx| {
-                            s.set_selected_index(Some(IndexPath::new(i)), window, cx)
-                        });
+                let at = self.efforts.iter().position(|e| *e == value);
+                self.active_thread.update(cx, |v, _| {
+                    v.thread.effort_pending = false;
+                    match at {
+                        Some(i) => {
+                            v.thread.effort = i;
+                            v.thread.effort_other = None;
+                        }
+                        None if value.is_empty() => v.thread.effort_other = Some("default".into()),
+                        None => v.thread.effort_other = Some(value),
                     }
-                    None if value.is_empty() => {
-                        self.active_thread.effort_other = Some("default".into())
-                    }
-                    None => self.active_thread.effort_other = Some(value),
+                });
+                if let Some(i) = at {
+                    self.effort_choice.update(cx, |s, cx| {
+                        s.set_selected_index(Some(IndexPath::new(i)), window, cx)
+                    });
                 }
             }
             Evt::Created { session, runtime } => {
                 // In the list at once with its subject: the first message's block state (and the
                 // block itself) depend on it, and the sessions list comes back only later.
+                let at = self.thread_ref(cx);
                 if !self.sessions.iter().any(|s| s.id == session) {
                     self.sessions.insert(
                         0,
@@ -187,49 +222,52 @@ impl BenchApp {
                             running: true,
                             source: "desktop".into(),
                             subject: self.new_subject.clone(),
-                            project: self.active_thread.thread_project.clone(),
-                            host: self.thread_host(),
+                            project: at.project.clone(),
+                            host: self.thread_host(&at),
                         },
                     );
                 }
                 self.opened.insert(session.clone(), runtime.clone());
-                self.inserts_created(&session);
-                self.active_thread.session = Some(session);
-                self.save_place();
-                self.active_thread.runtime = Some(runtime.clone());
-                if let (Some(text), Some(profile)) =
-                    (self.active_thread.queued.take(), self.profile.clone())
-                {
-                    let effort = self.take_effort();
-                    match self.parse_command(&text) {
-                        Some((name, arg)) => self.cmd(Cmd::Dispatch {
+                let efforts = self.efforts.clone();
+                let (queued, effort, at) = self.active_thread.update(cx, |v, cx| {
+                    v.thread.session = Some(session.clone());
+                    v.thread.runtime = Some(runtime.clone());
+                    let effort = v.thread.take_effort(&efforts);
+                    cx.notify();
+                    (v.thread.queued.take(), effort, v.thread.thread_ref())
+                });
+                self.inserts_created(&at, &session);
+                self.save_place(cx);
+                if let (Some(text), Some(profile)) = (queued, self.profile.clone()) {
+                    let cmd = match self.parse_command(&text) {
+                        Some((name, arg)) => Cmd::Dispatch {
                             profile,
                             session: runtime,
                             name,
                             arg,
-                        }),
-                        None => {
-                            let context = self.block_context(cx);
-                            self.cmd(Cmd::Send {
-                                profile,
-                                session: runtime,
-                                text,
-                                effort,
-                                context,
-                            })
-                        }
-                    }
+                        },
+                        None => Cmd::Send {
+                            profile,
+                            session: runtime,
+                            text,
+                            effort,
+                            context: self.inserts_context(&at, cx),
+                        },
+                    };
+                    self.cmd_at(&at, cmd);
                 }
                 // Show the new session in the list right away.
                 self.refresh_sessions();
             }
             Evt::Inserts(sid, list) => self.on_inserts(sid, list, cx),
             Evt::ResumeFailed(sid, why) => {
-                for t in std::iter::once(&mut self.active_thread).chain(self.beside_thread.as_mut())
-                {
-                    if t.session.as_deref() == Some(sid.as_str()) {
-                        t.history_error = Some(why.clone());
-                    }
+                for view in self.thread_views() {
+                    view.update(cx, |v, cx| {
+                        if v.thread.session.as_deref() == Some(sid.as_str()) {
+                            v.thread.history_error = Some(why.clone());
+                            cx.notify();
+                        }
+                    });
                 }
             }
             // Not made: the next insert or message tries again (until now a failed create kept the
@@ -251,7 +289,7 @@ impl BenchApp {
                     cx,
                 );
                 // The agent's list is the truth: read it again.
-                if self.active_thread.session.as_deref() == Some(&sid) {
+                if self.thread(cx).session.as_deref() == Some(&sid) {
                     self.open_session(sid, cx);
                 }
             }
@@ -262,51 +300,27 @@ impl BenchApp {
             Evt::ToolDone { .. } => {
                 self.speed.request();
                 // The agent may have changed the list this thread is about.
-                let subject = self.current_subject();
+                let subject = self.current_subject(cx);
                 if subject.starts_with("tasks:") {
                     self.load_tasks();
                 }
-                if self.active_thread.project.is_none() {
+                if self.thread(cx).project.is_none() {
                     self.resolve_project(window, cx);
                 }
             }
             Evt::Catalog(list) => self.catalog = list,
-            Evt::Processes(_, list) => self.on_processes(list, cx),
+            // A command that printed something: said as a toast, the thread is the agent's.
             Evt::Dispatched {
-                session,
-                output,
-                send,
-            } => match send {
-                // The command expanded into a prompt (skills, /goal, …): run it as a turn.
-                Some(message) => {
-                    if let Some(profile) = self.profile.clone() {
-                        self.speed.request();
-                        let context = self.block_context(cx);
-                        self.cmd(Cmd::Send {
-                            profile,
-                            session,
-                            text: message,
-                            effort: None,
-                            context,
-                        });
-                    }
+                output, send: None, ..
+            } => {
+                if let Some(out) = output.filter(|o| !o.trim().is_empty()) {
+                    self.toast(
+                        NotificationType::Info,
+                        bench_ui::clip(&out, 300),
+                        window,
+                        cx,
+                    );
                 }
-                None => {
-                    // A command that printed something: said as a toast, the thread is the agent's.
-                    if let Some(out) = output.filter(|o| !o.trim().is_empty()) {
-                        self.toast(
-                            NotificationType::Info,
-                            bench_ui::clip(&out, 300),
-                            window,
-                            cx,
-                        );
-                    }
-                }
-            },
-            // The free answer's field starts empty for a new question.
-            Evt::Clarify(_) => {
-                self.clarify_input
-                    .update(cx, |s, cx| s.set_value("", window, cx));
             }
             Evt::Usage(_, usage) => self.speed.usage(&usage),
             Evt::Complete { session, text } => {
@@ -317,10 +331,10 @@ impl BenchApp {
                         .map(str::trim)
                         .find(|l| !l.is_empty())
                         .unwrap_or("Done");
-                    let id = self.active_thread.session.clone().unwrap_or_default();
+                    let id = self.thread(cx).session.clone().unwrap_or_default();
                     crate::system::notify::post(
                         &id,
-                        &self.current_title(),
+                        &self.current_title(cx),
                         &bench_ui::clip(first, 140),
                     );
                 }
@@ -329,10 +343,14 @@ impl BenchApp {
                 // agent stores it where the thread lives).
                 let stat = self.speed.stat();
                 if !stat.is_empty() {
-                    self.cmd(Cmd::SaveSpeed {
-                        session: session.clone(),
-                        speed: stat.to_json(),
-                    });
+                    let at = self.thread_ref(cx);
+                    self.cmd_at(
+                        &at,
+                        Cmd::SaveSpeed {
+                            session: session.clone(),
+                            speed: stat.to_json(),
+                        },
+                    );
                 }
                 self.refresh_sessions();
             }
@@ -345,17 +363,24 @@ impl BenchApp {
         cx.notify();
     }
 
+    /// The view on screen showing the thread of runtime session `rt`, other than the open one.
+    fn view_of_runtime(&self, rt: &str, cx: &App) -> Option<Entity<crate::thread::ThreadView>> {
+        self.beside_thread
+            .clone()
+            .filter(|v| v.read(cx).thread.runtime.as_deref() == Some(rt))
+    }
+
     /// One of the person's own chats (not Telegram, cron or API) went from working to done in a
     /// sessions refresh, and it isn't the one on screen: a notification. The open chat is told
     /// by its own `Complete` (with the answer's first line).
-    pub(crate) fn notify_finished(&self, rows: &[crate::app::model::SessionRow]) {
+    pub(crate) fn notify_finished(&self, rows: &[crate::app::model::SessionRow], cx: &App) {
         for old in self.sessions.iter().filter(|s| s.running) {
             let done = rows
                 .iter()
                 .find(|r| r.id == old.id)
                 .is_some_and(|r| !r.running);
             let own = crate::app::model::source_label(&old.source) == "Bench";
-            if done && own && self.active_thread.session.as_deref() != Some(old.id.as_str()) {
+            if done && own && self.thread(cx).session.as_deref() != Some(old.id.as_str()) {
                 let title = if old.title.is_empty() {
                     "Bench"
                 } else {

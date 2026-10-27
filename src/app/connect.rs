@@ -34,9 +34,22 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// To the agent the command concerns (`agents.rs`): this Mac's, or a remote project's.
+    /// A command of the whole app — the sessions, the catalog, a session it names (opened,
+    /// renamed, deleted) — to the agent it concerns (`agents.rs`): this Mac's, or the session's
+    /// server's. A thread's own commands go to its agent with `cmd_at`.
     pub(crate) fn cmd(&self, cmd: Cmd) {
-        self.route(cmd);
+        let host = match &cmd {
+            Cmd::Delete { session, .. }
+            | Cmd::Rename { session, .. }
+            | Cmd::Open { session, .. } => self.host_of_session(session),
+            _ => String::new(),
+        };
+        self.route(&host, cmd);
+    }
+
+    /// A thread's command (a message, an insert, Stop…) to the agent keeping that thread.
+    pub(crate) fn cmd_at(&self, at: &crate::thread::ThreadRef, cmd: Cmd) {
+        self.route(&self.thread_host(at), cmd);
     }
 
     pub fn current_profile(&self) -> String {
@@ -44,8 +57,8 @@ impl BenchApp {
     }
 
     /// Events carry the runtime id.
-    pub(crate) fn is_current(&self, sid: &str) -> bool {
-        self.active_thread.runtime.as_deref() == Some(sid)
+    pub(crate) fn is_current(&self, sid: &str, cx: &App) -> bool {
+        self.thread(cx).runtime.as_deref() == Some(sid)
     }
 
     pub(crate) fn refresh_sessions(&self) {

@@ -1,6 +1,6 @@
-//! The open thread's state: which session it is, its journal and the list showing it, its run,
-//! what waits in its queue and composer's extras, what the agent asks in it, its project. One
-//! struct, so a second thread beside the first (`Panel::Thread`) is a second `ActiveThread`.
+//! A thread's state: which session it is, its journal and the list showing it, its run, what
+//! waits in its queue, what the agent asks in it, its project. Its `ThreadView` (`view.rs`) holds
+//! it with the composer; the app routes each event to the view of its thread (`app/events.rs`).
 
 use std::collections::HashSet;
 
@@ -17,8 +17,11 @@ pub struct ActiveThread {
     pub journal: ::thread::Thread,
     /// The open thread on screen: its list and rows (`ui::thread`).
     pub tv: crate::thread::View,
-    /// Opened pieces of work and steps, by the work row's key.
+    /// Opened pieces of work, by the work row's key; unfolded steps (work key, step); the source
+    /// host whose pages are listed (work key, host).
     pub open_work: HashSet<String>,
+    pub open_steps: HashSet<(String, usize)>,
+    pub open_source: Option<(String, String)>,
     /// The open thread's texts, parsed once (`ui::media::Texts`).
     pub texts: crate::media::text::Texts,
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
@@ -36,6 +39,8 @@ pub struct ActiveThread {
     /// The fallback model is answering the open thread: (its model, why the main one failed).
     pub fallback_on: Option<(String, String)>,
     pub effort: usize,
+    /// A level was chosen before the session existed: it goes with the first message.
+    pub effort_pending: bool,
     /// The open session's effort when it is none of EFFORTS (set elsewhere, e.g. `high`; "" is the
     /// provider's default): shown as it is, nothing checked.
     pub effort_other: Option<String>,
@@ -61,6 +66,8 @@ impl Default for ActiveThread {
             journal: Default::default(),
             tv: Default::default(),
             open_work: Default::default(),
+            open_steps: Default::default(),
+            open_source: None,
             texts: Default::default(),
             history_error: None,
             live: None,
@@ -72,6 +79,7 @@ impl Default for ActiveThread {
             usage: None,
             fallback_on: None,
             effort: crate::app::model::EFFORTS.len() - 1,
+            effort_pending: false,
             effort_other: None,
             approval: None,
             clarify: None,
@@ -84,7 +92,54 @@ impl Default for ActiveThread {
     }
 }
 
+/// One thread as the app acts on it for its view: which session it is, where it lives, whether
+/// it runs. The view makes it (`ActiveThread::thread_ref`) and hands it to what it asks of the app
+/// — an insert's block, an answer's media, sending — so the app never has to read a view, which
+/// may be drawing at that moment.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ThreadRef {
+    pub session: Option<String>,
+    pub runtime: Option<String>,
+    /// The project it belongs to; "" = none (its agent's Host).
+    pub project: String,
+    /// A run is live in it.
+    pub live: bool,
+}
+
+impl ThreadRef {
+    /// Its key for what is kept per thread (inserts, references): its session, or "draft" for a
+    /// new chat.
+    pub fn key(&self) -> String {
+        self.session.clone().unwrap_or_else(|| "draft".into())
+    }
+
+    /// Its project as the Explorer and the environment name it: its own, or the Host.
+    pub fn project_or_host(&self) -> String {
+        if self.project.is_empty() {
+            crate::app::model::ProjectKey::HOST.to_string()
+        } else {
+            self.project.clone()
+        }
+    }
+}
+
 impl ActiveThread {
+    pub fn thread_ref(&self) -> ThreadRef {
+        ThreadRef {
+            session: self.session.clone(),
+            runtime: self.runtime.clone(),
+            project: self.thread_project.clone(),
+            live: self.live.is_some(),
+        }
+    }
+
+    /// The level chosen before the session existed, once: it goes with the first message.
+    pub fn take_effort(&mut self, efforts: &[String]) -> Option<String> {
+        std::mem::take(&mut self.effort_pending)
+            .then(|| efforts.get(self.effort).cloned())
+            .flatten()
+    }
+
     /// What an event of this thread does to its own state (its journal, its run, what the agent
     /// asks). What it does to the window — the status bar's speed, a notification, a field — is
     /// the open thread's alone (`app/events.rs`).
@@ -141,6 +196,19 @@ impl ActiveThread {
                 self.todos = if ahead { todos.clone() } else { Vec::new() };
             }
             Evt::Usage(_, usage) => self.usage = Some(usage.clone()),
+            // Running ones first, then the newest.
+            Evt::Processes(_, list) => {
+                let mut list = list.clone();
+                list.sort_by(|a, b| {
+                    b.running.cmp(&a.running).then(
+                        b.started
+                            .unwrap_or(0.)
+                            .partial_cmp(&a.started.unwrap_or(0.))
+                            .unwrap_or(std::cmp::Ordering::Equal),
+                    )
+                });
+                self.processes = list;
+            }
             Evt::Complete { .. } => self.live = None,
             _ => {}
         }
@@ -169,15 +237,6 @@ impl ActiveThread {
             label: "Working…".into(),
         });
         true
-    }
-}
-
-impl crate::app::BenchApp {
-    /// The thread beside the open one, when the runtime session `rt` is its.
-    pub fn thread_beside_mut(&mut self, rt: &str) -> Option<&mut ActiveThread> {
-        self.beside_thread
-            .as_mut()
-            .filter(|t| t.runtime.as_deref() == Some(rt))
     }
 }
 

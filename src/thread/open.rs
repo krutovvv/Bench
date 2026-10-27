@@ -15,41 +15,19 @@ use crate::app::{BenchApp, now_secs};
 use crate::workspace::Center;
 
 impl BenchApp {
+    /// The center's view back to a new chat (another thread is opened in it next, or none).
     pub(crate) fn reset_chat(&mut self, cx: &mut Context<Self>) {
-        self.active_thread.processes.clear();
-        self.active_thread.process_open = None;
-        self.active_thread.session = None;
-        self.active_thread.runtime = None;
         self.inserts.remove("draft");
         self.creating = false;
-        self.queue_edit = None;
         // A new chat starts on the profile's level.
-        self.active_thread.effort_other = None;
-        self.active_thread.effort = self.profile_effort;
-        self.active_thread.journal = Default::default();
-        self.active_thread.texts.clear();
-        self.active_thread.history_error = None;
-        self.active_thread.live = None;
-        self.active_thread.queued = None;
-        self.active_thread.usage = None;
-        self.active_thread.fallback_on = None;
+        let effort = self.profile_effort;
+        self.active_thread.update(cx, |v, cx| v.reset(effort, cx));
         self.playing = None;
         self.media_playing = None;
         self.stop_video(None, cx);
-        self.active_thread.approval = None;
-        self.active_thread.clarify = None;
-        self.active_thread.todos.clear();
         // Speeds describe the model and server, not the chat: keep them, restart the counters.
         self.speed.restart();
-        self.active_thread.project = None;
         self.new_project = None;
-        self.reset_scroller(cx);
-    }
-
-    pub(crate) fn reset_scroller(&mut self, cx: &mut Context<Self>) {
-        self.open_steps.clear();
-        self.active_thread.open_work.clear();
-        self.open_source = None;
         cx.notify();
     }
 
@@ -76,7 +54,7 @@ impl BenchApp {
         self.reset_chat(cx);
         // Keep the session to resume across this reset (startup picks the profile first).
         if self.resume_session.is_none() {
-            self.save_place();
+            self.save_place(cx);
         }
         self.cmd(Cmd::Sessions(name));
         if self.center != Center::Chat {
@@ -95,7 +73,7 @@ impl BenchApp {
         // keep what the person has — the turns they are reading, the draft, the messages waiting
         // in the queue — and only fetch the history afresh. Resetting it first was felt as the
         // thread changing under them: the queue and their own unwritten message vanished with it.
-        if self.active_thread.session.as_deref() == Some(id.as_str()) {
+        if self.thread(cx).session.as_deref() == Some(id.as_str()) {
             self.cmd(Cmd::Open {
                 profile,
                 session: id,
@@ -105,33 +83,38 @@ impl BenchApp {
         }
         self.confirm_delete = None;
         self.project_form = None;
-        if let Some(prev) = self.active_thread.session.clone() {
-            self.thread_cache
-                .insert(prev, std::mem::take(&mut self.active_thread.journal));
+        let prev = self.active_thread.update(cx, |v, _| {
+            let journal = std::mem::take(&mut v.thread.journal);
+            v.thread.session.clone().map(|s| (s, journal))
+        });
+        if let Some((prev, journal)) = prev {
+            self.thread_cache.insert(prev, journal);
         }
         self.reset_chat(cx);
-        self.active_thread.session = Some(id.clone());
         // A thread seen before shows its last state now, and catches up when its journal comes.
-        if let Some(t) = self.thread_cache.remove(&id) {
-            self.active_thread.journal = t;
-        }
-        self.active_thread.thread_project = self
-            .sessions
-            .iter()
-            .find(|s| s.id == id)
-            .map(|s| s.project.clone())
-            .unwrap_or_default();
+        let journal = if self.demo {
+            self.demo_threads.get(&id).cloned()
+        } else {
+            self.thread_cache.remove(&id)
+        };
+        let project = self.project_of_session(&id);
+        let processes = if self.demo && id == "d-landing" {
+            crate::demo::processes(now_secs())
+        } else {
+            Vec::new()
+        };
+        self.active_thread.update(cx, |v, cx| {
+            v.thread.session = Some(id.clone());
+            v.thread.journal = journal.unwrap_or_default();
+            v.thread.thread_project = project;
+            v.thread.processes = processes;
+            cx.notify();
+        });
         if self.demo {
-            self.active_thread.journal = self.demo_threads.get(&id).cloned().unwrap_or_default();
-            self.active_thread.processes = if id == "d-landing" {
-                crate::demo::processes(now_secs())
-            } else {
-                Vec::new()
-            };
             cx.notify();
             return;
         }
-        self.save_place();
+        self.save_place(cx);
         self.cmd(Cmd::Open {
             profile,
             session: id,
@@ -142,8 +125,17 @@ impl BenchApp {
     pub fn new_session(&mut self, cx: &mut Context<Self>) {
         self.center = Center::Chat;
         self.reset_chat(cx);
-        self.save_place();
+        self.save_place(cx);
         cx.notify();
+    }
+
+    /// The project a session belongs to, as the sidebar lists it ("" = none).
+    pub(crate) fn project_of_session(&self, id: &str) -> String {
+        self.sessions
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.project.clone())
+            .unwrap_or_default()
     }
 
     /// Deleting a thread asks once: its row shows Delete · Cancel (⌫ again, or Delete, deletes).
@@ -171,7 +163,7 @@ impl BenchApp {
             );
             return;
         }
-        if self.active_thread.session.as_deref() == Some(&id) {
+        if self.thread(cx).session.as_deref() == Some(&id) {
             self.reset_chat(cx);
         }
         self.sessions.retain(|s| s.id != id);
@@ -282,7 +274,7 @@ impl BenchApp {
     }
 
     /// Remember the profile and session for this target (called whenever either changes).
-    pub(crate) fn save_place(&self) {
+    pub(crate) fn save_place(&self, cx: &App) {
         if self.demo {
             return;
         }
@@ -293,7 +285,7 @@ impl BenchApp {
             .unwrap_or_default();
         all.insert(
             self.target.label(),
-            (self.profile.clone(), self.active_thread.session.clone()),
+            (self.profile.clone(), self.thread(cx).session.clone()),
         );
         let _ = std::fs::create_dir_all(connection::state_dir());
         let _ = std::fs::write(path, serde_json::to_vec(&all).unwrap_or_default());

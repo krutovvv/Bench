@@ -8,14 +8,14 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use super::ThreadView;
 use super::work::{host_of, tool_urls};
-use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
-impl BenchApp {
+impl ThreadView {
     /// The agent waits: what it wants to run, and the answers it accepts.
     pub(crate) fn render_approval(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let req = self.active_thread.approval.clone()?;
+        let req = self.thread.approval.clone()?;
         let theme = cx.theme().clone();
         let label = |c: &str| match c {
             "once" => "Allow once",
@@ -76,8 +76,7 @@ impl BenchApp {
 
     /// The pages the work right above answer `k` touched: one chip per site.
     pub(crate) fn render_sources(&self, k: usize, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let Some(Row::Work { key, steps, .. }) =
-            k.checked_sub(1).map(|j| &self.active_thread.tv.rows[j])
+        let Some(Row::Work { key, steps, .. }) = k.checked_sub(1).map(|j| &self.thread.tv.rows[j])
         else {
             return None;
         };
@@ -101,6 +100,7 @@ impl BenchApp {
         }
         hosts.sort_by_key(|(_, p)| std::cmp::Reverse(p.len()));
         let open_host = self
+            .thread
             .open_source
             .as_ref()
             .filter(|(t, _)| t == key)
@@ -141,8 +141,8 @@ impl BenchApp {
                     .on_click(cx.listener(move |this, _, _, cx| match &single {
                         Some(url) => cx.open_url(url),
                         None => {
-                            this.click_claimed = true;
-                            this.open_source = match &this.open_source {
+                            this.claim_click(cx);
+                            this.thread.open_source = match &this.thread.open_source {
                                 Some((t, x)) if *t == key && *x == h => None,
                                 _ => Some((key.clone(), h.clone())),
                             };

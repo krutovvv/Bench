@@ -16,6 +16,7 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::app::model::Insert;
 use crate::inserts::InsertKind;
+use crate::thread::ThreadRef;
 
 pub struct Browser;
 
@@ -36,7 +37,7 @@ impl InsertKind for Browser {
         key == "browser"
     }
 
-    fn title(&self, app: &BenchApp, ins: &Insert) -> String {
+    fn title(&self, app: &BenchApp, _at: &ThreadRef, ins: &Insert) -> String {
         match tab_of(app, ins) {
             Some((_, _, t)) if !t.trim().is_empty() => format!("Browser · {t}"),
             _ => "Browser".into(),
@@ -46,6 +47,7 @@ impl InsertKind for Browser {
     fn controls(
         &self,
         app: &mut BenchApp,
+        _at: &ThreadRef,
         ins: &Insert,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -70,6 +72,7 @@ impl InsertKind for Browser {
     fn body(
         &self,
         app: &mut BenchApp,
+        at: &ThreadRef,
         ins: &Insert,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -88,7 +91,7 @@ impl InsertKind for Browser {
             app.ensure_browser(cx);
         }
         if let Some((tab, _, _)) = tab_of(app, ins) {
-            return Some(app.render_tab(tab, cx));
+            return Some(app.render_tab(at, tab, cx));
         }
         let ready = app
             .sites
@@ -130,10 +133,13 @@ impl InsertKind for Browser {
                         Button::new(SharedString::from(format!("{}-retry", ins.id)))
                             .small()
                             .label("Try again")
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.click_claimed = true;
-                                this.reopen_thread_tab(cx);
-                            })),
+                            .on_click({
+                                let at = at.clone();
+                                cx.listener(move |this, _, _, cx| {
+                                    this.click_claimed = true;
+                                    this.reopen_thread_tab(&at, cx);
+                                })
+                            }),
                     )
                     .into_any_element(),
             );
@@ -149,7 +155,7 @@ impl InsertKind for Browser {
         if url.is_empty() {
             // Put in: its tab opens at once.
             if !app.demo {
-                app.reopen_thread_tab(cx);
+                app.reopen_thread_tab(at, cx);
             }
             return Some(
                 ShimmerText::new("Opening this thread's tab…")
@@ -176,16 +182,19 @@ impl InsertKind for Browser {
                         .small()
                         .primary()
                         .label("Open again")
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.click_claimed = true;
-                            this.reopen_thread_tab(cx);
-                        })),
+                        .on_click({
+                            let at = at.clone();
+                            cx.listener(move |this, _, _, cx| {
+                                this.click_claimed = true;
+                                this.reopen_thread_tab(&at, cx);
+                            })
+                        }),
                 )
                 .into_any_element(),
         )
     }
 
-    fn context(&self, app: &BenchApp, ins: &Insert, _cx: &App) -> String {
+    fn context(&self, app: &BenchApp, _at: &ThreadRef, ins: &Insert, _cx: &App) -> String {
         match tab_of(app, ins) {
             Some((_, url, title)) => format!(
                 "This thread's tab in the shared browser is at {url} (title: {title}). Work only in it: select it with mcp__browser__browser_tabs (list, then select the one at this address)."
@@ -201,11 +210,12 @@ impl InsertKind for Browser {
     fn opened(
         &self,
         app: &mut BenchApp,
+        at: &ThreadRef,
         _ins: &Insert,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) {
         app.ensure_browser(cx);
-        app.touch_browser();
+        app.touch_browser(at);
     }
 }

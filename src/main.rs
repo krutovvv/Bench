@@ -292,11 +292,19 @@ pub fn open_main_window(cx: &mut App) {
                 return;
             }
             let used = match ks.key.as_str() {
+                // The thread whose composer has the focus (the open one, or the one beside).
                 "up" | "down" | "tab" | "enter" => watch
                     .upgrade()
-                    .map(|app| {
-                        app.update(cx, |this, cx| this.slash_key(ks.key.as_str(), window, cx))
+                    .and_then(|app| {
+                        app.read(cx).thread_views().into_iter().find(|v| {
+                            v.read(cx)
+                                .composer
+                                .read(cx)
+                                .focus_handle(cx)
+                                .is_focused(window)
+                        })
                     })
+                    .map(|view| view.update(cx, |v, cx| v.slash_key(ks.key.as_str(), window, cx)))
                     .unwrap_or(false),
                 _ => false,
             };

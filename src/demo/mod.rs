@@ -30,6 +30,22 @@ use serde_json::json;
 
 /// The blog project's environment, for its settings and the Explorer (any project the demo
 /// Fill the window with the demo instead of connecting.
+impl BenchApp {
+    /// A demo thread in the center's view, as if it were opened (nothing is fetched).
+    pub(crate) fn show_demo_thread(&mut self, id: &str, cx: &mut App) {
+        let journal = self.demo_threads.get(id).cloned().unwrap_or_default();
+        open_thread(self, cx, |t| {
+            t.session = Some(id.into());
+            t.journal = journal;
+        });
+    }
+}
+
+/// The open thread's state, set up (before anything is drawn).
+fn open_thread(app: &mut BenchApp, cx: &mut App, f: impl FnOnce(&mut crate::thread::ActiveThread)) {
+    app.active_thread.update(cx, |v, _| f(&mut v.thread));
+}
+
 pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
     let now = crate::app::now_secs();
     app.demo = true;
@@ -176,12 +192,16 @@ fewer form fields. Then check what it did to signups and give me a short summary
             .into_iter()
             .find(|r| matches!(r, ::thread::Row::Work { .. }))
         {
-            app.active_thread.open_work.insert(key);
+            open_thread(app, cx, |t| {
+                t.open_work.insert(key);
+            });
         }
     }
-    app.active_thread.journal = landing.clone();
-    app.demo_threads.insert("d-landing".into(), landing);
-    app.active_thread.session = Some("d-landing".into());
+    app.demo_threads.insert("d-landing".into(), landing.clone());
+    open_thread(app, cx, |t| {
+        t.journal = landing;
+        t.session = Some("d-landing".into());
+    });
     other_modes(app);
     subject_threads(app, now);
     // The demo's projects: each thread in one (the Telegram and cron ones stay without).
@@ -240,14 +260,13 @@ fewer form fields. Then check what it did to signups and give me a short summary
         _ => Some("d-site"),
     };
     if let Some(id) = open {
-        app.active_thread.session = Some(id.into());
-        app.active_thread.journal = app.demo_threads.get(id).cloned().unwrap_or_default();
-        app.active_thread.thread_project = app
-            .sessions
-            .iter()
-            .find(|s| s.id == id)
-            .map(|s| s.project.clone())
-            .unwrap_or_default();
+        let journal = app.demo_threads.get(id).cloned().unwrap_or_default();
+        let project = app.project_of_session(id);
+        open_thread(app, cx, |t| {
+            t.session = Some(id.into());
+            t.journal = journal;
+            t.thread_project = project;
+        });
     }
     // `BENCH_DEMO=long`: a thread of sixty exchanges, opened at its top.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("long") {
@@ -264,9 +283,11 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 30.,
             );
         }
-        app.active_thread.session = Some("d-landing".into());
-        app.active_thread.journal = journal.thread();
-        app.active_thread.processes.clear();
+        open_thread(app, cx, |t| {
+            t.session = Some("d-landing".into());
+            t.journal = journal.thread();
+            t.processes.clear();
+        });
     }
     // `BENCH_DEMO_JUMP=1`: "Jump to latest" pressed two seconds after opening.
     if std::env::var("BENCH_DEMO_JUMP").is_ok() {
@@ -274,27 +295,36 @@ fewer form fields. Then check what it did to signups and give me a short summary
             cx.background_executor()
                 .timer(std::time::Duration::from_secs(2))
                 .await;
-            this.update(cx, |app, cx| app.jump_to_latest(cx)).ok();
+            this.update(cx, |app, cx| {
+                app.active_thread.update(cx, |v, cx| v.jump_to_latest(cx))
+            })
+            .ok();
         })
         .detach();
     }
     // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {
-        app.active_thread.session = None;
-        app.active_thread.journal = Default::default();
+        open_thread(app, cx, |t| {
+            t.session = None;
+            t.journal = Default::default();
+        });
     }
-    app.active_thread.processes = processes(now);
-    if open.is_some() {
-        app.active_thread.processes.clear();
-    }
-    app.active_thread.usage = Some(Usage {
-        model: "Qwen3.8-Next-Flash".into(),
-        context_used: 38_400,
-        context_max: 131_072,
-        calls: 14,
-        input: 212_000,
-        output: 9_800,
-        ..Default::default()
+    let procs = if open.is_some() {
+        Vec::new()
+    } else {
+        processes(now)
+    };
+    open_thread(app, cx, |t| t.processes = procs);
+    open_thread(app, cx, |t| {
+        t.usage = Some(Usage {
+            model: "Qwen3.8-Next-Flash".into(),
+            context_used: 38_400,
+            context_max: 131_072,
+            calls: 14,
+            input: 212_000,
+            output: 9_800,
+            ..Default::default()
+        })
     });
     if std::env::var("BENCH_DEMO_RUN").is_ok() {
         run(cx);
@@ -304,8 +334,10 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // `BENCH_CLARIFY=1` (with `BENCH_CLARIFY_MULTI=1`) over a demo thread: the agent's question
     // card, its choices long enough to show they wrap.
     if std::env::var("BENCH_CLARIFY").is_ok() {
-        app.active_thread.clarify = Some(crate::app::model::ClarifyReq {
-            session: app.active_thread.session.clone().unwrap_or_default(),
+        let session = app.thread(cx).session.clone().unwrap_or_default();
+        open_thread(app, cx, |t| {
+            t.clarify = Some(crate::app::model::ClarifyReq {
+            session,
             prompt_id: "demo".into(),
             generation: None,
             question: "Как оформить разделы шестерни (Settings)?".into(),
@@ -315,6 +347,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 "Тихая боковая навигация как у сайдбара: те же строки, что в списке проектов (иконка + имя, акцентная полоска 2px у активного), отделена тонкой линией.".into(),
             ],
             multi_select: std::env::var("BENCH_CLARIFY_MULTI").is_ok(),
+        })
         });
     }
     // `BENCH_DEMO=explorer`: the blog in the Explorer (`env` opens its documents); `BENCH_DEMO=env`:
@@ -434,8 +467,10 @@ fn run(cx: &mut Context<BenchApp>) {
             );
             if this
                 .update(cx, |app, cx| {
-                    app.active_thread.journal.apply(e);
-                    cx.notify();
+                    app.active_thread.update(cx, |v, cx| {
+                        v.thread.journal.apply(e);
+                        cx.notify();
+                    })
                 })
                 .is_err()
             {

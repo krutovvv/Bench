@@ -11,6 +11,7 @@ use serde_json::json;
 
 use crate::app::BenchApp;
 use crate::inserts::browser::gateway::Browser;
+use crate::thread::ThreadRef;
 
 /// Where a new thread's tab starts.
 const START_PAGE: &str = "https://www.google.com/";
@@ -66,14 +67,14 @@ impl BenchApp {
     /// Frames flow only while someone watches: the open thread shows its browser, and the agent
     /// is working or the person touched the tab in the last IDLE. Otherwise the stream pauses
     /// (the last frame stays; a click resumes it).
-    pub fn update_browser_stream(&mut self) {
+    pub fn update_browser_stream(&mut self, at: &ThreadRef) {
         let Some(b) = self.sites.browser.clone() else {
             return;
         };
-        let open = self.center == crate::workspace::Center::Chat && self.thread_has_browser();
+        let open = self.center == crate::workspace::Center::Chat && self.thread_has_browser(at);
         let recent = self.sites.touched.is_some_and(|t| t.elapsed() < IDLE);
-        b.set_paused(!(open && (self.active_thread.live.is_some() || recent)));
-        if let Some(tab) = self.thread_tab() {
+        b.set_paused(!(open && (at.live || recent)));
+        if let Some(tab) = self.thread_tab(at) {
             // Asleep on the server (memory): woken, its new id comes back in `woke`.
             if open && b.is_asleep(&tab) {
                 b.wake(&tab);
@@ -83,16 +84,16 @@ impl BenchApp {
         }
     }
 
-    /// The person reached for a step: watch it live.
-    pub fn touch_browser(&mut self) {
+    /// The person reached for a step in thread `at`: watch it live.
+    pub fn touch_browser(&mut self, at: &ThreadRef) {
         self.sites.touched = Some(web_time::Instant::now());
-        self.update_browser_stream();
+        self.update_browser_stream(at);
     }
 
-    /// The open thread's browser insert: (its id, its tab, its url).
-    pub fn thread_browser(&self) -> Option<(String, String, String)> {
+    /// A thread's browser insert: (its id, its tab, its url).
+    pub fn thread_browser(&self, at: &ThreadRef) -> Option<(String, String, String)> {
         let all: Vec<_> = self
-            .thread_inserts()
+            .inserts_of(at)
             .into_iter()
             .filter(|i| i.key == "browser")
             .collect();
@@ -102,24 +103,25 @@ impl BenchApp {
         Some((ins.id.clone(), ins.get("tab"), ins.get("url")))
     }
 
-    /// The open thread's tab, when it is open in the browser.
-    pub fn thread_tab(&self) -> Option<String> {
-        let (_, tab, _) = self.thread_browser()?;
+    /// A thread's tab, when it is open in the browser.
+    pub fn thread_tab(&self, at: &ThreadRef) -> Option<String> {
+        let (_, tab, _) = self.thread_browser(at)?;
         let b = self.sites.browser.as_ref()?;
         (!tab.is_empty() && b.is_open(&tab)).then_some(tab)
     }
 
     /// The thread's tab: a new one (at its last address, when it had one), which becomes the
     /// thread's.
-    pub fn reopen_thread_tab(&mut self, cx: &mut Context<Self>) {
-        let (Some((id, _, url)), Some(b)) = (self.thread_browser(), self.ensure_browser(cx)) else {
+    pub fn reopen_thread_tab(&mut self, at: &ThreadRef, cx: &mut Context<Self>) {
+        let (Some((id, _, url)), Some(b)) = (self.thread_browser(at), self.ensure_browser(cx))
+        else {
             return;
         };
         if self.sites.reopening.is_some() {
             return;
         }
         self.sites.reopening = Some(id);
-        self.touch_browser();
+        self.touch_browser(at);
         // A new thread's tab starts on a search page (the gateway opens only http(s) pages); the
         // agent, or the person, takes it from there.
         b.state.lock().unwrap().error = None;
@@ -144,7 +146,8 @@ impl BenchApp {
                 std::mem::take(&mut st.woke),
             )
         };
-        if let Some((id, tab, url)) = self.thread_browser() {
+        let at = self.thread_ref(cx);
+        if let Some((id, tab, url)) = self.thread_browser(&at) {
             let mut claim = None;
             if let Some(new) = fresh
                 .last()
@@ -152,7 +155,7 @@ impl BenchApp {
             {
                 self.sites.reopening = None;
                 claim = Some(new.clone());
-            } else if self.active_thread.live.is_some() {
+            } else if at.live {
                 claim = moved.last().or(fresh.last()).cloned();
             }
             if let Some((_, new)) = woke.iter().find(|(old, _)| *old == tab) {
@@ -160,10 +163,10 @@ impl BenchApp {
             }
             if let Some(new) = claim.filter(|t| *t != tab) {
                 self.sites.touched = Some(web_time::Instant::now());
-                self.patch_insert(&id, json!({ "state": { "tab": new, "url": url } }), cx);
+                self.patch_insert(&at, &id, json!({ "state": { "tab": new, "url": url } }), cx);
             }
             // The tab's address as it goes, for opening it again.
-            if let Some(tab) = self.thread_tab() {
+            if let Some(tab) = self.thread_tab(&at) {
                 let now = b
                     .state
                     .lock()
@@ -174,11 +177,11 @@ impl BenchApp {
                     .map(|p| p.url.clone())
                     .unwrap_or_default();
                 if !now.is_empty() && now != url {
-                    self.patch_insert(&id, json!({ "state": { "tab": tab, "url": now } }), cx);
+                    self.patch_insert(&at, &id, json!({ "state": { "tab": tab, "url": now } }), cx);
                 }
             }
         }
-        self.update_browser_stream();
+        self.update_browser_stream(&at);
         cx.notify();
     }
 

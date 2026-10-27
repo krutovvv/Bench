@@ -10,12 +10,19 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
+use crate::thread::ThreadRef;
 
 /// A step's frame at most this tall in the thread.
 const MAX_H: f32 = 620.;
 
 impl BenchApp {
-    pub(crate) fn render_tab(&mut self, tab: String, cx: &mut Context<Self>) -> AnyElement {
+    /// Thread `at`'s tab `tab`.
+    pub(crate) fn render_tab(
+        &mut self,
+        at: &ThreadRef,
+        tab: String,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some((frame, w, h, live)) = self.tab_frame(&tab) else {
@@ -28,11 +35,14 @@ impl BenchApp {
                         .text_base()
                         .text_color(muted),
                 )
-                .on_click(cx.listener(|this, _, _, cx| {
-                    this.click_claimed = true;
-                    this.touch_browser();
-                    cx.notify();
-                }))
+                .on_click({
+                    let at = at.clone();
+                    cx.listener(move |this, _, _, cx| {
+                        this.click_claimed = true;
+                        this.touch_browser(&at);
+                        cx.notify();
+                    })
+                })
                 .into_any_element();
         };
         let size = frame.size(0);
@@ -53,6 +63,7 @@ impl BenchApp {
             .get_or_insert_with(|| cx.focus_handle())
             .clone();
         let b_down = self.sites.browser.clone();
+        let at = at.clone();
         let (b_up, b_move, b_wheel, b_key) = (
             b_down.clone(),
             b_down.clone(),
@@ -122,7 +133,7 @@ impl BenchApp {
                             this.click_claimed = true;
                             let was_paused =
                                 this.sites.browser.as_ref().is_some_and(|b| b.is_paused());
-                            this.touch_browser();
+                            this.touch_browser(&at);
                             // The first click on a paused view only wakes it.
                             if live && was_paused {
                                 focus.focus(window, cx);

@@ -6,14 +6,14 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 
+use super::ThreadView;
 use super::View;
-use crate::app::BenchApp;
 use bench_ui::clip;
 
-impl BenchApp {
+impl ThreadView {
     pub(crate) fn render_rail(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let users: Vec<(usize, String)> = self
-            .active_thread
+            .thread
             .tv
             .rows
             .iter()
@@ -27,7 +27,7 @@ impl BenchApp {
             return None;
         }
         let theme = cx.theme().clone();
-        let top = self.active_thread.tv.list.logical_scroll_top().item_ix;
+        let top = self.thread.tv.list.logical_scroll_top().item_ix;
         let current = users
             .iter()
             .rposition(|(k, _)| View::item_of(*k) <= top)
@@ -59,8 +59,8 @@ impl BenchApp {
                 )
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
                 .on_click(cx.listener(move |this, _, _, cx| {
-                    this.click_claimed = true;
-                    this.active_thread.tv.list.scroll_to(ListOffset {
+                    this.claim_click(cx);
+                    this.thread.tv.list.scroll_to(ListOffset {
                         item_ix: View::item_of(k),
                         offset_in_item: px(-8.),
                     });

@@ -88,8 +88,8 @@ checks the code here, the agent writes it in threads. It stays far smaller than 
 one click away) and grows by putting the same parts in more places, not by new copies:
 
 - **Docks hold panels, the center holds items** — as in Zed. The right dock shows one panel at
-  a time (`right_dock`): the open **thread** beside the code (the same `render_chat` the center
-  shows, so the IDE costs no second chat). Files are never kept beside: they open as tabs. In
+  a time (`right_dock`): the open **thread** beside the code (the same `ThreadView` entity the
+  center shows, so the IDE costs no second chat). Files are never kept beside: they open as tabs. In
   the threads view the right dock is empty (the thread is the center).
 - **Code goes to the thread as references.** ⌘L sends the selection (or the whole file) to the
   composer as a chip naming the file and lines; a tab dragged onto the thread, or its menu's

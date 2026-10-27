@@ -111,7 +111,7 @@ impl BenchApp {
 
         // Context: the agent's numbers once a turn has run; before that (a reopened chat) a rough
         // estimate from the transcript, marked "~". The limit falls back to model.context_length.
-        let usage = self.active_thread.usage.clone();
+        let usage = self.thread(cx).usage.clone();
         let real = usage.as_ref().filter(|u| u.context_used > 0);
         let max = real
             .map(|u| u.context_max)
@@ -119,16 +119,16 @@ impl BenchApp {
             .unwrap_or(self.profile_context);
         let (used, estimated) = match real {
             Some(u) => (u.context_used, false),
-            None => (self.estimate_tokens(), true),
+            None => (self.estimate_tokens(cx), true),
         };
         let percent = if max > 0 {
             used as f64 * 100. / max as f64
         } else {
             0.
         };
-        let stats = self.session_stats(used, max, estimated);
+        let stats = self.session_stats(used, max, estimated, cx);
         let context = (max > 0
-            && (self.active_thread.session.is_some() || !self.active_thread.journal.is_empty()))
+            && (self.thread(cx).session.is_some() || !self.thread(cx).journal.is_empty()))
         .then(|| {
             let color = if percent > 85. {
                 theme.danger
@@ -191,7 +191,7 @@ impl BenchApp {
             (Some(l), _) => Some(format!("{} t/s", rate(l))),
             (None, Some(g)) => Some(format!("{} t/s", rate(g))),
             _ => self
-                .active_thread
+                .thread(cx)
                 .usage
                 .as_ref()
                 .and_then(|u| u.avg_tps)
@@ -267,7 +267,7 @@ impl BenchApp {
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             // The fallback answering, in red: the main model failed, and why, until it answers again.
-            .children(self.active_thread.fallback_on.clone().map(|(model, why)| {
+            .children(self.thread(cx).fallback_on.clone().map(|(model, why)| {
                 let tip = if why.is_empty() {
                     "The main model is unavailable: the fallback answers until it is back.".to_string()
                 } else {
@@ -304,7 +304,10 @@ impl BenchApp {
             })
             .child(
                 button("attach", Ico::Paperclip, "Attach files", false)
-                    .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.active_thread
+                            .update(cx, |v, cx| v.pick_attachments(window, cx))
+                    })),
             )
             // Dictation: the mic stays the mic while it records — a small bar on its edge shows
             // the level (⌘⇧D or the same button stops). The typed text is never hidden: a
@@ -353,7 +356,7 @@ impl BenchApp {
             })
             // Stop last, at the window's edge: a filled chip is the heaviest thing on the bar, so
             // it belongs at the end, not among the flat icons (⌘. does the same).
-            .when(self.active_thread.live.is_some(), |d| {
+            .when(self.thread(cx).live.is_some(), |d| {
                 d.child(
                     h_flex().h_full().items_center().pl_1().pr_2().child(
                         div()

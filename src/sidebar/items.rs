@@ -176,7 +176,7 @@ impl BenchApp {
         }
         let order = self.drawn_threads();
         let at = self
-            .active_thread
+            .thread(cx)
             .session
             .as_ref()
             .and_then(|id| order.iter().position(|o| o == id));
@@ -214,7 +214,7 @@ impl BenchApp {
                 window.focus(&self.sidebar_focus, cx);
             }
             "escape" => self.cancel_delete(cx),
-            "enter" => self.composer.update(cx, |s, cx| s.focus(window, cx)),
+            "enter" => self.focus_composer(window, cx),
             _ => {}
         }
     }

@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use gpui_kit::component::input::{InputEvent, InputState, TextareaState};
+use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::select::SelectEvent;
 use gpui_kit::*;
 
@@ -16,8 +16,6 @@ use crate::client::rpc::Evt;
 impl BenchApp {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn subscriptions(
-        clarify_input: &Entity<InputState>,
-        composer: &Entity<TextareaState>,
         search: &Entity<InputState>,
         project_path: &Entity<InputState>,
         effort_choice: &Entity<Choice>,
@@ -32,39 +30,6 @@ impl BenchApp {
                 if this.appearance.mode == bench_ui::theme::Mode::System {
                     bench_ui::theme::apply(this.appearance, Some(window), cx);
                     this.repaint_terminals(cx);
-                }
-            }),
-            // Enter in the question card's field sends that text as the answer.
-            cx.subscribe_in(
-                clarify_input,
-                window,
-                |this, state, ev: &InputEvent, window, cx| {
-                    if let InputEvent::PressEnter { .. } = ev {
-                        let text = state.read(cx).value().trim().to_string();
-                        if !text.is_empty() {
-                            this.answer_clarify(text, window, cx);
-                        }
-                    }
-                },
-            ),
-            cx.subscribe_in(composer, window, |this, _, ev: &InputEvent, window, cx| {
-                match ev {
-                    // Enter is a new line; ⌘Enter sends.
-                    InputEvent::PressEnter {
-                        secondary: true, ..
-                    } => this.send(window, cx),
-                    // New text: the command list starts over at its first row.
-                    InputEvent::Change => {
-                        this.note_draft(cx);
-                        this.slash_sel = 0;
-                        // Esc hides the list for the current word; a new word may open it again.
-                        let text = this.composer.read(cx).value();
-                        if text.is_empty() || text.ends_with(char::is_whitespace) {
-                            this.slash_closed = false;
-                        }
-                        cx.notify();
-                    }
-                    _ => {}
                 }
             }),
             cx.subscribe_in(
@@ -173,10 +138,11 @@ impl BenchApp {
                     if this.media_playing.is_some() {
                         cx.notify(); // the elapsed time
                     }
-                    if this.active_thread.live.is_some() {
+                    let live = this.thread(cx).live.is_some();
+                    if live {
                         this.speed.tick();
                     }
-                    if this.active_thread.live.is_some() || this.recorder.is_some() {
+                    if live || this.recorder.is_some() {
                         cx.notify();
                     }
                     this.tick_tasks(cx);
@@ -190,7 +156,7 @@ impl BenchApp {
         let processes = cx.spawn(async move |this, cx| {
             loop {
                 cx.background_executor().timer(Duration::from_secs(3)).await;
-                if this.update(cx, |this, _| this.poll_processes()).is_err() {
+                if this.update(cx, |this, cx| this.poll_processes(cx)).is_err() {
                     break;
                 }
             }
@@ -200,9 +166,10 @@ impl BenchApp {
         // server shows that server's gateway.
         let backend = cx.spawn(async move |this, cx| {
             loop {
-                let Ok(job) = this.update(cx, |this, _| {
-                    this.thread_conn()
-                        .map(|c| (c, this.current_profile(), this.thread_target()))
+                let Ok(job) = this.update(cx, |this, cx| {
+                    let at = this.thread_ref(cx);
+                    this.thread_conn(&at)
+                        .map(|c| (c, this.current_profile(), this.thread_target(&at)))
                 }) else {
                     break;
                 };

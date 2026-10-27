@@ -10,9 +10,10 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::text::{answer_segments, markdown, render_code};
+use super::text::{Texts, answer_segments, markdown, render_code};
 use crate::app::BenchApp;
 use crate::media::{self, Fetched, Kind, Loaded, Segment, file_name};
+use crate::thread::ThreadRef;
 use bench_ui::icons::Ico;
 
 /// The largest box an image or preview takes, in points.
@@ -33,9 +34,12 @@ pub(super) fn fit(size: (f32, f32), max_w: f32, max_h: f32) -> (Pixels, Pixels) 
 
 impl BenchApp {
     /// An answer's text as it shows: prose, delivered files, diagrams, code. `key` names its
-    /// row (ids of its parts are made from it).
+    /// row (ids of its parts are made from it); `at` is the thread it is in (its files are where
+    /// its agent is), `texts` that thread's parsed texts.
     pub(crate) fn render_answer(
         &mut self,
+        at: &ThreadRef,
+        texts: &mut Texts,
         key: &str,
         text: &str,
         cx: &mut Context<Self>,
@@ -46,32 +50,28 @@ impl BenchApp {
             .into_iter()
             .enumerate()
             .map(|(k, s)| match s {
-                Segment::Text(text) => self
-                    .kept_markdown(&format!("answer-{key}-{k}"), &text, cx)
+                Segment::Text(text) => texts
+                    .markdown(&format!("answer-{key}-{k}"), &text, cx)
                     .into_any_element(),
-                Segment::Media(path) => self.render_media(key, k, path, cx),
+                Segment::Media(path) => self.render_media(at, key, k, path, cx),
                 Segment::Mermaid(code) => self.render_diagram(key, k, code, cx),
                 Segment::Code { lang, code } => {
                     let fence = if code.contains("```") { "~~~~" } else { "```" };
                     let md = format!("{fence}{lang}\n{code}{fence}");
-                    let body = TextView::new(&self.active_thread.texts.state(
-                        &format!("code-{key}-{k}"),
-                        &md,
-                        cx,
-                    ));
+                    let body = TextView::new(&texts.state(&format!("code-{key}-{k}"), &md, cx));
                     render_code(body, key, k, lang, code, cx)
                 }
             })
             .collect()
     }
 
-    fn fetch_media(&mut self, key: String, path: String, cx: &mut Context<Self>) {
-        let Some(conn) = self.thread_conn() else {
+    fn fetch_media(&mut self, at: &ThreadRef, key: String, path: String, cx: &mut Context<Self>) {
+        let Some(conn) = self.thread_conn(at) else {
             return; // still connecting: the next frame asks again
         };
         self.media.insert(key.clone(), Loaded::Pending);
-        let (target, profile) = (self.thread_target(), self.current_profile());
-        let machine = self.files_machine();
+        let (target, profile) = (self.thread_target(at), self.current_profile());
+        let machine = self.files_machine(at);
         cx.spawn(async move |this, cx| {
             let r = cx
                 .background_spawn(async move {
@@ -88,20 +88,21 @@ impl BenchApp {
 
     fn render_media(
         &mut self,
+        at: &ThreadRef,
         i: &str,
         k: usize,
         path: String,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         // A thread's files are where its agent is: this Mac's, or its server's.
-        let target = self.thread_target();
+        let target = self.thread_target(at);
         let key = format!("{}\0{path}", target.label());
         if !self.media.contains_key(&key) {
             match media::fetch_now(&target, &path) {
                 Some(f) => {
                     self.media.insert(key.clone(), Loaded::Ready(f));
                 }
-                None => self.fetch_media(key.clone(), path.clone(), cx),
+                None => self.fetch_media(at, key.clone(), path.clone(), cx),
             }
         }
         let theme = cx.theme().clone();

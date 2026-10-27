@@ -33,7 +33,7 @@ impl BenchApp {
         match (ks.key.as_str(), m.shift) {
             ("n", false) => {
                 self.new_session(cx);
-                self.composer.update(cx, |s, cx| s.focus(window, cx));
+                self.focus_composer(window, cx);
             }
             ("2", false) if crate::app::shortcuts::SSH => self.open_terminal_thread(window, cx),
             ("3", false) if crate::app::shortcuts::TOOLS => {
@@ -47,9 +47,9 @@ impl BenchApp {
             // ⌘⌫ / ⌘⌦: delete the open thread — asked once, as ⌫ ⌫ in the sidebar
             // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's.
             ("backspace" | "delete", false)
-                if self.center == Center::Chat && self.active_thread.session.is_some() =>
+                if self.center == Center::Chat && self.thread(cx).session.is_some() =>
             {
-                let id = self.active_thread.session.clone().unwrap_or_default();
+                let id = self.thread(cx).session.clone().unwrap_or_default();
                 if self.confirm_delete.as_deref() == Some(id.as_str()) {
                     self.delete_session(id, window, cx);
                 } else {
@@ -76,7 +76,7 @@ impl BenchApp {
                     self.close_doc(key, cx);
                 }
             }
-            (".", false) if self.active_thread.live.is_some() => self.stop(cx),
+            (".", false) if self.thread(cx).live.is_some() => self.stop(cx),
             ("=" | "+", _) => self.step_size(1, window, cx),
             ("-", false) => self.step_size(-1, window, cx),
             _ => return false,

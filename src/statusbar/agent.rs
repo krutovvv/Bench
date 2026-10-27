@@ -46,7 +46,7 @@ impl BenchApp {
         // The open thread's agent: this Mac's, or its project's server's.
         let where_ = format!(
             "{} · {}",
-            self.thread_target().label(),
+            self.thread_target(&self.thread_ref(cx)).label(),
             self.current_profile()
         );
         let view = cx.entity();

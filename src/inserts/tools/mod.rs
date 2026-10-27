@@ -13,6 +13,7 @@ use crate::app::BenchApp;
 use crate::app::model::Insert;
 use crate::inserts::subjects::tool_key;
 use crate::inserts::{InsertKind, Switch, clip};
+use crate::thread::ThreadRef;
 use devtools::{GROUPS, Tool};
 
 /// The tool's least height in the thread (it grows with its text).
@@ -38,11 +39,11 @@ impl InsertKind for Tools {
         Some("tools")
     }
 
-    fn title(&self, _app: &BenchApp, ins: &Insert) -> String {
+    fn title(&self, _app: &BenchApp, _at: &ThreadRef, ins: &Insert) -> String {
         tool_of(ins).name().to_string()
     }
 
-    fn switches(&self, _app: &BenchApp, ins: &Insert) -> Vec<Switch> {
+    fn switches(&self, _app: &BenchApp, _at: &ThreadRef, ins: &Insert) -> Vec<Switch> {
         let now = tool_of(ins);
         GROUPS
             .iter()
@@ -59,6 +60,7 @@ impl InsertKind for Tools {
     fn controls(
         &self,
         app: &mut BenchApp,
+        _at: &ThreadRef,
         ins: &Insert,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -89,6 +91,7 @@ impl InsertKind for Tools {
     fn body(
         &self,
         app: &mut BenchApp,
+        _at: &ThreadRef,
         ins: &Insert,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
@@ -113,7 +116,7 @@ impl InsertKind for Tools {
         )
     }
 
-    fn context(&self, app: &BenchApp, ins: &Insert, cx: &App) -> String {
+    fn context(&self, app: &BenchApp, _at: &ThreadRef, ins: &Insert, cx: &App) -> String {
         let tool = tool_of(ins);
         if app.tools.tool != tool {
             return String::new();
@@ -132,6 +135,7 @@ impl InsertKind for Tools {
     fn opened(
         &self,
         app: &mut BenchApp,
+        _at: &ThreadRef,
         ins: &Insert,
         window: &mut Window,
         cx: &mut Context<BenchApp>,

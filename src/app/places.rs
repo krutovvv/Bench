@@ -165,28 +165,24 @@ impl BenchApp {
             .unwrap_or_else(|| crate::app::LOCAL_HOST.into())
     }
 
-    /// The open thread's project as the Explorer and the environment name it: its own, or the
-    /// Host of this Mac when it has none.
-    pub fn thread_project_or_host(&self) -> String {
-        if self.active_thread.thread_project.is_empty() {
-            ProjectKey::HOST.to_string()
-        } else {
-            self.active_thread.thread_project.clone()
-        }
+    /// The open thread, as what the app does for it is told which thread it is (`ThreadRef`).
+    /// Never while its view draws (`App::thread`).
+    pub fn thread_ref(&self, cx: &App) -> crate::thread::ThreadRef {
+        self.thread(cx).thread_ref()
     }
 
-    /// Where the open thread (or the new one) lives: its agent is the one that keeps it.
-    pub fn thread_location(&self) -> Location {
-        let mut at = self.location(&self.active_thread.thread_project);
-        if let Some(id) = &self.active_thread.session {
+    /// Where a thread (or the new one) lives: its agent is the one that keeps it.
+    pub fn thread_location(&self, t: &crate::thread::ThreadRef) -> Location {
+        let mut at = self.location(&t.project);
+        if let Some(id) = &t.session {
             at.agent = self.host_of_session(id);
         }
         at
     }
 
-    /// The agent keeping the open thread: "" = this Mac.
-    pub fn thread_host(&self) -> String {
-        self.thread_location().agent
+    /// The agent keeping a thread: "" = this Mac.
+    pub fn thread_host(&self, t: &crate::thread::ThreadRef) -> String {
+        self.thread_location(t).agent
     }
 
     pub fn host_of_session(&self, id: &str) -> String {
@@ -211,8 +207,8 @@ impl BenchApp {
 
     /// A new thread's creation, for the agent that will keep it, in the project as that agent
     /// knows it (an agent's Host is its own environment: no project there).
-    pub fn create_cmd(&self, profile: String, cwd: Option<String>) -> Cmd {
-        let key = ProjectKey::parse(&self.active_thread.thread_project);
+    pub fn create_cmd(&self, profile: String, cwd: Option<String>, project: &str) -> Cmd {
+        let key = ProjectKey::parse(project);
         let remote = !key.agent.is_empty();
         Cmd::Create {
             profile: if remote { "default".into() } else { profile },

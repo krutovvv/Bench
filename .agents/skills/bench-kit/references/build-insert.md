@@ -13,7 +13,7 @@ read it first; the others are simpler cases of the same shape.
 |---|---|---|---|---|
 | `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`src/inserts/browser/`: `mod.rs` the kind, `state.rs` a tab per thread, `gateway.rs` the stream) | the browser MCP (Playwright on the server: browser-server-mcp, its own project) | the tab's address and title, and "work only in it" |
 | `tasks` {list} | `/tasks` | every list a click apart; in a project its tasks only (`src/inserts/tasks/`) | `tasks` (`agent/src/builtin/tasks.ts`) | which list is shown |
-| `ssh:local` (on the thread's machine, `thread_machine()`: this Mac or the project's server) | `/terminal` | the terminal, as tall as its text (`src/inserts/terminal/`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
+| `ssh:local` (on the thread's machine, `thread_machine(at)`: this Mac or the project's server) | `/terminal` | the terminal, as tall as its text (`src/inserts/terminal/`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
 | `tools` {tool} | `/tools` | every utility in its title's menu, the tool's input → output (`src/inserts/tools/`, the utilities themselves in `crates/devtools`) | none: `read`/`bash` on what it is sent | the tool's input and output |
 
 What belongs to a **project** rather than to a thread (its soul, MCP servers, skills, prompts,
@@ -44,6 +44,11 @@ row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "tasks:<lis
 
 **2. An `InsertKind`** — a folder `src/inserts/<kind>/`: `mod.rs` holds the unit struct, a line in
 `KINDS` (`src/inserts/mod.rs`) registers it:
+Every method but `owns` and `shared` is told the thread the insert sits in, `at: &ThreadRef`
+(its session, project, run): a thread on screen is its own `ThreadView` (the open one, or the
+one beside it), so the kind never asks "the open thread" — it reads `at` (`app.thread_machine(at)`,
+`app.inserts_of(at)`, `app.patch_insert(at, …)`). Its state is the app's (`&mut BenchApp`,
+`Context<BenchApp>`), and so are its listeners.
 - `owns(key)`; `shared` — a name when its live state is one for the whole app (`tasks`,
   `tools`): of several such inserts one is live (the last clicked, else the
   newest), the others say "click to show it here". The browser has none: its tab is the thread's;
@@ -57,11 +62,13 @@ row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "tasks:<lis
   it is live and unfolded;
 - `context` — what it shows now, as text for the agent (cut long text at 6000 characters);
 - `opened` (put in, or brought back: start a terminal), `removed`.
-The frame is the same for every kind (`render_insert`): the person's avatar, a light ground, a
+The frame is the same for every kind (`ThreadView::render_insert`, drawn by the thread it is in): the person's avatar, a light ground, a
 thin border, round corners, `block_head` on top (one height and look for every block's head).
 State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`, a field on
 `BenchApp` (`ssh`, `tools`, `tasks`, `sites` for the browser); a long body goes to `view.rs` beside it. Build it from `bench_ui`
-elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`.
+elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`. What
+it calls on the app while it draws must never read a `ThreadView` (`self.thread(cx)`,
+`active_thread.read`): the view drawing it is borrowed then — use `at`.
 
 **3. Its `/` word.** A line in `words()` (`src/inserts/mod.rs`); rows for `/word <query>` in
 `tool_slash` (`inserts/subjects.rs`) when picking straight away helps (`/tasks today`).

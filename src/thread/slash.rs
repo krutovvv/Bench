@@ -5,27 +5,54 @@
 
 use gpui_kit::*;
 
+use super::{ThreadRef, ThreadView};
 use crate::app::BenchApp;
 use crate::app::model::SlashCommand;
 
+/// `@word` at the end of the composer text: (byte offset of the `@`, the word).
+fn prompt_token(text: &str) -> Option<(usize, String)> {
+    let start = text.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
+    let token = &text[start..];
+    token
+        .starts_with('@')
+        .then(|| (start, token[1..].to_lowercase()))
+}
+
 impl BenchApp {
-    /// `@word` at the end of the composer text: (byte offset of the `@`, the word).
-    fn prompt_token(text: &str) -> Option<(usize, String)> {
-        let start = text.rfind(char::is_whitespace).map(|i| i + 1).unwrap_or(0);
-        let token = &text[start..];
-        token
-            .starts_with('@')
-            .then(|| (start, token[1..].to_lowercase()))
+    /// /browser shows the server browser's tab: offered where the thread's environment has that
+    /// browser's MCP server (a project's own, or Host's), not where another browser works.
+    pub fn browser_offered(&self, at: &ThreadRef) -> bool {
+        if self.demo {
+            return true;
+        }
+        match self.projects.iter().find(|p| p.id == at.project) {
+            Some(p) => p.browser,
+            None => self.host_browser,
+        }
     }
 
+    /// `/goal ship it` → ("/goal", "ship it") when `/goal` is a known command.
+    pub fn parse_command(&self, text: &str) -> Option<(String, String)> {
+        if !text.starts_with('/') {
+            return None;
+        }
+        let (name, arg) = text.split_once(char::is_whitespace).unwrap_or((text, ""));
+        self.catalog
+            .iter()
+            .any(|c| c.name.eq_ignore_ascii_case(name))
+            .then(|| (name.to_string(), arg.trim().to_string()))
+    }
+}
+
+impl ThreadView {
     /// Rows for the pop-up list: commands for a bare `/word`, prompts for a trailing `@word`.
     pub fn slash_matches(&self, cx: &App) -> Vec<SlashCommand> {
         let text = self.composer.read(cx).value();
-        if self.slash_closed {
+        let Some(app) = self.app(cx).filter(|_| !self.slash_closed) else {
             return vec![];
-        }
-        if let Some((_, q)) = Self::prompt_token(&text) {
-            return self
+        };
+        if let Some((_, q)) = prompt_token(&text) {
+            return app
                 .prompts
                 .iter()
                 .filter(|p| !p.path.is_empty())
@@ -45,8 +72,9 @@ impl BenchApp {
                 })
                 .collect();
         }
+        let at = self.thread_ref();
         // `/tasks today`, `/tools json`…: the tools this thread can attach.
-        if let Some(rows) = self.tool_slash(&text) {
+        if let Some(rows) = app.tool_slash(&at, &text) {
             return rows;
         }
         if !text.starts_with('/') || text.contains(char::is_whitespace) {
@@ -56,8 +84,8 @@ impl BenchApp {
         let mut first: Vec<SlashCommand> = vec![];
         let mut rest: Vec<SlashCommand> = vec![];
         // Tools only: the session's commands (/new, /model…) are the window's buttons here.
-        let browser = self.browser_offered();
-        for c in Self::tool_words()
+        let browser = app.browser_offered(&at);
+        for c in BenchApp::tool_words()
             .iter()
             .filter(|c| browser || c.name != "/browser")
         {
@@ -71,34 +99,6 @@ impl BenchApp {
         first.extend(rest);
         first.truncate(60);
         first
-    }
-
-    /// /browser shows the server browser's tab: offered where the thread's environment has that
-    /// browser's MCP server (a project's own, or Host's), not where another browser works.
-    pub fn browser_offered(&self) -> bool {
-        if self.demo {
-            return true;
-        }
-        match self
-            .projects
-            .iter()
-            .find(|p| p.id == self.active_thread.thread_project)
-        {
-            Some(p) => p.browser,
-            None => self.host_browser,
-        }
-    }
-
-    /// `/goal ship it` → ("/goal", "ship it") when `/goal` is a known command.
-    pub fn parse_command(&self, text: &str) -> Option<(String, String)> {
-        if !text.starts_with('/') {
-            return None;
-        }
-        let (name, arg) = text.split_once(char::is_whitespace).unwrap_or((text, ""));
-        self.catalog
-            .iter()
-            .any(|c| c.name.eq_ignore_ascii_case(name))
-            .then(|| (name.to_string(), arg.trim().to_string()))
     }
 
     /// Put the highlighted command into the composer ("/goal "); false when the list is closed.
@@ -117,14 +117,13 @@ impl BenchApp {
             return true;
         }
         let text = self.composer.read(cx).value().to_string();
-        let value = match (c.category.as_str(), Self::prompt_token(&text)) {
+        let value = match (c.category.as_str(), prompt_token(&text)) {
             // A prompt replaces the `@word` it was found by.
             ("Prompt", Some((start, _))) => {
                 let title = &c.name[1..];
                 let body = self
-                    .prompts
-                    .iter()
-                    .find(|p| p.title == title)
+                    .app(cx)
+                    .and_then(|a| a.prompts.iter().find(|p| p.title == title))
                     .map(|p| p.body.clone())
                     .unwrap_or_default();
                 format!("{}{body}", &text[..start])

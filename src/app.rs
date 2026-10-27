@@ -7,7 +7,7 @@ use web_time::Instant;
 
 use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
-use gpui_kit::component::input::{InputState, TextareaState};
+use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::select::SelectState;
 use gpui_kit::*;
@@ -26,6 +26,7 @@ mod subscriptions;
 
 use crate::env::ProjectEnv;
 use crate::settings::new_project::ProjectForm;
+use crate::thread::{ActiveThread, ThreadView};
 use crate::workspace::{Center, Dock, DockPosition, Panel};
 
 use crate::app::model::{EFFORTS, Profile, SessionRow, SkillRow, Target};
@@ -47,12 +48,12 @@ pub struct Live {
 }
 
 pub struct BenchApp {
-    /// The open thread: its session, its journal and list, its run, what waits in it, what it
-    /// asks (`thread/active.rs`).
-    pub active_thread: crate::thread::ActiveThread,
+    /// The open thread, an entity of its own (`thread/view.rs`): its state, its composer, drawn
+    /// by itself in the center (or the right dock, beside a document).
+    pub active_thread: Entity<ThreadView>,
     /// A second thread, beside the open one (the right dock's `Panel::Thread` when the center
-    /// shows a thread): its own state, its events routed to it (`app/events.rs`).
-    pub beside_thread: Option<crate::thread::ActiveThread>,
+    /// shows a thread): its own view, its events routed to it (`app/events.rs`).
+    pub beside_thread: Option<Entity<ThreadView>>,
     pub targets: Vec<Target>,
     pub target: Target,
     /// The gateway list as a Select (kept for its subscription; the status bar has its own menu).
@@ -63,13 +64,8 @@ pub struct BenchApp {
     pub inserts: HashMap<String, Vec<crate::app::model::Insert>>,
     /// A new chat's session is being made (an insert came before any message).
     pub creating: bool,
-    /// Inserts put while a message still waited in the composer: they belong after that message,
-    /// whose place in the thread is not there yet. Their ids; `send` fixes the place as it sends.
-    pub insert_draft: Vec<String>,
     /// Of the inserts whose state is app-wide (tasks, tools), the live one per kind.
     pub insert_live: HashMap<String, String>,
-    /// The waiting message whose words the person is fixing, and the field they fix them in.
-    pub queue_edit: Option<(String, Entity<TextareaState>)>,
     /// The person's projects: the sidebar.
     pub projects: Vec<crate::app::model::ProjectEntry>,
     /// The machine's own agent (Host) has the watchable server browser.
@@ -109,12 +105,11 @@ pub struct BenchApp {
     pub sites: crate::inserts::browser::state::Sites,
     pub sites_error: Option<String>,
     /// A step's tab being reopened: (thread, turn, url, the tabs before).
-    /// A click in the thread landed in something that types (a terminal, an editor): it keeps the focus.
+    /// A click in a thread landed in something that types (a terminal, an editor) or acts (a
+    /// fold, a button): it keeps the focus. The window's pointer, so the app's.
     pub click_claimed: bool,
     /// Where the left button went down in the thread (a drag selects text: no focus move).
     pub click_at: Option<Point<Pixels>>,
-    /// The composer shows a new chat (no placeholder) — what render last set.
-    pub composer_fresh: bool,
     pub(crate) evt_tx: async_channel::Sender<Evt>,
     pub connecting: bool,
 
@@ -132,14 +127,8 @@ pub struct BenchApp {
 
     /// Each thread opened in this run, as last shown: switching back shows it at once.
     pub thread_cache: HashMap<String, ::thread::Thread>,
-    /// `BENCH_DEMO_DRAFT` was put into the composer.
-    pub demo_draft_done: bool,
-    /// `BENCH_DEMO_SCROLL=end` was done.
-    pub demo_scrolled: bool,
     /// Send was pressed while dictating: send once the speech is recognized.
     pub send_after_transcribe: bool,
-    /// Files waiting in the composer to go with the next message.
-    pub attachments: Vec<std::path::PathBuf>,
     /// The project's code sent to a thread from the Explorer, waiting with its message, by
     /// `thread_key` (each thread its own, as its draft).
     pub references: HashMap<String, Vec<crate::thread::attachments::Reference>>,
@@ -154,12 +143,8 @@ pub struct BenchApp {
     pub gw_status: Option<Result<rest::GatewayStatus, String>>,
     /// The last lines of the agent's log, from where it runs (its own status item shows them).
     pub gw_log: Vec<String>,
-    /// Slash commands of the profile; the popup's highlighted row; Esc closed it for this text.
+    /// Slash commands of the profile.
     pub catalog: Vec<crate::app::model::SlashCommand>,
-    pub slash_sel: usize,
-    pub slash_closed: bool,
-    pub slash_scroll: ScrollHandle,
-    pub clarify_input: Entity<InputState>,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
     /// The profile's own approvals, effort and model have arrived: until then the status bar
@@ -201,7 +186,6 @@ pub struct BenchApp {
     pub search_query: String,
     pub search_hits: Option<Vec<(String, String)>>,
     pub(crate) search_seq: u64,
-    pub(crate) effort_pending: bool,
 
     /// What the middle of the window shows (`workspace.rs`).
     pub center: Center,
@@ -220,25 +204,11 @@ pub struct BenchApp {
     pub prompt_open: Option<usize>,
     pub effort_choice: Entity<Choice>,
 
-    pub composer: Entity<TextareaState>,
-    /// Unsent text per chat ("" = the new chat), kept on disk: switching chats or restarting
-    /// keeps it. `draft_key` is the chat whose draft the composer shows.
+    /// Unsent text per chat, kept on disk: switching chats or restarting keeps it. Each view's
+    /// composer shows its thread's (`thread/drafts.rs`).
     pub(crate) drafts: std::collections::HashMap<String, String>,
-    pub(crate) draft_key: Option<String>,
-    /// The next change of the thread brings the composer into view (a message sent, an insert put).
-    pub follow: bool,
     /// Keeps the `/`-list keystroke interceptor alive (main.rs).
     pub _slash_keys: Option<gpui_kit::Subscription>,
-    /// Where the composer is in the window, and the window's height (last frame): the `/` list
-    /// opens above the line when there is no room under it.
-    pub composer_y: Pixels,
-    /// The composer's measured height, from the same canvas as `composer_y`: how much of the
-    /// window the thread's last row has to share with it (`past_end`).
-    pub composer_h: f32,
-    pub viewport_h: Pixels,
-    /// Unfolded steps (work key, step) and the source host whose pages are listed (work key, host).
-    pub open_steps: HashSet<(String, usize)>,
-    pub open_source: Option<(String, String)>,
     pub recorder: Option<Recorder>,
     /// Repaints the waveform while recording.
     pub(crate) wave_ticker: Option<Task<()>>,
@@ -302,17 +272,13 @@ impl BenchApp {
         let profile_choice =
             cx.new(|cx| SelectState::new(Vec::<SharedString>::new(), None, window, cx));
 
-        let composer = cx.new(|cx| {
-            TextareaState::new(window, cx)
-                .auto_grow(1, 100_000)
-                .submit_on_enter(false)
-        });
+        let app = cx.weak_entity();
+        let active_thread = cx.new(|cx| ThreadView::new(app, window, cx));
         if let Ok(v) = std::env::var("BENCH_PREFILL") {
+            let composer = active_thread.read(cx).composer.clone();
             composer.update(cx, |s, cx| s.set_value(v, window, cx));
         }
         let search = cx.new(|cx| InputState::new(window, cx).placeholder("Search sessions"));
-        let clarify_input =
-            cx.new(|cx| InputState::new(window, cx).placeholder("Your own answer — Enter to send"));
         let project_path =
             cx.new(|cx| InputState::new(window, cx).placeholder("/home/you/project — Enter"));
         let group_name = cx.new(|cx| InputState::new(window, cx).placeholder("Name a group"));
@@ -327,8 +293,6 @@ impl BenchApp {
             )
         });
         let subs = Self::subscriptions(
-            &clarify_input,
-            &composer,
             &search,
             &project_path,
             &effort_choice,
@@ -370,8 +334,6 @@ impl BenchApp {
             new_subject: String::new(),
             inserts: HashMap::new(),
             creating: false,
-            insert_draft: Vec::new(),
-            queue_edit: None,
             insert_live: HashMap::new(),
             projects: vec![],
             host_browser: false,
@@ -395,7 +357,6 @@ impl BenchApp {
             sites_error: None,
             click_claimed: false,
             click_at: None,
-            composer_fresh: false,
             evt_tx,
             connecting: false,
             profiles: vec![],
@@ -408,9 +369,6 @@ impl BenchApp {
             tg_people: vec![],
             tg_visible: None,
             thread_cache: HashMap::new(),
-            demo_draft_done: false,
-            demo_scrolled: false,
-            attachments: vec![],
             references: HashMap::new(),
             send_after_transcribe: false,
             profile_effort: EFFORTS.len() - 1,
@@ -419,10 +377,6 @@ impl BenchApp {
             gw_status: None,
             gw_log: Vec::new(),
             catalog: vec![],
-            slash_sel: 0,
-            slash_closed: false,
-            slash_scroll: ScrollHandle::new(),
-            clarify_input,
             approval_mode: None,
             profile_context: 0,
             marks: crate::sidebar::marks::load(),
@@ -442,12 +396,11 @@ impl BenchApp {
             search_query: String::new(),
             search_hits: None,
             search_seq: 0,
-            effort_pending: false,
             center: Center::Chat,
             left_dock: Dock::new(DockPosition::Left, &[Panel::Threads, Panel::Explorer], true),
             right_dock: Dock::new(DockPosition::Right, &[Panel::Thread], false),
             bottom_dock: Dock::new(DockPosition::Bottom, &[Panel::Terminal], false),
-            active_thread: Default::default(),
+            active_thread,
             beside_thread: None,
             explorer: Default::default(),
             skills: vec![],
@@ -455,16 +408,8 @@ impl BenchApp {
             prompts: vec![],
             prompt_open: None,
             effort_choice,
-            composer,
             drafts: crate::thread::drafts::load_drafts(),
-            draft_key: None,
-            follow: false,
             _slash_keys: None,
-            composer_y: px(0.),
-            composer_h: 0.,
-            viewport_h: px(0.),
-            open_steps: HashSet::new(),
-            open_source: None,
             wave_ticker: None,
             recorder: None,
             transcribing: false,
@@ -497,6 +442,25 @@ impl BenchApp {
     /// Connected to a gateway — or showing the demo, which looks connected.
     pub fn online(&self) -> bool {
         self.local_conn().is_some() || self.demo
+    }
+
+    /// The open thread's state (its view's). Never while that view draws or handles an event:
+    /// what a view asks of the app is told which thread it is (`ThreadRef`, `thread/view.rs`).
+    pub fn thread<'a>(&self, cx: &'a App) -> &'a ActiveThread {
+        &self.active_thread.read(cx).thread
+    }
+
+    /// The views of the threads on screen: the open one, and the one beside it.
+    pub fn thread_views(&self) -> Vec<Entity<ThreadView>> {
+        std::iter::once(self.active_thread.clone())
+            .chain(self.beside_thread.clone())
+            .collect()
+    }
+
+    /// The open thread's composer takes the focus.
+    pub fn focus_composer(&self, window: &mut Window, cx: &mut App) {
+        let composer = self.active_thread.read(cx).composer.clone();
+        composer.update(cx, |s, cx| s.focus(window, cx));
     }
 
     pub fn toast(

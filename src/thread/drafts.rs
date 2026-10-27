@@ -2,43 +2,50 @@
 
 use gpui_kit::*;
 
-use crate::app::BenchApp;
+use super::ThreadView;
 
-impl BenchApp {
-    /// The composer's text is the open chat's draft (called on every change).
+impl ThreadView {
+    /// The composer's text is the thread's draft (called on every change). The drafts are the
+    /// app's, kept on disk.
     pub(crate) fn note_draft(&mut self, cx: &mut Context<Self>) {
         // A new chat keeps no draft: every new chat starts empty.
         let Some(key) = self.draft_key.clone().filter(|k| !k.is_empty()) else {
             return;
         };
         let text = self.composer.read(cx).value().to_string();
-        let changed = if text.trim().is_empty() {
-            self.drafts.remove(&key).is_some()
-        } else {
-            self.drafts.insert(key, text.clone()).as_deref() != Some(text.as_str())
-        };
-        if changed {
-            save_drafts(&self.drafts);
-        }
+        self.app
+            .update(cx, |app, _| {
+                let changed = if text.trim().is_empty() {
+                    app.drafts.remove(&key).is_some()
+                } else {
+                    app.drafts.insert(key, text.clone()).as_deref() != Some(text.as_str())
+                };
+                if changed {
+                    save_drafts(&app.drafts);
+                }
+            })
+            .ok();
     }
 
-    /// Another chat is open (or the new one): the composer shows its draft.
+    /// Another chat is open here (or the new one): the composer shows its draft.
     pub(crate) fn sync_draft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let key = self.active_thread.session.clone().unwrap_or_default();
+        let key = self.thread.session.clone().unwrap_or_default();
         if self.draft_key.as_ref() == Some(&key) {
             return;
         }
+        let Some(drafts) = self.app(cx).map(|a| &a.drafts) else {
+            return;
+        };
         // The new chat just became this thread (an insert, a message): what is typed stays.
-        let became = self.draft_key.as_deref() == Some("")
-            && !key.is_empty()
-            && !self.drafts.contains_key(&key);
+        let became =
+            self.draft_key.as_deref() == Some("") && !key.is_empty() && !drafts.contains_key(&key);
         let text = if became {
             self.composer.read(cx).value().to_string()
         } else if key.is_empty() {
             String::new()
         } else {
             // A lone "/word" is a command half picked, not a draft.
-            self.drafts
+            drafts
                 .get(&key)
                 .cloned()
                 .filter(|t| !(t.starts_with('/') && !t.trim().contains(' ')))

@@ -32,22 +32,43 @@ fn quiet_divider() -> gpui_kit::base::ResizeHandleRenderer {
     })
 }
 
+impl BenchApp {
+    /// The demo's hooks on the window (`BENCH_DEMO=new-project`, `BENCH_DEMO_RENAME`), once.
+    fn demo_hooks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.subject_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
+            self.subject_opened = true;
+            self.new_project_form(window, cx);
+        }
+        // `BENCH_DEMO_RENAME=<thread id>`: that thread being renamed.
+        static RENAME: std::sync::Once = std::sync::Once::new();
+        if let Ok(id) = std::env::var("BENCH_DEMO_RENAME") {
+            RENAME.call_once(|| {
+                self.start_rename(crate::sidebar::items::Item::Thread(id), window, cx)
+            });
+        }
+    }
+}
+
 impl Render for BenchApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        // The open chat's unsent text in the composer (app.rs, drafts).
-        self.sync_draft(window, cx);
-        // A new chat is a code editor's empty file: the caret alone (no avatars yet), focused.
-        // The composer never has a placeholder: it is the thread's next text, not a form field.
-        let fresh = self.active_thread.journal.is_empty() && self.active_thread.session.is_none();
-        if fresh != self.composer_fresh {
-            self.composer_fresh = fresh;
-            if fresh && self.center == Center::Chat {
-                self.composer.update(cx, |s, cx| s.focus(window, cx));
-            }
+        // The prompts offered with `@` follow the open thread's project.
+        let project = self.thread(cx).thread_project.clone();
+        if !self.demo
+            && self.local_conn().is_some()
+            && self.prompts_for.as_deref() != Some(project.as_str())
+        {
+            self.prompts_for = Some(project);
+            self.load_prompts(window, cx);
+        }
+        if self.demo {
+            self.demo_hooks(window, cx);
         }
         // The server browser's stream follows what is on screen (no frames for a hidden thread).
         #[cfg(not(target_family = "wasm"))]
-        self.update_browser_stream();
+        {
+            let at = self.thread_ref(cx);
+            self.update_browser_stream(&at);
+        }
         let theme = cx.theme().clone();
         let body = match self.center {
             // Files dropped anywhere on the chat or the input are attached.
@@ -56,9 +77,11 @@ impl Render for BenchApp {
                 .size_full()
                 .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
                 .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
-                    this.add_attachments(paths.paths().to_vec(), cx)
+                    let paths = paths.paths().to_vec();
+                    this.active_thread
+                        .update(cx, |v, cx| v.add_attachments(paths, cx))
                 }))
-                .child(div().flex_1().min_h_0().child(self.render_chat(window, cx)))
+                .child(div().flex_1().min_h_0().child(self.active_thread.clone()))
                 .into_any_element(),
             Center::Providers => self.render_providers(cx),
             Center::NewProject => self.render_project_form(cx),

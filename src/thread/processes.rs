@@ -4,8 +4,8 @@
 
 use gpui_kit::*;
 
+use super::ThreadView;
 use crate::app::BenchApp;
-use crate::app::model::BgProcess;
 use crate::client::rpc::Cmd;
 use crate::media::text::plain_text;
 use bench_ui::clock;
@@ -15,65 +15,59 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 
 impl BenchApp {
-    /// Ask the gateway again (the poll, and right after a Stop).
-    pub(crate) fn poll_processes(&self) {
-        if let (Some(profile), Some(session)) =
-            (self.profile.clone(), self.active_thread.runtime.clone())
-        {
-            self.cmd(Cmd::Processes { profile, session });
+    /// Ask the gateway again for the processes of the threads on screen (the poll).
+    pub(crate) fn poll_processes(&self, cx: &App) {
+        let Some(profile) = self.profile.clone() else {
+            return;
+        };
+        for view in self.thread_views() {
+            let at = view.read(cx).thread_ref();
+            if let Some(session) = at.runtime.clone() {
+                self.cmd_at(
+                    &at,
+                    Cmd::Processes {
+                        profile: profile.clone(),
+                        session,
+                    },
+                );
+            }
         }
     }
+}
 
-    pub(crate) fn on_processes(&mut self, list: Vec<BgProcess>, cx: &mut Context<Self>) {
-        // Running ones first, then the newest.
-        let mut list = list;
-        list.sort_by(|a, b| {
-            b.running.cmp(&a.running).then(
-                b.started
-                    .unwrap_or(0.)
-                    .partial_cmp(&a.started.unwrap_or(0.))
-                    .unwrap_or(std::cmp::Ordering::Equal),
-            )
-        });
-        let running = list.iter().any(|p| p.running);
-        if list != self.active_thread.processes || running {
-            // Running ones repaint for their clocks.
-            self.active_thread.processes = list;
-            cx.notify();
-        }
-    }
-
+impl ThreadView {
     pub(crate) fn kill_process(&mut self, id: String, cx: &mut Context<Self>) {
-        if let (Some(profile), Some(session)) =
-            (self.profile.clone(), self.active_thread.runtime.clone())
-        {
-            self.cmd(Cmd::KillProcess {
-                profile,
-                session,
-                id,
-            });
-            self.poll_processes();
+        if let (Some(profile), Some(session)) = (self.profile(cx), self.thread.runtime.clone()) {
+            self.cmd(
+                Cmd::KillProcess {
+                    profile: profile.clone(),
+                    session: session.clone(),
+                    id,
+                },
+                cx,
+            );
+            self.cmd(Cmd::Processes { profile, session }, cx);
         }
         cx.notify();
     }
 
     /// A row's output shown or hidden.
     pub(crate) fn toggle_process_output(&mut self, id: String, cx: &mut Context<Self>) {
-        if self.active_thread.process_open.as_deref() == Some(id.as_str()) {
-            self.active_thread.process_open = None;
+        if self.thread.process_open.as_deref() == Some(id.as_str()) {
+            self.thread.process_open = None;
         } else {
-            self.active_thread.process_open = Some(id);
+            self.thread.process_open = Some(id);
         }
         cx.notify();
     }
 }
 
-impl BenchApp {
+impl ThreadView {
     /// The background processes the agent started in this session, as a row of its own where the
     /// work began: running or finished, each with Stop (while it runs) and its latest output a
     /// click away.
     pub(crate) fn render_processes(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.active_thread.processes.is_empty() {
+        if self.thread.processes.is_empty() {
             return None;
         }
         let theme = cx.theme().clone();
@@ -81,14 +75,9 @@ impl BenchApp {
         let now = web_time::SystemTime::now()
             .duration_since(web_time::UNIX_EPOCH)
             .map_or(0., |d| d.as_secs_f64());
-        let running = self
-            .active_thread
-            .processes
-            .iter()
-            .filter(|p| p.running)
-            .count();
-        let done = self.active_thread.processes.len() - running;
-        let open = self.active_thread.processes_open;
+        let running = self.thread.processes.iter().filter(|p| p.running).count();
+        let done = self.thread.processes.len() - running;
+        let open = self.thread.processes_open;
         let mut bits = vec![];
         if running > 0 {
             bits.push(format!("{running} running"));
@@ -97,7 +86,7 @@ impl BenchApp {
             bits.push(format!("{done} finished"));
         }
         let rows: Vec<AnyElement> = self
-            .active_thread
+            .thread
             .processes
             .iter()
             .filter(|_| open)
@@ -124,7 +113,7 @@ impl BenchApp {
                         _ => code,
                     }
                 };
-                let shown = self.active_thread.process_open.as_deref() == Some(p.id.as_str());
+                let shown = self.thread.process_open.as_deref() == Some(p.id.as_str());
                 let (id_toggle, id_kill) = (p.id.clone(), p.id.clone());
                 // "cd <project> && cargo build": the folder is the session's, the rest is news.
                 let shown_cmd = match p.command.strip_prefix("cd ") {
@@ -256,8 +245,8 @@ impl BenchApp {
         .when(!open, |d| d.child(div().flex_1()))
         .on_click(cx.listener(|this, _, _, cx| {
             // Folding is the thread's own click: it must not pull the focus to the composer.
-            this.click_claimed = true;
-            this.active_thread.processes_open = !this.active_thread.processes_open;
+            this.claim_click(cx);
+            this.thread.processes_open = !this.thread.processes_open;
             cx.notify();
         }));
         let frame = v_flex()

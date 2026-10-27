@@ -28,7 +28,7 @@ impl BenchApp {
         let muted = theme.muted_foreground;
         let s = &self.sessions[i];
         let selected =
-            self.center == Center::Chat && self.active_thread.session.as_deref() == Some(&s.id);
+            self.center == Center::Chat && self.thread(cx).session.as_deref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
         let count = if s.running {
             "working…".to_string()
@@ -106,8 +106,8 @@ impl BenchApp {
         };
         // A chosen color marks the row with a quiet stripe (the open chat keeps the accent).
         let working = s.running
-            || (self.active_thread.live.is_some()
-                && self.active_thread.session.as_deref() == Some(s.id.as_str()));
+            || (self.thread(cx).live.is_some()
+                && self.thread(cx).session.as_deref() == Some(s.id.as_str()));
         let stripe = self
             .mark_of(&s.id)
             .color

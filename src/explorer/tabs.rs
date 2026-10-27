@@ -143,7 +143,7 @@ impl BenchApp {
         if self.center != Center::Chat {
             self.right_dock.activate(Panel::Thread);
         }
-        self.composer.update(cx, |s, cx| s.focus(window, cx));
+        self.focus_composer(window, cx);
         cx.notify();
     }
 

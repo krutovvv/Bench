@@ -13,7 +13,8 @@ use crate::app::BenchApp;
 impl BenchApp {
     /// Start each profile on its configured reasoning effort.
     pub(crate) fn load_profile_effort(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.effort_pending = false;
+        self.active_thread
+            .update(cx, |v, _| v.thread.effort_pending = false);
         self.profile_ready = false;
         self.rest(window, cx, rest::profile_defaults, |this, r, window, cx| {
             this.profile_ready = true;
@@ -29,10 +30,12 @@ impl BenchApp {
                 this.profile_effort = i;
             }
             // The profile's level is for new chats: an open session already has its own.
-            if let Some(i) = level.filter(|_| this.active_thread.runtime.is_none()) {
-                this.active_thread.effort = i;
-                this.active_thread.effort_other = None;
-                this.effort_pending = false;
+            if let Some(i) = level.filter(|_| this.thread(cx).runtime.is_none()) {
+                this.active_thread.update(cx, |v, _| {
+                    v.thread.effort = i;
+                    v.thread.effort_other = None;
+                    v.thread.effort_pending = false;
+                });
                 this.effort_choice.update(cx, |s, cx| {
                     s.set_selected_index(Some(IndexPath::new(i)), window, cx)
                 });

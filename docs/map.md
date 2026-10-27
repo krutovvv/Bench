@@ -22,6 +22,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change the bar over the center (a thread's title, the documents' project, a settings page's title) | `src/titlebar/mod.rs`; the documents' tab bar `src/explorer/view.rs` (`render_doc`), the tabs themselves `src/explorer/tabs.rs` |
 | change what happens on an agent event | `src/app/events.rs` |
 | open, delete or search threads | `src/thread/open.rs` |
+| change what a thread on screen keeps (its composer, its run, its events) | `src/thread/view.rs` (`ThreadView`), its state `src/thread/active.rs` (`ActiveThread`, `ThreadRef`) |
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
 | change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu, `top.rs` the strip over it; loading projects: `project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
 | change the status bar | `src/statusbar/` (`mod.rs` the bar, `agent.rs` the agent's item, `context.rs` the context and speed panels) |
@@ -58,7 +59,7 @@ src/
   workspace/     the window: docks and center (mod.rs), their layout (layout.rs)
   titlebar/      the bar over the center
   sidebar/       the threads panel: projects, threads, their menu and marks
-  thread/        the open thread on gpui::list: rows, what hangs around them, the composer, sending
+  thread/        a thread on screen, its own entity (ThreadView) on gpui::list: rows, what hangs around them, the composer, sending
   settings/      the gear's tabs, the new project's page
   statusbar/     the bar under everything: the agent's item, context and speed
   inserts/       one folder per insert kind, the registry in mod.rs
@@ -81,6 +82,7 @@ docs/            architecture.md (why), map.md (where), thread-rewrite.md (the t
 
 - **Row** (`crates/thread`): one line of the thread — User, Work, Answer, Insert, Fail, Writing, Queued.
 - **Work**: the agent's steps between two messages; counted per message, never per run.
-- **Insert** / **InsertKind** (`src/inserts/mod.rs`): a live tool in the thread and its kind.
+- **Insert** / **InsertKind** (`src/inserts/mod.rs`): a live tool in the thread and its kind; each method is told its thread (`ThreadRef`).
+- **ThreadView** (`src/thread/view.rs`): a thread on screen, an entity; **ThreadRef**: which thread, as the app is told it.
 - **Section** (`src/env/section.rs`): one part of a project's environment; a `SettingsForm` (fields on its Settings page) or `ExplorerParts` (parts in the Explorer's tree).
 - **Journal**: Pi's entries of a conversation; Bench's thread is read from it, nothing else.

@@ -71,7 +71,7 @@ impl BenchApp {
         }
         self.right_dock.toggle_panel(Panel::Thread);
         if self.right_dock.shows(Panel::Thread) {
-            self.composer.update(cx, |s, cx| s.focus(window, cx));
+            self.focus_composer(window, cx);
         }
         cx.notify();
     }
