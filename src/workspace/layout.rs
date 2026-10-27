@@ -13,21 +13,23 @@ use crate::workspace::{Center, DockPosition};
 /// The window's dock dividers draw no line at rest: the sidebar is darker than the chat, so
 /// the edge is its color (an old-school rule there was the eyesore). Hovered or dragged, the
 /// divider shows as an accent line, so it can still be found and pulled. The IDE panel draws
-/// its own left rule (content meets content there).
-fn quiet_divider() -> gpui_kit::base::ResizeHandleRenderer {
-    std::rc::Rc::new(|handle, _, cx| {
+/// its own left rule (content meets content there). `vertical` is for the divider above the
+/// bottom dock: the line lies down instead of standing.
+fn quiet_divider(vertical: bool) -> gpui_kit::base::ResizeHandleRenderer {
+    std::rc::Rc::new(move |handle, _, cx| {
         let rest = matches!(handle.state(), gpui_kit::base::ResizeHandleState::Idle);
+        let line = div().flex_none().bg(if rest {
+            gpui_kit::transparent_black()
+        } else {
+            cx.theme().primary.opacity(0.6)
+        });
         Some(
-            div()
-                .flex_none()
-                .w(px(1.))
-                .h_full()
-                .bg(if rest {
-                    gpui_kit::transparent_black()
-                } else {
-                    cx.theme().primary.opacity(0.6)
-                })
-                .into_any_element(),
+            if vertical {
+                line.h(px(1.)).w_full()
+            } else {
+                line.w(px(1.)).h_full()
+            }
+            .into_any_element(),
         )
     })
 }
@@ -201,6 +203,7 @@ impl BenchApp {
                 let pane = self.render_panel(panel, window, cx);
                 v_resizable("center-bottom")
                     .with_state(&self.bottom_state)
+                    .with_handle_appearance(quiet_divider(true))
                     .on_resize(remember_bottom)
                     .child(resizable_panel().child(main))
                     .child(
@@ -238,7 +241,7 @@ impl BenchApp {
         // Fixed: a window resize goes to the center; the docks keep their sizes.
         h_resizable("layout")
             .with_state(&self.layout_state)
-            .with_handle_appearance(quiet_divider())
+            .with_handle_appearance(quiet_divider(false))
             .on_resize(remember)
             .when_some(left, |d, pane| {
                 d.child(
