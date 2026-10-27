@@ -3363,6 +3363,8 @@ impl<M: InputModeKind> Element for TextElement<M> {
                 editor_paddings,
             );
             window.paint_quad(fill(gutter_bounds, gutter_bg));
+            let marks = self.state.read(cx).line_marks.clone();
+            let mark_w = px(3.);
 
             // Each item is the normal lines.
             for (lines, &buffer_line) in line_numbers
@@ -3382,6 +3384,20 @@ impl<M: InputModeKind> Element for TextElement<M> {
                                 size(gutter_bounds.size.width, height),
                             ),
                             bg_color,
+                        ));
+                    }
+                }
+
+                // The gutter's marks: a bar beside a marked line, a short rule over a line where
+                // something was removed.
+                for m in &marks {
+                    let at = point(gutter_bounds.origin.x, p.y);
+                    if m.lines.contains(&buffer_line) {
+                        window.paint_quad(fill(Bounds::new(at, size(mark_w, height)), m.color));
+                    } else if m.lines.is_empty() && m.lines.start == buffer_line {
+                        window.paint_quad(fill(
+                            Bounds::new(at, size(mark_w * 3., px(2.))),
+                            m.color,
                         ));
                     }
                 }

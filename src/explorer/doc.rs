@@ -85,13 +85,15 @@ pub enum DocKey {
     Problems {
         project: String,
     },
+    /// A file's changes against HEAD, read only (`git.rs`).
+    Diff(FileRef),
 }
 
 impl DocKey {
     /// The project it belongs to.
     pub fn project(&self) -> &str {
         match self {
-            DocKey::File(f) => &f.project,
+            DocKey::File(f) | DocKey::Diff(f) => &f.project,
             DocKey::Settings { project }
             | DocKey::Part { project, .. }
             | DocKey::Problems { project } => project,
@@ -109,8 +111,26 @@ pub struct Doc {
     pub binary: bool,
     /// The line to put the caret on once it is read (⌘⇧F's hit).
     pub goto: Option<u32>,
+    /// Its text at HEAD (`git.rs`); None: not in a repository, not committed, not read yet.
+    pub head: Option<String>,
     /// Its language servers' check under way (`lsp.rs`); a newer one replaces it.
     pub checking: Task<()>,
+}
+
+impl Doc {
+    /// A document whose text is still to come.
+    pub fn new(editor: Entity<EditorState>) -> Self {
+        Doc {
+            editor,
+            saved: String::new(),
+            dirty: false,
+            loading: true,
+            binary: false,
+            goto: None,
+            head: None,
+            checking: Task::ready(()),
+        }
+    }
 }
 
 impl BenchApp {
@@ -125,6 +145,20 @@ impl BenchApp {
                 }
             }
             DocKey::Problems { project } => self.read_problems(project.clone(), window, cx),
+            // The file's own document holds the text and HEAD's; the diff is made from them.
+            DocKey::Diff(f) => {
+                self.ensure_doc(f.clone(), window, cx);
+                if !self.explorer.docs.contains_key(&key) {
+                    let editor = crate::env::editor("diff", window, cx);
+                    editor.update(cx, |s, cx| {
+                        s.set_disabled(true, cx);
+                        // A diff's lines are not the file's: no numbers beside them.
+                        s.set_line_number(false, window, cx);
+                    });
+                    self.explorer.docs.insert(key.clone(), Doc::new(editor));
+                }
+                self.mark_changes(f, window, cx);
+            }
             DocKey::Part {
                 project,
                 kind,
@@ -189,23 +223,13 @@ impl BenchApp {
                 if !d.loading {
                     d.dirty = true;
                     this.check_doc_soon(&file, window, cx);
+                    this.mark_changes(&file, window, cx);
                     cx.notify();
                 }
             }
         })
         .detach();
-        self.explorer.docs.insert(
-            key,
-            Doc {
-                editor,
-                saved: String::new(),
-                dirty: false,
-                loading: true,
-                binary: false,
-                goto: None,
-                checking: Task::ready(()),
-            },
-        );
+        self.explorer.docs.insert(key, Doc::new(editor));
         self.attach_servers(&f, cx);
         self.read_doc(f, window, cx);
     }
@@ -224,6 +248,7 @@ impl BenchApp {
                 d.loading = false;
             }
             self.check_doc(&f, Default::default(), window, cx);
+            self.read_head(&f, window, cx);
             return;
         }
         let Some((conn, _)) = self.env_target(&f.project) else {
@@ -258,6 +283,7 @@ impl BenchApp {
                                 .update(cx, |s, cx| s.set_cursor_position(at, window, cx));
                         }
                         this.check_doc(&f, Default::default(), window, cx);
+                        this.read_head(&f, window, cx);
                     }
                     Err(err) => {
                         d.loading = false;
@@ -274,7 +300,7 @@ impl BenchApp {
         let f = match key {
             DocKey::Part { project, kind, .. } => return self.env_save(&project, kind, window, cx),
             // Each group of the settings has its own Save; problems are only read.
-            DocKey::Settings { .. } | DocKey::Problems { .. } => return,
+            DocKey::Settings { .. } | DocKey::Problems { .. } | DocKey::Diff(_) => return,
             DocKey::File(f) => f,
         };
         let Some(d) = self
@@ -346,7 +372,7 @@ impl BenchApp {
             DocKey::File(_) => self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
             DocKey::Part { .. } => self.part_dirty(&key),
             // Its typed fields stay in the environment until saved or reverted.
-            DocKey::Settings { .. } | DocKey::Problems { .. } => false,
+            DocKey::Settings { .. } | DocKey::Problems { .. } | DocKey::Diff(_) => false,
         };
         let armed = format!("close:{key:?}");
         if dirty && self.explorer.armed.as_deref() != Some(&armed) {
@@ -411,8 +437,25 @@ impl BenchApp {
 
     /// A file's editor goes when no tab holds it and nothing is unsaved.
     pub(super) fn drop_unused(&mut self, key: &DocKey) {
-        let held = self.explorer.tabs.contains(key);
-        if !held && self.explorer.docs.get(key).is_some_and(|d| !d.dirty) {
+        // A file's diff tab reads its document: it stays while either is open.
+        let held = match key {
+            DocKey::File(f) => self.explorer.tabs.contains(&DocKey::Diff(f.clone())),
+            DocKey::Diff(f) => {
+                let file = DocKey::File(f.clone());
+                if !self.explorer.tabs.contains(&file) {
+                    self.drop_unused_now(&file);
+                }
+                false
+            }
+            _ => false,
+        } || self.explorer.tabs.contains(key);
+        if !held {
+            self.drop_unused_now(key);
+        }
+    }
+
+    fn drop_unused_now(&mut self, key: &DocKey) {
+        if self.explorer.docs.get(key).is_some_and(|d| !d.dirty) {
             self.explorer.docs.remove(key);
         }
     }

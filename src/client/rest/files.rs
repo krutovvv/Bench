@@ -169,3 +169,18 @@ pub fn upload_file_to(
     )?;
     Ok(())
 }
+
+/// A file's text at HEAD of its repository (`/api/git/head`); None: not in one, or not committed.
+pub fn git_head(
+    conn: &Connection,
+    profile: &str,
+    machine: Option<&str>,
+    path: &str,
+) -> Result<Option<String>> {
+    let v = get(
+        conn,
+        &format!("/api/git/head?path={}{}", enc(path), on(machine)),
+        profile,
+    )?;
+    Ok(v["text"].as_str().map(str::to_string))
+}

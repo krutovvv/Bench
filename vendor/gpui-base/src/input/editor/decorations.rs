@@ -18,6 +18,15 @@ pub enum RangeDecorationStyle {
     Frame,
 }
 
+/// A mark in the gutter beside buffer lines (Zed's git hunks): a bar in `color` beside
+/// `lines`; an empty range is a mark between two lines, at the top of `lines.start` (what was
+/// removed there).
+#[derive(Clone, Debug, PartialEq)]
+pub struct LineMark {
+    pub lines: Range<usize>,
+    pub color: Hsla,
+}
+
 /// A geometric decoration over a UTF-8 byte range.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RangeDecoration {

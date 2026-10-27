@@ -202,6 +202,14 @@ impl EditorState {
         &self.extras.lsp
     }
 
+    /// The gutter's marks beside lines (a changed line, a removed one), replacing the last.
+    pub fn set_line_marks(&mut self, marks: Vec<super::LineMark>, cx: &mut gpui::Context<Self>) {
+        if self.line_marks != marks {
+            self.line_marks = marks;
+            cx.notify();
+        }
+    }
+
     /// The LSP providers, mutably. Configure the providers through this.
     pub fn lsp_mut(&mut self) -> &mut super::Lsp {
         &mut self.extras.lsp

@@ -58,6 +58,11 @@ const skipFind = SKIP.map((d) => `-name ${d} -prune -o`).join(" ");
 /** A POSIX script run in `dir` with its arguments as $1, $2…, on `machine` (over SSH) or here;
  * what it printed, at most `cap` lines. */
 async function shIn(machine: string | null, dir: string, script: string, args: string[], cap: number): Promise<string[]> {
+	return (await shOut(machine, dir, script, args)).split("\n").filter(Boolean).slice(0, cap);
+}
+
+/** What a POSIX script run in `dir` printed, whole (`shIn` runs it). */
+async function shOut(machine: string | null, dir: string, script: string, args: string[]): Promise<string> {
 	const full = `cd "$1" || exit 1; shift; ${script}`;
 	const m = await onMachine(machine, dir);
 	let out = "";
@@ -69,7 +74,14 @@ async function shIn(machine: string | null, dir: string, script: string, args: s
 			execFile("sh", ["-c", full, "sh", expand(dir), ...args], { maxBuffer: 64 << 20 }, (_e, stdout) => resolve(String(stdout ?? ""))),
 		);
 	}
-	return out.split("\n").filter(Boolean).slice(0, cap);
+	return out;
+}
+
+/** A file's text at HEAD of the repository it is in; null: not in one, or not committed. */
+export async function textAtHead(machine: string | null, file: string): Promise<string | null> {
+	const script = `if git cat-file -e "HEAD:./$1" 2>/dev/null; then printf T; git show "HEAD:./$1"; else printf N; fi`;
+	const out = await shOut(machine, path.posix.dirname(file), script, [path.posix.basename(file)]);
+	return out.startsWith("T") ? out.slice(1) : null;
 }
 
 export default (): Module => ({
@@ -186,6 +198,8 @@ export default (): Module => ({
 			});
 			return { hits };
 		},
+		// The Explorer's editor marks the lines changed since the last commit (`git show HEAD:`).
+		"GET /api/git/head": async (req) => ({ text: await textAtHead(req.query.get("machine"), required(req.query.get("path"), "path")) }),
 		"GET /api/fs/default-cwd": async (req) => ({ cwd: (await onMachine(req.query.get("machine"), "~"))?.path ?? os.homedir() }),
 		// A branch in its own folder, <repo>/.worktrees/<name>.
 		"POST /api/git/worktree/add": (req) => {

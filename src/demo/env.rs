@@ -104,6 +104,11 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         ),
         "part" => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
         "lsp" => app.open_part("p-blog".into(), "lsp", "pyright".into(), window, cx),
+        // The release post's changes since the last commit, beside it.
+        "diff" => {
+            let post = root.join("content/posts/release-2-4.md");
+            app.open_diff(post, window, cx);
+        }
         // The project's terminal under the post, its lines sent to the thread beside.
         "terminal" => {
             app.session = Some("d-site".into());
@@ -181,6 +186,23 @@ pub fn file_text(path: &str) -> String {
         "release-2-4.md" => "---\ntitle: \"Northwind 2.4: search that understands you\"\ntags: [releases, search]\ncover: /images/2-4-cover.png\nstatus: draft\n---\n\nSearch now reads what you mean, not only what you type. Ask for\n\"invoices from last spring\" and it finds them, even when none of them says *spring*.\n\n## What changed\n\n- Results understand dates, people and places.\n- Typos no longer hide what you were after.\n- The search box remembers your last five questions.\n\n## Why it matters\n\nMost of you search the same few things every day. Now it takes one try.\n".into(),
         "SKILL.md" => "---\nname: release-notes\ndescription: Turn a changelog into a post: what changed for the reader, not the commit list.\n---\n\n1. Read the changelog since the last release.\n2. Keep what a customer notices; drop refactors.\n3. Write the post in `content/posts/`, a draft, with a cover and two tags.\n".into(),
         _ => String::new(),
+    }
+}
+
+/// A file's text at the last commit (`explorer/git.rs`): the release post had another title, no
+/// line on the search box, and one more sentence.
+pub fn file_head(path: &str) -> Option<String> {
+    let now = file_text(path);
+    match path.rsplit('/').next().unwrap_or(path) {
+        "release-2-4.md" => Some(
+            now.replace("search that understands you", "smarter search")
+                .replace("- The search box remembers your last five questions.\n", "")
+                .replace(
+                    "Now it takes one try.\n",
+                    "Now it takes one try.\nAnd it is as fast as before.\n",
+                ),
+        ),
+        _ => (!now.is_empty()).then_some(now),
     }
 }
 

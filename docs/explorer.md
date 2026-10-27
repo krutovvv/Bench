@@ -113,7 +113,11 @@ Phases, each a thing of its own:
    `session.rs`) on the project's machine, started in its folder, one per project (the
    Explorer's while it is shown, else the thread's). "Send to the thread" puts its selection,
    or its last lines, in the composer (`Reference::Terminal`).
-4. **Git at a glance**: changed lines in the gutter against HEAD, a changed file's diff.
+4. **Git at a glance** (done, `explorer/git.rs`): a file's lines changed since HEAD marked in
+   its gutter as it is typed (added green, changed yellow, a red rule where lines were removed:
+   `LineMark`, added to the vendored editor, `vendor/gpui-base`), HEAD's text from the agent
+   (`/api/git/head`, on the file's machine); its diff against HEAD a read-only tab
+   (`DocKey::Diff`: the file head's button, its tab's and the tree's "Changes since HEAD").
 
 ## Growing it
 

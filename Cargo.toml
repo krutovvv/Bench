@@ -36,6 +36,8 @@ sha2 = "0.10"
 percent-encoding = "2"
 # The language servers' types, as the editor (gpui-base) takes them.
 lsp-types = "0.97"
+# The editor's engine itself, for what gpui-kit does not re-export (the gutter's `LineMark`).
+gpui-base = "0.8"
 
 [workspace]
 members = [".", "crates/*"]

@@ -56,12 +56,20 @@ pub fn entry_menu(
                     .separator();
             }
         } else {
-            let (a, b) = (f.clone(), f.clone());
+            let (a, b, c) = (f.clone(), f.clone(), f.clone());
             menu = menu
                 .item(PopupMenuItem::new("Open").on_click(act(
                     &view,
                     Box::new(move |this, w, cx| this.open_doc(DocKey::File(a.clone()), w, cx)),
                 )))
+                .item(
+                    PopupMenuItem::new("Changes since HEAD")
+                        .icon(Ico::FileDiff.icon())
+                        .on_click(act(
+                            &view,
+                            Box::new(move |this, w, cx| this.open_diff(c.clone(), w, cx)),
+                        )),
+                )
                 .item(
                     PopupMenuItem::new("Add to the thread")
                         .icon(Ico::MessagesSquare.icon())

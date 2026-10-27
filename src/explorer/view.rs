@@ -24,6 +24,7 @@ impl BenchApp {
                 name,
             }) => self.part_pane(&project, kind, &name, cx),
             Some(DocKey::Problems { project }) => self.problems_pane(&project, cx),
+            Some(DocKey::Diff(f)) => self.diff_pane(&f, cx),
             None => note("Open a file from the tree, or find one with ⌘P", cx),
         };
         let theme = cx.theme().clone();
@@ -77,6 +78,17 @@ impl BenchApp {
                 )
                 .into_any_element(),
         );
+        // Its changes since HEAD, when it is in a repository.
+        if d.head.is_some() {
+            let g = f.clone();
+            actions.push(
+                bench_ui::head_icon_button("doc-diff", Ico::FileDiff, "Changes since HEAD", cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_diff(g.clone(), window, cx)
+                    }))
+                    .into_any_element(),
+            );
+        }
         // Where else it opens: Zed (on its machine), Finder on this Mac.
         let at = self.location(&f.project);
         let host = f
@@ -114,6 +126,46 @@ impl BenchApp {
                 .appearance(false)
                 .h_full()
                 .into_any_element()
+        };
+        v_flex()
+            .size_full()
+            .child(head)
+            .child(div().flex_1().min_h_0().child(body))
+            .into_any_element()
+    }
+
+    /// A file's changes against HEAD: where it is, Open the file, and the diff read only.
+    fn diff_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
+        let Some(d) = self.explorer.docs.get(&DocKey::Diff(f.clone())) else {
+            return div().into_any_element();
+        };
+        let editor = d.editor.clone();
+        let known = self
+            .explorer
+            .docs
+            .get(&DocKey::File(f.clone()))
+            .map(|d| (d.loading, d.head.is_some()));
+        let file = f.clone();
+        let actions = vec![
+            bench_ui::form_action("diff-open", "Open the file", false, cx)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    this.open_doc(DocKey::File(file.clone()), window, cx)
+                }))
+                .into_any_element(),
+        ];
+        let head = bench_ui::ide_head(
+            format!("{} · changes since HEAD", f.name()),
+            Some(f.path.clone().into()),
+            actions,
+            cx,
+        );
+        let body = match known {
+            Some((true, _)) | None => note("Reading…", cx),
+            Some((false, false)) => note("Not in a repository, or not committed yet", cx),
+            Some((false, true)) => Editor::new(&editor)
+                .appearance(false)
+                .h_full()
+                .into_any_element(),
         };
         v_flex()
             .size_full()
@@ -200,6 +252,11 @@ impl BenchApp {
                     name.clone(),
                     (part_icon(kind), theme.muted_foreground),
                     self.part_dirty(&key),
+                ),
+                DocKey::Diff(f) => (
+                    format!("{} (changes)", f.name()),
+                    (Ico::FileDiff, theme.muted_foreground),
+                    false,
                 ),
                 DocKey::Problems { .. } => (
                     "Problems".to_string(),

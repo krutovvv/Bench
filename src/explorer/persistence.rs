@@ -32,6 +32,11 @@ enum Tab {
     Problems {
         project: String,
     },
+    Diff {
+        project: String,
+        machine: Option<String>,
+        path: String,
+    },
 }
 
 impl Tab {
@@ -53,6 +58,11 @@ impl Tab {
                 name,
             },
             DocKey::Problems { project } => Tab::Problems { project },
+            DocKey::Diff(f) => Tab::Diff {
+                project: f.project,
+                machine: f.machine,
+                path: f.path,
+            },
         }
     }
 
@@ -79,6 +89,15 @@ impl Tab {
                 name,
             },
             Tab::Problems { project } => DocKey::Problems { project },
+            Tab::Diff {
+                project,
+                machine,
+                path,
+            } => DocKey::Diff(FileRef {
+                project,
+                machine,
+                path,
+            }),
         })
     }
 }

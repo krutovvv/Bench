@@ -408,6 +408,8 @@ impl PrepaintCaretGeometry {
 pub struct InputBaseState<M: InputModeKind> {
     /// State only this mode needs. See [`InputModeKind::Extras`].
     pub(crate) extras: M::Extras,
+    /// Marks in the gutter beside lines (`LineMark`), painted with the line numbers.
+    pub(crate) line_marks: Vec<crate::input::LineMark>,
     pub(super) focus_handle: FocusHandle,
     selection_focus: Option<WeakFocusHandle>,
     pub(super) mode: LayoutMode,
@@ -857,6 +859,7 @@ impl<M: InputModeKind> InputBaseState<M> {
 
         Self {
             extras: M::Extras::default(),
+            line_marks: Vec::new(),
             focus_handle: focus_handle.clone(),
             selection_focus: None,
             text: "".into(),

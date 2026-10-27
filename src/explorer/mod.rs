@@ -12,6 +12,7 @@
 //! explorer/lsp.rs   the project's language servers in the editor: problems, hover, definition
 //! explorer/problems.rs  the project's Problems as a tab; problems sent to the thread
 //! explorer/persistence.rs  the tabs and folds kept on this Mac between starts
+//! explorer/git.rs   lines changed since HEAD in the gutter, a file's diff as a tab
 //! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder, Zed)
 //! explorer/tree.rs  the sidebar's tree
 //! explorer/view.rs  a document in the middle, the tabs, the thread beside, ⌘P's list
@@ -19,6 +20,7 @@
 
 pub mod doc;
 pub mod file_finder;
+pub mod git;
 pub mod lang;
 pub mod lsp;
 pub mod menus;

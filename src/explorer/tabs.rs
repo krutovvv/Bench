@@ -197,7 +197,7 @@ pub fn tab_menu(
         let DocKey::File(f) = key.clone() else {
             return menu;
         };
-        let (f1, f2, f3) = (f.clone(), f.clone(), f);
+        let (f1, f2, f3, f4) = (f.clone(), f.clone(), f.clone(), f);
         menu.separator()
             .item(
                 PopupMenuItem::new("Add to the thread  ⌘L")
@@ -205,6 +205,11 @@ pub fn tab_menu(
                     .on_click(act(Box::new(move |this, w, cx| {
                         this.send_file_to_thread(&f1, w, cx)
                     }))),
+            )
+            .item(
+                PopupMenuItem::new("Changes since HEAD")
+                    .icon(Ico::FileDiff.icon().small())
+                    .on_click(act(Box::new(move |this, w, cx| this.open_diff(f4.clone(), w, cx)))),
             )
             .item(
                 PopupMenuItem::new("Send its problems to the thread")
