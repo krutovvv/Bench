@@ -31,6 +31,7 @@ impl BenchApp {
                     (Ico::FileText, theme.muted_foreground),
                     "SYSTEM.md",
                     Some("the soul".into()),
+                    false,
                     chosen,
                     vec![],
                     cx,
@@ -156,6 +157,7 @@ impl BenchApp {
             label.to_string(),
             None,
             false,
+            false,
             acts,
             cx,
         )
@@ -215,6 +217,7 @@ impl BenchApp {
                         it.icon,
                         it.label,
                         Some(it.note.into()),
+                        false,
                         chosen,
                         vec![],
                         cx,

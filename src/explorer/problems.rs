@@ -254,6 +254,7 @@ impl BenchApp {
                     name,
                     dir,
                     false,
+                    false,
                     vec![],
                     cx,
                 )
@@ -283,6 +284,7 @@ impl BenchApp {
                         (Ico::CircleAlert, color),
                         d.message.lines().next().unwrap_or_default().to_string(),
                         Some(format!("{}:{}{source}", at.line + 1, at.character + 1).into()),
+                        false,
                         false,
                         vec![],
                         cx,

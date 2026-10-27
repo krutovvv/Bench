@@ -184,3 +184,30 @@ pub fn git_head(
     )?;
     Ok(v["text"].as_str().map(str::to_string))
 }
+
+/// The repository around `path` and what git ignores there (`/api/git/ignored`): the root, then
+/// paths relative to it — a trailing '/' marks a folded folder. "": not a repository.
+pub fn git_ignored(
+    conn: &Connection,
+    profile: &str,
+    machine: Option<&str>,
+    path: &str,
+) -> Result<(String, Vec<String>)> {
+    let v = get(
+        conn,
+        &format!("/api/git/ignored?path={}{}", enc(path), on(machine)),
+        profile,
+    )?;
+    let ignored = v["ignored"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter_map(|x| x.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+    Ok((
+        v["root"].as_str().unwrap_or_default().to_string(),
+        ignored,
+    ))
+}

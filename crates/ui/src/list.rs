@@ -178,43 +178,226 @@ pub fn choice_row(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
         .hover(|s| s.border_color(theme.primary).bg(theme.list_hover))
 }
 
-/// A file's icon and color by its name, as an editor's tree shows them.
+/// A file's icon and color by its name, as an editor's tree shows them: by name when the name
+/// itself says what the thing is (README, Cargo.toml, node_modules…), else by extension.
+/// Editors keep a large collection of these; this is the useful core of one, in one place.
 pub fn file_icon(name: &str, dir: bool, theme: &Theme) -> (Ico, Hsla) {
+    let (ico, tone) = file_kind(&name.to_lowercase(), dir);
+    let color = match tone {
+        Tone::Red => theme.red,
+        Tone::Yellow => theme.yellow,
+        Tone::Blue => theme.blue,
+        Tone::Magenta => theme.magenta,
+        Tone::Cyan => theme.cyan,
+        Tone::Green => theme.green,
+        Tone::Muted => theme.muted_foreground,
+    };
+    (ico, color)
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Tone {
+    Red,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    Green,
+    Muted,
+}
+
+/// The kind of a name: its icon and its tone (resolved against a theme by `file_icon`, so the
+/// map itself is testable without one). `lower` is the name, already lowered.
+fn file_kind(lower: &str, dir: bool) -> (Ico, Tone) {
     if dir {
-        return (Ico::Folder, theme.blue);
+        return match lower {
+            // Third-party code: a setting away from the work.
+            "node_modules" | "vendor" | "bower_components" | "deps" => (Ico::FolderCog, Tone::Muted),
+            // The source lives here.
+            "src" | "lib" | "libs" | "app" | "cmd" | "internal" => (Ico::FolderCode, Tone::Blue),
+            "scripts" | "tools" => (Ico::FolderCode, Tone::Green),
+            "test" | "tests" | "spec" | "specs" | "__tests__" | "e2e" => (Ico::FolderGit, Tone::Green),
+            "docs" | "doc" | "wiki" | "guides" => (Ico::FolderTree, Tone::Blue),
+            // What a build makes: never the work itself.
+            "dist" | "build" | "out" | "target" | "obj" | ".next" | ".nuxt" | "coverage" => {
+                (Ico::FolderArchive, Tone::Yellow)
+            }
+            "__pycache__" | ".venv" | "venv" | ".cache" | ".tox" | ".gradle" | ".terraform"
+            | ".parcel-cache" | "tmp" | "temp" => (Ico::FolderLock, Tone::Muted),
+            ".github" | ".gitlab" | ".circleci" | ".husky" | "ci" | "workflows" => {
+                (Ico::FolderCog, Tone::Cyan)
+            }
+            // Pictures and what ships to the browser.
+            "assets" | "static" | "public" | "images" | "img" | "media" | "resources"
+            | "fonts" | "icons" | "theme" | "themes" => (Ico::Folder, Tone::Magenta),
+            // A hidden folder is somebody else's bookkeeping.
+            _ if lower.starts_with('.') => (Ico::Folder, Tone::Muted),
+            _ => (Ico::Folder, Tone::Blue),
+        };
     }
-    let lower = name.to_lowercase();
+    // Names that say what the file is, wherever it lives.
+    if lower.starts_with("readme") {
+        return (Ico::FileText, Tone::Blue);
+    }
+    if lower.starts_with("changelog") || lower.starts_with("changes") {
+        return (Ico::FileText, Tone::Cyan);
+    }
+    if lower.starts_with("contributing") {
+        return (Ico::FileText, Tone::Muted);
+    }
+    if matches!(lower, "license" | "licence" | "copying")
+        || lower.starts_with("license.")
+        || lower.starts_with("licence.")
+    {
+        return (Ico::Scale, Tone::Muted);
+    }
+    // Words for the agent are its own kind of file.
+    if matches!(lower, "agents.md" | "claude.md" | "system.md") {
+        return (Ico::Bot, Tone::Cyan);
+    }
+    if lower == "skill.md" {
+        return (Ico::Wrench, Tone::Green);
+    }
+    // A manifest names its project; a lock freezes it.
+    if matches!(lower, "package.json" | "composer.json" | "deno.json")
+        || lower.starts_with("package.")
+    {
+        return (Ico::Package, Tone::Yellow);
+    }
+    if matches!(
+        lower,
+        "package-lock.json"
+            | "yarn.lock"
+            | "pnpm-lock.yaml"
+            | "bun.lock"
+            | "bun.lockb"
+            | "npm-shrinkwrap.json"
+            | "composer.lock"
+            | "cargo.lock"
+            | "go.sum"
+            | "uv.lock"
+            | "poetry.lock"
+            | "pipfile.lock"
+            | "gemfile.lock"
+    ) {
+        return (Ico::FileLock, Tone::Muted);
+    }
+    if matches!(
+        lower,
+        "cargo.toml" | "go.mod" | "requirements.txt" | "pyproject.toml" | "setup.py"
+            | "setup.cfg" | "gemfile" | "podfile" | "build.gradle" | "pom.xml" | "build.zig"
+            | "meson.build"
+    ) {
+        return (Ico::FileCog, Tone::Red);
+    }
+    // How a thing is built or shipped.
+    if matches!(lower, "makefile" | "gnumakefile" | "justfile" | "rakefile" | "jenkinsfile")
+        || lower.starts_with("taskfile.")
+    {
+        return (Ico::FileTerminal, Tone::Green);
+    }
+    if matches!(lower, "dockerfile" | "containerfile") {
+        return (Ico::FileCog, Tone::Cyan);
+    }
+    // A tool's own settings, by the tool's name.
+    if lower.starts_with("tsconfig")
+        || lower.starts_with("jsconfig")
+        || lower.ends_with(".config.js")
+        || lower.ends_with(".config.ts")
+        || lower.ends_with(".config.json")
+        || lower.ends_with(".config.mjs")
+        || matches!(lower, "biome.json" | ".eslintrc" | ".prettierrc" | ".editorconfig")
+    {
+        return (Ico::FileCog, Tone::Cyan);
+    }
+    // Secrets, and git's own say-so (.gitignore, .gitattributes): muted, not a general setting.
+    if lower.starts_with(".env") {
+        return (Ico::FileCog, Tone::Green);
+    }
+    if lower.starts_with(".git") {
+        return (Ico::FileCog, Tone::Muted);
+    }
     let ext = lower.rsplit_once('.').map(|(_, e)| e).unwrap_or("");
     match ext {
         "rs" | "go" | "c" | "h" | "cpp" | "hpp" | "swift" | "kt" | "java" | "cs" | "zig"
-        | "scala" => (Ico::FileCode, theme.red),
+        | "scala" => (Ico::FileCode, Tone::Red),
         "ts" | "tsx" | "js" | "jsx" | "mjs" | "cjs" | "vue" | "svelte" | "astro" => {
-            (Ico::FileCode, theme.yellow)
+            (Ico::FileCode, Tone::Yellow)
         }
-        "py" | "rb" | "php" | "lua" | "pl" | "ex" | "exs" => (Ico::FileCode, theme.blue),
-        "html" | "htm" | "css" | "scss" | "sass" | "less" | "xml" | "svg" => {
-            (Ico::FileCode, theme.magenta)
+        "py" | "rb" | "php" | "lua" | "pl" | "ex" | "exs" => (Ico::FileCode, Tone::Blue),
+        "html" | "htm" | "css" | "scss" | "sass" | "less" | "xml" | "svg" | "hbs" => {
+            (Ico::FileCode, Tone::Magenta)
         }
-        "json" | "jsonc" | "json5" => (Ico::FileJson, theme.yellow),
+        "json" | "jsonc" | "json5" => (Ico::FileJson, Tone::Yellow),
         "yml" | "yaml" | "toml" | "ini" | "conf" | "cfg" | "env" | "properties" | "plist" => {
-            (Ico::FileCog, theme.cyan)
+            (Ico::FileCog, Tone::Cyan)
         }
-        "md" | "mdx" | "txt" | "rst" | "org" | "csv" | "log" => {
-            (Ico::FileText, theme.muted_foreground)
-        }
-        "sh" | "bash" | "zsh" | "fish" | "ps1" => (Ico::FileTerminal, theme.green),
+        "md" | "mdx" | "txt" | "rst" | "org" | "csv" | "log" => (Ico::FileText, Tone::Muted),
+        "sh" | "bash" | "zsh" | "fish" | "ps1" => (Ico::FileTerminal, Tone::Green),
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "ico" | "bmp" | "tiff" | "heic" => {
-            (Ico::FileImage, theme.magenta)
+            (Ico::FileImage, Tone::Magenta)
         }
-        "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" => (Ico::FileAudio, theme.cyan),
-        "mp4" | "mov" | "mkv" | "webm" | "avi" => (Ico::FileVideo, theme.cyan),
+        "mp3" | "wav" | "ogg" | "m4a" | "flac" | "aac" => (Ico::FileAudio, Tone::Cyan),
+        "mp4" | "mov" | "mkv" | "webm" | "avi" => (Ico::FileVideo, Tone::Cyan),
         "zip" | "gz" | "tgz" | "bz2" | "xz" | "7z" | "rar" | "tar" | "zst" => {
-            (Ico::FileArchive, theme.yellow)
+            (Ico::FileArchive, Tone::Yellow)
         }
-        "lock" | "pem" | "key" | "crt" => (Ico::FileLock, theme.muted_foreground),
-        _ if matches!(lower.as_str(), "dockerfile" | "makefile") => (Ico::FileCog, theme.cyan),
+        "lock" | "pem" | "key" | "crt" => (Ico::FileLock, Tone::Muted),
         // A dotfile is a program's settings (.zshrc, .gitconfig).
-        _ if lower.starts_with('.') && !lower[1..].contains('.') => (Ico::FileCog, theme.cyan),
-        _ => (Ico::File, theme.muted_foreground),
+        _ if lower.starts_with('.') => (Ico::FileCog, Tone::Cyan),
+        _ => (Ico::File, Tone::Muted),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{file_kind, Tone};
+    use crate::icons::Ico;
+
+    /// `file_kind` reads a name already lowered, as `file_icon` hands it over.
+    fn kind(name: &str, dir: bool) -> (Ico, Tone) {
+        file_kind(&name.to_lowercase(), dir)
+    }
+
+    #[test]
+    fn a_name_that_says_what_it_is_outranks_its_extension() {
+        assert_eq!(kind("README.md", false), (Ico::FileText, Tone::Blue));
+        assert_eq!(kind("readme", false), (Ico::FileText, Tone::Blue));
+        assert_eq!(kind("CHANGELOG.md", false), (Ico::FileText, Tone::Cyan));
+        assert_eq!(kind("LICENSE", false), (Ico::Scale, Tone::Muted));
+        assert_eq!(kind("AGENTS.md", false), (Ico::Bot, Tone::Cyan));
+        assert_eq!(kind("SYSTEM.md", false), (Ico::Bot, Tone::Cyan));
+        assert_eq!(kind("SKILL.md", false), (Ico::Wrench, Tone::Green));
+        assert_eq!(kind("Cargo.toml", false), (Ico::FileCog, Tone::Red));
+        assert_eq!(kind("Cargo.lock", false), (Ico::FileLock, Tone::Muted));
+        assert_eq!(kind("package.json", false), (Ico::Package, Tone::Yellow));
+        assert_eq!(kind("package-lock.json", false), (Ico::FileLock, Tone::Muted));
+        assert_eq!(kind("pnpm-lock.yaml", false), (Ico::FileLock, Tone::Muted));
+        assert_eq!(kind("Makefile", false), (Ico::FileTerminal, Tone::Green));
+        assert_eq!(kind("Dockerfile", false), (Ico::FileCog, Tone::Cyan));
+        assert_eq!(kind("tsconfig.json", false), (Ico::FileCog, Tone::Cyan));
+        assert_eq!(kind("vite.config.ts", false), (Ico::FileCog, Tone::Cyan));
+        assert_eq!(kind(".env.local", false), (Ico::FileCog, Tone::Green));
+        assert_eq!(kind(".gitignore", false), (Ico::FileCog, Tone::Muted));
+        // Without a known name, the extension still speaks.
+        assert_eq!(kind("main.rs", false), (Ico::FileCode, Tone::Red));
+        assert_eq!(kind("welcome.md", false), (Ico::FileText, Tone::Muted));
+        assert_eq!(kind("post.hbs", false), (Ico::FileCode, Tone::Magenta));
+        assert_eq!(kind(".zshrc", false), (Ico::FileCog, Tone::Cyan));
+    }
+
+    #[test]
+    fn a_folder_says_where_the_work_is() {
+        assert_eq!(kind("node_modules", true), (Ico::FolderCog, Tone::Muted));
+        assert_eq!(kind("src", true), (Ico::FolderCode, Tone::Blue));
+        assert_eq!(kind("tests", true), (Ico::FolderGit, Tone::Green));
+        assert_eq!(kind("docs", true), (Ico::FolderTree, Tone::Blue));
+        assert_eq!(kind("dist", true), (Ico::FolderArchive, Tone::Yellow));
+        assert_eq!(kind("__pycache__", true), (Ico::FolderLock, Tone::Muted));
+        assert_eq!(kind(".github", true), (Ico::FolderCog, Tone::Cyan));
+        assert_eq!(kind("assets", true), (Ico::Folder, Tone::Magenta));
+        assert_eq!(kind(".agents", true), (Ico::Folder, Tone::Muted));
+        // A folder of one's own is plain.
+        assert_eq!(kind("content", true), (Ico::Folder, Tone::Blue));
     }
 }

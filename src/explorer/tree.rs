@@ -108,6 +108,7 @@ impl BenchApp {
                 (Ico::Settings, theme.muted_foreground),
                 "Settings",
                 Some("name, folder, model, Telegram".into()),
+                false,
                 self.explorer.active.as_ref() == Some(&settings),
                 vec![],
                 cx,
@@ -263,6 +264,7 @@ impl BenchApp {
             vec![]
         };
         let target = f.clone();
+        let dim = self.explorer.is_ignored(&f.path);
         bench_ui::tree_row(
             format!("ex-e-{key}"),
             depth,
@@ -270,6 +272,7 @@ impl BenchApp {
             icon,
             f.name().to_string(),
             note,
+            dim,
             chosen,
             acts,
             cx,

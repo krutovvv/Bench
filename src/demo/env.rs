@@ -171,12 +171,30 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
 }
 
 /// The demo's folders, as the agent would list them: (name, is a folder).
+/// What git ignores in the demo blog: the tree dims these rows, as it does for a real
+/// repository (`/api/git/ignored` reads the real ones).
+pub fn ignored(path: &str) -> Vec<String> {
+    match path.trim_end_matches('/') {
+        "/Users/demo/code/blog" => [
+            "/Users/demo/code/blog/node_modules",
+            "/Users/demo/code/blog/dist",
+            "/Users/demo/code/blog/package-lock.json",
+        ]
+        .map(str::to_string)
+        .to_vec(),
+        _ => vec![],
+    }
+}
+
 pub fn listing(path: &str) -> Vec<(String, String, bool)> {
     let names: &[(&str, bool)] = match path.trim_end_matches('/') {
         "/Users/demo/code/blog" => &[
             ("content", true),
             ("theme", true),
+            ("node_modules", true),
+            ("dist", true),
             (".gitignore", false),
+            ("package-lock.json", false),
             ("package.json", false),
             ("README.md", false),
         ],

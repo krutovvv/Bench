@@ -6,6 +6,8 @@
 use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
+use std::collections::HashSet;
+
 use serde_json::json;
 
 use super::{DocKey, Entry, Explorer, FileRef, Named, Naming};
@@ -132,12 +134,29 @@ impl BenchApp {
 
     /// Read a folder's entries: folders first, then by name.
     pub fn list_folder(&mut self, f: FileRef, window: &mut Window, cx: &mut Context<Self>) {
+        self.ensure_ignored(&f, window, cx);
         if self.demo {
             let entries = crate::demo::listing(&f.path)
                 .into_iter()
                 .map(|(name, path, dir)| Entry { name, path, dir })
                 .collect();
             self.explorer.listings.insert(f.listing_key(), entries);
+            let demo_ignored = crate::demo::ignored(&f.path);
+            if !demo_ignored.is_empty() {
+                let root = f.path.clone();
+                match self
+                    .explorer
+                    .ignored
+                    .iter_mut()
+                    .find(|(r, _)| *r == root)
+                {
+                    Some((_, set)) => set.extend(demo_ignored),
+                    None => self
+                        .explorer
+                        .ignored
+                        .push((root, demo_ignored.into_iter().collect())),
+                }
+            }
             return;
         }
         let Some((conn, _)) = self.env_target(&f.project) else {
@@ -171,8 +190,45 @@ impl BenchApp {
         );
     }
 
+    /// Ask the agent what git ignores around this folder, once per folder: the tree dims those
+    /// paths. Not a repository is an answer too (an empty list), so it is not asked twice.
+    fn ensure_ignored(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
+        if self.demo || !self.explorer.ignored_asked.insert(f.listing_key()) {
+            return;
+        }
+        let Some((conn, _)) = self.env_target(&f.project) else {
+            return;
+        };
+        let profile = self.current_profile();
+        let (machine, path) = (f.machine.clone(), f.path.clone());
+        self.background(
+            window,
+            cx,
+            move || rest::git_ignored(&conn, &profile, machine.as_deref(), &path),
+            move |this, r, _, cx| {
+                // Read of a path that vanished mid-flight: no rows to dim anyway.
+                let Ok((root, list)) = r else { return };
+                if root.is_empty() || list.is_empty() {
+                    return;
+                }
+                let set: HashSet<String> = list
+                    .into_iter()
+                    .map(|rel| format!("{root}/{}", rel.trim_end_matches('/')))
+                    .collect();
+                match this.explorer.ignored.iter_mut().find(|(x, _)| *x == root) {
+                    Some((_, known)) => known.extend(set),
+                    None => this.explorer.ignored.push((root, set)),
+                }
+                cx.notify();
+            },
+        );
+    }
+
     /// Every listed folder read again (the agent may have changed them).
     pub fn refresh_explorer(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Ignored paths follow .gitignore and the files themselves: asked for again.
+        self.explorer.ignored.clear();
+        self.explorer.ignored_asked.clear();
         let project = self.explorer.project.clone();
         let root = self.explorer_root();
         let keys: Vec<String> = self.explorer.listings.keys().cloned().collect();
@@ -430,5 +486,14 @@ impl Explorer {
     /// Whether a node of the tree is open.
     pub fn is_open(&self, node: &str) -> bool {
         self.open.contains(node)
+    }
+
+    /// Whether this path is what git ignores: ignored itself, or under an ignored folder
+    /// (`git ls-files --directory` folds such a folder into one line).
+    pub fn is_ignored(&self, path: &str) -> bool {
+        self.ignored.iter().any(|(_, set)| {
+            set.iter()
+                .any(|p| path == *p || (path.starts_with(p.as_str()) && path[p.len()..].starts_with('/')))
+        })
     }
 }

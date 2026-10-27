@@ -97,6 +97,12 @@ pub struct Explorer {
     pub restored: bool,
     /// Folders listed so far, by their path (a project's machine's or the agent's).
     pub listings: HashMap<String, Vec<Entry>>,
+    /// What git ignores, per repository the tree has shown (`/api/git/ignored`): the root, then
+    /// the absolute paths of the ignored files and folders. A row on one of these is dimmed —
+    /// ignored is noise to see past, as Zed shows it.
+    pub ignored: Vec<(String, HashSet<String>)>,
+    /// Folders whose ignored list was asked for ("": not a repository is an answer too).
+    pub ignored_asked: HashSet<String>,
     /// Open documents, the tabs of the middle in order, and the one shown there.
     pub docs: HashMap<DocKey, Doc>,
     pub tabs: Vec<DocKey>,

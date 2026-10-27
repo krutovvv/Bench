@@ -41,7 +41,8 @@ pub fn tree_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx
 }
 
 /// A row of the tree: set in by `depth`, a chevron when it opens (`Some(open)`), its icon in its
-/// color, the name and a muted note after it; lit when chosen; `actions` on hover.
+/// color, the name and a muted note after it; lit when chosen; `dim`: git ignores this path — a
+/// faded icon and name; `actions` on hover.
 #[allow(clippy::too_many_arguments)]
 pub fn tree_row(
     id: impl Into<SharedString>,
@@ -50,6 +51,7 @@ pub fn tree_row(
     icon: (Ico, Hsla),
     name: impl Into<SharedString>,
     note: Option<SharedString>,
+    dim: bool,
     chosen: bool,
     actions: Vec<AnyElement>,
     cx: &App,
@@ -87,8 +89,21 @@ pub fn tree_row(
                     )
                 }),
         )
-        .child(icon.0.icon().small().text_color(icon.1))
-        .child(div().min_w_0().truncate().child(name.into()))
+        .child(
+            div()
+                .flex_none()
+                .flex()
+                .items_center()
+                .when(dim, |d| d.opacity(0.5))
+                .child(icon.0.icon().small().text_color(icon.1)),
+        )
+        .child(
+            div()
+                .min_w_0()
+                .truncate()
+                .when(dim, |d| d.text_color(theme.muted_foreground).opacity(0.5))
+                .child(name.into()),
+        )
         .child(
             div()
                 .flex_1()

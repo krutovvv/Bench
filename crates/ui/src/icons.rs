@@ -7,7 +7,7 @@ use gpui_kit::*;
 
 macro_rules! icons {
     ($($name:ident => $file:literal),* $(,)?) => {
-        #[derive(Clone, Copy, Debug)]
+        #[derive(Clone, Copy, Debug, PartialEq)]
         pub enum Ico { $($name),* }
 
         impl Ico {
@@ -77,6 +77,12 @@ icons! {
     FileTerminal => "file-terminal",
     FileVideo => "file-video",
     FolderGit => "folder-git-2",
+    FolderArchive => "folder-archive",
+    FolderCode => "folder-code",
+    FolderCog => "folder-cog",
+    FolderLock => "folder-lock",
+    Package => "package",
+    Scale => "scale",
     Save => "save",
     ListChecks => "list-checks",
     Tag => "tag",

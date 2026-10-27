@@ -200,6 +200,15 @@ export default (): Module => ({
 		},
 		// The Explorer's editor marks the lines changed since the last commit (`git show HEAD:`).
 		"GET /api/git/head": async (req) => ({ text: await textAtHead(req.query.get("machine"), required(req.query.get("path"), "path")) }),
+		// The Explorer dims what git ignores: the ignored paths of the repository around a folder,
+		// from its root (--directory folds an ignored folder into one line: node_modules/). Not a
+		// repository: an empty list. Ignored-but-tracked files (-c -i) are dimmed too, as in Zed.
+		"GET /api/git/ignored": async (req) => {
+			const script = `root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0; cd "$root"; printf 'ROOT\\t%s\\n' "$root"; git ls-files -o -c -i --exclude-standard --directory 2>/dev/null`;
+			const lines = await shIn(req.query.get("machine"), required(req.query.get("path"), "path"), script, [], 5000);
+			const root = lines.find((l) => l.startsWith("ROOT\t"))?.slice(5) ?? "";
+			return { root, ignored: lines.filter((l) => !l.startsWith("ROOT\t")) };
+		},
 		"GET /api/fs/default-cwd": async (req) => ({ cwd: (await onMachine(req.query.get("machine"), "~"))?.path ?? os.homedir() }),
 		// A branch in its own folder, <repo>/.worktrees/<name>.
 		"POST /api/git/worktree/add": (req) => {

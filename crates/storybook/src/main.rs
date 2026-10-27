@@ -188,6 +188,7 @@ impl Render for Story {
                         (Ico::FileText, cx.theme().muted_foreground),
                         "SYSTEM.md",
                         Some("the soul".into()),
+                        false,
                         true,
                         vec![],
                         cx,
@@ -200,6 +201,7 @@ impl Render for Story {
                         "Skills",
                         None,
                         false,
+                        false,
                         vec![],
                         cx,
                     ))
@@ -210,6 +212,7 @@ impl Render for Story {
                         (Ico::Folder, cx.theme().blue),
                         "release-notes",
                         None,
+                        false,
                         false,
                         vec![],
                         cx,
