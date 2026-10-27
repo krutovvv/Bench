@@ -104,6 +104,13 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         ),
         "part" => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
         "lsp" => app.open_part("p-blog".into(), "lsp", "pyright".into(), window, cx),
+        // The project's terminal under the post, its lines sent to the thread beside.
+        "terminal" => {
+            app.session = Some("d-site".into());
+            app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
+            app.bottom_dock.activate(crate::workspace::Panel::Terminal);
+            app.send_terminal_to_thread(window, cx);
+        }
         // The project's Problems, sent to the thread beside.
         "problems" => {
             app.session = Some("d-site".into());

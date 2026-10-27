@@ -19,7 +19,7 @@ places that every view fills in its own way:
 
 - **The docks** (`src/workspace/dock.rs`, as Zed's): a `Dock` holds a list of `Panel`s and shows
   one at a time, open or folded, at its own size. The window has three — `left_dock`,
-  `right_dock`, `bottom_dock` (under the center, empty until the terminal comes) — drawn
+  `right_dock`, `bottom_dock` (under the center: the project's terminal) — drawn
   around the center by `workspace/layout.rs`, each panel by its own module
   (`BenchApp::render_panel`).
 - **The left dock** shows one panel at a time: `Panel::Threads` (projects and their threads)
@@ -108,8 +108,11 @@ Phases, each a thing of its own:
    click opens the file at its line; "Send to the thread" (and a file tab's "Send its problems
    to the thread") puts them in the composer as a reference (`thread/attachments.rs`
    `Reference::Problems`), beside ⌘L's code.
-3. **A terminal in the bottom dock** on the project's machine — the `/terminal` insert's session
-   (`src/inserts/terminal/session.rs`) in a dock instead of a thread; "Send output to the thread".
+3. **A terminal in the bottom dock** (done): `Panel::Terminal` (`src/inserts/terminal/panel.rs`),
+   ⌃` or the status bar's button — the `/terminal` insert's shell (`servers.rs` `Tab`,
+   `session.rs`) on the project's machine, started in its folder, one per project (the
+   Explorer's while it is shown, else the thread's). "Send to the thread" puts its selection,
+   or its last lines, in the composer (`Reference::Terminal`).
 4. **Git at a glance**: changed lines in the gutter against HEAD, a changed file's diff.
 
 ## Growing it
@@ -118,7 +121,7 @@ Phases, each a thing of its own:
   rows are `FileRef`s — opening, saving, renaming already work for any of them.
 - A diff view, an image viewer, a Markdown preview: another body in `view.rs` `file_pane` for
   the kind of file (`Doc::binary` already says "not text").
-- A panel in a dock (the terminal in the bottom dock, a second thread, a Problems panel): a
+- A panel in a dock (a second thread, a Problems panel): a
   `Panel` variant, its dock's list in `BenchApp::new`, its drawing in `render_panel`. A split
   middle: documents are already shared by key.
 - A thread opening a file (a changed file in its answer) in the editor, itself beside it: done in

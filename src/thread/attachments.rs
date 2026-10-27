@@ -15,6 +15,7 @@ use crate::media::attach;
 pub enum Reference {
     Code(CodeRef),
     Problems(ProblemsRef),
+    Terminal(TerminalRef),
 }
 
 impl Reference {
@@ -23,6 +24,7 @@ impl Reference {
         match self {
             Reference::Code(c) => c.label(),
             Reference::Problems(p) => p.label(),
+            Reference::Terminal(t) => t.label(),
         }
     }
 
@@ -31,6 +33,7 @@ impl Reference {
         match self {
             Reference::Code(c) => c.message(),
             Reference::Problems(p) => p.message(),
+            Reference::Terminal(t) => t.message(),
         }
     }
 
@@ -39,6 +42,7 @@ impl Reference {
         match self {
             Reference::Code(c) => bench_ui::file_icon(&c.path, false, theme),
             Reference::Problems(_) => (bench_ui::icons::Ico::CircleAlert, theme.danger),
+            Reference::Terminal(_) => (bench_ui::icons::Ico::Terminal, theme.muted_foreground),
         }
     }
 }
@@ -69,6 +73,27 @@ impl ProblemsRef {
             "Problems from the language servers{of}:\n```\n{}\n```",
             self.lines.join("\n")
         )
+    }
+}
+
+/// A terminal's output sent to the thread (the bottom dock's, `inserts/terminal/panel.rs`): what
+/// was selected in it, or its last lines.
+#[derive(Clone, Debug, PartialEq)]
+pub struct TerminalRef {
+    /// Where it runs: a server's name, or "this Mac".
+    pub machine: String,
+    pub text: String,
+}
+
+impl TerminalRef {
+    /// `Terminal · dev (12 lines)`.
+    pub fn label(&self) -> String {
+        let n = self.text.lines().count();
+        format!("Terminal · {} ({n} line{})", self.machine, if n == 1 { "" } else { "s" })
+    }
+
+    pub fn message(&self) -> String {
+        format!("The terminal on {} shows:\n```\n{}\n```", self.machine, self.text.trim_end())
     }
 }
 
@@ -233,7 +258,7 @@ impl BenchApp {
 
 #[cfg(test)]
 mod tests {
-    use super::{CodeRef, ProblemsRef, Reference, lines_of, with_references};
+    use super::{CodeRef, ProblemsRef, Reference, TerminalRef, lines_of, with_references};
 
     #[test]
     fn a_selection_names_its_lines() {
@@ -285,5 +310,18 @@ mod tests {
             lines: vec!["x".into(), "y".into()],
         };
         assert_eq!(all.label(), "Problems (2)");
+    }
+
+    #[test]
+    fn a_terminal_reads_as_its_lines_fenced() {
+        let t = TerminalRef {
+            machine: "dev".into(),
+            text: "$ make\nok\n".into(),
+        };
+        assert_eq!(t.label(), "Terminal · dev (2 lines)");
+        assert_eq!(
+            Reference::Terminal(t).message(),
+            "The terminal on dev shows:\n```\n$ make\nok\n```"
+        );
     }
 }

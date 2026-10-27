@@ -59,6 +59,7 @@ impl BenchApp {
             Panel::Threads => self.render_threads_panel(window, cx),
             Panel::Explorer => self.render_explorer_panel(window, cx),
             Panel::Thread => self.render_thread_panel(window, cx),
+            Panel::Terminal => self.render_terminal_panel(window, cx),
         }
     }
 

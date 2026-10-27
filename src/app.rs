@@ -506,7 +506,7 @@ impl BenchApp {
             center: Center::Chat,
             left_dock: Dock::new(DockPosition::Left, &[Panel::Threads, Panel::Explorer], true),
             right_dock: Dock::new(DockPosition::Right, &[Panel::Thread], false),
-            bottom_dock: Dock::new(DockPosition::Bottom, &[], false),
+            bottom_dock: Dock::new(DockPosition::Bottom, &[Panel::Terminal], false),
             explorer: Default::default(),
             skills: vec![],
             skill_open: None,

@@ -2,6 +2,7 @@
 //! on (`thread_machine()`). As tall as its text (its program still sees a whole screen); "to the
 //! background" leaves its head, and the status bar lists it.
 
+pub mod panel;
 pub mod servers;
 #[cfg(not(target_family = "wasm"))]
 pub mod session;

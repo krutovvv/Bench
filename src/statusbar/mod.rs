@@ -292,6 +292,13 @@ impl BenchApp {
                     background_terms,
                 ))
             })
+            // The bottom dock's terminal, on the project's machine (⌃`).
+            .child({
+                let open = self.bottom_dock.shows(crate::workspace::Panel::Terminal);
+                button("terminal-panel", Ico::PanelBottom, "Terminal  ⌃`", open).on_click(
+                    cx.listener(|this, _, window, cx| this.toggle_terminal_panel(window, cx)),
+                )
+            })
             .child(
                 button("attach", Ico::Paperclip, "Attach files", false)
                     .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),

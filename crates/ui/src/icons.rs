@@ -82,6 +82,7 @@ icons! {
     Loader => "loader-circle",
     MemoryStick => "memory-stick",
     Mic => "mic",
+    PanelBottom => "panel-bottom",
     PanelLeft => "panel-left",
     PanelRight => "panel-right",
     FolderTree => "folder-tree",

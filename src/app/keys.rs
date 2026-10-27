@@ -22,6 +22,11 @@ impl BenchApp {
         if ks.key == "escape" && !m.modified() {
             return self.escape(cx);
         }
+        // ⌃`: the terminal under the center, as in Zed and VS Code.
+        if ks.key == "`" && m.control && !m.platform && !m.alt && !m.shift {
+            self.toggle_terminal_panel(window, cx);
+            return true;
+        }
         if !m.platform || m.control || m.alt {
             return false;
         }

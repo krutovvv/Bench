@@ -13,6 +13,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change a queued message's row or its buttons | `src/thread/queued.rs` (the row and its actions: `queued`, `queue_edit_*`) |
 | change the ticks on the right of the thread | `src/thread/rail.rs` |
 | change the composer | `src/thread/composer.rs` (its pop-up `slash.rs`, files `attachments.rs`, drafts `drafts.rs`), sending in `src/thread/send.rs` (`send`) |
+| change the terminal in the bottom dock (⌃`) | `src/inserts/terminal/panel.rs` (the shell itself: `session.rs`, `view.rs`) |
 | change an insert (`/terminal`, `/tasks`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
 | add an insert | `.agents/skills/bench-kit/references/build-insert.md` |
 | change a project's Settings (name, where, model, Telegram) or its parts (MCP, language servers, schedule) | `src/env/<section>.rs` (`mcp.rs`, `schedule.rs`, `telegram.rs`…); the page `src/env/page.rs`; a new section: `src/env/mod.rs` header |
