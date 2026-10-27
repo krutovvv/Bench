@@ -21,9 +21,10 @@ pub struct Thread {
     head: u64,
     /// Messages the person sent that the journal has not shown yet, in the order sent.
     sent: Vec<String>,
-    /// Whether the agent has a plan it is working through (its steps are the view's). Like
-    /// `sent`, it is a live fact beside the journal: it puts a row where the work is.
-    plan: bool,
+    /// The plan the agent is working through, dated when it wrote it (the agent's `todos_at`):
+    /// the row stands in that turn. Like `sent`, a live fact beside the journal; the steps
+    /// themselves are the view's, so a step's status or a fold changes no row.
+    plan_at: Option<f64>,
     /// Grows with every change, so a view knows when to rebuild its rows.
     version: u64,
 }
@@ -119,11 +120,18 @@ impl Thread {
         self.version += 1;
     }
 
-    /// The agent's plan is open (or is over): the row comes or goes where the work in progress
-    /// is, above what waits. Only a change rebuilds the rows.
-    pub fn set_plan(&mut self, on: bool) {
-        if self.plan != on {
-            self.plan = on;
+    /// The agent wrote a plan (`Some(at)`, dated) or has none left to work through (`None`). The
+    /// date is the plan's own and does not change while it lives, so this moves the row once,
+    /// not on every step. Only a change rebuilds the rows.
+    pub fn set_plan(&mut self, at: Option<f64>) {
+        // A payload that carries no date (a tool's completion repeats the steps) says nothing
+        // about when the plan began: the date it has keeps its place.
+        let at = match at {
+            Some(0.) if self.plan_at.is_some() => self.plan_at,
+            other => other,
+        };
+        if self.plan_at != at {
+            self.plan_at = at;
             self.version += 1;
         }
     }
@@ -148,7 +156,9 @@ impl Thread {
             self.running,
             &self.stream,
             &self.sent,
-            self.plan,
+            // A plan is the plan of work being done: with no run there is none, and the steps
+            // the agent left behind tell nothing the thread does not already say.
+            self.running.then_some(self.plan_at).flatten(),
             &self.queue,
         )
     }

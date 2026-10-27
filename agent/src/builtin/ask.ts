@@ -29,7 +29,7 @@ export const clarify = defineTool({
 export const todo = defineTool({
 	name: "todo",
 	description:
-		"Keep a plan for work of 3+ steps, shown to the person: pass the whole list each time. Statuses: pending, in_progress (one at a time), completed, cancelled.",
+		"Keep a plan for work of 3+ steps, shown to the person: pass the whole list each time. Statuses: pending, in_progress (one at a time), completed, cancelled. Keep it current with every call: a step goes in_progress before you start it and completed the moment it is done, cancelled once you drop it — a plan left as it was reads to the person as work still owed, and is worse than no plan at all.",
 	parameters: Type.Object({
 		todos: Type.Array(
 			Type.Object({

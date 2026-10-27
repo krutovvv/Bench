@@ -188,13 +188,14 @@ impl ActiveThread {
             }
             // The plan row shows work still ahead: once no step is pending or in progress (the
             // agent finished the plan, or dropped it as wrong), the row goes by itself — a plan
-            // that is over tells nothing the thread does not already say.
-            Evt::Todos(_, todos, _at) => {
+            // that is over tells nothing the thread does not already say. The date the agent gave
+            // the plan is where its row stands: the turn it was made for.
+            Evt::Todos(_, todos, at) => {
                 let ahead = todos
                     .iter()
                     .any(|t| t.status == "pending" || t.status == "in_progress");
                 self.todos = if ahead { todos.clone() } else { Vec::new() };
-                self.journal.set_plan(ahead);
+                self.journal.set_plan(ahead.then(|| *at));
             }
             Evt::Usage(_, usage) => self.usage = Some(usage.clone()),
             // Running ones first, then the newest.

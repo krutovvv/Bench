@@ -147,6 +147,9 @@ impl ThreadView {
                     text: "Skip the pricing table for now, it goes in the next release.".into(),
                 },
             ]));
+            // A queue like this means a live run: the plan of that run shows, and it shows in
+            // the turn it was made for — a date past the last message is the turn going on now.
+            self.thread.journal.apply(protocol::ThreadEvent::Run(true));
             self.thread.todos = ["done", "doing", "next"]
                 .into_iter()
                 .zip(["completed", "in_progress", "pending"])
@@ -156,7 +159,7 @@ impl ThreadView {
                     depth: 0,
                 })
                 .collect();
-            self.thread.journal.set_plan(true);
+            self.thread.journal.set_plan(Some(f64::MAX));
         }
     }
 

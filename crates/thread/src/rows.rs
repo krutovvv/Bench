@@ -35,9 +35,9 @@ pub enum Row {
     },
     /// Why a run stopped.
     Fail { key: String, text: String },
-    /// The plan the agent is working through now. Its steps are the thread view's, not the
-    /// journal's: the row only says a plan is open, and stands with the work it plans — before
-    /// the messages that wait. Folded or not, it is the same row.
+    /// The plan the agent is working through. Its steps are the thread view's, not the
+    /// journal's: the row only says a plan is open, and it stands in the turn the agent dated it
+    /// in — before the next message and before what waits. Folded or not, it is the same row.
     Plan { key: String },
     /// The answer being written now (its text; the model's reasoning is not shown while it streams).
     Writing { text: String },
@@ -87,13 +87,15 @@ impl Step {
     }
 }
 
+/// `plan` is the plan the agent is working through, dated when it wrote it (`todos_at`): its row
+/// stands in that turn. `None` is no plan.
 pub(crate) fn rows_of(
     log: &[ThreadItem],
     inserts: &Map<String, Value>,
     running: bool,
     stream: &(String, String),
     sent: &[String],
-    plan: bool,
+    plan: Option<f64>,
     queue: &[QueuedItem],
 ) -> Vec<Row> {
     // An assistant entry with tool calls is work: its text is a note on the way, not an answer.
@@ -291,11 +293,19 @@ pub(crate) fn rows_of(
             text: stream.1.clone(),
         });
     }
-    // The plan of the work in progress goes where that work is: what the person sent since
-    // waits for it, so neither an optimistic row nor a queued one stands above the steps being
-    // taken now.
-    if plan {
-        rows.push(Row::Plan { key: "plan".into() });
+    // The plan stands in the turn it was made for: the agent dated it, so it goes after the last
+    // row of that turn — before the next message and before what waits, wherever the run has
+    // come to since. While the turn that made it is the live one, that is right after its work.
+    if let Some(at) = plan {
+        // No date to go by (an agent that does not date its plans): the end of the journal.
+        let after = if at > 0. {
+            rows.iter()
+                .position(|r| matches!(r, Row::User { at: Some(a), .. } if *a > at))
+                .unwrap_or(rows.len())
+        } else {
+            rows.len()
+        };
+        rows.insert(after, Row::Plan { key: "plan".into() });
     }
     rows.extend(sent.iter().enumerate().map(|(k, t)| Row::User {
         key: format!("sent-{k}"),

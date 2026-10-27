@@ -104,11 +104,11 @@ fn a_turn_is_message_work_answer() {
     assert_eq!((*from, *to), (Some(2000.), Some(5000.)));
 }
 
-/// The plan belongs to the work being done now, the queue to what comes after it: the row
-/// stands with its work, above every message that waits — by the rule of order, not by nailing
-/// it to a place.
+/// The plan belongs to the turn that made it: the agent dates it, and the row stands in that
+/// turn as newer messages come — above what waits, wherever the run has gone since. By the rule
+/// of order, not by nailing it to a place.
 #[test]
-fn rule_1_the_plan_stands_with_its_work_not_after_what_waits() {
+fn rule_1_the_plan_stands_in_the_turn_it_was_made_for() {
     let mut t = Thread::open(ThreadOpen {
         items: vec![user(1, "go"), tool(2, 0, "a")],
         running: true,
@@ -120,7 +120,8 @@ fn rule_1_the_plan_stands_with_its_work_not_after_what_waits() {
         ["user:go", "work:1+", "queued:later"],
         "no plan, no row"
     );
-    t.set_plan(true);
+    // Dated inside the turn going on now: right after its work, above what waits.
+    t.set_plan(Some(2000.));
     assert_eq!(
         kinds(&t.rows()),
         ["user:go", "work:1+", "plan", "queued:later"]
@@ -137,20 +138,87 @@ fn rule_1_the_plan_stands_with_its_work_not_after_what_waits() {
             "queued:later"
         ]
     );
-    // The plan over: the row goes, the waiting rows stay where they were.
-    let v = t.version();
-    t.set_plan(true);
-    assert_eq!(t.version(), v, "the same plan says nothing new");
-    t.set_plan(false);
+    // The agent takes up the next message: the plan stays where it was made, above it.
+    t.apply(ThreadEvent::Append(vec![user(7, "next"), tool(8, 0, "b")]));
     assert_eq!(
         kinds(&t.rows()),
         [
             "user:go",
+            "work:1",
+            "plan",
+            "user:next",
             "work:1+",
             "user:and one more thing",
             "queued:later"
         ]
     );
+    // A plan of an older turn is placed in it at once (the thread came back to it, or the date
+    // arrived with the plan).
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![
+            user(1, "go"),
+            text(2, 0, "Done."),
+            user(3, "next"),
+            text(4, 0, "Again."),
+        ],
+        running: true,
+        ..Default::default()
+    });
+    t.set_plan(Some(1500.));
+    assert_eq!(
+        kinds(&t.rows()),
+        [
+            "user:go",
+            "answer:Done.",
+            "plan",
+            "user:next",
+            "answer:Again."
+        ],
+        "a plan dated in an older turn is placed in it, not at the bottom"
+    );
+}
+
+/// A plan is the plan of work being done: no run, no plan — the steps the agent left behind
+/// tell nothing the thread does not already say. Its date is its own and survives a payload
+/// that repeats the steps without one.
+#[test]
+fn a_plan_lives_with_its_run_and_keeps_its_date() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go"), tool(2, 0, "a")],
+        running: true,
+        ..Default::default()
+    });
+    t.set_plan(Some(2000.));
+    let v = t.version();
+    t.set_plan(Some(2000.));
+    assert_eq!(t.version(), v, "the same plan says nothing new");
+    // The run ends: the row goes, the date stays for the next run.
+    t.apply(ThreadEvent::Run(false));
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:1"]);
+    t.apply(ThreadEvent::Run(true));
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:1+", "plan"]);
+    // A tool's completion repeats the steps but carries no date: the plan keeps its place.
+    t.apply(ThreadEvent::Append(vec![user(7, "next")]));
+    t.set_plan(Some(0.));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:1", "plan", "user:next", "work:0+"],
+        "the plan of the older turn stayed in it"
+    );
+    // An agent that does not date its plans: the plan goes at the end of the journal.
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "go"), user(2, "next")],
+        running: true,
+        ..Default::default()
+    });
+    t.set_plan(Some(0.));
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "user:next", "work:0+", "plan"]
+    );
+    // The plan over: the row goes, the waiting rows do not move.
+    t.set_plan(None);
+    assert_eq!(kinds(&t.rows()), ["user:go", "user:next", "work:0+"]);
 }
 
 #[test]
