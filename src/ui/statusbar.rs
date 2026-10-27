@@ -35,8 +35,8 @@ impl BenchApp {
         let button = |id: &'static str, icon: Ico, tip: &'static str, active: bool| {
             item(id)
                 .cursor_pointer()
+                // Muted from `item`; the accent while its panel is open, so set after it.
                 .when(active, |d| d.text_color(theme.primary))
-                .text_color(muted)
                 .text_xs()
                 .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
                 .child(icon.icon().small())
