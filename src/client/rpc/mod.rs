@@ -73,6 +73,9 @@ pub enum Cmd {
         profile: String,
         session: String,
     },
+    /// The person's hold: stand the run at its next step boundary (`true`), let it go on
+    /// (`false`). The answer being written is let through — only new steps wait.
+    SetPaused { session: String, paused: bool },
     /// How fast the model wrote in the answer that just ended, as Bench measured it from the
     /// stream (`crate::statusbar::speed::Stat`). The agent keeps it with the thread.
     SaveSpeed {

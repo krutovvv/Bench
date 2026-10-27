@@ -254,6 +254,15 @@ impl Rpc {
                     Pending::Ignore,
                 )?
             }
+            Cmd::SetPaused { session, paused } => self.call(
+                if paused {
+                    "session.pause"
+                } else {
+                    "session.unpause"
+                },
+                json!({"session_id": session}),
+                Pending::Ignore,
+            )?,
             Cmd::Regenerate {
                 profile,
                 session,

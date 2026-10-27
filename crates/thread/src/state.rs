@@ -15,6 +15,8 @@ pub struct Thread {
     queue: Vec<QueuedItem>,
     inserts: Map<String, Value>,
     running: bool,
+    /// The person held the run at a step boundary; it waits until they let it go on.
+    paused: bool,
     /// The answer being written: (reasoning, text).
     stream: (String, String),
     /// The last entry id seen: `thread.open {since: head}` after a reconnect.
@@ -31,6 +33,7 @@ impl Thread {
             queue: o.queue,
             inserts: o.inserts,
             running: o.running,
+            paused: o.paused,
             head: o.head,
             ..Default::default()
         };
@@ -44,6 +47,7 @@ impl Thread {
         self.queue = o.queue;
         self.inserts = o.inserts;
         self.running = o.running;
+        self.paused = o.paused;
         if !o.running {
             self.stream = Default::default();
         }
@@ -65,8 +69,10 @@ impl Thread {
                 self.running = on;
                 if !on {
                     self.stream = Default::default();
+                    self.paused = false;
                 }
             }
+            ThreadEvent::Paused(on) => self.paused = on,
         }
         self.version += 1;
     }
@@ -134,6 +140,7 @@ impl Thread {
             &self.log,
             &self.inserts,
             self.running,
+            self.paused,
             &self.stream,
             &self.sent,
             &self.queue,
@@ -153,6 +160,10 @@ impl Thread {
 
     pub fn running(&self) -> bool {
         self.running
+    }
+
+    pub fn paused(&self) -> bool {
+        self.paused
     }
 
     pub fn head(&self) -> u64 {

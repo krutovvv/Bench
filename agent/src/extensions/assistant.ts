@@ -110,6 +110,10 @@ export const assistant = defineExtension({
 		compactWithoutReasoning,
 		hook(ToolTask, {
 			beforeTool: async (call: any) => {
+				// The person's hold, felt before any next step — the current answer and the step
+				// already running are let through; nothing new begins until the hold lifts.
+				const held = host().session(call.conversationId ?? call.conversation?.id);
+				if (held) await host().hold(held.id);
 				if (call.name !== "bash") return undefined;
 				const info = host().session(call.conversationId ?? call.conversation?.id);
 				if (!info || approvalsMode(info.profile) !== "manual") return undefined;

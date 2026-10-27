@@ -46,6 +46,9 @@ interface Live {
 	row: SessionRow;
 	conversation: Conversation;
 	busy: boolean;
+	/** The person's hold: the run stands at a step boundary until the gate opens. */
+	paused: boolean;
+	hold?: { promise: Promise<void>; release: () => void };
 	generation: number;
 	abort?: AbortController;
 	/** Text of the in-flight assistant message per content block, to turn snapshots into deltas. */
@@ -348,6 +351,7 @@ export class Runtime {
 			row,
 			conversation,
 			busy: false,
+			paused: false,
 			generation: 0,
 			blocks: new Map(),
 			answer: "",
@@ -427,6 +431,8 @@ export class Runtime {
 		}
 		live.busy = true;
 		live.generation++;
+		// A fresh turn starts free: any earlier hold belongs to the turn it ended with.
+		this.unhold(live);
 		live.answer = "";
 		live.blocks.clear();
 		live.abort = new AbortController();
@@ -442,12 +448,50 @@ export class Runtime {
 	async interrupt(id: string): Promise<void> {
 		const live = this.live.get(id);
 		if (!live) return;
+		// A stop outranks a hold: nobody stands waiting on a run that is ending.
+		this.unhold(live);
 		live.abort?.abort();
 		for (const [pid, p] of live.prompts) {
 			p.resolve("");
 			live.prompts.delete(pid);
 		}
 		await live.conversation.abort(ctx);
+	}
+
+	// ---- the hold (the person's pause) ---------------------------------------------
+
+	/** Stand the run at its next step boundary: the answer being written is let through —
+	 * stopping mid-sentence cuts Pi's turn — but no new call begins until the person lets it
+	 * go on. The actions phase is where the minutes go; that is what the hold answers to. */
+	pause(id: string): void {
+		const live = this.live.get(id);
+		if (!live || !live.busy || live.paused) return;
+		let release!: () => void;
+		const promise = new Promise<void>((r) => (release = r));
+		live.paused = true;
+		live.hold = { promise, release };
+		this.emit(id, "thread.pause", { paused: true });
+	}
+
+	/** Let the held run take its next step. */
+	resume(id: string): void {
+		const live = this.live.get(id);
+		if (!live) return;
+		if (!live.paused) return;
+		this.unhold(live);
+		this.emit(id, "thread.pause", { paused: false });
+	}
+
+	private unhold(live: Live): void {
+		live.paused = false;
+		live.hold?.release();
+		live.hold = undefined;
+	}
+
+	/** Called before every tool call: waits while the person holds the run. */
+	async hold(sessionId: string): Promise<void> {
+		const live = this.live.get(sessionId);
+		while (live?.paused && live.hold) await live.hold.promise;
 	}
 
 	// ---- the queue (Pi's inbox) ------------------------------------------------
@@ -711,6 +755,11 @@ export class Runtime {
 				return row ? this.sessionInfo(row) : undefined;
 			},
 			adopt: (conversationId, sessionId) => void this.adopted.set(String(conversationId), sessionId),
+			// A subagent's call waits on its parent's hold too: the person holds the whole work.
+			hold: async (sessionId) => {
+				const live = this.live.get(sessionId);
+				while (live?.paused && live.hold) await live.hold.promise;
+			},
 			busyElsewhere: (sessionId) => [...this.live.values()].filter((l) => l.busy && l.row.id !== sessionId).length,
 			ask: async (sessionId, question, choices, multiSelect, signal) => {
 				const live = await this.session(sessionId);
@@ -953,6 +1002,10 @@ export class Runtime {
 	private finish(live: Live): void {
 		if (!live.busy) return;
 		live.busy = false;
+		// Whatever the person held, the run is over: the hold lets go, nobody waits on it.
+		const wasHeld = live.paused;
+		this.unhold(live);
+		if (wasHeld) this.emit(live.row.id, "thread.pause", { paused: false });
 		this.emit(live.row.id, "thread.run", { running: false });
 		// The turn's blended rate, as one number worth remembering.
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);
@@ -1026,7 +1079,7 @@ export class Runtime {
 	 * queue, the inserts' state, and whether a run is live. `head` is the last entry id: Bench asks
 	 * with `since: head` after a reconnect and gets only what it missed.
 	 */
-	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; head: number }> {
+	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; paused: boolean; head: number }> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const entries: any[] = [];
@@ -1052,6 +1105,7 @@ export class Runtime {
 			queue: queueOf(inbox as any),
 			inserts: doc?.items ?? {},
 			running: live.busy,
+			paused: live.paused,
 			head,
 		};
 	}

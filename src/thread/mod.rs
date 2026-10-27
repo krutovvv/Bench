@@ -421,6 +421,7 @@ impl ThreadView {
                 from,
                 to,
                 live,
+                paused,
                 plan,
                 asks,
             } => self.render_work(
@@ -429,6 +430,7 @@ impl ThreadView {
                 from,
                 to,
                 live,
+                paused,
                 &plan,
                 &asks,
                 live && !self.thread.processes.is_empty(),

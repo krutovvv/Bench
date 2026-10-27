@@ -26,6 +26,10 @@ status: string, parent?: string, };
 
 export type QueuedItem = { key: string, sub: string, mode: string, text: string, };
 
-export type ThreadOpen = { items: Array<ThreadItem>, queue: Array<QueuedItem>, inserts: Record<string, unknown>, running: boolean, head: number, };
+export type ThreadOpen = { items: Array<ThreadItem>, queue: Array<QueuedItem>, inserts: Record<string, unknown>, running: boolean, 
+/**
+ * The person held the run at a step boundary; it waits until they let it go on.
+ */
+paused: boolean, head: number, };
 
 export type StreamKind = "text" | "thought";

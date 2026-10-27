@@ -216,6 +216,9 @@ pub struct ThreadOpen {
     pub inserts: Map<String, Value>,
     #[serde(default)]
     pub running: bool,
+    /// The person held the run at a step boundary; it waits until they let it go on.
+    #[serde(default)]
+    pub paused: bool,
     #[serde(default)]
     #[ts(type = "number")]
     pub head: u64,
@@ -242,6 +245,8 @@ pub enum ThreadEvent {
     Inserts(Map<String, Value>),
     /// A run started or ended.
     Run(bool),
+    /// The person held the run at a step boundary, or let it go on.
+    Paused(bool),
 }
 
 impl ThreadEvent {
@@ -257,6 +262,7 @@ impl ThreadEvent {
             "thread.queue" => ThreadEvent::Queue(serde_json::from_value(items()).ok()?),
             "thread.inserts" => ThreadEvent::Inserts(items().as_object()?.clone()),
             "thread.run" => ThreadEvent::Run(payload.get("running")?.as_bool()?),
+            "thread.pause" => ThreadEvent::Paused(payload.get("paused")?.as_bool()?),
             _ => return None,
         })
     }
@@ -299,6 +305,10 @@ mod tests {
         assert_eq!(
             ThreadEvent::parse("thread.run", &json!({"running": false})),
             Some(ThreadEvent::Run(false))
+        );
+        assert_eq!(
+            ThreadEvent::parse("thread.pause", &json!({"paused": true})),
+            Some(ThreadEvent::Paused(true))
         );
         assert_eq!(
             ThreadEvent::parse("thread.queue", &json!({"items": []})),

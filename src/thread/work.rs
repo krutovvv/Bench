@@ -22,6 +22,8 @@ impl ThreadView {
         from: Option<f64>,
         to: Option<f64>,
         live: bool,
+        // The run stands held at a step boundary; the hold's own button shows it.
+        paused: bool,
         plan: &[(String, Vec<PlanStep>)],
         asks: &[AskCard],
         procs: bool,
@@ -52,25 +54,31 @@ impl ThreadView {
             parts.push((clock(s as u64), muted));
         }
         let has_parts = !parts.is_empty();
-        // What the agent is doing now: its newest signal, in a line. Words the model wrote
-        // beat everything until the next thing happens; while a call is the newest thing, a
-        // short word for its kind reads better than a command; before anything, the neutral
-        // word. A finished piece says Done.
-        let doing = live.then(|| {
-            steps
-                .iter()
+        // What the agent is doing now, in a line: the words it wrote — the narrative of what
+        // it is after — and, when a call is the newest thing, a short word for its kind after
+        // a dot: the story and the concrete step at once. Commands and paths stay where they
+        // belong — in the opened step list. Before any word: the neutral one. Held: no
+        // shimmer, and the hold's button says why.
+        let last_live = steps.iter().rev().find(|s| !matches!(s, Step::Thought(_)));
+        let narrative = steps.iter().rev().find_map(|s| match s {
+            Step::Note(t) => t
+                .lines()
                 .rev()
-                .find_map(|s| match s {
-                    Step::Note(t) => t
-                        .lines()
-                        .rev()
-                        .map(str::trim)
-                        .find(|l| !l.is_empty() && !l.starts_with('#'))
-                        .map(|l| clip(l, 160)),
-                    Step::Thought(_) => Some("Thinking…".to_string()),
-                    Step::Tool { name, preview, .. } => Some(activity_word(name, preview)),
-                })
-                .unwrap_or_else(|| "Thinking…".to_string())
+                .map(str::trim)
+                .find(|l| !l.is_empty() && !l.starts_with('#'))
+                .map(|l| clip(l, 120)),
+            _ => None,
+        });
+        let doing = live.then(|| match last_live {
+            Some(Step::Tool { name, preview, .. }) => {
+                let w = activity_word(name, preview);
+                match narrative {
+                    Some(n) => format!("{n} · {w}"),
+                    None => w,
+                }
+            }
+            Some(Step::Note(_)) => narrative.unwrap_or_else(|| "Thinking…".to_string()),
+            _ => "Thinking…".to_string(),
         });
         let work_key = key.to_string();
         let summary = h_flex()
@@ -88,12 +96,24 @@ impl ThreadView {
                     .child(if k == 0 { t } else { format!("· {t}") })
             }))
             .map(|d| match doing {
-                Some(label) => d.child(
-                    div()
-                        .min_w_0()
-                        .truncate()
-                        .child(ShimmerText::new(label).text_base().text_color(muted)),
-                ),
+                Some(label) => {
+                    // The narrative continues the counts; with no counts it stands alone.
+                    let label = if has_parts {
+                        format!("· {label}")
+                    } else {
+                        label
+                    };
+                    d.child(
+                        div().min_w_0().truncate().child(if paused {
+                            div().text_color(muted).child(label).into_any_element()
+                        } else {
+                            ShimmerText::new(label)
+                                .text_base()
+                                .text_color(muted)
+                                .into_any_element()
+                        }),
+                    )
+                },
                 // A piece of work without tool calls was the model thinking before it answered.
                 None => d.child(div().flex_none().child(
                     match (has_parts, tools > 0 || errors > 0) {
@@ -103,6 +123,49 @@ impl ThreadView {
                         (false, false) => "Thought",
                     },
                 )),
+            })
+            // The hold and the stop, at the far edge while the run is live: the actions are
+            // where the minutes go, so the answers to them ride the actions' own line, always
+            // in sight, and never make the line jump. A finished run has nothing to hold.
+            .when(live, |d| {
+                let held = paused;
+                let stop_view = self.thread_ref();
+                d.child(
+                    h_flex()
+                        .flex_none()
+                        .ml_auto()
+                        .gap_1()
+                        .child(
+                            bench_ui::head_icon_button(
+                                "work-hold",
+                                if held { Ico::Play } else { Ico::Pause },
+                                if held { "Resume" } else { "Pause" },
+                                cx,
+                            )
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.claim_click(cx);
+                                this.set_paused(!held, cx);
+                            })),
+                        )
+                        .child(
+                            bench_ui::head_icon_button("work-stop", Ico::Square, "Stop", cx)
+                                .on_click(cx.listener(move |this, _, _, cx| {
+                                    this.claim_click(cx);
+                                    if let (Some(profile), Some(session)) =
+                                        (this.profile(cx), stop_view.runtime.clone())
+                                    {
+                                        this.cmd(
+                                            crate::client::rpc::Cmd::Interrupt {
+                                                profile,
+                                                session,
+                                            },
+                                            cx,
+                                        );
+                                    }
+                                    cx.notify();
+                                })),
+                        ),
+                )
             })
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.claim_click(cx);

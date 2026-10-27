@@ -362,33 +362,7 @@ impl BenchApp {
                         .on_click(cx.listener(|this, _, window, cx| this.toggle_mic(window, cx)))
                 }
             })
-            // Stop last, at the window's edge: a filled chip is the heaviest thing on the bar, so
-            // it belongs at the end, not among the flat icons (⌘. does the same).
-            .when(self.thread(cx).live.is_some(), |d| {
-                d.child(
-                    h_flex().h_full().items_center().pl_1().pr_2().child(
-                        div()
-                            .id("stop")
-                            .h(px(20.))
-                            .px_2()
-                            .flex()
-                            .items_center()
-                            .gap_1()
-                            .cursor_pointer()
-                            .rounded_md()
-                            .bg(theme.danger)
-                            .text_color(theme.danger_foreground)
-                            .text_xs()
-                            .hover(|s| s.opacity(0.85))
-                            .child(Ico::Square.icon().xsmall())
-                            .child("Stop")
-                            .tooltip(|window, cx| Tooltip::new("Stop  ⌘.").build(window, cx))
-                            .on_click(cx.listener(|this, _, _, cx| {
-                                this.click_claimed = true;
-                                this.stop(cx);
-                            })),
-                    ),
-                )
-            })
+            // No Stop here anymore: the hold and the stop ride the actions' own line in the
+            // thread — where the minutes go, there the answers belong too (⌘. still works).
     }
 }

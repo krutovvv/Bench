@@ -98,6 +98,7 @@ icons! {
     Paperclip => "paperclip",
     Pencil => "pencil",
     Pin => "pin",
+    Pause => "pause",
     Play => "play",
     Plus => "plus",
     Power => "power",

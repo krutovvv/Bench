@@ -97,6 +97,15 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			await rt.interrupt(session_id);
 			return { ok: true };
 		},
+		// The person's hold: stand the run at its next step boundary, then let it go on.
+		"session.pause": ({ session_id }) => {
+			rt.pause(String(session_id));
+			return { ok: true };
+		},
+		"session.unpause": ({ session_id }) => {
+			rt.resume(String(session_id));
+			return { ok: true };
+		},
 		"session.undo": async ({ session_id }) => {
 			await rt.undo(session_id);
 			return { ok: true };

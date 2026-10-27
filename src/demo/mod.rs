@@ -458,7 +458,7 @@ fn run(cx: &mut Context<BenchApp>) {
                     at: Some(now),
                 },
                 ThreadItem::Tool {
-                    key: "901.1".into(),
+                    key: "901.2".into(),
                     seq: 901,
                     call_id: "c901".into(),
                     name: "web_fetch".into(),
@@ -468,8 +468,25 @@ fn run(cx: &mut Context<BenchApp>) {
                 },
             ]),
         ));
+        // Words the model wrote between its thinking and the call: the line of work shows
+        // this narrative, with the newest call's kind after a dot.
         events.push((
-            600,
+            400,
+            ThreadEvent::Append(vec![ThreadItem::Text {
+                key: "901.1".into(),
+                seq: 901,
+                text: "Checking the traffic splits, then rewriting the query.".into(),
+                at: Some(now),
+                error: None,
+            }]),
+        ));
+        // BENCH_DEMO_PAUSED=1 holds the run mid-work, for the hold's picture.
+        if std::env::var("BENCH_DEMO_PAUSED").is_ok() {
+            events.push((400, ThreadEvent::Paused(true)));
+            events.push((6000, ThreadEvent::Paused(false)));
+        }
+        events.push((
+            3000,
             ThreadEvent::Append(vec![ThreadItem::Result {
                 key: "902.0".into(),
                 seq: 902,

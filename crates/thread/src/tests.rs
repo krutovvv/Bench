@@ -43,6 +43,14 @@ fn result(seq: u64, call: &str) -> ThreadItem {
         at: Some(seq as f64 * 1000.),
     }
 }
+fn thought(seq: u64, sub: u32, t: &str) -> ThreadItem {
+    ThreadItem::Thought {
+        key: format!("{seq}.{sub}"),
+        seq,
+        text: t.into(),
+        at: Some(seq as f64 * 1000.),
+    }
+}
 fn queued(sub: u64, t: &str) -> QueuedItem {
     QueuedItem {
         key: format!("q{sub}"),
@@ -645,5 +653,62 @@ fn reasoning_streams_as_one_line_not_as_text() {
         kinds(&t.rows()),
         ["user:go", "work:1+", "writing:Here"],
         "only the answer is written out"
+    );
+}
+
+#[test]
+fn words_before_a_call_are_notes_on_the_work_line() {
+    // The model says what it's about to do, then calls: those words belong to the line of
+    // work — its narrative — not to an answer row.
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![
+            user(1, "fix it"),
+            text(2, 0, "Reading the test first."),
+            tool(2, 1, "a"),
+        ],
+        ..ThreadOpen::default()
+    });
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:fix it", "work:1"],
+        "the turn is one line of work"
+    );
+    let Row::Work { steps, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert_eq!(
+        steps.first(),
+        Some(&Step::Note("Reading the test first.".into())),
+        "the words are the line's narrative, standing before the call"
+    );
+}
+
+#[test]
+fn a_turn_that_only_answers_stays_an_answer() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "hi"), text(2, 0, "Hello!")],
+        ..ThreadOpen::default()
+    });
+    assert_eq!(kinds(&t.rows()), ["user:hi", "answer:Hello!"]);
+}
+
+#[test]
+fn words_appended_mid_run_join_their_turn_as_a_note() {
+    // The journal commits the model's words as its own entry between the calls: they belong
+    // to the running turn — the line's narrative — never a half-answer.
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![user(1, "fix it")],
+        ..ThreadOpen::default()
+    });
+    t.apply(ThreadEvent::Run(true));
+    t.apply(ThreadEvent::Append(vec![thought(2, 0, "hm")]));
+    t.apply(ThreadEvent::Append(vec![tool(2, 1, "a")]));
+    t.apply(ThreadEvent::Append(vec![text(2, 9, "Reading the test first.")]));
+    let Row::Work { steps, .. } = &t.rows()[1] else {
+        panic!()
+    };
+    assert!(
+        steps.iter().any(|s| matches!(s, Step::Note(t) if t == "Reading the test first.")),
+        "the words ride the work line: {steps:?}"
     );
 }

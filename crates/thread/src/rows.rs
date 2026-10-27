@@ -24,6 +24,8 @@ pub enum Row {
         from: Option<f64>,
         to: Option<f64>,
         live: bool,
+        /// The live run stands held at a step boundary (the person's pause).
+        paused: bool,
         /// The agent's plans written in this work: (id, the newest snapshot of its steps).
         plan: Vec<(String, Vec<PlanStep>)>,
         /// The agent's questions put in this work, settled or still waiting.
@@ -110,14 +112,16 @@ pub(crate) fn rows_of(
     log: &[ThreadItem],
     inserts: &Map<String, Value>,
     running: bool,
+    paused: bool,
     stream: &(String, String),
     sent: &[String],
     queue: &[QueuedItem],
 ) -> Vec<Row> {
-    // An assistant entry with tool calls is work: its text is a note on the way, not an answer.
+    // An assistant entry that thinks or acts is work: its text is a note on the way, not an
+    // answer. (A turn that only answers stays an answer.)
     let working: HashSet<u64> = log
         .iter()
-        .filter(|i| matches!(i, ThreadItem::Tool { .. }))
+        .filter(|i| matches!(i, ThreadItem::Tool { .. } | ThreadItem::Thought { .. }))
         .map(|i| i.seq())
         .collect();
     // Each plan lives once: its place is its first snapshot, its steps the newest one. Each
@@ -159,6 +163,7 @@ pub(crate) fn rows_of(
             from: at,
             to: at,
             live: false,
+            paused: false,
             plan: vec![],
             asks: vec![],
         });
@@ -184,6 +189,7 @@ pub(crate) fn rows_of(
             from: None,
             to: None,
             live: false,
+            paused: false,
             plan: vec![],
             asks: vec![],
         });
@@ -360,8 +366,9 @@ pub(crate) fn rows_of(
     let thinking = (running && !stream.0.is_empty()).then(|| Step::Thought(stream.0.clone()));
     // The work in progress is live while the run is: a view counts its time on from `from`.
     let had_work = work.is_some();
-    if let Some(Row::Work { live, steps, .. }) = work.as_mut() {
+    if let Some(Row::Work { live, paused: p, steps, .. }) = work.as_mut() {
         *live = running;
+        *p = if running { paused } else { false };
         steps.extend(thinking.clone());
     }
     close(&mut rows, &mut work);
@@ -379,6 +386,7 @@ pub(crate) fn rows_of(
             from: None,
             to: None,
             live: true,
+            paused,
             plan: vec![],
             asks: vec![],
         });

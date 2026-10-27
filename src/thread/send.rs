@@ -120,6 +120,14 @@ impl BenchApp {
 }
 
 impl ThreadView {
+    /// The work row's hold: stand the run at its next step boundary, or let it go on.
+    pub fn set_paused(&mut self, paused: bool, cx: &mut Context<Self>) {
+        if let Some(session) = self.thread_ref().runtime {
+            self.cmd(Cmd::SetPaused { session, paused }, cx);
+        }
+        cx.notify();
+    }
+
     pub fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(app) = self.app.upgrade() else {
             return;
