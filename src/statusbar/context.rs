@@ -175,9 +175,8 @@ pub(super) fn speed_panel(
                     .border_color(theme.border)
                     .children(bars),
             );
-        // Now: the last three seconds, while the answer streams. One second can hold a burst
-        // of chunks and read twice the truth; three is about a hundred tokens — stable, and
-        // still now.
+        // Now: the newest train's honest reading — its own span, first token to last. The
+        // burst guards are in the measure, so this is the tempo itself, not a mean over it.
         if let Some(now) = live {
             panel = panel.child(row("Generation · now", format!("{now:.0} tok/s")));
         }

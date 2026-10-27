@@ -538,7 +538,36 @@ fn run(cx: &mut Context<BenchApp>) {
             );
             if this
                 .update(cx, |app, cx| {
+                    // The run also feeds the speed meter, as a real stream does: the status
+                    // bar's live rate and chart live in the demo too.
+                    match &e {
+                        ThreadEvent::Run(true) => {
+                            app.speed.request();
+                            app.speed.begin_answer();
+                        }
+                        ThreadEvent::Stream(_, delta) => {
+                            app.speed.token(delta.chars().count());
+                        }
+                        ThreadEvent::Run(false) => app.speed.finish(),
+                        _ => {}
+                    }
                     app.active_thread.update(cx, |v, cx| {
+                        // And the thread runs live, so the meter is ticked and the sidebar
+                        // says "working…", as with a real agent.
+                        match &e {
+                            ThreadEvent::Run(true) => v.thread.live = Some(crate::app::Live { label: "Thinking…".into() }),
+                            ThreadEvent::Stream(kind, _) => {
+                                if let Some(l) = v.thread.live.as_mut() {
+                                    l.label = match kind {
+                                        protocol::StreamKind::Text => "Writing…",
+                                        _ => "Thinking…",
+                                    }
+                                    .into();
+                                }
+                            }
+                            ThreadEvent::Run(false) => v.thread.live = None,
+                            _ => {}
+                        }
                         v.thread.journal.apply(e);
                         cx.notify();
                     })

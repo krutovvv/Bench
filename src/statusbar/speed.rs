@@ -318,15 +318,6 @@ impl Meter {
     }
 }
 
-/// The live reading the person should see: the mean of the last three one-second samples.
-/// A single second can hold one burst of chunks delivered together, and reads twice the
-/// truth; three seconds is about a hundred tokens on a fast model — enough to be stable,
-/// short enough to still be "now".
-pub fn smoothed(samples: &[f64]) -> Option<f64> {
-    let tail = &samples[samples.len().saturating_sub(3)..];
-    (!tail.is_empty()).then(|| tail.iter().sum::<f64>() / tail.len() as f64)
-}
-
 /// Writing time in human terms: seconds while they are seconds, then minutes, then hours.
 pub fn fmt_secs(n: usize) -> String {
     match (n / 3600, n / 60 % 60, n % 60) {
@@ -339,14 +330,6 @@ pub fn fmt_secs(n: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn three_seconds_average_a_burst_into_the_truth() {
-        // A burst second that reads 240 between two honest 75s.
-        assert_eq!(smoothed(&[75., 240., 75.]).unwrap(), 130.);
-        assert_eq!(smoothed(&[70.]).unwrap(), 70.);
-        assert_eq!(smoothed(&[]), None);
-    }
 
     #[test]
     fn writing_time_reads_like_a_person_says_it() {
