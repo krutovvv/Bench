@@ -51,8 +51,8 @@ Its tree:
 |---|---|---|
 | the folder | the project's code, listed as folders open | its machine (`/api/fs/*?machine=` when this Mac's agent works there over SSH) |
 | Instructions | `SYSTEM.md` (its soul), prompts, skills by where they live | the agent's own files (`~/.bench/projects/<id>/`), a folder's `.agents/skills` |
-| Tools | MCP servers, language servers | the environment's parts (`Section`s whose `home()` is `Explorer("Tools")`) |
-| Schedule | scheduled jobs | the agent's cron (`Explorer("Schedule")`) |
+| Tools | MCP servers, language servers | the environment's parts (`ExplorerParts` whose `group()` is "Tools") |
+| Schedule | scheduled jobs | the agent's cron (`group()` "Schedule") |
 
 Every tab holds an `Item` (`explorer/item.rs`, as Zed's): its tab, unsaved changes, what
 opening it reads, how it is drawn, saved and closed; `DocKey` is the tab's identity and
@@ -77,9 +77,9 @@ was left too.
 
 ## Settings stay settings
 
-A project's Settings (`Center::Project`, `src/env/page.rs`) are its fields: name, where it lives,
-how it runs, its Telegram bot, its removal — `Section`s whose `home()` is `Settings` and that
-draw a `form()` (`SettingsForm`, in `FORMS`). What a project *contains* is in the Explorer; what it *is set to* is in Settings.
+A project's Settings (`src/env/page.rs`) are its fields: name, where it lives,
+how it runs, its Telegram bot, its removal — `SettingsForm`s (in `FORMS`), each
+drawing a `form()`; the page is the tab `DocKey::Settings` (`SettingsItem`). What a project *contains* is in the Explorer; what it *is set to* is in Settings.
 
 ## Where the IDE goes
 
