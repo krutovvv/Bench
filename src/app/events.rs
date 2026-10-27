@@ -184,6 +184,11 @@ impl BenchApp {
                 }
             }
             Evt::SessionsChanged => self.refresh_sessions(),
+            // The fork opens where the person is: it is the thread they go on in.
+            Evt::Forked(id) => {
+                self.refresh_sessions();
+                self.open_session(id, cx);
+            }
             Evt::Deleted => self.refresh_sessions(),
             Evt::DeleteFailed(e) => {
                 let msg = if e.contains("active") {

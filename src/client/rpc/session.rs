@@ -27,6 +27,7 @@ pub(super) enum Pending {
         replay: Vec<Value>,
     },
     Create,
+    Fork,
     /// An insert's answer: the session's new list.
     Inserts(String),
     Delete,
@@ -78,6 +79,11 @@ impl Rpc {
                 "session.resume",
                 json!({"session_id": session, "profile": profile}),
                 Pending::Resume(session, profile),
+            )?,
+            Cmd::Fork { session, at } => self.call(
+                "session.fork",
+                json!({"session_id": session, "at": at}),
+                Pending::Fork,
             )?,
             Cmd::Delete {
                 profile,

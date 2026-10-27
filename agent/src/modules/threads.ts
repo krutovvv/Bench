@@ -106,6 +106,12 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			await rt.resume(String(session_id));
 			return { ok: true };
 		},
+		// A new thread from this one's entry `at` (an answer's), Pi's fork: Bench opens it.
+		"session.fork": async ({ session_id, at }) => {
+			const row = await rt.fork(String(session_id), Number(at));
+			broadcast(row.id, "sessions.changed", {});
+			return { session_id: row.id };
+		},
 		"session.undo": async ({ session_id }) => {
 			await rt.undo(session_id);
 			return { ok: true };

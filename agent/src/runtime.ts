@@ -579,6 +579,34 @@ export class Runtime {
 		}, ctx);
 	}
 
+	/**
+	 * A new thread that goes on from entry `at` of this one: Pi's fork, its history through that
+	 * entry, the documents as their semantics say (the pause starts free). The thread it came
+	 * from is untouched. Its first message is the person's next one.
+	 */
+	async fork(id: string, at: number): Promise<SessionRow> {
+		const live = await this.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		const fork = await live.conversation.fork(at as any, { ownership: { kind: "ownerless" } } as any, ctx);
+		const row = live.row;
+		const newId = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_${randomBytes(4).toString("hex")}`;
+		const made = this.store.create({
+			id: newId,
+			conversation: fork.id,
+			profile: row.profile,
+			source: "local",
+			cwd: row.cwd,
+			model: row.model,
+			provider: row.provider,
+			effort: row.effort,
+			title: row.title ? `${row.title} (fork)` : "",
+			...(row.subject ? { subject: row.subject } : {}),
+			...(row.project ? { project: row.project } : {}),
+		});
+		await this.attach(made, fork);
+		return made;
+	}
+
 	/** Regenerate: drop the last exchange (a fork before the last user message) so the next prompt replaces it. */
 	async undo(id: string): Promise<void> {
 		const live = await this.session(id);

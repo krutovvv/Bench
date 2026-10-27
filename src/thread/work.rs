@@ -195,7 +195,9 @@ impl ThreadView {
             .when_some(tail, |d, (ak, atext)| {
                 let copy_id = format!("work-copy-{key}");
                 let speak_id = format!("work-speak-{key}");
+                let fork_id = format!("work-fork-{key}");
                 let ak_copy = ak.clone();
+                let ak_fork = ak.clone();
                 d.child(
                     h_flex()
                         .flex_none()
@@ -210,6 +212,20 @@ impl ThreadView {
                                     s.opacity(0.).group_hover(tgroup, |g| g.opacity(1.))
                                 })
                             },
+                        )
+                        .child(
+                            bench_ui::head_icon_button(
+                                &fork_id,
+                                Ico::GitFork,
+                                "Fork from here",
+                                cx,
+                            )
+                            .on_click(cx.listener(
+                                move |this, _, _, cx| {
+                                    this.claim_click(cx);
+                                    this.fork_at(&ak_fork, cx);
+                                },
+                            )),
                         )
                         .child(
                             bench_ui::head_icon_button(&copy_id, Ico::Copy, "Copy", cx).on_click(

@@ -58,6 +58,7 @@ icons! {
     Ellipsis => "ellipsis",
     Gauge => "gauge",
     GitBranch => "git-branch",
+    GitFork => "git-fork",
     Globe => "globe",
     ExternalLink => "external-link",
     File => "file",

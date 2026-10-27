@@ -75,6 +75,9 @@ pub(super) fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
                 .to_string();
             emit(Evt::Created { session, runtime })
         }
+        Pending::Fork => emit(Evt::Forked(
+            r["session_id"].as_str().unwrap_or_default().to_string(),
+        )),
         Pending::Inserts(session) => emit(Evt::Inserts(session, inserts(&r["inserts"]))),
         Pending::Delete => emit(Evt::Deleted),
         Pending::Catalog => emit(Evt::Catalog(catalog(r))),

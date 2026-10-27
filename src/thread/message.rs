@@ -106,7 +106,7 @@ impl ThreadView {
                 a.speaking.as_deref() == Some(key),
             )
         });
-        let (copy_key, speak_key) = (key.to_string(), key.to_string());
+        let (copy_key, speak_key, fork_key) = (key.to_string(), key.to_string(), key.to_string());
         // Hovering anywhere over the answer reveals its two actions, at the same edge the
         // live run's Pause and Stop sat at: read aloud, and copy — which copies the agent's
         // own markdown, what selecting the text on screen cannot. No regenerate: an agent
@@ -122,6 +122,10 @@ impl ThreadView {
             .when(!(playing || speaking), |d| {
                 d.opacity(0.).group_hover(group.clone(), |s| s.opacity(1.))
             })
+            .child(
+                bench_ui::icon_button(("fork", k), Ico::GitFork, "Fork from here", false, cx)
+                    .on_click(cx.listener(move |this, _, _, cx| this.fork_at(&fork_key, cx))),
+            )
             .child(
                 bench_ui::icon_button(("copy", k), Ico::Copy, "Copy", false, cx).on_click(
                     cx.listener(move |this, _, window, cx| this.copy_answer(&copy_key, window, cx)),

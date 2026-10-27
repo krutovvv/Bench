@@ -192,6 +192,13 @@ test("on a real Pi: commits reach the thread as thread.* events, and thread.open
 	const later = await rt.thread(row.id, first.head);
 	assert.deepEqual(later.items.map((i) => i.id), ["ib"], "only what came after the head");
 	assert.ok(later.head > first.head);
+
+	// A fork at the first insert: a thread of its own with the history through that entry, the
+	// first thread untouched.
+	const fork = await rt.fork(row.id, first.head);
+	assert.notEqual(fork.id, row.id);
+	assert.deepEqual((await rt.thread(fork.id)).items.map((i) => i.id), ["ia"], "history through the entry");
+	assert.deepEqual((await rt.thread(row.id)).items.map((i) => i.id), ["ia", "ib"], "the first thread is untouched");
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 	fs.rmSync(home, { recursive: true, force: true });
 });

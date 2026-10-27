@@ -63,6 +63,11 @@ pub enum Cmd {
         id: String,
         text: String,
     },
+    /// A new thread from entry `at` of this one (an answer's): Pi's fork.
+    Fork {
+        session: String,
+        at: u64,
+    },
     Send {
         profile: String,
         session: String,
@@ -183,6 +188,8 @@ pub enum Evt {
         session: String,
         runtime: String,
     },
+    /// A thread forked from another one's answer: the new thread's id, to open.
+    Forked(String),
     /// A thread's inserts as the agent keeps them (the whole list, in order).
     Inserts(String, Vec<crate::app::model::Insert>),
     /// The agent refused an insert's change: the thread's list is read again.

@@ -403,6 +403,18 @@ impl ThreadView {
         cx.notify();
     }
 
+    /// A new thread that goes on from the answer in the row `key`: Pi forks the conversation
+    /// through that answer's entry (the key's first part is the entry id), and it opens.
+    pub fn fork_at(&mut self, key: &str, cx: &mut Context<Self>) {
+        let (Some(session), Some(at)) = (
+            self.thread.runtime.clone(),
+            key.split('.').next().and_then(|s| s.parse::<u64>().ok()),
+        ) else {
+            return;
+        };
+        self.cmd(Cmd::Fork { session, at }, cx);
+    }
+
     /// Copy what the agent said in the row `key`.
     pub fn copy_answer(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(text) = self.answer_text(key) {
