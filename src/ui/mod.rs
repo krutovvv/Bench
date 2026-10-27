@@ -36,13 +36,12 @@ impl BenchApp {
     pub(crate) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let explorer = self.sidebar_panel == crate::app::SidebarPanel::Explorer;
         h_flex()
-            .h(px(35.))
+            .h(bench_ui::bar_h(cx))
             .flex_none()
             .justify_end()
             .items_center()
             .gap_1()
-            // The icon's 4 px box padding + 12 = the sidebar's 16 px inset.
-            .pr(px(12.))
+            .pr(px(bench_ui::SIDEBAR_STRIP_PR))
             .child(
                 bench_ui::icon_button(
                     "side-threads",
@@ -148,7 +147,7 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let bar = h_flex()
             .id("header")
-            .h(px(36.))
+            .h(bench_ui::header_h(cx))
             .flex_none()
             .bg(theme.title_bar)
             .items_center()
@@ -216,11 +215,7 @@ impl BenchApp {
         let title: SharedString = match self.center {
             Center::NewProject => "New project".into(),
             Center::Project => {
-                let id = self
-                    .project_env
-                    .as_ref()
-                    .map(|e| e.id.as_str())
-                    .unwrap_or("");
+                let id = self.settings_project.as_str();
                 let name = self
                     .projects
                     .iter()
@@ -303,9 +298,9 @@ impl Render for BenchApp {
                 .flex_none()
                 .child(
                     h_flex()
-                        .h(px(36.))
+                        .h(bench_ui::header_h(cx))
                         .flex_none()
-                        .pl(px(78.))
+                        .pl(px(bench_ui::WINDOW_BUTTONS_W))
                         .pr_1()
                         .items_center()
                         .bg(theme.title_bar)
@@ -380,7 +375,8 @@ impl BenchApp {
                 if let (Some(w), false) = (sizes.first(), this.sidebar_hidden) {
                     this.sidebar_w = *w;
                 }
-                if let (Some(w), Some(_)) = (sizes.last(), this.right.as_ref()) {
+                // The right dock's width, when it is drawn (the sizes are its, not the center's).
+                if let (Some(w), Some(_)) = (sizes.last(), this.right_shown()) {
                     if sizes.len() > 1 {
                         this.right_w = Some(*w);
                     }

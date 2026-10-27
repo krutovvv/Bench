@@ -17,7 +17,11 @@ impl BenchApp {
     pub(crate) fn render_doc(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let body = match self.explorer.active.clone() {
             Some(DocKey::File(f)) => self.file_pane(&f, false, cx),
-            Some(DocKey::Part { kind, name }) => self.part_pane(kind, &name, cx),
+            Some(DocKey::Part {
+                project,
+                kind,
+                name,
+            }) => self.part_pane(&project, kind, &name, cx),
             None => div().into_any_element(),
         };
         div()
@@ -71,11 +75,11 @@ impl BenchApp {
         let (zed, finder) = (f.path.clone(), f.path.clone());
         if host.is_none() {
             actions.push(
-                crate::inserts::icon_button(
+                bench_ui::head_icon_button(
                     &format!("doc-finder-{tag}"),
                     Ico::FolderOpen,
                     "Show in Finder",
-                    &theme,
+                    cx,
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.reveal_in_finder(&finder, window, cx)
@@ -84,7 +88,7 @@ impl BenchApp {
             );
         }
         actions.push(
-            crate::inserts::icon_button(&format!("doc-zed-{tag}"), Ico::Zed, "Open in Zed", &theme)
+            bench_ui::head_icon_button(&format!("doc-zed-{tag}"), Ico::Zed, "Open in Zed", cx)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.open_in_zed(&zed, None, host.as_deref(), cx)
                 }))
@@ -93,35 +97,25 @@ impl BenchApp {
         let other = f.clone();
         if beside {
             actions.push(
-                crate::inserts::icon_button(
-                    "doc-to-main",
-                    Ico::PanelLeft,
-                    "Open in the middle",
-                    &theme,
-                )
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.close_right(cx);
-                    this.open_doc(DocKey::File(other.clone()), window, cx)
-                }))
-                .into_any_element(),
+                bench_ui::head_icon_button("doc-to-main", Ico::PanelLeft, "Open in the middle", cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.close_right(cx);
+                        this.open_doc(DocKey::File(other.clone()), window, cx)
+                    }))
+                    .into_any_element(),
             );
             actions.push(
-                crate::inserts::icon_button("doc-beside-close", Ico::X, "Close", &theme)
+                bench_ui::head_icon_button("doc-beside-close", Ico::X, "Close", cx)
                     .on_click(cx.listener(|this, _, _, cx| this.close_right(cx)))
                     .into_any_element(),
             );
         } else {
             actions.push(
-                crate::inserts::icon_button(
-                    "doc-to-beside",
-                    Ico::PanelRight,
-                    "Open beside",
-                    &theme,
-                )
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.open_beside(other.clone(), window, cx)
-                }))
-                .into_any_element(),
+                bench_ui::head_icon_button("doc-to-beside", Ico::PanelRight, "Open beside", cx)
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        this.open_beside(other.clone(), window, cx)
+                    }))
+                    .into_any_element(),
             );
         }
         let where_ = match &f.machine {
@@ -150,9 +144,20 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// A part of the environment: its `Section`'s card, the head's actions its own.
-    fn part_pane(&mut self, kind: &'static str, name: &str, cx: &mut Context<Self>) -> AnyElement {
-        let card = crate::env::section(kind).and_then(|s| s.card(self, name, cx));
+    /// A part of the project `project`'s environment: its `Section`'s card, the head's actions
+    /// its own.
+    fn part_pane(
+        &mut self,
+        project: &str,
+        kind: &'static str,
+        name: &str,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let card = match (crate::env::section(kind), self.envs.get(project)) {
+            (Some(s), Some(e)) => s.card(self, e, name, cx),
+            (_, None) => return note("Reading…", cx),
+            _ => None,
+        };
         let Some(card) = card else {
             return note("It is no longer there", cx);
         };
@@ -194,15 +199,15 @@ impl BenchApp {
                     crate::ui::file_icon(f.name(), false, &theme),
                     self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
                 ),
-                DocKey::Part { kind, name } => (
+                DocKey::Part { kind, name, .. } => (
                     name.clone(),
                     (part_icon(kind), theme.muted_foreground),
-                    false,
+                    self.part_dirty(&key),
                 ),
             };
             let armed = self.explorer.armed.as_deref() == Some(format!("close:{key:?}").as_str());
             let (k1, k2) = (key.clone(), key.clone());
-            let close = crate::inserts::icon_button(
+            let close = bench_ui::head_icon_button(
                 &format!("doc-tab-x-{n}"),
                 Ico::X,
                 if armed {
@@ -210,7 +215,7 @@ impl BenchApp {
                 } else {
                     "Close  ⌘W"
                 },
-                &theme,
+                cx,
             )
             .when(armed, |d| d.text_color(theme.danger))
             .on_click(cx.listener(move |this, _, _, cx| {

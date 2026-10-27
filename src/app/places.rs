@@ -156,6 +156,16 @@ impl BenchApp {
         }
     }
 
+    /// The open thread's project as the Explorer and the environment name it: its own, or the
+    /// Host of this Mac when it has none.
+    pub fn thread_project_or_host(&self) -> String {
+        if self.thread_project.is_empty() {
+            ProjectKey::HOST.to_string()
+        } else {
+            self.thread_project.clone()
+        }
+    }
+
     /// Where the open thread (or the new one) lives: its agent is the one that keeps it.
     pub fn thread_location(&self) -> Location {
         let mut at = self.location(&self.thread_project);

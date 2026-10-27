@@ -20,7 +20,7 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::icons::Ico;
-use crate::inserts::{InsertKind, icon_button};
+use crate::inserts::InsertKind;
 use crate::model::Insert;
 
 /// The tallest a terminal gets in a thread; its program's screen is this many rows.
@@ -88,11 +88,11 @@ impl InsertKind for Terminal {
             ];
         }
         vec![
-            icon_button(
+            bench_ui::head_icon_button(
                 &format!("{}-bg", ins.id),
                 Ico::Terminal,
                 "Send to the background",
-                &theme,
+                cx,
             )
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.click_claimed = true;

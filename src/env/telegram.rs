@@ -19,15 +19,15 @@ pub struct TelegramEnv {
 }
 
 impl TelegramEnv {
-    pub(super) fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
+    pub(super) fn new(id: &str, window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let token =
             cx.new(|cx| InputState::new(window, cx).placeholder("Bot token from @BotFather"));
         let users = cx.new(|cx| {
             InputState::new(window, cx)
                 .placeholder("Telegram user ids who may write to it, comma-separated")
         });
-        on_change(&token, cx, |e| e.telegram.dirty = true);
-        on_change(&users, cx, |e| e.telegram.dirty = true);
+        on_change(&token, id, cx, |e| e.telegram.dirty = true);
+        on_change(&users, id, cx, |e| e.telegram.dirty = true);
         Self {
             bot: None,
             token,
@@ -49,8 +49,12 @@ impl Section for Telegram {
     fn block(&self, _general: bool) -> &'static str {
         "Telegram"
     }
-    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
-        let e = app.project_env.as_ref()?;
+    fn form(
+        &self,
+        _app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Vec<AnyElement>> {
         let bot = match &e.telegram.bot {
             Some((name, _, token)) if !token.is_empty() && !name.is_empty() => {
                 format!("@{name}: its chats become this project's threads")
@@ -76,7 +80,7 @@ impl Section for Telegram {
             )
             .into_any_element(),
         ];
-        out.extend(form_actions("telegram", e.telegram.dirty, cx));
+        out.extend(form_actions(&e.id, "telegram", e.telegram.dirty, cx));
         Some(out)
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
@@ -125,12 +129,12 @@ impl Section for Telegram {
     fn save(
         &self,
         app: &mut BenchApp,
-        _id: &str,
+        id: &str,
         eid: &str,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<Request> {
-        let e = app.project_env.as_ref()?;
+        let e = app.envs.get(id)?;
         let token = e.telegram.token.read(cx).value().trim().to_string();
         let users: Vec<String> = e
             .telegram
@@ -150,8 +154,14 @@ impl Section for Telegram {
     fn saved(&self, e: &mut ProjectEnv) {
         e.telegram.dirty = false;
     }
-    fn revert(&self, app: &mut BenchApp, _: &mut Window, _: &mut Context<BenchApp>) -> bool {
-        if let Some(e) = app.project_env.as_mut() {
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _: &mut Window,
+        _: &mut Context<BenchApp>,
+    ) -> bool {
+        if let Some(e) = app.envs.get_mut(id) {
             e.telegram.dirty = false;
         }
         false

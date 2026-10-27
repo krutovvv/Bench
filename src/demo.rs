@@ -348,9 +348,10 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Jou
     app.demo_threads.insert(id.into(), t);
 }
 
-/// The blog project's environment, for its settings and the Explorer.
-pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
-    let Some(e) = app.project_env.as_mut() else {
+/// The blog project's environment, for its settings and the Explorer (any project the demo
+/// shows reads as the blog).
+pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<BenchApp>) {
+    let Some(e) = app.envs.get_mut(id) else {
         return;
     };
     let v = serde_json::json!({
@@ -428,7 +429,7 @@ pub fn env(app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) 
     app.open_doc(post, window, cx);
     match std::env::var("BENCH_EXPLORER").as_deref() {
         Ok("beside") => app.open_beside(skill.join("SKILL.md"), window, cx),
-        Ok("part") => app.open_part("mcp", "ghost".into(), window, cx),
+        Ok("part") => app.open_part("p-blog".into(), "mcp", "ghost".into(), window, cx),
         // The thread beside the post, lines of it sent to the composer (⌘L).
         Ok("thread") => {
             app.session = Some("d-site".into());
@@ -906,7 +907,10 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // `BENCH_DEMO=env`: the blog's settings over the thread (`env` below fills them);
     // `BENCH_DEMO=explorer`: the blog in the Explorer (`env` opens its documents).
     match std::env::var("BENCH_DEMO").as_deref() {
-        Ok("env") => app.center = crate::app::Center::Project,
+        Ok("env") => {
+            app.center = crate::app::Center::Project;
+            app.settings_project = "p-blog".into();
+        }
         Ok("explorer") => {
             app.sidebar_panel = crate::app::SidebarPanel::Explorer;
             app.explorer.project = "p-blog".into();

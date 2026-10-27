@@ -42,7 +42,7 @@ cargo build 2>&1 | grep -E '^(warning|error)|Finished'
 $K/shot.sh target/debug/bench /tmp/before.png 8          # prints the size in px and pt
 ```
 - Pick the state first: `BENCH_DEMO=…` (made-up threads: `1`, `landing`, `top`, `long`, `new`,
-  `tasks`, `server`, `tool`, `env`, `env-open`…) or `BENCH_HOME=<a copy of ~/.bench>` (real
+  `tasks`, `server`, `tool`, `env`, `explorer`…) or `BENCH_HOME=<a copy of ~/.bench>` (real
   data, never the person's own folder): `$K/shot.sh target/debug/bench /tmp/before.png 8
   BENCH_DEMO=landing`. Every demo state and hook: `build-verification.md`. Only when neither
   reaches the state, a temporary hook (step 5).

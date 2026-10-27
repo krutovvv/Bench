@@ -6,7 +6,6 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::message::icon_button;
 use crate::app::BenchApp;
 use crate::icons::Ico;
 
@@ -50,19 +49,26 @@ impl BenchApp {
             })
             .when(field.is_some(), |d| {
                 d.child(
-                    icon_button((id.clone(), 0), Ico::Check, "Keep these words (⌘Enter)", cx)
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.click_claimed = true;
-                            this.queue_edit_save(window, cx);
-                        })),
+                    bench_ui::icon_button(
+                        (id.clone(), 0),
+                        Ico::Check,
+                        "Keep these words (⌘Enter)",
+                        false,
+                        cx,
+                    )
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.click_claimed = true;
+                        this.queue_edit_save(window, cx);
+                    })),
                 )
             })
             .when(field.is_none(), |d| {
                 d.child(
-                    icon_button(
+                    bench_ui::icon_button(
                         (id.clone(), 1),
                         Ico::Pencil,
                         "Fix the words before it goes out",
+                        false,
                         cx,
                     )
                     .on_click(cx.listener(move |this, _, window, cx| {
@@ -72,10 +78,11 @@ impl BenchApp {
                 )
                 .when(!steer, |d| {
                     d.child(
-                        icon_button(
+                        bench_ui::icon_button(
                             (id.clone(), 2),
                             Ico::Play,
                             "Send now: into the running work",
+                            false,
                             cx,
                         )
                         .on_click(cx.listener(move |this, _, _, cx| {
@@ -86,16 +93,16 @@ impl BenchApp {
                 })
             })
             .child(
-                icon_button((id.clone(), 3), Ico::X, "Take it back", cx).on_click(cx.listener(
-                    move |this, _, window, cx| {
+                bench_ui::icon_button((id.clone(), 3), Ico::X, "Take it back", false, cx).on_click(
+                    cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
                         if this.queue_edit.as_ref().is_some_and(|(e, _)| e == &rm_id) {
                             this.queue_edit_cancel(window, cx);
                         } else {
                             this.queued(rm_id.clone(), false, cx);
                         }
-                    },
-                )),
+                    }),
+                ),
             )
             .into_any_element();
         let editor = field.map(|st| {

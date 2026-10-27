@@ -18,11 +18,12 @@ impl BenchApp {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let inset = px(crate::ui::CHAT_LEFT);
+        let id = self.settings_project.clone();
         // The demo opens on the blog's settings (`demo::load`), read here once.
-        if self.demo && self.project_env.is_none() {
-            self.load_env("p-blog", window, cx);
+        if self.demo && !self.envs.contains_key(&id) {
+            self.load_env(&id, window, cx);
         }
-        let Some(e) = self.project_env.as_ref() else {
+        let Some(e) = self.envs.get(&id) else {
             return div()
                 .p(inset)
                 .text_color(theme.muted_foreground)
@@ -43,19 +44,22 @@ impl BenchApp {
                     .child(err)
                     .into_any_element()
             }))
-            .children(self.render_env_form(cx))
+            .children(self.render_env_form(&id, cx))
             .into_any_element()
     }
 
     /// Each group's heading, then its sections' fields.
-    fn render_env_form(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    fn render_env_form(&self, id: &str, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
-        let general = self.project_env.as_ref().is_some_and(|e| e.id == "general");
+        let Some(e) = self.envs.get(id) else {
+            return vec![];
+        };
+        let general = crate::model::ProjectKey::parse(&e.id).is_host();
         let mut groups: Vec<(&'static str, Vec<&'static dyn Section>)> = vec![];
         for s in SECTIONS
             .iter()
             .copied()
-            .filter(|s| s.home() == Home::Settings && s.shown(self))
+            .filter(|s| s.home() == Home::Settings && s.shown(self, e))
         {
             let title = s.block(general);
             match groups.last_mut() {
@@ -65,7 +69,7 @@ impl BenchApp {
         }
         let mut out = vec![];
         for (title, group) in groups {
-            let heads: Vec<AnyElement> = group.iter().filter_map(|s| s.head(self, cx)).collect();
+            let heads: Vec<AnyElement> = group.iter().filter_map(|s| s.head(self, e, cx)).collect();
             out.push(
                 bench_ui::settings_heading(title, heads, cx)
                     .flex_none()
@@ -73,7 +77,7 @@ impl BenchApp {
             );
             let fields: Vec<AnyElement> = group
                 .iter()
-                .filter_map(|s| s.form(self, cx))
+                .filter_map(|s| s.form(self, e, cx))
                 .flatten()
                 .collect();
             out.push(

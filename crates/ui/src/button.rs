@@ -61,6 +61,20 @@ pub fn icon_button(
         .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }
 
+/// The small icon button inside a block's head or a row (an insert's controls, a tree row's
+/// actions): no ground until hovered.
+pub fn head_icon_button(id: &str, icon: Ico, tip: &'static str, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme().clone();
+    div()
+        .id(SharedString::from(id.to_string()))
+        .p_0p5()
+        .cursor_pointer()
+        .text_color(theme.muted_foreground)
+        .hover(|s| s.text_color(theme.foreground).bg(theme.list_hover))
+        .child(icon.icon().small())
+        .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
+}
+
 /// A form's action as Bench draws it in the thread: the primary one filled, the others muted
 /// text. As tall as a field.
 pub fn form_action(

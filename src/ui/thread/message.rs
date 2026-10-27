@@ -1,7 +1,6 @@
 //! The person's rows and the agent's: who speaks is an avatar in the left gutter.
 
 use ::thread::Row;
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -104,44 +103,48 @@ impl BenchApp {
             self.speaking.as_deref() == Some(key),
         );
         let (copy_key, speak_key) = (key.to_string(), key.to_string());
-        let actions =
-            h_flex()
-                .absolute()
-                .top(px(TURN_Y + 3.))
-                .right_6()
-                .pl_1()
-                .gap_0p5()
-                .items_center()
-                .bg(theme.background)
-                .when(!(playing || speaking), |d| {
-                    d.opacity(0.).group_hover(group.clone(), |s| s.opacity(1.))
-                })
-                .child(icon_button(("copy", k), Ico::Copy, "Copy", cx).on_click(
+        let actions = h_flex()
+            .absolute()
+            .top(px(TURN_Y + 3.))
+            .right_6()
+            .pl_1()
+            .gap_0p5()
+            .items_center()
+            .bg(theme.background)
+            .when(!(playing || speaking), |d| {
+                d.opacity(0.).group_hover(group.clone(), |s| s.opacity(1.))
+            })
+            .child(
+                bench_ui::icon_button(("copy", k), Ico::Copy, "Copy", false, cx).on_click(
                     cx.listener(move |this, _, window, cx| this.copy_answer(&copy_key, window, cx)),
-                ))
-                .child(
-                    icon_button(
-                        ("speak", k),
-                        if playing {
-                            Ico::Square
-                        } else if speaking {
-                            Ico::Loader
-                        } else {
-                            Ico::Volume
-                        },
-                        if playing { "Stop" } else { "Read aloud" },
-                        cx,
-                    )
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.toggle_speak(&speak_key, window, cx)
-                    })),
+                ),
+            )
+            .child(
+                bench_ui::icon_button(
+                    ("speak", k),
+                    if playing {
+                        Ico::Square
+                    } else if speaking {
+                        Ico::Loader
+                    } else {
+                        Ico::Volume
+                    },
+                    if playing { "Stop" } else { "Read aloud" },
+                    false,
+                    cx,
                 )
-                .when(last, |d| {
-                    d.child(
-                        icon_button(("regen", k), Ico::RotateCcw, "Regenerate", cx)
-                            .on_click(cx.listener(|this, _, _, cx| this.regenerate(cx))),
-                    )
-                });
+                .on_click(
+                    cx.listener(move |this, _, window, cx| {
+                        this.toggle_speak(&speak_key, window, cx)
+                    }),
+                ),
+            )
+            .when(last, |d| {
+                d.child(
+                    bench_ui::icon_button(("regen", k), Ico::RotateCcw, "Regenerate", false, cx)
+                        .on_click(cx.listener(|this, _, _, cx| this.regenerate(cx))),
+                )
+            });
         let body = v_flex()
             .gap_3()
             .children(self.render_answer(key, text, cx))
@@ -194,22 +197,4 @@ impl BenchApp {
         )
         .into_any_element()
     }
-}
-
-pub(crate) fn icon_button(
-    id: impl Into<ElementId>,
-    icon: Ico,
-    tip: &'static str,
-    cx: &App,
-) -> Stateful<Div> {
-    let theme = cx.theme();
-    div()
-        .id(id)
-        .p_1()
-        .rounded_md()
-        .cursor_pointer()
-        .text_color(theme.muted_foreground)
-        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-        .child(icon.live(false))
-        .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }

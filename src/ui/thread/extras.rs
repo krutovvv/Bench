@@ -377,10 +377,7 @@ impl BenchApp {
                     })
                     // Beside the thread, in the right dock (Zed from its head).
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        let project = match this.thread_project.as_str() {
-                            "" => "general".to_string(),
-                            p => p.to_string(),
-                        };
+                        let project = this.thread_project_or_host();
                         let machine = this.location(&project).files_machine();
                         let f = crate::explorer::FileRef {
                             project,

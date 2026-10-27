@@ -41,16 +41,16 @@ pub struct ScheduleEnv {
 }
 
 impl ScheduleEnv {
-    pub(super) fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
+    pub(super) fn new(id: &str, window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let prompt = editor("markdown", window, cx);
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Its name: Weekly digest"));
         let schedule = cx.new(|cx| {
             InputState::new(window, cx)
                 .placeholder("every 1d · every 30m · 0 9 * * 1-5 · 2026-11-01T09:00")
         });
-        on_change(&prompt, cx, |e| e.cron.dirty = true);
-        on_change(&name, cx, |e| e.cron.dirty = true);
-        on_change(&schedule, cx, |e| e.cron.dirty = true);
+        on_change(&prompt, id, cx, |e| e.cron.dirty = true);
+        on_change(&name, id, cx, |e| e.cron.dirty = true);
+        on_change(&schedule, id, cx, |e| e.cron.dirty = true);
         Self {
             jobs: vec![],
             open: None,
@@ -74,22 +74,25 @@ impl Section for Schedule {
     fn block(&self, _general: bool) -> &'static str {
         "Schedule"
     }
-    fn head(&self, _app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn head(
+        &self,
+        _app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
+        let id = e.id.clone();
         Some(
             head_act("env-cron-add".into(), "+ New job", cx)
-                .on_click(cx.listener(|this, _, window, cx| {
+                .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
                     cx.stop_propagation();
-                    this.open_part("cron", "new".into(), window, cx)
+                    this.open_part(id.clone(), "cron", "new".into(), window, cx)
                 }))
                 .into_any_element(),
         )
     }
     /// What runs on its own, each run a thread of the project.
-    fn items(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<Item> {
-        let Some(e) = app.project_env.as_ref() else {
-            return vec![];
-        };
+    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<Item> {
         let theme = cx.theme().clone();
         e.cron
             .jobs
@@ -123,12 +126,18 @@ impl Section for Schedule {
                             theme.muted_foreground
                         },
                     ),
+                    file: None,
                 }
             })
             .collect()
     }
-    fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
-        let e = app.project_env.as_ref()?;
+    fn card(
+        &self,
+        _app: &BenchApp,
+        e: &ProjectEnv,
+        name: &str,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Card> {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let job = e.cron.jobs.iter().find(|j| j.id == name).cloned();
@@ -138,11 +147,12 @@ impl Section for Schedule {
         let mut actions = vec![];
         if let Some(j) = &job {
             let (run, pause, enabled) = (j.id.clone(), j.id.clone(), j.enabled);
+            let (p1, p2) = (e.id.clone(), e.id.clone());
             actions.push(
                 card_act("env-card-run".into(), "Run now".into(), muted)
                     .on_click(cx.listener(move |this, _, window, cx| {
                         this.click_claimed = true;
-                        this.env_cron(run.clone(), "trigger", window, cx)
+                        this.env_cron(&p1, run.clone(), "trigger", window, cx)
                     }))
                     .into_any_element(),
             );
@@ -159,6 +169,7 @@ impl Section for Schedule {
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
                     this.env_cron(
+                        &p2,
                         pause.clone(),
                         if enabled { "pause" } else { "resume" },
                         window,
@@ -168,8 +179,8 @@ impl Section for Schedule {
                 .into_any_element(),
             );
         }
-        actions.push(save("cron", e.cron.dirty, cx));
-        actions.extend(revert("cron", e.cron.dirty, cx));
+        actions.push(save(&e.id, "cron", e.cron.dirty, cx));
+        actions.extend(revert(&e.id, "cron", e.cron.dirty, cx));
         if job.is_some() {
             actions.push(remove(e, "cron", name.to_string(), "Remove", cx));
         }
@@ -227,22 +238,33 @@ impl Section for Schedule {
             })
             .collect();
     }
+    fn dirty(&self, e: &ProjectEnv) -> bool {
+        e.cron.open.is_some() && e.cron.dirty
+    }
     fn close(&self, e: &mut ProjectEnv) {
         e.cron.open = None;
+        e.cron.dirty = false;
     }
-    fn open(&self, app: &mut BenchApp, job: String, w: &mut Window, cx: &mut Context<BenchApp>) {
-        app.env_open_cron(job, w, cx);
+    fn open(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        job: String,
+        w: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
+        app.env_open_cron(id, job, w, cx);
     }
     /// A new job is POSTed to the project; a job's change is PUT to it.
     fn save(
         &self,
         app: &mut BenchApp,
-        _id: &str,
+        id: &str,
         eid: &str,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<Request> {
-        let e = app.project_env.as_ref()?;
+        let e = app.envs.get(id)?;
         let job = e.cron.open.clone()?;
         let fields = json!({
             "name": e.cron.name.read(cx).value().trim(),
@@ -267,14 +289,20 @@ impl Section for Schedule {
             e.card = None;
         }
     }
-    fn revert(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) -> bool {
-        let Some(e) = app.project_env.as_mut() else {
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> bool {
+        let Some(e) = app.envs.get_mut(id) else {
             return true;
         };
         e.cron.dirty = false;
         if let Some(job) = e.cron.open.take() {
             if job != "new" {
-                app.env_open_cron(job, window, cx);
+                app.env_open_cron(id, job, window, cx);
                 return true;
             }
         }
@@ -288,8 +316,14 @@ impl Section for Schedule {
 impl BenchApp {
     /// A job's row: its name, schedule and prompt open under it to edit (again: closes); "new":
     /// an empty form for a new job.
-    pub fn env_open_cron(&mut self, job: String, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(e) = self.project_env.as_mut() else {
+    pub fn env_open_cron(
+        &mut self,
+        id: &str,
+        job: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(e) = self.envs.get_mut(id) else {
             return;
         };
         let c = &mut e.cron;
@@ -321,14 +355,13 @@ impl BenchApp {
     /// A job's "Run now", "Pause", "Resume".
     pub fn env_cron(
         &mut self,
+        id: &str,
         job: String,
         action: &'static str,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
-            return;
-        };
+        let id = id.to_string();
         let Some((conn, _)) = self.env_target(&id) else {
             return;
         };

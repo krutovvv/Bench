@@ -72,9 +72,14 @@ impl Section for Run {
     }
     /// Choices, not texts: a click sets one for the project at once (a choice has no draft to
     /// save). The reasoning levels and the compaction shares are the presets' (the gear).
-    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
-        let e = app.project_env.as_ref()?;
+    fn form(
+        &self,
+        app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Vec<AnyElement>> {
         let view = cx.entity();
+        let pid = e.id.clone();
         let segmented = |id: &'static str,
                          kind: &'static str,
                          opts: Vec<String>,
@@ -82,10 +87,13 @@ impl Section for Run {
                          cx: &mut Context<BenchApp>| {
             let chosen = opts.iter().position(|o| o == cur).unwrap_or(usize::MAX);
             let labels: Vec<SharedString> = opts.iter().map(|o| o.clone().into()).collect();
-            let view = view.clone();
+            let (view, pid) = (view.clone(), pid.clone());
             let pick: bench_ui::OnPick = std::rc::Rc::new(move |k, window, cx| {
                 let value = opts[k].clone();
-                view.update(cx, |this, cx| this.env_set_run(kind, value, window, cx));
+                let pid = pid.clone();
+                view.update(cx, |this, cx| {
+                    this.env_set_run(&pid, kind, value, window, cx)
+                });
             });
             div()
                 .flex()
@@ -129,7 +137,7 @@ impl Section for Run {
             items,
             std::rc::Rc::new(move |this, k, window, cx| {
                 let value = shares[k].map(|a| a.to_string()).unwrap_or_default();
-                this.env_set_run("compaction", value, window, cx)
+                this.env_set_run(&pid, "compaction", value, window, cx)
             }),
             cx,
         );
@@ -165,15 +173,16 @@ impl BenchApp {
     /// start on it, a thread already begun keeps what it started with.
     pub fn env_set_run(
         &mut self,
+        id: &str,
         what: &'static str,
         value: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(e) = self.project_env.as_ref() else {
+        if !self.envs.contains_key(id) {
             return;
-        };
-        let id = e.id.clone();
+        }
+        let id = id.to_string();
         let Some((conn, eid)) = self.env_target(&id) else {
             return;
         };
@@ -191,7 +200,7 @@ impl BenchApp {
             move |this, r, window, cx| match r {
                 Ok(_) => this.load_env(&asked, window, cx),
                 Err(err) => {
-                    if let Some(e) = this.project_env.as_mut() {
+                    if let Some(e) = this.envs.get_mut(&asked) {
                         e.error = Some(format!("{err:#}"));
                     }
                     cx.notify();

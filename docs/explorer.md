@@ -24,8 +24,9 @@ places that every view fills in its own way:
 - **The center** is `Center` (`src/app/workspace.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
   file's click shows `Doc` with a tab per open document (the header holds the tabs instead of
   the thread's title). Leaving the Explorer does not close documents: their tabs come back.
-- **Beside** holds a file next to whatever the middle shows (`Explorer::beside`): open one with
-  the tree row's panel icon, ⌥-click, or a document's own "Open beside". It is how a file is
+- **The right dock** shows one panel (`RightPanel`): the thread beside a document (⌘J), or a
+  file next to whatever the middle shows: open one with the tree row's panel icon, ⌥-click, or a
+  document's own "Open beside". It is how a file is
   read or fixed while the thread runs.
 
 Sizes come from `bench_ui` (`crates/ui/src/ide.rs`: the tree rows, a document's head, the tabs,
@@ -103,5 +104,6 @@ Phases, each a thing of its own:
   rows are `FileRef`s — opening, saving, renaming already work for any of them.
 - A diff view, an image viewer, a Markdown preview: another body in `view.rs` `file_pane` for
   the kind of file (`Doc::binary` already says "not text").
-- Tabs beside, a split middle: `beside` becomes a list; documents are already shared by key.
+- Several panels in a dock, a bottom dock, a split middle: `RightPanel` becomes a dock's list of
+  panels; documents are already shared by key.
 - A thread opening a file (a changed file in its answer) beside itself: `open_beside`.

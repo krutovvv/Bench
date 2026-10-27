@@ -60,7 +60,9 @@ impl BenchApp {
             ("e", false) => self.toggle_side(window, cx),
             // The thread beside the code, and the code sent to it.
             ("j", false) => self.toggle_thread_beside(window, cx),
-            ("l", false) if self.center == Center::Doc => self.send_selection_to_thread(window, cx),
+            ("l", false) if self.focused_doc(window, cx).is_some() => {
+                self.send_selection_to_thread(window, cx)
+            }
             ("p", false) => self.open_quick(window, cx),
             ("f", true) => self.open_find(window, cx),
             ("s", false) => return self.save_active_doc(window, cx),

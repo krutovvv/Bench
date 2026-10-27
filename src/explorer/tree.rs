@@ -23,7 +23,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         // The demo opens on the blog (`demo::load`), read here once.
-        if self.demo && self.project_env.is_none() {
+        if self.demo && !self.envs.contains_key(&self.explorer.project) {
             let id = self.explorer.project.clone();
             self.load_env(&id, window, cx);
         }
@@ -68,32 +68,35 @@ impl BenchApp {
             out.extend(self.instruction_rows(cx));
         }
         // The environment's parts, by the group their sections name.
+        let Some(e) = self.envs.get(&self.explorer.project) else {
+            return out;
+        };
         let mut groups: Vec<&'static str> = vec![];
-        for s in SECTIONS.iter().filter(|s| s.shown(self)) {
+        for s in SECTIONS.iter().filter(|s| s.shown(self, e)) {
             if let Home::Explorer(g) = s.home() {
                 if !groups.contains(&g) {
                     groups.push(g);
                 }
             }
         }
-        let general = self.project_env.as_ref().is_some_and(|e| e.id == "general");
+        let general = crate::model::ProjectKey::parse(&e.id).is_host();
         for g in groups {
             let node = format!("g:{g}");
             // A group of one section named as it (Schedule): its actions on the group's heading,
             // its parts right under it.
             let only: Vec<_> = SECTIONS
                 .iter()
-                .filter(|s| s.home() == Home::Explorer(g) && s.shown(self))
+                .filter(|s| s.home() == Home::Explorer(g) && s.shown(self, e))
                 .collect();
             let alone = only.len() == 1 && only[0].block(general) == g;
             let acts = if alone {
-                only[0].head(self, cx).into_iter().collect()
+                only[0].head(self, e, cx).into_iter().collect()
             } else {
                 vec![]
             };
             out.push(self.heading(&node, g, acts, cx));
             if self.explorer.is_open(&node) {
-                out.extend(self.part_rows(g, alone, cx));
+                out.extend(self.part_rows(e, g, alone, cx));
             }
         }
         out
@@ -108,10 +111,12 @@ impl BenchApp {
             .find(|p| p.id == id)
             .map(|p| p.name.clone())
             .unwrap_or_else(|| crate::app::LOCAL_HOST.into());
-        let choices: Vec<(String, String)> =
-            std::iter::once(("general".to_string(), crate::app::LOCAL_HOST.to_string()))
-                .chain(self.projects.iter().map(|p| (p.id.clone(), p.name.clone())))
-                .collect();
+        let choices: Vec<(String, String)> = std::iter::once((
+            crate::model::ProjectKey::HOST.to_string(),
+            crate::app::LOCAL_HOST.to_string(),
+        ))
+        .chain(self.projects.iter().map(|p| (p.id.clone(), p.name.clone())))
+        .collect();
         let view = cx.entity();
         let picker = Button::new("ex-project")
             .ghost()
@@ -333,7 +338,7 @@ impl BenchApp {
     /// The soul, the prompts, the skills (each a folder of its own).
     fn instruction_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
-        let Some(e) = self.project_env.as_ref() else {
+        let Some(e) = self.envs.get(&self.explorer.project) else {
             return vec![quiet("Reading…", 0, cx)];
         };
         let mut out = vec![];
@@ -388,7 +393,7 @@ impl BenchApp {
         out.push(self.node_row("skills", "Skills", Ico::Folder, None, vec![add], cx));
         if self.explorer.is_open("skills") {
             out.extend(self.naming_row(&Named::Skill, 0));
-            let general = e.id == "general";
+            let general = crate::model::ProjectKey::parse(&e.id).is_host();
             let remote = crate::env::is_remote(self, &e.id);
             let machine = self.location(&e.id).files_machine();
             let scopes: [(&str, &str); 3] = [
@@ -481,15 +486,16 @@ impl BenchApp {
     /// A group's parts: each section of it a node (its heading actions on it), its items under it.
     fn part_rows(
         &self,
+        e: &crate::env::ProjectEnv,
         group: &'static str,
         alone: bool,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         let mut out = vec![];
-        let general = self.project_env.as_ref().is_some_and(|e| e.id == "general");
+        let general = crate::model::ProjectKey::parse(&e.id).is_host();
         for s in SECTIONS
             .iter()
-            .filter(|s| s.home() == Home::Explorer(group) && s.shown(self))
+            .filter(|s| s.home() == Home::Explorer(group) && s.shown(self, e))
         {
             let node = format!("s:{}", s.key());
             let depth = if alone { 0 } else { 1 };
@@ -500,22 +506,27 @@ impl BenchApp {
                     title,
                     Ico::Folder,
                     None,
-                    s.head(self, cx).into_iter().collect(),
+                    s.head(self, e, cx).into_iter().collect(),
                     cx,
                 ));
                 if !self.explorer.is_open(&node) {
                     continue;
                 }
             }
-            let items = s.items(self, cx);
+            let items = s.items(self, e, cx);
             if items.is_empty() {
                 out.push(quiet("None yet", depth, cx));
             }
             let kind = s.key();
             for it in items {
-                let key = DocKey::Part {
-                    kind,
-                    name: it.name.clone(),
+                // A part, or the file it is written in (a language server: lsp.json).
+                let key = match it.file {
+                    Some(f) => DocKey::File(f),
+                    None => DocKey::Part {
+                        project: e.id.clone(),
+                        kind,
+                        name: it.name.clone(),
+                    },
                 };
                 let chosen = self.explorer.active.as_ref() == Some(&key);
                 out.push(
@@ -633,8 +644,7 @@ fn act(
     cx: &mut Context<BenchApp>,
     f: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
 ) -> AnyElement {
-    let theme = cx.theme().clone();
-    crate::inserts::icon_button(id, ico, tip, &theme)
+    bench_ui::head_icon_button(id, ico, tip, cx)
         .on_click(cx.listener(move |this, _, window, cx| {
             cx.stop_propagation();
             f(this, window, cx)

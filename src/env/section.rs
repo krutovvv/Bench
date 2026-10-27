@@ -33,6 +33,8 @@ pub struct Item {
     pub label: String,
     pub note: String,
     pub icon: (Ico, Hsla),
+    /// The file its row opens instead of a part (a language server: its project's lsp.json).
+    pub file: Option<crate::explorer::FileRef>,
 }
 
 /// A part opened in the middle, as its `card` gives it: the head's title and actions, the body.
@@ -54,43 +56,65 @@ impl Card {
 
 pub trait Section: Sync {
     /// What `env_card`, `env_save`, `env_revert` and `env_remove` are called with: "name",
-    /// "place", "soul", "telegram", "model", "mcp", "lsp", "skill", "prompt", "cron", "host".
+    /// "place", "telegram", "model", "project", "mcp", "lsp", "cron".
     fn key(&self) -> &'static str;
     /// Where it is shown.
     fn home(&self) -> Home;
     /// Its heading: the group of Settings it is drawn under (neighbours in `SECTIONS` may share
     /// one), or its node in the Explorer's group.
     fn block(&self, general: bool) -> &'static str;
-    /// Whether it is shown for this project.
-    fn shown(&self, _app: &BenchApp) -> bool {
+    /// Whether it is shown for the project of `e`.
+    fn shown(&self, _app: &BenchApp, _e: &ProjectEnv) -> bool {
         true
     }
     /// What it adds to its heading, on the right ("+ Add", "Check").
-    fn head(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+    fn head(
+        &self,
+        _app: &BenchApp,
+        _e: &ProjectEnv,
+        _cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         None
     }
     /// Drawn as a form: its fields (`settings_field` rows, then `form_actions` once something
-    /// changed). None: it is a list (`rows`).
-    fn form(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
+    /// changed). None: it is a list (`items`).
+    fn form(
+        &self,
+        _app: &BenchApp,
+        _e: &ProjectEnv,
+        _cx: &mut Context<BenchApp>,
+    ) -> Option<Vec<AnyElement>> {
         None
     }
     /// Its parts, in the Explorer.
-    fn items(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Vec<Item> {
+    fn items(&self, _app: &BenchApp, _e: &ProjectEnv, _cx: &mut Context<BenchApp>) -> Vec<Item> {
         vec![]
     }
     /// What the part `name` opens in the middle: its fields, its actions (None: nothing to show).
-    fn card(&self, _app: &BenchApp, _name: &str, _cx: &mut Context<BenchApp>) -> Option<Card> {
+    fn card(
+        &self,
+        _app: &BenchApp,
+        _e: &ProjectEnv,
+        _name: &str,
+        _cx: &mut Context<BenchApp>,
+    ) -> Option<Card> {
         None
+    }
+    /// Its open part has changes not saved (its tab's dot; closing it or opening another part
+    /// of the project asks first).
+    fn dirty(&self, _e: &ProjectEnv) -> bool {
+        false
     }
     /// Its part of the agent's answer (`/api/projects/<id>/env`); fields being typed in keep
     /// their text.
     fn apply(&self, _e: &mut ProjectEnv, _v: &Value, _window: &mut Window, _cx: &mut App) {}
-    /// Another card opens: what it has open shuts.
+    /// Another card opens, or its own closes: what it has open shuts, its draft with it.
     fn close(&self, _e: &mut ProjectEnv) {}
-    /// Its row's card opens: fill it.
+    /// Its row's card opens in the project `id`: fill it.
     fn open(
         &self,
         _app: &mut BenchApp,
+        _id: &str,
         _name: String,
         _window: &mut Window,
         _cx: &mut Context<BenchApp>,
@@ -101,8 +125,8 @@ pub trait Section: Sync {
     fn new_one(&self, _e: &mut ProjectEnv) -> Option<(Entity<EditorState>, &'static str)> {
         None
     }
-    /// Its Save's call; None: nothing to save (it may say why in a toast). `id` is the project,
-    /// `eid` the project as its agent knows it.
+    /// Its Save's call for the project `id` (`app.envs[id]`); None: nothing to send (it may say
+    /// why in a toast, or have done it itself). `eid` is the project as its agent knows it.
     fn save(
         &self,
         _app: &mut BenchApp,
@@ -113,23 +137,46 @@ pub trait Section: Sync {
     ) -> Option<Request> {
         None
     }
+    /// A new one saved: the name of the part it is now, whose tab takes the new one's form's
+    /// place (None: the form stays as it is).
+    fn made(&self, _e: &ProjectEnv, _cx: &App) -> Option<String> {
+        None
+    }
     /// After a save went through: its dirty flag goes, a new one's form closes.
     fn saved(&self, _e: &mut ProjectEnv) {}
     /// After a save, besides the environment: what else to read again.
-    fn reload(&self, _app: &mut BenchApp, _window: &mut Window, _cx: &mut Context<BenchApp>) {}
-    /// Revert: the saved text back. True when it opened its text again itself; false: the
-    /// environment is read again.
+    fn reload(
+        &self,
+        _app: &mut BenchApp,
+        _id: &str,
+        _window: &mut Window,
+        _cx: &mut Context<BenchApp>,
+    ) {
+    }
+    /// Revert in the project `id`: the saved text back. True when it opened its text again
+    /// itself; false: the environment is read again.
     fn revert(
         &self,
         _app: &mut BenchApp,
+        _id: &str,
         _window: &mut Window,
         _cx: &mut Context<BenchApp>,
     ) -> bool {
         false
     }
-    /// The DELETE path of its row `name` (None: it has no Remove).
+    /// The DELETE path of its row `name` (None: it has no Remove, or `remove_here` does it).
     fn remove_path(&self, _eid: &str, _name: &str) -> Option<String> {
         None
+    }
+    /// A Remove done here rather than by a DELETE to the agent (the project itself). True: done.
+    fn remove_here(
+        &self,
+        _app: &mut BenchApp,
+        _id: &str,
+        _window: &mut Window,
+        _cx: &mut Context<BenchApp>,
+    ) -> bool {
+        false
     }
 }
 
@@ -146,11 +193,17 @@ pub fn head_act(id: SharedString, label: &'static str, cx: &App) -> Stateful<Div
         .child(label)
 }
 
-/// "+ Add": a new one's form, opened in the middle.
-pub fn add(id: &'static str, kind: &'static str, cx: &mut Context<BenchApp>) -> Stateful<Div> {
+/// "+ Add": a new one's form for the project `project`, opened in the middle.
+pub fn add(
+    id: &'static str,
+    project: &str,
+    kind: &'static str,
+    cx: &mut Context<BenchApp>,
+) -> Stateful<Div> {
+    let project = project.to_string();
     head_act(id.into(), "+ Add", cx).on_click(cx.listener(move |this, _, window, cx| {
         cx.stop_propagation();
-        this.open_part(kind, "new".into(), window, cx)
+        this.open_part(project.clone(), kind, "new".into(), window, cx)
     }))
 }
 
@@ -165,8 +218,14 @@ pub fn card_act(id: String, label: String, color: Hsla) -> Stateful<Div> {
         .child(label)
 }
 
-/// A card's Save: live once something changed.
-pub fn save(what: &'static str, dirty: bool, cx: &mut Context<BenchApp>) -> AnyElement {
+/// A card's Save in the project `project`: live once something changed.
+pub fn save(
+    project: &str,
+    what: &'static str,
+    dirty: bool,
+    cx: &mut Context<BenchApp>,
+) -> AnyElement {
+    let project = project.to_string();
     let theme = cx.theme().clone();
     div()
         .id(SharedString::from(format!("env-card-save-{what}")))
@@ -177,19 +236,31 @@ pub fn save(what: &'static str, dirty: bool, cx: &mut Context<BenchApp>) -> AnyE
             d.cursor_pointer()
                 .bg(theme.primary)
                 .text_color(theme.primary_foreground)
-                .on_click(cx.listener(move |this, _, window, cx| this.env_save(what, window, cx)))
+                .on_click(
+                    cx.listener(move |this, _, window, cx| {
+                        this.env_save(&project, what, window, cx)
+                    }),
+                )
         })
         .when(!dirty, |d| d.text_color(theme.muted_foreground))
         .child("Save")
         .into_any_element()
 }
 
-/// A card's Revert, while something changed.
-pub fn revert(what: &'static str, dirty: bool, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
+/// A card's Revert in the project `project`, while something changed.
+pub fn revert(
+    project: &str,
+    what: &'static str,
+    dirty: bool,
+    cx: &mut Context<BenchApp>,
+) -> Option<AnyElement> {
     let muted = cx.theme().muted_foreground;
+    let project = project.to_string();
     dirty.then(|| {
         card_act(format!("env-card-revert-{what}"), "Revert".into(), muted)
-            .on_click(cx.listener(move |this, _, window, cx| this.env_revert(what, window, cx)))
+            .on_click(
+                cx.listener(move |this, _, window, cx| this.env_revert(&project, what, window, cx)),
+            )
             .into_any_element()
     })
 }
@@ -203,6 +274,7 @@ pub fn remove(
     cx: &mut Context<BenchApp>,
 ) -> AnyElement {
     let on = e.armed.as_deref() == Some(format!("{what}:{target}").as_str());
+    let project = e.id.clone();
     card_act(
         format!("env-card-rm-{what}"),
         if on {
@@ -212,9 +284,9 @@ pub fn remove(
         },
         cx.theme().danger,
     )
-    .on_click(
-        cx.listener(move |this, _, window, cx| this.env_remove(what, target.clone(), window, cx)),
-    )
+    .on_click(cx.listener(move |this, _, window, cx| {
+        this.env_remove(&project, what, target.clone(), window, cx)
+    }))
     .into_any_element()
 }
 
@@ -254,7 +326,7 @@ pub fn new_card(
     named: bool,
     cx: &mut Context<BenchApp>,
 ) -> Card {
-    let actions = vec![save(kind, true, cx)];
+    let actions = vec![save(&e.id, kind, true, cx)];
     let body = v_flex()
         .when(named, |d| {
             d.child(
@@ -272,12 +344,15 @@ pub fn new_card(
     Card::new(title, body, actions)
 }
 
-/// A form's Revert and Save, under its fields, while something in it changed.
+/// A form's Revert and Save in the project `project`, under its fields, while something in it
+/// changed.
 pub fn form_actions(
+    project: &str,
     what: &'static str,
     dirty: bool,
     cx: &mut Context<BenchApp>,
 ) -> Option<AnyElement> {
+    let (p1, p2) = (project.to_string(), project.to_string());
     dirty.then(|| {
         h_flex()
             .w_full()
@@ -292,7 +367,7 @@ pub fn form_actions(
                     cx,
                 )
                 .on_click(
-                    cx.listener(move |this, _, window, cx| this.env_revert(what, window, cx)),
+                    cx.listener(move |this, _, window, cx| this.env_revert(&p1, what, window, cx)),
                 ),
             )
             .child(
@@ -302,7 +377,9 @@ pub fn form_actions(
                     true,
                     cx,
                 )
-                .on_click(cx.listener(move |this, _, window, cx| this.env_save(what, window, cx))),
+                .on_click(
+                    cx.listener(move |this, _, window, cx| this.env_save(&p2, what, window, cx)),
+                ),
             )
             .into_any_element()
     })

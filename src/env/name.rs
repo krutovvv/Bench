@@ -6,7 +6,7 @@ use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::*;
 use serde_json::Value;
 
-use super::section::{Home, Section, form_actions, remove};
+use super::section::{Home, Request, Section, form_actions, remove};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::model::ProjectKey;
@@ -19,9 +19,9 @@ pub struct NameEnv {
 }
 
 impl NameEnv {
-    pub(super) fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
+    pub(super) fn new(id: &str, window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let field = cx.new(|cx| InputState::new(window, cx));
-        on_change(&field, cx, |e| e.name.dirty = true);
+        on_change(&field, id, cx, |e| e.name.dirty = true);
         Self {
             field,
             dirty: false,
@@ -41,14 +41,16 @@ impl Section for Name {
     fn block(&self, _general: bool) -> &'static str {
         "Project"
     }
-    fn shown(&self, app: &BenchApp) -> bool {
-        app.project_env.as_ref().is_some_and(|e| {
-            let key = ProjectKey::parse(&e.id);
-            !(key.agent.is_empty() && key.is_host())
-        })
+    fn shown(&self, _app: &BenchApp, e: &ProjectEnv) -> bool {
+        let key = ProjectKey::parse(&e.id);
+        !(key.agent.is_empty() && key.is_host())
     }
-    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
-        let e = app.project_env.as_ref()?;
+    fn form(
+        &self,
+        _app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Vec<AnyElement>> {
         let host = ProjectKey::parse(&e.id).is_host();
         let hint = if host {
             "The server's name in Bench"
@@ -64,7 +66,7 @@ impl Section for Name {
             )
             .into_any_element(),
         ];
-        out.extend(form_actions("name", e.name.dirty, cx));
+        out.extend(form_actions(&e.id, "name", e.name.dirty, cx));
         Some(out)
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
@@ -78,13 +80,35 @@ impl Section for Name {
                 .update(cx, |s, cx| s.set_value(name, window, cx));
         }
     }
-    // Saving goes through `BenchApp::rename_project` (`env_save`): a project is renamed where it
-    // lives, a server's Host in this Mac's list of agents.
+    /// A name is the project's, wherever it lives: `BenchApp::rename_project` renames it there
+    /// (a server's Host in this Mac's list of agents); nothing is sent from here.
+    fn save(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _eid: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Request> {
+        let e = app.envs.get_mut(id)?;
+        let name = e.name.field.read(cx).value().trim().to_string();
+        e.name.dirty = false;
+        if !name.is_empty() {
+            app.rename_project(id.to_string(), name, window, cx);
+        }
+        None
+    }
     fn saved(&self, e: &mut ProjectEnv) {
         e.name.dirty = false;
     }
-    fn revert(&self, app: &mut BenchApp, _: &mut Window, _: &mut Context<BenchApp>) -> bool {
-        if let Some(e) = app.project_env.as_mut() {
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _: &mut Window,
+        _: &mut Context<BenchApp>,
+    ) -> bool {
+        if let Some(e) = app.envs.get_mut(id) {
             e.name.dirty = false;
         }
         false
@@ -105,13 +129,15 @@ impl Section for Danger {
     fn block(&self, _general: bool) -> &'static str {
         "Remove"
     }
-    fn shown(&self, app: &BenchApp) -> bool {
-        app.project_env
-            .as_ref()
-            .is_some_and(|e| !ProjectKey::parse(&e.id).is_host())
+    fn shown(&self, _app: &BenchApp, e: &ProjectEnv) -> bool {
+        !ProjectKey::parse(&e.id).is_host()
     }
-    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
-        let e = app.project_env.as_ref()?;
+    fn form(
+        &self,
+        _app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Vec<AnyElement>> {
         Some(vec![
             settings_field(
                 "Remove the project",
@@ -131,5 +157,24 @@ impl Section for Danger {
             )
             .into_any_element(),
         ])
+    }
+    /// The project goes (asked already, in its form): its page closes, a new thread starts.
+    fn remove_here(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) -> bool {
+        app.envs.remove(id);
+        if app.settings_project == id {
+            app.settings_project = String::new();
+        }
+        app.confirm_delete = Some(format!("p:{id}"));
+        app.delete_project(id.to_string(), window, cx);
+        app.center = crate::app::Center::Chat;
+        app.new_session(cx);
+        app.thread_project = String::new();
+        true
     }
 }

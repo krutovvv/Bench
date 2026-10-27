@@ -123,11 +123,11 @@ impl InsertKind for Tasks {
         let head = crate::ui::block_head(&theme, true)
             .child(div().flex_1().min_w_0().truncate().child(title))
             .child(
-                crate::inserts::icon_button(
+                bench_ui::head_icon_button(
                     &format!("{}-task-close", ins.id),
                     crate::icons::Ico::X,
                     "Close",
-                    &theme,
+                    cx,
                 )
                 .on_click(cx.listener(|this, _, window, cx| {
                     this.click_claimed = true;

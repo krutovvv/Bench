@@ -21,7 +21,6 @@ pub mod tools;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
 use serde_json::Value;
@@ -315,11 +314,11 @@ impl BenchApp {
             .child(div().flex_1())
             .children(controls)
             .child(
-                icon_button(
+                bench_ui::head_icon_button(
                     &format!("{id}-rm"),
                     Ico::X,
                     "Remove from the thread",
-                    &theme,
+                    cx,
                 )
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.click_claimed = true;
@@ -365,23 +364,6 @@ impl BenchApp {
             )
             .into_any_element()
     }
-}
-
-/// A small icon in an insert's head.
-pub(crate) fn icon_button(
-    id: &str,
-    ico: Ico,
-    tip: &'static str,
-    theme: &gpui_kit::component::Theme,
-) -> Stateful<Div> {
-    div()
-        .id(SharedString::from(id.to_string()))
-        .p_0p5()
-        .cursor_pointer()
-        .text_color(theme.muted_foreground)
-        .hover(|s| s.text_color(theme.foreground).bg(theme.list_hover))
-        .child(ico.icon().small())
-        .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }
 
 /// Shorten text for the agent.

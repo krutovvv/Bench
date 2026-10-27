@@ -40,10 +40,7 @@ impl BenchApp {
             return;
         }
         let project = if self.explorer.project.is_empty() {
-            match self.thread_project.as_str() {
-                "" => "general".to_string(),
-                p => p.to_string(),
-            }
+            self.thread_project_or_host()
         } else {
             self.explorer.project.clone()
         };
@@ -233,8 +230,8 @@ impl BenchApp {
             return;
         };
         let dir = self
-            .project_env
-            .as_ref()
+            .envs
+            .get(&project)
             .map(|e| e.dir.clone())
             .unwrap_or_default();
         let profile = self.current_profile();
@@ -321,7 +318,7 @@ impl BenchApp {
     /// A rename: the open tabs, the pane beside and the open folders follow the entry.
     fn moved(&mut self, from: &FileRef, to: &FileRef) {
         let follow = |f: &FileRef| -> Option<FileRef> {
-            f.within(&from.path).then(|| FileRef {
+            f.inside(from).then(|| FileRef {
                 path: format!("{}{}", to.path, &f.path[from.path.len()..]),
                 ..f.clone()
             })
@@ -378,15 +375,15 @@ impl BenchApp {
                         .explorer
                         .tabs
                         .iter()
-                        .filter(|t| matches!(t, DocKey::File(o) if o.within(&f.path)))
+                        .filter(|t| matches!(t, DocKey::File(o) if o.inside(&f)))
                         .cloned()
                         .collect();
                     for k in gone {
                         this.explorer.docs.remove(&k);
                         this.close_doc(k, cx);
                     }
-                    if this.beside_file().is_some_and(|b| b.within(&f.path)) {
-                        this.right = None;
+                    if this.beside_file().is_some_and(|b| b.inside(&f)) {
+                        this.close_right(cx);
                     }
                     this.list_folder(f.parent(), window, cx);
                     this.after_write(&f, window, cx);
@@ -399,10 +396,7 @@ impl BenchApp {
     /// ⌘P: a field over the middle and every file of the project's folder to choose from.
     pub fn open_quick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.sidebar_panel != SidebarPanel::Explorer || self.explorer.project.is_empty() {
-            let project = match self.thread_project.as_str() {
-                "" => "general".to_string(),
-                p => p.to_string(),
-            };
+            let project = self.thread_project_or_host();
             self.show_explorer(project, window, cx);
         }
         let Some(root) = self.explorer_root() else {

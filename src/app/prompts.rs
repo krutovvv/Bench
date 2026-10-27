@@ -12,7 +12,8 @@ impl BenchApp {
     pub(crate) fn load_prompts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let project = self.thread_project.clone();
         let target = if project.is_empty() {
-            self.local_conn().map(|c| (c, "general".to_string()))
+            self.local_conn()
+                .map(|c| (c, crate::model::ProjectKey::HOST.to_string()))
         } else {
             self.env_target(&project)
         };

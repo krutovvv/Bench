@@ -54,7 +54,8 @@ src/
   ui/            the frame: mod.rs (layout, header), sidebar, statusbar, composer, media
   ui/thread/     the open thread on gpui::list: messages, work, queued, rail, extras
   inserts/       one folder per insert kind, the registry in mod.rs
-  env/           a project's Settings page: one file per section, the registry in mod.rs, page.rs, ide.rs
+  env/           a project's environment: one file per section, the registry in mod.rs, the Settings page page.rs
+  explorer/      the Explorer: tree, documents, tabs, the tree's work (docs/explorer.md)
   gateway.rs     the WebSocket to the agent;  rest.rs  its REST API
   connection.rs, pi_agent.rs   where the agent runs, starting it (here or over SSH)
 agent/src/

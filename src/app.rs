@@ -85,8 +85,11 @@ pub struct BenchApp {
     pub host_browser: bool,
     /// The new project's form, in the chat area while open (the sidebar's "+").
     pub project_form: Option<ProjectForm>,
-    /// The open environment thread's project environment (its block).
-    pub project_env: Option<ProjectEnv>,
+    /// Projects' environments, by project id (`ProjectEnv::id`), each read once something shows
+    /// it: the Settings page (`settings_project`), the Explorer (`explorer.project`), a part's tab.
+    pub envs: HashMap<String, ProjectEnv>,
+    /// The project whose Settings `Center::Project` shows.
+    pub settings_project: String,
     /// The project whose prompts `prompts` holds (they follow the open thread's project).
     pub prompts_for: Option<String>,
     /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
@@ -171,8 +174,9 @@ pub struct BenchApp {
     pub process_open: Option<String>,
     /// Files waiting in the composer to go with the next message.
     pub attachments: Vec<std::path::PathBuf>,
-    /// The project's code sent to the thread from the Explorer, waiting with the message.
-    pub references: Vec<attachments::CodeRef>,
+    /// The project's code sent to a thread from the Explorer, waiting with its message, by
+    /// `thread_key` (each thread its own, as its draft).
+    pub references: HashMap<String, Vec<attachments::CodeRef>>,
     /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
     pub sidebar_hidden: bool,
     pub usage: Option<Usage>,
@@ -612,7 +616,8 @@ impl BenchApp {
             projects: vec![],
             host_browser: false,
             project_form: None,
-            project_env: None,
+            envs: HashMap::new(),
+            settings_project: String::new(),
             prompts_for: None,
             agents: HashMap::new(),
             gear_agent: String::new(),
@@ -656,7 +661,7 @@ impl BenchApp {
             live: None,
             queued: None,
             attachments: vec![],
-            references: vec![],
+            references: HashMap::new(),
             sidebar_hidden: false,
             files_open: false,
             processes: vec![],

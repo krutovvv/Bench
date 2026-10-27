@@ -25,10 +25,10 @@ pub struct PlaceEnv {
 }
 
 impl PlaceEnv {
-    pub(super) fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
+    pub(super) fn new(id: &str, window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let folder = cx
             .new(|cx| InputState::new(window, cx).placeholder("/path/to/the/folder — empty: none"));
-        on_change(&folder, cx, |e| e.place.dirty = true);
+        on_change(&folder, id, cx, |e| e.place.dirty = true);
         Self {
             folder,
             confined: false,
@@ -51,8 +51,12 @@ impl Section for Place {
     }
     /// Its agent and the machine it works on (chosen when it was made, read here), its folder and
     /// whether the agent is kept in it.
-    fn form(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
-        let e = app.project_env.as_ref()?;
+    fn form(
+        &self,
+        app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Vec<AnyElement>> {
         let key = ProjectKey::parse(&e.id);
         let at = app.location(&e.id);
         let mut out = vec![];
@@ -92,6 +96,7 @@ impl Section for Place {
             return Some(out);
         }
         let local = at.machine_here().is_empty();
+        let pid = e.id.clone();
         out.push(
             settings_field(
                 "Folder",
@@ -106,8 +111,8 @@ impl Section for Place {
                     .when(local, |d| {
                         d.child(
                             crate::ui::form_action("env-folder-pick", "Choose…", false, cx)
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    this.env_pick_folder(window, cx)
+                                .on_click(cx.listener(move |this, _, window, cx| {
+                                    this.env_pick_folder(pid.clone(), window, cx)
                                 })),
                         )
                     })
@@ -117,12 +122,13 @@ impl Section for Place {
             .into_any_element(),
         );
         let view = cx.entity();
+        let pid = e.id.clone();
         let kept = Checkbox::new("env-folder-confined")
             .checked(e.place.confined)
             .on_click(move |on, _, cx| {
                 let on = *on;
                 view.update(cx, |this, cx| {
-                    if let Some(e) = this.project_env.as_mut() {
+                    if let Some(e) = this.envs.get_mut(&pid) {
                         e.place.confined = on;
                         e.place.dirty = true;
                     }
@@ -139,7 +145,7 @@ impl Section for Place {
             )
             .into_any_element(),
         );
-        out.extend(form_actions("place", e.place.dirty, cx));
+        out.extend(form_actions(&e.id, "place", e.place.dirty, cx));
         Some(out)
     }
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
@@ -157,12 +163,12 @@ impl Section for Place {
     fn save(
         &self,
         app: &mut BenchApp,
-        _id: &str,
+        id: &str,
         eid: &str,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<Request> {
-        let e = app.project_env.as_ref()?;
+        let e = app.envs.get(id)?;
         let folder = e.place.folder.read(cx).value().trim().to_string();
         Some((
             "PUT",
@@ -174,21 +180,27 @@ impl Section for Place {
         e.place.dirty = false;
     }
     /// The sidebar knows the folder too (Zed, the icon).
-    fn reload(&self, app: &mut BenchApp, window: &mut Window, cx: &mut Context<BenchApp>) {
+    fn reload(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        window: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
         app.load_projects(window, cx);
-        let agent = ProjectKey::parse(
-            app.project_env
-                .as_ref()
-                .map(|e| e.id.as_str())
-                .unwrap_or(""),
-        )
-        .agent;
+        let agent = ProjectKey::parse(id).agent;
         if !agent.is_empty() {
             app.load_server_projects(agent, window, cx);
         }
     }
-    fn revert(&self, app: &mut BenchApp, _: &mut Window, _: &mut Context<BenchApp>) -> bool {
-        if let Some(e) = app.project_env.as_mut() {
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _: &mut Window,
+        _: &mut Context<BenchApp>,
+    ) -> bool {
+        if let Some(e) = app.envs.get_mut(id) {
             e.place.dirty = false;
         }
         false
@@ -196,8 +208,8 @@ impl Section for Place {
 }
 
 impl BenchApp {
-    /// The folder's "Choose…": a folder on this Mac.
-    pub fn env_pick_folder(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// The folder's "Choose…" in the project `id`'s Settings: a folder on this Mac.
+    pub fn env_pick_folder(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         let picked = cx.prompt_for_paths(PathPromptOptions {
             files: false,
             directories: true,
@@ -212,7 +224,7 @@ impl BenchApp {
                 return;
             };
             let _ = this.update_in(cx, |this, window, cx| {
-                if let Some(e) = this.project_env.as_mut() {
+                if let Some(e) = this.envs.get_mut(&id) {
                     let folder = path.to_string_lossy().to_string();
                     e.place
                         .folder

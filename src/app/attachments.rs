@@ -47,6 +47,24 @@ impl CodeRef {
     }
 }
 
+/// The 1-based lines a selection (byte offsets into `text`) covers; a selection ending at a
+/// line's start does not take that line.
+pub fn lines_of(text: &str, range: std::ops::Range<usize>) -> (usize, usize) {
+    let clamp = |at: usize| {
+        let mut at = at.min(text.len());
+        while !text.is_char_boundary(at) {
+            at -= 1;
+        }
+        at
+    };
+    let (start, mut end) = (clamp(range.start), clamp(range.end));
+    if end > start && text[..end].ends_with('\n') {
+        end -= 1;
+    }
+    let line = |at: usize| text[..at].matches('\n').count() + 1;
+    (line(start), line(end.max(start)))
+}
+
 /// The message's words with the references under them.
 pub fn with_references(text: String, refs: &[CodeRef]) -> String {
     std::iter::once(text)
@@ -57,19 +75,30 @@ pub fn with_references(text: String, refs: &[CodeRef]) -> String {
 }
 
 impl BenchApp {
-    /// A reference to the project's code into the composer (once).
+    /// The open thread's references waiting in its composer.
+    pub fn thread_references(&self) -> Vec<CodeRef> {
+        self.references
+            .get(&self.thread_key())
+            .cloned()
+            .unwrap_or_default()
+    }
+
+    /// A reference to the project's code into the open thread's composer (once).
     pub fn add_reference(&mut self, r: CodeRef, cx: &mut Context<Self>) {
-        if !self.references.contains(&r) {
-            self.references.push(r);
+        let list = self.references.entry(self.thread_key()).or_default();
+        if !list.contains(&r) {
+            list.push(r);
         }
         cx.notify();
     }
 
     pub fn remove_reference(&mut self, k: usize, cx: &mut Context<Self>) {
-        if k < self.references.len() {
-            self.references.remove(k);
-            cx.notify();
+        if let Some(list) = self.references.get_mut(&self.thread_key()) {
+            if k < list.len() {
+                list.remove(k);
+            }
         }
+        cx.notify();
     }
 
     pub fn add_attachments(&mut self, paths: Vec<PathBuf>, cx: &mut Context<Self>) {
@@ -136,5 +165,41 @@ impl BenchApp {
         }
         self.add_attachments(paths, cx);
         true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CodeRef, lines_of, with_references};
+
+    #[test]
+    fn a_selection_names_its_lines() {
+        let text = "one\ntwo\nthree\nfour\n";
+        // "two\nthree"
+        assert_eq!(lines_of(text, 4..13), (2, 3));
+        // whole lines, ending after the newline: the next line is not taken
+        assert_eq!(lines_of(text, 4..14), (2, 3));
+        // a caret
+        assert_eq!(lines_of(text, 0..0), (1, 1));
+        // past the end, and inside a letter of two bytes
+        assert_eq!(lines_of("é\nb", 1..99), (1, 2));
+    }
+
+    #[test]
+    fn a_reference_reads_as_path_lines_and_code() {
+        let r = CodeRef {
+            path: "/p/src/a.rs".into(),
+            lines: Some((3, 5)),
+            text: Some("fn a() {}\n".into()),
+        };
+        assert_eq!(r.label(), "a.rs:3–5");
+        assert_eq!(r.message(), "`/p/src/a.rs:3-5`\n```rs\nfn a() {}\n```");
+        let f = CodeRef {
+            path: "/p/README".into(),
+            lines: None,
+            text: None,
+        };
+        assert_eq!(f.label(), "README");
+        assert_eq!(with_references("look".into(), &[f]), "look\n\n`/p/README`");
     }
 }

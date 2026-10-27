@@ -52,9 +52,9 @@ pub struct McpEnv {
 }
 
 impl McpEnv {
-    pub(super) fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
+    pub(super) fn new(id: &str, window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         let json = editor("json", window, cx);
-        on_change(&json, cx, |e| e.mcp.dirty = true);
+        on_change(&json, id, cx, |e| e.mcp.dirty = true);
         Self {
             servers: vec![],
             checking: false,
@@ -109,8 +109,12 @@ impl Section for Mcp {
     /// The head says how the set stands, so a block of unchecked servers cannot read as calm.
     /// Asking is one action for the project, in the head, because a check reconnects the
     /// project's servers together, not one at a time.
-    fn head(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Option<AnyElement> {
-        let e = app.project_env.as_ref()?;
+    fn head(
+        &self,
+        _app: &BenchApp,
+        e: &ProjectEnv,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<AnyElement> {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let checking = e.mcp.checking;
@@ -146,17 +150,18 @@ impl Section for Mcp {
                     .into_any_element(),
             );
         }
+        let id = e.id.clone();
         head.push(
             head_act("env-mcp-check".into(), "Check", cx)
                 .when(checking, |d| d.opacity(0.5))
-                .on_click(cx.listener(|this, _, window, cx| {
+                .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
                     cx.stop_propagation();
-                    this.env_check_mcp(window, cx)
+                    this.env_check_mcp(id.clone(), window, cx)
                 }))
                 .into_any_element(),
         );
-        head.push(add("env-mcp-add", "mcp", cx).into_any_element());
+        head.push(add("env-mcp-add", &e.id, "mcp", cx).into_any_element());
         Some(
             h_flex()
                 .gap_3()
@@ -168,10 +173,7 @@ impl Section for Mcp {
     /// Each server carries a sign of what the agent knows of it. A server says nothing until
     /// something asks it for its tools, so "not tried yet" is its own state and says so out
     /// loud — it is not a working server.
-    fn items(&self, app: &BenchApp, cx: &mut Context<BenchApp>) -> Vec<Item> {
-        let Some(e) = app.project_env.as_ref() else {
-            return vec![];
-        };
+    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<Item> {
         let theme = cx.theme().clone();
         e.mcp
             .servers
@@ -191,12 +193,18 @@ impl Section for Mcp {
                     label: m.name.clone(),
                     note: mcp_note(m),
                     icon,
+                    file: None,
                 }
             })
             .collect()
     }
-    fn card(&self, app: &BenchApp, name: &str, cx: &mut Context<BenchApp>) -> Option<Card> {
-        let e = app.project_env.as_ref()?;
+    fn card(
+        &self,
+        app: &BenchApp,
+        e: &ProjectEnv,
+        name: &str,
+        cx: &mut Context<BenchApp>,
+    ) -> Option<Card> {
         if name == "new" {
             let mut card = new_card(
                 e,
@@ -216,7 +224,7 @@ impl Section for Mcp {
                 .iter()
                 .filter(|(n, _, _)| !have.contains(&n.as_str()))
                 .map(|(n, title, spec)| {
-                    let (n, spec) = (n.clone(), spec.clone());
+                    let (n, spec, id) = (n.clone(), spec.clone(), e.id.clone());
                     div()
                         .id(SharedString::from(format!("env-mcp-preset-{n}")))
                         .px_2()
@@ -230,7 +238,7 @@ impl Section for Mcp {
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.click_claimed = true;
                             cx.stop_propagation();
-                            this.env_fill_mcp(n.clone(), &spec, window, cx)
+                            this.env_fill_mcp(&id, n.clone(), &spec, window, cx)
                         }))
                         .into_any_element()
                 });
@@ -246,7 +254,7 @@ impl Section for Mcp {
         }
         let mut actions = vec![];
         if e.mcp.auth.contains(name) {
-            let n = name.to_string();
+            let (n, id) = (name.to_string(), e.id.clone());
             actions.push(
                 card_act(
                     "env-card-auth".into(),
@@ -255,13 +263,13 @@ impl Section for Mcp {
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
                     this.click_claimed = true;
-                    this.env_authorize(n.clone(), window, cx)
+                    this.env_authorize(id.clone(), n.clone(), window, cx)
                 }))
                 .into_any_element(),
             );
         }
-        actions.push(save("mcp", e.mcp.dirty, cx));
-        actions.extend(revert("mcp", e.mcp.dirty, cx));
+        actions.push(save(&e.id, "mcp", e.mcp.dirty, cx));
+        actions.extend(revert(&e.id, "mcp", e.mcp.dirty, cx));
         actions.push(remove(e, "mcp", name.to_string(), "Remove", cx));
         Some(Card::new(
             format!("MCP server · {name}"),
@@ -272,11 +280,22 @@ impl Section for Mcp {
     fn apply(&self, e: &mut ProjectEnv, v: &Value, _window: &mut Window, _cx: &mut App) {
         apply_mcp(e, v);
     }
+    fn dirty(&self, e: &ProjectEnv) -> bool {
+        e.mcp.open.is_some() && e.mcp.dirty
+    }
     fn close(&self, e: &mut ProjectEnv) {
         e.mcp.open = None;
+        e.mcp.dirty = false;
     }
-    fn open(&self, app: &mut BenchApp, name: String, w: &mut Window, cx: &mut Context<BenchApp>) {
-        app.env_open_mcp(name, w, cx);
+    fn open(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        name: String,
+        w: &mut Window,
+        cx: &mut Context<BenchApp>,
+    ) {
+        app.env_open_mcp(id, name, w, cx);
     }
     fn new_one(&self, e: &mut ProjectEnv) -> Option<(Entity<EditorState>, &'static str)> {
         e.mcp.open = Some("new".into());
@@ -285,12 +304,12 @@ impl Section for Mcp {
     fn save(
         &self,
         app: &mut BenchApp,
-        _id: &str,
+        id: &str,
         eid: &str,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<Request> {
-        let e = app.project_env.as_ref()?;
+        let e = app.envs.get(id)?;
         let mut name = e.mcp.open.clone()?;
         if name == "new" {
             name = e.new_name.read(cx).value().trim().to_string();
@@ -305,11 +324,21 @@ impl Section for Mcp {
             json!({"text": e.mcp.json.read(cx).value().to_string()}),
         ))
     }
+    /// A new server, saved, is its name's part.
+    fn made(&self, e: &ProjectEnv, cx: &App) -> Option<String> {
+        Some(e.new_name.read(cx).value().trim().to_string())
+    }
     fn saved(&self, e: &mut ProjectEnv) {
         e.mcp.dirty = false;
     }
-    fn revert(&self, app: &mut BenchApp, _: &mut Window, _: &mut Context<BenchApp>) -> bool {
-        if let Some(e) = app.project_env.as_mut() {
+    fn revert(
+        &self,
+        app: &mut BenchApp,
+        id: &str,
+        _: &mut Window,
+        _: &mut Context<BenchApp>,
+    ) -> bool {
+        if let Some(e) = app.envs.get_mut(id) {
             e.mcp.dirty = false;
         }
         false
@@ -320,9 +349,15 @@ impl Section for Mcp {
 }
 
 impl BenchApp {
-    /// A server's row: its config opens under it to edit (again: closes).
-    pub fn env_open_mcp(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(e) = self.project_env.as_mut() else {
+    /// A server's row in the project `id`: its config opens to edit (again: closes).
+    pub fn env_open_mcp(
+        &mut self,
+        id: &str,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(e) = self.envs.get_mut(id) else {
             return;
         };
         if e.mcp.open.as_deref() == Some(&name) && !e.mcp.dirty {
@@ -347,19 +382,16 @@ impl BenchApp {
     /// rows say what came back. A server only tells you what it is when you ask it, so this is
     /// the difference between "unknown" and "working"; the agent answers when the slowest has had
     /// its say, so this is the one environment job allowed to take a minute.
-    pub fn env_check_mcp(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn env_check_mcp(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         // One check at a time: a second reconnect while the first is in flight would answer out
         // of order and show a stale set.
-        if self.project_env.as_ref().is_some_and(|e| e.mcp.checking) {
+        if self.envs.get(&id).is_none_or(|e| e.mcp.checking) {
             return;
         }
-        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
-            return;
-        };
         let Some((conn, eid)) = self.env_target(&id) else {
             return;
         };
-        if let Some(e) = self.project_env.as_mut() {
+        if let Some(e) = self.envs.get_mut(&id) {
             e.mcp.checking = true;
         }
         cx.notify();
@@ -371,7 +403,7 @@ impl BenchApp {
             move || rest::send_json_secs(&conn, "POST", &path, &profile, Value::Null, 90),
             move |this, r, window, cx| {
                 let mut note = None;
-                if let Some(e) = this.project_env.as_mut().filter(|e| e.id == id) {
+                if let Some(e) = this.envs.get_mut(&id) {
                     e.mcp.checking = false;
                     match &r {
                         Ok(v) => {
@@ -400,10 +432,13 @@ impl BenchApp {
 
     /// Sign in to an MCP server (OAuth): its page opens in the browser; the agent connects it once
     /// the browser comes back, and the block reads the environment again until it shows connected.
-    pub fn env_authorize(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
-            return;
-        };
+    pub fn env_authorize(
+        &mut self,
+        id: String,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some((conn, eid)) = self.env_target(&id) else {
             return;
         };
@@ -436,9 +471,9 @@ impl BenchApp {
                             let more = this
                                 .update_in(cx, |this, window, cx| {
                                     let waiting = this
-                                        .project_env
-                                        .as_ref()
-                                        .is_some_and(|e| e.id == id && e.mcp.auth.contains(&name));
+                                        .envs
+                                        .get(&id)
+                                        .is_some_and(|e| e.mcp.auth.contains(&name));
                                     if waiting {
                                         this.load_env(&id, window, cx);
                                     }
@@ -462,12 +497,13 @@ impl BenchApp {
     /// A preset into the new MCP server's form: its name and its config, to look at and Save.
     pub fn env_fill_mcp(
         &mut self,
+        id: &str,
         name: String,
         spec: &Value,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(e) = self.project_env.as_mut() else {
+        let Some(e) = self.envs.get_mut(id) else {
             return;
         };
         let text = serde_json::to_string_pretty(spec).unwrap_or_default();

@@ -61,6 +61,19 @@ pub fn bar_h(cx: &App) -> Pixels {
     cx.theme().font_size * 2.5
 }
 
+/// The window's header: a bar and the rule under it.
+pub fn header_h(cx: &App) -> Pixels {
+    bar_h(cx) + px(1.)
+}
+
+/// Room left of the header for the window's buttons (macOS's three lights), when the sidebar
+/// that usually sits under them is folded away.
+pub const WINDOW_BUTTONS_W: f32 = 78.;
+
+/// The sidebar's strip under the window buttons: its icons end at the sidebar's 16 px inset
+/// (an icon's 4 px box padding + this).
+pub const SIDEBAR_STRIP_PR: f32 = 12.;
+
 /// A row under a group header starts where the header's name does.
 pub fn nest_pl(cx: &App) -> Pixels {
     cx.theme().font_size * 2.375 - px(4.)

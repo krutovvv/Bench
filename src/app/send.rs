@@ -150,7 +150,7 @@ impl BenchApp {
             return;
         };
         // The code sent from the Explorer goes under the words.
-        let typed = super::attachments::with_references(typed, &self.references);
+        let typed = super::attachments::with_references(typed, &self.thread_references());
         let files = self.attachments.clone();
         if typed.is_empty() && files.is_empty() {
             return;
@@ -180,7 +180,7 @@ impl BenchApp {
                 .update(cx, |s, cx| s.set_value("", window, cx));
             self.note_draft(cx);
             self.attachments.clear();
-            self.references.clear();
+            self.references.remove(&self.thread_key());
             let context = self.block_context(cx);
             // It becomes the thread's next message: the inserts that waited with it go after it.
             let after = self.thread.messages() + 1;
@@ -240,7 +240,7 @@ impl BenchApp {
             .update(cx, |s, cx| s.set_value("", window, cx));
         self.note_draft(cx);
         self.attachments.clear();
-        self.references.clear();
+        self.references.remove(&self.thread_key());
         let shown: Vec<String> = files
             .iter()
             .map(|f| format!("{}{}]", attach::PREFIX, f.display()))

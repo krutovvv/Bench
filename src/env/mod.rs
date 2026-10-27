@@ -50,8 +50,9 @@ pub struct ProjectEnv {
     pub cron: schedule::ScheduleEnv,
     /// A new MCP server's name.
     pub new_name: Entity<InputState>,
-    /// The part open in the middle (the Explorer's `DocKey::Part`): (kind, name), the kind a
-    /// `Section::key` ("new" for a new one). One at a time: its fields are its section's.
+    /// The part open in the middle (the Explorer's `DocKey::Part` of this project): (kind,
+    /// name), the kind a `Section::key` (name "new" for a new one). One per project: its fields
+    /// are its section's.
     pub card: Option<(&'static str, String)>,
     /// A remove asked once ("mcp:<name>", "project:"): the second click does it.
     pub armed: Option<String>,
@@ -80,7 +81,7 @@ pub fn section(key: &str) -> Option<&'static dyn Section> {
 /// Host project. Its model, reasoning level and approvals live in that agent's folder, so a
 /// project thinks and asks as it was set to, not as the machine was.
 pub(crate) fn env_agent(id: &str) -> String {
-    if id == "general" {
+    if id == crate::model::ProjectKey::HOST {
         "default".into()
     } else {
         format!("project:{id}")
@@ -111,14 +112,17 @@ pub(crate) fn editor(
     e
 }
 
-/// A part typed in: `mark` sets its dirty flag, so its Save shows.
+/// A field of the project `id`'s environment typed in: `mark` sets its dirty flag, so its Save
+/// shows.
 pub(crate) fn on_change<T: EventEmitter<InputEvent>>(
     field: &Entity<T>,
+    id: &str,
     cx: &mut Context<BenchApp>,
     mark: fn(&mut ProjectEnv),
 ) {
+    let id = id.to_string();
     cx.subscribe(field, move |this, _, ev: &InputEvent, cx| {
-        if let (InputEvent::Change, Some(e)) = (ev, this.project_env.as_mut()) {
+        if let (InputEvent::Change, Some(e)) = (ev, this.envs.get_mut(&id)) {
             mark(e);
             cx.notify();
         }
@@ -140,18 +144,25 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         self.load_env(&id, window, cx);
+        self.settings_project = id;
         self.open_center(crate::app::Center::Project, window, cx);
     }
 
-    /// A part of the shown project's environment opened in the middle (`DocKey::Part`).
+    /// A part of the project `project`'s environment opened in the middle (`DocKey::Part`).
     pub fn open_part(
         &mut self,
+        project: String,
         kind: &'static str,
         name: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.open_doc(crate::explorer::DocKey::Part { kind, name }, window, cx);
+        let key = crate::explorer::DocKey::Part {
+            project,
+            kind,
+            name,
+        };
+        self.open_doc(key, window, cx);
     }
 
     fn new_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) -> ProjectEnv {
@@ -159,14 +170,14 @@ impl BenchApp {
         ProjectEnv {
             id: id.to_string(),
             dir: String::new(),
-            name: name::NameEnv::new(window, cx),
-            place: place::PlaceEnv::new(window, cx),
-            lsp: lsp::LspEnv::new(window, cx),
-            telegram: telegram::TelegramEnv::new(window, cx),
+            name: name::NameEnv::new(id, window, cx),
+            place: place::PlaceEnv::new(id, window, cx),
+            lsp: Default::default(),
+            telegram: telegram::TelegramEnv::new(id, window, cx),
             run: Default::default(),
-            mcp: mcp::McpEnv::new(window, cx),
+            mcp: mcp::McpEnv::new(id, window, cx),
             instructions: Default::default(),
-            cron: schedule::ScheduleEnv::new(window, cx),
+            cron: schedule::ScheduleEnv::new(id, window, cx),
             new_name,
             card: None,
             armed: None,
@@ -174,15 +185,16 @@ impl BenchApp {
         }
     }
 
-    /// Read the environment for the page (again after the agent or a Save changed it); what is
-    /// being typed is kept.
+    /// Read the project `id`'s environment (again after the agent or a Save changed it) into its
+    /// entry of `envs`, made the first time; what is being typed is kept, other projects' entries
+    /// are not touched.
     pub fn load_env(&mut self, id: &str, window: &mut Window, cx: &mut Context<Self>) {
-        if self.project_env.as_ref().is_none_or(|e| e.id != id) {
+        if !self.envs.contains_key(id) {
             let env = self.new_env(id, window, cx);
-            self.project_env = Some(env);
+            self.envs.insert(id.to_string(), env);
         }
         if self.demo {
-            crate::demo::env(self, window, cx);
+            crate::demo::env(self, id, window, cx);
             return;
         }
         let Some((conn, eid)) = self.env_target(id) else {
@@ -203,7 +215,7 @@ impl BenchApp {
                 let Ok((effort, _, _, approvals, _)) = r else {
                     return;
                 };
-                let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked2) else {
+                let Some(e) = this.envs.get_mut(&asked2) else {
                     return;
                 };
                 e.run.effort = effort.unwrap_or_default();
@@ -223,7 +235,7 @@ impl BenchApp {
                     .iter()
                     .find(|p| p.id == asked)
                     .map(|p| p.name.clone());
-                let Some(e) = this.project_env.as_mut().filter(|e| e.id == asked) else {
+                let Some(e) = this.envs.get_mut(&asked) else {
                     return;
                 };
                 match r {
@@ -241,91 +253,99 @@ impl BenchApp {
         );
     }
 
-    /// Save what changed in a section's card (`what`: its key).
-    pub fn env_save(&mut self, what: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    /// Save what changed in a section of the project `id` (`what`: the section's key).
+    pub fn env_save(
+        &mut self,
+        id: &str,
+        what: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(section) = section(what) else {
             return;
         };
-        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
-            return;
-        };
-        // A name is the project's, wherever it lives (`places.rs` knows where).
-        if what == "name" {
-            if let Some(e) = self.project_env.as_mut() {
-                let name = e.name.field.read(cx).value().trim().to_string();
-                e.name.dirty = false;
-                if !name.is_empty() {
-                    self.rename_project(id, name, window, cx);
-                }
-            }
+        if !self.envs.contains_key(id) {
             return;
         }
-        let Some((conn, eid)) = self.env_target(&id) else {
+        // The project as its agent knows it (`env_target`'s); a section that saves elsewhere
+        // (the name) needs no link to the agent.
+        let eid = crate::model::ProjectKey::parse(id).id;
+        let Some((method, path, body)) = section.save(self, id, &eid, window, cx) else {
             return;
         };
-        let Some((method, path, body)) = section.save(self, &id, &eid, window, cx) else {
+        let Some((conn, _)) = self.env_target(id) else {
             return;
         };
         let profile = self.current_profile();
+        let id = id.to_string();
         self.background(
             window,
             cx,
             move || rest::send_json(&conn, method, &path, &profile, body),
             move |this, r, window, cx| match r {
                 Ok(_) => {
-                    // A new one is made: its form's tab gives way to it (an MCP server is named
-                    // in its form; a job keeps its form open as itself).
+                    // A new one is made: its form's tab gives way to it when it has a name of its
+                    // own (an MCP server is named in its form; a job keeps its form).
                     let mut made = None;
-                    if let Some(e) = this.project_env.as_mut() {
-                        if e.card.as_ref().is_some_and(|(_, n)| n == "new") && what != "cron" {
+                    if let Some(e) = this.envs.get_mut(&id) {
+                        let new = e
+                            .card
+                            .as_ref()
+                            .is_some_and(|(k, n)| *k == what && n == "new");
+                        if let Some(name) = new.then(|| section.made(e, cx)).flatten() {
+                            section.close(e);
                             e.card = None;
-                            e.mcp.open = None;
-                            made = Some(e.new_name.read(cx).value().trim().to_string());
+                            made = Some(name);
                         }
                         section.saved(e);
                     }
                     if let Some(name) = made {
                         let new = crate::explorer::DocKey::Part {
+                            project: id.clone(),
                             kind: what,
                             name: "new".into(),
                         };
                         this.close_doc(new, cx);
-                        if what == "mcp" && !name.is_empty() {
-                            this.open_part(what, name, window, cx);
+                        if !name.is_empty() {
+                            this.open_part(id.clone(), what, name, window, cx);
                         }
                     }
                     this.load_env(&id, window, cx);
-                    section.reload(this, window, cx);
+                    section.reload(this, &id, window, cx);
                 }
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
             },
         );
     }
 
-    /// Revert: what is saved, back in the field.
-    pub fn env_revert(&mut self, what: &'static str, window: &mut Window, cx: &mut Context<Self>) {
+    /// Revert in the project `id`: what is saved, back in the field.
+    pub fn env_revert(
+        &mut self,
+        id: &str,
+        what: &'static str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         let Some(section) = section(what) else {
             return;
         };
-        if self.project_env.is_none() || section.revert(self, window, cx) {
+        if !self.envs.contains_key(id) || section.revert(self, id, window, cx) {
             return;
         }
-        let Some(id) = self.project_env.as_ref().map(|e| e.id.clone()) else {
-            return;
-        };
-        self.load_env(&id, window, cx);
+        self.load_env(id, window, cx);
     }
 
-    /// A Remove, twice: armed, then done. `what`: a section's key ("mcp", "lsp", "cron"), or
-    /// "project" (the project itself: its page closes).
+    /// A Remove in the project `id`, twice: armed, then done. `what`: a section's key ("mcp",
+    /// "cron", "project": the project itself, which its section removes here).
     pub fn env_remove(
         &mut self,
+        id: &str,
         what: &'static str,
         name: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(e) = self.project_env.as_mut() else {
+        let Some(e) = self.envs.get_mut(id) else {
             return;
         };
         let key = format!("{what}:{name}");
@@ -335,24 +355,20 @@ impl BenchApp {
             return;
         }
         e.armed = None;
-        let id = e.id.clone();
-        if what == "project" {
-            self.project_env = None;
-            // Asked already, in its card.
-            self.confirm_delete = Some(format!("p:{id}"));
-            self.delete_project(id, window, cx);
-            self.center = crate::app::Center::Chat;
-            self.new_session(cx);
-            self.thread_project = String::new();
-            return;
-        }
-        let Some((conn, eid)) = self.env_target(&id) else {
+        let Some(section) = section(what) else {
             return;
         };
-        let Some(path) = section(what).and_then(|s| s.remove_path(&eid, &name)) else {
+        if section.remove_here(self, id, window, cx) {
+            return;
+        }
+        let Some((conn, eid)) = self.env_target(id) else {
+            return;
+        };
+        let Some(path) = section.remove_path(&eid, &name) else {
             return;
         };
         let profile = self.current_profile();
+        let id = id.to_string();
         self.background(
             window,
             cx,
@@ -360,7 +376,12 @@ impl BenchApp {
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     // What was removed was open: its tab closes.
-                    this.close_doc(crate::explorer::DocKey::Part { kind: what, name }, cx);
+                    let gone = crate::explorer::DocKey::Part {
+                        project: id.clone(),
+                        kind: what,
+                        name,
+                    };
+                    this.close_doc(gone, cx);
                     this.load_env(&id, window, cx);
                 }
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
@@ -368,16 +389,18 @@ impl BenchApp {
         );
     }
 
-    /// A part made the open one: what had another open shuts, its section fills its fields
-    /// ("new": an empty form, its text to paste or write, then Save).
+    /// A part of the project `id` made its open one: what had another open shuts, its section
+    /// fills its fields ("new": an empty form, its text to paste or write, then Save). The caller
+    /// (`open_doc`) has made sure no unsaved draft is lost.
     pub fn env_card(
         &mut self,
+        id: &str,
         kind: &'static str,
         name: String,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(e) = self.project_env.as_mut() else {
+        let Some(e) = self.envs.get_mut(id) else {
             return;
         };
         if e.card
@@ -402,9 +425,17 @@ impl BenchApp {
             }
         }
         if let Some(s) = sec {
-            s.open(self, name, window, cx);
+            s.open(self, id, name, window, cx);
         }
         cx.notify();
+    }
+
+    /// The open part of the project `id`, when its draft is not saved: its section.
+    pub fn env_dirty_card(&self, id: &str) -> Option<(&'static dyn Section, String)> {
+        let e = self.envs.get(id)?;
+        let (kind, name) = e.card.clone()?;
+        let s = section(kind).filter(|s| s.dirty(e))?;
+        Some((s, name))
     }
 
     /// A folder or file shown in Finder (this Mac's projects only).

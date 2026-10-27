@@ -39,7 +39,7 @@ pub enum Center {
     Providers,
     /// A new project: a page of its own, not a thread (a project is not a conversation).
     NewProject,
-    /// A project's Settings (`project_env`, `src/env/page.rs`).
+    /// A project's Settings (`settings_project`, `src/env/page.rs`).
     Project,
 }
 
@@ -70,8 +70,12 @@ impl BenchApp {
         }
     }
 
-    /// ⌘J, the header's thread button: the thread beside the code, or not.
+    /// ⌘J, the header's thread button: the thread beside the code, or not. The center showing
+    /// the thread itself, there is nothing to put beside it (a file kept there stays).
     pub fn toggle_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.center == Center::Chat {
+            return;
+        }
         if self.right == Some(RightPanel::Thread) {
             self.right = None;
         } else {

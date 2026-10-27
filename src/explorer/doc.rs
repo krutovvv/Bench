@@ -45,7 +45,12 @@ impl FileRef {
         }
     }
 
-    /// Whether it is this folder or inside it.
+    /// Whether it is `other` or inside it, on the same machine of the same project.
+    pub fn inside(&self, other: &FileRef) -> bool {
+        self.project == other.project && self.machine == other.machine && self.within(&other.path)
+    }
+
+    /// Whether its path is this folder's or inside it (wherever it is: `inside` asks that too).
     pub fn within(&self, folder: &str) -> bool {
         self.path == folder
             || self
@@ -63,8 +68,10 @@ impl FileRef {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DocKey {
     File(FileRef),
-    /// A `Section`'s row in the shown project's environment: its key and the row's name.
+    /// A `Section`'s row in a project's environment: the project (`ProjectEnv::id`), the
+    /// section's key and the row's name ("new": a new one's form).
     Part {
+        project: String,
         kind: &'static str,
         name: String,
     },
@@ -87,17 +94,39 @@ impl BenchApp {
     pub fn open_doc(&mut self, key: DocKey, window: &mut Window, cx: &mut Context<Self>) {
         match &key {
             DocKey::File(f) => self.ensure_doc(f.clone(), window, cx),
-            DocKey::Part { kind, name } => {
-                // Another part's draft is the environment's one card: its tab gives way.
-                if let Some(old) = self
-                    .explorer
-                    .tabs
-                    .iter()
-                    .position(|t| matches!(t, DocKey::Part { .. }) && *t != key)
-                {
+            DocKey::Part {
+                project,
+                kind,
+                name,
+            } => {
+                if !self.envs.contains_key(project) {
+                    self.load_env(project, window, cx);
+                }
+                // A project has one open part (its fields are its section's): another one's
+                // unsaved draft is not dropped for it.
+                if let Some((s, open)) = self.env_dirty_card(project) {
+                    if (s.key(), open.as_str()) != (*kind, name.as_str()) {
+                        let what = if open == "new" {
+                            "the new one".to_string()
+                        } else {
+                            open
+                        };
+                        self.toast(
+                            NotificationType::Warning,
+                            format!("Save or revert {what} first"),
+                            window,
+                            cx,
+                        );
+                        return;
+                    }
+                }
+                // The project's other part gives way: its tab closes.
+                if let Some(old) = self.explorer.tabs.iter().position(|t| {
+                    matches!(t, DocKey::Part { project: p, .. } if p == project) && *t != key
+                }) {
                     self.explorer.tabs.remove(old);
                 }
-                self.env_card(kind, name.clone(), window, cx);
+                self.env_card(project, kind, name.clone(), window, cx);
             }
         }
         if !self.explorer.tabs.contains(&key) {
@@ -225,7 +254,7 @@ impl BenchApp {
     /// ⌘S, a document's Save: a file is written; a part saves as its section does.
     pub fn save_doc(&mut self, key: DocKey, window: &mut Window, cx: &mut Context<Self>) {
         let f = match key {
-            DocKey::Part { kind, .. } => return self.env_save(kind, window, cx),
+            DocKey::Part { project, kind, .. } => return self.env_save(&project, kind, window, cx),
             DocKey::File(f) => f,
         };
         let Some(d) = self
@@ -272,12 +301,28 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// ⌘S: the document in the middle (or, with none, the one beside).
+    /// The document a command means (⌘S, ⌘L): the file beside when its editor has the caret,
+    /// else the center's document, else the file beside.
+    pub fn focused_doc(&self, window: &Window, cx: &App) -> Option<DocKey> {
+        let beside = self.beside_file().cloned();
+        let has_caret = |f: &FileRef| {
+            self.explorer
+                .docs
+                .get(&DocKey::File(f.clone()))
+                .is_some_and(|d| d.editor.read(cx).focus_handle(cx).is_focused(window))
+        };
+        match (&beside, &self.center, &self.explorer.active) {
+            (Some(f), _, _) if has_caret(f) => Some(DocKey::File(f.clone())),
+            (_, Center::Doc, Some(k)) => Some(k.clone()),
+            (Some(f), _, _) => Some(DocKey::File(f.clone())),
+            _ => None,
+        }
+    }
+
+    /// ⌘S: the document the caret is in.
     pub fn save_active_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        let key = match (&self.center, &self.explorer.active, self.beside_file()) {
-            (Center::Doc, Some(k), _) => k.clone(),
-            (_, _, Some(f)) => DocKey::File(f.clone()),
-            _ => return false,
+        let Some(key) = self.focused_doc(window, cx) else {
+            return false;
         };
         self.save_doc(key, window, cx);
         true
@@ -288,7 +333,7 @@ impl BenchApp {
     pub fn close_doc(&mut self, key: DocKey, cx: &mut Context<Self>) {
         let dirty = match &key {
             DocKey::File(_) => self.explorer.docs.get(&key).is_some_and(|d| d.dirty),
-            DocKey::Part { .. } => false,
+            DocKey::Part { .. } => self.part_dirty(&key),
         };
         let armed = format!("close:{key:?}");
         if dirty && self.explorer.armed.as_deref() != Some(&armed) {
@@ -313,8 +358,13 @@ impl BenchApp {
                 self.center = Center::Chat;
             }
         }
-        if let DocKey::Part { kind, name } = &key {
-            if let Some(e) = self.project_env.as_mut() {
+        if let DocKey::Part {
+            project,
+            kind,
+            name,
+        } = &key
+        {
+            if let Some(e) = self.envs.get_mut(project) {
                 if e.card.as_ref().is_some_and(|(k, n)| k == kind && n == name) {
                     for s in crate::env::SECTIONS {
                         s.close(e);
@@ -323,12 +373,28 @@ impl BenchApp {
                 }
             }
         }
-        // Unsaved changes asked for already: the next opening reads the file again.
-        if dirty {
+        // Unsaved changes asked for already: the next opening reads the file again (unless the
+        // same file stays open beside, with them).
+        let beside = matches!(&key, DocKey::File(f) if self.beside_file() == Some(f));
+        if dirty && !beside {
             self.explorer.docs.remove(&key);
         }
         self.drop_unused(&key);
         cx.notify();
+    }
+
+    /// Whether `key` is a part whose draft is not saved (it is its project's open part).
+    pub fn part_dirty(&self, key: &DocKey) -> bool {
+        let DocKey::Part {
+            project,
+            kind,
+            name,
+        } = key
+        else {
+            return false;
+        };
+        self.env_dirty_card(project)
+            .is_some_and(|(s, open)| s.key() == *kind && open == *name)
     }
 
     /// A file's editor goes when no tab and not the pane beside hold it, and nothing is unsaved.
@@ -343,10 +409,9 @@ impl BenchApp {
     /// A file written here (or made, renamed, removed): what shows it is read again — its folder's
     /// listing, and the environment when it is the agent's text (the soul, a prompt, a skill).
     pub fn after_write(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
-        let env_dir = self.project_env.as_ref().map(|e| e.dir.clone());
-        let skills: Vec<String> = self
-            .project_env
-            .as_ref()
+        let env = self.envs.get(&f.project);
+        let env_dir = env.map(|e| e.dir.clone());
+        let skills: Vec<String> = env
             .map(|e| {
                 e.instructions
                     .skills

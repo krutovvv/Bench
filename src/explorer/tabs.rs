@@ -88,15 +88,10 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// ⌘L: the selection of the file in the center (or the whole file) goes to the thread's
+    /// ⌘L: the selection of the file with the caret (or the whole file) goes to the thread's
     /// composer, and the thread shows beside the code.
     pub fn send_selection_to_thread(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(DocKey::File(f)) = self
-            .explorer
-            .active
-            .clone()
-            .filter(|_| self.center == Center::Doc)
-        else {
+        let Some(DocKey::File(f)) = self.focused_doc(window, cx) else {
             return;
         };
         let Some(d) = self.explorer.docs.get(&DocKey::File(f.clone())) else {
@@ -112,16 +107,9 @@ impl BenchApp {
             }
         } else {
             let text = s.value().to_string();
-            let line_of = |at: usize| text[..at.min(text.len())].matches('\n').count() + 1;
-            // A selection ending at a line's start does not take that line.
-            let end = if text[..range.end.min(text.len())].ends_with('\n') {
-                range.end - 1
-            } else {
-                range.end
-            };
             crate::app::attachments::CodeRef {
                 path: f.path.clone(),
-                lines: Some((line_of(range.start), line_of(end.max(range.start)))),
+                lines: Some(crate::app::attachments::lines_of(&text, range)),
                 text: Some(s.selected_value().to_string()),
             }
         };

@@ -106,7 +106,7 @@ impl BenchApp {
             )
         }));
         // The project's code sent from the Explorer (⌘L, a dropped tab): its file and lines.
-        chips.extend(self.references.clone().iter().enumerate().map(|(k, r)| {
+        chips.extend(self.thread_references().iter().enumerate().map(|(k, r)| {
             let close = div()
                 .id(("ref-x", k))
                 .flex_none()
