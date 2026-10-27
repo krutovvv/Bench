@@ -164,6 +164,7 @@ impl BenchApp {
                             .child(crate::media::text::markdown(
                                 "tool-md",
                                 self.tools.preview.clone(),
+                                cx,
                             )),
                     )
                     .into_any_element();

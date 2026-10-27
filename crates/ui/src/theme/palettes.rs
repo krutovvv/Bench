@@ -70,71 +70,6 @@ macro_rules! syntax {
     };
 }
 
-/// Bench's own look, after Zed's One Light / One Dark: flat, square, a step under the loudest
-/// themes. The first of `SCHEMES`, so it is the default and what a theme without a light half
-/// (Dracula) borrows for its light mode.
-const BENCH_LIGHT: Palette = Palette {
-    background: 0xFAFAFA,
-    foreground: 0x242529,
-    sidebar: 0xEAEAEC,
-    sidebar_foreground: 0x242529,
-    sidebar_border: 0xD9D9DA,
-    sidebar_accent: 0xDEDEE1,
-    sidebar_accent_foreground: 0x242529,
-    chrome: 0xE4E4E6,
-    chrome_border: 0xD9D9DA,
-    border: 0xD9D9DA,
-    input: 0xC9C9CB,
-    window_border: 0xC9C9CB,
-    muted: 0xEBEBEC,
-    muted_foreground: 0x6E6F75,
-    secondary: 0xEDEDEE,
-    secondary_hover: 0xE2E2E4,
-    secondary_active: 0xD6D6D8,
-    secondary_foreground: 0x242529,
-    accent: 0xE2E2E4,
-    accent_foreground: 0x242529,
-    list_hover: 0xE6E6E8,
-    popover: 0xFAFAFA,
-    popover_foreground: 0x242529,
-    thumb: 0x242529,
-    danger: 0xC9503F,
-    danger_foreground: 0xFFFFFF,
-    success: 0x4F8A3F,
-    warning: 0xB7791F,
-};
-
-const BENCH_DARK: Palette = Palette {
-    background: 0x282C33,
-    foreground: 0xDCE0E5,
-    sidebar: 0x2F343E,
-    sidebar_foreground: 0xDCE0E5,
-    sidebar_border: 0x464B57,
-    sidebar_accent: 0x363C46,
-    sidebar_accent_foreground: 0xDCE0E5,
-    chrome: 0x3B414D,
-    chrome_border: 0x464B57,
-    border: 0x464B57,
-    input: 0x535966,
-    window_border: 0x535966,
-    muted: 0x333842,
-    muted_foreground: 0xA9AFBC,
-    secondary: 0x363C46,
-    secondary_hover: 0x3E4451,
-    secondary_active: 0x454A56,
-    secondary_foreground: 0xDCE0E5,
-    accent: 0x3E4451,
-    accent_foreground: 0xDCE0E5,
-    list_hover: 0x363C46,
-    popover: 0x2F343E,
-    popover_foreground: 0xDCE0E5,
-    thumb: 0xDCE0E5,
-    danger: 0xD07277,
-    danger_foreground: 0x1E2127,
-    success: 0xA1C181,
-    warning: 0xDEC184,
-};
-
 /// One Dark Pro (dark) and One Light Pro (light), the VS Code family: the page a step lighter
 /// than the chrome, and a near-black rule between the parts.
 const ONE_LIGHT: Palette = Palette {
@@ -231,7 +166,8 @@ const DRACULA: Palette = Palette {
     warning: 0xF1FA8C,
 };
 
-/// Visual Studio Code's own defaults: Dark+ and Light+.
+/// Visual Studio Code's own defaults: Dark+ and Light+. The first of `SCHEMES`, so it is the
+/// default and what a theme without a light half (Dracula) borrows for its light mode.
 const VS_LIGHT: Palette = Palette {
     background: 0xFFFFFF,
     foreground: 0x1F1F1F,
@@ -423,13 +359,13 @@ const GITHUB_DARK: Palette = Palette {
 /// The gear's list, in the order it shows them. The first is the default.
 pub const SCHEMES: &[Scheme] = &[
     Scheme {
-        name: "Bench",
-        halves: "the built-in light and dark",
-        swatch: 0x4F6FD8,
-        light: BENCH_LIGHT,
-        dark: BENCH_DARK,
-        syntax_light: syntax!("one-light"),
-        syntax_dark: syntax!("one-dark"),
+        name: "VS Code",
+        halves: "Dark+ and Light+",
+        swatch: 0x007ACC,
+        light: VS_LIGHT,
+        dark: VS_DARK,
+        syntax_light: syntax!("vs-light"),
+        syntax_dark: syntax!("vs-dark"),
     },
     Scheme {
         name: "One Dark Pro",
@@ -442,21 +378,12 @@ pub const SCHEMES: &[Scheme] = &[
     },
     Scheme {
         name: "Dracula",
-        halves: "Dracula dark, Bench light",
+        halves: "Dracula dark, VS Code Light+ light",
         swatch: 0xBD93F9,
-        light: BENCH_LIGHT,
-        dark: DRACULA,
-        syntax_light: syntax!("one-light"),
-        syntax_dark: syntax!("dracula"),
-    },
-    Scheme {
-        name: "VS Code",
-        halves: "Dark+ and Light+",
-        swatch: 0x007ACC,
         light: VS_LIGHT,
-        dark: VS_DARK,
+        dark: DRACULA,
         syntax_light: syntax!("vs-light"),
-        syntax_dark: syntax!("vs-dark"),
+        syntax_dark: syntax!("dracula"),
     },
     Scheme {
         name: "JetBrains",
@@ -547,7 +474,64 @@ mod test {
                     .unwrap_or_else(|e| panic!("{} ({half}): {e}", s.name));
                 assert_eq!(v["appearance"].as_str(), Some(half), "{}", s.name);
                 let roles = v["style"]["syntax"].as_object().expect("roles");
-                assert!(roles.len() >= 30, "{}: {} roles", s.name, roles.len());
+                // Every role the kit's `SyntaxColors` has: a role a theme leaves out is not
+                // "less colourful", it is the kit's own default colour under this theme.
+                const ROLES: [&str; 41] = [
+                    "attribute",
+                    "boolean",
+                    "comment",
+                    "comment_doc",
+                    "constant",
+                    "constructor",
+                    "embedded",
+                    "emphasis",
+                    "emphasis.strong",
+                    "enum",
+                    "function",
+                    "hint",
+                    "keyword",
+                    "label",
+                    "link_text",
+                    "link_uri",
+                    "number",
+                    "operator",
+                    "predictive",
+                    "preproc",
+                    "primary",
+                    "property",
+                    "punctuation",
+                    "punctuation.bracket",
+                    "punctuation.delimiter",
+                    "punctuation.list_marker",
+                    "punctuation.special",
+                    "string",
+                    "string.escape",
+                    "string.regex",
+                    "string.special",
+                    "string.special.symbol",
+                    "tag",
+                    "tag.doctype",
+                    "text.code.span",
+                    "text.literal",
+                    "title",
+                    "type",
+                    "variable",
+                    "variable.special",
+                    "variant",
+                ];
+                for role in ROLES {
+                    assert!(roles.contains_key(role), "{} ({half}): {role}", s.name);
+                }
+                assert_eq!(roles.len(), ROLES.len(), "{} ({half})", s.name);
+                // The status colours (the editor's diagnostics, a field's error) come from the
+                // theme too; the kit blends their backgrounds and borders itself.
+                for status in ["error", "warning", "success", "info", "hint"] {
+                    assert!(
+                        v["style"][status].is_string(),
+                        "{} ({half}): {status}",
+                        s.name
+                    );
+                }
                 let _: HighlightTheme = serde_json::from_str(json)
                     .unwrap_or_else(|e| panic!("{} ({half}) for the kit: {e}", s.name));
             }

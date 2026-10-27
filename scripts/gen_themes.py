@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Write the syntax themes of assets/themes/*.json from role colours.
 
-Every theme here is written to the same key set as assets/themes/one-dark.json, so
-no scope is left to the kit's default by accident.
+Every theme here carries every role the kit's `SyntaxColors` knows (the test in
+`crates/ui/src/theme/palettes.rs` checks it) and the status colours, so nothing is left to the
+kit's default by accident. The key names are the kit's own: `comment_doc`, not `comment.doc`.
 """
 import json, pathlib
 
@@ -14,7 +15,8 @@ def theme(name, appearance, bg, fg, line, lineno, lineno_on, invisible, r):
         "attribute": {"color": "#" + r["attr"]},
         "boolean": {"color": "#" + r["num"]},
         "comment": {"color": "#" + r["comment"], "font_style": "italic"},
-        "comment.doc": {"color": "#" + r["comment_doc"], "font_style": "italic"},
+        # The kit's own key name: `comment.doc` parses as an unknown key and is dropped.
+        "comment_doc": {"color": "#" + r["comment_doc"], "font_style": "italic"},
         "constant": {"color": "#" + r["constant"]},
         "constructor": {"color": "#" + r["fn"]},
         "embedded": {"color": "#" + fg},
@@ -22,6 +24,7 @@ def theme(name, appearance, bg, fg, line, lineno, lineno_on, invisible, r):
         "emphasis.strong": {"font_weight": 700},
         "enum": {"color": "#" + r["enum"]},
         "function": {"color": "#" + r["fn"]},
+        "hint": {"color": "#" + r["hint"]},
         "keyword": {"color": "#" + r["kw"]},
         "label": {"color": "#" + r["attr"]},
         "link_text": {"color": "#" + r["fn"], "font_style": "normal"},
@@ -49,6 +52,8 @@ def theme(name, appearance, bg, fg, line, lineno, lineno_on, invisible, r):
         "variable.special": {"color": "#" + r["num"]},
         "primary": {"color": "#" + fg},
         "predictive": {"color": "#" + r["comment"]},
+        "preproc": {"color": "#" + r["preproc"]},
+        "variant": {"color": "#" + r["variant"]},
     }
     return {
         "name": name,
@@ -60,6 +65,13 @@ def theme(name, appearance, bg, fg, line, lineno, lineno_on, invisible, r):
             "editor.line_number": "#" + lineno,
             "editor.active_line_number": "#" + lineno_on,
             "editor.invisible": "#" + invisible,
+            # The status colours the kit reads from here (it blends the backgrounds and borders
+            # itself): the editor's diagnostics, the Problems tab, a field's error.
+            "error": "#" + r["err"],
+            "warning": "#" + r["warn"],
+            "success": "#" + r["ok"],
+            "info": "#" + r["info"],
+            "hint": "#" + r["hint"],
             "syntax": s,
         },
     }
@@ -73,7 +85,8 @@ THEMES = {
              type="E5C07B", var="E06C75", prop="E06C75", tag="E06C75", attr="D19A66",
              op="56B6C2", comment="5C6370", comment_doc="7F848E", escape="56B6C2",
              regex="56B6C2", enum="E5C07B", punct="ABB2BF", punct2="B2B9C6",
-             red="E06C75", cyan="56B6C2"),
+             red="E06C75", cyan="56B6C2",
+             hint="5C6370", preproc="C678DD", variant="E5C07B", err="E06C75", warn="E5C07B", ok="98C379", info="61AFEF"),
     ),
     "one-light-pro": theme(
         "One Light Pro", "light", "FAFAFA", "383A42", "EFEFEF", "A0A1A7", "383A42", "CACAC9",
@@ -81,7 +94,8 @@ THEMES = {
              type="C18401", var="E45649", prop="E45649", tag="E45649", attr="986801",
              op="A626A4", comment="A0A1A7", comment_doc="4078F2", escape="4078F2",
              regex="3E998F", enum="C18401", punct="383A42", punct2="383A42",
-             red="E45649", cyan="0184BC"),
+             red="E45649", cyan="0184BC",
+             hint="A0A1A7", preproc="A626A4", variant="C18401", err="E45649", warn="C18401", ok="50A14F", info="4078F2"),
     ),
     # Dracula: the dark half of the family; its light half is Bench's.
     "dracula": theme(
@@ -90,7 +104,8 @@ THEMES = {
              type="8BE9FD", var="F8F8F2", prop="8BE9FD", tag="50FA7B", attr="50FA7B",
              op="FF79C6", comment="6272A2", comment_doc="6272A2", escape="BD93F9",
              regex="F1FA8C", enum="8BE9FD", punct="F8F8F2", punct2="F8F8F2",
-             red="FF5555", cyan="8BE9FD"),
+             red="FF5555", cyan="8BE9FD",
+             hint="6272A2", preproc="FF79C6", variant="8BE9FD", err="FF5555", warn="F1FA8C", ok="50FA7B", info="8BE9FD"),
     ),
     # Visual Studio Code's own defaults.
     "vs-dark": theme(
@@ -99,7 +114,8 @@ THEMES = {
              type="4EC9B0", var="9CDCFE", prop="9CDCFE", tag="569CD6", attr="9CDCFE",
              op="D4D4D4", comment="6A9955", comment_doc="6A9955", escape="569CD6",
              regex="D16969", enum="4EC9B0", punct="D4D4D4", punct2="D4D4D4",
-             red="F44747", cyan="4FC1FF"),
+             red="F44747", cyan="4FC1FF",
+             hint="858585", preproc="AF6B99", variant="4EC9B0", err="F44747", warn="CCA700", ok="81D071", info="75BEFF"),
     ),
     "vs-light": theme(
         "VS Code Light+", "light", "FFFFFF", "000000", "F2F2F2", "237893", "0B216F", "A5A5A5",
@@ -107,7 +123,8 @@ THEMES = {
              type="267F99", var="001080", prop="001080", tag="800000", attr="FF0000",
              op="000000", comment="008000", comment_doc="008000", escape="0000FF",
              regex="811F3F", enum="267F99", punct="000000", punct2="000000",
-             red="CD3131", cyan="0451A5"),
+             red="CD3131", cyan="0451A5",
+             hint="6C6C6C", preproc="808080", variant="267F99", err="CD3131", warn="E9A700", ok="587C0C", info="0451A5"),
     ),
     # JetBrains: Darcula and IntelliJ Light.
     "darcula": theme(
@@ -116,7 +133,8 @@ THEMES = {
              type="A9B7C6", var="A9B7C6", prop="9876AA", tag="E8BF6A", attr="BABABA",
              op="CC7832", comment="808080", comment_doc="629755", escape="CC7832",
              regex="6A8759", enum="A9B7C6", punct="A9B7C6", punct2="CC7832",
-             red="FF6B68", cyan="6897BB"),
+             red="FF6B68", cyan="6897BB",
+             hint="808080", preproc="CC7832", variant="A9B7C6", err="FF6B68", warn="FFC66D", ok="6A8759", info="6897BB"),
     ),
     "intellij-light": theme(
         "IntelliJ Light", "light", "FFFFFF", "000000", "F2F2F2", "737373", "000000", "A0A0A0",
@@ -124,7 +142,8 @@ THEMES = {
              type="A02AA6", var="000000", prop="871094", tag="000080", attr="871094",
              op="000000", comment="8C8C8C", comment_doc="526D8A", escape="067D17",
              regex="871094", enum="A02AA6", punct="000000", punct2="000000",
-             red="D80606", cyan="0000C0"),
+             red="D80606", cyan="0000C0",
+             hint="8C8C8C", preproc="0033B3", variant="A02AA6", err="D80606", warn="CC7A00", ok="067D17", info="0000C0"),
     ),
     # GitHub's own themes.
     "github-dark": theme(
@@ -133,7 +152,8 @@ THEMES = {
              type="FFA657", var="FFA657", prop="79C0FF", tag="7EE787", attr="79C0FF",
              op="FF7B72", comment="8B949E", comment_doc="8B949E", escape="A5D6FF",
              regex="A5D6FF", enum="FFA657", punct="C9D1D9", punct2="8B949E",
-             red="F85149", cyan="79C0FF"),
+             red="F85149", cyan="79C0FF",
+             hint="8B949E", preproc="FF7B72", variant="79C0FF", err="F85149", warn="D29922", ok="3FB950", info="58A6FF"),
     ),
     "github-light": theme(
         "GitHub Light", "light", "FFFFFF", "1F2328", "F6F8FA", "8C959F", "1F2328", "D0D7DE",
@@ -141,7 +161,8 @@ THEMES = {
              type="953800", var="953800", prop="0550AE", tag="116329", attr="0550AE",
              op="CF222E", comment="6E7781", comment_doc="6E7781", escape="0A3069",
              regex="0A3069", enum="953800", punct="1F2328", punct2="656D76",
-             red="CF222E", cyan="0550AE"),
+             red="CF222E", cyan="0550AE",
+             hint="6E7781", preproc="CF222E", variant="0550AE", err="CF222E", warn="BF8700", ok="1A7F37", info="0969DA"),
     ),
 }
 

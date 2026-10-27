@@ -8,6 +8,11 @@
     "editor.line_number": "#8C959F",
     "editor.active_line_number": "#1F2328",
     "editor.invisible": "#D0D7DE",
+    "error": "#CF222E",
+    "warning": "#BF8700",
+    "success": "#1A7F37",
+    "info": "#0969DA",
+    "hint": "#6E7781",
     "syntax": {
       "attribute": {
         "color": "#0550AE"
@@ -19,7 +24,7 @@
         "color": "#6E7781",
         "font_style": "italic"
       },
-      "comment.doc": {
+      "comment_doc": {
         "color": "#6E7781",
         "font_style": "italic"
       },
@@ -43,6 +48,9 @@
       },
       "function": {
         "color": "#8250DF"
+      },
+      "hint": {
+        "color": "#6E7781"
       },
       "keyword": {
         "color": "#CF222E"
@@ -127,6 +135,12 @@
       },
       "predictive": {
         "color": "#6E7781"
+      },
+      "preproc": {
+        "color": "#CF222E"
+      },
+      "variant": {
+        "color": "#0550AE"
       }
     }
   }

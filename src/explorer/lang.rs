@@ -61,7 +61,10 @@ pub fn language_for(path: &str) -> &'static str {
         "sql" | "psql" | "mysql" => "sql",
         "mk" | "mak" => "make",
         "cmake" => "cmake",
-        "diff" | "patch" => "diff",
+        // A patch as plain text: the bundled diff query paints deletions with the keyword's
+        // colour and additions with the string's — colours that say nothing about a change. The
+        // gutter's marks (`git.rs`) are what say it, in the theme's own success and danger.
+        "diff" | "patch" => "text",
         "graphql" | "gql" => "graphql",
         "proto" => "proto",
         "ex" | "exs" => "elixir",

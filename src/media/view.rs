@@ -57,7 +57,10 @@ impl BenchApp {
                 Segment::Mermaid(code) => self.render_diagram(key, k, code, cx),
                 Segment::Code { lang, code } => {
                     let fence = if code.contains("```") { "~~~~" } else { "```" };
-                    let md = format!("{fence}{lang}\n{code}{fence}");
+                    // A patch without a language on the fence: its query colours deletions as
+                    // keywords and additions as strings. Its head still says `diff` (`lang` below).
+                    let fence_lang = if lang == "diff" || lang == "patch" { "" } else { lang.as_str() };
+                    let md = format!("{fence}{fence_lang}\n{code}{fence}");
                     let body = TextView::new(&texts.state(&format!("code-{key}-{k}"), &md, cx));
                     render_code(body, key, k, lang, code, cx)
                 }
@@ -413,7 +416,7 @@ impl BenchApp {
                             .px_3()
                             .py_2()
                             .when(long && !open, |d| d.max_h(px(PREVIEW_H)).overflow_hidden())
-                            .child(markdown(id("md"), text)),
+                            .child(markdown(id("md"), text, cx)),
                     )
                     .when(long, |d| {
                         d.child(
@@ -484,7 +487,7 @@ impl BenchApp {
             }
             // Not drawable here (a diagram type it lacks, or a syntax slip): its source, as code.
             Some(Loaded::Failed(_)) => {
-                markdown(id, format!("```mermaid\n{code}```")).into_any_element()
+                markdown(id, format!("```mermaid\n{code}```"), cx).into_any_element()
             }
             _ => div().into_any_element(),
         }

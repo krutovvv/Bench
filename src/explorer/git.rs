@@ -71,7 +71,9 @@ impl Item for DiffItem {
         app.ensure_doc(f.clone(), window, cx);
         let key = DocKey::Diff(f.clone());
         if !app.explorer.docs.contains_key(&key) {
-            let editor = crate::env::editor("diff", window, cx);
+            // Plain text, like a `.patch` file in the tree (`lang.rs`): the diff's own query
+            // colours deletions and additions as keywords and strings.
+            let editor = crate::env::editor("text", window, cx);
             editor.update(cx, |s, cx| {
                 s.set_disabled(true, cx);
                 // A diff's lines are not the file's: no numbers beside them.

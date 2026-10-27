@@ -1,8 +1,10 @@
 # Design system (Zed style)
 
 Reference: the Zed editor's look — flat, dense, quiet chrome, content first, slightly rounded.
-Working copy of everything below: `crates/ui/src/theme.rs` (palettes, `apply`),
-`crates/ui/src/metrics.rs` (every size), `assets/themes/one-light.json`, `one-dark.json`.
+Working copy of everything below: `crates/ui/src/theme/` (`mod.rs`: `apply`; `palettes.rs`: the
+`Scheme`s — VS Code (Dark+/Light+) is the first, so it is the default),
+`crates/ui/src/metrics.rs` (every size), and the default syntax pair
+`assets/themes/vs-light.json`, `vs-dark.json` (written by `scripts/gen_themes.py`).
 
 ## Base switches (`theme.rs`)
 

@@ -140,7 +140,7 @@ impl Texts {
     /// An answer's prose (Markdown, with formulas), kept under `id`.
     pub(crate) fn markdown(&mut self, id: &str, text: &str, cx: &mut App) -> TextView {
         let state = self.state(id, text, cx);
-        answer_style(TextView::new(&state))
+        answer_style(TextView::new(&state), cx)
     }
 
     /// The person's own words exactly as written, kept under `id`.
@@ -188,17 +188,30 @@ pub(crate) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
 
 /// Markdown as answers show it: with formulas. Code blocks keep the monospace font (trees and
 /// columns stay aligned) at the chat text's size, not the theme's larger code size.
-pub(crate) fn markdown(id: impl Into<SharedString>, text: String) -> TextView {
-    answer_style(TextView::markdown(ElementId::Name(id.into()), text))
+pub(crate) fn markdown(id: impl Into<SharedString>, text: String, cx: &App) -> TextView {
+    answer_style(TextView::markdown(ElementId::Name(id.into()), text), cx)
 }
 
-fn answer_style(view: TextView) -> TextView {
+/// Inline code as the theme paints it: a step of the page's own surface under the text's ink.
+/// The kit's default tints the span with the selection colour, and code is not selected.
+fn code_span(t: &gpui_kit::component::Theme) -> HighlightStyle {
+    HighlightStyle {
+        color: Some(t.foreground),
+        background_color: Some(t.secondary),
+        ..Default::default()
+    }
+}
+
+fn answer_style(view: TextView, cx: &App) -> TextView {
+    let code = code_span(&cx.theme());
     view.plugin(InlineMath).plugin(BlockMath).style(
-        gpui_kit::component::text::TextViewStyle::default().code_block(
-            StyleRefinement::default()
-                .text_size(rems(0.8125))
-                .line_height(relative(bench_ui::LEAD)),
-        ),
+        gpui_kit::component::text::TextViewStyle::default()
+            .inline_code(code)
+            .code_block(
+                StyleRefinement::default()
+                    .text_size(rems(0.8125))
+                    .line_height(relative(bench_ui::LEAD)),
+            ),
     )
 }
 
@@ -217,7 +230,9 @@ pub(super) fn render_code(
         // Any action, even an empty one, keeps the language out of the code's own corner.
         .code_block_actions(|_, _, _| div())
         .style(
-            gpui_kit::component::text::TextViewStyle::default().code_block(
+            gpui_kit::component::text::TextViewStyle::default()
+                .inline_code(code_span(&theme))
+                .code_block(
                 StyleRefinement::default()
                     .text_size(rems(0.8125))
                     .line_height(relative(bench_ui::LEAD))
