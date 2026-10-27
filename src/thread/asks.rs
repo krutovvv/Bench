@@ -322,7 +322,18 @@ impl ThreadView {
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .child(Input::new(&self.clarify_input).small()),
+                                // The field types itself: the click is its, or the thread's
+                                // mouse-up hands the focus back to the composer the moment the
+                                // button is released.
+                                .on_mouse_down(
+                                    MouseButton::Left,
+                                    cx.listener(|this, _: &MouseDownEvent, _, cx| {
+                                        this.claim_click(cx)
+                                    }),
+                                )
+                                // `medium` as high as a choice row: the answer's own line should
+                                // not read as the shabby cousin of the offered ones.
+                                .child(Input::new(&self.clarify_input)),
                         )
                         .when(card.multi, |d| {
                             d.child(
