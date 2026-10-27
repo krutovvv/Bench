@@ -27,6 +27,7 @@ import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
 import { noThinking } from "./thinking.ts";
 import { setHost, type Host, type SessionInfo } from "./host.ts";
+import { closeHold, Gates, held, HoldDoc, type Hold } from "./hold.ts";
 import { projects } from "./builtin/projects.ts";
 import { Store, type SessionRow } from "./store.ts";
 
@@ -46,12 +47,8 @@ interface Live {
 	row: SessionRow;
 	conversation: Conversation;
 	busy: boolean;
-	/** The person's holds of this run (ms), oldest first; the last one open while it stands held.
-	 * Pi has no pause of a conversation, so the hold is ours: a gate before every tool call. */
-	holds: { from: number; to?: number }[];
-	/** Opens the gate a held run waits at. */
-	release?: () => void;
-	gate?: Promise<void>;
+	/** The run's holds as last committed to its `bench.hold` document (src/hold.ts). */
+	holds: Hold[];
 	generation: number;
 	abort?: AbortController;
 	/** Text of the in-flight assistant message per content block, to turn snapshots into deltas. */
@@ -131,6 +128,8 @@ export class Runtime {
 	private registered = new Set<string>();
 	/** Subagents' conversations act for their parent's session. */
 	private adopted = new Map<string, string>();
+	/** Wake-ups of the calls waiting at a held run's gate (src/hold.ts). */
+	private gates = new Gates();
 
 	listeners = new Set<Emit>();
 	/** Every event goes to Bench's sockets (the sink) and to in-process listeners (cron, subagents). */
@@ -352,11 +351,12 @@ export class Runtime {
 	}
 
 	private async attach(row: SessionRow, conversation: Conversation): Promise<Live> {
+		const hold = (await this.harness.snapshot(HoldDoc as any, conversation.id, ctx)) as any;
 		const live: Live = {
 			row,
 			conversation,
 			busy: false,
-			holds: [],
+			holds: hold?.holds ?? [],
 			generation: 0,
 			blocks: new Map(),
 			answer: "",
@@ -436,9 +436,8 @@ export class Runtime {
 		}
 		live.busy = true;
 		live.generation++;
-		// A fresh turn starts free: any earlier hold belongs to the turn it ended with.
-		this.unhold(live);
-		live.holds = [];
+		// A fresh turn starts free: the holds belong to the turn they were made in.
+		await this.setHolds(live, (h) => h.splice(0).length > 0);
 		live.answer = "";
 		live.blocks.clear();
 		live.narrating = false;
@@ -453,12 +452,12 @@ export class Runtime {
 	}
 
 	async interrupt(id: string): Promise<void> {
-		const live = this.live.get(id);
+		const live = await this.session(id);
 		if (!live) return;
-		// A stop outranks a hold: the run is marked ended first, so the call waiting at the gate
-		// sees it and does not start.
 		live.abort?.abort();
-		this.unhold(live);
+		// A stop outranks a hold: the call waiting at the gate is told to stop, not to go on.
+		await this.setHolds(live, (h) => closeHold(h, Date.now()));
+		this.gates.wake(String(live.conversation.id), false);
 		for (const [pid, p] of live.prompts) {
 			p.resolve("");
 			live.prompts.delete(pid);
@@ -471,41 +470,47 @@ export class Runtime {
 	/** Stand the run at its next step boundary: the answer being written is let through —
 	 * stopping mid-sentence cuts Pi's turn — but no new call begins until the person lets it
 	 * go on. The actions phase is where the minutes go; that is what the hold answers to. */
-	pause(id: string): void {
-		const live = this.live.get(id);
-		if (!live || !live.busy || live.gate) return;
-		live.gate = new Promise<void>((r) => (live.release = r));
-		live.holds.push({ from: Date.now() });
-		this.emit(id, "thread.pause", { holds: live.holds });
+	async pause(id: string): Promise<void> {
+		const live = await this.session(id);
+		if (!live?.busy) return;
+		await this.setHolds(live, (h) => !held(h) && h.push({ from: Date.now() }) > 0);
 	}
 
 	/** Let the held run take its next step. */
-	resume(id: string): void {
-		const live = this.live.get(id);
-		if (!live?.gate) return;
-		this.unhold(live);
-		this.emit(id, "thread.pause", { holds: live.holds });
+	async resume(id: string): Promise<void> {
+		const live = await this.session(id);
+		if (!live) return;
+		await this.setHolds(live, (h) => closeHold(h, Date.now()));
+		this.gates.wake(String(live.conversation.id), true);
 	}
 
-	/** Open the gate and close the open hold. */
-	private unhold(live: Live): void {
-		const open = live.holds.at(-1);
-		if (open && open.to === undefined) open.to = Date.now();
-		live.release?.();
-		live.release = undefined;
-		live.gate = undefined;
+	/** Change the run's holds in a commit of their document; Bench hears the change. */
+	private async setHolds(live: Live, change: (holds: Hold[]) => boolean): Promise<void> {
+		let changed = false;
+		const holds = await live.conversation.commit(async (tx) => {
+			const doc = (await tx.doc(HoldDoc as any, live.conversation.id)) as any;
+			changed = change(doc.holds);
+			return JSON.parse(JSON.stringify(doc.holds)) as Hold[];
+		}, ctx);
+		live.holds = holds;
+		if (changed) this.emit(live.row.id, "thread.pause", { holds });
 	}
 
-	/** Called before every tool call (a subagent's too, through its parent's session): waits
-	 * while the person holds the run; false when they stopped it meanwhile. */
-	async hold(sessionId: string): Promise<boolean> {
-		const live = this.live.get(sessionId);
-		while (live?.gate) await live.gate;
-		return !live?.abort?.signal.aborted;
+	/** Called before every tool call (a subagent's with its parent's session): waits while the
+	 * run's document says it is held; false when the person stopped it meanwhile. */
+	async hold(sessionId: string, signal?: AbortSignal): Promise<boolean> {
+		const row = this.store.get(sessionId);
+		if (!row) return true;
+		const conversation = Number(row.conversation);
+		for (;;) {
+			const doc = (await this.harness.snapshot(HoldDoc as any, conversation as any, ctx)) as any;
+			if (!held(doc?.holds)) return true;
+			if (!(await this.gates.next(String(conversation), signal))) return false;
+		}
 	}
 
 	isPaused(id: string): boolean {
-		return Boolean(this.live.get(id)?.gate);
+		return held(this.live.get(id)?.holds);
 	}
 
 	// ---- the queue (Pi's inbox) ------------------------------------------------
@@ -761,7 +766,7 @@ export class Runtime {
 			},
 			adopt: (conversationId, sessionId) => void this.adopted.set(String(conversationId), sessionId),
 			// A subagent's call waits on its parent's hold too: the person holds the whole work.
-			hold: (sessionId) => this.hold(sessionId),
+			hold: (sessionId, signal) => this.hold(sessionId, signal),
 			busyElsewhere: (sessionId) => [...this.live.values()].filter((l) => l.busy && l.row.id !== sessionId).length,
 			ask: async (sessionId, callId, question, choices, multiSelect, signal) => {
 				const live = await this.session(sessionId);
@@ -1001,9 +1006,8 @@ export class Runtime {
 		if (!live.busy) return;
 		live.busy = false;
 		// Whatever the person held, the run is over: the hold lets go, nobody waits on it.
-		const wasHeld = Boolean(live.gate);
-		this.unhold(live);
-		if (wasHeld) this.emit(live.row.id, "thread.pause", { holds: live.holds });
+		if (held(live.holds)) void this.setHolds(live, (h) => closeHold(h, Date.now())).catch(() => {});
+		this.gates.wake(String(live.conversation.id), false);
 		this.emit(live.row.id, "thread.run", { running: false });
 		// The turn's blended rate, as one number worth remembering.
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);
@@ -1077,7 +1081,7 @@ export class Runtime {
 	 * queue, the inserts' state, and whether a run is live. `head` is the last entry id: Bench asks
 	 * with `since: head` after a reconnect and gets only what it missed.
 	 */
-	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; holds: { from: number; to?: number }[]; head: number }> {
+	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; holds: Hold[]; head: number }> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const entries: any[] = [];

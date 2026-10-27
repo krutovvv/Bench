@@ -109,12 +109,12 @@ export const assistant = defineExtension({
 	hooks: [
 		compactWithoutReasoning,
 		hook(ToolTask, {
-			beforeTool: async (call: any, api: any) => {
+			beforeTool: async (call: any, api: any, context: any) => {
 				// The person's hold, felt before any next step — the current answer and the step
 				// already running are let through; nothing new begins until the hold lifts.
 				// The conversation is the hook's `api`'s, not the call's (Pi's ToolCall has no id of it).
 				const info = host().session(api.conversationId);
-				if (info && !(await host().hold(info.id))) return { block: "The person stopped the run." };
+				if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
 				if (call.name !== "bash" || !info || approvalsMode(info.profile) !== "manual") return undefined;
 				const command = String(call.arguments?.command ?? call.args?.command ?? "");
 				const hit = DANGEROUS.find(([re]) => re.test(command));
