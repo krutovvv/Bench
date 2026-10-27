@@ -8,7 +8,17 @@ preview: string, at?: number, } | { "kind": "result", key: string, seq: number, 
 /**
  * An edit's unified patch.
  */
-diff?: string, at?: number, } | { "kind": "insert", key: string, seq: number, id: string, insert_key: string, } | { "kind": "fail", key: string, seq: number, text: string, };
+diff?: string, at?: number, } | { "kind": "insert", key: string, seq: number, id: string, insert_key: string, } | { "kind": "fail", key: string, seq: number, text: string, } | { "kind": "plan", key: string, seq: number, id: string, todos: Array<PlanStep>, } | { "kind": "ask", key: string, seq: number, id: string, 
+/**
+ * "clarify" or "approve".
+ */
+ask_kind: string, question: string, choices: Array<string>, multi: boolean, } | { "kind": "asked", key: string, seq: number, id: string, answer?: string, };
+
+export type PlanStep = { id: string, content: string, 
+/**
+ * "pending", "in_progress", "completed", "cancelled".
+ */
+status: string, parent?: string, };
 
 export type QueuedItem = { key: string, sub: string, mode: string, text: string, };
 
