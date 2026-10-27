@@ -53,6 +53,9 @@ impl Section for Lsp {
     fn tab(&self) -> Tab {
         Tab::Tools
     }
+    fn first(&self, e: &ProjectEnv) -> Option<String> {
+        e.lsp.servers.first().map(|s| s.name.clone())
+    }
     fn block(&self, _general: bool) -> &'static str {
         "Language servers"
     }
@@ -72,8 +75,7 @@ impl Section for Lsp {
         e.lsp
             .servers
             .iter()
-            .enumerate()
-            .map(|(k, s)| {
+            .map(|s| {
                 let state = if s.state.is_empty() {
                     "starts with the first file it knows".to_string()
                 } else {
@@ -87,7 +89,6 @@ impl Section for Lsp {
                     s.name.clone(),
                     format!("{} · {state}", s.extensions.join(", ")),
                     bad,
-                    k == 0,
                     cx,
                 )
             })

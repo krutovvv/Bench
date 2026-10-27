@@ -142,10 +142,12 @@ cap, no centering.
 Two settings pages, one look: the gear (the app's) and a project's Settings
 (`open_project_settings`, `Panel::Project`, `src/env/page.rs`). Both have `settings_tabs` on top
 and groups under `settings_heading`: a form is `settings_field` rows (Save / Revert under them once
-something changed, `form_actions`), a list is a bordered block of rows whose click opens its card
-under the list. Instructions (soul, prompts, skills) is a small IDE (`src/env/ide.rs`,
-`bench_ui::ide`): a tree on the left, the open text in the code editor filling the page — the one
-place a text scrolls inside itself. A section is a `Section` in `src/env/` with its `Tab`.
+something changed, `form_actions`). A project's other tabs are two panes filling the page
+(`bench_ui::ide`): on the left what there is — Instructions' tree of texts (`src/env/ide.rs`), or
+the lists of servers, jobs and accesses (a name and a line under it, `section::row`) — and on the
+right the one chosen: a text in the code editor, or a row's fields with its actions in the head.
+Choosing a tab opens its first item, so the right pane is never empty. Each pane scrolls on its
+own. A section is a `Section` in `src/env/` with its `Tab`.
 
 ## The thread's column
 

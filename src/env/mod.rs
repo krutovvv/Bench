@@ -211,8 +211,20 @@ impl BenchApp {
         }
         self.ssh.form = None;
         self.files_remote.form = false;
-        if tab == Tab::Instructions && !on_tab {
+        // The right pane is never empty when there is something to show: Instructions opens on
+        // the soul, a list on its first row.
+        if !on_tab && tab == Tab::Instructions {
             self.env_card("soul", String::new(), window, cx);
+        } else if !on_tab && tab != Tab::General {
+            let first = self.project_env.as_ref().and_then(|e| {
+                SECTIONS
+                    .iter()
+                    .filter(|s| s.tab() == tab && s.shown(self))
+                    .find_map(|s| Some((s.key(), s.first(e)?)))
+            });
+            if let Some((kind, name)) = first {
+                self.env_card(kind, name, window, cx);
+            }
         }
         cx.notify();
     }
@@ -474,6 +486,44 @@ impl BenchApp {
             s.open(self, name, window, cx);
         }
         cx.notify();
+    }
+
+    /// Something chosen on the left of a tab — a text of Instructions, a row of a list: it opens
+    /// on the right, unless an open text has unsaved changes (the editors are shared, so they
+    /// would be lost). The open one chosen again stays; the open skill shuts its folder.
+    pub fn env_open(
+        &mut self,
+        kind: &'static str,
+        name: String,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(e) = self.project_env.as_ref() else {
+            return;
+        };
+        let same = e
+            .card
+            .as_ref()
+            .is_some_and(|(k, n)| *k == kind && *n == name);
+        if same && kind != "skill" {
+            return;
+        }
+        let dirty = match e.card.as_ref().map(|(k, _)| *k) {
+            Some("soul") => e.soul.dirty,
+            Some("prompt") => e.prompts.dirty,
+            Some("skill") => e.skills.dirty,
+            _ => false,
+        };
+        if dirty && !same {
+            self.toast(
+                NotificationType::Info,
+                "Save or revert the open text first",
+                window,
+                cx,
+            );
+            return;
+        }
+        self.env_card(kind, name, window, cx);
     }
 
     /// A folder or file shown in Finder (this Mac's projects only).

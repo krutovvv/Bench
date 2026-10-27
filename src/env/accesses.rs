@@ -91,6 +91,13 @@ impl Section for Accesses {
     fn key(&self) -> &'static str {
         "host"
     }
+    fn first(&self, e: &ProjectEnv) -> Option<String> {
+        e.hosts
+            .list
+            .iter()
+            .find(|a| a.kind != "ssh")
+            .map(|a| a.id.clone())
+    }
     fn tab(&self) -> Tab {
         Tab::Access
     }
@@ -128,9 +135,9 @@ impl Section for Accesses {
                 cx,
             ));
         }
-        for (k, a) in list.into_iter().enumerate() {
+        for a in list {
             let note = format!("{} · {}", a.kind, a.at());
-            rows.push(row(e, "host", a.id, a.name, note, false, k == 0, cx));
+            rows.push(row(e, "host", a.id, a.name, note, false, cx));
         }
         rows
     }
@@ -322,6 +329,13 @@ impl Section for Machines {
     fn key(&self) -> &'static str {
         "ssh-host"
     }
+    fn first(&self, e: &ProjectEnv) -> Option<String> {
+        e.hosts
+            .list
+            .iter()
+            .find(|a| a.kind == "ssh")
+            .map(|a| a.id.clone())
+    }
     fn tab(&self) -> Tab {
         Tab::Access
     }
@@ -359,8 +373,7 @@ impl Section for Machines {
             )];
         }
         list.into_iter()
-            .enumerate()
-            .map(|(k, a)| {
+            .map(|a| {
                 row(
                     e,
                     "ssh-host",
@@ -368,7 +381,6 @@ impl Section for Machines {
                     a.name.clone(),
                     format!("ssh · {}", a.at()),
                     false,
-                    k == 0,
                     cx,
                 )
             })

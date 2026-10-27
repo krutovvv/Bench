@@ -103,6 +103,9 @@ impl Section for Mcp {
     fn tab(&self) -> Tab {
         Tab::Tools
     }
+    fn first(&self, e: &ProjectEnv) -> Option<String> {
+        e.mcp.servers.first().map(|m| m.name.clone())
+    }
     fn block(&self, _general: bool) -> &'static str {
         "MCP servers"
     }
@@ -133,13 +136,16 @@ impl Section for Mcp {
                     .child(ico.icon().small().text_color(color))
                     .into_any_element()
             };
+            // The tally itself on hover: the heading sits over a narrow list.
             head.push(
-                h_flex()
-                    .gap_1()
+                div()
+                    .id("env-mcp-tally")
+                    .flex()
                     .items_center()
-                    .text_color(muted)
                     .child(sign)
-                    .child(text)
+                    .tooltip(move |window, cx| {
+                        gpui_kit::component::tooltip::Tooltip::new(text.clone()).build(window, cx)
+                    })
                     .into_any_element(),
             );
         }
@@ -178,7 +184,7 @@ impl Section for Mcp {
                 cx,
             ));
         }
-        for (k, m) in e.mcp.servers.iter().cloned().enumerate() {
+        for m in e.mcp.servers.iter().cloned() {
             let tone = mcp_tone(&m);
             let name = m.name.clone();
             let bad = matches!(tone, McpTone::Error | McpTone::Dead);
@@ -218,7 +224,6 @@ impl Section for Mcp {
                 name,
                 mcp_note(&m),
                 bad,
-                k == 0,
                 actions,
                 cx,
             ));

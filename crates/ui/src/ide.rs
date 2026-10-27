@@ -11,6 +11,8 @@ use crate::metrics::BLOCK_HEAD_H;
 
 /// The tree's column.
 pub const IDE_TREE_W: f32 = 260.;
+/// A list's column (a name and a line under it, so wider than a tree).
+pub const LIST_W: f32 = 340.;
 /// How far a level of the tree is set in.
 pub const TREE_INDENT: f32 = 14.;
 
@@ -126,8 +128,9 @@ pub fn ide_head(
         .children(actions)
 }
 
-/// Tree | the open text, in one bordered, rounded block filling the room it is given.
-pub fn ide(tree: AnyElement, head: AnyElement, body: AnyElement, cx: &App) -> Div {
+/// Tree (or list) `tree_w` wide | the open one, in one bordered, rounded block filling the room it
+/// is given.
+pub fn ide(tree_w: f32, tree: AnyElement, head: AnyElement, body: AnyElement, cx: &App) -> Div {
     let theme = cx.theme();
     h_flex()
         .size_full()
@@ -139,7 +142,7 @@ pub fn ide(tree: AnyElement, head: AnyElement, body: AnyElement, cx: &App) -> Di
         .child(
             div()
                 .id("ide-tree")
-                .w(px(IDE_TREE_W))
+                .w(px(tree_w))
                 .flex_none()
                 .h_full()
                 .overflow_y_scroll()

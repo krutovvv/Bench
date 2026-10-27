@@ -72,6 +72,9 @@ impl Section for Schedule {
     fn tab(&self) -> Tab {
         Tab::Schedule
     }
+    fn first(&self, e: &ProjectEnv) -> Option<String> {
+        e.cron.jobs.first().map(|j| j.id.clone())
+    }
     fn block(&self, _general: bool) -> &'static str {
         "Schedule"
     }
@@ -95,7 +98,7 @@ impl Section for Schedule {
         if e.cron.jobs.is_empty() {
             rows.push(empty("Nothing runs on its own yet: a job runs its prompt in a new thread of the project, on a schedule.", cx));
         }
-        for (k, j) in e.cron.jobs.iter().cloned().enumerate() {
+        for j in e.cron.jobs.iter().cloned() {
             let next = j
                 .next_run
                 .as_deref()
@@ -117,7 +120,6 @@ impl Section for Schedule {
                 j.name.clone(),
                 note,
                 failed,
-                k == 0,
                 cx,
             ));
         }

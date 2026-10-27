@@ -6,7 +6,6 @@
 //! `skills_tree.rs`).
 
 use gpui_kit::component::input::{Editor, EditorState, Input};
-use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -17,44 +16,6 @@ use crate::app::BenchApp;
 use crate::icons::Ico;
 
 impl BenchApp {
-    /// A text chosen in the tree: it opens in the editor, unless the open one has unsaved
-    /// changes (the editors are shared, so they would be lost). The open skill chosen again
-    /// shuts its folder.
-    pub fn env_pick_text(
-        &mut self,
-        kind: &'static str,
-        name: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let Some(e) = self.project_env.as_ref() else {
-            return;
-        };
-        let same = e
-            .card
-            .as_ref()
-            .is_some_and(|(k, n)| *k == kind && *n == name);
-        if same && kind != "skill" {
-            return;
-        }
-        let dirty = match e.card.as_ref().map(|(k, _)| *k) {
-            Some("soul") => e.soul.dirty,
-            Some("prompt") => e.prompts.dirty,
-            Some("skill") => e.skills.dirty,
-            _ => false,
-        };
-        if dirty && !same {
-            self.toast(
-                NotificationType::Info,
-                "Save or revert the open text first",
-                window,
-                cx,
-            );
-            return;
-        }
-        self.env_card(kind, name, window, cx);
-    }
-
     /// The tree beside the editor, both filling the room the page gives them.
     pub(super) fn render_env_ide(
         &mut self,
@@ -63,7 +24,7 @@ impl BenchApp {
     ) -> AnyElement {
         let tree = self.env_tree(cx);
         let (head, body) = self.env_editor(cx);
-        bench_ui::ide(tree, head, body, cx).into_any_element()
+        bench_ui::ide(bench_ui::IDE_TREE_W, tree, head, body, cx).into_any_element()
     }
 
     /// Soul, Prompts, Skills (by where each lives); the open skill's files under it.
@@ -89,17 +50,18 @@ impl BenchApp {
                 vec![],
                 cx,
             )
-            .on_click(cx.listener(|this, _, window, cx| {
-                this.env_pick_text("soul", String::new(), window, cx)
-            }))
+            .on_click(
+                cx.listener(|this, _, window, cx| this.env_open("soul", String::new(), window, cx)),
+            )
             .into_any_element(),
         );
 
-        let add_prompt = head_act("env-t-prompt-add".into(), "+ New", cx)
-            .on_click(cx.listener(|this, _, window, cx| {
-                this.env_pick_text("prompt", "new".into(), window, cx)
-            }))
-            .into_any_element();
+        let add_prompt =
+            head_act("env-t-prompt-add".into(), "+ New", cx)
+                .on_click(cx.listener(|this, _, window, cx| {
+                    this.env_open("prompt", "new".into(), window, cx)
+                }))
+                .into_any_element();
         rows.push(bench_ui::tree_heading("Prompts", vec![add_prompt], cx).into_any_element());
         if e.prompts.names.is_empty() && !is("prompt", "new") {
             rows.push(quiet("None of its own: @ offers the general ones", cx));
@@ -133,16 +95,16 @@ impl BenchApp {
                     cx,
                 )
                 .on_click(cx.listener(move |this, _, window, cx| {
-                    this.env_pick_text("prompt", pick.clone(), window, cx)
+                    this.env_open("prompt", pick.clone(), window, cx)
                 }))
                 .into_any_element(),
             );
         }
 
         let add_skill = head_act("env-t-skill-add".into(), "+ New", cx)
-            .on_click(cx.listener(|this, _, window, cx| {
-                this.env_pick_text("skill", "new".into(), window, cx)
-            }))
+            .on_click(
+                cx.listener(|this, _, window, cx| this.env_open("skill", "new".into(), window, cx)),
+            )
             .into_any_element();
         rows.push(bench_ui::tree_heading("Skills", vec![add_skill], cx).into_any_element());
         if e.skills.list.is_empty() && !is("skill", "new") {
@@ -191,7 +153,7 @@ impl BenchApp {
                         cx,
                     )
                     .on_click(cx.listener(move |this, _, window, cx| {
-                        this.env_pick_text("skill", pick.clone(), window, cx)
+                        this.env_open("skill", pick.clone(), window, cx)
                     }))
                     .into_any_element(),
                 );

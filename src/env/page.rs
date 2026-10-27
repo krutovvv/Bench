@@ -1,6 +1,8 @@
-//! A project's settings drawn: the gear's tabs on top, then the open tab's groups — a heading
-//! with its actions, and under it the fields of a form or a list in a bordered block, the open
-//! row's card under its list. Instructions is the editor of `ide.rs` and fills the page.
+//! A project's settings drawn: the gear's tabs on top, then the open tab. General is a form —
+//! groups under headings, fields in rows — and scrolls as a page. The others are two panes
+//! filling the page, as in an editor: on the left what there is (Instructions' tree of texts in
+//! `ide.rs`; the lists of servers, jobs and accesses here), on the right the one chosen, its
+//! fields and actions.
 
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -46,34 +48,36 @@ impl BenchApp {
             view.update(cx, |this, cx| this.env_tab(tab, window, cx));
         });
         let at = tabs.iter().position(|t| *t == open).unwrap_or(0);
-        let head = div()
+        let head = v_flex()
             .flex_none()
             .pt(inset)
             .px(inset)
-            .flex()
             .child(bench_ui::settings_tabs("env-tabs", &labels, at, cx, pick))
             .when_some(error, |d, err| {
                 d.child(div().pt_2().text_color(theme.danger).child(err))
             });
-        let body = if open == Tab::Instructions {
-            div()
-                .flex_1()
-                .min_h_0()
-                .pt_4()
-                .px(inset)
-                .pb(inset)
-                .child(self.render_env_ide(window, cx))
-                .into_any_element()
-        } else {
-            v_flex()
+        let body = match open {
+            Tab::General => v_flex()
                 .id("env-page")
                 .flex_1()
                 .min_h_0()
                 .overflow_y_scroll()
                 .px(inset)
                 .pb(inset)
-                .children(self.render_env_groups(open, cx))
-                .into_any_element()
+                .children(self.render_env_form(open, cx))
+                .into_any_element(),
+            _ => div()
+                .flex_1()
+                .min_h_0()
+                .pt_4()
+                .px(inset)
+                .pb(inset)
+                .child(if open == Tab::Instructions {
+                    self.render_env_ide(window, cx)
+                } else {
+                    self.render_env_lists(open, cx)
+                })
+                .into_any_element(),
         };
         v_flex()
             .size_full()
@@ -82,118 +86,128 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// The groups of a tab: each section's `block`, its sections' heading actions, their forms
-    /// or rows; the open card under the list it belongs to, a new server's or file host's form
-    /// under Machines or File hosts.
-    fn render_env_groups(&mut self, tab: Tab, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let theme = cx.theme().clone();
-        let Some(e) = self.project_env.as_ref() else {
-            return vec![];
-        };
-        let general = e.id == "general";
-        let card_kind = e.card.as_ref().map(|(k, _)| *k);
-        let shown: Vec<&'static dyn Section> = SECTIONS
+    /// The sections of a tab that are shown, in runs of one `block` each.
+    fn env_groups(&self, tab: Tab) -> Vec<(&'static str, Vec<&'static dyn Section>)> {
+        let general = self.project_env.as_ref().is_some_and(|e| e.id == "general");
+        let mut out: Vec<(&'static str, Vec<&'static dyn Section>)> = vec![];
+        for s in SECTIONS
             .iter()
             .copied()
             .filter(|s| s.tab() == tab && s.shown(self))
-            .collect();
-        let mut out = vec![];
-        let mut at = 0;
-        while at < shown.len() {
-            let title = shown[at].block(general);
-            let end = shown[at..]
-                .iter()
-                .position(|s| s.block(general) != title)
-                .map_or(shown.len(), |n| at + n);
-            let group = &shown[at..end];
-            at = end;
-            let heads: Vec<AnyElement> = group.iter().filter_map(|s| s.head(self, cx)).collect();
-            out.push(bench_ui::settings_heading(title, heads, cx).into_any_element());
-            let mut forms = vec![];
-            let mut rows = vec![];
-            for s in group {
-                match s.form(self, cx) {
-                    Some(f) => forms.extend(f),
-                    None => rows.extend(s.rows(self, cx)),
-                }
-            }
-            if !forms.is_empty() {
-                out.push(
-                    v_flex()
-                        .w_full()
-                        .border_t_1()
-                        .border_color(theme.border)
-                        .children(forms)
-                        .into_any_element(),
-                );
-            }
-            if !rows.is_empty() {
-                out.push(
-                    v_flex()
-                        .w_full()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(theme.border)
-                        .overflow_hidden()
-                        .bg(theme.background)
-                        .children(rows)
-                        .into_any_element(),
-                );
-            }
-            if card_kind.is_some_and(|k| group.iter().any(|s| s.key() == k)) {
-                if let Some(card) = self.render_env_card(cx) {
-                    out.push(div().pt_3().child(card).into_any_element());
-                }
-            }
-            // The forms of the accesses' "+ Add" (and a machine's edit), where they were asked.
-            let form = match title {
-                "File hosts" if self.files_remote.form => Some(self.render_host_form(cx)),
-                "Machines" if self.ssh.form.is_some() => Some(self.render_server_form(cx)),
-                _ => None,
-            };
-            if let Some(form) = form {
-                out.push(
-                    div()
-                        .mt_3()
-                        .p_3()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(theme.border)
-                        .child(form)
-                        .into_any_element(),
-                );
+        {
+            let title = s.block(general);
+            match out.last_mut() {
+                Some((t, group)) if *t == title => group.push(s),
+                _ => out.push((title, vec![s])),
             }
         }
         out
     }
 
-    /// The open row's card: its fields, and in its head Save (live once something changed),
-    /// Revert, its own actions, Remove (twice) and Close.
-    fn render_env_card(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// A form tab: each group's heading, then its sections' fields.
+    fn render_env_form(&mut self, tab: Tab, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
-        let (kind, name) = self.project_env.as_ref()?.card.clone()?;
-        let Card {
-            title,
-            body,
-            actions,
-        } = section(kind)?.card(self, &name, cx)?;
-        let close =
-            crate::inserts::icon_button("env-card-close", crate::icons::Ico::X, "Close", &theme)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.env_card(kind, name.clone(), window, cx)
-                }));
-        let head = crate::ui::block_head(&theme, true)
-            .gap_3()
-            .child(
+        let mut out = vec![];
+        for (title, group) in self.env_groups(tab) {
+            let heads: Vec<AnyElement> = group.iter().filter_map(|s| s.head(self, cx)).collect();
+            out.push(
+                bench_ui::settings_heading(title, heads, cx)
+                    .flex_none()
+                    .into_any_element(),
+            );
+            let fields: Vec<AnyElement> = group
+                .iter()
+                .filter_map(|s| s.form(self, cx))
+                .flatten()
+                .collect();
+            out.push(
+                v_flex()
+                    .flex_none()
+                    .w_full()
+                    .border_t_1()
+                    .border_color(theme.border)
+                    .children(fields)
+                    .into_any_element(),
+            );
+        }
+        out
+    }
+
+    /// A list tab: on the left each group's heading ("+ Add" and the like) and its rows; on the
+    /// right what is open — a row's fields, a new one's form, a new server's or file host's form.
+    fn render_env_lists(&mut self, tab: Tab, cx: &mut Context<Self>) -> AnyElement {
+        let mut left = vec![];
+        let mut keys = vec![];
+        for (title, group) in self.env_groups(tab) {
+            let heads: Vec<AnyElement> = group.iter().filter_map(|s| s.head(self, cx)).collect();
+            left.push(bench_ui::tree_heading(title, heads, cx).into_any_element());
+            for s in group {
+                keys.push(s.key());
+                left.extend(s.rows(self, cx));
+            }
+        }
+        let list = v_flex().w_full().children(left).into_any_element();
+        let (head, body) = self.render_env_open(tab, &keys, cx);
+        bench_ui::ide(bench_ui::LIST_W, list, head, body, cx).into_any_element()
+    }
+
+    /// The right pane of a list tab: the open row (`keys`: the tab's sections) or the access form
+    /// being filled; else a line saying what to do.
+    fn render_env_open(
+        &mut self,
+        tab: Tab,
+        keys: &[&str],
+        cx: &mut Context<Self>,
+    ) -> (AnyElement, AnyElement) {
+        let theme = cx.theme().clone();
+        let scroll = |body: AnyElement| {
+            div()
+                .id("env-open")
+                .size_full()
+                .overflow_y_scroll()
+                .child(body)
+                .into_any_element()
+        };
+        // The forms of the accesses' "+ Add" (and a machine's edit) carry their own title and
+        // buttons.
+        let form = if tab != Tab::Access {
+            None
+        } else if self.files_remote.form {
+            Some(self.render_host_form(cx))
+        } else if self.ssh.form.is_some() {
+            Some(self.render_server_form(cx))
+        } else {
+            None
+        };
+        if let Some(form) = form {
+            return (
+                bench_ui::ide_head("", None, vec![], cx).into_any_element(),
+                scroll(div().p_3().child(form).into_any_element()),
+            );
+        }
+        let open = self
+            .project_env
+            .as_ref()
+            .and_then(|e| e.card.clone())
+            .filter(|(k, _)| keys.contains(k));
+        let card = open.and_then(|(kind, name)| section(kind)?.card(self, &name, cx));
+        match card {
+            Some(Card {
+                title,
+                body,
+                actions,
+            }) => (
+                bench_ui::ide_head(title, None, actions, cx).into_any_element(),
+                scroll(body),
+            ),
+            None => (
+                bench_ui::ide_head("", None, vec![], cx).into_any_element(),
                 div()
-                    .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .text_color(theme.foreground)
-                    .child(title),
-            )
-            .children(actions)
-            .child(close);
-        Some(crate::inserts::card(head, body, &theme))
+                    .p_3()
+                    .text_color(theme.muted_foreground)
+                    .child("Choose one on the left, or + Add a new one")
+                    .into_any_element(),
+            ),
+        }
     }
 }

@@ -51,8 +51,8 @@ impl Tab {
     }
 }
 
-/// A section's card, as its `card` gives it: the head's title and actions (Close is added), the
-/// body.
+/// What a list's row opens on the right of the list, as its `card` gives it: the head's title and
+/// actions, the body.
 pub struct Card {
     pub title: String,
     pub body: AnyElement,
@@ -91,11 +91,15 @@ pub trait Section: Sync {
     fn form(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Option<Vec<AnyElement>> {
         None
     }
-    /// A list's rows, in a bordered block.
+    /// A list's rows, on the left of the tab; a click opens one's `card` on the right.
     fn rows(&self, _app: &BenchApp, _cx: &mut Context<BenchApp>) -> Vec<AnyElement> {
         vec![]
     }
-    /// The card of the row `name`, under the list (None: nothing to show).
+    /// A list's first row, opened when its tab is chosen.
+    fn first(&self, _e: &ProjectEnv) -> Option<String> {
+        None
+    }
+    /// What the row `name` opens on the right: its fields, its actions (None: nothing to show).
     fn card(&self, _app: &BenchApp, _name: &str, _cx: &mut Context<BenchApp>) -> Option<Card> {
         None
     }
@@ -163,16 +167,16 @@ pub fn head_act(id: SharedString, label: &'static str, cx: &App) -> Stateful<Div
         .child(label)
 }
 
-/// "+ Add": a new one's card under the list.
+/// "+ Add": a new one's form, on the right of the list.
 pub fn add(id: &'static str, kind: &'static str, cx: &mut Context<BenchApp>) -> Stateful<Div> {
     head_act(id.into(), "+ Add", cx).on_click(cx.listener(move |this, _, window, cx| {
         cx.stop_propagation();
-        this.env_card(kind, "new".into(), window, cx)
+        this.env_open(kind, "new".into(), window, cx)
     }))
 }
 
-/// A row: its name, a one-line note, its actions on hover; lit when its card is open. `mark` is
-/// a status sign before the name (MCP servers have one).
+/// A row of a list: its name and under it a one-line note, its actions on hover; lit when it is
+/// open on the right. `mark` is a status sign before the name (MCP servers have one).
 #[allow(clippy::too_many_arguments)]
 pub fn row_with(
     e: &ProjectEnv,
@@ -182,12 +186,10 @@ pub fn row_with(
     label: String,
     note: String,
     bad: bool,
-    first: bool,
     actions: Vec<AnyElement>,
     cx: &mut Context<BenchApp>,
 ) -> AnyElement {
     let theme = cx.theme().clone();
-    let muted = theme.muted_foreground;
     let note = note.split_whitespace().collect::<Vec<_>>().join(" ");
     let on = e
         .card
@@ -197,24 +199,32 @@ pub fn row_with(
     h_flex()
         .id(SharedString::from(format!("env-{kind}-{name}")))
         .group(group.clone())
+        .flex_none()
         .px_3()
         .py_1p5()
         .gap_2()
         .cursor_pointer()
-        .when(!first, |d| {
-            d.border_t_1().border_color(theme.border.opacity(0.5))
-        })
         .when(on, |d| d.bg(theme.list_active))
-        .hover(|s| s.bg(theme.list_hover))
+        .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
         .children(mark)
-        .child(div().flex_none().child(label))
         .child(
-            div()
+            v_flex()
                 .flex_1()
                 .min_w_0()
-                .truncate()
-                .text_color(if bad { theme.danger } else { muted })
-                .child(note),
+                .child(div().truncate().child(label))
+                .when(!note.is_empty(), |d| {
+                    d.child(
+                        div()
+                            .truncate()
+                            .text_sm()
+                            .text_color(if bad {
+                                theme.danger
+                            } else {
+                                theme.muted_foreground
+                            })
+                            .child(note),
+                    )
+                }),
         )
         .children(actions.into_iter().map(|a| {
             div()
@@ -224,7 +234,7 @@ pub fn row_with(
                 .child(a)
         }))
         .on_click(
-            cx.listener(move |this, _, window, cx| this.env_card(kind, name.clone(), window, cx)),
+            cx.listener(move |this, _, window, cx| this.env_open(kind, name.clone(), window, cx)),
         )
         .into_any_element()
 }
@@ -238,10 +248,9 @@ pub fn row(
     label: String,
     note: String,
     bad: bool,
-    first: bool,
     cx: &mut Context<BenchApp>,
 ) -> AnyElement {
-    row_with(e, kind, name, None, label, note, bad, first, vec![], cx)
+    row_with(e, kind, name, None, label, note, bad, vec![], cx)
 }
 
 /// A list with nothing in it: one muted line.
