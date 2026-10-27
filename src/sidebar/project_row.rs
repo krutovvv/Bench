@@ -73,7 +73,7 @@ impl BenchApp {
                 .pb_1()
                 .gap_1p5()
                 .items_center()
-                .text_sm()
+                .text_base()
                 .child(bench_ui::head_icon_in(icon, color, cx))
                 .child(match renaming {
                     Some(field) => div()
@@ -82,12 +82,14 @@ impl BenchApp {
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .child(Input::new(&field).xsmall())
                         .into_any_element(),
+                    // Capital letters, as the Explorer's headings: a group of threads reads as a
+                    // section, and a color on it is a mark, not a smaller type.
                     None => div()
                         .min_w_0()
                         .truncate()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(color.unwrap_or(muted))
-                        .child(p.name.clone())
+                        .child(p.name.to_uppercase())
                         .into_any_element(),
                 })
                 .child(div().flex_1())

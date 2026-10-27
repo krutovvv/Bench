@@ -66,7 +66,7 @@ pub fn tree_row(
         .py_1()
         .gap_1p5()
         .items_center()
-        .text_sm()
+        .text_base()
         .cursor_pointer()
         .when(chosen, |d| d.bg(theme.list_active))
         .when(!chosen, |d| d.hover(|s| s.bg(theme.list_hover)))

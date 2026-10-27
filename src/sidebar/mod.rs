@@ -117,7 +117,7 @@ impl BenchApp {
                 .pb_1()
                 .gap_1p5()
                 .items_center()
-                .text_sm()
+                .text_base()
                 .child(bench_ui::head_icon_in(Ico::Server, host_color, cx))
                 .child(
                     div()
@@ -125,7 +125,7 @@ impl BenchApp {
                         .truncate()
                         .font_weight(FontWeight::MEDIUM)
                         .text_color(host_color.unwrap_or(muted))
-                        .child(crate::app::LOCAL_HOST),
+                        .child(crate::app::LOCAL_HOST.to_uppercase()),
                 )
                 .child(div().flex_1())
                 // "⋯" (on hover), as a right click: its environment, its color — the same menu as
@@ -146,6 +146,30 @@ impl BenchApp {
                                     Item::Project(crate::app::model::ProjectKey::HOST.into()),
                                     false,
                                 )),
+                        ),
+                )
+                // The gear (on hover), as on a project's row: this Mac's environment, in the
+                // Explorer.
+                .child(
+                    div()
+                        .flex_none()
+                        .opacity(0.)
+                        .group_hover(group.clone(), |s| s.opacity(1.))
+                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .child(
+                            Button::new("general-set")
+                                .ghost()
+                                .xsmall()
+                                .icon(Ico::Settings.icon())
+                                .tooltip("Settings")
+                                .on_click(cx.listener(|this, _, window, cx| {
+                                    cx.stop_propagation();
+                                    this.open_project_settings(
+                                        crate::app::model::ProjectKey::HOST.into(),
+                                        window,
+                                        cx,
+                                    )
+                                })),
                         ),
                 )
                 .child(

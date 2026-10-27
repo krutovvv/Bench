@@ -66,9 +66,13 @@ Key colors (light): keyword `#A626A4`, function `#4078F2`, string `#50A14F`, num
 ## Typography
 
 - UI: system font, 14px base. The thread is **one size**, `text_base` — messages, answers,
-  steps, cards' heads, the composer; secondary things are muted, never smaller. Chrome (sidebar
-  titles at `SESSION_TITLE` 14, header, status bar, block heads) is `text_sm`. Medium weight
-  only for titles and the header.
+  steps, cards' heads, the composer; secondary things are muted, never smaller. Chrome (the
+  header, the status bar, block heads) is `text_sm`. Medium weight only for titles and the header.
+- The sidebar and the Explorer's tree are **one size too**: `text_base` for every row — a
+  project's head, its threads, a file, a skill, an MCP server, Settings. A group says "section"
+  by CAPITAL LETTERS, not by a smaller type: a project's head (`project_row.rs`) and the tree's
+  headings (`tree_heading`, `text_xs`, muted). Under a row, a note (a skill's line, a server's
+  transport) stays `text_xs` and muted — it is an annotation, not a row.
 - Code: Menlo, `mono_font_size` 12 — editors, diffs, command names, cron schedules.
 - Size presets (⌘+ / ⌘−; no setting): Small 13/11, Normal 14/12, Large 15/13. Rem-based
   spacing scales with the font; fixed sizes don't — rems for what must keep proportions.
