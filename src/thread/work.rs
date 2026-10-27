@@ -25,7 +25,7 @@ impl ThreadView {
         // The person's holds of the live run: its clock skips them; the last open one means
         // it stands held, and the hold's own button shows it.
         holds: &[Hold],
-        plan: &[(String, Vec<PlanStep>)],
+        plan: Option<&(String, Vec<PlanStep>)>,
         asks: &[AskCard],
         procs: bool,
         // The answer this work leads to, when the run has ended: its read-aloud and copy
@@ -276,7 +276,31 @@ impl ThreadView {
         });
         // The plan and the questions this work wrote, under its steps; the live work also
         // carries the background processes it started.
-        let mut artifacts = self.render_work_artifacts(plan, asks, cx);
+        // A call of this work waiting for the person's approval: its card joins the questions.
+        // The request is live state (the call is the journal's): it is asked again after a restart.
+        let approval = self.thread.approval.as_ref().filter(|a| {
+            steps
+                .iter()
+                .any(|s| matches!(s, Step::Tool { call_id, .. } if *call_id == a.prompt_id))
+        });
+        let asks: Vec<AskCard> = asks
+            .iter()
+            .cloned()
+            .chain(approval.map(|a| AskCard {
+                id: a.prompt_id.clone(),
+                ask_kind: "approve".into(),
+                question: if a.description.is_empty() {
+                    "The agent asks to run this".into()
+                } else {
+                    format!("The agent asks to run this: {}", a.description)
+                },
+                detail: Some(a.command.clone()),
+                choices: a.choices.clone(),
+                multi: false,
+                answer: None,
+            }))
+            .collect();
+        let mut artifacts = self.render_work_artifacts(plan, &asks, cx);
         if procs {
             artifacts.extend(self.processes_frame(cx));
         }

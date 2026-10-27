@@ -374,10 +374,6 @@ pub(super) fn run(
                     replay.push(json!({"type": "session.inserts", "session_id": runtime,
                                        "payload": {"inserts": r["inserts"]}}));
                 }
-                if r["todo_state"]["todos"].is_array() {
-                    replay.push(json!({"type": "todo.updated", "session_id": runtime,
-                                       "payload": r["todo_state"]}));
-                }
                 let params = json!({"session_id": runtime, "profile": profile});
                 rpc.call(
                     "thread.open",

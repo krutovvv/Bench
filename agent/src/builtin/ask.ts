@@ -4,7 +4,6 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { host, sessionOf } from "../host.ts";
-import type { Todo } from "../store.ts";
 
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
 
@@ -18,11 +17,18 @@ export const clarify = defineTool({
 		choices: Type.Optional(Type.Array(Type.String(), { maxItems: 4 })),
 		multi_select: Type.Optional(Type.Boolean()),
 	}),
+	// Asking again after a restart is harmless: the question is still the person's to answer.
+	replay: "safe",
+	// The call is the question and its result the answer (docs/thread-objects.md): the card in
+	// Bench reads both from the journal. The id the person answers to is the call's.
 	execute: async (args, api, context) => {
 		const s = sessionOf(api.conversationId);
 		const choices = (args.choices ?? []).map((c) => c.trim()).filter(Boolean).slice(0, 4);
-		const answer = await host().ask(s.id, args.question, choices, Boolean(args.multi_select) && choices.length > 0, context?.abortSignal);
-		return text(answer ? { answer } : { answer: null, note: "No answer (declined or timed out). Decide yourself or stop." });
+		const answer = await host().ask(s.id, api.callId, args.question, choices, Boolean(args.multi_select) && choices.length > 0, context?.abortSignal);
+		return {
+			...text(answer ? { answer } : { answer: null, note: "No answer (declined or timed out). Decide yourself or stop." }),
+			details: { answer: answer || null },
+		};
 	},
 });
 
@@ -40,9 +46,10 @@ export const todo = defineTool({
 			}),
 		),
 	}),
-	execute: async (args, api) => {
-		const s = sessionOf(api.conversationId);
-		host().setTodos(s.id, args.todos as Todo[]);
+	// The plan is this call itself: its arguments in the journal are what Bench shows, where the
+	// first call of the work stands (docs/thread-objects.md). Nothing is kept beside it.
+	replay: "safe",
+	execute: async (args) => {
 		const done = args.todos.filter((t) => t.status === "completed").length;
 		return text({ success: true, done, total: args.todos.filter((t) => t.status !== "cancelled").length });
 	},

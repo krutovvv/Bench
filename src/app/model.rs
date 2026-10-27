@@ -255,7 +255,12 @@ pub struct CommitBrief {
 #[derive(Clone, Debug)]
 pub struct ApprovalReq {
     pub session: String,
+    /// The id of the call that waits for the approval.
     pub prompt_id: String,
+    /// What it wants to run, why it asks, and what the person may answer.
+    pub command: String,
+    pub description: String,
+    pub choices: Vec<String>,
 }
 
 pub const APPROVAL_MODES: &[&str] = &["off", "smart", "manual"];

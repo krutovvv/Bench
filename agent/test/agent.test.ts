@@ -180,7 +180,7 @@ test("telegram: a batch keeps the order the messages came in and waits for voice
 });
 
 const { Store } = await import("../src/store.ts");
-const { totalsOf, usagePayload, planFresh } = await import("../src/usage.ts");
+const { totalsOf, usagePayload } = await import("../src/usage.ts");
 
 test("usage: a thread's counters are kept and come back on a fresh store", () => {
 	const st = new Store();
@@ -196,26 +196,6 @@ test("usage: a thread's counters are kept and come back on a fresh store", () =>
 	assert.equal(frame.avg_tps, 31.4);
 	assert.deepEqual(totalsOf("junk"), { input: 0, output: 0, calls: 0 });
 	st.delete("u1");
-});
-
-test("a plan keeps its place: only steps with new ids begin a plan", () => {
-	const plan = [{ id: "a", status: "pending" }, { id: "b", status: "pending" }];
-	assert.equal(planFresh([], plan), true, "nothing before: a plan begins");
-	assert.equal(planFresh(plan, plan), false, "the same steps are the same plan");
-	assert.equal(planFresh(plan, [{ id: "a", status: "completed" }, { id: "b", status: "in_progress" }]), false);
-	assert.equal(planFresh(plan, [{ id: "c", status: "pending" }]), true, "other steps: another plan");
-	assert.equal(planFresh(undefined, plan), true, "an unreadable previous list is no plan");
-});
-
-test("a plan's moment is saved with its steps", () => {
-	const st = new Store();
-	st.create({ id: "p1", conversation: 2, profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
-	assert.equal(st.get("p1")!.todos_at, 0, "a thread that never planned has no moment");
-	st.update("p1", { todos: [{ id: "a", status: "pending" } as any], todos_at: 1730000000.5 });
-	const back = new Store().get("p1")!;
-	assert.equal(back.todos_at, 1730000000.5);
-	assert.equal(back.todos[0].id, "a");
-	st.delete("p1");
 });
 
 test("a waiting message keeps its attachments and block state when its words are fixed", async () => {

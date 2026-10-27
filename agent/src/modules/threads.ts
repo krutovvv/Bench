@@ -64,7 +64,6 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 				inserts: await rt.inserts(session_id),
 				prompts: rt.pendingPrompts(session_id),
 				info: { reasoning_effort: row.effort, model: row.model, cwd: row.cwd, revision: 0, execution_generation: live.generation },
-				todo_state: { todos: row.todos, at: row.todos_at ?? 0 },
 				usage: usagePayload(row.model, live.usage, resolveModel().contextLength),
 				speed: row.speed ?? speedOf(null),
 			};

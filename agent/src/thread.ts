@@ -16,7 +16,7 @@ export function preview(name: string, args: any): string {
 }
 
 // The items and the queue are typed in crates/protocol: Bench reads them with the same types.
-import type { QueuedItem, ThreadItem } from "./protocol.gen.ts";
+import type { PlanStep, QueuedItem, ThreadItem } from "./protocol.gen.ts";
 export type { QueuedItem, ThreadItem };
 
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
@@ -48,6 +48,12 @@ export function textOf(content: any): string {
 }
 
 /** The items of one journal entry, in order. Entries the person never sees give none. */
+/** The steps a `todo` call wrote. */
+function planOf(args: any): PlanStep[] {
+	const todos = Array.isArray(args?.todos) ? args.todos : [];
+	return todos.map((t: any) => ({ id: String(t?.id ?? ""), content: String(t?.content ?? ""), status: String(t?.status ?? "pending"), ...(typeof t?.parent === "string" ? { parent: t.parent } : {}) }));
+}
+
 export function itemsOf(entry: any): ThreadItem[] {
 	const seq = Number(entry.id);
 	const out: ThreadItem[] = [];
@@ -57,19 +63,6 @@ export function itemsOf(entry: any): ThreadItem[] {
 	}
 	if (entry.kind === FAIL_KIND) {
 		out.push({ key: `${seq}`, seq, kind: "fail", text: String(entry.data?.text ?? "") });
-		return out;
-	}
-	if (entry.kind === "bench.plan") {
-		const todos = Array.isArray(entry.data?.todos) ? entry.data.todos : [];
-		out.push({ key: `${seq}`, seq, kind: "plan", id: String(entry.data?.id ?? ""), todos: todos.map((t: any) => ({ id: String(t?.id ?? ""), content: String(t?.content ?? ""), status: String(t?.status ?? "pending"), ...(typeof t?.parent === "string" ? { parent: t.parent } : {}) })) });
-		return out;
-	}
-	if (entry.kind === "bench.ask") {
-		out.push({ key: `${seq}`, seq, kind: "ask", id: String(entry.data?.id ?? ""), ask_kind: String(entry.data?.ask_kind ?? "clarify"), question: String(entry.data?.question ?? ""), ...(entry.data?.detail ? { detail: String(entry.data.detail) } : {}), choices: (Array.isArray(entry.data?.choices) ? entry.data.choices : []).map(String), multi: Boolean(entry.data?.multi) });
-		return out;
-	}
-	if (entry.kind === "bench.asked") {
-		out.push({ key: `${seq}`, seq, kind: "asked", id: String(entry.data?.id ?? ""), ...(entry.data?.answer == null ? {} : { answer: String(entry.data.answer) }) });
 		return out;
 	}
 	if (entry.kind === COMPACTION_KIND || entry.kind === "pi.system") return out;
@@ -94,13 +87,29 @@ export function itemsOf(entry: any): ThreadItem[] {
 						at,
 						narration: m.content.some((x: any) => x?.type === "toolCall"),
 					});
-				else if (b.type === "toolCall") out.push({ key: key(), seq, kind: "tool", call_id: String(b.id), name: String(b.name), args: b.arguments ?? {}, preview: preview(String(b.name), b.arguments), at });
+				else if (b.type === "toolCall") {
+					out.push({ key: key(), seq, kind: "tool", call_id: String(b.id), name: String(b.name), args: b.arguments ?? {}, preview: preview(String(b.name), b.arguments), at });
+					// The plan is the `todo` call itself (docs/thread-objects.md): its steps, read
+					// from the journal, under the call's id.
+					if (b.name === "todo") out.push({ key: key(), seq, kind: "plan", id: String(b.id), todos: planOf(b.arguments) });
+					// So is a question: the `clarify` call, answered by its result.
+					if (b.name === "clarify") {
+						const a = b.arguments ?? {};
+						const choices = (Array.isArray(a.choices) ? a.choices : []).map(String);
+						out.push({ key: key(), seq, kind: "ask", id: String(b.id), ask_kind: "clarify", question: String(a.question ?? ""), choices, multi: Boolean(a.multi_select) && choices.length > 0 });
+					}
+				}
 			}
 			if (m.stopReason === "error") out.push({ key: key(), seq, kind: "text", text: "", at, error: String(m.errorMessage ?? "the model stopped with an error") });
 		} else if (m.role === "toolResult") {
 			// An edit's unified patch, as Pi's edit tool reports it in its details.
 			const patch = (entry.data as any)?.details?.patch ?? m.details?.patch;
 			out.push({ key: key(), seq, kind: "result", call_id: String(m.toolCallId), name: String(m.toolName), output: textOf(m.content), failed: !!m.isError, ...(typeof patch === "string" ? { diff: patch } : {}), at });
+			// A question's answer is its call's result ("" declined, or no answer came).
+			if (m.toolName === "clarify") {
+				const answer = m.details?.answer ?? (entry.data as any)?.details?.answer;
+				out.push({ key: key(), seq, kind: "asked", id: String(m.toolCallId), answer: typeof answer === "string" ? answer : "" });
+			}
 		}
 	}
 	return out;

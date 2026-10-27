@@ -2,7 +2,6 @@
 // or an approval to the person (Bench's card, Telegram's buttons), update the session's plan, run
 // a prompt in a session of its own. The runtime installs itself here at start.
 
-import type { Todo } from "./store.ts";
 
 export interface SessionInfo {
 	id: string;
@@ -29,11 +28,10 @@ export interface Host {
 	/** How many threads other than `sessionId` are running a turn now (each holds one of the model server's slots). */
 	busyElsewhere(sessionId: string): number;
 	/** The answer, or "" when declined or timed out. */
-	ask(sessionId: string, question: string, choices: string[], multiSelect: boolean, signal?: AbortSignal): Promise<string>;
+	/** Ask the person; `callId` is the asking call's, the id their answer comes back to. */
+	ask(sessionId: string, callId: string, question: string, choices: string[], multiSelect: boolean, signal?: AbortSignal): Promise<string>;
 	/** "once" | "session" | "always" | "deny". */
-	approve(sessionId: string, command: string, description: string): Promise<string>;
-	setTodos(sessionId: string, todos: Todo[]): void;
-	todos(sessionId: string): Todo[];
+	approve(sessionId: string, callId: string, command: string, description: string): Promise<string>;
 	emit(sessionId: string, type: string, payload: Record<string, unknown>): void;
 	search(query: string, limit: number, profile: string): { session_id: string; title: string; snippet: string; when: string }[];
 	/** Runs one prompt to its answer in a new session of this profile (cron jobs). */

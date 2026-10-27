@@ -16,15 +16,15 @@ use super::ThreadView;
 use bench_ui::icons::Ico;
 
 impl ThreadView {
-    /// The work row's cards, under its steps: one frame per plan, one per question.
+    /// The work row's cards, under its steps: its plan, then one per question.
     pub(crate) fn render_work_artifacts(
         &mut self,
-        plan: &[(String, Vec<PlanStep>)],
+        plan: Option<&(String, Vec<PlanStep>)>,
         asks: &[AskCard],
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         let mut els: Vec<AnyElement> = Vec::new();
-        for (id, todos) in plan {
+        if let Some((id, todos)) = plan {
             els.push(self.render_plan_frame(id, todos, cx));
         }
         for card in asks {

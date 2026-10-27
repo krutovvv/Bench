@@ -20,7 +20,7 @@ import path from "node:path";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
 import { AGENT_HOME, agents, compactionAt, compactionPolicy, getSetting, readConfig, readAgent, reasoningEffort, resolveFallback, resolveModel, setSetting, type ModelChoice } from "./config.ts";
 import { fallbackProvider } from "./fallback.ts";
-import { EMPTY_TOTALS, planFresh, totalsOf, usagePayload } from "./usage.ts";
+import { EMPTY_TOTALS, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
 import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, compactionsOf, FAIL_KIND, itemsOfAll, preview, queueOf, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
@@ -28,7 +28,7 @@ import { ensureMcp } from "./mcp.ts";
 import { noThinking } from "./thinking.ts";
 import { setHost, type Host, type SessionInfo } from "./host.ts";
 import { projects } from "./builtin/projects.ts";
-import { Store, type SessionRow, type Todo } from "./store.ts";
+import { Store, type SessionRow } from "./store.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
@@ -644,25 +644,16 @@ export class Runtime {
 
 	// ---- prompts (clarify, approval) --------------------------------------
 
-	private prompt(live: Live, kind: "clarify" | "approval", payload: Record<string, unknown>, timeoutS: number): Promise<string> {
-		const promptId = randomUUID();
-		// The question lives in the journal, where Bench puts its card: an entry at ask time and
-		// one at the answer, so the card keeps its place in the work that asked, on every reopen.
-		const askKind = kind === "approval" ? "approve" : "clarify";
-		void live.conversation.submit({ type: "write", entry: { kind: "bench.ask", data: {
-			id: promptId,
-			ask_kind: askKind,
-			question: String(payload.question ?? payload.command ?? (kind === "approval" ? "The agent asks to run this" : "")),
-			detail: kind === "approval" && payload.command ? String(payload.command) : undefined,
-			choices: (Array.isArray(payload.choices) ? payload.choices : []).map(String),
-			multi: Boolean(payload.multi_select),
-		} } } as any, ctx);
+	/** Wait for the person's answer to the tool call `promptId` (a `clarify` call, or a call
+	 * that wants approval). What waits is live state, not the journal's: the call is already in
+	 * the journal, and its result will be the answer. After a restart Pi runs the call again
+	 * (or its `beforeTool`), which asks again — nothing to restore. */
+	private prompt(live: Live, promptId: string, kind: "clarify" | "approval", payload: Record<string, unknown>, timeoutS: number): Promise<string> {
 		return new Promise<string>((resolve) => {
 			const timer = setTimeout(() => done(""), timeoutS * 1000);
 			const done = (answer: string) => {
 				clearTimeout(timer);
 				if (!live.prompts.delete(promptId)) return;
-				void live.conversation.submit({ type: "write", entry: { kind: "bench.asked", data: { id: promptId, answer } } } as any, ctx);
 				this.emit(live.row.id, `${kind}.settled`, { prompt_id: promptId });
 				resolve(answer);
 			};
@@ -772,43 +763,21 @@ export class Runtime {
 			// A subagent's call waits on its parent's hold too: the person holds the whole work.
 			hold: (sessionId) => this.hold(sessionId),
 			busyElsewhere: (sessionId) => [...this.live.values()].filter((l) => l.busy && l.row.id !== sessionId).length,
-			ask: async (sessionId, question, choices, multiSelect, signal) => {
+			ask: async (sessionId, callId, question, choices, multiSelect, signal) => {
 				const live = await this.session(sessionId);
 				if (!live) return "";
-				const answer = this.prompt(live, "clarify", { question, choices, multi_select: multiSelect }, Number(cfg()?.agent?.clarify_timeout ?? 600));
+				const answer = this.prompt(live, callId, "clarify", { question, choices, multi_select: multiSelect }, Number(cfg()?.agent?.clarify_timeout ?? 600));
 				signal?.addEventListener("abort", () => [...live.prompts.values()].forEach((p) => p.kind === "clarify" && p.resolve("")));
 				return answer;
 			},
-			approve: async (sessionId, command, description) => {
+			approve: async (sessionId, callId, command, description) => {
 				const live = await this.session(sessionId);
 				if (!live) return "deny";
 				if (live.approvedForSession.has(command)) return "session";
-				const choice = await this.prompt(live, "approval", { command, description, choices: ["once", "session", "always", "deny"], allow_session: true, allow_permanent: true }, Number(cfg()?.approvals?.timeout ?? 120));
+				const choice = await this.prompt(live, callId, "approval", { command, description, choices: ["once", "session", "always", "deny"], allow_session: true, allow_permanent: true }, Number(cfg()?.approvals?.timeout ?? 120));
 				if (choice === "session" || choice === "always") live.approvedForSession.add(command);
 				return choice || "deny";
 			},
-			setTodos: (sessionId, todos: Todo[]) => {
-				// A plan with new steps is a new plan: it gets its own moment, and Bench keeps its
-				// block there instead of trailing it after the thread. Steps of the same plan
-				// (same ids) only change their status and stay where they were put.
-				const prev = this.store.get(sessionId)?.todos ?? [];
-				const fresh = planFresh(prev, todos);
-				const now = Date.now() / 1000;
-				// One plan, one id: it begins when its steps share nothing with the plan before.
-				const cur = this.store.get(sessionId);
-				const planId = fresh || !cur?.plan_id ? randomUUID() : cur.plan_id;
-				this.store.update(sessionId, { todos, ...(fresh ? { todos_at: now, plan_id: planId } : {}) });
-				const at = fresh ? now : cur?.todos_at ?? 0;
-				const live = this.live.get(sessionId);
-				if (live) {
-					live.row.todos = todos;
-					// The plan's snapshots join the journal at the turn that wrote them; Bench merges
-					// them by id into one card that ticks in place, nowhere else.
-					void live.conversation.submit({ type: "write", entry: { kind: "bench.plan", data: { id: planId, todos } } } as any, ctx);
-				}
-				this.emit(sessionId, "todo.updated", { todos, at });
-			},
-			todos: (sessionId) => this.store.get(sessionId)?.todos ?? [],
 			emit: (sessionId, type, payload) => this.emit(sessionId, type, payload),
 			search: (query, limit, profile) =>
 				this.store.search(query, limit, profile).map((h) => ({ session_id: h.session_id, title: this.store.get(h.session_id)?.title ?? "", snippet: h.snippet, when: new Date(h.ts * 1000).toISOString() })),

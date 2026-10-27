@@ -27,8 +27,8 @@ pub enum Row {
         /// The live run's holds (the person's pauses): its clock skips them, and the last one
         /// open means it stands held. Empty for finished work.
         holds: Vec<Hold>,
-        /// The agent's plans written in this work: (id, the newest snapshot of its steps).
-        plan: Vec<(String, Vec<PlanStep>)>,
+        /// The plan this work keeps: its first `todo` call's id, and the steps of its newest.
+        plan: Option<(String, Vec<PlanStep>)>,
         /// The agent's questions put in this work, settled or still waiting.
         asks: Vec<AskCard>,
     },
@@ -122,8 +122,8 @@ impl Step {
     }
 }
 
-/// The plan and the questions are journal items of the turn that wrote them; no side state,
-/// no dates: the journal alone says where they stand.
+/// Every row stands on a journal item; the plan and the questions are the agent's own calls
+/// (`todo`, `clarify`) inside the work that made them (docs/thread-objects.md).
 pub(crate) fn rows_of(
     log: &[ThreadItem],
     inserts: &Map<String, Value>,
@@ -135,40 +135,16 @@ pub(crate) fn rows_of(
     queue: &[QueuedItem],
     sent_queue: &[String],
 ) -> Vec<Row> {
-    // The agent's own words about what it is doing are notes on the work line; the words of
-    // a message that ends its turn are the answer. Pi settles this at the entry itself: the
-    // message that called a tool is narration (its `narration` flag), the one that didn't is
-    // the answer — no guessing from position, so an answer never flashes and folds away.
-    // The flag only arrives with the agent's items; an older journal's texts are judged by
-    // what the journal still holds after them: a turn's last words answer, however much
-    // the turn acted before (Pi commits them under one seq).
-    let mut actions_left: HashMap<u64, usize> = HashMap::new();
-    for i in log {
-        if matches!(i, ThreadItem::Tool { .. } | ThreadItem::Thought { .. }) {
-            *actions_left.entry(i.seq()).or_default() += 1;
-        }
-    }
-    // Each plan lives once: its place is its first snapshot, its steps the newest one. Each
-    // question too, with the answer the journal has for it.
-    let mut plan_first: HashMap<&str, u64> = HashMap::new();
-    let mut plan_latest: HashMap<&str, Vec<PlanStep>> = HashMap::new();
-    let mut ask_first: HashMap<&str, u64> = HashMap::new();
-    let mut asked: HashMap<&str, Option<&String>> = HashMap::new();
-    for it in log {
-        match it {
-            ThreadItem::Plan { id, seq, todos, .. } => {
-                plan_first.entry(id).or_insert(*seq);
-                plan_latest.insert(id, todos.clone());
-            }
-            ThreadItem::Ask { id, seq, .. } => {
-                ask_first.entry(id).or_insert(*seq);
-            }
+    // A question's answer is its call's result, which comes later in the journal.
+    let asked: HashMap<&str, &str> = log
+        .iter()
+        .filter_map(|it| match it {
             ThreadItem::Asked { id, answer, .. } => {
-                asked.insert(id, answer.as_ref());
+                Some((id.as_str(), answer.as_deref().unwrap_or("")))
             }
-            _ => {}
-        }
-    }
+            _ => None,
+        })
+        .collect();
     let mut rows = Vec::new();
     let mut work: Option<Row> = None;
     // An insert moved after the n-th message (put while that message waited in the composer):
@@ -188,7 +164,7 @@ pub(crate) fn rows_of(
             to: at,
             live: false,
             holds: vec![],
-            plan: vec![],
+            plan: None,
             asks: vec![],
         });
         if let Row::Work {
@@ -204,8 +180,7 @@ pub(crate) fn rows_of(
             }
         }
     };
-    // The plan and the questions join the work that wrote them: the newest snapshot ticks the
-    // card at its birth place; nothing here is placed by a clock.
+    // The plan and the questions join the work whose calls they are.
     let attach = |work: &mut Option<Row>, key: &str, put: &dyn Fn(&mut Row)| {
         let w = work.get_or_insert_with(|| Row::Work {
             key: key.to_string(),
@@ -214,12 +189,12 @@ pub(crate) fn rows_of(
             to: None,
             live: false,
             holds: vec![],
-            plan: vec![],
+            plan: None,
             asks: vec![],
         });
         put(w);
     };
-    for (idx, it) in log.iter().enumerate() {
+    for it in log {
         match it {
             ThreadItem::User { key, text, at, .. } => {
                 close(&mut rows, &mut work);
@@ -231,35 +206,20 @@ pub(crate) fn rows_of(
                     at: *at,
                 });
             }
-            ThreadItem::Thought {
-                key, seq, text, at, ..
-            } => {
-                *actions_left.entry(*seq).or_default() = actions_left
-                    .get(seq)
-                    .copied()
-                    .unwrap_or(0)
-                    .saturating_sub(1);
+            ThreadItem::Thought { key, text, at, .. } => {
                 step(&mut work, key, *at, Step::Thought(text.clone()))
             }
             ThreadItem::Text {
                 key,
-                seq,
                 text,
                 at,
                 error,
                 narration,
+                ..
             } => {
-                let on_the_way = match narration {
-                    // The agent said what this message's words are; nothing to guess.
-                    Some(n) => *n,
-                    // An agent too old to say: what the journal still holds after them, and
-                    // a live run's trailing text, are the old signs of words on the way.
-                    None => {
-                        actions_left.get(seq).copied().unwrap_or(0) > 0
-                            || (running && idx + 1 == log.len())
-                    }
-                };
-                if error.is_none() && on_the_way {
+                // The words of a message that also called a tool are notes on the way; the
+                // agent reads this from the entry's own blocks (`narration`), nothing is guessed.
+                if error.is_none() && narration.unwrap_or(false) {
                     step(&mut work, key, *at, Step::Note(text.clone()));
                 } else {
                     close(&mut rows, &mut work);
@@ -272,7 +232,6 @@ pub(crate) fn rows_of(
             }
             ThreadItem::Tool {
                 key,
-                seq,
                 call_id,
                 name,
                 args,
@@ -280,11 +239,6 @@ pub(crate) fn rows_of(
                 at,
                 ..
             } => {
-                *actions_left.entry(*seq).or_default() = actions_left
-                    .get(seq)
-                    .copied()
-                    .unwrap_or(0)
-                    .saturating_sub(1);
                 step(
                     &mut work,
                     key,
@@ -369,21 +323,19 @@ pub(crate) fn rows_of(
                     text: text.clone(),
                 });
             }
-            // The plan and the questions are parts of the work that wrote them: the card stands
-            // where its first snapshot was written and ticks from the newest one.
-            ThreadItem::Plan { key, seq, id, .. } if plan_first.get(id.as_str()) == Some(seq) => {
-                let todos = plan_latest.get(id.as_str()).cloned().unwrap_or_default();
-                let key = key.clone();
-                let id = id.clone();
-                attach(&mut work, &key, &|w| {
+            // The plan is the work's first `todo` call; a later one in the same work ticks it.
+            ThreadItem::Plan { key, id, todos, .. } => {
+                attach(&mut work, key, &|w| {
                     if let Row::Work { plan, .. } = w {
-                        plan.push((id.clone(), todos.clone()));
+                        match plan {
+                            Some((_, steps)) => *steps = todos.clone(),
+                            None => *plan = Some((id.clone(), todos.clone())),
+                        }
                     }
                 });
             }
             ThreadItem::Ask {
                 key,
-                seq,
                 id,
                 ask_kind,
                 question,
@@ -391,7 +343,7 @@ pub(crate) fn rows_of(
                 choices,
                 multi,
                 ..
-            } if ask_first.get(id.as_str()) == Some(seq) => {
+            } => {
                 let card = AskCard {
                     id: id.clone(),
                     ask_kind: ask_kind.clone(),
@@ -399,16 +351,15 @@ pub(crate) fn rows_of(
                     detail: detail.clone(),
                     choices: choices.clone(),
                     multi: *multi,
-                    answer: asked.get(id.as_str()).copied().flatten().cloned(),
+                    answer: asked.get(id.as_str()).map(|a| a.to_string()),
                 };
-                let key = key.clone();
-                attach(&mut work, &key, &|w| {
+                attach(&mut work, key, &|w| {
                     if let Row::Work { asks, .. } = w {
                         asks.push(card.clone());
                     }
                 });
             }
-            ThreadItem::Plan { .. } | ThreadItem::Ask { .. } | ThreadItem::Asked { .. } => {}
+            ThreadItem::Asked { .. } => {}
         }
     }
     // What the model is thinking now: a step of the work in progress, folded with it like the
@@ -450,7 +401,7 @@ pub(crate) fn rows_of(
             to: None,
             live: true,
             holds: holds.to_vec(),
-            plan: vec![],
+            plan: None,
             asks: vec![],
         });
     }

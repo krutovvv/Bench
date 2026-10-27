@@ -464,7 +464,7 @@ impl ThreadView {
                 to,
                 live,
                 &holds,
-                &plan,
+                plan.as_ref(),
                 &asks,
                 live && !self.thread.processes.is_empty(),
                 // The answer that follows this work: its read-aloud and copy ride this

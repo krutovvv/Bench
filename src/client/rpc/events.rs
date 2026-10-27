@@ -140,8 +140,7 @@ pub(super) fn on_event(p: &Value, emit: &impl Fn(Evt)) {
             detail: payload["context"].as_str().unwrap_or_default().to_string(),
             session: sid,
         }),
-        // A todo `tool.complete` repeats the plan: it needs no notice — the plan is journal
-        // items now (`bench.plan`), and the commit already carried them to the thread.
+        // A `todo` call's completion needs no notice: the plan is the call itself, in the journal.
         "tool.complete" => emit(Evt::ToolDone { session: sid }),
         kind if kind.starts_with("thread.") => {
             if let Some(e) = protocol::ThreadEvent::parse(kind, payload) {
@@ -154,6 +153,17 @@ pub(super) fn on_event(p: &Value, emit: &impl Fn(Evt)) {
                 .or(payload["request_id"].as_str())
                 .unwrap_or_default()
                 .to_string(),
+            command: payload["command"].as_str().unwrap_or_default().to_string(),
+            description: payload["description"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+            choices: payload["choices"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|c| c.as_str().map(str::to_string))
+                .collect(),
             session: sid,
         })),
         "approval.settled" | "approval.cancelled" | "approval.received" => {

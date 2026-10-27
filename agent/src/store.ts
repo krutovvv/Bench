@@ -1,16 +1,9 @@
-// bench-agent's session index: what Bench lists and searches (titles, sources, folders, the
-// plan, a searchable copy of the text). The transcripts themselves are Pi Durable's, in pi.sqlite.
+// bench-agent's session index: what Bench lists and searches (titles, sources, folders, a
+// searchable copy of the text). The transcripts themselves are Pi Durable's, in pi.sqlite.
 
 import type { DatabaseSync } from "node:sqlite";
 import { db } from "./config.ts";
 import { speedOf, totalsOf, type SpeedStat, type Totals } from "./usage.ts";
-
-export interface Todo {
-	id: string;
-	content: string;
-	status: "pending" | "in_progress" | "completed" | "cancelled";
-	parent?: string;
-}
 
 export interface SessionRow {
 	id: string;
@@ -25,14 +18,6 @@ export interface SessionRow {
 	created: number;
 	updated: number;
 	message_count: number;
-	todos: Todo[];
-	/** When the plan in `todos` started (unix seconds): where Bench puts its block in the
-	 *  thread. 0 = no plan of note. */
-	todos_at: number;
-	/** Identity of the plan in `todos` (the `todo` tool): one id while a plan lives, a new one
-	 *  when its steps share nothing with the plan before. Bench merges the journal's snapshots
-	 *  of one id into a single card. "" = no plan written yet. */
-	plan_id: string;
 	chat_id?: string;
 	display_name?: string;
 	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:local", "folder:<path>"; "" = a plain chat. */
@@ -56,7 +41,7 @@ export class Store {
 				id TEXT PRIMARY KEY, conversation TEXT NOT NULL, profile TEXT NOT NULL, title TEXT DEFAULT '',
 				source TEXT DEFAULT 'local', cwd TEXT DEFAULT '', model TEXT DEFAULT '', provider TEXT DEFAULT '',
 				effort TEXT DEFAULT '', created REAL, updated REAL, message_count INTEGER DEFAULT 0,
-				todos TEXT DEFAULT '[]', todos_at REAL DEFAULT 0, usage TEXT DEFAULT '',
+				usage TEXT DEFAULT '',
 				speed TEXT DEFAULT '',
 				chat_id TEXT, display_name TEXT,
 				deleted INTEGER DEFAULT 0
@@ -73,12 +58,6 @@ export class Store {
 			try {
 				this.db.exec(`ALTER TABLE sessions ADD COLUMN ${col} TEXT DEFAULT ''`);
 			} catch {}
-		try {
-			this.db.exec("ALTER TABLE sessions ADD COLUMN todos_at REAL DEFAULT 0");
-		} catch {}
-		try {
-			this.db.exec("ALTER TABLE sessions ADD COLUMN plan_id TEXT DEFAULT ''");
-		} catch {}
 		// Pi's conversation ids are integers; early rows kept them as "125.0".
 		this.db.exec("UPDATE sessions SET conversation = CAST(CAST(conversation AS REAL) AS INTEGER) WHERE conversation LIKE '%.%'");
 	}
@@ -96,11 +75,13 @@ export class Store {
 		} catch {
 			speed = speedOf(null);
 		}
-		return { ...r, todos: JSON.parse(r.todos || "[]"), todos_at: r.todos_at ?? 0, plan_id: r.plan_id ?? "", usage, speed };
+		// The plan is the journal's (the `todo` calls), not the row's: old rows' columns stay unread.
+		const { todos: _t, todos_at: _a, plan_id: _p, ...rest } = r;
+		return { ...rest, usage, speed };
 	}
 
 	create(
-		s: Omit<SessionRow, "created" | "updated" | "message_count" | "todos" | "todos_at" | "plan_id" | "title" | "usage" | "speed"> & { title?: string },
+		s: Omit<SessionRow, "created" | "updated" | "message_count" | "title" | "usage" | "speed"> & { title?: string },
 	): SessionRow {
 		const now = Date.now() / 1000;
 		this.db

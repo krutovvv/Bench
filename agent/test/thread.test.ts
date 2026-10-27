@@ -57,16 +57,22 @@ test("a tool result, an insert, a fail note; compaction and system entries are n
 	assert.deepEqual(itemsOf({ id: 14, kind: "pi.system", model: [{ role: "user", content: "x" }] }), []);
 });
 
-test("the plan, the questions and their answers are journal items of their own", () => {
-	assert.deepEqual(itemsOf({ id: 12, kind: "bench.plan", data: { id: "p1", todos: [{ id: "1", content: "a", status: "in_progress" }, { id: "2", content: "b", status: "pending", parent: "1" }] } }), [
-		{ key: "12", seq: 12, kind: "plan", id: "p1", todos: [{ id: "1", content: "a", status: "in_progress" }, { id: "2", content: "b", status: "pending", parent: "1" }] },
-	]);
-	assert.deepEqual(itemsOf({ id: 13, kind: "bench.ask", data: { id: "q1", ask_kind: "clarify", question: "Which?", choices: ["a", "b"], multi: false } }), [
-		{ key: "13", seq: 13, kind: "ask", id: "q1", ask_kind: "clarify", question: "Which?", choices: ["a", "b"], multi: false },
-	]);
-	assert.deepEqual(itemsOf({ id: 14, kind: "bench.asked", data: { id: "q1", answer: "a" } }), [{ key: "14", seq: 14, kind: "asked", id: "q1", answer: "a" }]);
-	// a decline is an empty answer, kept as it is
-	assert.deepEqual(itemsOf({ id: 15, kind: "bench.asked", data: { id: "q1", answer: "" } }), [{ key: "15", seq: 15, kind: "asked", id: "q1", answer: "" }]);
+test("the plan and the questions are their own calls in the journal: todo, clarify and its result", () => {
+	const todos = [{ id: "1", content: "a", status: "in_progress" }, { id: "2", content: "b", status: "pending", parent: "1" }];
+	const items = itemsOf(assistant(12, [{ type: "toolCall", id: "c1", name: "todo", arguments: { todos } }, { type: "toolCall", id: "c2", name: "clarify", arguments: { question: "Which?", choices: ["a", "b"] } }]));
+	assert.deepEqual(
+		items.filter((i: any) => i.kind !== "tool"),
+		[
+			{ key: "12.1", seq: 12, kind: "plan", id: "c1", todos },
+			{ key: "12.3", seq: 12, kind: "ask", id: "c2", ask_kind: "clarify", question: "Which?", choices: ["a", "b"], multi: false },
+		],
+	);
+	assert.equal(items.filter((i: any) => i.kind === "tool").length, 2, "each call is still a step of the work");
+	const answered = itemsOf({ id: 14, kind: "pi.tool-result", model: [{ role: "toolResult", toolCallId: "c2", toolName: "clarify", content: [{ type: "text", text: "{}" }], details: { answer: "a" } }] });
+	assert.deepEqual(answered.at(-1), { key: "14.1", seq: 14, kind: "asked", id: "c2", answer: "a" });
+	// a decline, or no answer, is an empty one
+	const declined = itemsOf({ id: 15, kind: "pi.tool-result", model: [{ role: "toolResult", toolCallId: "c2", toolName: "clarify", content: [], details: { answer: null } }] });
+	assert.deepEqual(declined.at(-1), { key: "15.1", seq: 15, kind: "asked", id: "c2", answer: "" });
 });
 
 test("how often the thread was compacted comes from its journal", () => {

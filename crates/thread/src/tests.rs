@@ -18,7 +18,8 @@ fn text(seq: u64, sub: u32, t: &str) -> ThreadItem {
         text: t.into(),
         at: Some(seq as f64 * 1000.),
         error: None,
-        narration: None,
+        // The agent marks every text: these are the words of a message that called nothing.
+        narration: Some(false),
     }
 }
 /// The agent's own marking: words of a message that also called a tool (Pi's signal).
@@ -120,8 +121,8 @@ fn kinds(rows: &[Row]) -> Vec<String> {
                     steps.iter().filter(|s| s.is_tool()).count(),
                     if *live { "+" } else { "" }
                 );
-                if !plan.is_empty() {
-                    s += &format!("·p{}", plan.len());
+                if plan.is_some() {
+                    s += "·p";
                 }
                 if !asks.is_empty() {
                     s += &format!(
@@ -146,7 +147,7 @@ fn a_turn_is_message_work_answer() {
     let t = Thread::open(ThreadOpen {
         items: vec![
             user(1, "go"),
-            text(2, 0, "Looking."),
+            narr(2, 0, "Looking."),
             tool(2, 1, "a"),
             result(3, "a"),
             tool(4, 0, "b"),
@@ -177,13 +178,29 @@ fn a_turn_is_message_work_answer() {
 
 /// The plan lives in the work that wrote it: journal items, merged by id into one card that
 /// ticks in place as newer snapshots come. No dates, no floating row, nothing to move.
+/// The plan is the work's own `todo` calls: the card stands on the first of them and shows the
+/// newest. The next piece of work keeps a card of its own; the earlier one stays as it ended.
 #[test]
 fn rule_1_the_plan_lives_in_the_work_that_wrote_it() {
+    let steps = |t: &Thread, k: usize| match &t.rows()[k] {
+        Row::Work {
+            plan: Some((id, steps)),
+            ..
+        } => (
+            id.clone(),
+            steps.iter().map(|s| s.status.clone()).collect::<Vec<_>>(),
+        ),
+        r => panic!("no plan on {r:?}"),
+    };
     let mut t = Thread::open(ThreadOpen {
         items: vec![
             user(1, "go"),
             tool(2, 0, "a"),
-            plan(3, "p", &[("1", "dig", "in_progress")]),
+            plan(
+                3,
+                "c1",
+                &[("1", "dig", "in_progress"), ("2", "haul", "pending")],
+            ),
             tool(4, 0, "b"),
         ],
         running: true,
@@ -192,28 +209,29 @@ fn rule_1_the_plan_lives_in_the_work_that_wrote_it() {
     });
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "work:2+·p1", "queued:later"],
+        ["user:go", "work:2+·p", "queued:later"],
         "the plan is part of its work, not a row of its own"
     );
-    // Ticking: a newer snapshot of the same plan stamps the same card, in place.
+    // The next `todo` call of the same work ticks the same card, in place.
     t.apply(ThreadEvent::Append(vec![plan(
         5,
-        "p",
+        "c2",
         &[("1", "dig", "completed"), ("2", "haul", "in_progress")],
     )]));
-    assert_eq!(kinds(&t.rows()), ["user:go", "work:2+·p1", "queued:later"]);
-    let Row::Work { plan: cards, .. } = &t.rows()[1] else {
-        panic!()
-    };
-    assert_eq!(cards[0].1.len(), 2, "the card shows the newest snapshot");
-    // A message taken up mid-run splits the work: the plan keeps living on the card it was
-    // born on, ticking there — it does not repeat below.
+    assert_eq!(kinds(&t.rows()), ["user:go", "work:2+·p", "queued:later"]);
+    assert_eq!(
+        steps(&t, 1),
+        ("c1".into(), vec!["completed".into(), "in_progress".into()]),
+        "the card keeps its first call's id and shows the newest steps"
+    );
+    // A message taken up mid-run starts another piece of work. The first card stays as its
+    // work left it; a `todo` call now is a card of the new work.
     t.apply(ThreadEvent::Append(vec![
         user(7, "and hurry"),
         tool(8, 0, "c"),
         plan(
             9,
-            "p",
+            "c3",
             &[("1", "dig", "completed"), ("2", "haul", "completed")],
         ),
     ]));
@@ -221,42 +239,27 @@ fn rule_1_the_plan_lives_in_the_work_that_wrote_it() {
         kinds(&t.rows()),
         [
             "user:go",
-            "work:2·p1",
+            "work:2·p",
             "user:and hurry",
-            "work:1+",
-            "queued:later"
-        ],
-        "one plan, one card, where it was born"
-    );
-    let Row::Work { plan: cards, .. } = &t.rows()[1] else {
-        panic!()
-    };
-    assert_eq!(cards[0].1[1].status, "completed");
-    // Another plan, sharing no steps: a card of its own, on the work going on now.
-    t.apply(ThreadEvent::Append(vec![plan(
-        10,
-        "q",
-        &[("1", "another", "pending")],
-    )]));
-    assert_eq!(
-        kinds(&t.rows()),
-        [
-            "user:go",
-            "work:2·p1",
-            "user:and hurry",
-            "work:1+·p1",
+            "work:1+·p",
             "queued:later"
         ]
     );
+    assert_eq!(
+        steps(&t, 1).1,
+        ["completed", "in_progress"],
+        "the first card did not move"
+    );
+    assert_eq!(steps(&t, 3).1, ["completed", "completed"]);
     // The run ends: the cards stay — they say what those turns worked through.
     t.apply(ThreadEvent::Run(false));
     assert_eq!(
         kinds(&t.rows()),
         [
             "user:go",
-            "work:2·p1",
+            "work:2·p",
             "user:and hurry",
-            "work:1·p1",
+            "work:1·p",
             "queued:later"
         ]
     );
@@ -329,15 +332,13 @@ fn rule_1_journal_then_writing_then_queue() {
         kinds(&t.rows()),
         ["user:go", "work:1+", "writing:Half", "queued:later"]
     );
-    // The answer's entry, while the run is still live, rides the work line: another call
-    // may follow it, and a half-answer that later turns into notes must not flash as one.
+    // The answer's entry (a message that called nothing) is the answer at once, in the seat
+    // it was written in, though the run still lives; the work above it is done.
     t.apply(ThreadEvent::Append(vec![text(3, 0, "Half done.")]));
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "work:1+", "queued:later"],
-        "the words are on the way"
+        ["user:go", "work:1", "answer:Half done.", "queued:later"]
     );
-    // The run ends: those same words are the answer, and the work above it is done.
     t.apply(ThreadEvent::Run(false));
     assert_eq!(
         kinds(&t.rows()),
@@ -694,11 +695,7 @@ fn the_agent_s_marks_decide_without_guessing() {
         ..Default::default()
     });
     assert_eq!(kinds(&t.rows()), ["user:go", "work:1+"]);
-    let mut marked: ThreadItem = text(3, 0, "All green.");
-    if let ThreadItem::Text { narration, .. } = &mut marked {
-        *narration = Some(false);
-    }
-    t.apply(ThreadEvent::Append(vec![marked]));
+    t.apply(ThreadEvent::Append(vec![text(3, 0, "All green.")]));
     // The answer of a message that called nothing shows at once, though the run is live.
     // The closed line of work is done; the answer shows at once, though the run is live.
     assert_eq!(kinds(&t.rows()), ["user:go", "work:1", "answer:All green."]);
@@ -769,7 +766,7 @@ fn words_before_a_call_are_notes_on_the_work_line() {
     let t = Thread::open(ThreadOpen {
         items: vec![
             user(1, "fix it"),
-            text(2, 0, "Reading the test first."),
+            narr(2, 0, "Reading the test first."),
             tool(2, 1, "a"),
         ],
         ..ThreadOpen::default()
@@ -809,7 +806,7 @@ fn words_appended_mid_run_join_their_turn_as_a_note() {
     t.apply(ThreadEvent::Run(true));
     t.apply(ThreadEvent::Append(vec![thought(2, 0, "hm")]));
     t.apply(ThreadEvent::Append(vec![tool(2, 1, "a")]));
-    t.apply(ThreadEvent::Append(vec![text(
+    t.apply(ThreadEvent::Append(vec![narr(
         2,
         9,
         "Reading the test first.",
