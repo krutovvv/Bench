@@ -85,6 +85,7 @@ icons! {
     PanelLeft => "panel-left",
     PanelRight => "panel-right",
     FolderTree => "folder-tree",
+    FileDiff => "file-diff",
     MessagesSquare => "messages-square",
     Paperclip => "paperclip",
     Pencil => "pencil",

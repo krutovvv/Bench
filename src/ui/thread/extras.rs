@@ -246,36 +246,21 @@ impl BenchApp {
                     .into_any_element()
             })
             .collect();
-        let head = crate::ui::block_head(&theme, open)
-            .id("procs-head")
-            // As short as the thread's other small rows, not as tall as a block's head.
-            .h(px(crate::ui::CHIP_H))
-            .gap_1p5()
-            .cursor_pointer()
-            .hover(|s| s.text_color(theme.foreground))
-            .child(
-                if open {
-                    Ico::ChevronDown
-                } else {
-                    Ico::ChevronRight
-                }
-                .icon()
-                .xsmall(),
-            )
-            .child(Ico::Terminal.icon().xsmall())
-            .child(
-                div()
-                    .flex_none()
-                    .child(format!("BACKGROUND · {}", bits.join(" · "))),
-            )
-            .when(running > 0, |d| d.child(Ico::Loader.live(false)))
-            .when(!open, |d| d.child(div().flex_1()))
-            .on_click(cx.listener(|this, _, _, cx| {
-                // Folding is the thread's own click: it must not pull the focus to the composer.
-                this.click_claimed = true;
-                this.processes_open = !this.processes_open;
-                cx.notify();
-            }));
+        let head = bench_ui::fold_head(
+            "procs-head",
+            open,
+            Some(Ico::Terminal),
+            format!("Background · {}", bits.join(" · ")),
+            cx,
+        )
+        .when(running > 0, |d| d.child(Ico::Loader.live(false)))
+        .when(!open, |d| d.child(div().flex_1()))
+        .on_click(cx.listener(|this, _, _, cx| {
+            // Folding is the thread's own click: it must not pull the focus to the composer.
+            this.click_claimed = true;
+            this.processes_open = !this.processes_open;
+            cx.notify();
+        }));
         let frame = v_flex()
             .id("procs-block")
             .w_full()
@@ -390,56 +375,52 @@ impl BenchApp {
                                 .child("written"),
                         )
                     })
-                    // In Zed, the code editor beside Bench.
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        let host = this.thread_host();
-                        this.open_in_zed(&open, None, Some(host.as_str()), cx)
+                    // Beside the thread, in the right dock (Zed from its head).
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        let project = match this.thread_project.as_str() {
+                            "" => "general".to_string(),
+                            p => p.to_string(),
+                        };
+                        let machine = this.location(&project).files_machine();
+                        let f = crate::explorer::FileRef {
+                            project,
+                            machine,
+                            path: open.clone(),
+                        };
+                        this.open_beside(f, window, cx)
                     }))
                     .into_any_element()
             })
             .collect();
         Some(
             v_flex()
+                .bg(theme.background)
                 .border_1()
                 .rounded_md()
                 .border_color(theme.border)
+                .overflow_hidden()
                 // Folded by default: one line with the totals; a click lists the files.
                 .child(
-                    h_flex()
-                        .id("files-head")
-                        // As tall as a source chip (px_1p5 py_0p5 around text_xs).
-                        .px_1p5()
-                        .py_0p5()
-                        .gap_1p5()
-                        .items_center()
-                        .text_base()
-                        .text_color(theme.muted_foreground)
-                        .cursor_pointer()
-                        .hover(|s| s.text_color(theme.foreground))
-                        .when(open, |d| d.border_b_1().border_color(theme.border))
-                        .child(
-                            if open {
-                                Ico::ChevronDown
-                            } else {
-                                Ico::ChevronRight
-                            }
-                            .icon()
-                            .xsmall(),
-                        )
-                        .child(format!(
-                            "CHANGED FILES · {}",
+                    bench_ui::fold_head(
+                        "files-head",
+                        open,
+                        Some(Ico::FileDiff),
+                        format!(
+                            "Changed files · {}",
                             plural(count, "file", "files", "files")
-                        ))
-                        .when(all_add > 0, |d| {
-                            d.child(div().text_color(theme.success).child(format!("+{all_add}")))
-                        })
-                        .when(all_del > 0, |d| {
-                            d.child(div().text_color(theme.danger).child(format!("−{all_del}")))
-                        })
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.files_open = !this.files_open;
-                            cx.notify();
-                        })),
+                        ),
+                        cx,
+                    )
+                    .when(all_add > 0, |d| {
+                        d.child(div().text_color(theme.success).child(format!("+{all_add}")))
+                    })
+                    .when(all_del > 0, |d| {
+                        d.child(div().text_color(theme.danger).child(format!("−{all_del}")))
+                    })
+                    .on_click(cx.listener(|this, _, _, cx| {
+                        this.files_open = !this.files_open;
+                        cx.notify();
+                    })),
                 )
                 .children(rows)
                 .into_any_element(),

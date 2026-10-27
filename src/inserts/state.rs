@@ -53,6 +53,17 @@ impl BenchApp {
         let Some(kind) = kind_of(&key) else {
             return;
         };
+        // An insert shows once the agent has written it into the thread: with no agent yet (just
+        // started, or reconnecting) it would wait unseen.
+        if self.profile.is_none() {
+            self.toast(
+                gpui_kit::component::notification::NotificationType::Info,
+                "The agent is not connected yet",
+                window,
+                cx,
+            );
+            return;
+        }
         let thread = self.thread_key();
         // A message may be waiting in the composer: then the insert belongs after it, and only
         // `send` knows that message's place. Until then it shows at the thread's end.

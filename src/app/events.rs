@@ -224,6 +224,17 @@ impl BenchApp {
                     self.history_error = Some(why);
                 }
             }
+            // Not made: the next insert or message tries again (until now a failed create kept the
+            // new thread waiting for a session that never came, until another thread was opened).
+            Evt::CreateFailed(e) => {
+                self.creating = false;
+                self.toast(
+                    NotificationType::Error,
+                    format!("The thread wasn't created: {e}"),
+                    window,
+                    cx,
+                );
+            }
             Evt::InsertFailed(sid, e) => {
                 self.toast(
                     NotificationType::Error,

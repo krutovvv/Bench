@@ -78,3 +78,33 @@ pub fn empty_state(text: impl Into<SharedString>, cx: &App) -> Div {
         .text_color(cx.theme().muted_foreground)
         .child(text.into())
 }
+
+/// A foldable block's head, the same in every block of the thread (an insert, the background
+/// processes, the changed files): the chevron, an icon, the title in the head's plain text; what
+/// follows (counts, actions) is the caller's.
+pub fn fold_head(
+    id: impl Into<ElementId>,
+    open: bool,
+    icon: Option<Ico>,
+    title: impl Into<SharedString>,
+    cx: &App,
+) -> Stateful<Div> {
+    let theme = cx.theme();
+    let fg = theme.foreground;
+    block_head(theme, open)
+        .id(id)
+        .gap_1p5()
+        .cursor_pointer()
+        .hover(move |s| s.text_color(fg))
+        .child(
+            if open {
+                Ico::ChevronDown
+            } else {
+                Ico::ChevronRight
+            }
+            .icon()
+            .xsmall(),
+        )
+        .children(icon.map(|i| i.icon().xsmall()))
+        .child(div().flex_none().child(title.into()))
+}

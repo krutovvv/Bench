@@ -267,7 +267,7 @@ impl BenchApp {
                 this.patch_insert(&fold_id, serde_json::json!({ "folded": !folded }), cx);
             }));
         let title_el: AnyElement = if switches.is_empty() {
-            div().px_1().italic().child(title).into_any_element()
+            div().px_1().child(title).into_any_element()
         } else {
             let view = cx.entity();
             let ins_id = ins.id.clone();
