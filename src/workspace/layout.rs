@@ -67,6 +67,7 @@ impl Render for BenchApp {
         }
         if self.demo {
             self.demo_hooks(window, cx);
+            self.drop_probe(window, cx);
         }
         // The server browser's stream follows what is on screen (no frames for a hidden thread).
         #[cfg(not(target_family = "wasm"))]
@@ -76,17 +77,9 @@ impl Render for BenchApp {
         }
         let theme = cx.theme().clone();
         let body = match self.center {
-            // Files dropped anywhere on the chat or the input are attached.
-            Center::Chat => v_flex()
-                .id("chat-drop")
+            Center::Chat => div()
                 .size_full()
-                .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
-                .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
-                    let paths = paths.paths().to_vec();
-                    this.active_thread
-                        .update(cx, |v, cx| v.add_attachments(paths, cx))
-                }))
-                .child(div().flex_1().min_h_0().child(self.active_thread.clone()))
+                .child(self.active_thread.clone())
                 .into_any_element(),
             Center::Providers => self.render_providers(cx),
             Center::NewProject => self.render_project_form(cx),

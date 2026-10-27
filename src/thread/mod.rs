@@ -182,6 +182,13 @@ impl ThreadView {
         div()
             .relative()
             .size_full()
+            // A file dropped anywhere on the thread — in the middle, in a dock, beside another —
+            // waits in the composer with the next message (`attachments.rs`).
+            .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
+            .on_drop(cx.listener(|this, paths: &ExternalPaths, _, cx| {
+                let paths = paths.paths().to_vec();
+                this.add_attachments(paths, cx)
+            }))
             .child(
                 v_flex()
                     .id("chat")

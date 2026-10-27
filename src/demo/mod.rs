@@ -8,6 +8,7 @@
 //! a code block, a chart, a diagram, a formula, a video and a voice reply, its sources, the
 //! files it changed, a process still running. The media live in `assets/demo/`.
 
+mod drop;
 mod env;
 mod inserts;
 mod journal;
