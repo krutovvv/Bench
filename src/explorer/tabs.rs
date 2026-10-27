@@ -1,7 +1,7 @@
 //! The center's tabs: dragged to another place (or onto the thread, which takes the file), a
 //! menu each (close this, others, to the left, to the right, the saved, all; copy the path; open
 //! beside; add to the thread), and what is sent from the code to the thread — the selection or
-//! the whole file (⌘L) — as a reference (`app/attachments.rs` `CodeRef`).
+//! the whole file (⌘L) — as a reference (`thread/attachments.rs` `CodeRef`).
 
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;
@@ -9,8 +9,9 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
 
 use super::{DocKey, FileRef};
-use crate::app::{BenchApp, Center, RightPanel};
-use crate::icons::Ico;
+use crate::app::BenchApp;
+use crate::workspace::{Center, RightPanel};
+use bench_ui::icons::Ico;
 
 /// A tab being dragged: what it holds, and what the ghost under the pointer says.
 #[derive(Clone)]
@@ -100,16 +101,16 @@ impl BenchApp {
         let s = d.editor.read(cx);
         let range = s.selected_range();
         let r = if range.is_empty() {
-            crate::app::attachments::CodeRef {
+            crate::thread::attachments::CodeRef {
                 path: f.path.clone(),
                 lines: None,
                 text: None,
             }
         } else {
             let text = s.value().to_string();
-            crate::app::attachments::CodeRef {
+            crate::thread::attachments::CodeRef {
                 path: f.path.clone(),
-                lines: Some(crate::app::attachments::lines_of(&text, range)),
+                lines: Some(crate::thread::attachments::lines_of(&text, range)),
                 text: Some(s.selected_value().to_string()),
             }
         };
@@ -125,7 +126,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         self.add_reference(
-            crate::app::attachments::CodeRef {
+            crate::thread::attachments::CodeRef {
                 path: f.path.clone(),
                 lines: None,
                 text: None,

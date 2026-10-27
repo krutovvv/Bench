@@ -35,10 +35,10 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 
 ## The two cores (read before touching them)
 
-- **The thread** — Pi's journal → `crates/thread` rows → `src/ui/thread/` on `gpui::list`.
+- **The thread** — Pi's journal → `crates/thread` rows → `src/thread/` on `gpui::list`.
   Nothing moves it but the person; rows are remeasured in place, never spliced; the room past
   the end; no flash when an entry replaces what was streamed. `references/build-thread.md`.
-- **Projects and agents** — `ProjectKey` and `Location` (`src/model.rs`), `src/app/places.rs`
+- **Projects and agents** — `ProjectKey` and `Location` (`src/app/model.rs`), `src/app/places.rs`
   the only place that says where a project lives, `src/app/agents.rs` the links to agents;
   the agent works on a project's machine through Pi's `ExecutionEnv` (`agent/src/ssh-env.ts`,
   `confined-env.ts`). `references/build-projects.md`.
@@ -46,19 +46,19 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 ## The shape of every change
 
 - **An element or a size** → `crates/ui` (and the storybook). Never `px(…)` in a screen.
-- **What the thread shows, its order** → `crates/thread` (rules as tests), drawn by `src/ui/thread/`.
+- **What the thread shows, its order** → `crates/thread` (rules as tests), drawn by `src/thread/`.
 - **Where a project lives, a new kind of place** → `src/app/places.rs` + the agent's project row.
 - **A new insert** → a folder in `src/inserts/` (`references/build-insert.md`).
-- **The window's places** → `src/app/workspace.rs` (`SidebarPanel`, `Center`), as Zed's workspace;
+- **The window's places** → `src/workspace/mod.rs` (`SidebarPanel`, `Center`), as Zed's workspace;
   **the Explorer** (a project's files and the agent's texts as an IDE shows them) →
   `src/explorer/`, `docs/explorer.md`.
 - **A project's Settings or parts** → a file in `src/env/` implementing `Section` (its `Home`), a line in `SECTIONS`
   (`src/env/mod.rs`); where it lives: `place.rs`; its data from `/api/projects/<id>/env`.
-- **The sidebar** → `src/ui/sidebar.rs` draws; what is done to a thread or project (menu, pin,
-  color, rename, ⌫⌫, ↑↓) is `src/app/sidebar_items.rs`, marks in `src/app/marks.rs`.
-- **The gear** → `src/ui/providers.rs`: tabs Agents (each agent's models and voice, add/remove a
-  server's agent: `src/app/agent_form.rs`), Presets (`src/app/presets.rs`; defaults in
-  `agent/src/builtin/presets.ts`), Appearance (`src/ui/panels.rs`).
+- **The sidebar** → `src/sidebar/mod.rs` draws; what is done to a thread or project (menu, pin,
+  color, rename, ⌫⌫, ↑↓) is `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs`.
+- **The gear** → `src/settings/mod.rs`: tabs Agents (each agent's models and voice, add/remove a
+  server's agent: `src/settings/agent_form.rs`), Presets (`src/settings/presets.rs`; defaults in
+  `agent/src/builtin/presets.ts`), Appearance (`src/settings/appearance.rs`).
 - **A new area of the agent** → a module in `agent/src/modules/`, a line in `server.ts`.
 - **A tool of the agent** → `agent/src/builtin/<tool>.ts`, listed in `extensions/assistant.ts`;
   through `api.env` it works on the project's machine. Code tools: grep, glob, ls

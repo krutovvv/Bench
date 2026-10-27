@@ -12,7 +12,7 @@ use super::section::{
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
-use crate::rest;
+use crate::client::rest;
 
 /// A scheduled job of the project (the agent's `cron_jobs`): it runs `prompt` in a new thread of
 /// the project on `schedule` ("every 1d", "0 9 * * 1-5", an ISO time for once).
@@ -117,7 +117,7 @@ impl Section for Schedule {
                     label: j.name.clone(),
                     note,
                     icon: (
-                        crate::icons::Ico::Clock,
+                        bench_ui::icons::Ico::Clock,
                         if failed {
                             theme.danger
                         } else if j.enabled {

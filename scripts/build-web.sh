@@ -1,5 +1,5 @@
 #!/bin/bash
-# The browser demo: Bench compiled to WebAssembly, always in demo mode (src/demo.rs), into
+# The browser demo: Bench compiled to WebAssembly, always in demo mode (src/demo/mod.rs), into
 # web/dist/ — a static folder for GitHub Pages or any web server.
 #
 # Needs: rustup target add wasm32-unknown-unknown; cargo install wasm-bindgen-cli --version <the

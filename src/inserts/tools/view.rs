@@ -102,7 +102,7 @@ impl BenchApp {
                 .text_color(theme.muted_foreground)
                 .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
                 .tooltip(|window, cx| Tooltip::new("Copy").build(window, cx))
-                .child(crate::icons::Ico::Copy.icon().small())
+                .child(bench_ui::icons::Ico::Copy.icon().small())
                 .on_click(cx.listener(|this, _, _, cx| this.copy_tool_output(cx)))
                 .into_any_element()
         };
@@ -161,7 +161,7 @@ impl BenchApp {
                             .px_4()
                             .py_3()
                             .text_base()
-                            .child(crate::ui::media::markdown(
+                            .child(crate::media::view::markdown(
                                 "tool-md",
                                 self.tools.preview.clone(),
                             )),
@@ -226,7 +226,7 @@ impl BenchApp {
                         .px_1p5()
                         .py_0p5()
                         .text_sm()
-                        .font_family(crate::theme::MONO)
+                        .font_family(bench_ui::theme::MONO)
                         .border_1()
                         .rounded_md()
                         .border_color(theme.border)
@@ -351,7 +351,7 @@ pub(crate) fn pane_bar(
     cx: &mut Context<BenchApp>,
 ) -> AnyElement {
     let theme = cx.theme();
-    crate::ui::block_head(theme, true)
+    bench_ui::block_head(theme, true)
         .child(div().flex_1().min_w_0().truncate().map(|d| {
             match &error {
                 Some(e) => d.text_color(theme.danger).child(e.clone()),
@@ -466,7 +466,7 @@ pub(crate) fn segmented_tall_owned(
     let theme = cx.theme().clone();
     h_flex()
         .flex_none()
-        .h(px(crate::ui::FIELD_H))
+        .h(px(bench_ui::FIELD_H))
         .border_1()
         .rounded_md()
         .overflow_hidden()

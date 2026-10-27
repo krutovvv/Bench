@@ -18,7 +18,7 @@ Sizes are `bench_ui` names (`crates/ui/src/metrics.rs`); the numbers below are w
 └───────────────────────────────────────────────────────────────┘
 ```
 
-`src/ui/mod.rs` `render_layout`: `h_resizable` with the sidebar a fixed `resizable_panel`
+`src/workspace/layout.rs` `render_layout`: `h_resizable` with the sidebar a fixed `resizable_panel`
 (`sidebar_w`, 200–480, its width kept) and the main column; the status bar under both
 (`render_statusbar`). The column divider is `quiet_divider`: transparent at rest, an accent line
 on hover. A whole project opens in Zed from its menu. The title bar is transparent: the sidebar starts with a 35px strip beside the traffic
@@ -47,7 +47,7 @@ Measure it (`build-verification.md`): the rules' pixel rows must be equal, not "
 
 ## Sidebar
 
-Only projects (`src/ui/sidebar.rs`, order and acts in `src/app/sidebar_items.rs`). Order
+Only projects (`src/sidebar/mod.rs`, order and acts in `src/sidebar/items.rs`). Order
 (`sidebar_groups`, the order ↑ ↓ walk): this Mac's **Host** first with the threads of no
 project (Telegram's, cron's), then each project — pinned projects first, pinned threads first
 inside. A server's Host (its agent's own environment) is followed by that server's projects.
@@ -83,17 +83,17 @@ a row's: New window is the header's.
 
 ## Header strip
 
-`h(36).bg(title_bar).border_b_1().pl_4().pr_2().gap_1()` (`ui/mod.rs` `render_header`): the
+`h(36).bg(title_bar).border_b_1().pl_4().pr_2().gap_1()` (`workspace/layout.rs` `render_header`): the
 title (`flex_1 min_w_0 text_sm` medium, truncate), the project chip (repo · branch when the
 thread works in git, `render_project_chip`), then `render_header_tail`
 (`src/inserts/terminal/form.rs`): New window ⌘⇧N as a `bench_ui::icon_button`. Tasks, servers,
 files and tools are inserts (`build-insert.md`), never header switches. The gear's page has the
 title "Settings" and a close ×; its tabs (Agents, Presets, Appearance) are on the page
-(`src/ui/providers.rs`).
+(`src/settings/mod.rs`).
 
 ## Status bar
 
-`STATUS_H` 29 with its rule, `bg(status_bar)`, `text_sm` (`src/ui/statusbar.rs`). Left: the
+`STATUS_H` 29 with its rule, `bg(status_bar)`, `text_sm` (`src/statusbar/mod.rs`). Left: the
 gateway of the project's machine (always there; its state, log, Reconnect, Restart inside), the
 fallback in red when it answers, then model, context, effort, approvals. Right, icons only:
 background terminals (if any), attach (paperclip), dictate (mic, with a level bar while
@@ -112,7 +112,7 @@ reset on reconnect). Every label and icon `muted_foreground`: the bar is one ton
 
 ## Composer
 
-**Part of the thread**: its last row (the list's tail item, `src/ui/composer.rs`
+**Part of the thread**: its last row (the list's tail item, `src/thread/composer.rs`
 `render_composer`), there from the start, scrolling with the thread. No rule above it, no
 background of its own.
 
@@ -126,12 +126,12 @@ A new thread is an editor's empty file: the caret alone, focused, no avatar unti
 message. The caret is 2px (`vendor/gpui-base`, `CURSOR_WIDTH`).
 
 **The room past the end**: the list scrolls past its last row by exactly as much as puts the
-composer, scrolled to the end, where it stands in a new thread (`src/ui/thread/mod.rs`
+composer, scrolled to the end, where it stands in a new thread (`src/thread/mod.rs`
 `room_past_end`; `build-thread.md`).
 
 **The `/` list** (`render_slash`): under the composer's line, or above it when the window has no
 room below (the list's own height decides). Enter / Tab pick, ↑ ↓ move, Esc closes
-(`src/app/slash.rs`, seen first at the root).
+(`src/thread/slash.rs`, seen first at the root).
 
 **The thread's width**: the window's whole width from its left edge, as an editor's text — no
 cap, no centering.
@@ -149,7 +149,7 @@ a `Section` in `src/env/` with its `Home`.
 
 ## The thread's column
 
-Every row (`src/ui/thread/message.rs` `speaker_row`) is `h_flex().pl(CHAT_LEFT).pr(CHAT_RIGHT)
+Every row (`src/thread/message.rs` `speaker_row`) is `h_flex().pl(CHAT_LEFT).pr(CHAT_RIGHT)
 .py(TURN_Y).gap(14).items_start().text_base()`: a 24px avatar (`bench_ui::avatar`: the person a
 dark disc `foreground 78%` with UserRound; the agent a solid `primary` disc with Bot — both
 solid, a pale disc reads smaller), then the text column `flex_1 min_w_0`. A row following the
@@ -158,7 +158,7 @@ that lines up with the text starts at `CHAT_TEXT` (66) and ends `CHAT_RIGHT` (66
 right: the composer's text, chips, inserts, cards, the plan — measure that they start within
 0.5pt (`build-verification.md`).
 
-Then: the work row ("N actions · time · Done", `src/ui/thread/work.rs`; the live label a
+Then: the work row ("N actions · time · Done", `src/thread/work.rs`; the live label a
 `ShimmerText`; steps unfold into their arguments and output), the Markdown answer split into text
 / files / diagrams (`build-media.md`), and hover actions (copy, read aloud, regenerate on the
 last) floating over the answer's top-right corner (`absolute().top(TURN_Y + 3).right_6()`, on the
@@ -166,9 +166,9 @@ page's background) — never a row of their own.
 
 Code blocks in an answer are a block: a rounded 1px frame, `block_head` with the language on the
 left and Copy on the right, the highlighted code under it, **no fill** (`render_code`,
-`src/ui/media.rs`; recipe `ui-content.md`).
+`src/media/view.rs`; recipe `ui-content.md`).
 
-**The rail** instead of a scrollbar (`src/ui/thread/rail.rs`): absolute in the right gutter,
+**The rail** instead of a scrollbar (`src/thread/rail.rs`): absolute in the right gutter,
 vertically centered, one 10×2 tick per message of the person (pitch 3–8), the one being read in
 the accent, the others muted 35%; hover changes color only and shows the message as a tooltip; a
 click brings it to the top (`list.scroll_to(ListOffset { item_ix, offset_in_item })`). Shown

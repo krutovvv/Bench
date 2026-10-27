@@ -9,7 +9,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::icons::Ico;
+use bench_ui::icons::Ico;
 use crate::inserts::tasks::model::{self as tasks, List, Task, today};
 
 impl BenchApp {
@@ -496,7 +496,7 @@ impl BenchApp {
                         div()
                             .id(("task-project", k))
                             .flex_none()
-                            .h(px(crate::ui::FIELD_H))
+                            .h(px(bench_ui::FIELD_H))
                             .px_2()
                             .flex()
                             .items_center()
@@ -548,7 +548,7 @@ impl BenchApp {
                             .id("task-timer")
                             .flex_none()
                             // As tall as the fields beside it.
-                            .h(px(crate::ui::FIELD_H))
+                            .h(px(bench_ui::FIELD_H))
                             .px_3()
                             .gap_1()
                             .flex()

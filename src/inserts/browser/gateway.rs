@@ -61,7 +61,7 @@ pub struct State {
 
 /// Where the gateway is and this person's key.
 fn access() -> Result<(String, String)> {
-    let file = crate::connection::state_dir().join("browser.json");
+    let file = crate::client::connection::state_dir().join("browser.json");
     let v: Value = serde_json::from_slice(&std::fs::read(&file).map_err(|_| {
         anyhow!(
             "No browser access yet: ask for your key (live.mjs add <name>) and put it in {}",

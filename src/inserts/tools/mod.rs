@@ -10,9 +10,9 @@ use gpui_kit::*;
 use serde_json::json;
 
 use crate::app::BenchApp;
-use crate::app::subjects::tool_key;
+use crate::inserts::subjects::tool_key;
 use crate::inserts::{InsertKind, Switch, clip};
-use crate::model::Insert;
+use crate::app::model::Insert;
 use devtools::{GROUPS, Tool};
 
 /// The tool's least height in the thread (it grows with its text).
@@ -102,7 +102,7 @@ impl InsertKind for Tools {
             e.read(cx).value().lines().count()
         };
         let n = lines(&app.tools.input).max(lines(&app.tools.output)) + 2;
-        let h = (n as f32 * crate::ui::editor_line(cx) + crate::ui::BLOCK_HEAD_H + 24.).max(MIN_H);
+        let h = (n as f32 * bench_ui::editor_line(cx) + bench_ui::BLOCK_HEAD_H + 24.).max(MIN_H);
         Some(
             div()
                 .h(px(h))

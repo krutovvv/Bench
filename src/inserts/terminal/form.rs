@@ -4,7 +4,7 @@ use gpui_kit::component::h_flex;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::icons::Ico;
+use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// The header's right end: a new window.

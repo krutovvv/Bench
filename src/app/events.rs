@@ -4,7 +4,7 @@ use gpui_kit::component::IndexPath;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use crate::gateway::{Cmd, Evt};
+use crate::client::rpc::{Cmd, Evt};
 
 use super::*;
 
@@ -177,7 +177,7 @@ impl BenchApp {
                 if !self.sessions.iter().any(|s| s.id == session) {
                     self.sessions.insert(
                         0,
-                        crate::model::SessionRow {
+                        crate::app::model::SessionRow {
                             id: session.clone(),
                             title: "Untitled".into(),
                             messages: 0,
@@ -314,7 +314,7 @@ impl BenchApp {
                     if let Some(out) = output.filter(|o| !o.trim().is_empty()) {
                         self.toast(
                             NotificationType::Info,
-                            crate::ui::clip(&out, 300),
+                            bench_ui::clip(&out, 300),
                             window,
                             cx,
                         );
@@ -372,7 +372,7 @@ impl BenchApp {
                         .find(|l| !l.is_empty())
                         .unwrap_or("Done");
                     let id = self.session.clone().unwrap_or_default();
-                    crate::notify::post(&id, &self.current_title(), &crate::ui::clip(first, 140));
+                    crate::system::notify::post(&id, &self.current_title(), &bench_ui::clip(first, 140));
                 }
                 self.live = None;
                 self.speed.finish();
@@ -399,20 +399,20 @@ impl BenchApp {
     /// One of the person's own chats (not Telegram, cron or API) went from working to done in a
     /// sessions refresh, and it isn't the one on screen: a notification. The open chat is told
     /// by its own `Complete` (with the answer's first line).
-    pub(crate) fn notify_finished(&self, rows: &[crate::model::SessionRow]) {
+    pub(crate) fn notify_finished(&self, rows: &[crate::app::model::SessionRow]) {
         for old in self.sessions.iter().filter(|s| s.running) {
             let done = rows
                 .iter()
                 .find(|r| r.id == old.id)
                 .is_some_and(|r| !r.running);
-            let own = crate::model::source_label(&old.source) == "Bench";
+            let own = crate::app::model::source_label(&old.source) == "Bench";
             if done && own && self.session.as_deref() != Some(old.id.as_str()) {
                 let title = if old.title.is_empty() {
                     "Bench"
                 } else {
                     &old.title
                 };
-                crate::notify::post(&old.id, title, "The agent finished");
+                crate::system::notify::post(&old.id, title, "The agent finished");
             }
         }
     }

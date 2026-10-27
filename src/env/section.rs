@@ -11,7 +11,7 @@ use serde_json::Value;
 
 use super::ProjectEnv;
 use crate::app::BenchApp;
-use crate::icons::Ico;
+use bench_ui::icons::Ico;
 
 /// A save's REST call: method, path, JSON body.
 pub type Request = (&'static str, String, Value);
@@ -308,7 +308,7 @@ pub fn code(state: &Entity<EditorState>, cx: &App) -> AnyElement {
         .sum::<usize>()
         .max(1);
     div()
-        .h(px(crate::ui::editor_height(lines, cx)))
+        .h(px(bench_ui::editor_height(lines, cx)))
         .child(
             gpui_kit::component::input::Editor::new(state)
                 .appearance(false)
@@ -335,7 +335,7 @@ pub fn new_card(
                 div()
                     .px_3()
                     .pt_2()
-                    .pb(px(crate::ui::RING_CLEAR))
+                    .pb(px(bench_ui::RING_CLEAR))
                     .child(gpui_kit::component::input::Input::new(&e.new_name)),
             )
         })
@@ -360,7 +360,7 @@ pub fn form_actions(
             .gap_2()
             .justify_end()
             .child(
-                crate::ui::form_action(
+                bench_ui::form_action(
                     SharedString::from(format!("env-form-revert-{what}")),
                     "Revert",
                     false,
@@ -371,7 +371,7 @@ pub fn form_actions(
                 ),
             )
             .child(
-                crate::ui::form_action(
+                bench_ui::form_action(
                     SharedString::from(format!("env-form-save-{what}")),
                     "Save",
                     true,

@@ -13,7 +13,7 @@ use gpui_kit::*;
 use super::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
 use crate::env::{Home, SECTIONS};
-use crate::icons::Ico;
+use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// The sidebar's list in the Explorer view.
@@ -79,7 +79,7 @@ impl BenchApp {
                 }
             }
         }
-        let general = crate::model::ProjectKey::parse(&e.id).is_host();
+        let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
         for g in groups {
             let node = format!("g:{g}");
             // A group of one section named as it (Schedule): its actions on the group's heading,
@@ -112,7 +112,7 @@ impl BenchApp {
             .map(|p| p.name.clone())
             .unwrap_or_else(|| crate::app::LOCAL_HOST.into());
         let choices: Vec<(String, String)> = std::iter::once((
-            crate::model::ProjectKey::HOST.to_string(),
+            crate::app::model::ProjectKey::HOST.to_string(),
             crate::app::LOCAL_HOST.to_string(),
         ))
         .chain(self.projects.iter().map(|p| (p.id.clone(), p.name.clone())))
@@ -223,7 +223,7 @@ impl BenchApp {
         let icon = if open {
             (Ico::FolderOpen, theme.blue)
         } else {
-            crate::ui::file_icon(f.name(), dir, &theme)
+            bench_ui::file_icon(f.name(), dir, &theme)
         };
         let mut acts = vec![];
         if dir && editable {
@@ -393,7 +393,7 @@ impl BenchApp {
         out.push(self.node_row("skills", "Skills", Ico::Folder, None, vec![add], cx));
         if self.explorer.is_open("skills") {
             out.extend(self.naming_row(&Named::Skill, 0));
-            let general = crate::model::ProjectKey::parse(&e.id).is_host();
+            let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
             let remote = crate::env::is_remote(self, &e.id);
             let machine = self.location(&e.id).files_machine();
             let scopes: [(&str, &str); 3] = [
@@ -492,7 +492,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         let mut out = vec![];
-        let general = crate::model::ProjectKey::parse(&e.id).is_host();
+        let general = crate::app::model::ProjectKey::parse(&e.id).is_host();
         for s in SECTIONS
             .iter()
             .filter(|s| s.home() == Home::Explorer(group) && s.shown(self, e))
@@ -592,7 +592,7 @@ impl BenchApp {
                 for (n, (path, line, text)) in hits.iter().enumerate() {
                     if *path != last {
                         last = path.clone();
-                        let (ico, color) = crate::ui::file_icon(path, false, &theme);
+                        let (ico, color) = bench_ui::file_icon(path, false, &theme);
                         out.push(
                             h_flex()
                                 .flex_none()

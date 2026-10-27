@@ -42,7 +42,7 @@ Never send to "the" agent: there are several.
   `session.interrupt {session_id, profile, execution_generation}`; questions and approvals are
   answered with it too.
 - **The work's clock** counts from its real start, not from when you looked: a `Row::Work` has
-  `from`, `to` and `live` (`crates/thread`), drawn by `src/ui/thread/work.rs` — a live one counts
+  `from`, `to` and `live` (`crates/thread`), drawn by `src/thread/work.rs` — a live one counts
   on, a finished one keeps the time its steps took. Switching threads and coming back keeps the
   time running.
 - Model, reasoning and retry: `slash.exec` `/model …`, `config.set` `reasoning`,
@@ -80,7 +80,7 @@ completion_reason, output_tail | output_preview}]}`. Shown as a row of its own a
 beside Changed files: a folded line "PROCESSES · 2 running", rows with the command
 (mono, truncated), a live clock or the exit code, **Stop** (`process.kill {session_id, process_id,
 profile}`, then poll again), and a click that unfolds the output tail. Running first, then newest.
-Bench `src/app/processes.rs`, `gateway.rs` `processes()`, `src/ui/thread/extras.rs` `render_processes`.
+Bench `src/thread/processes.rs`, `gateway.rs` `processes()`, `src/thread/extras.rs` `render_processes`.
 
 ## Voice: dictation and reading aloud
 
@@ -96,7 +96,7 @@ Bench `src/app/processes.rs`, `gateway.rs` `processes()`, `src/ui/thread/extras.
 
 ## "The agent finished": a macOS notification
 
-Turns run for minutes to hours while the person is elsewhere. Bench `src/notify.rs`
+Turns run for minutes to hours while the person is elsewhere. Bench `src/system/notify.rs`
 (UserNotifications through `objc2-user-notifications`): `notify::request()` once at start (macOS
 asks the person once), `notify::post(id, title, body)` — `id` = the session's id, so a newer
 notification replaces the older one for the same thread.
@@ -141,7 +141,7 @@ notification replaces the older one for the same thread.
 ## Agents, machines, projects
 
 This Mac's agent always; a server's when the person adds it in the gear (Agents tab,
-`src/app/agent_form.rs`). The list of servers' agents is kept by this Mac's agent
+`src/settings/agent_form.rs`). The list of servers' agents is kept by this Mac's agent
 (`agent/src/builtin/servers.ts`, setting `agents`, `/api/agents`); Bench installs and starts each
 over SSH (`pi_agent::ensure_remote`, Node 22.18+ on the server) and links to it
 (`src/app/agents.rs`). A project = its agent + its machine (the agent's own, or a server this Mac's

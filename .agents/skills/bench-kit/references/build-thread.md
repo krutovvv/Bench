@@ -14,13 +14,13 @@ crates/protocol               the types (ThreadItem, QueuedItem, ThreadEvent); T
         ↓
 crates/thread                 Thread::open / apply / rows(): the rows — User, Work, Answer, Insert, Fail, Writing, Queued
         ↓                     the rules of order are tests (crates/thread/src/tests.rs)
-src/ui/thread/                View (mod.rs) on gpui::list: sync rows by diff, render each row
+src/thread/                View (mod.rs) on gpui::list: sync rows by diff, render each row
                               message.rs (user, answer), work.rs ("N actions"), queued.rs, rail.rs, extras.rs (tail)
 ```
 
 What the thread shows and in what order is decided in `crates/thread` and nowhere else; the view
 only draws rows. A new kind of row: a `Row` variant + its rule in `rows.rs` + a test + its
-renderer in `src/ui/thread/`.
+renderer in `src/thread/`.
 
 ## What the view promises (keep it)
 

@@ -21,7 +21,7 @@ places that every view fills in its own way:
   or `SidebarPanel::Explorer` (one project's tree). The switch is at its top; ⌘E flips it. A new
   way to look at things (search across threads, git, tasks) is a new `SidebarPanel` with its own
   list, nothing else changes.
-- **The center** is `Center` (`src/app/workspace.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
+- **The center** is `Center` (`src/workspace/mod.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
   file's click shows `Doc` with a tab per open document (the header holds the tabs instead of
   the thread's title). Leaving the Explorer does not close documents: their tabs come back.
 - **The right dock** shows one panel (`RightPanel`): the thread beside a document (⌘J), or a

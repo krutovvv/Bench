@@ -7,8 +7,9 @@ use gpui_kit::component::input::{EditorState, InputEvent};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use crate::app::{BenchApp, Center};
-use crate::rest;
+use crate::app::BenchApp;
+use crate::workspace::Center;
+use crate::client::rest;
 
 /// A file as the Explorer reaches it: through the agent of `project`, on `machine` when that is
 /// not the agent's own (a project this Mac's agent works on over SSH).
@@ -147,17 +148,17 @@ impl BenchApp {
     pub fn open_beside(&mut self, file: FileRef, window: &mut Window, cx: &mut Context<Self>) {
         self.ensure_doc(file.clone(), window, cx);
         if let Some(old) = self.beside_file().cloned() {
-            self.right = Some(crate::app::RightPanel::File(file));
+            self.right = Some(crate::workspace::RightPanel::File(file));
             self.drop_unused(&DocKey::File(old));
         } else {
-            self.right = Some(crate::app::RightPanel::File(file));
+            self.right = Some(crate::workspace::RightPanel::File(file));
         }
         cx.notify();
     }
 
     /// The right dock closes (its file stays open if a tab has it).
     pub fn close_right(&mut self, cx: &mut Context<Self>) {
-        if let Some(crate::app::RightPanel::File(f)) = self.right.take() {
+        if let Some(crate::workspace::RightPanel::File(f)) = self.right.take() {
             self.drop_unused(&DocKey::File(f));
         }
         cx.notify();
@@ -199,7 +200,7 @@ impl BenchApp {
         if self.demo {
             if let Some(d) = self.explorer.docs.get_mut(&DocKey::File(f.clone())) {
                 let text = crate::demo::file_text(&f.path);
-                let language = crate::lang::language_for_text(&f.path, &text);
+                let language = crate::explorer::lang::language_for_text(&f.path, &text);
                 d.editor.update(cx, |s, cx| {
                     s.set_highlighter(language, cx);
                     s.set_value(text.clone(), window, cx)
@@ -227,7 +228,7 @@ impl BenchApp {
                     Ok(t) => {
                         d.binary = t.binary || t.truncated;
                         d.loading = true;
-                        let language = crate::lang::language_for_text(&f.path, &t.text);
+                        let language = crate::explorer::lang::language_for_text(&f.path, &t.text);
                         d.editor.update(cx, |s, cx| {
                             s.set_highlighter(language, cx);
                             s.set_value(t.text.clone(), window, cx)

@@ -5,7 +5,7 @@
 use gpui_kit::*;
 
 use super::{BenchApp, Center};
-use crate::theme::Size;
+use bench_ui::theme::Size;
 
 impl BenchApp {
     /// Returns true when the key was a shortcut (and is not passed on).
@@ -31,12 +31,12 @@ impl BenchApp {
                 self.composer.update(cx, |s, cx| s.focus(window, cx));
             }
             ("n", true) => self.open_new_window(cx),
-            ("2", false) if crate::bench::SSH => self.open_terminal_thread(window, cx),
-            ("3", false) if crate::bench::TOOLS => {
+            ("2", false) if crate::app::shortcuts::SSH => self.open_terminal_thread(window, cx),
+            ("3", false) if crate::app::shortcuts::TOOLS => {
                 let tool = self.tools.tool;
                 self.open_tool_thread(tool, window, cx)
             }
-            ("4", false) if crate::bench::TASKS => {
+            ("4", false) if crate::app::shortcuts::TASKS => {
                 self.open_task_list(crate::inserts::tasks::model::List::Today, window, cx)
             }
             ("\\", false) => self.toggle_sidebar(cx),
@@ -136,7 +136,7 @@ impl BenchApp {
             .unwrap_or(1) as i32;
         let next = sizes[(at + step).clamp(0, 2) as usize];
         if next != self.appearance.size {
-            let a = crate::theme::Appearance {
+            let a = bench_ui::theme::Appearance {
                 size: next,
                 ..self.appearance
             };

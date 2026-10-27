@@ -9,7 +9,7 @@ use serde_json::json;
 use super::section::{Home, Section, choices};
 use super::{ProjectEnv, env_agent};
 use crate::app::BenchApp;
-use crate::rest;
+use crate::client::rest;
 use bench_ui::settings_field;
 
 #[derive(Default)]
@@ -111,7 +111,7 @@ impl Section for Run {
         let approvals = segmented(
             "env-approvals",
             "approvals",
-            crate::model::APPROVAL_MODES
+            crate::app::model::APPROVAL_MODES
                 .iter()
                 .map(|m| m.to_string())
                 .collect(),

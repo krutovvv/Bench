@@ -15,7 +15,7 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::inserts::InsertKind;
-use crate::model::Insert;
+use crate::app::model::Insert;
 
 pub struct Browser;
 

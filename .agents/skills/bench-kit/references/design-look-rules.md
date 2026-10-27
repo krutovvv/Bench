@@ -13,7 +13,7 @@
    steps, meta lines, cards' heads, the composer; secondary things are muted, never smaller.
    Chrome is `text_sm`. Who speaks is an avatar in a gutter, not a band. The sidebar meets the
    thread with **no rule**: column dividers are transparent at rest, an accent line on hover
-   (`src/ui/mod.rs` `quiet_divider`).
+   (`src/workspace/layout.rs` `quiet_divider`).
 5. **Every size is a `bench_ui` name** (`crates/ui/src/metrics.rs`): gaps are `Gap` steps
    (2/4/8/12/16), fields `FIELD_H` 28, block heads `BLOCK_HEAD_H` 32, the thread's columns
    `CHAT_LEFT` / `CHAT_TEXT` / `CHAT_RIGHT` (28 / 66 / 66), rows `TURN_Y` 14 top and bottom.

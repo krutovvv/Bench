@@ -23,7 +23,7 @@
 | ```mermaid block | SVG diagram (mermaid-rs-renderer), theme follows light/dark | opens the SVG |
 | `$…$`, `$$…$$` | Unicode text (unicodeit), italic | — |
 
-Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()`, `ui/media.rs`.
+Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()`, `media/view.rs`.
 
 ## Getting the bytes
 
@@ -134,14 +134,14 @@ has a quiet ↗ "Open" icon; for kinds shown only as a row the whole row opens t
 
 ## Attachments: paperclip, drag and drop, ⌘V
 
-Reference: `src/app/attachments.rs`, `src/attach.rs`, chips in `src/ui/media.rs`
-(`attachment_chip`), composer in `src/ui/composer.rs`.
+Reference: `src/thread/attachments.rs`, `src/media/attach.rs`, chips in `src/media/view.rs`
+(`attachment_chip`), composer in `src/thread/composer.rs`.
 
-- **Paperclip**: a button in the status bar (`src/ui/statusbar.rs`; the composer has no
+- **Paperclip**: a button in the status bar (`src/statusbar/mod.rs`; the composer has no
   buttons) →
   `cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: true, prompt: Some("Attach".into()) })`,
   await the receiver in `cx.spawn`, then add the paths.
-- **Drop**: on the whole thread column (messages + composer, `src/ui/mod.rs`):
+- **Drop**: on the whole thread column (messages + composer, `src/workspace/layout.rs`):
   `.drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active)).on_drop(cx.listener(|this, p: &ExternalPaths, _, cx| this.add(p.paths().to_vec(), cx)))`.
   Screenshot thumbnails dragged from the macOS corner preview arrive as files in
   `/var/folders/…` that vanish — copy those before using them.

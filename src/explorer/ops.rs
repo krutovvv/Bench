@@ -10,9 +10,9 @@ use serde_json::json;
 
 use super::{DocKey, Entry, Explorer, FileRef, Find, Named, Naming, Quick};
 use crate::app::BenchApp;
-use crate::app::SidebarPanel;
+use crate::workspace::SidebarPanel;
 use crate::env::enc;
-use crate::rest;
+use crate::client::rest;
 
 impl BenchApp {
     /// The Explorer on `project` (its environment read, its tree as it was left).
@@ -340,7 +340,7 @@ impl BenchApp {
                 *f = n;
             }
         }
-        if let Some(crate::app::RightPanel::File(b)) = self.right.as_mut() {
+        if let Some(crate::workspace::RightPanel::File(b)) = self.right.as_mut() {
             if let Some(n) = follow(b) {
                 if let Some(doc) = self.explorer.docs.remove(&DocKey::File(b.clone())) {
                     self.explorer.docs.insert(DocKey::File(n.clone()), doc);

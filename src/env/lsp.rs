@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 use super::ProjectEnv;
 use super::section::{Card, Home, Item, Section, add};
 use crate::app::BenchApp;
-use crate::rest;
+use crate::client::rest;
 
 /// A server of lsp.json as its row says it.
 #[derive(Clone, Debug)]
@@ -79,7 +79,7 @@ impl Section for Lsp {
                     label: s.name.clone(),
                     note: format!("{} · {state}", s.extensions.join(", ")),
                     icon: (
-                        crate::icons::Ico::FileCog,
+                        bench_ui::icons::Ico::FileCog,
                         if bad {
                             theme.danger
                         } else {

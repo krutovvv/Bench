@@ -19,9 +19,9 @@ use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::icons::Ico;
+use bench_ui::icons::Ico;
 use crate::inserts::InsertKind;
-use crate::model::Insert;
+use crate::app::model::Insert;
 
 /// The tallest a terminal gets in a thread; its program's screen is this many rows.
 const MAX_H: f32 = 280.;
@@ -116,7 +116,7 @@ impl InsertKind for Terminal {
         if app.demo {
             return Some(
                 div()
-                    .font_family(crate::theme::MONO)
+                    .font_family(bench_ui::theme::MONO)
                     .text_sm()
                     .whitespace_nowrap()
                     .overflow_hidden()

@@ -1,6 +1,6 @@
 //! The Explorer: a project seen as an editor sees it — a panel of the left dock (its tree), its
 //! documents in the center with tabs, a file kept in the right dock (`docs/explorer.md`,
-//! `src/app/workspace.rs`). The tree has the project's folder (on its
+//! `src/workspace/mod.rs`). The tree has the project's folder (on its
 //! machine), what its agent reads as text (the soul, prompts, skills), its tools (MCP and
 //! language servers) and its schedule.
 //!
@@ -14,6 +14,7 @@
 //! ```
 
 pub mod doc;
+pub mod lang;
 pub mod ops;
 pub mod tabs;
 pub mod tree;

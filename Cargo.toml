@@ -43,8 +43,8 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 2
 
-# macOS only: "the agent finished" is a system notification (src/notify.rs); elsewhere
-# src/notify_other.rs stands in.
+# macOS only: "the agent finished" is a system notification (src/system/notify.rs); elsewhere
+# src/system/notify_other.rs stands in.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"

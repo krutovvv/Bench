@@ -16,12 +16,12 @@ and projects on servers: `docs/remote-projects.md` (and `build-projects.md`). In
   - `app/places.rs` — the only place that says where a project lives; it puts the sidebar's
     projects together from their sources;
   - `app/agents.rs` — the links to agents (this Mac's, key `""`, and servers'), `conn_of`,
-    `route`; `app/agent_form.rs` adds and removes a server's agent in the gear;
-  - `app/sidebar_items.rs` — what is done to a thread or project in the sidebar (pin, color,
-    rename, ⌫⌫, ↑↓); `app/marks.rs` the pins and colors, kept on this Mac;
-  - `app/presets.rs` — the person's presets, edited in the gear;
-  - `ui/` — the frame: sidebar, header, status bar, composer, the gear (`providers.rs`), the
-    thread view in `ui/thread/`;
+    `route`; `settings/agent_form.rs` adds and removes a server's agent in the gear;
+  - `sidebar/items.rs` — what is done to a thread or project in the sidebar (pin, color,
+    rename, ⌫⌫, ↑↓); `sidebar/marks.rs` the pins and colors, kept on this Mac;
+  - `settings/presets.rs` — the person's presets, edited in the gear;
+  - `` — the frame: sidebar, header, status bar, composer, the gear (`providers.rs`), the
+    thread view in `thread/`;
   - `inserts/` — one folder per insert kind; `env/` — a project's environment, one file per section;
   - `gateway.rs` and `rest.rs` — the protocol to the agent (WebSocket JSON-RPC, REST);
     `connection.rs` and `pi_agent.rs` — where an agent runs, installing and starting it here or
