@@ -189,10 +189,7 @@ impl BenchApp {
                 .into_any_element();
         }
 
-        let title: SharedString = match self.center {
-            Center::NewProject => "New project".into(),
-            _ => "Settings".into(),
-        };
+        let title: SharedString = "Settings".into();
         bar.child(
             div()
                 .px_4()

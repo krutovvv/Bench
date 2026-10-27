@@ -1,14 +1,14 @@
-//! The new project's page (the sidebar's "+"), `docs/remote-projects.md`: its name, its agent —
-//! this Mac's or a server's (servers' agents are added in the gear) — and where its work is:
-//! - this Mac's agent: on this Mac (a folder, if any), or on a server over SSH (a folder there;
-//!   nothing installed on it);
-//! - a server's agent: on that server (a folder there, if any).
+//! The new project's dialog (the sidebar's "New project"), `docs/remote-projects.md`: its name,
+//! its agent — this Mac's or a server's — and where its work is. A short decision gets a short
+//! surface: a card over the thread, not a page; every line of prose the page carried became a
+//! placeholder or went away — the chips name themselves ("This Mac", "dev"), the folder field
+//! says its shape in the placeholder.
 //!
 //! Creating it starts its first thread; its environment is set up in its environment thread.
 
-use gpui_kit::component::input::InputState;
+use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::json;
@@ -16,7 +16,7 @@ use serde_json::json;
 use crate::app::BenchApp;
 use crate::client::rest;
 
-/// The new project's form (the sidebar's "+").
+/// The new project's form; lives while the dialog is open.
 pub struct ProjectForm {
     pub name: Entity<InputState>,
     /// The agent that keeps it: "" = this Mac's, else a server's (its ~/.ssh/config alias).
@@ -27,23 +27,43 @@ pub struct ProjectForm {
     pub folder: Option<String>,
     /// On a server: its folder there, typed (there is no picker for a server's disk).
     pub server_folder: Entity<InputState>,
+    /// Enter in either field creates the project — the dialog's commit.
+    _enter: Vec<Subscription>,
 }
 
 impl BenchApp {
-    /// The sidebar's "+": the new project's page, in place of the thread (the thread stays as it was).
+    /// The sidebar's "New project": the card over the thread (the thread stays as it was).
     pub fn new_project_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.center = crate::workspace::Center::NewProject;
         let name = cx.new(|cx| InputState::new(window, cx).placeholder("Project name"));
         name.update(cx, |s, cx| s.focus(window, cx));
         let server_folder =
-            cx.new(|cx| InputState::new(window, cx).placeholder("/var/www/site — empty: its home"));
+            cx.new(|cx| InputState::new(window, cx).placeholder("/var/www/site — or empty: its home"));
+        let mut enter = Vec::new();
+        for field in [&name, &server_folder] {
+            enter.push(cx.subscribe_in(
+                field,
+                window,
+                |this, _, ev: &InputEvent, window, cx| {
+                    if matches!(ev, InputEvent::PressEnter { .. }) {
+                        this.save_project(window, cx);
+                    }
+                },
+            ));
+        }
         self.project_form = Some(ProjectForm {
             name,
             agent: String::new(),
             machine: None,
             folder: None,
             server_folder,
+            _enter: enter,
         });
+        cx.notify();
+    }
+
+    /// Close the card: Escape, its ✕, Cancel, a click beside it.
+    pub fn cancel_project_form(&mut self, cx: &mut Context<Self>) {
+        self.project_form = None;
         cx.notify();
     }
 
@@ -122,7 +142,6 @@ impl BenchApp {
             move |this, r, window, cx| match r {
                 Ok(v) => {
                     this.project_form = None;
-                    this.center = crate::workspace::Center::Chat;
                     let Some(id) = v["project"]["id"].as_str().map(str::to_string) else {
                         return;
                     };
@@ -144,8 +163,8 @@ impl BenchApp {
         );
     }
 
-    /// The new project's page, laid out like Settings: name, agent, where its work is.
-    pub(crate) fn render_project_form(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    /// The card: a name, who runs it, where its work is. Enter creates, Escape closes.
+    pub(crate) fn render_project_dialog(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let Some(form) = self.project_form.as_ref() else {
@@ -158,123 +177,101 @@ impl BenchApp {
             form.folder.clone(),
             form.server_folder.clone(),
         );
-        let note = |text: String| {
+        let label = |text: &'static str| {
             div()
-                .pt_2()
-                .text_sm()
+                .text_xs()
                 .text_color(muted)
                 .child(text)
                 .into_any_element()
         };
-        let mut page: Vec<AnyElement> = vec![
-            div()
-                .pt_6()
-                .text_base()
-                .text_color(muted)
-                .child("A project is what you work on: a client, a site, a codebase. Its threads share its environment (soul, MCP servers, skills, prompts, Telegram, schedule); you set that up in its environment thread once it exists.")
-                .into_any_element(),
-            self.pv_heading("PROJECT", cx).into_any_element(),
-            self.pv_row("Name", "How it shows in the sidebar", self.pv_input(&name), cx).into_any_element(),
-        ];
-
-        // The agent: this Mac's, or one of the servers' the gear lists.
+        // Who runs it: this Mac's agent, or a server's (added in the gear). With one agent
+        // there is nothing to choose, and no row to show.
         let hosts = self.agent_hosts();
-        let labels: Vec<String> = hosts.iter().map(|h| Self::agent_name(h)).collect();
-        let at = hosts.iter().position(|h| *h == agent).unwrap_or(0);
-        let pick = crate::inserts::tools::view::segmented_tall_owned(
-            "project-agent",
-            labels,
-            at,
-            cx,
-            move |this, k, _, cx| {
-                if let Some(f) = this.project_form.as_mut() {
-                    f.agent = hosts[k].clone();
-                    f.machine = None;
-                }
-                cx.notify();
+        let agent_row = (hosts.len() > 1).then(|| {
+            let labels: Vec<String> = hosts.iter().map(|h| Self::agent_name(h)).collect();
+            let at = hosts.iter().position(|h| *h == agent).unwrap_or(0);
+            v_flex()
+                .gap_1p5()
+                .child(label("Who runs its threads"))
+                .child(crate::inserts::tools::view::segmented_tall_owned(
+                    "project-agent",
+                    labels,
+                    at,
+                    cx,
+                    move |this, k, _, cx| {
+                        if let Some(f) = this.project_form.as_mut() {
+                            f.agent = hosts[k].clone();
+                            f.machine = None;
+                        }
+                        cx.notify();
+                    },
+                ))
+                .into_any_element()
+        });
+        // Where its files and commands are, when this Mac's agent runs it.
+        let machine_row = (agent.is_empty() && self.ssh.servers.iter().next().is_some()).then(
+            || {
+                let mut labels = vec!["This Mac".to_string()];
+                labels.extend(self.ssh.servers.iter().map(|s| s.alias.clone()));
+                let at = machine
+                    .as_ref()
+                    .and_then(|m| labels.iter().position(|l| l == m))
+                    .unwrap_or(0);
+                let names = labels.clone();
+                v_flex()
+                    .gap_1p5()
+                    .child(label("Where its work is"))
+                    .child(crate::inserts::tools::view::segmented_tall_owned(
+                        "project-machine",
+                        labels,
+                        at,
+                        cx,
+                        move |this, k, _, cx| {
+                            if let Some(f) = this.project_form.as_mut() {
+                                f.machine = (k > 0).then(|| names[k].clone());
+                            }
+                            cx.notify();
+                        },
+                    ))
+                    .into_any_element()
             },
         );
-        page.push(
-            self.pv_row(
-                "Agent",
-                "Who runs its threads (servers' agents are added in the gear)",
-                h_flex().flex_wrap().child(pick).into_any_element(),
-                cx,
-            )
-            .into_any_element(),
-        );
-
-        if !agent.is_empty() {
-            // A server's agent: the server is the machine; only its folder there.
-            page.push(
-                self.pv_row(
-                    "Folder",
-                    format!("Optional: where on {agent} its threads work"),
-                    self.pv_input(&server_folder),
-                    cx,
+        // The folder: picked from this Mac's disk, or typed for a server's.
+        let on_server = !agent.is_empty() || machine.is_some();
+        let folder_row = if on_server {
+            let who = if !agent.is_empty() {
+                agent.clone()
+            } else {
+                machine.clone().unwrap_or_default()
+            };
+            v_flex()
+                .gap_1p5()
+                .child(label("Folder on it, optional"))
+                .child(Input::new(&server_folder).xsmall().into_any_element())
+                .child(
+                    div()
+                        .text_xs()
+                        .text_color(muted)
+                        .child(format!("Empty: {who}'s home directory.")),
                 )
-                .into_any_element(),
-            );
-            page.push(note(format!(
-                "Made on {agent}'s agent: its threads, skills and MCP servers live there, its models are {agent}'s (the gear), and it works without this Mac — its Telegram bot too."
-            )));
+                .into_any_element()
         } else {
-            // This Mac's agent: its work on this Mac, or on a server over SSH.
-            let mut labels = vec!["This Mac".to_string()];
-            labels.extend(self.ssh.servers.iter().map(|s| s.alias.clone()));
-            let at = machine
-                .as_ref()
-                .and_then(|m| labels.iter().position(|l| l == m))
-                .unwrap_or(0);
-            let names = labels.clone();
-            let pick = crate::inserts::tools::view::segmented_tall_owned(
-                "project-machine",
-                labels,
-                at,
-                cx,
-                move |this, k, _, cx| {
-                    if let Some(f) = this.project_form.as_mut() {
-                        f.machine = (k > 0).then(|| names[k].clone());
-                    }
-                    cx.notify();
-                },
-            );
-            page.push(
-                self.pv_row(
-                    "Works on",
-                    "Where its files and commands are",
-                    h_flex().flex_wrap().child(pick).into_any_element(),
-                    cx,
-                )
-                .into_any_element(),
-            );
-            match machine {
-                Some(m) => {
-                    page.push(
-                        self.pv_row(
-                            "Folder",
-                            format!("Optional: where on {m} its threads work"),
-                            self.pv_input(&server_folder),
-                            cx,
-                        )
-                        .into_any_element(),
-                    );
-                    page.push(note(format!(
-                        "This Mac's agent works on {m} over SSH: nothing is installed there, its models and settings are this Mac's, and it answers while this Mac is on."
-                    )));
-                }
-                None => {
-                    let has = folder.is_some();
-                    let control = h_flex()
+            let has = folder.is_some();
+            v_flex()
+                .gap_1p5()
+                .child(label("Codebase folder, optional"))
+                .child(
+                    h_flex()
                         .gap_2()
                         .items_center()
                         .child(
                             div()
+                                .flex_1()
                                 .min_w_0()
                                 .truncate()
-                                .text_base()
+                                .text_sm()
                                 .text_color(if has { theme.foreground } else { muted })
-                                .child(folder.clone().unwrap_or_else(|| "None".into())),
+                                .child(folder.clone().unwrap_or_else(|| "No folder".into())),
                         )
                         .child(
                             bench_ui::form_action(
@@ -298,47 +295,64 @@ impl BenchApp {
                                     })),
                             )
                         })
-                        .into_any_element();
-                    page.push(
-                        self.pv_row(
-                            "Folder",
-                            "Optional: a codebase its threads work in",
-                            control,
+                        .into_any_element(),
+                )
+                .into_any_element()
+        };
+        v_flex()
+            .w(px(440.))
+            .gap_4()
+            .p_5()
+            .rounded_lg()
+            .border_1()
+            .border_color(theme.border)
+            .bg(theme.background)
+            // Clicks inside the card are the card's; only the dim behind closes it.
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .child(
+                h_flex()
+                    .items_center()
+                    .child(
+                        div()
+                            .text_base()
+                            .font_weight(FontWeight::MEDIUM)
+                            .child("New project"),
+                    )
+                    .child(div().flex_1())
+                    .child(
+                        bench_ui::icon_button(
+                            "project-close",
+                            bench_ui::icons::Ico::X,
+                            "Close  esc",
+                            false,
                             cx,
                         )
-                        .into_any_element(),
-                    );
-                }
-            }
-        }
-        page.push(
-            h_flex()
-                .pt_4()
-                .gap_2()
-                .child(
-                    bench_ui::form_action("project-save", "Create project", true, cx)
-                        .on_click(cx.listener(|this, _, window, cx| this.save_project(window, cx))),
-                )
-                .child(
-                    bench_ui::form_action("project-cancel", "Cancel", false, cx).on_click(
-                        cx.listener(|this, _, _, cx| {
-                            this.project_form = None;
-                            this.center = crate::workspace::Center::Chat;
-                            cx.notify();
-                        }),
+                        .on_click(cx.listener(|this, _, _, cx| this.cancel_project_form(cx))),
                     ),
-                )
-                .into_any_element(),
-        );
-        v_flex()
-            .id("new-project")
-            .size_full()
-            .overflow_y_scroll()
-            // the thread's inset all around, like the gear's page
-            .pl(px(bench_ui::CHAT_LEFT))
-            .pr(px(bench_ui::CHAT_LEFT))
-            .pb(px(bench_ui::CHAT_LEFT))
-            .child(v_flex().flex_1().children(page))
+            )
+            .child(
+                v_flex()
+                    .gap_1p5()
+                    .child(label("Name"))
+                    .child(Input::new(&name).xsmall().into_any_element()),
+            )
+            .children(agent_row)
+            .children(machine_row)
+            .child(folder_row)
+            .child(
+                h_flex()
+                    .justify_end()
+                    .gap_2()
+                    .child(
+                        bench_ui::form_action("project-cancel", "Cancel", false, cx).on_click(
+                            cx.listener(|this, _, _, cx| this.cancel_project_form(cx)),
+                        ),
+                    )
+                    .child(
+                        bench_ui::form_action("project-save", "Create project", true, cx)
+                            .on_click(cx.listener(|this, _, window, cx| this.save_project(window, cx))),
+                    ),
+            )
             .into_any_element()
     }
 }

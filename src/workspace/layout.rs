@@ -84,7 +84,6 @@ impl Render for BenchApp {
                 .child(self.active_thread.clone())
                 .into_any_element(),
             Center::Providers => self.render_providers(cx),
-            Center::NewProject => self.render_project_form(cx),
             Center::Doc => self.render_doc(window, cx),
         };
 
@@ -132,7 +131,7 @@ impl Render for BenchApp {
             .child(div().flex_1().min_h_0().child(body));
 
         let content = self.render_layout(main, window, cx);
-        v_flex()
+        let base = v_flex()
             .size_full()
             .bg(theme.background)
             .text_color(theme.foreground)
@@ -146,7 +145,27 @@ impl Render for BenchApp {
                 }
             }))
             .child(div().flex_1().min_h_0().child(content))
-            .child(self.render_statusbar(window, cx))
+            .child(self.render_statusbar(window, cx));
+        // The new project's card, over everything: the shortest surface a short
+        // decision deserves (the design guides' dialog rule). Behind it, the dimmed window.
+        div()
+            .relative()
+            .size_full()
+            .child(base)
+            .when(self.project_form.is_some(), |d| {
+                d.child(
+                    div()
+                        .id("project-mask")
+                        .absolute()
+                        .inset_0()
+                        .bg(rgb(0x0000_0000).opacity(0.55))
+                        .flex()
+                        .items_center()
+                        .justify_center()
+                        .on_click(cx.listener(|this, _, _, cx| this.cancel_project_form(cx)))
+                        .child(self.render_project_dialog(cx)),
+                )
+            })
     }
 }
 

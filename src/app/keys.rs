@@ -94,6 +94,11 @@ impl BenchApp {
     /// Esc: cancel a recording (nothing is transcribed), close the quick-open list, the server
     /// form or the settings. Otherwise it belongs to whatever has focus.
     fn escape(&mut self, cx: &mut Context<Self>) -> bool {
+        // The new project's card is the topmost layer while it is open.
+        if self.project_form.is_some() {
+            self.cancel_project_form(cx);
+            return true;
+        }
         if self.renaming.is_some() {
             self.cancel_rename(cx);
             return true;
