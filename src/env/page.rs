@@ -36,6 +36,7 @@ impl BenchApp {
             .id("env-page")
             .size_full()
             .overflow_y_scroll()
+            .track_scroll(&self.env_scroll)
             .px(inset)
             .pb(inset)
             .children(error.map(|err| {

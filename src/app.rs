@@ -218,6 +218,8 @@ pub struct BenchApp {
     pub speaking: Option<String>,
     /// Files answers delivered, by target and path; diagrams, by source and dark theme.
     pub media: HashMap<String, Loaded<media::Fetched>>,
+    /// The project's Settings page, so a demo can show a part of it lower down.
+    pub env_scroll: ScrollHandle,
     /// What the title bar's repository chip knows about each repo folder (read in the
     /// background; dropped when a run ends, since the agent may have committed there).
     pub git_info: HashMap<String, RepoInfo>,
@@ -430,6 +432,7 @@ impl BenchApp {
             demo_threads: HashMap::new(),
             restart_armed: None,
             media: HashMap::new(),
+            env_scroll: ScrollHandle::new(),
             git_info: HashMap::new(),
             git_reading: std::collections::HashSet::new(),
             open_after_fetch: None,

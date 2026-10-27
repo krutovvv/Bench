@@ -11,10 +11,11 @@ use crate::app::BenchApp;
 use bench_ui::settings_field;
 
 pub struct TelegramEnv {
-    /// Its bot: (@name, allowed user ids, its token).
-    pub bot: Option<(String, Vec<String>, String)>,
+    /// Its bot: (@name, allowed user ids, its token, its proxy URL).
+    pub bot: Option<(String, Vec<String>, String, String)>,
     pub token: Entity<InputState>,
     pub users: Entity<InputState>,
+    pub proxy: Entity<InputState>,
     pub dirty: bool,
 }
 
@@ -26,12 +27,18 @@ impl TelegramEnv {
             InputState::new(window, cx)
                 .placeholder("Telegram user ids who may write to it, comma-separated")
         });
+        let proxy = cx.new(|cx| {
+            InputState::new(window, cx)
+                .placeholder("http://127.0.0.1:7890 — blank: the agent's own proxy settings")
+        });
         on_change(&token, id, cx, |e| e.telegram.dirty = true);
         on_change(&users, id, cx, |e| e.telegram.dirty = true);
+        on_change(&proxy, id, cx, |e| e.telegram.dirty = true);
         Self {
             bot: None,
             token,
             users,
+            proxy,
             dirty: false,
         }
     }
@@ -63,6 +70,10 @@ impl Section for Telegram {
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_string(),
+                t.get("proxy")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_string(),
             )
         });
         if !e.telegram.dirty {
@@ -84,6 +95,15 @@ impl Section for Telegram {
             e.telegram
                 .token
                 .update(cx, |s, cx| s.set_value(token, window, cx));
+            let proxy = e
+                .telegram
+                .bot
+                .as_ref()
+                .map(|t| t.3.clone())
+                .unwrap_or_default();
+            e.telegram
+                .proxy
+                .update(cx, |s, cx| s.set_value(proxy, window, cx));
         }
     }
 
@@ -107,10 +127,12 @@ impl Section for Telegram {
             .map(|u| u.trim().to_string())
             .filter(|u| !u.is_empty())
             .collect();
-        let mut body = json!({"allowed_users": users});
+        let mut body = json!({ "allowed_users": users });
         if !token.is_empty() {
             body["token"] = json!(token);
         }
+        // Sent always: blank clears it, and the bot falls back to the agent's env again.
+        body["proxy"] = json!(e.telegram.proxy.read(cx).value().trim());
         Some(("PUT", format!("/api/projects/{eid}/telegram"), body))
     }
 
@@ -144,10 +166,10 @@ impl SettingsForm for Telegram {
         cx: &mut Context<BenchApp>,
     ) -> Option<Vec<AnyElement>> {
         let bot = match &e.telegram.bot {
-            Some((name, _, token)) if !token.is_empty() && !name.is_empty() => {
+            Some((name, _, token, _)) if !token.is_empty() && !name.is_empty() => {
                 format!("@{name}: its chats become this project's threads")
             }
-            Some((_, _, token)) if !token.is_empty() => {
+            Some((_, _, token, _)) if !token.is_empty() => {
                 "Its chats become this project's threads".to_string()
             }
             _ => "No bot of its own yet: a token from @BotFather".to_string(),
@@ -164,6 +186,13 @@ impl SettingsForm for Telegram {
                 "Who may write",
                 "Telegram user ids, comma-separated",
                 Input::new(&e.telegram.users).into_any_element(),
+                cx,
+            )
+            .into_any_element(),
+            settings_field(
+                "Proxy",
+                "A URL, http://host:port — for servers where Telegram is blocked; blank: the agent's own settings",
+                Input::new(&e.telegram.proxy).into_any_element(),
                 cx,
             )
             .into_any_element(),

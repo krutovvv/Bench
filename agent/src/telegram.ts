@@ -66,6 +66,8 @@ export class Batch {
 interface Config {
 	token: string;
 	allowed_users: string[];
+	/** Proxy URL (http://host:port) for this bot; beats the agent's TELEGRAM_PROXY. */
+	proxy?: string;
 	profile?: string;
 }
 
@@ -122,9 +124,10 @@ export async function syncTelegram(rt: Runtime): Promise<void> {
 async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void> {
 	const profile = cfg.profile || "default";
 	const allowed = new Set(cfg.allowed_users.map(String));
-	// Where Telegram is reached only through a proxy (TELEGRAM_PROXY, else HTTPS_PROXY in the agent's env).
+	// Where Telegram is reached only through a proxy: the bot's own URL when it has one, else
+	// the agent's env (TELEGRAM_PROXY, else HTTPS_PROXY).
 	const env = profileEnv("default");
-	const proxy = env.TELEGRAM_PROXY || env.HTTPS_PROXY || env.https_proxy;
+	const proxy = cfg.proxy || env.TELEGRAM_PROXY || env.HTTPS_PROXY || env.https_proxy;
 	const bot = new Bot(cfg.token, proxy ? { client: { baseFetchConfig: { agent: new HttpsProxyAgent(proxy), compress: true } } } : undefined);
 	const api = bot.api;
 

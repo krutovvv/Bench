@@ -34,6 +34,12 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         },
         "compaction": 0.9,
         "window": 131072,
+        "telegram": {
+            "username": "northwind_blog_bot",
+            "allowed_users": ["246813579"],
+            "token": "4711:AAExampleTokenForScreenshots",
+            "proxy": "http://127.0.0.1:7890"
+        },
         "skills": [
             {"name": "release-notes", "description": "Turn a changelog into a post: what changed for the reader, not the commit list.", "scope": "project", "dir": "~/.bench/projects/p-blog/skills/release-notes"},
             {"name": "cover-image", "description": "A 1600×900 cover in the blog's colors, from a photo or a gradient.", "scope": "project", "dir": "~/.bench/projects/p-blog/skills/cover-image"},
@@ -46,6 +52,18 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         ]
     });
     crate::env::apply(e, &v, window, cx);
+    // `BENCH_ENV=telegram`: the page scrolls to the Telegram block a beat after opening.
+    if std::env::var("BENCH_ENV").as_deref() == Ok("telegram") {
+        let scroll = app.env_scroll.clone();
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_millis(900))
+                .await;
+            scroll.scroll_to_bottom();
+            let _ = this.update(cx, |_app, cx| cx.notify());
+        })
+        .detach();
+    }
     // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
     // `BENCH_EXPLORER=settings` its settings, `=part` an MCP server, `=lsp` a language
     // server that failed, `=thread` the thread beside it

@@ -15,7 +15,7 @@ import { syncTelegram } from "../telegram.ts";
 import { cronView } from "./cron.ts";
 
 /** A project's environment: the agent its threads run with, its folder, the project row. */
-function envOf(id: string): { agent: string; dir: string; project: { id: string; name: string; telegram?: { token: string; allowed_users: string[]; username?: string } | null } } {
+function envOf(id: string): { agent: string; dir: string; project: { id: string; name: string; telegram?: { token: string; allowed_users: string[]; username?: string; proxy?: string } | null } } {
 	if (id === "general") {
 		const tg = getSetting("telegram");
 		return { agent: "default", dir: agentDir("default"), project: { id, name: "Host", telegram: tg?.token ? { token: tg.token, allowed_users: (tg.allowed_users ?? []).map(String) } : null } };
@@ -100,7 +100,7 @@ export default ({ rt }: Ctx): Module => ({
 					mcp_json: fs.existsSync(path.join(dir, "mcp.json")) ? fs.readFileSync(path.join(dir, "mcp.json"), "utf8") : "",
 					cron: jobs.list(agent).map(cronView),
 					// The bot's token is shown whole (the person's own machine and bot).
-					telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token, token: p.telegram.token ?? "" } : null,
+					telegram: p.telegram ? { username: p.telegram.username ?? "", allowed_users: p.telegram.allowed_users, has_token: !!p.telegram.token, token: p.telegram.token ?? "", proxy: p.telegram.proxy ?? "" } : null,
 				};
 			},
 		],
@@ -120,9 +120,11 @@ export default ({ rt }: Ctx): Module => ({
 				const { project: p } = envOf(id1(m));
 				const token = String(req.body?.token ?? p.telegram?.token ?? "").trim();
 				const allowed = (req.body?.allowed_users ?? p.telegram?.allowed_users ?? []).map(String).filter(Boolean);
+				// Its own proxy URL; blank means the agent's env again.
+				const proxy = String(req.body?.proxy ?? p.telegram?.proxy ?? "").trim();
 				// The general bot stays a setting; a project's is the project's.
-				if (p.id === "general") setSetting("telegram", token ? { ...(getSetting("telegram") ?? {}), token, allowed_users: allowed } : undefined);
-				else projects.save({ ...(projects.get(p.id) as any), telegram: token ? { token, allowed_users: allowed } : null });
+				if (p.id === "general") setSetting("telegram", token ? { ...(getSetting("telegram") ?? {}), token, allowed_users: allowed, proxy: proxy || undefined } : undefined);
+				else projects.save({ ...(projects.get(p.id) as any), telegram: token ? { token, allowed_users: allowed, proxy: proxy || undefined } : null });
 				await syncTelegram(rt);
 				return { ok: true };
 			},
