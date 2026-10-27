@@ -70,7 +70,9 @@ impl BenchApp {
                 .cursor_pointer()
                 .px_4()
                 .pt(rems(if g == 0 { 0.5 } else { 0.75 }))
-                .pb_1()
+                // One pixel more breath under a heading than a plain pb_1: projects are
+                // sections, and the eye wants the groups further apart than the threads inside.
+                .pb(px(5.))
                 .gap_1p5()
                 .items_center()
                 // Small caps, as the Explorer's headings (`tree_heading`): a group of threads
