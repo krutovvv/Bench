@@ -19,10 +19,10 @@ impl BenchApp {
         h_flex()
             .h(bench_ui::bar_h(cx))
             .flex_none()
-            .justify_end()
             .items_center()
-            .gap_1()
-            .pr(px(bench_ui::SIDEBAR_STRIP_PR))
+            // Past the traffic lights, which overlay this strip; fold's right edge keeps
+            // the strip's 12 px padding, like the Explorer button's corner above.
+            .pl(px(76.))
             .child(
                 Button::new("new-item")
                     .ghost()
@@ -39,6 +39,8 @@ impl BenchApp {
                     false,
                     cx,
                 )
+                .ml_auto()
+                .mr(px(6.))
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
             )
             .into_any_element()
