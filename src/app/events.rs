@@ -26,9 +26,9 @@ impl BenchApp {
             Evt::Error(e) => {
                 self.connecting = false;
                 // A send that failed: no run started, and the message never reached the journal.
-                if self.live.is_some() && !self.thread.running() {
-                    self.live = None;
-                    self.thread.clear_sent();
+                if self.active_thread.live.is_some() && !self.active_thread.journal.running() {
+                    self.active_thread.live = None;
+                    self.active_thread.journal.clear_sent();
                 }
                 self.toast(NotificationType::Error, e, window, cx);
             }
@@ -71,7 +71,9 @@ impl BenchApp {
                     self.sessions.retain(|s| !s.host.is_empty());
                     self.sessions.extend(rows);
                     if let Some(id) = self.resume_session.take() {
-                        if self.session.is_none() && self.sessions.iter().any(|s| s.id == id) {
+                        if self.active_thread.session.is_none()
+                            && self.sessions.iter().any(|s| s.id == id)
+                        {
                             self.open_session(id, cx);
                         }
                     }
@@ -121,18 +123,19 @@ impl BenchApp {
                 open,
             } => {
                 self.opened.insert(session.clone(), runtime.clone());
-                if self.session.as_deref() == Some(&session) {
+                if self.active_thread.session.as_deref() == Some(&session) {
                     let running = open.running;
                     // A thread already on screen keeps what it has and only catches up.
-                    if self.runtime.as_deref() == Some(runtime.as_str()) || !self.thread.is_empty()
+                    if self.active_thread.runtime.as_deref() == Some(runtime.as_str())
+                        || !self.active_thread.journal.is_empty()
                     {
-                        self.thread.catch_up(open);
+                        self.active_thread.journal.catch_up(open);
                     } else {
-                        self.thread = ::thread::Thread::open(open);
+                        self.active_thread.journal = ::thread::Thread::open(open);
                     }
-                    self.runtime = Some(runtime);
-                    self.history_error = None;
-                    self.live = running.then(|| Live {
+                    self.active_thread.runtime = Some(runtime);
+                    self.active_thread.history_error = None;
+                    self.active_thread.live = running.then(|| Live {
                         label: "Working…".into(),
                     });
                     self.resolve_project(window, cx);
@@ -149,10 +152,10 @@ impl BenchApp {
                         self.queue_edit = None;
                     }
                 }
-                self.thread.apply(e);
+                self.active_thread.journal.apply(e);
             }
             Evt::Fallback(sid, note) if self.is_current(&sid) => {
-                self.fallback_on = note;
+                self.active_thread.fallback_on = note;
                 cx.notify();
             }
             Evt::Effort(sid, value) if self.is_current(&sid) => {
@@ -161,14 +164,16 @@ impl BenchApp {
                 self.effort_pending = false;
                 match self.efforts.iter().position(|e| *e == value) {
                     Some(i) => {
-                        self.effort = i;
-                        self.effort_other = None;
+                        self.active_thread.effort = i;
+                        self.active_thread.effort_other = None;
                         self.effort_choice.update(cx, |s, cx| {
                             s.set_selected_index(Some(IndexPath::new(i)), window, cx)
                         });
                     }
-                    None if value.is_empty() => self.effort_other = Some("default".into()),
-                    None => self.effort_other = Some(value),
+                    None if value.is_empty() => {
+                        self.active_thread.effort_other = Some("default".into())
+                    }
+                    None => self.active_thread.effort_other = Some(value),
                 }
             }
             Evt::Created { session, runtime } => {
@@ -184,17 +189,19 @@ impl BenchApp {
                             running: true,
                             source: "desktop".into(),
                             subject: self.new_subject.clone(),
-                            project: self.thread_project.clone(),
+                            project: self.active_thread.thread_project.clone(),
                             host: self.thread_host(),
                         },
                     );
                 }
                 self.opened.insert(session.clone(), runtime.clone());
                 self.inserts_created(&session);
-                self.session = Some(session);
+                self.active_thread.session = Some(session);
                 self.save_place();
-                self.runtime = Some(runtime.clone());
-                if let (Some(text), Some(profile)) = (self.queued.take(), self.profile.clone()) {
+                self.active_thread.runtime = Some(runtime.clone());
+                if let (Some(text), Some(profile)) =
+                    (self.active_thread.queued.take(), self.profile.clone())
+                {
                     let effort = self.take_effort();
                     match self.parse_command(&text) {
                         Some((name, arg)) => self.cmd(Cmd::Dispatch {
@@ -220,8 +227,8 @@ impl BenchApp {
             }
             Evt::Inserts(sid, list) => self.on_inserts(sid, list, cx),
             Evt::ResumeFailed(sid, why) => {
-                if self.session.as_deref() == Some(sid.as_str()) {
-                    self.history_error = Some(why);
+                if self.active_thread.session.as_deref() == Some(sid.as_str()) {
+                    self.active_thread.history_error = Some(why);
                 }
             }
             // Not made: the next insert or message tries again (until now a failed create kept the
@@ -243,26 +250,26 @@ impl BenchApp {
                     cx,
                 );
                 // The agent's list is the truth: read it again.
-                if self.session.as_deref() == Some(&sid) {
+                if self.active_thread.session.as_deref() == Some(&sid) {
                     self.open_session(sid, cx);
                 }
             }
             Evt::Started(sid) if self.is_current(&sid) => {
-                if self.live.is_none() {
-                    self.live = Some(Live {
+                if self.active_thread.live.is_none() {
+                    self.active_thread.live = Some(Live {
                         label: "Thinking…".into(),
                     });
                 }
             }
             Evt::Delta(sid, text) if self.is_current(&sid) => {
                 self.speed.token(text.chars().count());
-                if let Some(live) = self.live.as_mut() {
+                if let Some(live) = self.active_thread.live.as_mut() {
                     live.label = "Writing…".into();
                 }
             }
             Evt::Reasoning(sid, text) if self.is_current(&sid) => {
                 self.speed.token(text.chars().count());
-                if let Some(live) = self.live.as_mut() {
+                if let Some(live) = self.active_thread.live.as_mut() {
                     live.label = "Thinking…".into();
                 }
             }
@@ -272,7 +279,7 @@ impl BenchApp {
                 detail,
             } if self.is_current(&session) => {
                 self.speed.tool_call();
-                if let Some(live) = self.live.as_mut() {
+                if let Some(live) = self.active_thread.live.as_mut() {
                     live.label = crate::thread::work::tool_label(&name, &detail).into();
                 }
             }
@@ -283,7 +290,7 @@ impl BenchApp {
                 if subject.starts_with("tasks:") {
                     self.load_tasks();
                 }
-                if self.project.is_none() {
+                if self.active_thread.project.is_none() {
                     self.resolve_project(window, cx);
                 }
             }
@@ -310,7 +317,7 @@ impl BenchApp {
                 }
                 None => {
                     // A command that printed something: said as a toast, the thread is the agent's.
-                    self.live = None;
+                    self.active_thread.live = None;
                     if let Some(out) = output.filter(|o| !o.trim().is_empty()) {
                         self.toast(
                             NotificationType::Info,
@@ -322,28 +329,38 @@ impl BenchApp {
                 }
             },
             Evt::Approval(req) if self.is_current(&req.session) => {
-                if let Some(live) = self.live.as_mut() {
+                if let Some(live) = self.active_thread.live.as_mut() {
                     live.label = "Waiting for your approval…".into();
                 }
-                self.approval = Some(req);
+                self.active_thread.approval = Some(req);
             }
             Evt::ApprovalDone(sid) => {
-                if self.approval.as_ref().is_some_and(|a| a.session == sid) {
-                    self.approval = None;
+                if self
+                    .active_thread
+                    .approval
+                    .as_ref()
+                    .is_some_and(|a| a.session == sid)
+                {
+                    self.active_thread.approval = None;
                 }
             }
             Evt::Clarify(req) if self.is_current(&req.session) => {
-                if let Some(live) = self.live.as_mut() {
+                if let Some(live) = self.active_thread.live.as_mut() {
                     live.label = "Waiting for your answer…".into();
                 }
-                self.clarify = Some(req);
-                self.clarify_picked.clear();
+                self.active_thread.clarify = Some(req);
+                self.active_thread.clarify_picked.clear();
                 self.clarify_input
                     .update(cx, |s, cx| s.set_value("", window, cx));
             }
             Evt::ClarifyDone(sid) => {
-                if self.clarify.as_ref().is_some_and(|c| c.session == sid) {
-                    self.clarify = None;
+                if self
+                    .active_thread
+                    .clarify
+                    .as_ref()
+                    .is_some_and(|c| c.session == sid)
+                {
+                    self.active_thread.clarify = None;
                 }
             }
             Evt::Todos(sid, todos, _at) if self.is_current(&sid) => {
@@ -354,14 +371,14 @@ impl BenchApp {
                     .iter()
                     .any(|t| t.status == "pending" || t.status == "in_progress");
                 if live {
-                    self.todos = todos;
+                    self.active_thread.todos = todos;
                 } else {
-                    self.todos.clear();
+                    self.active_thread.todos.clear();
                 }
             }
             Evt::Usage(sid, usage) if self.is_current(&sid) => {
                 self.speed.usage(&usage);
-                self.usage = Some(usage);
+                self.active_thread.usage = Some(usage);
             }
             Evt::Complete { session, text } if self.is_current(&session) => {
                 // Bench in the background: say the open chat is done (in front, it's on screen).
@@ -371,14 +388,14 @@ impl BenchApp {
                         .map(str::trim)
                         .find(|l| !l.is_empty())
                         .unwrap_or("Done");
-                    let id = self.session.clone().unwrap_or_default();
+                    let id = self.active_thread.session.clone().unwrap_or_default();
                     crate::system::notify::post(
                         &id,
                         &self.current_title(),
                         &bench_ui::clip(first, 140),
                     );
                 }
-                self.live = None;
+                self.active_thread.live = None;
                 self.speed.finish();
                 // The answer is over: its speed is the thread's to keep (Bench measured it, the
                 // agent stores it where the thread lives).
@@ -410,7 +427,7 @@ impl BenchApp {
                 .find(|r| r.id == old.id)
                 .is_some_and(|r| !r.running);
             let own = crate::app::model::source_label(&old.source) == "Bench";
-            if done && own && self.session.as_deref() != Some(old.id.as_str()) {
+            if done && own && self.active_thread.session.as_deref() != Some(old.id.as_str()) {
                 let title = if old.title.is_empty() {
                     "Bench"
                 } else {

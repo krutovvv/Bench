@@ -176,12 +176,12 @@ fewer form fields. Then check what it did to signups and give me a short summary
             .into_iter()
             .find(|r| matches!(r, ::thread::Row::Work { .. }))
         {
-            app.open_work.insert(key);
+            app.active_thread.open_work.insert(key);
         }
     }
-    app.thread = landing.clone();
+    app.active_thread.journal = landing.clone();
     app.demo_threads.insert("d-landing".into(), landing);
-    app.session = Some("d-landing".into());
+    app.active_thread.session = Some("d-landing".into());
     other_modes(app);
     subject_threads(app, now);
     // The demo's projects: each thread in one (the Telegram and cron ones stay without).
@@ -240,9 +240,9 @@ fewer form fields. Then check what it did to signups and give me a short summary
         _ => Some("d-site"),
     };
     if let Some(id) = open {
-        app.session = Some(id.into());
-        app.thread = app.demo_threads.get(id).cloned().unwrap_or_default();
-        app.thread_project = app
+        app.active_thread.session = Some(id.into());
+        app.active_thread.journal = app.demo_threads.get(id).cloned().unwrap_or_default();
+        app.active_thread.thread_project = app
             .sessions
             .iter()
             .find(|s| s.id == id)
@@ -264,9 +264,9 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 30.,
             );
         }
-        app.session = Some("d-landing".into());
-        app.thread = journal.thread();
-        app.processes.clear();
+        app.active_thread.session = Some("d-landing".into());
+        app.active_thread.journal = journal.thread();
+        app.active_thread.processes.clear();
     }
     // `BENCH_DEMO_JUMP=1`: "Jump to latest" pressed two seconds after opening.
     if std::env::var("BENCH_DEMO_JUMP").is_ok() {
@@ -280,14 +280,14 @@ fewer form fields. Then check what it did to signups and give me a short summary
     }
     // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {
-        app.session = None;
-        app.thread = Default::default();
+        app.active_thread.session = None;
+        app.active_thread.journal = Default::default();
     }
-    app.processes = processes(now);
+    app.active_thread.processes = processes(now);
     if open.is_some() {
-        app.processes.clear();
+        app.active_thread.processes.clear();
     }
-    app.usage = Some(Usage {
+    app.active_thread.usage = Some(Usage {
         model: "Qwen3.8-Next-Flash".into(),
         context_used: 38_400,
         context_max: 131_072,
@@ -304,8 +304,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // `BENCH_CLARIFY=1` (with `BENCH_CLARIFY_MULTI=1`) over a demo thread: the agent's question
     // card, its choices long enough to show they wrap.
     if std::env::var("BENCH_CLARIFY").is_ok() {
-        app.clarify = Some(crate::app::model::ClarifyReq {
-            session: app.session.clone().unwrap_or_default(),
+        app.active_thread.clarify = Some(crate::app::model::ClarifyReq {
+            session: app.active_thread.session.clone().unwrap_or_default(),
             prompt_id: "demo".into(),
             generation: None,
             question: "Как оформить разделы шестерни (Settings)?".into(),
@@ -434,7 +434,7 @@ fn run(cx: &mut Context<BenchApp>) {
             );
             if this
                 .update(cx, |app, cx| {
-                    app.thread.apply(e);
+                    app.active_thread.journal.apply(e);
                     cx.notify();
                 })
                 .is_err()

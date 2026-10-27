@@ -29,9 +29,9 @@ impl BenchApp {
                 this.profile_effort = i;
             }
             // The profile's level is for new chats: an open session already has its own.
-            if let Some(i) = level.filter(|_| this.runtime.is_none()) {
-                this.effort = i;
-                this.effort_other = None;
+            if let Some(i) = level.filter(|_| this.active_thread.runtime.is_none()) {
+                this.active_thread.effort = i;
+                this.active_thread.effort_other = None;
                 this.effort_pending = false;
                 this.effort_choice.update(cx, |s, cx| {
                     s.set_selected_index(Some(IndexPath::new(i)), window, cx)

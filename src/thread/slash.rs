@@ -79,7 +79,11 @@ impl BenchApp {
         if self.demo {
             return true;
         }
-        match self.projects.iter().find(|p| p.id == self.thread_project) {
+        match self
+            .projects
+            .iter()
+            .find(|p| p.id == self.active_thread.thread_project)
+        {
             Some(p) => p.browser,
             None => self.host_browser,
         }

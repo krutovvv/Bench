@@ -144,7 +144,7 @@ impl BenchApp {
 impl BenchApp {
     /// A waiting message (the thread's queue): sent now, into the running work, or taken back.
     pub fn queued(&mut self, id: String, send_now: bool, cx: &mut Context<Self>) {
-        let Some(session) = self.runtime.clone() else {
+        let Some(session) = self.active_thread.runtime.clone() else {
             return;
         };
         self.cmd(if send_now {
@@ -202,7 +202,7 @@ impl BenchApp {
             return;
         };
         let text = field.read(cx).value().trim().to_string();
-        if let Some(session) = self.runtime.clone() {
+        if let Some(session) = self.active_thread.runtime.clone() {
             if !text.is_empty() {
                 self.cmd(Cmd::QueueEdit { session, id, text });
             }

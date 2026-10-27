@@ -15,9 +15,9 @@ impl BenchApp {
     /// The question card: choices (one click answers; with multi-select, tick then Send), an
     /// answer of your own, or Decline.
     pub(crate) fn render_clarify(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let req = self.clarify.clone()?;
+        let req = self.active_thread.clarify.clone()?;
         let theme = cx.theme().clone();
-        let picked = self.clarify_picked.clone();
+        let picked = self.active_thread.clarify_picked.clone();
         let choices: Vec<AnyElement> = req
             .choices
             .iter()
@@ -142,30 +142,39 @@ impl BenchApp {
     /// under the head when open. It goes when no step is left to do (`Evt::Todos`), so an ended
     /// plan never lingers.
     pub(crate) fn render_plan(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.todos.is_empty() {
+        if self.active_thread.todos.is_empty() {
             return None;
         }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let open = self.plan_open;
+        let open = self.active_thread.plan_open;
         let done = self
+            .active_thread
             .todos
             .iter()
             .filter(|t| t.status == "completed")
             .count();
         let total = self
+            .active_thread
             .todos
             .iter()
             .filter(|t| t.status != "cancelled")
             .count();
         let current = self
+            .active_thread
             .todos
             .iter()
             .find(|t| t.status == "in_progress")
-            .or_else(|| self.todos.iter().find(|t| t.status == "pending"))
+            .or_else(|| {
+                self.active_thread
+                    .todos
+                    .iter()
+                    .find(|t| t.status == "pending")
+            })
             .map(|t| t.content.clone());
         let steps: Vec<AnyElement> = if open {
-            self.todos
+            self.active_thread
+                .todos
                 .iter()
                 .map(|t| {
                     let (icon, color, strike) = match t.status.as_str() {
@@ -227,7 +236,7 @@ impl BenchApp {
             .on_click(cx.listener(|this, _, _, cx| {
                 // Folding is the thread's own click: it must not pull the focus to the composer.
                 this.click_claimed = true;
-                this.plan_open = !this.plan_open;
+                this.active_thread.plan_open = !this.active_thread.plan_open;
                 cx.notify();
             }));
         let frame = v_flex()

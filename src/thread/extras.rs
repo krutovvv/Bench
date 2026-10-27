@@ -15,7 +15,7 @@ use bench_ui::icons::Ico;
 impl BenchApp {
     /// The agent waits: what it wants to run, and the answers it accepts.
     pub(crate) fn render_approval(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let req = self.approval.clone()?;
+        let req = self.active_thread.approval.clone()?;
         let theme = cx.theme().clone();
         let label = |c: &str| match c {
             "once" => "Allow once",
@@ -76,7 +76,9 @@ impl BenchApp {
 
     /// The pages the work right above answer `k` touched: one chip per site.
     pub(crate) fn render_sources(&self, k: usize, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let Some(Row::Work { key, steps, .. }) = k.checked_sub(1).map(|j| &self.tv.rows[j]) else {
+        let Some(Row::Work { key, steps, .. }) =
+            k.checked_sub(1).map(|j| &self.active_thread.tv.rows[j])
+        else {
             return None;
         };
         let mut urls = vec![];

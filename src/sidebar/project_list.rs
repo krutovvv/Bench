@@ -40,7 +40,7 @@ impl BenchApp {
         self.new_session(cx);
         self.new_project = None;
         self.new_subject = String::new();
-        self.thread_project = project;
+        self.active_thread.thread_project = project;
         // The thread exists at once ("Untitled" in the project until its first message).
         self.create_thread_now();
         cx.notify();

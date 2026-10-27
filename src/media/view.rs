@@ -54,8 +54,11 @@ impl BenchApp {
                 Segment::Code { lang, code } => {
                     let fence = if code.contains("```") { "~~~~" } else { "```" };
                     let md = format!("{fence}{lang}\n{code}{fence}");
-                    let body =
-                        TextView::new(&self.texts.state(&format!("code-{key}-{k}"), &md, cx));
+                    let body = TextView::new(&self.active_thread.texts.state(
+                        &format!("code-{key}-{k}"),
+                        &md,
+                        cx,
+                    ));
                     render_code(body, key, k, lang, code, cx)
                 }
             })

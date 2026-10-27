@@ -38,7 +38,7 @@ impl Render for BenchApp {
         self.sync_draft(window, cx);
         // A new chat is a code editor's empty file: the caret alone (no avatars yet), focused.
         // The composer never has a placeholder: it is the thread's next text, not a form field.
-        let fresh = self.thread.is_empty() && self.session.is_none();
+        let fresh = self.active_thread.journal.is_empty() && self.active_thread.session.is_none();
         if fresh != self.composer_fresh {
             self.composer_fresh = fresh;
             if fresh && self.center == Center::Chat {

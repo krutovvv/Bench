@@ -14,11 +14,11 @@ impl BenchApp {
     /// After the last turn: every file this session edited, with +/- counts.
     pub(crate) fn render_session_files(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let files = self.session_files();
-        if files.is_empty() || self.thread.running() {
+        if files.is_empty() || self.active_thread.journal.running() {
             return None;
         }
         let theme = cx.theme().clone();
-        let open = self.files_open;
+        let open = self.active_thread.files_open;
         let count = files.len();
         let (all_add, all_del) = files
             .iter()
@@ -135,7 +135,7 @@ impl BenchApp {
                         d.child(div().text_color(theme.danger).child(format!("−{all_del}")))
                     })
                     .on_click(cx.listener(|this, _, _, cx| {
-                        this.files_open = !this.files_open;
+                        this.active_thread.files_open = !this.active_thread.files_open;
                         cx.notify();
                     })),
                 )
@@ -149,7 +149,7 @@ impl BenchApp {
     /// Every file the thread's work edited or wrote: (path, its diffs).
     pub fn session_files(&self) -> Vec<(String, Vec<String>)> {
         let mut out: Vec<(String, Vec<String>)> = vec![];
-        for r in &self.tv.rows {
+        for r in &self.active_thread.tv.rows {
             let Row::Work { steps, .. } = r else { continue };
             for s in steps {
                 let Step::Tool {

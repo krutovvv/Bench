@@ -83,8 +83,8 @@ impl BenchApp {
     /// Work out the open session's project (and its live branch); infer it from edited files
     /// when the agent has none.
     pub(crate) fn resolve_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(session) = self.session.clone() else {
-            self.project = None;
+        let Some(session) = self.active_thread.session.clone() else {
+            self.active_thread.project = None;
             return;
         };
         let known = self.project_of(&session);
@@ -99,14 +99,14 @@ impl BenchApp {
                     .first()
                     .and_then(|(p, _)| p.rsplit_once('/').map(|(d, _)| d.to_string()))
                 else {
-                    self.project = None;
+                    self.active_thread.project = None;
                     return;
                 };
                 dir
             }
         };
         if known.is_some() {
-            self.project = known;
+            self.active_thread.project = known;
         }
         let target = self.target.clone();
         self.background(
@@ -119,7 +119,7 @@ impl BenchApp {
                 Ok((top, branch))
             },
             move |this, r: anyhow::Result<(String, String)>, _window, cx| {
-                if this.session.as_deref() != Some(&session) {
+                if this.active_thread.session.as_deref() != Some(&session) {
                     return;
                 }
                 match r {
@@ -132,7 +132,7 @@ impl BenchApp {
                                 serde_json::to_vec(&this.inferred).unwrap_or_default(),
                             );
                         }
-                        this.project = Some(Project::from_top(&top, &branch));
+                        this.active_thread.project = Some(Project::from_top(&top, &branch));
                     }
                     // The folder is gone or not a repo: keep what the agent recorded, if anything.
                     Err(_) => {}
@@ -182,7 +182,8 @@ impl BenchApp {
     }
 
     pub(crate) fn current_title(&self) -> String {
-        self.session
+        self.active_thread
+            .session
             .as_ref()
             .and_then(|id| self.sessions.iter().find(|s| &s.id == id))
             .map(|s| s.title.clone())

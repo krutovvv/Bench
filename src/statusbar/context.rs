@@ -12,6 +12,7 @@ impl BenchApp {
     /// Rough tokens of the open chat: its text at ~3.5 characters a token.
     pub(super) fn estimate_tokens(&self) -> u64 {
         let chars: usize = self
+            .active_thread
             .tv
             .rows
             .iter()
@@ -43,6 +44,7 @@ impl BenchApp {
         let tilde = if estimated { "~" } else { "" };
         // Which model this thread answers with; the project sets it in its environment.
         if let Some(m) = self
+            .active_thread
             .usage
             .as_ref()
             .map(|u| u.model.clone())
@@ -62,6 +64,7 @@ impl BenchApp {
             rows.push(("Left".into(), compact(max.saturating_sub(used))));
         }
         let messages = self
+            .active_thread
             .tv
             .rows
             .iter()
@@ -69,6 +72,7 @@ impl BenchApp {
             .count();
         rows.push(("Messages".into(), messages.to_string()));
         let tools = self
+            .active_thread
             .tv
             .rows
             .iter()
@@ -82,7 +86,7 @@ impl BenchApp {
         if !files.is_empty() {
             rows.push(("Files changed".into(), files.len().to_string()));
         }
-        if let Some(u) = self.usage.as_ref() {
+        if let Some(u) = self.active_thread.usage.as_ref() {
             if u.calls > 0 {
                 rows.push(("Model calls".into(), u.calls.to_string()));
             }

@@ -17,7 +17,9 @@ use gpui_kit::prelude::FluentBuilder as _;
 impl BenchApp {
     /// Ask the gateway again (the poll, and right after a Stop).
     pub(crate) fn poll_processes(&self) {
-        if let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) {
+        if let (Some(profile), Some(session)) =
+            (self.profile.clone(), self.active_thread.runtime.clone())
+        {
             self.cmd(Cmd::Processes { profile, session });
         }
     }
@@ -34,15 +36,17 @@ impl BenchApp {
             )
         });
         let running = list.iter().any(|p| p.running);
-        if list != self.processes || running {
+        if list != self.active_thread.processes || running {
             // Running ones repaint for their clocks.
-            self.processes = list;
+            self.active_thread.processes = list;
             cx.notify();
         }
     }
 
     pub(crate) fn kill_process(&mut self, id: String, cx: &mut Context<Self>) {
-        if let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) {
+        if let (Some(profile), Some(session)) =
+            (self.profile.clone(), self.active_thread.runtime.clone())
+        {
             self.cmd(Cmd::KillProcess {
                 profile,
                 session,
@@ -55,10 +59,10 @@ impl BenchApp {
 
     /// A row's output shown or hidden.
     pub(crate) fn toggle_process_output(&mut self, id: String, cx: &mut Context<Self>) {
-        if self.process_open.as_deref() == Some(id.as_str()) {
-            self.process_open = None;
+        if self.active_thread.process_open.as_deref() == Some(id.as_str()) {
+            self.active_thread.process_open = None;
         } else {
-            self.process_open = Some(id);
+            self.active_thread.process_open = Some(id);
         }
         cx.notify();
     }
@@ -69,7 +73,7 @@ impl BenchApp {
     /// work began: running or finished, each with Stop (while it runs) and its latest output a
     /// click away.
     pub(crate) fn render_processes(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.processes.is_empty() {
+        if self.active_thread.processes.is_empty() {
             return None;
         }
         let theme = cx.theme().clone();
@@ -77,9 +81,14 @@ impl BenchApp {
         let now = web_time::SystemTime::now()
             .duration_since(web_time::UNIX_EPOCH)
             .map_or(0., |d| d.as_secs_f64());
-        let running = self.processes.iter().filter(|p| p.running).count();
-        let done = self.processes.len() - running;
-        let open = self.processes_open;
+        let running = self
+            .active_thread
+            .processes
+            .iter()
+            .filter(|p| p.running)
+            .count();
+        let done = self.active_thread.processes.len() - running;
+        let open = self.active_thread.processes_open;
         let mut bits = vec![];
         if running > 0 {
             bits.push(format!("{running} running"));
@@ -88,6 +97,7 @@ impl BenchApp {
             bits.push(format!("{done} finished"));
         }
         let rows: Vec<AnyElement> = self
+            .active_thread
             .processes
             .iter()
             .filter(|_| open)
@@ -114,7 +124,7 @@ impl BenchApp {
                         _ => code,
                     }
                 };
-                let shown = self.process_open.as_deref() == Some(p.id.as_str());
+                let shown = self.active_thread.process_open.as_deref() == Some(p.id.as_str());
                 let (id_toggle, id_kill) = (p.id.clone(), p.id.clone());
                 // "cd <project> && cargo build": the folder is the session's, the rest is news.
                 let shown_cmd = match p.command.strip_prefix("cd ") {
@@ -247,7 +257,7 @@ impl BenchApp {
         .on_click(cx.listener(|this, _, _, cx| {
             // Folding is the thread's own click: it must not pull the focus to the composer.
             this.click_claimed = true;
-            this.processes_open = !this.processes_open;
+            this.active_thread.processes_open = !this.active_thread.processes_open;
             cx.notify();
         }));
         let frame = v_flex()

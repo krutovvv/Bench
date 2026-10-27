@@ -111,7 +111,7 @@ impl BenchApp {
 
         // Context: the agent's numbers once a turn has run; before that (a reopened chat) a rough
         // estimate from the transcript, marked "~". The limit falls back to model.context_length.
-        let usage = self.usage.clone();
+        let usage = self.active_thread.usage.clone();
         let real = usage.as_ref().filter(|u| u.context_used > 0);
         let max = real
             .map(|u| u.context_max)
@@ -127,7 +127,9 @@ impl BenchApp {
             0.
         };
         let stats = self.session_stats(used, max, estimated);
-        let context = (max > 0 && (self.session.is_some() || !self.thread.is_empty())).then(|| {
+        let context = (max > 0
+            && (self.active_thread.session.is_some() || !self.active_thread.journal.is_empty()))
+        .then(|| {
             let color = if percent > 85. {
                 theme.danger
             } else if percent > 60. {
@@ -189,6 +191,7 @@ impl BenchApp {
             (Some(l), _) => Some(format!("{} t/s", rate(l))),
             (None, Some(g)) => Some(format!("{} t/s", rate(g))),
             _ => self
+                .active_thread
                 .usage
                 .as_ref()
                 .and_then(|u| u.avg_tps)
@@ -264,7 +267,7 @@ impl BenchApp {
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             // The fallback answering, in red: the main model failed, and why, until it answers again.
-            .children(self.fallback_on.clone().map(|(model, why)| {
+            .children(self.active_thread.fallback_on.clone().map(|(model, why)| {
                 let tip = if why.is_empty() {
                     "The main model is unavailable: the fallback answers until it is back.".to_string()
                 } else {
@@ -350,7 +353,7 @@ impl BenchApp {
             })
             // Stop last, at the window's edge: a filled chip is the heaviest thing on the bar, so
             // it belongs at the end, not among the flat icons (⌘. does the same).
-            .when(self.live.is_some(), |d| {
+            .when(self.active_thread.live.is_some(), |d| {
                 d.child(
                     h_flex().h_full().items_center().pl_1().pr_2().child(
                         div()

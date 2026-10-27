@@ -192,7 +192,7 @@ impl SettingsForm for Danger {
         app.delete_project(id.to_string(), window, cx);
         app.center = crate::workspace::Center::Chat;
         app.new_session(cx);
-        app.thread_project = String::new();
+        app.active_thread.thread_project = String::new();
         true
     }
 }

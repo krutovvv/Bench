@@ -24,7 +24,7 @@ impl BenchApp {
 
     /// Another chat is open (or the new one): the composer shows its draft.
     pub(crate) fn sync_draft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let key = self.session.clone().unwrap_or_default();
+        let key = self.active_thread.session.clone().unwrap_or_default();
         if self.draft_key.as_ref() == Some(&key) {
             return;
         }

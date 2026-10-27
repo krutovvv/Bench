@@ -45,7 +45,7 @@ impl BenchApp {
 
     /// Events carry the runtime id.
     pub(crate) fn is_current(&self, sid: &str) -> bool {
-        self.runtime.as_deref() == Some(sid)
+        self.active_thread.runtime.as_deref() == Some(sid)
     }
 
     pub(crate) fn refresh_sessions(&self) {

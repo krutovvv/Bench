@@ -47,9 +47,9 @@ impl BenchApp {
             // ⌘⌫ / ⌘⌦: delete the open thread — asked once, as ⌫ ⌫ in the sidebar
             // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's.
             ("backspace" | "delete", false)
-                if self.center == Center::Chat && self.session.is_some() =>
+                if self.center == Center::Chat && self.active_thread.session.is_some() =>
             {
-                let id = self.session.clone().unwrap_or_default();
+                let id = self.active_thread.session.clone().unwrap_or_default();
                 if self.confirm_delete.as_deref() == Some(id.as_str()) {
                     self.delete_session(id, window, cx);
                 } else {
@@ -76,7 +76,7 @@ impl BenchApp {
                     self.close_doc(key, cx);
                 }
             }
-            (".", false) if self.live.is_some() => self.stop(cx),
+            (".", false) if self.active_thread.live.is_some() => self.stop(cx),
             ("=" | "+", _) => self.step_size(1, window, cx),
             ("-", false) => self.step_size(-1, window, cx),
             _ => return false,

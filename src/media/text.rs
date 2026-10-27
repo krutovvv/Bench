@@ -149,13 +149,13 @@ impl BenchApp {
         text: &str,
         cx: &mut Context<Self>,
     ) -> TextView {
-        let state = self.texts.state(id, text, cx);
+        let state = self.active_thread.texts.state(id, text, cx);
         answer_style(TextView::new(&state))
     }
 
     /// The person's own words exactly as written, from the thread's kept texts.
     pub(crate) fn kept_plain(&mut self, id: &str, text: &str, cx: &mut Context<Self>) -> TextView {
-        let state = self.texts.state(id, &escape_plain(text), cx);
+        let state = self.active_thread.texts.state(id, &escape_plain(text), cx);
         TextView::new(&state)
     }
 }

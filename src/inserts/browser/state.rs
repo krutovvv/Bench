@@ -72,7 +72,7 @@ impl BenchApp {
         };
         let open = self.center == crate::workspace::Center::Chat && self.thread_has_browser();
         let recent = self.sites.touched.is_some_and(|t| t.elapsed() < IDLE);
-        b.set_paused(!(open && (self.live.is_some() || recent)));
+        b.set_paused(!(open && (self.active_thread.live.is_some() || recent)));
         if let Some(tab) = self.thread_tab() {
             // Asleep on the server (memory): woken, its new id comes back in `woke`.
             if open && b.is_asleep(&tab) {
@@ -152,7 +152,7 @@ impl BenchApp {
             {
                 self.sites.reopening = None;
                 claim = Some(new.clone());
-            } else if self.live.is_some() {
+            } else if self.active_thread.live.is_some() {
                 claim = moved.last().or(fresh.last()).cloned();
             }
             if let Some((_, new)) = woke.iter().find(|(old, _)| *old == tab) {

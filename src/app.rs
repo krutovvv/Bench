@@ -28,7 +28,7 @@ use crate::env::ProjectEnv;
 use crate::settings::new_project::ProjectForm;
 use crate::workspace::{Center, Dock, DockPosition, Panel};
 
-use crate::app::model::{EFFORTS, Profile, SessionRow, SkillRow, Target, Usage};
+use crate::app::model::{EFFORTS, Profile, SessionRow, SkillRow, Target};
 use crate::client::connection::{self};
 use crate::client::rest;
 use crate::client::rpc::Evt;
@@ -47,6 +47,9 @@ pub struct Live {
 }
 
 pub struct BenchApp {
+    /// The open thread: its session, its journal and list, its run, what waits in it, what it
+    /// asks (`thread/active.rs`).
+    pub active_thread: crate::thread::ActiveThread,
     pub targets: Vec<Target>,
     pub target: Target,
     /// The gateway list as a Select (kept for its subscription; the status bar has its own menu).
@@ -64,8 +67,6 @@ pub struct BenchApp {
     pub insert_live: HashMap<String, String>,
     /// The waiting message whose words the person is fixing, and the field they fix them in.
     pub queue_edit: Option<(String, Entity<TextareaState>)>,
-    /// The project the open thread belongs to (a new one is created in it); "" = none.
-    pub thread_project: String,
     /// The person's projects: the sidebar.
     pub projects: Vec<crate::app::model::ProjectEntry>,
     /// The machine's own agent (Host) has the watchable server browser.
@@ -118,10 +119,6 @@ pub struct BenchApp {
     pub profile: Option<String>,
     pub profile_choice: Entity<Choice>,
     pub sessions: Vec<SessionRow>,
-    /// Stored id of the open session (what the session list shows).
-    pub session: Option<String>,
-    /// The id the gateway uses for prompts and events of the open session.
-    pub runtime: Option<String>,
     pub confirm_delete: Option<String>,
     /// Stored id -> runtime id for sessions this client has opened (to close before delete).
     pub(crate) opened: HashMap<String, String>,
@@ -130,45 +127,19 @@ pub struct BenchApp {
     pub tg_people: Vec<(String, String)>,
     pub tg_visible: Option<HashSet<String>>,
 
-    /// The open thread: its journal, what is being written, its queue (`crates/thread`).
-    pub thread: ::thread::Thread,
     /// Each thread opened in this run, as last shown: switching back shows it at once.
     pub thread_cache: HashMap<String, ::thread::Thread>,
-    /// The open thread on screen: its list and rows (`ui::thread`).
-    pub tv: crate::thread::View,
-    /// Opened pieces of work and steps, by the work row's key.
-    pub open_work: HashSet<String>,
-    /// The open thread's texts, parsed once (`ui::media::Texts`).
-    pub texts: crate::media::text::Texts,
-    /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
-    pub history_error: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer.
     pub demo_draft_done: bool,
     /// `BENCH_DEMO_SCROLL=end` was done.
     pub demo_scrolled: bool,
-    pub live: Option<Live>,
-    pub(crate) queued: Option<String>,
     /// Send was pressed while dictating: send once the speech is recognized.
     pub send_after_transcribe: bool,
-    /// The "Changed files" list under the last turn is unfolded (folded by default).
-    pub files_open: bool,
-    /// The open session's background processes (`thread/processes.rs`), the card's fold, and
-    /// the process whose output is shown.
-    pub processes: Vec<crate::app::model::BgProcess>,
-    pub processes_open: bool,
-    pub process_open: Option<String>,
     /// Files waiting in the composer to go with the next message.
     pub attachments: Vec<std::path::PathBuf>,
     /// The project's code sent to a thread from the Explorer, waiting with its message, by
     /// `thread_key` (each thread its own, as its draft).
     pub references: HashMap<String, Vec<crate::thread::attachments::Reference>>,
-    pub usage: Option<Usage>,
-    /// The fallback model is answering the open thread: (its model, why the main one failed).
-    pub fallback_on: Option<(String, String)>,
-    pub effort: usize,
-    /// The open session's effort when it is none of EFFORTS (set elsewhere, e.g. `high`; "" is the
-    /// provider's default): shown as it is, nothing checked.
-    pub effort_other: Option<String>,
     /// The profile's `agent.reasoning_effort`: where a new chat starts.
     pub(crate) profile_effort: usize,
     /// The profile's primary model and its fallbacks, as (model, provider).
@@ -185,15 +156,7 @@ pub struct BenchApp {
     pub slash_sel: usize,
     pub slash_closed: bool,
     pub slash_scroll: ScrollHandle,
-    /// The agent waits for an answer (approval mode manual/smart).
-    pub approval: Option<crate::app::model::ApprovalReq>,
-    /// A question the agent asks, the choices ticked so far (multi-select), the free answer.
-    pub clarify: Option<crate::app::model::ClarifyReq>,
-    pub clarify_picked: Vec<usize>,
     pub clarify_input: Entity<InputState>,
-    /// The agent's plan for this chat, and whether its list is unfolded.
-    pub todos: Vec<crate::app::model::Todo>,
-    pub plan_open: bool,
     /// The profile's `approvals.mode`, once read.
     pub approval_mode: Option<String>,
     /// The profile's own approvals, effort and model have arrived: until then the status bar
@@ -215,8 +178,6 @@ pub struct BenchApp {
     /// Session folders/repos as the agent recorded them, and repos inferred from edited files.
     pub places: HashMap<String, crate::app::model::Place>,
     pub inferred: HashMap<String, String>,
-    /// The open session's project (None for chats that touch no repo).
-    pub project: Option<crate::app::model::Project>,
     /// The agent's default working folder (sessions started there have no folder of their own).
     pub default_cwd: Option<String>,
     /// Reopen this session once the list arrives (where the app was last closed).
@@ -409,7 +370,6 @@ impl BenchApp {
             insert_draft: Vec::new(),
             queue_edit: None,
             insert_live: HashMap::new(),
-            thread_project: String::new(),
             projects: vec![],
             host_browser: false,
             project_form: None,
@@ -439,34 +399,17 @@ impl BenchApp {
             profile: None,
             profile_choice,
             sessions: vec![],
-            session: None,
-            runtime: None,
             confirm_delete: None,
             opened: HashMap::new(),
             tg_owner: HashMap::new(),
             tg_people: vec![],
             tg_visible: None,
-            thread: Default::default(),
             thread_cache: HashMap::new(),
-            tv: Default::default(),
-            open_work: HashSet::new(),
-            texts: Default::default(),
-            history_error: None,
             demo_draft_done: false,
             demo_scrolled: false,
-            live: None,
-            queued: None,
             attachments: vec![],
             references: HashMap::new(),
-            files_open: false,
-            processes: vec![],
-            processes_open: false,
-            process_open: None,
             send_after_transcribe: false,
-            usage: None,
-            fallback_on: None,
-            effort: EFFORTS.len() - 1,
-            effort_other: None,
             profile_effort: EFFORTS.len() - 1,
             profile_models: vec![],
             pv: Default::default(),
@@ -476,19 +419,13 @@ impl BenchApp {
             slash_sel: 0,
             slash_closed: false,
             slash_scroll: ScrollHandle::new(),
-            approval: None,
-            clarify: None,
-            clarify_picked: vec![],
             clarify_input,
-            todos: vec![],
-            plan_open: false,
             approval_mode: None,
             profile_context: 0,
             marks: crate::sidebar::marks::load(),
             start_place: next.as_ref().map(|(_, p, s)| (p.clone(), s.clone())),
             places: HashMap::new(),
             inferred: HashMap::new(),
-            project: None,
             default_cwd: None,
             resume_session: None,
             new_project: None,
@@ -507,6 +444,7 @@ impl BenchApp {
             left_dock: Dock::new(DockPosition::Left, &[Panel::Threads, Panel::Explorer], true),
             right_dock: Dock::new(DockPosition::Right, &[Panel::Thread], false),
             bottom_dock: Dock::new(DockPosition::Bottom, &[Panel::Terminal], false),
+            active_thread: Default::default(),
             explorer: Default::default(),
             skills: vec![],
             skill_open: None,

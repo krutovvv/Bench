@@ -176,6 +176,7 @@ impl BenchApp {
         }
         let order = self.drawn_threads();
         let at = self
+            .active_thread
             .session
             .as_ref()
             .and_then(|id| order.iter().position(|o| o == id));

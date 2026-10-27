@@ -111,22 +111,22 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         }
         // The project's terminal under the post, its lines sent to the thread beside.
         "terminal" => {
-            app.session = Some("d-site".into());
-            app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
+            app.active_thread.session = Some("d-site".into());
+            app.active_thread.journal = app.demo_threads.get("d-site").cloned().unwrap_or_default();
             app.bottom_dock.activate(crate::workspace::Panel::Terminal);
             app.send_terminal_to_thread(window, cx);
         }
         // The project's Problems, sent to the thread beside.
         "problems" => {
-            app.session = Some("d-site".into());
-            app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
+            app.active_thread.session = Some("d-site".into());
+            app.active_thread.journal = app.demo_threads.get("d-site").cloned().unwrap_or_default();
             app.open_problems(window, cx);
             app.send_problems_to_thread("p-blog", window, cx);
         }
         // The thread beside the post, lines of it sent to the composer (⌘L).
         "thread" => {
-            app.session = Some("d-site".into());
-            app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
+            app.active_thread.session = Some("d-site".into());
+            app.active_thread.journal = app.demo_threads.get("d-site").cloned().unwrap_or_default();
             app.right_dock.activate(crate::workspace::Panel::Thread);
             app.add_reference(
                 crate::thread::attachments::Reference::Code(crate::thread::attachments::CodeRef {

@@ -117,7 +117,10 @@ impl BenchApp {
 
     /// The open thread's key for things kept per thread: its session id, or "draft".
     pub fn thread_key(&self) -> String {
-        self.session.clone().unwrap_or_else(|| "draft".into())
+        self.active_thread
+            .session
+            .clone()
+            .unwrap_or_else(|| "draft".into())
     }
 
     /// "!command": typed into the thread's terminal (its last terminal insert); a thread with
@@ -166,7 +169,8 @@ impl BenchApp {
 
     /// The open thread's folder, when it works in one.
     fn folder_of_current(&self) -> Option<String> {
-        self.session
+        self.active_thread
+            .session
             .as_ref()
             .and_then(|id| self.folder_of(id))
             .or_else(|| self.new_project.clone())

@@ -173,10 +173,10 @@ impl BenchApp {
                     if this.media_playing.is_some() {
                         cx.notify(); // the elapsed time
                     }
-                    if this.live.is_some() {
+                    if this.active_thread.live.is_some() {
                         this.speed.tick();
                     }
-                    if this.live.is_some() || this.recorder.is_some() {
+                    if this.active_thread.live.is_some() || this.recorder.is_some() {
                         cx.notify();
                     }
                     this.tick_tasks(cx);

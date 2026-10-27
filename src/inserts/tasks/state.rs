@@ -344,7 +344,7 @@ impl BenchApp {
 
     /// What the open thread is about: its session's subject, or the new chat's.
     pub fn current_subject(&self) -> String {
-        match &self.session {
+        match &self.active_thread.session {
             Some(id) => self
                 .sessions
                 .iter()
@@ -492,9 +492,9 @@ impl BenchApp {
     /// The tasks follow the open thread: in a project its tag filters the list (dropped with a
     /// click on "All"); in Host every task shows.
     pub fn sync_task_project(&mut self) {
-        if self.tasks.project != self.thread_project {
-            self.tasks.project = self.thread_project.clone();
-            self.tasks.tag_filter = self.project_tag(&self.thread_project);
+        if self.tasks.project != self.active_thread.thread_project {
+            self.tasks.project = self.active_thread.thread_project.clone();
+            self.tasks.tag_filter = self.project_tag(&self.active_thread.thread_project);
         }
     }
 

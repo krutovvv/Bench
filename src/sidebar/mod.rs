@@ -210,7 +210,8 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let selected = self.center == Center::Chat && self.session.as_deref() == Some(id);
+        let selected =
+            self.center == Center::Chat && self.active_thread.session.as_deref() == Some(id);
         let title = self
             .sessions
             .iter()

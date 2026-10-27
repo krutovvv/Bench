@@ -73,7 +73,7 @@ impl BenchApp {
             key,
             state,
             folded: false,
-            after: self.thread.messages() + usize::from(draft),
+            after: self.active_thread.journal.messages() + usize::from(draft),
         };
         if draft {
             self.insert_draft.push(ins.id.clone());
@@ -82,7 +82,7 @@ impl BenchApp {
             .entry(thread.clone())
             .or_default()
             .push(ins.clone());
-        match self.session.clone() {
+        match self.active_thread.session.clone() {
             Some(session) => self.send_insert(&session, &ins),
             None => self.create_thread_now(),
         }
@@ -116,7 +116,7 @@ impl BenchApp {
     /// A new chat's session, made before any message (an insert was put into it, or a
     /// project's "+": the thread shows in the sidebar at once).
     pub(crate) fn create_thread_now(&mut self) {
-        if self.creating || self.runtime.is_some() {
+        if self.creating || self.active_thread.runtime.is_some() {
             return;
         }
         let Some(profile) = self.profile.clone() else {
@@ -160,7 +160,7 @@ impl BenchApp {
             }
         }
         // A draft's inserts reach the agent when its session does (`inserts_created`).
-        if let Some(session) = self.session.clone() {
+        if let Some(session) = self.active_thread.session.clone() {
             self.cmd(Cmd::PatchInsert {
                 session,
                 id: id.to_string(),

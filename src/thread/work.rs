@@ -30,7 +30,7 @@ impl BenchApp {
             .iter()
             .filter(|s| matches!(s, Step::Tool { failed: true, .. }))
             .count();
-        let open = self.open_work.contains(key);
+        let open = self.active_thread.open_work.contains(key);
         // A live piece of work counts on; a finished one keeps the time its steps took.
         let secs = match (from, to, live) {
             (Some(a), _, true) => Some((now_secs() * 1000. - a).max(0.) / 1000.),
@@ -88,8 +88,8 @@ impl BenchApp {
             })
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.click_claimed = true;
-                if !this.open_work.remove(&work_key) {
-                    this.open_work.insert(work_key.clone());
+                if !this.active_thread.open_work.remove(&work_key) {
+                    this.active_thread.open_work.insert(work_key.clone());
                 }
                 cx.notify();
             }));

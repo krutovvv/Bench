@@ -22,19 +22,19 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let current = self.efforts.get(self.effort).cloned();
+        let current = self.efforts.get(self.active_thread.effort).cloned();
         let profile = self.efforts.get(self.profile_effort).cloned();
         self.efforts = levels;
         let last = self.efforts.len().saturating_sub(1);
         let at = |v: Option<String>| v.and_then(|v| self.efforts.iter().position(|e| *e == v));
-        self.effort = at(current).unwrap_or(last);
+        self.active_thread.effort = at(current).unwrap_or(last);
         self.profile_effort = at(profile).unwrap_or(last);
         let labels: Vec<SharedString> = self
             .efforts
             .iter()
             .map(|e| SharedString::from(e.clone()))
             .collect();
-        let selected = self.effort;
+        let selected = self.active_thread.effort;
         self.effort_choice.update(cx, |s, cx| {
             s.set_items(labels, window, cx);
             s.set_selected_index(Some(IndexPath::new(selected)), window, cx)
@@ -42,9 +42,9 @@ impl BenchApp {
     }
 
     pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
-        self.effort = i;
-        self.effort_other = None;
-        match self.runtime.clone() {
+        self.active_thread.effort = i;
+        self.active_thread.effort_other = None;
+        match self.active_thread.runtime.clone() {
             Some(session) => {
                 self.effort_pending = false;
                 self.cmd(Cmd::SetEffort {
@@ -59,7 +59,7 @@ impl BenchApp {
 
     pub(crate) fn take_effort(&mut self) -> Option<String> {
         std::mem::take(&mut self.effort_pending)
-            .then(|| self.efforts.get(self.effort).cloned())
+            .then(|| self.efforts.get(self.active_thread.effort).cloned())
             .flatten()
     }
 
@@ -99,8 +99,8 @@ impl BenchApp {
         // answer is ready — with its files too: they are staged first (copied aside, uploaded
         // over SSH), then the same queue. The old refusal ("files go with the next message")
         // was ours, not Pi's: the inbox takes a follow-up with attachments like any other.
-        if self.live.is_some() {
-            let Some(session) = self.runtime.clone() else {
+        if self.active_thread.live.is_some() {
+            let Some(session) = self.active_thread.runtime.clone() else {
                 return;
             };
             let text = typed;
@@ -111,7 +111,7 @@ impl BenchApp {
             self.references.remove(&self.thread_key());
             let context = self.block_context(cx);
             // It becomes the thread's next message: the inserts that waited with it go after it.
-            let after = self.thread.messages() + 1;
+            let after = self.active_thread.journal.messages() + 1;
             if files.is_empty() {
                 self.cmd(Cmd::Queue {
                     session,
@@ -138,7 +138,7 @@ impl BenchApp {
                 let _ = this.update_in(cx, |this, window, cx| match prepared {
                     Ok(prep) => {
                         // The thread he sent from, even if another is open by now.
-                        let same = this.runtime.as_deref() == Some(session.as_str());
+                        let same = this.active_thread.runtime.as_deref() == Some(session.as_str());
                         this.cmd(Cmd::Queue {
                             session,
                             text: with_attachments(&text, &prep.lines),
@@ -174,14 +174,14 @@ impl BenchApp {
             .map(|f| format!("{}{}]", attach::PREFIX, f.display()))
             .collect();
         let shown = with_attachments(&text, &shown);
-        self.thread.sent(shown.clone());
+        self.active_thread.journal.sent(shown.clone());
         // Inserts put while this message was in the composer sit after it, not before.
-        let after = self.thread.messages();
+        let after = self.active_thread.journal.messages();
         self.anchor_draft_inserts(after, cx);
         self.follow = true;
         self.speed.begin_answer();
         self.speed.request();
-        self.live = Some(Live {
+        self.active_thread.live = Some(Live {
             label: if files.is_empty() {
                 "Sending…"
             } else {
@@ -208,17 +208,17 @@ impl BenchApp {
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match prepared {
                 Ok(prep) => {
-                    if let Some(live) = this.live.as_mut() {
+                    if let Some(live) = this.active_thread.live.as_mut() {
                         live.label = "Sending…".into();
                     }
                     let full = with_attachments(&text, &prep.lines);
                     // Shown with the files where they were; sent with where they are now.
-                    this.thread.resent(&shown, full.clone());
+                    this.active_thread.journal.resent(&shown, full.clone());
                     this.submit(profile, full, window, cx);
                 }
                 Err(e) => {
-                    this.live = None;
-                    this.thread.unsent(&shown);
+                    this.active_thread.live = None;
+                    this.active_thread.journal.unsent(&shown);
                     // His files come back: the message stays his to send again.
                     this.attachments = keep;
                     this.toast(
@@ -241,7 +241,7 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        match self.runtime.clone() {
+        match self.active_thread.runtime.clone() {
             Some(session) => match self.parse_command(&text) {
                 Some((name, arg)) => self.cmd(Cmd::Dispatch {
                     profile,
@@ -264,7 +264,7 @@ impl BenchApp {
             None => {
                 // A new session is created on the first message; the effort goes with it.
                 self.effort_pending = true;
-                self.queued = Some(text.clone());
+                self.active_thread.queued = Some(text.clone());
                 let group = self.group_name.read(cx).value().trim().to_string();
                 if self.new_project.is_none() && !group.is_empty() {
                     // A named group: its folder first (made where the gateway lives), then the chat.
@@ -299,19 +299,28 @@ impl BenchApp {
 
     /// Ask the last question again: the gateway drops the last exchange, then the same text is sent.
     pub fn regenerate(&mut self, cx: &mut Context<Self>) {
-        let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) else {
+        let (Some(profile), Some(session)) =
+            (self.profile.clone(), self.active_thread.runtime.clone())
+        else {
             return;
         };
-        if self.thread.running() {
+        if self.active_thread.journal.running() {
             return;
         }
-        let Some(text) = self.tv.rows.iter().rev().find_map(|r| match r {
-            ::thread::Row::User { text, .. } => Some(text.clone()),
-            _ => None,
-        }) else {
+        let Some(text) = self
+            .active_thread
+            .tv
+            .rows
+            .iter()
+            .rev()
+            .find_map(|r| match r {
+                ::thread::Row::User { text, .. } => Some(text.clone()),
+                _ => None,
+            })
+        else {
             return;
         };
-        self.live = Some(Live {
+        self.active_thread.live = Some(Live {
             label: "Regenerating…".into(),
         });
         self.follow = true;
@@ -332,24 +341,27 @@ impl BenchApp {
     }
 
     pub(crate) fn answer_text(&self, key: &str) -> Option<String> {
-        self.tv.rows.iter().find_map(|r| match r {
+        self.active_thread.tv.rows.iter().find_map(|r| match r {
             ::thread::Row::Answer { key: k, text, .. } if k == key => Some(text.clone()),
             _ => None,
         })
     }
 
     pub fn stop(&mut self, cx: &mut Context<Self>) {
-        if let (Some(profile), Some(session)) = (self.profile.clone(), self.runtime.clone()) {
+        if let (Some(profile), Some(session)) =
+            (self.profile.clone(), self.active_thread.runtime.clone())
+        {
             self.cmd(Cmd::Interrupt { profile, session });
         }
         cx.notify();
     }
 
     pub fn answer_approval(&mut self, choice: String, cx: &mut Context<Self>) {
-        let (Some(req), Some(profile)) = (self.approval.take(), self.profile.clone()) else {
+        let (Some(req), Some(profile)) = (self.active_thread.approval.take(), self.profile.clone())
+        else {
             return;
         };
-        if let Some(live) = self.live.as_mut() {
+        if let Some(live) = self.active_thread.live.as_mut() {
             live.label = "Working…".into();
         }
         self.cmd(Cmd::Approve {
