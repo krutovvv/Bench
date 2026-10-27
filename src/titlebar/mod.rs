@@ -75,7 +75,8 @@ impl BenchApp {
                 .small()
                 .text_color(theme.muted_foreground)
                 .icon(bench_ui::icons::Ico::GitBranch.icon().small())
-                .label(label)
+                // A Button's `.label()` takes the control's size: the bars' size is set here.
+                .child(div().text_xs().child(label))
                 .dropdown_menu(move |menu, _, _| {
                     // One line each, clipped: a long subject or path must not grow the menu
                     // wider than the window (clicking still copies the whole thing).
@@ -137,7 +138,8 @@ impl BenchApp {
                     div()
                         .flex_1()
                         .min_w_0()
-                        .text_sm()
+                        // The bars' one size, the status bar's: title, chips and buttons alike.
+                        .text_xs()
                         .font_weight(FontWeight::MEDIUM)
                         .truncate()
                         .child(name),
@@ -165,7 +167,8 @@ impl BenchApp {
                     div()
                         .flex_1()
                         .min_w_0()
-                        .text_sm()
+                        // The bars' one size, the status bar's: title, chips and buttons alike.
+                        .text_xs()
                         .font_weight(FontWeight::MEDIUM)
                         .truncate()
                         .child(title),
@@ -179,7 +182,7 @@ impl BenchApp {
         bar.child(
             div()
                 .px_4()
-                .text_sm()
+                .text_xs()
                 .font_weight(FontWeight::MEDIUM)
                 .child(title),
         )
