@@ -39,7 +39,7 @@ impl BenchApp {
     /// pinned projects and pinned threads first.
     pub fn sidebar_groups(&self) -> (Vec<usize>, Vec<(ProjectEntry, Vec<usize>)>) {
         let visible = self.visible_sessions();
-        let loose: Vec<usize> = visible
+        let mut loose: Vec<usize> = visible
             .iter()
             .copied()
             .filter(|&i| {
@@ -48,6 +48,8 @@ impl BenchApp {
                     && (s.project.is_empty() || !self.projects.iter().any(|p| p.id == s.project))
             })
             .collect();
+        // Pinned first in the Host's group too: a new thread lands under them, never above.
+        loose.sort_by_key(|&i| !self.mark_of(&self.sessions[i].id).pinned);
         let mut projects = self.projects.clone();
         projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
         let groups = projects
