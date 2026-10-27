@@ -472,11 +472,11 @@ impl BenchApp {
                     let (said, _) = crate::media::attach::split(&text);
                     if !said.is_empty() {
                         self.texts
-                            .state(&key, &crate::media::view::escape_plain(&said), cx);
+                            .state(&key, &crate::media::text::escape_plain(&said), cx);
                     }
                 }
                 Row::Answer { key, text, .. } => {
-                    for (k, seg) in crate::media::view::answer_segments(&text)
+                    for (k, seg) in crate::media::text::answer_segments(&text)
                         .into_iter()
                         .enumerate()
                     {

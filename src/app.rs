@@ -139,7 +139,7 @@ pub struct BenchApp {
     /// Opened pieces of work and steps, by the work row's key.
     pub open_work: HashSet<String>,
     /// The open thread's texts, parsed once (`ui::media::Texts`).
-    pub texts: crate::media::view::Texts,
+    pub texts: crate::media::text::Texts,
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
     pub history_error: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer.

@@ -161,7 +161,7 @@ impl BenchApp {
                             .px_4()
                             .py_3()
                             .text_base()
-                            .child(crate::media::view::markdown(
+                            .child(crate::media::text::markdown(
                                 "tool-md",
                                 self.tools.preview.clone(),
                             )),

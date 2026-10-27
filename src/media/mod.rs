@@ -6,20 +6,23 @@
 pub(crate) mod attach;
 pub(crate) mod audio;
 pub(crate) mod video;
+pub(crate) mod chip;
+mod diagram;
+mod fetch;
+mod latex;
+mod playback;
+pub(crate) mod text;
 pub(crate) mod view;
 mod voice;
 
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use std::io::Read;
-use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+pub use diagram::*;
+pub use fetch::*;
+pub use latex::*;
 
-use anyhow::{Result, bail};
+use std::path::Path;
 
-use crate::client::connection::{Connection, state_dir};
-use crate::app::model::Target;
-use crate::client::rest;
+use anyhow::Result;
+
 
 /// Something fetched or drawn off the UI thread.
 #[derive(Clone, Debug)]
@@ -229,292 +232,6 @@ fn inline_media(line: &str) -> (String, Vec<String>) {
     (out, paths)
 }
 
-pub(crate) fn hash_of(parts: &[&str]) -> String {
-    let mut h = DefaultHasher::new();
-    parts.hash(&mut h);
-    format!("{:016x}", h.finish())
-}
-
-fn home() -> PathBuf {
-    PathBuf::from(std::env::var("HOME").unwrap_or_default())
-}
-
-/// A delivered file, ready to show: where it is on this Mac and what to draw for it.
-#[derive(Clone, Debug)]
-pub struct Fetched {
-    pub local: PathBuf,
-    /// An image's size in pixels.
-    pub size: Option<(f32, f32)>,
-    /// A video's or document's Quick Look picture, with its size.
-    pub thumb: Option<(PathBuf, (f32, f32))>,
-    /// A Markdown file's text.
-    pub text: Option<String>,
-}
-
-const MAX_DOWNLOAD: u64 = 512 << 20;
-
-/// The file itself, when the gateway runs on this Mac and it is there.
-fn on_this_mac(target: &Target, path: &str) -> Option<PathBuf> {
-    let p = match path.strip_prefix("~/") {
-        Some(rest) => home().join(rest),
-        None => PathBuf::from(path),
-    };
-    (*target == Target::Local && p.is_file()).then_some(p)
-}
-
-/// A local file whose preview needs no work (no download, no Quick Look run): ready in the
-/// same frame, so the chat lays out at its final height and nothing jumps.
-pub fn fetch_now(target: &Target, path: &str) -> Option<Fetched> {
-    let local = on_this_mac(target, path)?;
-    if matches!(kind(path), Kind::Video | Kind::Doc) && !thumb_file(&local).is_file() {
-        return None;
-    }
-    prepare(local, path).ok()
-}
-
-/// Bring a delivered file here (a local gateway's files are read in place) and prepare its
-/// preview. Blocking: call off the UI thread.
-/// `machine`: the file is on that machine, not the agent's own (a project worked over SSH).
-pub fn fetch(
-    conn: &Connection,
-    target: &Target,
-    machine: Option<&str>,
-    profile: &str,
-    path: &str,
-) -> Result<Fetched> {
-    let local = match on_this_mac(target, path) {
-        Some(p) => p,
-        None => download(conn, target, machine, profile, path)?,
-    };
-    prepare(local, path)
-}
-
-/// A local file prepared now (its video frame drawn), so the first paint already has it — for
-/// the demo, which has no gateway to fetch through.
-pub fn warm(path: &str) {
-    let _ = prepare(PathBuf::from(path), path);
-}
-
-fn prepare(local: PathBuf, path: &str) -> Result<Fetched> {
-    let mut out = Fetched {
-        local: local.clone(),
-        size: None,
-        thumb: None,
-        text: None,
-    };
-    match kind(path) {
-        Kind::Image => {
-            out.size = imagesize::size(&local)
-                .ok()
-                .map(|s| (s.width as f32, s.height as f32));
-        }
-        Kind::Markdown => {
-            let mut bytes = vec![];
-            std::fs::File::open(&local)?
-                .take(256 << 10)
-                .read_to_end(&mut bytes)?;
-            out.text = Some(String::from_utf8_lossy(&bytes).into_owned());
-        }
-        Kind::Video | Kind::Doc => out.thumb = quick_look(&local).ok(),
-        Kind::Audio | Kind::File => {}
-    }
-    Ok(out)
-}
-
-fn download(
-    conn: &Connection,
-    target: &Target,
-    machine: Option<&str>,
-    profile: &str,
-    path: &str,
-) -> Result<PathBuf> {
-    let bytes = rest::download(conn, profile, machine, path, MAX_DOWNLOAD)?;
-    let dir = state_dir()
-        .join("media")
-        .join(hash_of(&[&target.label(), profile, path]));
-    std::fs::create_dir_all(&dir)?;
-    let file = dir.join(file_name(path));
-    std::fs::write(&file, bytes)?;
-    Ok(file)
-}
-
-/// Where a file's Quick Look picture is kept: by path, size and modification time, so an
-/// overwritten file gets a new one.
-fn thumb_file(file: &Path) -> PathBuf {
-    let meta = std::fs::metadata(file).ok();
-    let stamp = meta
-        .as_ref()
-        .map(|m| {
-            let t = m
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map_or(0, |d| d.as_secs());
-            format!("{}-{t}", m.len())
-        })
-        .unwrap_or_default();
-    let dir = state_dir()
-        .join("media")
-        .join("thumbs")
-        .join(hash_of(&[&file.to_string_lossy(), &stamp]));
-    dir.join(format!(
-        "{}.png",
-        file.file_name().unwrap_or_default().to_string_lossy()
-    ))
-}
-
-/// The first frame or page as Quick Look draws it (`qlmanage -t`), with its pixel size.
-fn quick_look(file: &Path) -> Result<(PathBuf, (f32, f32))> {
-    let png = thumb_file(file);
-    if !png.is_file() {
-        let dir = png.parent().unwrap_or(Path::new("/tmp"));
-        std::fs::create_dir_all(dir)?;
-        let status = Command::new("qlmanage")
-            .args(["-t", "-s", "720", "-o"])
-            .arg(dir)
-            .arg(file)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()?;
-        if !status.success() || !png.is_file() {
-            bail!("no preview");
-        }
-    }
-    let s = imagesize::size(&png)?;
-    Ok((png, (s.width as f32, s.height as f32)))
-}
-
-/// A diagram as an SVG file and its size in points. Cached on disk by source and theme.
-pub type Diagram = (PathBuf, (f32, f32));
-
-pub fn mermaid_svg(code: &str, dark: bool) -> Result<Diagram> {
-    let dir = state_dir().join("diagrams");
-    std::fs::create_dir_all(&dir)?;
-    let file = dir.join(format!(
-        "{}.svg",
-        hash_of(&[code, if dark { "dark" } else { "light" }])
-    ));
-    let svg = match std::fs::read_to_string(&file) {
-        Ok(svg) => svg,
-        Err(_) => {
-            let mut options = mermaid_rs_renderer::RenderOptions::modern();
-            if dark {
-                options.theme = mermaid_rs_renderer::Theme::dark();
-            }
-            let svg = mermaid_rs_renderer::render_with_options(code, options)?;
-            std::fs::write(&file, &svg)?;
-            svg
-        }
-    };
-    let head = &svg[..svg.find('>').unwrap_or(svg.len())];
-    let num = |attr: &str| -> Option<f32> {
-        let at = head.find(attr)? + attr.len();
-        head[at..].split('"').next()?.parse().ok()
-    };
-    match (num(" width=\""), num(" height=\"")) {
-        (Some(w), Some(h)) if w > 0. && h > 0. => Ok((file, (w, h))),
-        _ => bail!("diagram has no size"),
-    }
-}
-
-/// LaTeX as Unicode text: x², α, √x, ∑ᵢ, a/b. Fractions, text and roots are unwrapped here;
-/// the symbols are unicodeit's.
-pub fn latex_text(tex: &str) -> String {
-    fn group(s: &str) -> Option<(String, &str)> {
-        let s = s.trim_start();
-        let rest = s.strip_prefix('{')?;
-        let mut depth = 1;
-        for (i, c) in rest.char_indices() {
-            match c {
-                '{' => depth += 1,
-                '}' => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return Some((rest[..i].to_string(), &rest[i + 1..]));
-                    }
-                }
-                _ => {}
-            }
-        }
-        None
-    }
-    let wrap = |s: String| {
-        if s.chars().count() <= 1 || s.chars().all(|c| c.is_alphanumeric()) {
-            s
-        } else {
-            format!("({s})")
-        }
-    };
-    let mut out = String::new();
-    let mut rest = tex;
-    while let Some(at) = rest.find('\\') {
-        out.push_str(&rest[..at]);
-        let after = &rest[at + 1..];
-        let name: String = after
-            .chars()
-            .take_while(|c| c.is_ascii_alphabetic())
-            .collect();
-        let tail = &after[name.len()..];
-        match name.as_str() {
-            "frac" | "dfrac" | "tfrac" => match group(tail).and_then(|(a, t)| Some((a, group(t)?)))
-            {
-                Some((a, (b, t))) => {
-                    out.push_str(&format!(
-                        "{}/{}",
-                        wrap(latex_text(&a)),
-                        wrap(latex_text(&b))
-                    ));
-                    rest = t;
-                    continue;
-                }
-                None => out.push_str("\\frac"),
-            },
-            "sqrt" => match group(tail) {
-                Some((a, t)) => {
-                    out.push_str(&format!("√{}", wrap(latex_text(&a))));
-                    rest = t;
-                    continue;
-                }
-                None => out.push_str("\\sqrt"),
-            },
-            "text" | "mathrm" | "operatorname" | "textrm" | "mathit" | "textbf" | "mathbf" => {
-                match group(tail) {
-                    Some((a, t)) => {
-                        out.push_str(&a);
-                        rest = t;
-                        continue;
-                    }
-                    None => {}
-                }
-            }
-            "left" | "right" | "displaystyle" => {
-                rest = tail;
-                continue;
-            }
-            "" => {
-                // \, \; \! \  : spacing.
-                let c = after.chars().next().unwrap_or(' ');
-                if matches!(c, ',' | ';' | ':' | ' ' | '!') {
-                    out.push(if c == '!' { '\u{200b}' } else { ' ' });
-                    rest = &after[c.len_utf8()..];
-                    continue;
-                }
-                out.push('\\');
-                rest = after;
-                continue;
-            }
-            _ => {}
-        }
-        out.push('\\');
-        out.push_str(&name);
-        rest = tail;
-    }
-    out.push_str(rest);
-    unicodeit::replace(&out)
-        .replace(['{', '}'], "")
-        .replace("\u{200b}", "")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -596,14 +313,5 @@ print(1)
                 Segment::Text("![web](https://x.io/c.png)\n".into()),
             ]
         );
-    }
-
-    #[test]
-    fn latex_reads_as_text() {
-        assert_eq!(latex_text("E = mc^2"), "E = mc²");
-        assert_eq!(latex_text("\\frac{a+b}{2}"), "(a+b)/2");
-        assert_eq!(latex_text("\\sqrt{x} \\leq \\alpha"), "√x ≤ α");
-        assert_eq!(latex_text("\\text{cost} \\times 3"), "cost × 3");
-        assert_eq!(latex_text("\\int_0^1 f(x)\\,dx"), "∫₀¹ f(x) dx");
     }
 }

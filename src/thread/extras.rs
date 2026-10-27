@@ -11,7 +11,7 @@ use gpui_kit::*;
 use super::work::{host_of, tool_urls};
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
-use crate::media::view::plain_text;
+use crate::media::text::plain_text;
 use bench_ui::{clock, plural};
 
 impl BenchApp {
