@@ -321,7 +321,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // the same, its settings open.
     match std::env::var("BENCH_DEMO").as_deref() {
         Ok("explorer") | Ok("env") => {
-            app.sidebar_panel = crate::workspace::SidebarPanel::Explorer;
+            app.left_dock.activate(crate::workspace::Panel::Explorer);
             app.explorer.project = "p-blog".into();
         }
         _ => {}

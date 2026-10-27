@@ -50,7 +50,7 @@ takes them again).
   tall as its text). In `crates/ui`: `settings_heading`, `settings_field`, `segmented`.
 - **The Explorer** — `crates/ui/src/ide.rs`: `tree_heading`, `tree_row`, `tree_pl` (a tree's
   indent), `ide_head` (an open document's head), `doc_tab` (its tab), `QUICK_W` (⌘P),
-  `BESIDE_W` (the right dock).
+  `LEFT_DOCK`, `RIGHT_DOCK`, `BOTTOM_DOCK` (a dock's size and its range).
 
 A piece that is not here: add it to `crates/ui` (and to the storybook), then use it — not in the
 screen that needs it. Ask the person before inventing a new kind of control.

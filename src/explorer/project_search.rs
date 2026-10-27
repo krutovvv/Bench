@@ -8,7 +8,7 @@ use super::{DocKey, FileRef, Find};
 use crate::app::BenchApp;
 use crate::client::rest;
 use crate::env::enc;
-use crate::workspace::SidebarPanel;
+use crate::workspace::Panel;
 use bench_ui::icons::Ico;
 use gpui_kit::component::input::Input;
 use gpui_kit::component::input::{InputEvent, InputState, Position};
@@ -104,7 +104,7 @@ impl BenchApp {
 impl BenchApp {
     /// ⌘⇧F: the field over the tree.
     pub fn open_find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.sidebar_panel != SidebarPanel::Explorer {
+        if !self.left_dock.shows(Panel::Explorer) {
             self.toggle_side(window, cx);
         }
         if self.explorer_root().is_none() {

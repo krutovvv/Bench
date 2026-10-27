@@ -191,10 +191,33 @@ pub fn doc_tab(
 pub const QUICK_W: f32 = 560.;
 pub const QUICK_MAX_H: f32 = 420.;
 
-/// The right dock (a file kept beside): its width at first, and how far it can be dragged.
-pub const BESIDE_W: f32 = 520.;
-pub const BESIDE_MIN_W: f32 = 280.;
-pub const BESIDE_MAX_W: f32 = 1000.;
+/// A dock's size (a side dock's width, the bottom dock's height): at first, and how far it can be
+/// dragged.
+#[derive(Clone, Copy, Debug)]
+pub struct DockSize {
+    pub start: f32,
+    pub min: f32,
+    pub max: f32,
+}
+
+/// The left dock: the threads, the Explorer's tree.
+pub const LEFT_DOCK: DockSize = DockSize {
+    start: 280.,
+    min: 200.,
+    max: 480.,
+};
+/// The right dock: the thread beside a document.
+pub const RIGHT_DOCK: DockSize = DockSize {
+    start: 520.,
+    min: 280.,
+    max: 1000.,
+};
+/// The bottom dock, under the center: a terminal.
+pub const BOTTOM_DOCK: DockSize = DockSize {
+    start: 260.,
+    min: 120.,
+    max: 640.,
+};
 
 /// A tab's name is cut past this.
 pub const TAB_MAX_W: f32 = 180.;

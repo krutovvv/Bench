@@ -11,7 +11,7 @@ use serde_json::json;
 use super::{DocKey, Entry, Explorer, FileRef, Named, Naming};
 use crate::app::BenchApp;
 use crate::client::rest;
-use crate::workspace::SidebarPanel;
+use crate::workspace::Panel;
 
 impl BenchApp {
     /// The Explorer on `project` (its environment read, its tree as it was left).
@@ -34,7 +34,7 @@ impl BenchApp {
         }
         // The IDE takes the window: the tree on the left, documents in the center (its last one
         // again, or a word on how to open one).
-        self.sidebar_panel = SidebarPanel::Explorer;
+        self.left_dock.activate(Panel::Explorer);
         self.center = crate::workspace::Center::Doc;
         if self
             .explorer
@@ -62,9 +62,9 @@ impl BenchApp {
     /// The IDE closed (its pressed button atop the sidebar, ⌘E): the threads again, the thread
     /// that was open in the center, nothing beside it. Its documents stay for the next time.
     pub fn close_explorer(&mut self, cx: &mut Context<Self>) {
-        self.sidebar_panel = SidebarPanel::Threads;
+        self.left_dock.activate(Panel::Threads);
         self.center = crate::workspace::Center::Chat;
-        self.right = None;
+        self.right_dock.open = false;
         let ex = &mut self.explorer;
         ex.quick = None;
         ex.find = None;
@@ -75,7 +75,7 @@ impl BenchApp {
 
     /// ⌘E: the IDE closed, or opened on the open thread's project.
     pub fn toggle_side(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.sidebar_panel == SidebarPanel::Explorer {
+        if self.left_dock.shows(Panel::Explorer) {
             self.close_explorer(cx);
         } else {
             let project = self.thread_project_or_host();

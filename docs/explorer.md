@@ -7,7 +7,7 @@ places that every view fills in its own way:
 ```
 ┌──────────────┬───────────────────────────────┬────────────────┐
 │ Sidebar      │ The middle                    │ Beside         │
-│ (SidebarPanel) │ (Center)                        │ (optional)     │
+│ (left_dock)  │ (Center)                      │ (right_dock)   │
 │              │                               │                │
 │ Threads      │ Chat — the open thread        │ the thread     │
 │ Explorer     │ Doc — the open document, tabs │ beside a       │
@@ -17,14 +17,19 @@ places that every view fills in its own way:
 └──────────────┴───────────────────────────────┴────────────────┘
 ```
 
-- **The sidebar** lists one thing at a time: `SidebarPanel::Threads` (projects and their threads)
-  or `SidebarPanel::Explorer` (one project's tree). The Explorer is opened from a project (its menu's Explorer, ⌘E on the open thread's project) and takes the window: tree, documents, the thread beside on demand; its pressed button atop the sidebar (or ⌘E) closes it and brings the thread back. A new
-  way to look at things (search across threads, git, tasks) is a new `SidebarPanel` with its own
+- **The docks** (`src/workspace/dock.rs`, as Zed's): a `Dock` holds a list of `Panel`s and shows
+  one at a time, open or folded, at its own size. The window has three — `left_dock`,
+  `right_dock`, `bottom_dock` (under the center, empty until the terminal comes) — drawn
+  around the center by `workspace/layout.rs`, each panel by its own module
+  (`BenchApp::render_panel`).
+- **The left dock** shows one panel at a time: `Panel::Threads` (projects and their threads)
+  or `Panel::Explorer` (one project's tree). The Explorer is opened from a project (its menu's Explorer, ⌘E on the open thread's project) and takes the window: tree, documents, the thread beside on demand; its pressed button atop the sidebar (or ⌘E) closes it and brings the thread back. A new
+  way to look at things (search across threads, git, tasks) is a new `Panel` in the left dock's
   list, nothing else changes.
 - **The center** is `Center` (`src/workspace/mod.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
   file's click shows `Doc` with a tab per open document (the tabs are the center's own bar,
   under the window's title bar). Leaving the Explorer does not close documents: their tabs come back.
-- **The right dock** shows the thread beside a document (`RightPanel::Thread`, ⌘J or the
+- **The right dock** shows the thread beside a document (`Panel::Thread` in `right_dock`, ⌘J or the
   button in the window's top-right corner) — the same thread the center shows in the threads
   view, so the IDE needs no chat of its own.
 
@@ -79,7 +84,7 @@ checks the code here, the agent writes it in threads. It stays far smaller than 
 one click away) and grows by putting the same parts in more places, not by new copies:
 
 - **Docks hold panels, the center holds items** — as in Zed. The right dock shows one panel at
-  a time (`RightPanel`): the open **thread** beside the code (the same `render_chat` the center
+  a time (`right_dock`): the open **thread** beside the code (the same `render_chat` the center
   shows, so the IDE costs no second chat). Files are never kept beside: they open as tabs. In
   the threads view the right dock is empty (the thread is the center).
 - **Code goes to the thread as references.** ⌘L sends the selection (or the whole file) to the
@@ -113,10 +118,11 @@ Phases, each a thing of its own:
   rows are `FileRef`s — opening, saving, renaming already work for any of them.
 - A diff view, an image viewer, a Markdown preview: another body in `view.rs` `file_pane` for
   the kind of file (`Doc::binary` already says "not text").
-- Several panels in a dock, a bottom dock, a split middle: `RightPanel` becomes a dock's list of
-  panels; documents are already shared by key.
+- A panel in a dock (the terminal in the bottom dock, a second thread, a Problems panel): a
+  `Panel` variant, its dock's list in `BenchApp::new`, its drawing in `render_panel`. A split
+  middle: documents are already shared by key.
 - A thread opening a file (a changed file in its answer) in the editor, itself beside it: done in
-  `thread/changed_files.rs` (`open_doc` + `RightPanel::Thread`).
+  `thread/changed_files.rs` (`open_doc` + `right_dock.activate(Panel::Thread)`).
 
 ## What the person sees, briefly
 

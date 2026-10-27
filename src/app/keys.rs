@@ -112,14 +112,14 @@ impl BenchApp {
     pub(crate) fn open_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let search = self.search.clone();
         // A hidden sidebar comes back to show its search.
-        self.sidebar_hidden = false;
+        self.left_dock.open = true;
         search.update(cx, |s, cx| s.focus(window, cx));
         cx.notify();
     }
 
     /// ⌘\ or the toggle in the sidebar's top strip (the header's, while it is hidden).
     pub(crate) fn toggle_sidebar(&mut self, cx: &mut Context<Self>) {
-        self.sidebar_hidden = !self.sidebar_hidden;
+        self.left_dock.toggle();
         cx.notify();
     }
 

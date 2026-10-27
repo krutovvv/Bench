@@ -115,7 +115,7 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         "thread" => {
             app.session = Some("d-site".into());
             app.thread = app.demo_threads.get("d-site").cloned().unwrap_or_default();
-            app.right = Some(crate::workspace::RightPanel::Thread);
+            app.right_dock.activate(crate::workspace::Panel::Thread);
             app.add_reference(
                 crate::thread::attachments::Reference::Code(crate::thread::attachments::CodeRef {
                     path: "/Users/demo/code/blog/content/posts/release-2-4.md".into(),

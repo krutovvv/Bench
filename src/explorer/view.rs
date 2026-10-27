@@ -179,17 +179,6 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// The right dock: the thread beside the code.
-    pub(crate) fn render_right(
-        &mut self,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> Option<AnyElement> {
-        Some(match self.right_shown()? {
-            crate::workspace::RightPanel::Thread => self.render_thread_panel(window, cx),
-        })
-    }
-
     /// The header in `Center::Doc`: a tab per open document.
     pub(crate) fn render_doc_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();

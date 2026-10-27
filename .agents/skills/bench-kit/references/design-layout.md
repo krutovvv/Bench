@@ -18,8 +18,9 @@ Sizes are `bench_ui` names (`crates/ui/src/metrics.rs`); the numbers below are w
 └───────────────────────────────────────────────────────────────┘
 ```
 
-`src/workspace/layout.rs` `render_layout`: `h_resizable` with the sidebar a fixed `resizable_panel`
-(`sidebar_w`, 200–480, its width kept) and the main column; the status bar under both
+`src/workspace/layout.rs` `render_layout`: `h_resizable` with each dock a fixed `resizable_panel`
+(`Dock::size`, its range `bench_ui::LEFT_DOCK`…, kept once dragged) around the main column, the
+bottom dock under it in a `v_resizable`; the status bar under both
 (`render_statusbar`). The column divider is `quiet_divider`: transparent at rest, an accent line
 on hover. A whole project opens in Zed from its menu. The title bar is transparent: the sidebar starts with a 35px strip beside the traffic
 lights (`render_sidebar_top`: + New project, Hide sidebar ⌘\); the header (36) tops the main

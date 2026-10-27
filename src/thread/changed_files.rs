@@ -104,7 +104,7 @@ impl BenchApp {
                             path: open.clone(),
                         };
                         this.open_doc(crate::explorer::DocKey::File(f), window, cx);
-                        this.right = Some(crate::workspace::RightPanel::Thread);
+                        this.right_dock.activate(crate::workspace::Panel::Thread);
                     }))
                     .into_any_element()
             })

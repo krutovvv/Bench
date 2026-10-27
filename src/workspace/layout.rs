@@ -2,15 +2,15 @@
 //! (`render_layout`), the status bar under everything; the keys for the whole window see every
 //! key first.
 
-use gpui_kit::component::resizable::{h_resizable, resizable_panel};
+use gpui_kit::component::resizable::{h_resizable, resizable_panel, v_resizable};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::workspace::Center;
+use crate::workspace::{Center, DockPosition};
 
-/// The window's column dividers draw no line at rest: the sidebar is darker than the chat, so
+/// The window's dock dividers draw no line at rest: the sidebar is darker than the chat, so
 /// the edge is its color (an old-school rule there was the eyesore). Hovered or dragged, the
 /// divider shows as an accent line, so it can still be found and pulled. The IDE panel draws
 /// its own left rule (content meets content there).
@@ -68,7 +68,7 @@ impl Render for BenchApp {
         // The sidebar folded away: its corner joins the header — room for the window's buttons
         // and the toggle that brings it back.
         let header = self.render_header(cx);
-        let header = if self.sidebar_hidden {
+        let header = if self.shown_panel(DockPosition::Left).is_none() {
             let theme = cx.theme().clone();
             h_flex()
                 .flex_none()
@@ -128,66 +128,114 @@ impl Render for BenchApp {
 }
 
 impl BenchApp {
-    /// The workspace's docks around the center (`workspace/mod.rs`): the sidebar | the center |
-    /// the right dock's panel (the thread beside a document), the docks resizable and their widths kept.
+    /// The workspace's docks around the center (`workspace/dock.rs`): the left dock | the center
+    /// over the bottom dock | the right dock, each drawn with the panel it shows; their dividers
+    /// dragged, a dock keeps its size.
     fn render_layout(
         &mut self,
         main: Div,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let hidden = self.sidebar_hidden;
-        let beside = self.render_right(window, cx);
-        let shape = (false, beside.is_some(), hidden);
+        let left = self.shown_panel(DockPosition::Left);
+        let right = self.shown_panel(DockPosition::Right);
+        let bottom = self.shown_panel(DockPosition::Bottom);
+        let shape = (left.is_some(), right.is_some(), bottom.is_some());
         if self.layout_synced != Some(shape) {
             self.layout_synced = Some(shape);
             self.layout_state = cx.new(|_| Default::default());
+            self.bottom_state = cx.new(|_| Default::default());
         }
-        let state = self.layout_state.clone();
-        // Every drag of the divider is the sidebar's width from now on.
+        let theme = cx.theme().clone();
+        // Every drag of a divider is its docks' size from now on (the center takes the rest).
         let view = cx.entity();
         let remember = move |state: &Entity<gpui_kit::component::resizable::ResizableState>,
                              _: &mut Window,
                              cx: &mut App| {
             let sizes = state.read(cx).sizes().clone();
             view.update(cx, |this, _| {
-                if let (Some(w), false) = (sizes.first(), this.sidebar_hidden) {
-                    this.sidebar_w = *w;
+                let (l, r) = (shape.0, shape.1);
+                if let (true, Some(w)) = (l, sizes.first()) {
+                    this.left_dock.size = Some(*w);
                 }
-                // The right dock's width, when it is drawn (the sizes are its, not the center's).
-                if let (Some(w), Some(_)) = (sizes.last(), this.right_shown()) {
-                    if sizes.len() > 1 {
-                        this.right_w = Some(*w);
-                    }
+                if let (true, Some(w), true) = (r, sizes.last(), sizes.len() > 1) {
+                    this.right_dock.size = Some(*w);
                 }
             });
         };
-        // Fixed: a window resize goes to the thread; the sidebar keeps its width.
-        let left = resizable_panel()
-            .size(self.sidebar_w)
-            .size_range(px(200.)..px(480.))
-            .fixed();
+        let center = match bottom {
+            Some(panel) => {
+                let view = cx.entity();
+                let remember_bottom =
+                    move |state: &Entity<gpui_kit::component::resizable::ResizableState>,
+                          _: &mut Window,
+                          cx: &mut App| {
+                        let sizes = state.read(cx).sizes().clone();
+                        view.update(cx, |this, _| {
+                            if let (Some(h), true) = (sizes.last(), sizes.len() > 1) {
+                                this.bottom_dock.size = Some(*h);
+                            }
+                        });
+                    };
+                let pane = self.render_panel(panel, window, cx);
+                v_resizable("center-bottom")
+                    .with_state(&self.bottom_state)
+                    .on_resize(remember_bottom)
+                    .child(resizable_panel().child(main))
+                    .child(
+                        resizable_panel()
+                            .size(self.bottom_dock.size())
+                            .size_range(self.bottom_dock.size_range())
+                            .fixed()
+                            .child(
+                                div()
+                                    .size_full()
+                                    .border_t_1()
+                                    .border_color(theme.border)
+                                    .bg(theme.background)
+                                    .child(pane),
+                            ),
+                    )
+                    .into_any_element()
+            }
+            None => main.into_any_element(),
+        };
+        // The left dock: its strip beside the window's buttons (`sidebar/top.rs`), its panel.
+        let left = left.map(|panel| {
+            v_flex()
+                .size_full()
+                .bg(theme.sidebar)
+                .child(self.render_sidebar_top(cx))
+                .child(div().flex_1().min_h_0().child(self.render_panel(panel, window, cx)))
+        });
+        let right = right.map(|panel| self.render_panel(panel, window, cx));
+        // Fixed: a window resize goes to the center; the docks keep their sizes.
         h_resizable("layout")
-            .with_state(&state)
+            .with_state(&self.layout_state)
             .with_handle_appearance(quiet_divider())
             .on_resize(remember)
-            .when(!hidden, |d| {
-                d.child(left.child(self.render_sidebar(window, cx)))
-            })
-            .child(resizable_panel().child(main))
-            .when_some(beside, |d, pane| {
-                let w = self.right_w.unwrap_or(px(bench_ui::BESIDE_W));
+            .when_some(left, |d, pane| {
                 d.child(
                     resizable_panel()
-                        .size(w)
-                        .size_range(px(bench_ui::BESIDE_MIN_W)..px(bench_ui::BESIDE_MAX_W))
+                        .size(self.left_dock.size())
+                        .size_range(self.left_dock.size_range())
+                        .fixed()
+                        .child(pane),
+                )
+            })
+            .child(resizable_panel().child(center))
+            .when_some(right, |d, pane| {
+                d.child(
+                    resizable_panel()
+                        .size(self.right_dock.size())
+                        .size_range(self.right_dock.size_range())
                         .fixed()
                         .child(
                             div()
                                 .size_full()
                                 .border_l_1()
-                                .border_color(cx.theme().border)
-                                .bg(cx.theme().background)
+                                .border_color(theme.border)
+                                .bg(theme.background)
                                 .child(pane),
                         ),
                 )

@@ -26,31 +26,14 @@ use bench_ui::icons::Ico;
 pub(crate) const SESSION_TITLE: f32 = 14.;
 
 impl BenchApp {
-    pub(crate) fn render_sidebar(
+    /// The left dock's threads panel (`Panel::Threads`): the search, then the projects and their
+    /// threads. The dock's strip over it is the dock's (`top.rs`).
+    pub(crate) fn render_threads_panel(
         &mut self,
-        window: &mut Window,
+        _: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        // The left dock's other panel: the Explorer's tree (`src/explorer/tree.rs`).
-        if self.sidebar_panel == crate::workspace::SidebarPanel::Explorer {
-            let rows = self.render_explorer(window, cx);
-            return v_flex()
-                .size_full()
-                .bg(theme.sidebar)
-                .child(self.render_sidebar_top(cx))
-                .child(
-                    v_flex()
-                        .id("explorer")
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_scroll()
-                        .pb_1()
-                        .children(rows),
-                )
-                .into_any_element();
-        }
+        let muted = cx.theme().muted_foreground;
         let mut list: Vec<AnyElement> = vec![];
         let searching = !self.search_query.is_empty();
         if searching {
@@ -82,10 +65,8 @@ impl BenchApp {
 
         v_flex()
             .size_full()
-            .bg(theme.sidebar)
-            // Under the window buttons: the search as a band, then the groups as an IDE's tree
-            // (a new chat: "+" on a group, or in the top strip).
-            .child(self.render_sidebar_top(cx))
+            // The search as a band, then the groups as an IDE's tree (a new chat: "+" on a
+            // group, or in the top strip).
             .child(bench_ui::search_band(&self.search, cx))
             .child(
                 v_flex()

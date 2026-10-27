@@ -26,7 +26,7 @@ mod subscriptions;
 
 use crate::env::ProjectEnv;
 use crate::settings::new_project::ProjectForm;
-use crate::workspace::{Center, RightPanel, SidebarPanel};
+use crate::workspace::{Center, Dock, DockPosition, Panel};
 
 use crate::app::model::{EFFORTS, Profile, SessionRow, SkillRow, Target, Usage};
 use crate::client::connection::{self};
@@ -162,8 +162,6 @@ pub struct BenchApp {
     /// The project's code sent to a thread from the Explorer, waiting with its message, by
     /// `thread_key` (each thread its own, as its draft).
     pub references: HashMap<String, Vec<crate::thread::attachments::Reference>>,
-    /// The sidebar is folded away (⌘\, its top strip's toggle): one thread, the whole window.
-    pub sidebar_hidden: bool,
     pub usage: Option<Usage>,
     /// The fallback model is answering the open thread: (its model, why the main one failed).
     pub fallback_on: Option<(String, String)>,
@@ -243,12 +241,14 @@ pub struct BenchApp {
 
     /// What the middle of the window shows (`workspace.rs`).
     pub center: Center,
-    /// What the sidebar lists, and the Explorer's state (`src/explorer/`).
-    pub sidebar_panel: SidebarPanel,
+    /// The window's docks, as Zed's workspace has them (`workspace/dock.rs`): the left one (the
+    /// threads or the Explorer's tree; ⌘\ folds it), the right one (the thread beside a
+    /// document), the bottom one (under the center).
+    pub left_dock: Dock,
+    pub right_dock: Dock,
+    pub bottom_dock: Dock,
+    /// The Explorer's state (`src/explorer/`).
     pub explorer: crate::explorer::Explorer,
-    /// What the right dock shows, and its width once dragged.
-    pub right: Option<RightPanel>,
-    pub right_w: Option<Pixels>,
     pub skills: Vec<SkillRow>,
     pub skill_open: Option<String>,
     /// Settings → Prompts.
@@ -301,12 +301,11 @@ pub struct BenchApp {
     pub tools: crate::inserts::tools::state::Tools,
     /// The tasks the /tasks insert shows, and its card.
     pub tasks: crate::inserts::tasks::state::TasksMode,
-    /// The left column (sessions, servers, or the maximized IDE's tree) is one column: one
-    /// width, kept by the app across the two layouts that show it (`workspace/layout.rs`).
-    pub sidebar_w: Pixels,
+    /// The docks' dividers (`workspace/layout.rs`): across the window, and over the bottom dock.
     pub layout_state: Entity<gpui_kit::component::resizable::ResizableState>,
-    /// The layout shape (maximized IDE, IDE on the right) the left width was last applied to;
-    /// a new shape gets it again.
+    pub bottom_state: Entity<gpui_kit::component::resizable::ResizableState>,
+    /// Which docks were drawn when the dividers last took their sizes; another set takes them
+    /// again.
     pub layout_synced: Option<(bool, bool, bool)>,
 
     pub(crate) _subscriptions: Vec<Subscription>,
@@ -398,8 +397,8 @@ impl BenchApp {
             ssh,
             tools,
             tasks: tasks_mode,
-            sidebar_w: px(280.),
             layout_state: cx.new(|_| Default::default()),
+            bottom_state: cx.new(|_| Default::default()),
             layout_synced: None,
             targets,
             target: initial.clone(),
@@ -459,7 +458,6 @@ impl BenchApp {
             queued: None,
             attachments: vec![],
             references: HashMap::new(),
-            sidebar_hidden: false,
             files_open: false,
             processes: vec![],
             processes_open: false,
@@ -506,10 +504,10 @@ impl BenchApp {
             search_seq: 0,
             effort_pending: false,
             center: Center::Chat,
-            sidebar_panel: SidebarPanel::Threads,
+            left_dock: Dock::new(DockPosition::Left, &[Panel::Threads, Panel::Explorer], true),
+            right_dock: Dock::new(DockPosition::Right, &[Panel::Thread], false),
+            bottom_dock: Dock::new(DockPosition::Bottom, &[], false),
             explorer: Default::default(),
-            right: None,
-            right_w: None,
             skills: vec![],
             skill_open: None,
             prompts: vec![],

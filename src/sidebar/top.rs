@@ -11,7 +11,7 @@ impl BenchApp {
     /// in the IDE (the Explorer) its button, pressed, which closes it, instead of "+".
     /// 35 + the search band's top rule = the header's 36: the two rules are one line.
     pub(crate) fn render_sidebar_top(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let ide = self.sidebar_panel == crate::workspace::SidebarPanel::Explorer;
+        let ide = self.left_dock.shows(crate::workspace::Panel::Explorer);
         let first = if ide {
             bench_ui::icon_button(
                 "ide-close",

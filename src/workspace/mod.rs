@@ -1,32 +1,19 @@
-//! The window's layout, as Zed's workspace has it: a left dock (the sidebar) showing one panel —
-//! the threads or the Explorer —, the center showing a thread, a document (a project's settings
-//! among them) or a settings page, and a right dock showing one panel — today the thread beside the
-//! code (`docs/explorer.md`). What fills each is the panel's or
-//! item's own module (`src/sidebar/mod.rs`, `src/explorer/`, `src/thread/`, `src/env/`); here
-//! is only which one is shown.
+//! The window's layout, as Zed's workspace has it: three docks (`dock.rs`) around the center,
+//! each showing one of its panels — the left one the threads or the Explorer's tree, the right
+//! one the thread beside the code, the bottom one what runs under the center — and the center
+//! showing a thread, a document (a project's settings among them) or a settings page
+//! (`docs/explorer.md`). What fills each is the panel's or item's own module
+//! (`src/sidebar/mod.rs`, `src/explorer/`, `src/thread/`, `src/env/`); here is only which one is
+//! shown.
 
+pub mod dock;
 mod layout;
 
 use gpui_kit::*;
 
+pub use dock::{Dock, DockPosition, Panel};
+
 use crate::app::BenchApp;
-
-/// What the left dock shows.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum SidebarPanel {
-    /// Projects and their threads (`src/sidebar/mod.rs`).
-    #[default]
-    Threads,
-    /// One project's tree (`src/explorer/tree.rs`).
-    Explorer,
-}
-
-/// What the right dock shows (one panel at a time; more kinds come as Zed's docks have them).
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum RightPanel {
-    /// The open thread, beside a document (`render_chat`, the center's own when it is `Chat`).
-    Thread,
-}
 
 /// What the center shows.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,11 +36,29 @@ impl Center {
 }
 
 impl BenchApp {
-    /// What the right dock shows now: the thread only beside something else than itself.
-    pub fn right_shown(&self) -> Option<RightPanel> {
-        match &self.right {
-            Some(RightPanel::Thread) if self.center == Center::Chat => None,
-            other => other.clone(),
+    /// The panel a dock shows now. The thread is beside something else than itself only: with
+    /// the center showing it, the right dock has nothing to show.
+    pub fn shown_panel(&self, dock: DockPosition) -> Option<Panel> {
+        let d = match dock {
+            DockPosition::Left => &self.left_dock,
+            DockPosition::Right => &self.right_dock,
+            DockPosition::Bottom => &self.bottom_dock,
+        };
+        d.active_panel()
+            .filter(|p| !(*p == Panel::Thread && self.center == Center::Chat))
+    }
+
+    /// A panel drawn, by its own module.
+    pub(crate) fn render_panel(
+        &mut self,
+        panel: Panel,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        match panel {
+            Panel::Threads => self.render_threads_panel(window, cx),
+            Panel::Explorer => self.render_explorer_panel(window, cx),
+            Panel::Thread => self.render_thread_panel(window, cx),
         }
     }
 
@@ -63,10 +68,8 @@ impl BenchApp {
         if self.center == Center::Chat {
             return;
         }
-        if self.right == Some(RightPanel::Thread) {
-            self.right = None;
-        } else {
-            self.right = Some(RightPanel::Thread);
+        self.right_dock.toggle_panel(Panel::Thread);
+        if self.right_dock.shows(Panel::Thread) {
             self.composer.update(cx, |s, cx| s.focus(window, cx));
         }
         cx.notify();

@@ -11,7 +11,7 @@ use gpui_kit::*;
 use super::{DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::thread::attachments::{CodeRef, Reference};
-use crate::workspace::{Center, RightPanel};
+use crate::workspace::{Center, Panel};
 use bench_ui::icons::Ico;
 
 /// A tab being dragged: what it holds, and what the ghost under the pointer says.
@@ -141,7 +141,7 @@ impl BenchApp {
     /// The thread in the right dock (unless it is the center already), its composer focused.
     pub(super) fn show_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.center != Center::Chat {
-            self.right = Some(RightPanel::Thread);
+            self.right_dock.activate(Panel::Thread);
         }
         self.composer.update(cx, |s, cx| s.focus(window, cx));
         cx.notify();

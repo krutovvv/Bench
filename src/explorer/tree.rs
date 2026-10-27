@@ -6,7 +6,7 @@
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -16,6 +16,22 @@ use crate::env::{Home, SECTIONS};
 use bench_ui::icons::Ico;
 
 impl BenchApp {
+    /// The left dock's Explorer panel (`Panel::Explorer`): the project's tree, scrolling.
+    pub(crate) fn render_explorer_panel(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let rows = self.render_explorer(window, cx);
+        v_flex()
+            .id("explorer")
+            .size_full()
+            .overflow_y_scroll()
+            .pb_1()
+            .children(rows)
+            .into_any_element()
+    }
+
     /// The sidebar's list in the Explorer view.
     pub(crate) fn render_explorer(
         &mut self,

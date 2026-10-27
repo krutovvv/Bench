@@ -9,12 +9,12 @@ use super::{DocKey, Quick};
 use crate::app::BenchApp;
 use crate::client::rest;
 use crate::env::enc;
-use crate::workspace::SidebarPanel;
+use crate::workspace::Panel;
 
 impl BenchApp {
     /// ⌘P: a field over the middle and every file of the project's folder to choose from.
     pub fn open_quick(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.sidebar_panel != SidebarPanel::Explorer || self.explorer.project.is_empty() {
+        if !self.left_dock.shows(Panel::Explorer) || self.explorer.project.is_empty() {
             let project = self.thread_project_or_host();
             self.show_explorer(project, window, cx);
         }

@@ -49,7 +49,7 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 - **What the thread shows, its order** → `crates/thread` (rules as tests), drawn by `src/thread/`.
 - **Where a project lives, a new kind of place** → `src/app/places.rs` + the agent's project row.
 - **A new insert** → a folder in `src/inserts/` (`references/build-insert.md`).
-- **The window's places** → `src/workspace/mod.rs` (`SidebarPanel`, `Center`), as Zed's workspace;
+- **The window's places** → `src/workspace/dock.rs` (`Dock`, `Panel`) and `mod.rs` (`Center`), as Zed's workspace;
   **the Explorer** (a project's files and the agent's texts as an IDE shows them) →
   `src/explorer/`, `docs/explorer.md`.
 - **A project's Settings or parts** → a file in `src/env/` implementing `Section` (its `Home`), a line in `SECTIONS`
