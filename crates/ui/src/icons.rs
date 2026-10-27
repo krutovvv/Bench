@@ -79,6 +79,7 @@ icons! {
     FolderGit => "folder-git-2",
     Save => "save",
     ListChecks => "list-checks",
+    Tag => "tag",
     Loader => "loader-circle",
     MemoryStick => "memory-stick",
     Mic => "mic",

@@ -2,7 +2,9 @@
 //! open one with its tags as a filter strip, Today with "This Evening", Upcoming as the next seven
 //! days then months, the Logbook by day then month; the open task's card.
 
+use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::{Input, Textarea};
+use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -420,6 +422,7 @@ impl BenchApp {
             usize::MAX
         };
         let id = t.id.clone();
+        let view = cx.entity();
         let (i1, i2, i3, i4, i5) = (id.clone(), id.clone(), id.clone(), id.clone(), id.clone());
         let armed = self.tasks.delete_armed.as_deref() == Some(id.as_str());
         let running = t.timer.is_some();
@@ -472,69 +475,125 @@ impl BenchApp {
                     .border_t_1()
                     .border_color(theme.border)
                     .pt_2()
-                    .child(crate::inserts::tools::view::segmented(
-                        "task-when",
-                        &["Today", "Evening", "Tomorrow", "Anytime"],
-                        when,
-                        cx,
-                        move |this, k, window, cx| this.set_task_when(i2.clone(), k, window, cx),
-                    ))
+                    // "When": one button that says it with the four answers in its menu —
+                    // the strip of four labels beside a date field took half the row before,
+                    // and pushed everything after it onto a second line.
+                    .child({
+                        let label = if when == usize::MAX {
+                            t.day
+                                .map(|d| tasks::show_date(d, day))
+                                .unwrap_or_else(|| "Anytime".into())
+                        } else {
+                            ["Today", "This evening", "Tomorrow", "Anytime"][when.min(3)].to_string()
+                        };
+                        let (app, when_id) = (view.clone(), i2.clone());
+                        Button::new("task-when")
+                            .ghost()
+                            .small()
+                            .icon(Ico::CalendarDays.icon())
+                            .label(format!("{label}  ▾"))
+                            .dropdown_menu(move |mut menu, _, _| {
+                                for (k, name) in [
+                                    (0, "Today"),
+                                    (1, "This evening"),
+                                    (2, "Tomorrow"),
+                                    (3, "Anytime"),
+                                ] {
+                                    let (app, id) = (app.clone(), when_id.clone());
+                                    menu = menu.item(
+                                        PopupMenuItem::new(name)
+                                            .checked(when == k)
+                                            .on_click(move |_, window, cx| {
+                                                app.update(cx, |this, cx| {
+                                                    this.set_task_when(id.clone(), k, window, cx)
+                                                });
+                                            }),
+                                    );
+                                }
+                                menu
+                            })
+                    })
                     .child(
                         div()
-                            .w(px(150.))
+                            .w(px(110.))
                             .flex_none()
                             .child(Input::new(&self.tasks.day)),
                     )
                     .when(t.done(), |d| {
                         d.child(
                             div()
-                                .w(px(140.))
+                                .w(px(120.))
                                 .flex_none()
                                 .child(Input::new(&self.tasks.completed)),
                         )
                     })
-                    // The projects as tags: a click puts the project's tag on the task (or takes it off).
-                    .children({
-                        let on: Vec<String> = t.tags.iter().map(|g| g.to_lowercase()).collect();
-                        self.projects
+                    // The tags: the projects in a menu, ticked what is on the task; the field
+                    // next to it adds a tag no project has. Chips for every project ate the row.
+                    .child({
+                        let lower: Vec<String> =
+                            t.tags.iter().map(|g| g.to_lowercase()).collect();
+                        let mut items: Vec<(String, bool)> = self
+                            .projects
                             .iter()
                             .map(|p| tasks::slug(&p.name))
                             .filter(|s| !s.is_empty())
-                            .enumerate()
-                            .map(|(k, tag)| {
-                                let chosen = on.contains(&tag);
-                                div()
-                                    .id(("task-project", k))
-                                    .flex_none()
-                                    .h(px(bench_ui::FIELD_H))
-                                    .px_2()
-                                    .flex()
-                                    .items_center()
-                                    .text_sm()
-                                    .rounded_md()
-                                    .border_1()
-                                    .cursor_pointer()
-                                    .when(chosen, |d| {
-                                        d.bg(theme.primary)
-                                            .border_color(theme.primary)
-                                            .text_color(theme.primary_foreground)
-                                    })
-                                    .when(!chosen, |d| {
-                                        d.border_color(theme.border)
-                                            .hover(|s| s.bg(theme.list_hover))
-                                    })
-                                    .child(tag.clone())
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.click_claimed = true;
-                                        this.toggle_task_tag(tag.clone(), window, cx)
-                                    }))
-                                    .into_any_element()
+                            .map(|tag| {
+                                let chosen = lower.contains(&tag.to_lowercase());
+                                (tag, chosen)
                             })
-                            .collect::<Vec<AnyElement>>()
+                            .collect();
+                        // Tags of the task that are no project's ride the menu too, ticked.
+                        let own: Vec<String> = t
+                            .tags
+                            .iter()
+                            .filter(|g| !items.iter().any(|(s, _)| s.eq_ignore_ascii_case(g)))
+                            .cloned()
+                            .collect();
+                        items.extend(own.into_iter().map(|g| (g, true)));
+                        let (app, empty) = (view.clone(), lower.is_empty());
+                        Button::new("task-tags")
+                            .ghost()
+                            .small()
+                            .icon(Ico::Tag.icon())
+                            .label(if empty {
+                                "Tags  ▾".to_string()
+                            } else {
+                                format!("Tags · {}  ▾", lower.len())
+                            })
+                            .dropdown_menu(move |mut menu, _, _| {
+                                if items.is_empty() {
+                                    menu = menu
+                                        .label("No tags yet — type one in the field")
+                                        .separator();
+                                }
+                                for (tag, chosen) in items.iter() {
+                                    let app = app.clone();
+                                    let tag = tag.clone();
+                                    menu = menu.item(
+                                        PopupMenuItem::new(tag.clone())
+                                            .checked(*chosen)
+                                            .on_click(move |_, window, cx| {
+                                                app.update(cx, |this, cx| {
+                                                    this.toggle_task_tag(tag.clone(), window, cx)
+                                                });
+                                            }),
+                                    );
+                                }
+                                let app = app.clone();
+                                menu.separator().item(
+                                    PopupMenuItem::new("Clear tags").on_click(
+                                        move |_, window, cx| {
+                                            app.update(cx, |this, cx| {
+                                                this.clear_task_tags(window, cx)
+                                            });
+                                        },
+                                    ),
+                                )
+                            })
                     })
                     .child(
                         div()
-                            .w(px(140.))
+                            .w(px(100.))
                             .flex_none()
                             .child(Input::new(&self.tasks.tags)),
                     )
@@ -545,7 +604,7 @@ impl BenchApp {
                             .items_center()
                             .child(
                                 div()
-                                    .w(px(80.))
+                                    .w(px(64.))
                                     .child(Input::new(&self.tasks.spent)),
                             )
                             .child(

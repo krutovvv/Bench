@@ -526,6 +526,15 @@ impl BenchApp {
         cx.notify();
     }
 
+    /// The tags menu's "Clear": empties the card's tags field.
+    pub fn clear_task_tags(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.tasks
+            .tags
+            .update(cx, |s, cx| s.set_value(String::new(), window, cx));
+        self.task_fields_changed(cx);
+        cx.notify();
+    }
+
     pub fn new_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.flush_task(cx);
         let token = self.tasks.next_token;
