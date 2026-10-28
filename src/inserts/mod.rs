@@ -79,6 +79,11 @@ pub trait InsertKind: Sync {
     fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<SlashCommand> {
         vec![self.word().command("Tool")]
     }
+    /// Its rows of the bare "/" list: its word, or — a kind of many things (the utilities) —
+    /// one word for each, so a tool is one pick away and not two.
+    fn words(&self) -> Vec<SlashCommand> {
+        vec![self.word().command("Insert")]
+    }
     /// Kinds whose live state is one for the whole app (the task list, the tool): their
     /// name. Of several such inserts one is live — the last clicked, else the newest in the
     /// thread; the others offer to show it there.
@@ -144,10 +149,11 @@ pub trait InsertKind: Sync {
     }
 }
 
+// In the "/" list's order: the terminal and the browser first, then each utility.
 static KINDS: &[&dyn InsertKind] = &[
     &terminal::Terminal,
-    &tools::Tools,
     &browser::Browser,
+    &tools::Tools,
 ];
 
 pub fn kind_of(key: &str) -> Option<&'static dyn InsertKind> {
@@ -181,10 +187,10 @@ pub(crate) fn scroll_pane(
         .into_any_element()
 }
 
-/// The words of the bare "/" list: each puts its insert in at once (the insert itself offers
-/// what to show: a list, a tool).
+/// The words of the bare "/" list: each puts its insert in at once — the terminal, the browser,
+/// each utility by its own word.
 pub fn words() -> Vec<SlashCommand> {
-    KINDS.iter().map(|k| k.word().command("Insert")).collect()
+    KINDS.iter().flat_map(|k| k.words()).collect()
 }
 
 /// The kind whose "/" word this is.

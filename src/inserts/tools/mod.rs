@@ -58,6 +58,21 @@ impl InsertKind for Tools {
             .collect()
     }
 
+    /// Each utility its own word in the bare "/" list ("/base64", "/json-yaml"), its name and
+    /// group beside it; "/tools …" still lists them all.
+    fn words(&self) -> Vec<crate::thread::composer::slash::SlashCommand> {
+        GROUPS
+            .iter()
+            .flat_map(|g| g.tools.iter().map(move |t| (*t, g.name)))
+            .map(|(t, g)| crate::thread::composer::slash::SlashCommand {
+                name: format!("/{}", tool_key(t)),
+                desc: format!("{} · {g}", t.name()),
+                category: "Tool".into(),
+                key: format!("tools:{}", tool_key(t)),
+            })
+            .collect()
+    }
+
     fn shared(&self) -> Option<&'static str> {
         Some("tools")
     }

@@ -322,7 +322,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
     }
     // `BENCH_DEMO_TYPE=1` writes a line into the composer two seconds in (with
     // `BENCH_TOOLS_SHOWN=1` it shows the composer's hover tools where they sit with text).
-    if std::env::var("BENCH_DEMO_TYPE").is_ok() {
+    // Any other value is typed as it is (`BENCH_DEMO_TYPE=/` opens the "/" list).
+    if let Ok(typed) = std::env::var("BENCH_DEMO_TYPE") {
         cx.spawn(async move |this, cx| {
             cx.background_executor()
                 .timer(std::time::Duration::from_secs(2))
@@ -331,15 +332,17 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 app.focus_composer(window, cx);
                 app.active_thread.update(cx, |v, cx| {
                     v.composer.update(cx, |s, cx| {
-                        s.set_value(
+                        let text = if typed == "1" {
                             "Check the staging deploy and tell me whether it is healthy.\n\
                                  \n\
                                  Second paragraph, long enough to reach the very right of the \
                                  field, where the tools' gutter keeps the paperclip and the mic \
-                                 clear of every word.",
-                            window,
-                            cx,
-                        );
+                                 clear of every word."
+                                .to_string()
+                        } else {
+                            typed.clone()
+                        };
+                        s.set_value(text, window, cx);
                     })
                 });
             })

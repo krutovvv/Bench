@@ -23,8 +23,9 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   an insert. Bench shows Pi's journal of it as rows (`crates/thread`), on a list that **nothing
   moves but the person** — a run that ends, a row that grows, an answer that arrives never scroll
   it (`docs/thread-rewrite.md`).
-- **Insert**: a small live tool put into a thread with `/`. The words are `/terminal`, `/tools`,
-  `/browser`. Every `/` adds a new insert where the conversation is. An insert:
+- **Insert**: a small live tool put into a thread with `/`. The words are `/terminal`, `/browser`
+  (where the project has the server browser's MCP) and each utility's own (`/base64`, `/json-yaml`…;
+  `/tools …` lists them all). Every `/` adds a new insert where the conversation is. An insert:
   - shows something live (a terminal, a utility, a browser tab);
   - tells the agent what it shows with every message (`<block-state>`, kept out of the history);
   - has an agent tool that acts on it;

@@ -108,7 +108,10 @@ impl ThreadView {
             let name = c.name.to_lowercase();
             if name.starts_with(&q) {
                 first.push(c.clone());
-            } else if q.len() > 2 && name.contains(&q[1..]) {
+            } else if q.len() > 2
+                && (name.contains(&q[1..]) || c.desc.to_lowercase().contains(&q[1..]))
+            {
+                // A word inside it, or in its title ("/yaml" finds JSON ⇄ YAML).
                 rest.push(c.clone());
             }
         }
