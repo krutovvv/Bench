@@ -26,10 +26,8 @@ import files from "./modules/files.ts";
 import lsp from "./modules/lsp.ts";
 import projects from "./modules/projects.ts";
 import settings from "./modules/settings.ts";
-import tasks from "./modules/tasks.ts";
 import threads from "./modules/threads.ts";
 import { Runtime } from "./runtime/runtime.ts";
-import { onTasksChanged } from "./builtin/tasks.ts";
 import { syncTelegram } from "./telegram.ts";
 
 const STATE = path.join(AGENT_HOME, "server.json");
@@ -56,7 +54,6 @@ for (const name of migrateProfiles()) console.log(`[migrate] agent ${name} → a
 for (const row of migrateServerRows()) console.log(`[migrate] ${row} is a server's agent now, not a project row`);
 for (const id of migrateProjectModels()) console.log(`[migrate] project ${id} follows the general model now (its settings.json in backups/)`);
 const rt = new Runtime(publish);
-onTasksChanged(() => publish({ type: "tasks_changed" }));
 await rt.open();
 
 
@@ -64,7 +61,7 @@ await rt.open();
 
 // Each module declares its RPC methods and REST routes (src/modules/*.ts); the server only
 // collects them. A new area of the agent is a new module and a line here.
-const modules: Module[] = [threads, commands, projects, agents, presetsModule, tasks, cron, files, lsp, audio, settings].map((m) => m({ rt, publish }));
+const modules: Module[] = [threads, commands, projects, agents, presetsModule, cron, files, lsp, audio, settings].map((m) => m({ rt, publish }));
 const methods: Record<string, (params: any) => unknown> = Object.assign({}, ...modules.map((m) => m.rpc ?? {}));
 const routes: Record<string, Route> = Object.assign({}, ...modules.map((m) => m.routes ?? {}));
 const dynamic: Dynamic[] = modules.flatMap((m) => m.dynamic ?? []);

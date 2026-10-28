@@ -8,11 +8,11 @@ Bench's view state. Two places, in this order:
    `~/.ssh/config`, files in their folders, sign-ins in the browser's profile,
    a service's records behind its API or MCP server. Bench shows them there; the agent reaches
    them with its own tool or MCP server.
-2. **`~/.bench/bench.sqlite`**, Bench's one home, owned by the agent: tasks, projects, cron jobs, providers, settings (among them `agents`, the
+2. **`~/.bench/bench.sqlite`**, Bench's one home, owned by the agent: projects, cron jobs, providers, settings (among them `agents`, the
    servers' agents, `servers.ts`; `presets`, the person's own, `presets.ts`). Bench reads and
-   writes it **through the agent's REST API** (`/api/tasks`, `/api/projects`, `/api/agents`;
-   routes in `agent/src/modules/<area>.ts`, e.g. `tasks.ts`), never by opening the file; the
-   agent through its tool (`agent/src/builtin/tasks.ts`).
+   writes it **through the agent's REST API** (`/api/projects`, `/api/agents`;
+   routes in `agent/src/modules/<area>.ts`, e.g. `projects.ts`), never by opening the file; the
+   agent through its tool (`agent/src/builtin/projects.ts`).
    One store, two clients.
 3. **`~/.bench/projects/<id>/`**, a project's environment as files (an agent directory in Pi's
    terms): `SYSTEM.md`, `mcp.json`, `lsp.json`, `skills/`, `prompts/`, and `files/`, where a
@@ -26,23 +26,6 @@ Bench.
 The agent (its tool), cron jobs, Telegram, another Bench window, another machine. So Bench
 re-reads the list now and then and never assumes it is the only writer (`build-insert.md`, "a
 list re-read from its source": keep unsaved new items, don't overwrite a card being typed into).
-
-## Bench's Tasks, the worked example
-
-- **The data**: `Task` in `agent/src/builtin/tasks.ts` (title, notes, tags, day, evening,
-  someday, important, completed, spent seconds, a running timer) in `bench.sqlite`. The same
-  shape in Rust: `src/inserts/tasks/model.rs` (lists: Today, Upcoming, Anytime, Logbook —
-  someday tasks show in Anytime; pure functions, tested).
-- **Bench's side**: `src/inserts/tasks/store.rs` — a worker thread that sends `Cmd::Load / Save /
-  Delete` as REST calls and returns `Evt::Loaded / Created / Error` over an `async_channel`; the
-  `/tasks` insert shows them (`mod.rs`, `state.rs`, `view.rs` beside it). The open task card is
-  Things-shaped: title, notes (no frame), and one thin wrapped strip under a border — when-
-  segmented, day, project chips, tags, time + timer, Done, delete; never a stack of label rows.
-- **The agent's side**: the `tasks` tool (list with status, tag, `done_since` / `done_until`,
-  sums `spent_minutes_total`; add; update; complete; delete). Its line in the `inserts` prompt
-  section says "the only place they live, never look for them in files".
-- **How they got there**: years in Things, then Apple Reminders, then `bench.sqlite`
-  (2026-10-24), imported once; the import is gone from the code.
 
 ## Moving data in, and everything that used the old place
 

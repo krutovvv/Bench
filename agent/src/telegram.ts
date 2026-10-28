@@ -106,7 +106,7 @@ function activityWord(name: string): string {
 		read: "reading…", edit: "editing…", write: "editing…", search_replace: "editing…",
 		grep: "searching…", glob: "searching…", ls: "searching…", session_search: "searching…", tool_search: "searching…",
 		web_fetch: "checking the web…", web_search: "checking the web…",
-		delegate: "delegating…", todo: "planning…", memory: "taking notes…", tasks: "the task list…",
+		delegate: "delegating…", todo: "planning…", memory: "taking notes…",
 		cron: "the schedule…", clarify: "asking you…", skill_view: "a skill…", skill_manage: "a skill…",
 	};
 	return words[name] ?? `using ${base}…`;

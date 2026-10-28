@@ -99,7 +99,6 @@ impl BenchApp {
                     if live || this.media.recorder.is_some() {
                         cx.notify();
                     }
-                    this.tick_tasks(cx);
                 });
                 if alive.is_err() {
                     break;

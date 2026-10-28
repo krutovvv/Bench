@@ -51,7 +51,7 @@ export function environment(s: ThreadFacts): string {
 	return [
 		`Today is ${day} (${timezone()}). For the exact time, run date.`,
 		`Machine: ${os.type() === "Darwin" ? "macOS" : os.type()}, home ${os.homedir()}. Working directory: ${s.cwd}.`,
-		"Bench's own data (tasks, sessions, settings) is reached through your tools, not files.",
+		"Bench's own data (threads, settings) is reached through your tools, not files.",
 		// The tools for code, said once: a long thread spent most of its steps reading files through
 		// bash in small windows and editing them with scripts.
 		"Files: find with grep (text), glob (names) and ls (a folder's tree); read a file whole with read (up to 2000 lines at once, not in small pieces); change it with edit, all its changes in one call (edits[]); new files with write. bash is for running things — builds, tests, git — not for reading or editing files.",
@@ -127,8 +127,6 @@ export function inserted(items: { key: string; state: Record<string, unknown> }[
 	const lines = items.map(({ key, state }) => {
 		const [kind] = key.split(":");
 		if (kind === "ssh") return "- This machine's terminal. Run commands on it with ssh_run (host \"local\").";
-		if (kind === "tasks")
-			return `- The person's tasks, the "${state.list ?? "today"}" list. One list for every project; a project is a tag (its name as a slug), and in a project's thread the tasks tool works on that tag unless told "all". Read and change them with the tasks tool — the only place they live; the list updates by itself, so don't repeat it back unless asked. Time spent: list status "completed" with done_since / done_until and a tag; the result sums it.`;
 		if (kind === "tools") return `- The everyday utilities, now on "${state.tool ?? ""}" (its input and output come with each message). Do what is asked with its content yourself (read, bash) and give the result in your answer.`;
 		if (kind === "browser")
 			return "- This thread's own tab in the server's shared browser, live: the person watches it, can click and type in it, then says \"continue\". Drive it with the mcp__browser__* tools only (find them with tool_search \"browser\" if not loaded). Work only in this thread's tab — the others are other threads'; <block-state> says its address: at the start of a turn, browser_tabs list and select it; if it is gone, browser_tabs new and go on there (it becomes this thread's tab). The browser keeps the sign-ins. The person already sees the page: read it with snapshots, never take screenshots to show it. End each turn with what is on the page now and what the next step would be.";

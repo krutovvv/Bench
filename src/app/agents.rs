@@ -237,7 +237,7 @@ impl BenchApp {
     }
 
     /// An agent came up: what waited for it is asked now — its threads, the gear showing it, the
-    /// servers this Mac knows and the tasks (this Mac's), a server's own projects.
+    /// servers this Mac knows, a server's own projects.
     pub fn agent_up(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
         if self.center == super::Center::Settings && self.gear.agent == host && !self.gear.providers.loaded {
             self.load_providers(window, cx);
@@ -254,8 +254,6 @@ impl BenchApp {
                 });
             }
             self.load_commands(cx);
-            // Tasks live with the agent: another machine, its own tasks.
-            self.restart_tasks(cx);
         } else {
             self.load_server_projects(host.clone(), window, cx);
         }

@@ -47,9 +47,6 @@ impl BenchApp {
                 let tool = self.inserts.tools.tool;
                 self.open_tool_thread(tool, window, cx)
             }
-            ("4", false) if crate::app::shortcuts::TASKS => {
-                self.open_task_list(crate::inserts::tasks::model::List::Today, window, cx)
-            }
             ("\\", false) => self.toggle_sidebar(cx),
             // ⌘⌫ / ⌘⌦: delete the open thread — asked once, as ⌫ ⌫ in the sidebar
             // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's.

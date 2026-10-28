@@ -1,7 +1,7 @@
 //! Projects: the sidebar's only unit. A project is a row in the agent's store (`/api/projects`);
 //! a folder on disk (a codebase) is optional — without one its threads work in a folder Bench
 //! keeps for it. A thread belongs to one project; its tools (a server, a host, the browser,
-//! tasks, a utility) are attached inside the thread with `/` (`inserts/slash.rs`).
+//! a utility) are attached inside the thread with `/` (`inserts/slash.rs`).
 
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;

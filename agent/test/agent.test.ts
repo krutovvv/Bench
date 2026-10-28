@@ -150,18 +150,6 @@ test("telegram: markdown to HTML, splitting, MEDIA files", () => {
 	assert.deepEqual(extractMedia(`see\nMEDIA:${f}\n`).files, [f]);
 });
 
-test("tasks: add, list by tag, complete, import without doubles", async () => {
-	const { tasks, tasksTool } = await import("../src/builtin/tasks.ts");
-	const add = await run(tasksTool, { action: "add", title: "Pay rent", tags: ["Дом"], day: "2026-11-01", important: true });
-	assert.equal(add.task.title, "Pay rent");
-	assert.equal((await run(tasksTool, { action: "list", tag: "дом" })).count, 1);
-	await run(tasksTool, { action: "complete", id: add.task.id });
-	assert.equal((await run(tasksTool, { action: "list" })).count, 0);
-	assert.equal((await run(tasksTool, { action: "list", done_since: "2000-01-01" })).count, 1);
-	assert.equal(tasks.import([{ title: "From Reminders", source_id: "r1" }]), 1);
-	assert.equal(tasks.import([{ title: "From Reminders", source_id: "r1" }]), 0);
-});
-
 test("telegram: a batch keeps the order the messages came in and waits for voice", async () => {
 	const { Batch } = await import("../src/telegram.ts");
 	const b = new Batch("me");

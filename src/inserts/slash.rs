@@ -1,6 +1,6 @@
 //! What "/" puts into a thread: the bare words and, after one, what its kind can show
 //! (`InsertKind::word`, `choices`); a new thread with an insert in it (the terminal, a tool, the
-//! tasks opened from the keyboard); "!command" typed into the thread's terminal.
+//! a utility opened from the keyboard); "!command" typed into the thread's terminal.
 
 use gpui_kit::*;
 
@@ -17,7 +17,7 @@ impl BenchApp {
         self.put_insert(&view, key, window, cx);
     }
 
-    /// `/terminal`, `/browser`, `/tasks`, `/tools` and what follows: the tools that can be
+    /// `/terminal`, `/browser`, `/tools` and what follows: the tools that can be
     /// attached to this thread, filtered by the rest of the line. None when the line is not one.
     pub fn tool_slash(
         &self,

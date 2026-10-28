@@ -568,7 +568,7 @@ fn rule_5_inserts_where_put_removed_ones_gone() {
         key: seq.to_string(),
         seq,
         id: id.into(),
-        insert_key: "tasks".into(),
+        insert_key: "tools".into(),
     };
     let mut t = Thread::open(ThreadOpen {
         items: vec![ins(1, "i0"), user(2, "a"), ins(3, "i1"), text(4, 0, "x")],
@@ -579,7 +579,7 @@ fn rule_5_inserts_where_put_removed_ones_gone() {
         ["insert:i0", "user:a", "insert:i1", "answer:x"]
     );
     t.apply(ThreadEvent::Inserts(
-        serde_json::from_value(json!({"i1": {"key": "tasks", "removed": true}})).unwrap(),
+        serde_json::from_value(json!({"i1": {"key": "tools", "removed": true}})).unwrap(),
     ));
     assert_eq!(
         t.insert_list().iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>(),

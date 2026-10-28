@@ -5,7 +5,7 @@ use super::journal::*;
 use crate::app::BenchApp;
 use protocol::ThreadItem;
 
-/// A thread about something (`tasks:today`, `ssh:local`…): one turn, done.
+/// A thread about something (`ssh:local`, `tool:json`…): one turn, done.
 fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {
     app.threads.list.push(row(id, title, false, "desktop"));
     let mut t = journal.thread();
@@ -56,26 +56,6 @@ pub(super) fn subject_threads(app: &mut BenchApp, now: f64) {
         j.turn(user, None, calls, answer, now - 600.0, secs);
         j
     };
-    thread(
-        app,
-        "d-today",
-        "What's left for today",
-        "tasks:today",
-        done(
-            "What's left for today? Move the RFC to tomorrow and log 40 minutes on the API task.",
-            vec![
-                tool("tasks", "list today"),
-                tool("tasks", "update: Read the RFC on rate limits → tomorrow"),
-                tool("tasks", "update: Rate limiting for the public API, +40 min"),
-            ],
-            "Three left for today:\n\n\
-- **Send the quarterly report** (flagged)\n\
-- **Rate limiting for the public API** — 2 h 15 min logged now\n\
-- **Review the landing page copy**\n\n\
-The RFC moved to tomorrow.",
-            9.0,
-        ),
-    );
     thread(
         app,
         "d-web1-tls",

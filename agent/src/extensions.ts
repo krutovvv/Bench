@@ -31,7 +31,6 @@ import * as cron from "./builtin/cron.ts";
 import * as memory from "./builtin/memory.ts";
 import * as skills from "./builtin/skills.ts";
 import * as subagent from "./builtin/subagent.ts";
-import * as taskStore from "./builtin/tasks.ts";
 import { agentDir, agents, readAgent } from "./config.ts";
 import { createAnchoredEdit, createAnchoredRead } from "./builtin/hashline.ts";
 import { assistant, images } from "./extensions/assistant.ts";
@@ -62,7 +61,6 @@ export const blocks = () => {
 			skill_manage: skills.skillManage,
 			cron: cron.cronTool,
 			delegate: subagent.delegate,
-			tasks: taskStore.tasksTool,
 		},
 	};
 };

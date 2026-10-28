@@ -84,16 +84,12 @@ impl BenchApp {
         self.inserts.by_thread.get(&at.key()).cloned().unwrap_or_default()
     }
 
-    /// What a "/" row puts in: "tasks:<list>", "tools:<tool>"; the rest as they are
+    /// What a "/" row puts in: "tools:<tool>"; the rest as they are
     /// ("ssh:local", "browser"…).
     pub fn insert_spec(slash_key: &str) -> (String, Map<String, Value>) {
         let mut state = Map::new();
         let (kind, value) = slash_key.split_once(':').unwrap_or((slash_key, ""));
         let key = match (kind, value) {
-            ("tasks", v) if !v.is_empty() => {
-                state.insert("list".into(), json!(v));
-                "tasks"
-            }
             ("tools" | "tool", v) if !v.is_empty() => {
                 state.insert("tool".into(), json!(v));
                 "tools"
@@ -284,11 +280,11 @@ impl BenchApp {
 
 /// What the window keeps of the inserts: each thread's list as its journal has them, the live one
 /// of the kinds that are live once, and each kind's own state (the terminals and servers, the
-/// utilities, the tasks, the server browser's sites).
+/// utilities, the server browser's sites).
 pub struct InsertsState {
     /// By `ThreadRef::key` ("draft" for a new chat).
     pub by_thread: std::collections::HashMap<String, Vec<Insert>>,
-    /// Of the kinds whose state is app-wide (tasks, tools), the live insert per kind.
+    /// Of the kinds whose state is app-wide (tools), the live insert per kind.
     pub live: std::collections::HashMap<String, String>,
     /// /terminal: the servers of ~/.ssh/config and the shells.
     pub ssh: crate::inserts::terminal::servers::Ssh,
@@ -296,8 +292,6 @@ pub struct InsertsState {
     pub dock_terms: crate::inserts::terminal::panel::DockTerms,
     /// /tools: the utilities of `devtools`.
     pub tools: crate::inserts::tools::state::Tools,
-    /// /tasks: the tasks and the card.
-    pub tasks: crate::inserts::tasks::state::TasksMode,
     /// /browser: each thread's tab on the server's browser, live or as its last frame.
     pub sites: crate::inserts::browser::state::Sites,
     pub sites_error: Option<String>,
@@ -311,21 +305,20 @@ impl InsertsState {
             ssh: crate::inserts::terminal::servers::Ssh::new(),
             dock_terms: Default::default(),
             tools: crate::inserts::tools::state::Tools::new(window, cx),
-            tasks: crate::inserts::tasks::state::TasksMode::new(window, cx),
             sites: Default::default(),
             sites_error: None,
         }
     }
 }
 
-/// A piece the person put into a thread with "/" (the terminal, the tasks, the utilities, the
+/// A piece the person put into a thread with "/" (the terminal, the utilities, the
 /// browser's tab): kept by the agent as a Pi entry where it was put and a document of its state
 /// (agent/src/runtime/inserts.ts), read from the thread's journal (`Thread::insert_list`). Its look and
 /// behaviour: `crate::inserts`.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Insert {
     pub id: String,
-    /// What it is: "ssh:local" (the terminal on the thread's machine), "tasks", "tools",
+    /// What it is: "ssh:local" (the terminal on the thread's machine), "tools",
     /// "browser".
     pub key: String,
     /// Its own state (the list, the tool, the browser's tab).

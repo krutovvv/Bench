@@ -186,7 +186,6 @@ pub(crate) fn activity_word(name: &str, preview: &str) -> String {
         "delegate" => "delegating…".to_string(),
         "todo" => "planning…".to_string(),
         "memory" => "taking notes…".to_string(),
-        "tasks" => "the task list…".to_string(),
         "cron" => "the schedule…".to_string(),
         "clarify" => "asking you…".to_string(),
         "skill_view" | "skill_manage" => "a skill…".to_string(),

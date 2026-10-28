@@ -53,7 +53,7 @@ test("a tool result, an insert, a fail note; compaction and system entries are n
 	assert.deepEqual(itemsOf(result(10, "c1", "out", true)), [{ key: "10.0", seq: 10, kind: "result", call_id: "c1", name: "bash", output: "out", failed: true, at: undefined }]);
 	const edit = { ...result(15, "c2", "ok"), data: { details: { patch: "--- a\n+++ b" } } };
 	assert.equal((itemsOf(edit)[0] as any).diff, "--- a\n+++ b", "an edit carries its patch");
-	assert.deepEqual(itemsOf({ id: 11, kind: "bench.insert", data: { id: "i1", key: "tasks" } }), [{ key: "11", seq: 11, kind: "insert", id: "i1", insert_key: "tasks" }]);
+	assert.deepEqual(itemsOf({ id: 11, kind: "bench.insert", data: { id: "i1", key: "tools" } }), [{ key: "11", seq: 11, kind: "insert", id: "i1", insert_key: "tools" }]);
 	assert.deepEqual(itemsOf({ id: 12, kind: FAIL_KIND, data: { text: "no model" } }), [{ key: "12", seq: 12, kind: "fail", text: "no model" }]);
 	assert.deepEqual(itemsOf({ id: 13, kind: "pi.compaction", data: {} }), []);
 	assert.deepEqual(itemsOf({ id: 14, kind: "pi.system", model: [{ role: "user", content: "x" }] }), []);
@@ -114,7 +114,7 @@ test("a commit: entries of watched threads in id order, the inbox as the queue, 
 		{ type: "entry", value: user(40, "go") },
 		{ type: "entry", value: { ...user(42, "elsewhere"), conversationId: 8 } },
 		{ type: "document", conversationId: 7, record: { kind: INBOX_KIND }, value: { items: [{ id: 50, mode: "followUp", content: "next" }] } },
-		{ type: "document", conversationId: 7, record: { kind: INSERTS_KIND }, value: { items: { i1: { key: "tasks" } } } },
+		{ type: "document", conversationId: 7, record: { kind: INSERTS_KIND }, value: { items: { i1: { key: "tools" } } } },
 		{ type: "task", value: {} },
 	];
 	const out = changesOf(changes, (c) => c === "7", () => new Requests());
@@ -123,7 +123,7 @@ test("a commit: entries of watched threads in id order, the inbox as the queue, 
 	assert.equal(t.conversation, "7");
 	assert.deepEqual(t.append!.map((i) => i.key), ["40.0", "41.0"]);
 	assert.deepEqual(t.queue!.map((i) => i.text), ["next"]);
-	assert.deepEqual(t.inserts, { i1: { key: "tasks" } });
+	assert.deepEqual(t.inserts, { i1: { key: "tools" } });
 });
 
 test("a commit that only empties the queue says so, so the waiting row leaves", () => {
@@ -179,11 +179,11 @@ test("on a real Pi: commits reach the thread as thread.* events, and thread.open
 	const idOf = (i: ThreadItem) => (i.kind === "insert" ? i.id : undefined);
 	await rt.open();
 	const { row } = await rt.create("default", undefined, "local");
-	await rt.inserts.put(row.id, "ia", "tasks", { list: "today" });
+	await rt.inserts.put(row.id, "ia", "tools", { tool: "json" });
 	const first = await rt.journal.open(row.id);
 	assert.deepEqual(first.items.map((i) => [i.kind, idOf(i)]), [["insert", "ia"]]);
 	assert.deepEqual(first.queue, []);
-	assert.equal((first.inserts as any).ia.key, "tasks");
+	assert.equal((first.inserts as any).ia.key, "tools");
 	assert.equal(first.running, false);
 
 	await rt.inserts.put(row.id, "ib", "ssh:local");

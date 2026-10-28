@@ -10,11 +10,11 @@ fn reads_thread_open() {
             {"key": "5.0", "seq": 5, "kind": "user", "text": "fix it", "at": 1005},
             {"key": "9.2", "seq": 9, "kind": "tool", "call_id": "c1", "name": "bash", "args": {"command": "ls"}},
             {"key": "10.0", "seq": 10, "kind": "result", "call_id": "c1", "name": "bash", "output": "a", "failed": false},
-            {"key": "11", "seq": 11, "kind": "insert", "id": "i1", "insert_key": "tasks"},
+            {"key": "11", "seq": 11, "kind": "insert", "id": "i1", "insert_key": "tools"},
             {"key": "12", "seq": 12, "kind": "fail", "text": "no model"}
         ],
         "queue": [{"key": "q31", "sub": "31", "mode": "followUp", "text": "next"}],
-        "inserts": {"i1": {"key": "tasks", "state": {"list": "today"}, "folded": false, "removed": false}},
+        "inserts": {"i1": {"key": "tools", "state": {"tool": "json"}, "folded": false, "removed": false}},
         "running": true,
         "asks": [{"id": "c7", "kind": "approve", "command": "rm -rf build", "choices": ["once", "deny"]}],
         "info": {"effort": "high"},
@@ -25,7 +25,7 @@ fn reads_thread_open() {
     assert_eq!(open.items[1].order(), (9, 2));
     assert_eq!(open.items[3].order(), (11, 0));
     assert_eq!(open.queue[0].text, "next");
-    assert_eq!(open.inserts["i1"].state["list"], "today");
+    assert_eq!(open.inserts["i1"].state["tool"], "json");
     assert_eq!(open.asks[0].kind, AskKind::Approve);
     assert_eq!(open.info.effort, "high");
     assert!(open.running);

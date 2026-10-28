@@ -18,7 +18,6 @@
 pub mod browser;
 pub mod state;
 pub mod slash;
-pub mod tasks;
 pub mod terminal;
 pub mod tools;
 
@@ -147,7 +146,6 @@ pub trait InsertKind: Sync {
 
 static KINDS: &[&dyn InsertKind] = &[
     &terminal::Terminal,
-    &tasks::Tasks,
     &tools::Tools,
     &browser::Browser,
 ];
@@ -438,11 +436,3 @@ pub(crate) fn clip(s: &str, n: usize) -> String {
     }
 }
 
-/// A block an insert opened (a file, a task): a border, round corners, `block_head` on top with
-/// its title and buttons, the content under it at its full height.
-pub(crate) fn card(head: Div, body: AnyElement, cx: &App) -> AnyElement {
-    bench_ui::block_frame(cx)
-        .child(head)
-        .child(body)
-        .into_any_element()
-}

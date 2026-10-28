@@ -89,7 +89,7 @@ impl ThreadView {
                 .collect();
         }
         let at = self.thread_ref();
-        // `/tasks today`, `/tools json`…: the tools this thread can attach.
+        // `/tools json`…: the tools this thread can attach.
         if let Some(rows) = app.tool_slash(&at, &text) {
             return rows;
         }
@@ -179,13 +179,13 @@ impl ThreadView {
 }
 
 /// A slash command from the agent's commands, a saved prompt, or a tool to attach to the
-/// thread (`/tasks today`).
+/// thread (`/tools json`).
 #[derive(Clone, Debug, Default)]
 pub struct SlashCommand {
     /// "/goal".
     pub name: String,
     pub desc: String,
     pub category: String,
-    /// A tool's subject key ("tasks:today"); empty for commands and prompts.
+    /// A tool's subject key ("tools:json"); empty for commands and prompts.
     pub key: String,
 }

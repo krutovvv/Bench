@@ -1,5 +1,5 @@
-//! What the inserts show in the demo: made-up ~/.ssh/config servers (and a terminal's last screen)
-//! and tasks, so the demo never shows the person's own.
+//! What the inserts show in the demo: made-up ~/.ssh/config servers (and a terminal's last
+//! screen), so the demo never shows the person's own.
 
 use crate::app::BenchApp;
 
@@ -16,24 +16,7 @@ fn server(alias: &str, hostname: &str, folder: &str) -> crate::system::sshconfig
     }
 }
 
-fn task(
-    id: &str,
-    title: &str,
-    tags: &[&str],
-    day: Option<i64>,
-) -> crate::inserts::tasks::model::Task {
-    crate::inserts::tasks::model::Task {
-        id: id.into(),
-        title: title.into(),
-        tags: tags.iter().map(|t| t.to_string()).collect(),
-        day: day.map(|d| crate::inserts::tasks::model::today() + chrono::Duration::days(d)),
-        created: crate::inserts::tasks::model::now(),
-        project: "p-me".into(),
-        ..Default::default()
-    }
-}
-
-/// Made-up ~/.ssh/config servers and tasks, so the demo never shows the person's own.
+/// Made-up ~/.ssh/config servers, so the demo never shows the person's own.
 pub(super) fn other_modes(app: &mut BenchApp) {
     app.inserts.ssh.servers = vec![
         server("web-1", "203.0.113.10", "Production"),
@@ -43,53 +26,6 @@ pub(super) fn other_modes(app: &mut BenchApp) {
         server("ci-runner", "198.51.100.9", "Staging"),
         server("homelab", "192.168.1.50", ""),
     ];
-    let today = crate::inserts::tasks::model::today();
-    let mut done = task("t-done", "Renew the TLS certificates", &["ops"], Some(-1));
-    done.completed = Some(today - chrono::Duration::days(1));
-    done.spent = 25 * 60;
-    let mut flagged = task("t-tax", "Send the quarterly report", &["finance"], Some(0));
-    flagged.important = true;
-    let evening = task(
-        "t-read",
-        "Read the RFC on rate limits",
-        &["reading"],
-        Some(1),
-    );
-    let mut timed = task(
-        "t-api",
-        "Rate limiting for the public API",
-        &["storefront"],
-        Some(0),
-    );
-    timed.spent = 135 * 60;
-    timed.notes = "Token bucket per API key; 429 with Retry-After.".into();
-    app.inserts.tasks.items = vec![
-        flagged,
-        timed,
-        task(
-            "t-copy",
-            "Review the landing page copy",
-            &["storefront", "marketing"],
-            Some(0),
-        ),
-        evening,
-        task(
-            "t-demo",
-            "Prepare the demo for Friday",
-            &["storefront"],
-            Some(2),
-        ),
-        task("t-1on1", "One-on-ones: agenda", &["team"], Some(3)),
-        task("t-trip", "Book the conference trip", &["travel"], Some(9)),
-        task(
-            "t-idea",
-            "Try a local model for code review",
-            &["ideas"],
-            None,
-        ),
-        done,
-    ];
-    app.inserts.tasks.loaded = true;
 }
 
 /// The demo server's terminal: its last screen (no shell runs in the demo).

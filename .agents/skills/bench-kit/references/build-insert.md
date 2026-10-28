@@ -12,7 +12,6 @@ read it first; the others are simpler cases of the same shape.
 | Key (state) | `/` word | What's live | The agent's tool | What Bench sends with each message |
 |---|---|---|---|---|
 | `browser` {tab, url} | `/browser` | the thread's own tab of the shared server browser (`src/inserts/browser/`: `mod.rs` the kind, `state.rs` a tab per thread, `gateway.rs` the stream) | the browser MCP (Playwright on the server: browser-server-mcp, its own project) | the tab's address and title, and "work only in it" |
-| `tasks` {list} | `/tasks` | every list a click apart; in a project its tasks only (`src/inserts/tasks/`) | `tasks` (`agent/src/builtin/tasks.ts`) | which list is shown |
 | `ssh:local` (on the thread's machine, `thread_machine(at)`: this Mac or the project's server) | `/terminal` | the terminal, as tall as its text (`src/inserts/terminal/`) | `ssh_run` (`builtin/ssh.ts`) | the terminal's last 60 lines |
 | `tools` {tool} | `/tools` | every utility in its title's menu, the tool's input → output (`src/inserts/tools/`, the utilities themselves in `crates/devtools`) | none: `read`/`bash` on what it is sent | the tool's input and output |
 
@@ -40,7 +39,7 @@ its first insert comes, not with the first message. Tests: `agent/test/inserts.t
 
 **1. A key and its state.** A key names the kind (several inserts of a kind can sit in a
 thread); everything that changes as the person works is `state` (a JSON object). Map the `/`
-row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "tasks:<list>" → tasks {list}.
+row's key to (key, state) in `insert_spec` (`src/inserts/state.rs`): "tools:<tool>" → tools {tool}.
 
 **2. An `InsertKind`** — a folder `src/inserts/<kind>/`: `mod.rs` holds the unit struct, a line in
 `KINDS` (`src/inserts/mod.rs`) registers it:
@@ -65,7 +64,7 @@ one beside it), so the kind never asks "the open thread" — it reads `at` (`app
 The frame is the same for every kind (`ThreadView::render_insert`, drawn by the thread it is in): the person's avatar, a light ground, a
 thin border, round corners, `block_head` on top (one height and look for every block's head).
 State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`, a field of
-`InsertsState` (`src/inserts/state.rs`; `app.inserts.ssh`, `.tools`, `.tasks`, `.sites`); a long body goes to `view.rs` beside it. Build it from `bench_ui`
+`InsertsState` (`src/inserts/state.rs`; `app.inserts.ssh`, `.tools`, `.sites`); a long body goes to `view.rs` beside it. Build it from `bench_ui`
 elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`. What
 it calls on the app while it draws must never read a `ThreadView` (`self.thread(cx)`,
 `active_thread.read`): the view drawing it is borrowed then — use `at`.

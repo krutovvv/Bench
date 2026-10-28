@@ -276,7 +276,7 @@ pub type Inserts = BTreeMap<String, InsertState>;
 /// One insert's state: what it is, what it shows, how it sits in the thread.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
 pub struct InsertState {
-    /// What it is: "ssh:<machine>", "tasks", "tools", "browser".
+    /// What it is: "ssh:<machine>", "tools", "browser".
     pub key: String,
     /// Its own state (the list, the tool, the browser's tab).
     #[ts(type = "Record<string, unknown>")]

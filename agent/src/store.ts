@@ -39,6 +39,8 @@ export class Store {
 		renameOld("ALTER TABLE sessions RENAME TO threads");
 		renameOld("ALTER TABLE threads RENAME COLUMN profile TO agent");
 		renameOld("ALTER TABLE search RENAME COLUMN session_id TO thread_id");
+		// The /tasks list left Bench (2026-10-28): its table goes with it.
+		this.db.exec("DROP TABLE IF EXISTS tasks");
 		this.db.exec(`
 			CREATE TABLE IF NOT EXISTS threads (
 				id TEXT PRIMARY KEY, conversation TEXT NOT NULL, agent TEXT NOT NULL, title TEXT DEFAULT '',

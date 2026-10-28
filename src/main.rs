@@ -1,5 +1,5 @@
 //! Bench — one window for its own agent (bench-agent, `agent/`), its sessions, the user's servers
-//! (terminal over SSH), their files (a mini IDE), everyday tools and tasks. Crate, binary and
+//! (terminal over SSH), their files (a mini IDE), everyday tools. Crate, binary and
 //! bundle id (local.bench.app) are "bench"; its state lives in `~/.bench/ui` (copied over from
 //! `~/Library/Application Support/bench` or `…/hermes-gpui` on the first start,
 //! `client::connection::migrate_state`).

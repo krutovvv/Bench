@@ -1,5 +1,5 @@
 //! A made-up session for screenshots and the web demo: `BENCH_DEMO=1 ./target/release/bench`
-//! opens the browser thread (the centrepiece); `BENCH_DEMO=tasks|server|tool` another subject's
+//! opens the browser thread (the centrepiece); `BENCH_DEMO=server|tool` another subject's
 //! thread; `BENCH_DEMO=landing` the landing-page chat at the end of its answer, `BENCH_DEMO=top`
 //! at its beginning with the agent's steps unfolded.
 //!
@@ -226,7 +226,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
             "d-landing" | "d-api" | "d-tests" => "p-store",
             "d-web1" | "d-web1-tls" => "p-web",
             "d-audit-1" | "d-audit-2" => "p-audit",
-            "d-today" | "d-tool" | "d-notes" => "p-me",
+            "d-tool" | "d-notes" => "p-me",
             _ => "",
         }
         .into();
@@ -250,9 +250,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
     }
     // The demo's own folds, not the person's: every group open but the long Tools.
     app.sidebar.collapsed = ["s:Tools".to_string()].into_iter().collect();
-    // `BENCH_DEMO=tasks|tasks-open|server|browser|tool`: that thread open instead.
+    // `BENCH_DEMO=server|browser|tool`: that thread open instead.
     let open = match std::env::var("BENCH_DEMO").as_deref() {
-        Ok("tasks") | Ok("tasks-open") => Some("d-today"),
         Ok("server") => Some("d-web1"),
         Ok("tool") => Some("d-tool"),
         Ok("landing") | Ok("top") | Ok("new") | Ok("long") => None,
@@ -296,19 +295,6 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 .await;
             this.update(cx, |app, cx| {
                 app.active_thread.update(cx, |v, cx| v.jump_to_latest(cx))
-            })
-            .ok();
-        })
-        .detach();
-    }
-    // `BENCH_DEMO=tasks-open`: the API task's card opened a second in, as when it is being edited.
-    if std::env::var("BENCH_DEMO").as_deref() == Ok("tasks-open") {
-        cx.spawn(async move |this, cx| {
-            cx.background_executor()
-                .timer(std::time::Duration::from_secs(1))
-                .await;
-            this.update_in(cx, |app, window, cx| {
-                app.select_task("t-api".into(), window, cx);
             })
             .ok();
         })

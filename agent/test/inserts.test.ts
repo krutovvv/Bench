@@ -19,7 +19,7 @@ const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 
 test("inserts sit after the messages they were put after", () => {
 	const entries = [
-		{ kind: "bench.insert", data: { id: "i1", key: "tasks" } },
+		{ kind: "bench.insert", data: { id: "i1", key: "tools" } },
 		{ kind: "pi.user" },
 		{ kind: "pi.assistant" },
 		{ kind: "bench.insert", data: { id: "i2", key: "ssh:web" } },
@@ -30,7 +30,7 @@ test("inserts sit after the messages they were put after", () => {
 		items: {
 			// i1 sits where its entry says; i2 was moved down the thread (a message that went
 			// after it); i3's "after" is nonsense, so its entry decides.
-			i1: { key: "tasks", state: { list: "upcoming" }, folded: true, removed: false },
+			i1: { key: "tools", state: { tool: "json" }, folded: true, removed: false },
 			i2: { key: "ssh:db", state: {}, folded: false, removed: false, after: 4 },
 			i3: { key: "tools", state: {}, folded: false, removed: true, after: -2 },
 		},
@@ -39,11 +39,11 @@ test("inserts sit after the messages they were put after", () => {
 	assert.deepEqual(
 		got.map((i) => [i.id, i.key, i.after, i.folded]),
 		[
-			["i1", "tasks", 0, true],
+			["i1", "tools", 0, true],
 			["i2", "ssh:db", 4, false],
 		],
 	);
-	assert.deepEqual(got[0].state, { list: "upcoming" });
+	assert.deepEqual(got[0].state, { tool: "json" });
 	assert.equal(patchInsert(doc as any, "nope", { folded: true }), false);
 	assert.equal(patchInsert(doc as any, "i2", { state: [1], key: 5, removed: false, after: "3" }), true);
 	assert.deepEqual(doc.items.i2, { key: "ssh:db", state: {}, folded: false, removed: false, after: 4 }, "bad fields change nothing");
@@ -62,17 +62,17 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 	await rt.inserts.put(id, "ib", "tools");
 	await rt.inserts.patch(id, "ib", { state: { tool: "json" } });
 	await rt.inserts.patch(id, "ia", { removed: true });
-	await rt.inserts.put(id, "ic", "tasks", { list: "today" });
+	await rt.inserts.put(id, "ic", "tools", { tool: "json" });
 	// It was put while a message waited in the composer: it sits after that message.
 	await rt.inserts.patch(id, "ic", { after: 3 });
-	await assert.rejects(rt.inserts.put(id, "bad id!", "tasks"));
+	await assert.rejects(rt.inserts.put(id, "bad id!", "tools"));
 	await assert.rejects(rt.inserts.patch(id, "missing", { folded: true }));
 	const check = (list: any[]) => {
 		assert.deepEqual(
 			list.map((i) => [i.id, i.key, i.after]),
 			[
 				["ib", "tools", 0],
-				["ic", "tasks", 3],
+				["ic", "tools", 3],
 			],
 		);
 		assert.deepEqual(list[0].state, { tool: "json" });
@@ -81,7 +81,6 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 	// The prompt lists what is inserted.
 	const text = inserted((await rt.inserts.list(id)).map((i) => ({ key: i.key, state: i.state })))!;
 	assert.match(text, /everyday utilities, now on "json"/);
-	assert.match(text, /tasks tool/);
 	assert.doesNotMatch(text, /terminal/);
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 	// Another process: the same, from Pi's storage.

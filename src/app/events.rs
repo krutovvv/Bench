@@ -1,6 +1,6 @@
 //! What the agents say unasked (`protocol::Event`), applied to the window: a thread changed — to
 //! the views showing it, and what a run's end means for the window (a notification, stale copies
-//! of files) —, an agent's list of threads changed, the tasks changed.
+//! of files) —, an agent's list of threads changed.
 
 use gpui_kit::*;
 use protocol::{Event, ThreadEvent, ThreadId};
@@ -19,7 +19,6 @@ impl BenchApp {
     ) {
         match event {
             Event::ThreadsChanged => self.list_threads(host, cx),
-            Event::TasksChanged => self.load_tasks(),
             // A project's environment shown here is read again.
             Event::EnvChanged { project } => {
                 let key = crate::app::model::ProjectKey::new(host, &project).to_string();

@@ -5,5 +5,3 @@
 pub const SSH: bool = true;
 /// ⌘3: a new thread with the /tools insert (the last utility used).
 pub const TOOLS: bool = true;
-/// ⌘4: a new thread with the /tasks insert on Today (`~/.bench/bench.sqlite`).
-pub const TASKS: bool = true;
