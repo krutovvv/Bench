@@ -23,17 +23,19 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change the bar over the center (a thread's title, the documents' project, a settings page's title) | `src/titlebar/mod.rs`; the documents' tab bar `src/explorer/view.rs` (`render_doc`), the tabs themselves `src/explorer/tabs.rs` |
 | change what happens on an agent event | `src/app/events.rs` |
 | open, delete or search threads | `src/thread/open.rs` |
+| make anything wait for a second press (delete, remove, close unsaved) | `src/app/armed.rs` (`self.armed.confirm(key)`), the control `bench_ui::confirm_buttons` |
 | change what a thread on screen keeps (its composer, its run, its events) | `src/thread/view.rs` (`ThreadView`), its state `src/thread/active.rs` (`ActiveThread`, `ThreadRef`) |
 | change the second thread beside the open one ("Open beside") or the right dock's thread head | `src/thread/beside.rs`, `src/thread/panel.rs`; the menu item in `src/sidebar/menu.rs` |
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
 | change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu, `top.rs` the strip over it; loading projects: `project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
-| change the status bar | `src/statusbar/` (`mod.rs` the bar, `agent.rs` the agent's item, `context.rs` the context and speed panels) |
-| change the gear (tabs Agents, Presets, Appearance) | `src/settings/mod.rs` (the tabs; its controls `controls.rs`), `src/settings/providers.rs`, `src/settings/agent_form.rs` (add/remove a server's agent), `src/settings/presets.rs`, `src/settings/appearance.rs` (Appearance) |
+| change the status bar | `src/statusbar/` (`mod.rs` the bar, `agent.rs` the agent's item) |
+| change a thread's meters (context, speed, fallback, by its repo) | `src/thread/meters.rs`, the speed meter `src/thread/speed.rs` |
+| change the gear (tabs Agents, Presets, Appearance) | `src/settings/mod.rs` (the tabs, built from `bench_ui::settings_*`), `src/settings/providers.rs`, `src/settings/agent_form.rs` (add/remove a server's agent), `src/settings/presets.rs`, `src/settings/appearance.rs` (Appearance) |
 | change a keyboard shortcut | `src/app/keys.rs` (the built-in inserts' shortcuts on or off: `src/app/shortcuts.rs`); the macOS menu (Settings… ⌘,, New Window ⌘⇧N) `src/app/menu.rs` |
 | change a /tools utility | `crates/devtools/src/` (pure functions with tests) |
-| change what Bench sends or receives | `src/client/rpc/` (WebSocket: `Cmd`, `Evt` in `mod.rs`, the session `session.rs`, what comes back `events.rs`), `src/client/rest/` (REST); types shared with the agent in `crates/protocol` |
+| change what Bench sends or receives | a method or an event: `crates/protocol` (`rpc.rs` one type per method with its answer, `event.rs`, `thread.rs`), its handler in `agent/src/modules/`, Bench's side `app.request`/`send`/`send_at` (`src/app/agents.rs`), events in `src/app/events.rs`; the socket `src/client/rpc/`; REST `src/client/rest/` |
 | change the agent's answer to an RPC or a REST route | `agent/src/modules/<area>.ts` |
-| change how the agent runs a thread | `agent/src/runtime.ts`; what Bench reads of it: `agent/src/thread.ts` |
+| change how the agent runs a thread | `agent/src/runtime.ts` (the core) and its part for the job (`stream.ts`, `queue.ts`, `hold.ts`, `asks.ts`, `inserts.ts`, `title.ts`, `models.ts`); what Bench reads of it: `agent/src/thread.ts` |
 | change how work is done on a server (a project's machine over SSH) | `agent/src/ssh-env.ts` (Pi's `ExecutionEnv`; its tests are Pi's conformance suite, `test/ssh-env.test.ts`) |
 | change the agents Bench talks to (this Mac's, servers') | `src/app/agents.rs` (links), the list of servers' agents in `agent/src/builtin/servers.ts`; adding/removing in `src/settings/agent_form.rs` |
 | change where a project lives (agent, machine, folder) or how the sidebar's projects are put together | `src/app/places.rs` (`ProjectKey`, `Location` in `src/app/model.rs`); its rows in `src/env/place.rs` |
@@ -73,7 +75,7 @@ src/
 agent/src/
   server.ts      starts the agent, collects modules/
   modules/       threads, commands, projects (environment), agents, presets, tasks, cron, files, audio, settings
-  runtime.ts     Pi conversations, the queue, inserts
+  runtime.ts     the threads' core; its parts: models, stream, thread (Journal), hold, queue, asks, inserts, title
   thread.ts      Pi's journal → the items Bench shows
   builtin/       the agent's tools
 docs/            architecture.md (why), map.md (where), thread-rewrite.md (the thread's design),
