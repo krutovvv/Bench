@@ -54,7 +54,7 @@ impl BenchApp {
                 return bench_ui::settings_page("settings", page);
             }
             2 => {
-                page.push(bench_ui::settings_heading("APPEARANCE", vec![], cx).into_any_element());
+                page.push(bench_ui::settings_heading("Appearance", vec![], cx).into_any_element());
                 page.push(self.render_appearance(cx).into_any_element());
                 return bench_ui::settings_page("settings", page);
             }
@@ -63,7 +63,7 @@ impl BenchApp {
 
         // ---- agents: each has its own models and voice (its own network: a model on its
         // own machine is localhost there) ----
-        page.push(bench_ui::settings_heading("AGENTS", vec![], cx).into_any_element());
+        page.push(bench_ui::settings_heading("Agents", vec![], cx).into_any_element());
         for host in self.agent_hosts() {
             let current = crate::client::launch::build();
             // A server's agent is linked once this Mac's lists it; until then (and in the demo,
@@ -153,7 +153,7 @@ impl BenchApp {
                 // One model for every thread of this agent's projects: the main one and the
                 // fallback below.
                 format!(
-                    "MODELS · {} · its projects",
+                    "Models · {} · its projects",
                     Self::agent_name(&self.gear.agent)
                 ),
                 vec![],
@@ -296,17 +296,17 @@ impl BenchApp {
             div()
                 .id("ep-add")
                 .py_2()
-                .text_base()
-                .text_color(muted)
+                .text_size(px(bench_ui::SIDEBAR_TEXT))
+                .text_color(theme.primary)
                 .cursor_pointer()
-                .hover(|s| s.text_color(theme.foreground))
-                .child("+ Add a provider")
+                .hover(|s| s.opacity(0.8))
+                .child("Add a provider…")
                 .on_click(cx.listener(|this, _, window, cx| this.add_endpoint(window, cx)))
                 .into_any_element(),
         );
 
         // ---- fallback ----
-        page.push(bench_ui::settings_heading("FALLBACK", vec![], cx).into_any_element());
+        page.push(bench_ui::settings_heading("Fallback", vec![], cx).into_any_element());
         let current = self.gear.providers.fallback.clone();
         let label = current
             .as_ref()
@@ -375,7 +375,7 @@ impl BenchApp {
                 v.tts_voice.clone(),
             );
             page.push(
-                bench_ui::settings_heading("VOICE · OPENAI-COMPATIBLE SERVERS", vec![], cx)
+                bench_ui::settings_heading("Voice · OpenAI-compatible servers", vec![], cx)
                     .into_any_element(),
             );
             page.push(

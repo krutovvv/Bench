@@ -184,7 +184,7 @@ pub fn settings_row(
         .child(control)
 }
 
-/// A group's title on a settings page: small, muted, in capitals, with air above; its actions
+/// A group's title on a settings page, with air above; its actions
 /// ("+ Add", "Check") on the right.
 pub fn settings_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx: &App) -> Div {
     let title: SharedString = title.into();
@@ -194,19 +194,24 @@ pub fn settings_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>
         .pb_2()
         .gap_3()
         .items_center()
-        .text_sm()
-        .text_color(cx.theme().muted_foreground)
+        // A group's title as macOS Settings has them: in its own case, semibold, the text's
+        // colour, over the rows it heads.
+        .text_size(px(crate::metrics::SIDEBAR_TEXT))
+        .font_weight(FontWeight::SEMIBOLD)
+        .text_color(cx.theme().foreground)
         .child(
             div()
                 .flex_1()
                 .min_w_0()
                 .truncate()
-                .child(title.to_uppercase()),
+                .child(title),
         )
         .children(actions)
 }
 
-/// Pick one of a few: cells sharing borders, the chosen one in the accent.
+/// Pick one of a few, as a Mac's segmented control: a grey track, the chosen segment a raised
+/// chip on the page's ground, the others words in the muted colour (`segment_track`,
+/// `segment`; the header's Chat | Code is the same).
 pub fn segmented(
     id: &'static str,
     labels: &[SharedString],
@@ -215,28 +220,41 @@ pub fn segmented(
     on_pick: OnPick,
 ) -> Div {
     let theme = cx.theme().clone();
+    segment_track(&theme).children(labels.iter().enumerate().map(|(k, label)| {
+        let pick = on_pick.clone();
+        segment(div().id((id, k)), k == chosen, &theme)
+            .child(label.clone())
+            .on_click(move |_, window, cx| pick(k, window, cx))
+    }))
+}
+
+/// A segmented control's track: the segments sit in it with a hair of air round them.
+pub fn segment_track(theme: &gpui_kit::component::Theme) -> Div {
     h_flex()
+        .flex_none()
+        .p(px(crate::metrics::MODE_SWITCH_PAD))
+        .gap(px(crate::metrics::MODE_SWITCH_PAD))
         .rounded_md()
-        .overflow_hidden()
-        .border_1()
-        .border_color(theme.border)
-        .children(labels.iter().enumerate().map(|(k, label)| {
-            let on = k == chosen;
-            let pick = on_pick.clone();
-            div()
-                .id((id, k))
-                .px_3()
-                .py_1()
-                .text_sm()
-                .cursor_pointer()
-                .when(k > 0, |d| d.border_l_1().border_color(theme.border))
-                .when(on, |d| {
-                    d.bg(theme.primary).text_color(theme.primary_foreground)
-                })
-                .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
-                .child(label.clone())
-                .on_click(move |_, window, cx| pick(k, window, cx))
-        }))
+        .bg(theme.foreground.opacity(0.06))
+}
+
+/// One segment of a track: `on`, a raised chip; else muted words that darken on hover.
+pub fn segment(d: Stateful<Div>, on: bool, theme: &gpui_kit::component::Theme) -> Stateful<Div> {
+    d.h(px(crate::metrics::SEGMENT_H))
+        .px_3()
+        .flex()
+        .items_center()
+        .rounded_sm()
+        .text_size(px(crate::metrics::SIDEBAR_TEXT))
+        .cursor_pointer()
+        .map(|d| {
+            if on {
+                d.bg(theme.background).shadow_xs().text_color(theme.foreground)
+            } else {
+                let fg = theme.foreground;
+                d.text_color(theme.muted_foreground).hover(move |s| s.text_color(fg))
+            }
+        })
 }
 
 /// Sections of a settings panel: quiet text tabs with icons, the open one in the foreground

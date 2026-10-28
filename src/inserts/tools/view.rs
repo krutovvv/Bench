@@ -442,35 +442,12 @@ pub(crate) fn segmented_tall_owned(
     on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
 ) -> AnyElement {
     let theme = cx.theme().clone();
-    h_flex()
-        // Roomy where it has room; in a narrow popover the segments wrap instead of clipping.
-        .flex_none()
+    // The kit's segmented control; in a narrow popover the segments wrap instead of clipping.
+    bench_ui::segment_track(&theme)
         .flex_wrap()
-        .min_h(px(bench_ui::FIELD_H))
-        .border_1()
-        .rounded_md()
-        .overflow_hidden()
-        .items_center()
-        .border_color(theme.border)
         .children(labels.into_iter().enumerate().map(|(k, label)| {
             let on = on.clone();
-            div()
-                .id((id, k))
-                // Their own height, not the container's: when a row wraps, the second line is
-                // as tall as the first — `h_full` stretched every line to the grown box.
-                .h(px(bench_ui::FIELD_H - 2.))
-                .flex()
-                .items_center()
-                .px_3()
-                // The fields beside it draw their text at `text_sm` (gpui-kit's default input):
-                // the cells match, so nothing in the row changes size.
-                .text_sm()
-                .cursor_pointer()
-                .when(k > 0, |d| d.border_l_1().border_color(theme.border))
-                .when(k == chosen, |d| {
-                    d.bg(theme.primary).text_color(theme.primary_foreground)
-                })
-                .when(k != chosen, |d| d.hover(|s| s.bg(theme.list_hover)))
+            bench_ui::segment(div().id((id, k)), k == chosen, &theme)
                 .child(label)
                 .on_click(cx.listener(move |this, _, window, cx| on(this, k, window, cx)))
         }))

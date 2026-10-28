@@ -111,6 +111,8 @@ pub const BAR_SEPARATOR_H: f32 = 16.;
 /// The header's Chat | Code switch: the track's inset around its segments, and a segment's height.
 pub const MODE_SWITCH_PAD: f32 = 2.;
 pub const MODE_SEGMENT_H: f32 = 22.;
+/// A segmented control's segment on a page (settings, forms): a Mac's regular size.
+pub const SEGMENT_H: f32 = 24.;
 
 /// Room left of the header for the window's buttons (macOS's three lights), when the sidebar
 /// that usually sits under them is folded away.
@@ -188,7 +190,7 @@ pub const SIDEBAR_HEAD_TEXT: f32 = 11.;
 /// rows and far from the group above, so the groups read apart (Finder's sidebar sections).
 pub const GROUP_GAP: f32 = 20.;
 pub const GROUP_HEAD_PB: f32 = 3.;
-/// A thread's row: its marker stripe, and its padding in the ordinary and the compact list.
+/// A thread's row: its marker stripe, and its padding.
 pub const ROW_STRIPE: f32 = 2.;
 /// A sidebar row is set in from the sidebar's edges by this, so its rounded ground (the open
 /// thread's, a hover's) floats in the list.
@@ -196,7 +198,6 @@ pub const SIDEBAR_ROW_INSET: f32 = 10.;
 /// A mark's dot beside a name (Finder's tag).
 pub const TAG_DOT: f32 = 8.;
 pub const THREAD_ROW_PY: f32 = 4.;
-pub const THREAD_ROW_PY_COMPACT: f32 = 3.;
 /// A search hit's inset.
 pub const HIT_PL: f32 = 14.;
 

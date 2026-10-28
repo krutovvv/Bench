@@ -62,7 +62,6 @@ impl BenchApp {
         let (open_id, del_id) = (s.id.clone(), s.id.clone());
         // Deleting asks once (⌫, or the menu): the row shows Delete · Cancel; ⌫ again deletes.
         let armed = self.armed.is(&crate::app::armed::thread_key(s.id.as_str()));
-        let compact = self.appearance.compact_sidebar;
 
         let delete = if armed {
             bench_ui::confirm_buttons(
@@ -115,9 +114,7 @@ impl BenchApp {
             .rounded_md()
             .pl(px(bench_ui::SIDEBAR_TEXT_X - bench_ui::SIDEBAR_ROW_INSET))
             .pr_2()
-            // The compact list packs rows closer; the ordinary one keeps a breath around
-            // each title.
-            .map(|d| if compact { d.py(px(bench_ui::THREAD_ROW_PY_COMPACT)) } else { d.py(px(bench_ui::THREAD_ROW_PY)) })
+            .py(px(bench_ui::THREAD_ROW_PY))
             .cursor_pointer()
             // The open chat: the sidebar's selected ground; hovered: the list's.
             .when(selected, |d| d.bg(theme.sidebar_accent).text_color(theme.foreground))
@@ -188,9 +185,8 @@ impl BenchApp {
                                 d.child(Ico::Pin.icon().xsmall().text_color(faint))
                             }),
                     )
-                    // Waiting for an answer: the words where there is room, the dot in the
-                    // compact list.
-                    .when(waiting && !compact, |d| {
+                    // Waiting for an answer: two words in the accent.
+                    .when(waiting, |d| {
                         d.child(
                             div()
                                 .flex_none()
@@ -200,9 +196,8 @@ impl BenchApp {
                                 .child("needs you"),
                         )
                     })
-                    .when(waiting && compact, |d| d.child(bench_ui::dot(accent)))
-                    // Compact: the title alone (a working session still shimmers).
-                    .when_some(meta.filter(|_| !compact), |d, meta| {
+                    // A paused run, or the branch of a chat in its own branch folder.
+                    .when_some(meta, |d, meta| {
                         d.child(div().flex_none().text_xs().text_color(faint).child(meta))
                     }),
             )

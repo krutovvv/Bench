@@ -53,9 +53,6 @@ pub struct Appearance {
     pub scheme: String,
     pub accent: usize,
     pub size: Size,
-    /// Sidebar rows as their titles only, closer together (the default: the counts and
-    /// addresses are rarely needed and pull the eye).
-    pub compact_sidebar: bool,
 }
 
 impl Default for Appearance {
@@ -65,7 +62,6 @@ impl Default for Appearance {
             scheme: palettes::SCHEMES[0].name.into(),
             accent: 0,
             size: Size::default(),
-            compact_sidebar: true,
         }
     }
 }

@@ -188,7 +188,7 @@ impl BenchApp {
                 )],
             };
             out.push(
-                bench_ui::settings_heading(title.to_uppercase(), vec![], cx).into_any_element(),
+                bench_ui::settings_heading(title, vec![], cx).into_any_element(),
             );
             for (name, note) in lines {
                 out.push(

@@ -79,8 +79,8 @@ impl BenchApp {
                             let theme = cx.theme().clone();
                             let muted = theme.muted_foreground;
                             let dot = |ok: bool, warn: bool| {
-                                div().size(px(bench_ui::DOT)).bg(if ok {
-                                    theme.primary
+                                bench_ui::dot(if ok {
+                                    theme.success
                                 } else if warn {
                                     theme.warning
                                 } else {
@@ -136,7 +136,7 @@ impl BenchApp {
                                         .gap_2()
                                         .items_start()
                                         .border_b_1()
-                                        .border_color(theme.border)
+                                        .border_color(theme.border.opacity(0.6))
                                         .child(v_flex().flex_1().min_w_0().gap_1().children(lines))
                                         .child(
                                             icon("backend-reconnect", Ico::RefreshCw, "Reconnect")
@@ -175,17 +175,16 @@ impl BenchApp {
                                         .px_3()
                                         .py_2()
                                         .gap_1()
-                                        .border_t_1()
-                                        .border_color(theme.border)
                                         .child(
                                             h_flex()
                                                 .gap_2()
                                                 .items_center()
                                                 .child(
                                                     div()
-                                                        .text_sm()
+                                                        .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
+                                                        .font_weight(FontWeight::SEMIBOLD)
                                                         .text_color(muted)
-                                                        .child("NOTIFICATIONS"),
+                                                        .child("Notifications"),
                                                 )
                                                 .child(div().flex_1())
                                                 .child(
@@ -239,12 +238,13 @@ impl BenchApp {
                                         .py_2()
                                         .gap_px()
                                         .border_t_1()
-                                        .border_color(theme.border)
+                                        .border_color(theme.border.opacity(0.6))
                                         .child(
                                             div()
-                                                .text_sm()
+                                                .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
+                                                .font_weight(FontWeight::SEMIBOLD)
                                                 .text_color(muted)
-                                                .child("LOG · ~/.bench/server.log"),
+                                                .child("Log · ~/.bench/server.log"),
                                         )
                                         .when(log.is_empty(), |d| {
                                             d.child(

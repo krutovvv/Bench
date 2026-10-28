@@ -1,9 +1,7 @@
 //! The gear's Appearance tab, and where Bench keeps the person's choice (the look itself lives in
 //! `bench_ui::theme`).
 
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use bench_ui::theme::Appearance;
@@ -41,26 +39,13 @@ impl BenchApp {
                 )
                 .child(control)
         };
-        // A segmented control: square cells sharing borders, the chosen one in the accent.
+        // The kit's segmented control (a Mac's): a grey track, the chosen one raised.
         let segmented = |id: &'static str,
                          items: Vec<(&'static str, bool, bench_ui::theme::Appearance)>,
                          cx: &mut Context<Self>| {
-            h_flex()
-                .border_1()
-                .rounded_md()
-                .border_color(theme.border)
+            bench_ui::segment_track(&theme)
                 .children(items.into_iter().enumerate().map(|(k, (label, on, next))| {
-                    div()
-                        .id((id, k))
-                        .px_3()
-                        .py_1()
-                        .text_base()
-                        .cursor_pointer()
-                        .when(k > 0, |d| d.border_l_1().border_color(theme.border))
-                        .when(on, |d| {
-                            d.bg(theme.primary).text_color(theme.primary_foreground)
-                        })
-                        .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
+                    bench_ui::segment(div().id((id, k)), on, &theme)
                         .child(label)
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.set_appearance(next.clone(), window, cx)
@@ -86,18 +71,6 @@ impl BenchApp {
             )
         })
         .collect();
-        let view = cx.entity();
-        let look = a.clone();
-        let compact = Checkbox::new("compact-sidebar")
-            .checked(a.compact_sidebar)
-            .on_click(move |on, window, cx| {
-                let next = bench_ui::theme::Appearance {
-                    compact_sidebar: *on,
-                    ..look.clone()
-                };
-                view.update(cx, |this, cx| this.set_appearance(next, window, cx));
-            })
-            .into_any_element();
         // The page's own width: these rows are rows of the same list, and a narrower column for
         // them alone read as a mistake (their rules ended short of every other rule).
         v_flex().w_full().child(
@@ -107,11 +80,6 @@ impl BenchApp {
                     "Mode",
                     "Light, dark, or follow macOS.",
                     segmented("mode", modes, cx),
-                ))
-                .child(row(
-                    "Compact sidebar",
-                    "Chats and servers as titles only, closer together.",
-                    compact,
                 )),
         )
     }
