@@ -277,9 +277,12 @@ pub fn ensure() -> Result<(u16, String)> {
                 if !orphan && (v["build"].as_str() == Some(hash.as_str()) || !idle) {
                     return Ok((port as u16, token.to_string()));
                 }
-                stop();
             }
         }
+        // Not this build, or alive but not answering (an older agent that speaks another
+        // protocol): it stops before a new one starts — two agents on one pi.sqlite would both
+        // resume the same runs.
+        stop();
     }
     let node = node()?;
     let log = std::fs::File::create(agent_home().join("server.log"))?;
