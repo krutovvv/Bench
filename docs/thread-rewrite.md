@@ -81,8 +81,7 @@ key = (seq, sub)
 | План агента | вызовы `todo` в журнале ([thread-objects.md](thread-objects.md)) | карточка «ПЛАН · 3/7» внутри работы, на первом её вызове `todo`, с шагами последнего |
 | Ответ агента | `pi.assistant` с текстом | отдельное сообщение |
 | Следующее сообщение агента (план, вопрос, карточка) | своя запись | отдельное сообщение, как в Telegram-боте |
-| Вставка (`/terminal`, `/tasks`…) | `bench.insert` | там, где поставлена; × убирает |
-| Открытая задача из `/tasks` | новая запись-карточка | новое сообщение под вставкой |
+| Вставка (`/terminal`, `/browser`, утилиты…) | `bench.insert` | там, где поставлена; × убирает |
 
 Правила, которые станут тестами (`cargo test`), а не комментариями:
 
@@ -123,7 +122,7 @@ key = (seq, sub)
 | Ваш уровень (Angular) | В GPUI / Zed | В Bench |
 |---|---|---|
 | Элемент (директива) | `#[derive(IntoElement)]` + `RenderOnce`: без состояния, вход → вид | `crates/ui`: кнопка, поле, `block_head`, строка списка, текст |
-| Сервис | `Entity<Model>` или `Global`: состояние и логика без вёрстки | `crates/thread` (журнал), `crates/agent_client` (протокол), `crates/tasks`, `crates/ssh` |
+| Сервис | `Entity<Model>` или `Global`: состояние и логика без вёрстки | `crates/thread` (журнал), `crates/agent_client` (протокол), `crates/ssh` |
 | Модуль / компонент | крейт с `Entity<View>` (`impl Render`), который читает свой сервис | `crates/thread_view`, `crates/composer`, `crates/sidebar`, `crates/inserts/*` |
 | Блок / страница | панель или pane в `Workspace` | окно: сайдбар + тред + статус-бар (`crates/bench` — только сборка) |
 

@@ -3,70 +3,51 @@
 Dated where it changed. The person's later decisions win over earlier ones: a rule marked
 *superseded* is history, kept so it is not brought back.
 
-## Look and feel
+## Look and feel (final, 2026-10-28)
 
-- Reference: the Zed editor. Flat, monolithic, dense but breathing. No shadows, no gradients,
-  no "cards floating on a background". *Superseded:* "no rounded corners" (rounding was once
-  removed as "отвратительный вид"); now every block is `rounded_md` and controls use the theme
-  radius 4 / 6, the same everywhere (`crates/ui/src/theme.rs`).
-- Light theme by default; dark is optional (Light / Dark / System + accent + S/M/L size).
-- Fonts: happy with 14 UI / 12 code; adjust only by small steps, never big redesigns. Chat text
-  (answers and own messages) was `text_sm` like session titles ("идеально"), then on
-  2026-10-24 one size up, `text_base`, with a bit more inset: the middle is what is read (as in
-  Zed). Disliked there: mixed fonts between blocks.
-- Syntax: One Light (One Dark in dark mode), the same in every editor and diff.
-- Icons: Lucide, monochrome, small. Liked them a lot.
-- Spacing is the most frequent complaint. Wants one rhythm ("like a step / golden ratio"):
-  equal insets on all sides of a block, facing bars of equal height, rules that line up across
-  panels, no 1px "steps" between neighbouring borders. Points out 1–3 pt differences — measure.
-- Text in single-line places is truncated with an ellipsis, never wrapped.
-- Wrapped titles: tight line height (1.25), not looser than the gap to the line below.
-- No scrollbars. Navigation aids are quiet (a rail of ticks).
-- Only the thread scrolls: no scroll inside a scroll (the terminal excepted); editors are as tall
-  as their text (`editor_height`), lists as long as they are, an empty state is one line.
-- Hover-only actions; nothing jumps or changes size on hover/selection (color only).
-- Nothing jumps on load either: opening a chat with images/diagrams must not shift the view
-  after the first frame.
-- One tone per bar: every label and icon in the status bar the same muted color.
-- Who speaks is an avatar in a left gutter (2026-10-24; the edge-to-edge question band before
-  it is *superseded*); the sidebar's right rule went too ("олдскульно") and the chrome got
-  darker. The columns are `CHAT_LEFT` / `CHAT_TEXT` / `CHAT_RIGHT` in `crates/ui/src/metrics.rs`.
-- The user's own messages are selectable/copyable like the answers.
-- Media in the chat itself — images, video playing in place, audio, Markdown, diagrams,
-  formulas; anything else opens in its default app on a click. All with the lightest possible
-  implementation (no browsers), see `references/build-media.md`.
-- Color labels: thin stripe + light tint of the row background, for quick scanning.
-- Working items (a session whose agent runs) show a moving highlight over their title
-  (`ShimmerText`, follows the text color) besides the "working…" meta, so they are found at a glance.
+The person: "этот дизайн основной … финальный и исчерпывающий". Keep it; a new piece is made
+in the same voice. The rules are `design-look-rules.md`, the values `design-system.md`, the
+places `design-layout.md`.
 
-- Sidebar projects as a file explorer: icon + name + chevron/"+" on the right, rows on an
-  indent guide; no counts, no horizontal rules (`design-layout.md`, Sidebar).
-- Tabs and lists that can overflow scroll sideways rather than squeeze; code editors don't
-  soft-wrap in narrow panels (horizontal scroll).
+- **A Mac app.** Xcode, Finder, Mail, Messages, System Settings are the references; take their
+  concrete values (sizes, weights, radii), never a spec of one's own — "spec-driven" tweaks made
+  it worse, Apple's numbers made it right. Everyone knows that UI: no learning a new one.
+- **One light and one dark half**, following macOS; no theme, accent or size to choose.
+- **A classic chat**: the person's messages as grey bubbles, no avatars, the composer pinned at
+  the bottom (Claude's one-line field: plus, text, mic, Send — the three the same round size).
+  The document look stays in code (`src/thread/look.rs`), not a setting.
+- **The sidebar as a Mac source list**: 13pt one-line rows, heads 11 semibold in their own
+  case (Xcode has no heavy sections), a selected row a soft grey pill whose text keeps its
+  colour, marks as Finder tag dots, the pin faint after the title, "New project" at the foot.
+- **Mac controls**: segmented controls (Chat | Code, Light · Dark · System), switches for
+  on/off, a pull-down for the project, navigator glyphs for Files | Threads, a completion list
+  for `/`, the menu bar with every shortcut.
+- **Bars balanced**: the title bar 40 across the window with the fold right after the traffic
+  lights; the status bar 29 in one muted tone; facing bars of one height with one rule.
+- **Widgets in Apple's way**: blocks as grouped boxes with soft hairlines and a card's corner;
+  a work's steps as a grouped list (a verb column, a file's name before its folder); a
+  question a soft tinted card, answered a quiet line; changed files as Xcode's list.
+- **Insets**: one rhythm, measured to the point; a thread in a narrow dock takes narrow sides.
+- **Code**: Menlo 12 at Zed's leading (1.618).
+- Icons: Lucide, monochrome, small.
+- Text in single-line places is truncated, never wrapped.
+- Nothing jumps on load; nothing changes size on hover or selection.
+- Media in the chat itself (images, video, audio, Markdown, diagrams, formulas), the lightest
+  implementation (`build-media.md`).
 
-- **Every bar the header's height, every crossing rule one line.** The user spots a 1px step
-  between neighbouring bars and calls it "бесит". All bars 36 with their rule.
-- **No text-size setting** (removed 2026-10-24): one size, tuned; ⌘+ / ⌘− still zoom.
-- **Insets in small steps.** "Чуточку больше" means one step (16 → 20 → 24 over two rounds),
-  the same number on every side and in every place of the area (message, answer, composer).
-  A big app's generous padding (Claude Desktop) is the direction, not the target.
-- **No modes** (mode toggles over the sidebar: *superseded* 2026-10-24). The sidebar holds only
-  projects and their threads (2026-10-25); tasks, servers, files, tools and the browser are
-  inserts put into a thread with `/` (`build-insert.md`). New window is the header's right end;
-  the status bar's right holds icons only: background terminals, attach, dictate, the gear, Stop.
-- **Cards are frames, not fills**: code blocks, audio, video, Changed files — a 1px rounded
-  frame, no background; heads all `block_head` (`BLOCK_HEAD_H` 32). A darker code background read as "тёмный вид".
-- **Code in answers has a header**: language left, Copy right, like every AI chat.
-- **Fields can read as text**: a name and "Select folder" on one line, the field without a
-  frame, sized to its placeholder; one column of stacked controls looked worse.
-- **Lists that grow must stay even**: day steps in Upcoming identical however many there are.
+*Superseded* (do not bring back): Zed's look and One Light/One Dark; theme and accent pickers;
+avatars and the composer as the thread's last row; the rail of ticks instead of a scrollbar;
+"one size in the thread" (14 for everything); CAPITAL group heads; tinted rows with a stripe for
+marks; a compact sidebar option; the thread full width from the left; the mic, attach and Stop
+in the status bar; a header "New window" button; the task list (removed 2026-10-28, Things
+is separate).
 
 ## Behaviour
 
 - English UI throughout.
 - No dialogs for simple things: defaults + inline editing + arm-to-confirm for deletes.
-- Status bar: only items agreed with the user. Pickers there show their icon inside the button;
-  readouts open detail popovers on click (stats, speed chart with per-second bars).
+- Status bar: only items agreed with the user. The thread's own readouts (context, speed) sit in
+  the title bar by its repo and open detail popovers on click (stats, speed chart).
 - Elapsed time of a running job counts from the job's own start time (from the backend), never
   from when the view was opened: switching chats or restarting the app must not reset it
   (agents run for hours while the user is elsewhere).
@@ -80,10 +61,9 @@ Dated where it changed. The person's later decisions win over earlier ones: a ru
 - Git when needed, never forced: the repo and branch are detected from the thread's folder or
   edited files and shown as a label; no git actions of Bench's own (branches per thread were
   dropped). Chats with no files show nothing git-related.
-- Dictation (the status bar's mic, ⌘⇧D): the mic stays the mic while it records, a small level
+- Dictation (the composer's mic, ⌘⇧D): the mic stays the mic while it records, a small level
   bar on its edge; the typed text is never hidden (a thought is dictated in pieces between
-  typing); a spinner while transcribing. *Superseded:* a waveform over the field and a round
-  filled Stop in the composer.
+  typing); a spinner while transcribing.
 - Nothing slow starts by itself: version checks etc. run from an explicit button.
 - Placeholders are misleading: hide model / effort / approvals until the real values arrive.
 - Restart / Stop must actually work and say why when they can't.
@@ -97,16 +77,14 @@ Dated where it changed. The person's later decisions win over earlier ones: a ru
   agent working on a server as a project's machine (over SSH). A server's own agent (added in
   the gear) and a project's language servers are installed there by Bench
   (`docs/remote-projects.md`).
-- Lightweight first, the heavy tool one click away: the whole project opens in Zed from the
-  project's ⋯ menu (only where it has a folder).
+- The IDE is built in (the Explorer, Code): no external editor is referenced or needed.
 
 - **The Bench aggregates; data stays native** (servers in `~/.ssh/config`). The user rejected a JSON store, then SQLite, then a
   third-party app (Things) as the store, then an MCP built into the Bench: the agents' MCP lives
   in the agent, the Bench only shows and edits (`build-native-data.md`). *Updated 2026-10-24:*
-  tasks and sessions now live in `~/.bench/bench.sqlite`, owned by the agent (`agent/`), which
-  Bench reads and writes through it; still no store of Bench's own.
-- No iPhone notifications from tasks (no alarms); back-dated completion is welcome; tags matter
-  more than lists or priorities.
+  threads now live in `~/.bench/bench.sqlite` and Pi's store, owned by the agent (`agent/`),
+  which Bench reads and writes through it; still no store of Bench's own. Tasks are not
+  Bench's (removed 2026-10-28; the person keeps them in Things).
 - After moving data, the scheduled reports must keep working: check every cron job and skill
   that touched the old place.
 - Projects without a folder are wanted ("an audit", "a research" of 3–5 deep researches): a
@@ -130,18 +108,3 @@ Dated where it changed. The person's later decisions win over earlier ones: a ru
   by the next one.)
 - When an approach turns out heavier than expected (a browser engine, a big runtime), stop and
   say so before shipping it; the user prefers dropping a feature to carrying weight.
-- **The composer is part of the thread** (2026-10-24): the messages' font size, no buttons
-  (⌘Enter, ⌘⇧D, drag-and-drop), no scroll of its own, there while history loads; the thread
-  scrolls past its end like a code editor. The mic lives in the status bar.
-- **The sidebar is a tree** (projects and their threads, nothing else): no "New session"
-  button; "+" on a project is a new thread (⌘N), "New project", the last row of the projects, opens its page in the center.
-- **Fold strips (Background, Changed files) are as tall as a source chip.**
-- **One size in the thread** (2026-10-24): the thread is one document in one font size — the
-  messages' (`text_base`). Step summaries ("Sending… · 17s", "Done · N actions"), step rows,
-  site labels, file and fold strips, source chips, plan and asks: all `text_base`, set apart by
-  color (muted) only. Code stays monospaced. "это единый документ. Он одним шрифтом идет."
-- **One size in the bars**: header title, settings tabs, every status bar item
-  are the sidebar's group-name size (`text_sm`, buttons `.small()`, icons `.small()`).
-- **No centering, no max width** for the thread: full width from the left, like an editor.
-- **Primary buttons in the accent** (`button_primary = primary` in `theme.rs`), never the kit's black.
-

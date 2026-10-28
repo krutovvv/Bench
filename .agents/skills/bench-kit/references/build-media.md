@@ -133,13 +133,12 @@ TextView::markdown(id, text).plugin(InlineMath).plugin(BlockMath)
 `cx.open_with_system(&path)` (default app), `cx.reveal_path(&path)` (Finder). Every media card
 has a quiet ↗ "Open" icon; for kinds shown only as a row the whole row opens the file.
 
-## Attachments: paperclip, drag and drop, ⌘V
+## Attachments: the plus, drag and drop, ⌘V
 
 Reference: `src/thread/attachments.rs`, `src/media/attach.rs`, chips in `src/media/view.rs`
-(`attachment_chip`), composer in `src/thread/composer.rs`.
+(`attachment_chip`), composer in `src/thread/composer/input.rs`.
 
-- **Paperclip**: a button in the status bar (`src/statusbar/mod.rs`; the composer has no
-  buttons) →
+- **The plus**: the composer's first button (`round_icon_button`, "Attach files") →
   `cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: true, prompt: Some("Attach".into()) })`,
   await the receiver in `cx.spawn`, then add the paths.
 - **Drop**: on the whole thread column (messages + composer, `src/workspace/layout.rs`):

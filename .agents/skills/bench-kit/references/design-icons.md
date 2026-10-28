@@ -27,8 +27,8 @@ macro, keep the list alphabetical. Icons take color from `text_color` (currentCo
 
 `bench_ui::icon_button(id, Ico, tip, on, cx)` (`crates/ui/src/button.rs`): a square, quiet
 button with a tooltip for block heads, rows, the header, the sidebar's strip; `on` lights it in
-the accent. The composer has no buttons (⌘Enter, ⌘⇧D, drop or paste); the paperclip, mic,
-gear and Stop are in the status bar (`src/statusbar/mod.rs`). Plain Lucide everywhere — no
+the accent. The composer's plus, mic and Send are `round_icon_button`s of Send's size
+(`SEND_BUTTON`) in its field (`src/thread/composer/input.rs`). Plain Lucide everywhere — no
 hand-made bold cuts or filled glyphs.
 
 ## Sizes
@@ -42,7 +42,7 @@ hand-made bold cuts or filled glyphs.
 | Meaning | Lucide name |
 |---|---|
 | stop | square |
-| dictate / attach | mic / paperclip |
+| dictate / attach | mic / plus |
 | loading (must spin) | loader-circle |
 | new item | plus |
 | row menu | ellipsis |

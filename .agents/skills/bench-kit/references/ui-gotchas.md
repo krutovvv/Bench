@@ -65,7 +65,7 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
   `max_offset()`, `scroll_to_item(ix)`, `top_item()`.
 - **A scroll container ignores the last child's margin** → append a real spacer
   (`div().h_3().flex_none()`).
-- Don't add visible scrollbars by design; use a rail/minimap if navigation is needed.
+- The thread's scrollbar is a Mac's overlay one (`gpui_kit::component::scroll::Scrollbar`); don't add others.
 
 ## Keyboard
 
@@ -125,7 +125,7 @@ already recognizes `$…$` (`Node::InlineMath`) and `$$…$$` (`Node::Math`). md
 
 - Copying a widget's look 1:1 from another app (a fixed-width command popup) — rebuild it in
   this app's grid instead (full chat width, attached to its anchor).
-- Changing an element's size on hover/selection (rail ticks grew) — change color only.
+- Changing an element's size on hover/selection — change color only.
 - Letting a selected-state color override a user-chosen color.
 - Showing an empty dropdown before data arrives.
 - Loading content sizes in the background so the thread jumped after opening.

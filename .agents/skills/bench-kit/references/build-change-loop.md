@@ -65,8 +65,8 @@ python3 -I $K/measure.py /tmp/before.png row 1500 560 2480  # raw color runs, in
 - `rules.py` x values: one column in the sidebar (around 100) and one in the main area (around
   600). The rules that must be one line across the window must show the same y in both.
 - **Choosing the band's y**: run `rules.py` first — a bar's content lies between two of its
-  rules (the top strip: 0–35, the search band: 36–70, the composer: 737–772, the status bar:
-  773–800 at the default size); inside the list or the chat, look at a `crop.py` picture of the
+  rules (the title bar: 0–40, the status bar: the last 29 at the default size; the composer is a
+  rounded field, not a band); inside the list or the chat, look at a `crop.py` picture of the
   area and read y off it (crop coordinates are the window's, in pt).
 - `spans.py <png> <y0> <y1> [x0 x1]`: each icon, word or button along the band, its position,
   and the gaps between them and to both ends — the tool for "is the icon 16 from the edge", "is
@@ -88,7 +88,7 @@ state, each with its own hook.
 
 - The smallest edit that meets the target, in the house style of the code around it (same
   helpers, same comment density). A comment says *why* a number is what it is, e.g. `// 26 so
-  the composer stays the header's 36`.
+  the plus and the mic match Send`.
 - Use exact-string edits (an Edit tool, or a script that asserts the old text occurs exactly
   once). After `cargo fmt` the text changes: re-read before the next scripted edit.
 - Change every place that shares the value (`ui-areas.md`, "When a change makes something else

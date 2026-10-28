@@ -233,11 +233,6 @@ pub const COMPOSER_TOOLS_W: f32 = 56.;
 pub const COMPOSER_TOOLS_H: f32 = 40.;
 pub const COMPOSER_GAP: f32 = 10.;
 pub const COMPOSER_PB: f32 = 6.;
-/// The rail of ticks on the thread's right: a tick, the rail, its inset from the edge.
-pub const RAIL_TICK_W: f32 = 10.;
-pub const RAIL_TICK_H: f32 = 2.;
-pub const RAIL_W: f32 = 14.;
-pub const RAIL_INSET: f32 = 4.;
 /// The speed panel's chart: a bar a second, its height, the gap between bars.
 pub const SPEED_BAR_W: f32 = 3.;
 pub const SPEED_CHART_H: f32 = 56.;

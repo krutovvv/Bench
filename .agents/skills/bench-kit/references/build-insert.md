@@ -48,8 +48,7 @@ Every method but `owns` and `shared` is told the thread the insert sits in, `at:
 one beside it), so the kind never asks "the open thread" — it reads `at` (`app.thread_machine(at)`,
 `app.inserts_of(at)`, `app.patch_insert(at, …)`). Its state is the app's (`&mut BenchApp`,
 `Context<BenchApp>`), and so are its listeners.
-- `owns(key)`; `shared` — a name when its live state is one for the whole app (`tasks`,
-  `tools`): of several such inserts one is live (the last clicked, else the
+- `owns(key)`; `shared` — a name when its live state is one for the whole app (`tools`): of several such inserts one is live (the last clicked, else the
   newest), the others say "click to show it here". The browser has none: its tab is the thread's;
 - `title`; `switches` — the title's menu (another list, another tool): each a patch of the insert;
 - `controls` — the head's own buttons; the frame adds fold and remove;
@@ -61,8 +60,7 @@ one beside it), so the kind never asks "the open thread" — it reads `at` (`app
   it is live and unfolded;
 - `context` — what it shows now, as text for the agent (cut long text at 6000 characters);
 - `opened` (put in, or brought back: start a terminal), `removed`.
-The frame is the same for every kind (`ThreadView::render_insert`, drawn by the thread it is in): the person's avatar, a light ground, a
-thin border, round corners, `block_head` on top (one height and look for every block's head).
+The frame is the same for every kind (`ThreadView::render_insert`, drawn by the thread it is in): the page's ground, a soft hairline and a card's corner (`block_frame`), `block_head` on top (one height and look for every block's head).
 State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`, a field of
 `InsertsState` (`src/inserts/state.rs`; `app.inserts.ssh`, `.tools`, `.sites`); a long body goes to `view.rs` beside it. Build it from `bench_ui`
 elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`. What
@@ -70,8 +68,8 @@ it calls on the app while it draws must never read a `ThreadView` (`self.thread(
 `active_thread.read`): the view drawing it is borrowed then — use `at`.
 
 **3. Its `/` word.** The trait's `word()` (the word, its aliases, what it is, the key it puts
-in); `choices()` for the rows of `/word <query>` when picking straight away helps (`/tasks
-today`). The "/" list reads them from `KINDS` (`inserts/slash.rs`).
+in); `choices()` for the rows of `/word <query>` when picking straight away helps (`/tools
+json`); `words()` when each choice deserves its own word in the bare "/" list (every utility). The "/" list reads them from `KINDS` (`inserts/slash.rs`).
 
 **4. The agent's side**, in `agent/`:
 - **A tool** for its work: `defineTool` in `agent/src/builtin/<kind>.ts`, in the assistant's
@@ -79,7 +77,7 @@ today`). The "/" list reads them from `KINDS` (`inserts/slash.rs`).
   `sessionOf(api.conversationId).inserts` (see `ssh.ts`), so the agent never has to name what
   the thread shows. When an MCP server already does the job, use it (the browser).
 - **A prompt line**: its case in `inserted()` (`agent/src/prompt.ts`): what it is, which tool works
-  on it, what not to do ("never look for the tasks in files"; "don't take screenshots to show the
+  on it, what not to do ("never look for the files in a folder by hand"; "don't take screenshots to show the
   page"). The `inserts` section is built from the document, so it changes only when an insert
   comes, goes or switches, and the prompt cache keeps.
 - **Its live state**: Bench sends every insert's `context` with each message; the agent appends it
@@ -109,7 +107,7 @@ The pattern for anything live from elsewhere:
 ## Where the data lives
 
 The tool's records live where the agent can reach them with Bench closed: in `~/.bench`
-(`bench.sqlite`, through the agent's REST API: the tasks, `/api/tasks`) or where they already
+(`bench.sqlite`, through the agent's REST API) or where they already
 live (`~/.ssh/config`, a server's files, a website behind the browser). Never only in Bench's
 memory.
 `build-native-data.md`.
@@ -119,10 +117,10 @@ memory.
 - **Input → output** (a tool): two panes side by side, `h_flex().size_full().items_stretch()`;
   `block_head` over each pane with its title and small buttons (copying is an icon);
   `Editor::new(&state).appearance(false)` in a `div().flex_1().min_h_0()`. `src/inserts/tools/view.rs`.
-- **A list re-read from its source** (tasks, a folder): re-read it now and then and replace the
+- **A list re-read from its source** (a folder, a server's list): re-read it now and then and replace the
   list, with three rules, each from a real bug: keep what exists only here (a new item's
   temporary id `new:<token>`); don't overwrite a card being typed into (save 700 ms after the last
-  key, then re-read); every row in a scrolling list gets `.flex_none()`. `src/inserts/tasks/state.rs`.
+  key, then re-read); every row in a scrolling list gets `.flex_none()`.
 - **A terminal**: as tall as its text, while its program sees a whole screen
   (`Session::set_min_rows`, `src/inserts/terminal/session.rs`): `ls` must not shrink it to one line.
 - **Something live from elsewhere** (a terminal, a browser tab): a worker thread owns the

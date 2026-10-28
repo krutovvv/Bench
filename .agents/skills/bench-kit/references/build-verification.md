@@ -78,20 +78,17 @@ python3 -I measure.py shot.png row <y> <x0> <x1>      # e.g. across the composer
 ```
 
 Typical checks that settled real complaints:
-- **Every bar = 36 and the rules on one row**: down a sidebar column and down a main-area column
-  the rule rows must be identical — header bottom = search band top (px 70–71), search band
-  bottom = tag strip bottom, bottom button top = composer rule (e.g. both at 1472).
-- The rule above the composer and the top edge of the sidebar's bottom button: same y.
-- Text start in the composer vs. the button's distance from the divider (glyph side bearing
-  makes text look 1pt further — fix the exact number of px measured).
+- **Bars and their rules on one row**: the title bar's rule (y 40 pt) crosses the window in one
+  pixel row; in the IDE the Explorer's bar and the documents' tabs end on one rule; the sidebar's
+  foot and the status bar's rule line up with the main area's.
+- Text starts within a column share one x: a group head and its rows (`SIDEBAR_TEXT_X`), the
+  composer's text and its chips; glyphs differ by ~0.5pt, more is a real offset.
 - Left/right gaps around a centered thing (waveform) are equal.
-- Text starts across areas (question band, answer, composer) share one x — scan each row from
-  the divider for the first dark pixel; glyphs differ by ~0.5pt, more is a real offset.
 - Two cards' header lines (code block vs Changed files): rule-to-rule distance equal.
 - A row of things that can collide (a segmented control in a fixed-width card): nothing touches
   the edge.
 
-Find elements by their exact colors (button fill, sidebar `#EFEFF0`, border `#D9D9DA`) with
+Find elements by their exact colors (the sidebar `#F6F6F7`, a hairline `#E2E3E7`, a selected row `#E6E7EB`) with
 numpy rather than guessing coordinates; crops of a full-screen shot catch other windows.
 
 ## Before saying "done"

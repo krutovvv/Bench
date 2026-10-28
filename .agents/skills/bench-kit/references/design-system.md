@@ -1,124 +1,91 @@
-# Design system (Zed style)
+# Design system (a Mac app's)
 
-Reference: the Zed editor's look — flat, dense, quiet chrome, content first, slightly rounded.
-Working copy of everything below: `crates/ui/src/theme/` (`mod.rs`: `apply`; `palettes.rs`: Bench's
-one scheme, a light and a dark half), `crates/ui/src/metrics.rs` (every size), and its syntax pair
-`assets/themes/bench-light.json`, `bench-dark.json` (written by `scripts/gen_themes.py`).
+Reference: Apple's own apps — Xcode, Finder, Mail, Messages, System Settings. Working copy of
+everything below: `crates/ui/src/theme/` (`mod.rs`: `apply`; `palettes.rs`: `BENCH_LIGHT`,
+`BENCH_DARK`), `crates/ui/src/metrics.rs` (every size), `crates/ui/src/mark.rs` (Finder's tag
+colours), and the syntax pair `assets/themes/bench-light.json`, `bench-dark.json` (written by
+`scripts/gen_themes.py`, checked against the palette by `cargo test -p bench_ui`).
 
-## Base switches (`theme.rs`)
+## Base switches (`theme/mod.rs` `apply`)
 
 ```rust
 Theme::update(cx, |t| {
-    t.radius = px(4.);          // buttons, fields, menus
-    t.radius_lg = px(6.);       // blocks use rounded_md
-    t.shadow = false;           // no drop shadows (popovers keep only the OS shadow)
-    t.font_size = px(14.);      // UI font = rem: every rems()/px_4()/h_8() scales with it
-    t.mono_font_size = px(12.); // code, editors, diffs, line numbers
+    t.radius = px(4.);          // the library's controls
+    t.radius_lg = px(6.);       // rounded_md
+    t.shadow = false;           // shadows are set where macOS has them, not by the library
+    t.font_size = px(14.);      // the rem: the thread's words
+    t.mono_font_size = px(12.); // code, editors, diffs, the terminal
 });
 ```
 
-Apply order matters: `Theme::change(mode, None, cx)` (reloads the registered palette for
-light/dark) **then** `Theme::update(cx, |t| …)` with your overrides. `Theme::global_mut` edits do
-not propagate to already-built windows; `Theme::update` does.
+Apply order matters: `Theme::change(mode, None, cx)` then `Theme::update(cx, |t| …)`. ⌘+ / ⌘−
+step the whole size (13/11, 14/12, 15/13); there is no size setting.
 
-## Light palette (default)
+## Palette
 
-| Token | Hex | Use |
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| background | `#FFFFFF` | `#1A1B1F` | pages: the thread, editors, settings |
+| foreground | `#1B1C1F` | `#E4E5E8` | text |
+| sidebar, chrome (title bar, status bar, tabs) | `#F6F6F7` | `#202126` | the light grey frame |
+| border | `#E2E3E7` | `#303238` | every hairline |
+| sidebar_accent | `#E6E7EB` | `#30333A` | a selected row's ground |
+| list_hover | `#EDEDF0` | `#2A2C31` | a hovered row |
+| muted_foreground | `#5D6068` | `#A0A3AB` | secondary text |
+| `faint(theme)` | muted at lower alpha | — | the quietest: dirs, notes, the agent's thoughts |
+| popover | `#FFFFFF` | `#25272C` | popovers, the completion list |
+| primary (accent) | `#2F6BED` | `#5B9BFF` | the one accent |
+| danger / success / warning | `#C93C3C` / `#1E8A4C` / `#B7791F` | | errors / ok / waiting |
+
+Marks are Finder's tag colours (`bench_ui::mark_color`), drawn as a `tag_dot`.
+
+## Typography (`metrics.rs`)
+
+| Name | Size | Where |
 |---|---|---|
-| background | `#FAFAFA` | content (chat, editors) |
-| foreground | `#242529` | text |
-| sidebar | `#EAEAEC` | left panel (no rule against the thread) |
-| sidebar_accent / list_hover | `#DEDEE1` / `#E6E6E8` | hover in the sidebar / elsewhere |
-| title_bar, status_bar, tab_bar | `#E4E4E6` | chrome a step darker than content |
-| border, sidebar_border | `#D9D9DA` | all 1px rules |
-| input, window_border | `#C9C9CB` | input outlines |
-| muted / muted_foreground | `#EBEBEC` / `#6E6F75` | secondary text, meta lines |
-| secondary | `#EDEDEE` | quiet fills (secondary buttons) |
-| primary (accent) | `#4F6FD8` | selection stripe, primary button, focus, live values |
-| danger / success / warning | `#C9503F` / `#4F8A3F` / `#B7791F` | errors only / ok / caution |
-| list_active | accent at 14% | selected row background |
-| selection | accent at 25% | text selection |
-| scrollbar thumb | `#242529` at 18% (hover 30%) | — |
+| rem (`text_base`) | 14 | the thread's words: messages, answers, the composer |
+| `THREAD_META` | 13 | the work line, steps, block heads, cards' text in the thread |
+| `SIDEBAR_TEXT` | 13 | sidebar and tree rows, controls (segmented, form actions, completions, popovers) |
+| `SIDEBAR_HEAD_TEXT` | 11 semibold, muted | group heads (Host, a project, Agent, Project), popover section titles, log lines |
+| `BAR_TEXT` | 12 | the status bar, chips in bars, an IDE head |
+| `BAR_TITLE` | 13 semibold | the window's title, the Explorer's project pull-down |
+| mono | 12 | code (`CODE_LEAD` 1.618, Zed's), the terminal, diffs |
 
-Dark (One Dark): content `#282C33`, panels `#2F343E`, chrome `#3B414D`, borders `#464B57`,
-text `#DCE0E5`, muted `#A9AFBC`; accent lightened (blue `#74A5F2`), primary_foreground dark
-`#1E2127`. Full list: `crates/ui/src/theme.rs` → `dark_palette`.
+Leading: the thread's prose `LEAD` (1.5rem), shared with the composer.
 
-Accent presets (light, dark): Blue `#4F6FD8/#74A5F2`, Violet `#7A5BD0/#A98BF0`, Green
-`#3F8A50/#86C08A`, Teal `#16848A/#5FC0C4`, Amber `#B7700F/#E2B05A`, Coral `#CF5A3C/#EE8C6C`,
-Rose `#C2457A/#EC86AE`. Hover = lightness −5% (light) / +6% (dark).
-
-Item colors (user-assigned labels, e.g. session colors): `#D0605A #D99A4E #D6C24A #6DB86A
-#5C8FD8 #9A6AD6 #D46A9F` (saved by index — append new ones at the end) — shown as a 2px left stripe plus the same color at 12% as row background
-(22% when selected). A chosen color wins over the accent stripe — on hover too: hover keeps
-the row's color, slightly denser (20% / 30%), never the generic grey ("color epilepsy").
-
-## Syntax highlighting
-
-One Light / One Dark as gpui-kit `HighlightTheme` JSON (Zed-compatible keys: `editor.background`,
-`editor.line_number`, `syntax.keyword.color`, …), loaded with
-`serde_json::from_str::<HighlightTheme>(include_str!(…))` and set as `t.highlight_theme`.
-One theme for every editor and diff in the app (config YAML, MCP JSON, skills Markdown, files).
-Key colors (light): keyword `#A626A4`, function `#4078F2`, string `#50A14F`, number/constant
-`#986801`, type `#C18401`, property/tag `#E45649`, operator `#0184BC`, comment `#A0A1A7` italic.
-
-## Typography
-
-- UI: system font, 14px base.
-- **The thread is one size: `text_base`, everything.** The words, the steps, the queue and its
-  labels, the plan and its steps, the background row, every block's head and every code block in
-  the thread (`bench_ui::block_head`, `fold_head`, the code in `media/text.rs`), and the composer.
-  A thread is an editor of its own, and in an editor nothing changes size mid-document: what
-  sets a row apart is **colour and weight**, never a smaller type. Only the composer's own chrome
-  (the `/` list's descriptions, an attachment chip) and the text inside a utility's form stay
-  `text_sm` / `mono_font_size`.
-- Chrome outside the thread is `text_sm`: the header, the status bar, a search hit, an empty
-  state. Medium weight only for titles and the header.
-- The sidebar and the Explorer's tree are **one size too**: `text_base` for every row — a
-  project's head, its threads, a file, a skill, an MCP server, Settings. A compact sidebar keeps
-  that rule strictly: a note under a row goes away with it, and only the roomy one may write a
-  note (`text_xs`/`text_sm`) under a row. A group says "section" by CAPITAL LETTERS, not by a
-  smaller type: a project's head (`project_row.rs`) and the tree's headings (`tree_heading`,
-  `text_xs`, muted). Under a row, a note (a skill's line, a server's transport) stays `text_xs`
-  and muted — it is an annotation, not a row.
-- Code: Menlo. **In the thread it is the words' size** (`rems(1.0)`): mono by family, not by
-  size. Elsewhere `mono_font_size` 12 — the Explorer's editors, diffs, a cron schedule in a note.
-- Size presets (⌘+ / ⌘−; no setting): Small 13/11, Normal 14/12, Large 15/13. Rem-based
-  spacing scales with the font; fixed sizes don't — rems for what must keep proportions.
-- Leading: the thread's is `LEAD` (1.5rem), shared by messages and the composer; wrapped list
-  titles `line_height(relative(1.25))`.
-
-## Sizes and gaps (`crates/ui/src/metrics.rs`)
-
-Never a `px(…)` in a screen: name one of these, or add it there first.
+## Sizes (`crates/ui/src/metrics.rs`)
 
 | Name | Value | What |
 |---|---|---|
-| `Gap::Xs/S/M/L/Xl` | 2 / 4 / 8 / 12 / 16 | every gap between elements; `Xl` the inset from a panel's edge |
-| `FIELD_H` | 28 | a field; buttons, pickers, chips of a form match it |
-| `BLOCK_HEAD_H` | 32 | the head of every block (`block_head`) |
-| `CHIP_H` | = `FIELD_H` | attachment, queued message, a plan's head |
-| `RING_CLEAR` | 4 | air under a focused field (the ring is drawn outside) |
+| `TITLE_BAR_H` | 40 | the title bar across the window |
 | `STATUS_H` | 29 | the status bar with its rule |
-| `bar_h(cx)` | font × 2.5 (35) | every bar without its rule; + 1 = the header's 36 |
-| `TURN_Y` | 14 | every thread row pads top and bottom by it: rows 28 apart |
-| `CHAT_LEFT` | 28 (2 × `TURN_Y`) | the avatar's x |
-| `AVATAR` | 24 | the avatar disc |
-| `CHAT_TEXT` | 66 (`CHAT_LEFT + AVATAR + 14`) | where the thread's text starts |
-| `CHAT_RIGHT` | = `CHAT_TEXT` | as much free on the right |
-| `LEAD`, `THUMB`, `BAR_CONTROL_REMS` | 1.5 / 64 / 2 | leading; a picture's square; a filled control outside a bar |
-| `nest_pl`, `editor_line`, `editor_height(lines)` | fns | a row under a group header; an editor as tall as its text |
+| `bar_h(cx)` | font × 2.5 | the Explorer's bar, the documents' tabs, IDE heads |
+| `FIELD_H` | 28 | a field; form actions match it |
+| `SEGMENT_H` / `MODE_SEGMENT_H` | 24 / 22 | a segmented control's segment / Chat · Code's |
+| `LIST_ROW_H` | 26 | a list row: steps, changed files |
+| `COMPLETION_ROW_H`, `COMPLETION_GAP` | 26, 6 | the `/` list's rows, its air over the field |
+| `BLOCK_HEAD_H` | 32 | every block's head (`block_head`) |
+| `SIDEBAR_ROW_INSET`, `SIDEBAR_TEXT_X` | 10, 20 | a row's inset from the sidebar's edge, where its text starts |
+| `THREAD_ROW_PY`, `GROUP_GAP` | 4, 20 | a sidebar row's padding, the air between groups |
+| `TAG_DOT`, `DOT` | 8, 6 | a mark, a state dot |
+| `THREAD_MAX_W` | 860 | the thread's column, centred |
+| `CHAT_LEFT`, `CHAT_LEFT_NARROW`, `THREAD_NARROW_W` | 28, 16, 640 | the thread's sides; narrower than 640 (a dock) takes 16 |
+| `BUBBLE_PX/PY/R` | 14 / 8 / 16 | the person's message |
+| `COMPOSER_CARD_R/PX/PY/PB` | 14 / 8 / 8 / 12 | the composer's field and the air under it |
+| `SEND_BUTTON`, `STOP_MARK` | 26, 9 | Send (and the plus and mic beside it), Stop's square |
+| `STEP_VERB_W` | 88 | a step's verb column |
+| `SETTINGS_W`, `PAGE_W` | 760, 680 | a settings page's column, the new project's page |
+| `TURN_Y` | 14 | a thread row's top and bottom |
+| `Gap::Xs…Xl` | 2 / 4 / 8 / 12 / 16 | gaps |
+| `editor_height(lines)` | fn | an editor as tall as its text |
 
-Other fixed sizes: header 36, sidebar 280 (resizable 200–480), popovers 260–300 wide.
+`CHAT_TEXT`, `AVATAR`, `CHAT_RIGHT`, `COMPOSER_TOOLS_*` belong to the document look
+(`src/thread/look.rs`), kept in code, not shown.
 
-## Color usage rules
+## Colour use
 
-- Muted text for everything secondary (meta, counters, timestamps, hints).
-- Accent only for "active/selected/live/primary". Never decorative. Primary buttons in the accent
-  (`button_primary = primary`).
-- Red only for errors (error counts, failed steps, destructive confirm, the fallback model).
-- Live states: calm accent + motion (spinning loader, shimmer).
-- Status bar: every label and icon `muted_foreground`; only live speed (accent) and context
-  thresholds (amber/red) differ. Context > 60% amber, > 85% red.
-- Corners: `rounded_md` on every bordered block (`bench_ui::block`), the theme radius on
-  controls; `rounded_full` only for avatars and overlay badges (a ▶ on a video frame).
+- Muted for everything secondary; `faint` for what the eye should pass over.
+- The accent only for live, chosen or primary — never decoration.
+- Red only for errors (an error count, a failed step, a destructive confirm, the fallback).
+- Waiting for the person: amber (`warning`), in the dot and the line over the composer.
+- Live states: the accent plus motion (a spinner, the title's shimmer).

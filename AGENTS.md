@@ -31,8 +31,8 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   - has an agent tool that acts on it;
   - is restored exactly on return.
 
-  Kinds that can be live only once (the task list, the utilities) show "click to show it here"
-  on the older ones.
+  Kinds that can be live only once (the utilities) show "click to show it here" on the older
+  ones.
 - **Card**: a form or an editor that appears in the thread as an agent-message block, under the
   insert that asked for it (a task). A project's parts that are not files (an MCP server, a cron
   job) open as documents in the Explorer instead.
@@ -187,19 +187,27 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 
 ## The look, in short
 
-The look is Zed's: flat and precise, with one accent. Never invent a look or a control; assemble
-from `bench_ui` (`crates/ui`, shown by the storybook). A size or a gap is a `bench_ui` constant or
-`Gap` step, never a `px(…)` written in a screen; a missing piece is added to `crates/ui` first.
+The look is a Mac app's — Xcode, Finder, Mail, Messages, System Settings — settled as final on
+2026-10-28: extend it in the same voice, with Apple's concrete values, never a look of one's own.
+Assemble from `bench_ui` (`crates/ui`, shown by the storybook). A size or a gap is a `bench_ui`
+constant or `Gap` step, never a `px(…)` written in a screen; a missing piece is added to
+`crates/ui` first. The rules: `.agents/skills/bench-kit/references/design-look-rules.md`.
 
 - **Colours.** One look, two halves: `BENCH_LIGHT` and `BENCH_DARK` in
   `crates/ui/src/theme/palettes.rs` plus their syntax JSON (`assets/themes/bench-*.json`, checked
   against the palette by `cargo test -p bench_ui`). Light or dark is the person's Mode, macOS's by
   default; there is no theme or accent to choose (one accent, Bench's blue). A thread's or a
-  project's mark is a colour of `bench_ui::mark` (Finder's tag colours).
-- **Blocks.** Every bordered block is rounded (`rounded_md`, theme radius). Every block head is
-  `block_head` (32 px). Fields are `FIELD_H` (28 px). Buttons are rounded and consistent.
-- **Scrolling.** Only the thread scrolls. There is no scroll inside a scroll, except the
-  terminal. Editors are as tall as their text (`editor_height`). Lists are as long as they are.
-  Empty states take one line.
-- **Messages.** In the thread there is one font size, the messages'. Copy is an icon.
+  project's mark is a Finder tag dot (`bench_ui::mark`).
+- **Type.** The thread's words 14, its meta 13; sidebar rows 13, group heads 11 semibold in
+  their own case; bars 12, the title 13 semibold; controls 13; code Menlo 12 at Zed's leading.
+- **Controls.** Mac ones: segmented controls, switches, pull-downs, navigator glyphs, a
+  completion list for `/`, the menu bar with every shortcut (`src/app/menu.rs`).
+- **The thread.** A classic chat: the person's grey bubbles, no avatars, a centred column,
+  the composer pinned as one rounded field (plus, text, mic, Send). The document look stays in
+  code (`src/thread/look.rs`).
+- **Blocks.** Grouped boxes: the page's ground, a soft hairline, a card's corner
+  (`block_frame`); every block head is `block_head`. Fields are `FIELD_H` (28).
+- **Scrolling.** Only the thread scrolls, with a Mac's overlay scrollbar. No scroll inside a
+  scroll, except the terminal and editors. Lists are as long as they are. Empty states take one
+  line.
 - **One place for each change.** A change to how blocks look goes to all of them at once.

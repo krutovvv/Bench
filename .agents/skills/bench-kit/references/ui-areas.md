@@ -14,35 +14,33 @@ result to the pixel. The change cycle itself (build, screenshot, measure, ship) 
 
 ```
 x: 0                         280 (sidebar, resizable)                                   1240
-y ┌──────────────────────────┬─────────────────────────────────────────────────────────┐
-0 │ ● ● ●       TOP STRIP + ◧ │ HEADER: thread title · project chip ………………… ⧉ New window│ 0–35
-35│━━━━━━━━━━━━━━━━━━━━━━━━━━│━━━━━━━━━━━━━━━━━━━━━━━━━ (one line across) ━━━━━━━━━━━━━│ 35 rule
-  │ 🔍 SEARCH BAND           │ THE THREAD (gpui::list, the only scroll):              │
-  │━━━━━━━━━━━━━━━━━━━━━━━━━━│   messages, "N actions", answers, inserts in the rows   │
-  │ Host               ˅ +   │   where the person put them, cards under them           │
-  │ │ thread                 │   tail: plan, processes, approval, a form, COMPOSER     │
-  │ PROJECT            ˅ +   │   (the composer is the last row; room past the end)    │
-  │ │ thread       (hover ⋯) │                                                         │
-772│━━━━━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│ rule
-  │ STATUS BAR: agent · model · context · speed · effort · approvals …… ▣ 📎 🎤 ⚙ Stop │ STATUS_H 29
+y ┌──────────────────────────────────────────────────────────────────────────────────────┐
+0 │ ● ● ●  ◧ │ TITLE (13 semibold) [/ second thread ×]   meters · repo chip [Chat|Code] │ 0–40
+40│━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│ rule
+  │ [🔍 Search threads ⌘F]   │ THE THREAD (gpui::list, the only scroll), centred ≤ 860:│
+  │ Host                   › │   bubbles, "N actions", answers, inserts where put,     │
+  │ Project ● ✈              │   cards under them; the overlay scrollbar               │
+  │  (thread row)            │ ┌ + text …                                  🎤 (↑) ┐    │
+  │──────────────────────────│ └ COMPOSER, pinned, COMPOSER_CARD_PB over the bar ─┘    │
+  │ + New project            │                                                         │
+772│━━━━━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│ rule
+  │ STATUS BAR: ● Agent · state            (IDE: Ln, Col · indent · language) ✦ ▭      │ STATUS_H 29
   └────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 | Area | Height | Inside | Inset | Code |
 |---|---|---|---|---|
-| Top bar's lead (left of the header) | 36 | room for the window's buttons, the sidebar's fold, a short rule; the title follows | left 78 | `render_window_lead`, `src/titlebar/mod.rs` |
-| Search band | `bar_h + 1` | the search input, no frame | magnifier over the head icons (measured) | `bench_ui::search_band` (`crates/ui/src/bars.rs`), used in `src/sidebar/mod.rs` |
-| Sidebar list | rest | projects only: Host's threads first, then each project (pinned first) with its threads | nested rows `nest_pl` | `src/sidebar/mod.rs` (`render_loose`, `render_project`); order and acts `src/sidebar/items.rs` |
-| Header | 36 incl. its rule | the thread's title, the project chip; at the right end New window | left 16 (`pl_4`), right 8 (`pr_2`) | `render_header`, `src/titlebar/mod.rs`; its right end `render_header_tail`, `src/inserts/terminal/form.rs` |
-| The thread | rest | rows from `crates/thread`; inserts where the journal puts them; the tail | `CHAT_TEXT` / `CHAT_RIGHT`, rows `TURN_Y` | `render_chat`, `src/thread/mod.rs`; inserts `render_insert_by_id`, `src/inserts/mod.rs` |
-| Cards under an answer / the tail | — | Changed files, sources, processes, approval, plan; code, audio, video | the answer's column | `src/thread/extras.rs`, `src/media/view.rs` |
-| Composer | its text | text only, no buttons (⌘Enter sends); attachment chips over it | text at `CHAT_TEXT` | `src/thread/composer.rs` |
-| Status bar | `STATUS_H` (29) incl. its top rule | left: the agent's state, model, context, speed, effort, approvals; right: background terminals, paperclip, mic, Settings gear, Stop last | items `px_2` | `src/statusbar/mod.rs` |
+| Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), the thread's meters and repo chip, Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header`, `render_header_tail` in `src/titlebar/mod.rs` |
+| Search | its field | a filled field, no rule | `SIDEBAR_ROW_INSET` | `bench_ui::search_band` (`crates/ui/src/bars.rs`) |
+| Sidebar list | rest | Host's threads first, then each project (pinned first) with its threads | rows at `SIDEBAR_ROW_INSET`, text at `SIDEBAR_TEXT_X` | `src/sidebar/mod.rs`; order and acts `src/sidebar/items.rs` |
+| Sidebar foot | `STATUS_H` | New project | as a row | `render_new_project_row`, `src/sidebar/mod.rs` |
+| The thread | rest | rows from `crates/thread`, centred in `THREAD_MAX_W`; inserts where the journal puts them | `CHAT_LEFT` (`CHAT_LEFT_NARROW` in a dock) | `src/thread/mod.rs`; inserts `src/inserts/mod.rs` |
+| Composer | its text | plus, text, mic, Send in one rounded field; chips over the text | the column's sides | `src/thread/composer/input.rs` |
+| Status bar | `STATUS_H` 29 incl. its rule | the agent's state; in the IDE the cursor; the thread-beside and terminal toggles | items `px_2` | `src/statusbar/mod.rs` |
+| Explorer bar (Code) | `bar_h` + its rule, level with the tabs | the project pull-down, Files \| Threads glyphs, Refresh, ⌘P | `SIDEBAR_ROW_INSET` | `explorer_picker`, `src/explorer/tree/view.rs` |
 
-`bar_h` = `font_size × 2.5` (35). Every rule that crosses the window is one pixel row. The
-status bar is the only shorter bar. The Settings panel (the gear) and the new project's page take
-the thread's inset all around — `CHAT_LEFT` (28) from the divider, the window's right edge and the
-bottom, and the same air over their tabs; their content fills that width, no max-width.
+Every rule that crosses the window is one pixel row. Settings pages are a centred column of
+`SETTINGS_W`.
 
 ## Which area a thing belongs to
 
@@ -52,16 +50,16 @@ bottom, and the same air over their tabs; their content fills that width, no max
 | A form a tool needs (a new server, a new host) | an agent-message card under the insert that asked for it | a dialog, a settings page |
 | A project's settings (name, where, model, Telegram) | its Settings page (`Center::Project`, `src/env/page.rs`) | a thread, a dialog |
 | What a project contains (files, soul, prompts, skills, MCP, schedule) | the Explorer (`src/explorer/`, `docs/explorer.md`) | a thread, a settings tab |
-| The sidebar's own buttons (hide) | top strip, right; New project: the list's last row | the status bar |
-| New window | the header's right end (`render_header_tail`) | — |
-| Settings (the gear), attach, dictate, Stop | status bar, right; Stop last | the composer |
-| Facts (where, model, counts) | status bar, left; text or pickers, not buttons | — |
-| A live choice (model, effort, approvals) | status bar, a picker; hidden until loaded | a default pretending to be real |
+| The sidebar's fold | the title bar, right after the traffic lights; New project: the sidebar's foot | the status bar |
+| New window, Settings, and every other command | the menu bar (`app/menu.rs`), with its key | a button in a bar |
+| Attach, dictate, Send / Stop | the composer's field | the status bar |
+| The thread's facts (context, speed, repo) | the title bar, by the title | — |
+| The agent's state | status bar, left; its popover | — |
 | Rare actions on a thread or project | its row's hover "⋯" and right-click (one `item_menu`) | the header |
 | Quick actions on a row (a new thread "+") | on the row, shown on hover | always visible |
-| Actions on an answer (copy, read aloud, regenerate) | over the answer's top-right corner, on hover | a row of their own |
-| Results that come with an answer (files, processes, code) | a card under the answer: 1px frame, rounded, no fill, a head line | a dialog |
-| Search over threads | the search band | inside the list |
+| Actions on an answer (copy, read aloud) | at the end of its work line, on hover | a row of their own |
+| Results that come with an answer (files, processes, code) | a block under the answer: `block_frame`, `block_head` | a dialog |
+| Search over threads | the sidebar's search field | inside the list |
 | A choice to make before starting | the empty state, one line | a separate screen |
 
 If the person names an area ("over the sidebar", "in the bottom corner"), that wins: do it,
@@ -79,7 +77,7 @@ same for any icon.
 3. **Rebuild the control as the target area's piece, not as a copy of the old one.** A status
    bar button (`button` inside `render_statusbar`) becomes a header icon:
    `bench_ui::icon_button(id, Ico::X, "Tip  ⌘…", on, cx)` (`crates/ui/src/button.rs`), its
-   tooltip naming the shortcut. A button that opens rather than switches (New window, +) passes
+   tooltip naming the shortcut. A button that opens rather than switches (New project, +) passes
    `on` false, so it never lights up.
 4. **Order and spacing in the target**: as asked ("Tools, then Tasks"), the area's own gap
    (`gap_1`), and its inset (the last icon's edge 16pt from the sidebar's right edge).
@@ -92,26 +90,21 @@ same for any icon.
    (the icons that were there must not move);
    `spans.py` on the old area shows it's gone. Crop both areas and look at them.
 
-Other moves done the same way:
-- **Stop** from the composer to the status bar's right end; the paperclip and the mic too (the
-  composer has no buttons).
-- **An answer's hover actions** from a row under the answer to an overlay on its top-right
-  corner (`absolute().top(23).right_6()`, on the chat background so the text under it is
-  covered cleanly).
+Other moves done the same way: New window from the header to the menu bar; Stop, attach and
+the mic from the status bar into the composer's field; a second thread's title from a head over
+the dock into the title bar.
 
 ## Fitting one piece to another
 
 The real case: "The code block's header must be as tall as the Changed files line." Others:
-- the search band as tall as the header;
+- the Explorer's bar as tall as the documents' tabs (`bar_h`, one rule);
 - an insert's head as tall as a code block's (`block_head`, `BLOCK_HEAD_H`);
-- the composer's text at the thread's column (`CHAT_TEXT`).
+- a step row as tall as a changed file's (`LIST_ROW_H`).
 
-1. **Name the reference piece and find its code.** Changed files' line ("CHANGED FILES" in
-   `src/thread/extras.rs`). That is the target. "Similar" is not enough: take its exact
+1. **Name the reference piece and find its code.** Changed files' head (`src/thread/rows/changed_files.rs`). That is the target. "Similar" is not enough: take its exact
    padding and text size — better, one `bench_ui` constant for both.
 2. **Copy those values to the piece you fit**, or make both use the same piece (`block_head`).
-   The code header is `render_code` in `src/media/view.rs`; both are `text_base` muted (one text
-   size in the thread).
+   The code header is `render_code` in `src/media/view.rs`; both are `THREAD_META` muted.
 3. **Check every child that can make it taller.** The Copy button had `py_0p5`: 2pt more than
    the reference line. Its vertical padding went. A row is as tall as its tallest child plus
    the row's padding.
@@ -121,7 +114,7 @@ The real case: "The code block's header must be as tall as the Changed files lin
    `bar_h` is `bar_h + 1`; a neighbour of exactly `bar_h` is a visible 1px step.
 6. **For insets, measure text starts, not code.** `textx.py` from the divider for each band.
    Glyphs differ by about 0.5pt; anything more is a real offset. The composer's textarea pads
-   itself; `render_composer` pulls it back so its text starts at `CHAT_TEXT`.
+   itself; `render_composer` pulls it back by `INPUT_PAD_X` / `INPUT_PAD_Y`.
 
 ## Placing an icon exactly
 
@@ -129,7 +122,7 @@ The real case: "The code block's header must be as tall as the Changed files lin
   toggle's edge at the sidebar's 16pt inset: `pr(12)` on the strip + `p_1` (4pt) on the toggle.
 - Inputs pad themselves (about 10pt) and glyphs have side bearings. The search magnifier sits
   over the group icons with `pl(3.5)`: a measured number, not a guess. Measure with `textx.py`
-  on the search band and on a group header; the x values must match.
+  on the search field and on a group head; the x values must match.
 - Icon sizes are fixed per place (`design-icons.md`): `xsmall` in rows, `small` for head and
   status-bar icons. A size between two of these is not allowed: pick the place's size.
 - Centered things get equal gaps on both sides. Measure left and right with `measure.py row`.
