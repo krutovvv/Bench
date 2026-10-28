@@ -10,7 +10,7 @@ import { defineExtension, defineTool, hook, section, ToolTask } from "@earendil-
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
-import { clarify, sessionSearch, todo } from "../builtin/ask.ts";
+import { clarify, planNudge, sessionSearch, todo } from "../builtin/ask.ts";
 import { CronTask, cronTool } from "../builtin/cron.ts";
 import { ProcessTask, processTool } from "../builtin/process.ts";
 import { memoryTool } from "../builtin/memory.ts";
@@ -128,11 +128,14 @@ export const assistant = defineExtension({
 			// (`lsp.ts`): the model sees them as an editor shows them, without asking.
 			// The module's spec, the first time the thread touches a file under it (`specs.ts`):
 			// the decisions and contracts the code does not show, found without being looked for.
+			// The plan left unchanged for several steps (`planNudge`): the model is reminded to update it.
 			afterTool: async (call: any, result: any, api: any) => {
-				if (!["read", "edit", "write"].includes(call.name) || result?.isError) return undefined;
+				const nudge = planNudge(String(api.conversationId), call);
+				const withNotes = (notes: string[]) => (notes.length ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined);
+				if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(nudge ? [nudge] : []);
 				const info = host().thread(api.conversationId);
-				if (!info) return undefined;
-				const notes: string[] = [];
+				if (!info) return withNotes(nudge ? [nudge] : []);
+				const notes: string[] = nudge ? [nudge] : [];
 				const spec = await specNote(info, String(api.conversationId), String(call.arguments?.path ?? "")).catch(() => undefined);
 				if (spec) notes.push(spec);
 				if (call.name !== "read") {
@@ -140,7 +143,7 @@ export const assistant = defineExtension({
 					const diag = at ? await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text).catch(() => undefined) : undefined;
 					if (diag) notes.push(diag);
 				}
-				return notes.length ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
+				return withNotes(notes);
 			},
 		} as any),
 	],
