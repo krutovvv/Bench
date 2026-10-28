@@ -123,7 +123,8 @@ pub trait SettingsForm: Section {
 /// A section of what the project contains that is not a file: parts in the Explorer's tree
 /// (`src/explorer/parts.rs`), each opened in the middle as its `card` (`DocKey::Part`).
 pub trait ExplorerParts: Section {
-    /// The Explorer's group it goes under ("Tools", "Schedule").
+    /// The Explorer's group it goes under: "Agent" (with the soul, prompts and skills) or
+    /// "Project" (with its Settings).
     fn group(&self) -> &'static str;
     /// Its node in that group.
     fn block(&self, general: bool) -> &'static str;

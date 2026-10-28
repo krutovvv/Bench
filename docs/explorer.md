@@ -55,9 +55,8 @@ Its tree:
 | Group | What | Where it is |
 |---|---|---|
 | the folder | the project's code, listed as folders open | its machine (`/api/fs/*?machine=` when this Mac's agent works there over SSH) |
-| Instructions | `SYSTEM.md` (its soul), prompts, skills by where they live | the agent's own files (`~/.bench/projects/<id>/`), a folder's `.agents/skills` |
-| Tools | MCP servers, language servers | the environment's parts (`ExplorerParts` whose `group()` is "Tools") |
-| Schedule | scheduled jobs | the agent's cron (`group()` "Schedule") |
+| Agent | `SYSTEM.md` (its soul), prompts, skills by where they live; then its tools: MCP servers, language servers | the agent's own files (`~/.bench/projects/<id>/`), a folder's `.agents/skills`; the environment's parts whose `group()` is "Agent" |
+| Project | scheduled jobs, then its Settings | the agent's cron (`group()` "Project"); the settings document |
 
 Every tab holds an `Item` (`explorer/item.rs`, as Zed's): its tab, unsaved changes, what
 opening it reads, how it is drawn, saved and closed; `DocKey` is the tab's identity and

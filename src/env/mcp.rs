@@ -147,8 +147,10 @@ impl Section for Mcp {
 }
 
 impl ExplorerParts for Mcp {
+    /// The agent's own tools sit with its texts (the tree's Agent group); what the project
+    /// is set to and does by itself is the Project group.
     fn group(&self) -> &'static str {
-        "Tools"
+        "Agent"
     }
 
     fn block(&self, _general: bool) -> &'static str {

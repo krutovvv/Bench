@@ -60,17 +60,23 @@ impl BenchApp {
                 out.extend(self.folder_rows(&root, 0, cx));
             }
         }
-        out.push(self.heading("instructions", "Instructions", vec![], cx));
-        if self.explorer.is_open("instructions") {
+        // The agent's: its texts (the soul, prompts, skills), then its tools — the parts whose
+        // group is "Agent". (The fold keeps its old key, "instructions".)
+        out.push(self.heading("instructions", "Agent", vec![], cx));
+        let open = self.explorer.is_open("instructions");
+        if open {
             out.extend(self.instruction_rows(cx));
         }
         // The environment's parts, by the group their sections name.
         let Some(e) = self.envs.get(&self.explorer.project) else {
             return out;
         };
+        if open {
+            out.extend(self.part_rows(e, "Agent", false, cx));
+        }
         let mut groups: Vec<&'static str> = vec![];
         for s in PARTS.iter().filter(|s| s.shown(self, e)) {
-            if !groups.contains(&s.group()) {
+            if s.group() != "Agent" && !groups.contains(&s.group()) {
                 groups.push(s.group());
             }
         }
