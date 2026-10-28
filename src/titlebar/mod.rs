@@ -7,6 +7,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
@@ -197,19 +198,57 @@ impl BenchApp {
                 // A thread about a task list is named after it until it has a title of its own.
                 .unwrap_or_else(|| "New thread".into())
                 .into();
+            // A second thread beside this one: its title after a slash, a quieter one, with its
+            // close — the two threads named in one bar, not a second bar over the dock.
+            let beside = (self.center == Center::Chat
+                && self.right_dock.shows(crate::workspace::Panel::Thread))
+            .then(|| self.beside_thread.clone())
+            .flatten()
+            .map(|v| self.thread_title(v.read(cx).thread.id.as_ref()));
+            let theme = cx.theme().clone();
             return bar
                 .pl_4()
                 .pr_2()
                 .gap_1()
                 .child(
-                    div()
+                    h_flex()
                         .flex_1()
                         .min_w_0()
+                        .gap_1p5()
+                        .items_center()
                         // The header's title: the sidebar's size, semibold; its chips the bars' size.
                         .text_size(px(bench_ui::BAR_TITLE))
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .truncate()
-                        .child(title),
+                        .child(
+                            div()
+                                .min_w_0()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .truncate()
+                                .child(title),
+                        )
+                        .when_some(beside, |d, second| {
+                            d.child(div().flex_none().text_color(bench_ui::faint(&theme)).child("/"))
+                                .child(
+                                    div()
+                                        .min_w_0()
+                                        .font_weight(FontWeight::MEDIUM)
+                                        .text_color(theme.muted_foreground)
+                                        .truncate()
+                                        .child(second),
+                                )
+                                .child(
+                                    bench_ui::icon_button(
+                                        "beside-close",
+                                        bench_ui::icons::Ico::X,
+                                        "Close the thread beside  ⌘J",
+                                        false,
+                                        cx,
+                                    )
+                                    .on_click(cx.listener(|this, _, _, cx| {
+                                        this.close_beside(cx);
+                                        this.right_dock.open = false;
+                                    })),
+                                )
+                        }),
                 )
                 // The thread's own meters, then its repo: what is this thread's, together.
                 .children(self.active_thread.read(cx).render_meters(self.defaults.context_length, cx))

@@ -273,8 +273,10 @@ impl BenchApp {
             div()
                 .id(id("picture"))
                 .relative()
-                .w(w)
-                .h(h)
+                // Its own size at most, and narrower with a narrow thread (a dock): the shape kept.
+                .w_full()
+                .max_w(w)
+                .aspect_ratio(f32::from(w) / f32::from(h).max(1.))
                 .border_1()
                 .rounded_md()
                 .border_color(theme.border)
@@ -548,8 +550,10 @@ impl BenchApp {
                 let open = svg.clone();
                 div()
                     .id(id)
-                    .w(w)
-                    .h(h)
+                    // As a picture: its size at most, narrower with the thread, its shape kept.
+                    .w_full()
+                    .max_w(w)
+                    .aspect_ratio(f32::from(w) / f32::from(h).max(1.))
                     .cursor_pointer()
                     .child(img(svg.clone()).size_full())
                     .tooltip(|window, cx| Tooltip::new("Diagram — click to open").build(window, cx))

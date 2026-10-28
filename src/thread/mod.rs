@@ -223,15 +223,42 @@ impl ThreadView {
         // wait said over it while the person is elsewhere in the thread.
         let waiting = !self.thread.journal.asks().is_empty() && below;
         let composer = self.render_composer(cx);
+        let view = cx.entity();
+        let side = if self.narrow {
+            bench_ui::CHAT_LEFT_NARROW
+        } else {
+            bench_ui::CHAT_LEFT
+        };
         v_flex()
             .size_full()
+            .relative()
+            // Its own width, measured: a dock's is narrow, and its sides come in.
+            .child(
+                canvas(
+                    move |bounds, _, cx| {
+                        view.update(cx, |this, cx| {
+                            let narrow = f32::from(bounds.size.width) < bench_ui::THREAD_NARROW_W;
+                            if this.narrow != narrow {
+                                this.narrow = narrow;
+                                // The rows' widths change, not the list's: measured again.
+                                let n = this.thread.tv.list.item_count();
+                                this.thread.tv.list.remeasure_items(0..n);
+                                cx.notify();
+                            }
+                        })
+                    },
+                    |_, _, _, _| {},
+                )
+                .absolute()
+                .size_full(),
+            )
             .child(area)
             .child(
                 h_flex().w_full().flex_none().justify_center().child(
                     v_flex()
                         .w_full()
                         .max_w(px(bench_ui::THREAD_MAX_W))
-                        .px(px(bench_ui::CHAT_LEFT))
+                        .px(px(side))
                         .pb(px(bench_ui::COMPOSER_CARD_PB))
                         .gap_2()
                         .when(waiting, |d| d.child(self.render_waiting_line(cx)))
@@ -372,11 +399,21 @@ impl ThreadView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let item = self.render_list_item(ix, window, cx);
-        h_flex()
-            .w_full()
+        let row = h_flex()
             .justify_center()
-            .child(div().w_full().max_w(px(bench_ui::THREAD_MAX_W)).child(item))
-            .into_any_element()
+            .child(div().w_full().max_w(px(bench_ui::THREAD_MAX_W)).child(item));
+        if self.narrow {
+            // Narrow: every row's sides (CHAT_LEFT, set by each row) pulled out to the narrow
+            // ones at once — the row stretched past the list's edges by the difference, which
+            // the list clips.
+            let pull = bench_ui::CHAT_LEFT - bench_ui::CHAT_LEFT_NARROW;
+            v_flex()
+                .w_full()
+                .child(row.mx(px(-pull)))
+                .into_any_element()
+        } else {
+            row.w_full().into_any_element()
+        }
     }
 
     fn render_list_item(

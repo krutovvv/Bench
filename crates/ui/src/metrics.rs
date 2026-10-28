@@ -55,6 +55,10 @@ pub const CHAT_LEFT: f32 = 2. * TURN_Y;
 pub const AVATAR: f32 = 24.;
 pub const CHAT_TEXT: f32 = CHAT_LEFT + AVATAR + 14.;
 pub const CHAT_RIGHT: f32 = CHAT_TEXT;
+/// A thread narrower than this (in a dock, beside a document or a thread) takes the narrow
+/// sides: its rows and composer set in by CHAT_LEFT_NARROW, as a sidebar's content is.
+pub const THREAD_NARROW_W: f32 = 640.;
+pub const CHAT_LEFT_NARROW: f32 = 16.;
 /// The thread's column at its widest, its margins with it (a text of ~720 px): a wider pane
 /// centres it rather than lengthening its lines.
 pub const THREAD_MAX_W: f32 = 860.;

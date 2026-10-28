@@ -49,6 +49,8 @@ pub struct ThreadView {
     /// The composer's measured height, from the same canvas as `composer_y`: how much of the
     /// window the thread's last row has to share with it (`past_end`).
     pub composer_h: f32,
+    /// Its width is a dock's, not the center's (`THREAD_NARROW_W`): the thread's sides come in.
+    pub narrow: bool,
     pub viewport_h: Pixels,
     /// The composer shows a new chat — what render last set.
     pub(super) composer_fresh: bool,
@@ -69,7 +71,7 @@ impl ThreadView {
                 .auto_grow(1, 100_000)
                 .submit_on_enter(false)
                 // One quiet line on an empty row: what it is and its two keys.
-                .placeholder("Write to the agent · / puts a tool here · ⌘⏎ sends")
+                .placeholder("Write to the agent · / for a tool")
         });
         let clarify_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Your own answer — Enter to send"));
@@ -123,6 +125,7 @@ impl ThreadView {
             slash_scroll: ScrollHandle::new(),
             composer_y: px(0.),
             composer_h: 0.,
+            narrow: false,
             viewport_h: px(0.),
             composer_fresh: false,
             reveal_tail: None,

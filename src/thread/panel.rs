@@ -41,28 +41,10 @@ impl BenchApp {
             return div().into_any_element();
         };
         let title = self.thread_title(view.read(cx).thread.id.as_ref());
-        // Beside a thread: only Close (a new thread is the center's).
+        // Beside a thread: no head of its own — its title and close are in the window's bar,
+        // after the open thread's (`titlebar`), so two threads are not two bars.
         if self.center == Center::Chat {
-            let head = bench_ui::ide_head(
-                title,
-                None,
-                vec![
-                    bench_ui::icon_button("beside-close", Ico::X, "Close  ⌘J", false, cx)
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            this.close_beside(cx);
-                            this.right_dock.open = false;
-                        }))
-                        .into_any_element(),
-                ],
-                cx,
-            )
-            .h(bench_ui::bar_h(cx))
-            .bg(theme.title_bar);
-            return v_flex()
-                .size_full()
-                .child(head)
-                .child(div().flex_1().min_h_0().child(view))
-                .into_any_element();
+            return div().size_full().child(view).into_any_element();
         }
         // A document in the middle: a new thread is the compose button Mail and Notes have,
         // its words in the tooltip. Closing is the status bar's sparkle pressed off (⌘J), not a
