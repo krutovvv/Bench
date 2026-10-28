@@ -1,21 +1,19 @@
-//! The bar under everything: the agent's state on the left (its log, Reconnect, Restart); the open
-//! thread's context and speed; the fallback answering; terminals sent to the background.
+//! The bar under everything, the window's own: the agent's state on the left (its log, Reconnect,
+//! Restart); terminals sent to the background, the thread beside and the terminal panel on the
+//! right. What belongs to a thread (its context, its speed) is in the title bar by its repo
+//! (`thread/meters.rs`).
 
 mod agent;
-mod context;
-pub(crate) mod speed;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use self::context::speed_panel;
 use crate::app::BenchApp;
 use crate::workspace::Center;
-use bench_ui::compact;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -110,119 +108,6 @@ impl BenchApp {
             )
         };
 
-        // Context: the agent's numbers once a turn has run; before that (a reopened chat) a rough
-        // estimate from the transcript, marked "~". The limit falls back to model.context_length.
-        let usage = self.thread(cx).journal.usage().cloned();
-        let real = usage.as_ref().filter(|u| u.context_used > 0);
-        let max = real
-            .map(|u| u.context_max)
-            .filter(|m| *m > 0)
-            .unwrap_or(self.context_length);
-        let (used, estimated) = match real {
-            Some(u) => (u.context_used, false),
-            None => (self.estimate_tokens(cx), true),
-        };
-        let percent = if max > 0 {
-            used as f64 * 100. / max as f64
-        } else {
-            0.
-        };
-        let stats = self.session_stats(used, max, estimated, cx);
-        let context = (max > 0
-            && (self.thread(cx).id.is_some() || !self.thread(cx).journal.is_empty()))
-        .then(|| {
-            let color = if percent > 85. {
-                theme.danger
-            } else if percent > 60. {
-                theme.warning
-            } else {
-                muted
-            };
-            let label = format!(
-                "{}{} / {} · {:.0}%",
-                if estimated { "~" } else { "" },
-                compact(used),
-                compact(max),
-                percent
-            );
-            gpui_kit::component::popover::Popover::new("context-pop")
-                .anchor(gpui_kit::Anchor::BottomRight)
-                .trigger(
-                    Button::new("context")
-                        .ghost()
-                        .small()
-                        .icon(Ico::MemoryStick.icon())
-                        .child(div().text_xs().child(label))
-                        .text_color(color),
-                )
-                .content(move |_, _, cx| {
-                    let theme = cx.theme();
-                    v_flex()
-                        .w(px(260.))
-                        .py_1()
-                        .children(stats.iter().map(|(k, v)| {
-                            h_flex()
-                                .px_3()
-                                .py_0p5()
-                                .gap_4()
-                                .text_sm()
-                                .child(
-                                    div()
-                                        .flex_1()
-                                        .text_color(theme.muted_foreground)
-                                        .child(k.clone()),
-                                )
-                                .child(div().child(v.clone()))
-                        }))
-                })
-        });
-
-        // Speed: how fast the model writes, in the bar's own muted colour.
-        let rate = |v: f64| {
-            if v >= 1000. {
-                format!("{:.1}k", v / 1000.)
-            } else {
-                format!("{v:.0}")
-            }
-        };
-        // Speed: the model's real pace, not a running average. While text streams: the newest
-        // train's measured rate — its own span from first token to last, which is what makes a
-        // single reading honest (the burst guards live in the measure); a three-second mean
-        // lags the tempo and reads as someone else's number. When the stream pauses (a tool,
-        // the next call's prefill) the last train's reading of THIS answer stays on the chip —
-        // it vanishing between bursts read as the meter breaking; else the last call's measured
-        // generation, else the agent's blended average. Prefill is not shown here: it is in the
-        // panel this opens. Click: the chart of this answer.
-        let meter = &self.thread(cx).speed;
-        let live = meter.live;
-        let recent = meter.samples.last().copied();
-        let label = match (live.or(recent), meter.generation) {
-            (Some(l), _) => Some(format!("{} t/s", rate(l))),
-            (None, Some(g)) => Some(format!("{} t/s", rate(g))),
-            _ => self
-                .thread(cx)
-                .journal
-                .usage()
-                .and_then(|u| u.avg_tps)
-                .map(|t| format!("{} t/s", rate(t))),
-        };
-        let meter = &self.thread(cx).speed;
-        let samples = meter.samples.clone();
-        let (prefill, generation) = (meter.prefill, meter.generation);
-        let speed = label.map(|label| {
-            gpui_kit::component::popover::Popover::new("speed-pop")
-                .anchor(gpui_kit::Anchor::BottomRight)
-                .trigger(
-                    Button::new("speed")
-                        .ghost()
-                        .small()
-                        .icon(Ico::Gauge.icon())
-                        .child(div().text_xs().child(label))
-                        .text_color(muted),
-                )
-                .content(move |_, _, cx| speed_panel(&samples, live, prefill, generation, cx))
-        });
-
         // Terminals sent to the background: each brings it back into its thread; Stop all ends them.
         let mut background_terms: Vec<(
             String,
@@ -269,29 +154,9 @@ impl BenchApp {
             .border_color(theme.border)
             // The bar's font: a row's extra-small, like the header and the pane strips.
             .text_xs()
-            // Nothing about where the agent runs or which one: a thread runs with its project.
             // Far left: the agent of the machine this project lives on — always there, healthy
-            // or not; its state in detail, its log, Reconnect and Restart are inside. Then the
-            // model, how full its context is, how hard it thinks, what it may run.
+            // or not; its state in detail, its log, Reconnect and Restart are inside.
             .children(self.render_backend(cx))
-            .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
-            .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
-            // The fallback answering, in red: the main model failed, and why, until it answers again.
-            .children(self.thread(cx).journal.info().fallback.clone().map(|protocol::Fallback { model, reason: why }| {
-                let tip = if why.is_empty() {
-                    "The main model is unavailable: the fallback answers until it is back.".to_string()
-                } else {
-                    format!("The main model is unavailable ({why}): the fallback answers until it is back.")
-                };
-                h_flex().h_full().items_center().pl_1().child(
-                    item("fallback")
-                        .text_color(theme.danger)
-                        .text_xs()
-                        .child(Ico::CircleAlert.icon().small())
-                        .child(format!("Main model down · on fallback {model}"))
-                        .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx)),
-                )
-            }))
             .child(div().flex_1())
             // Right: icons only — the terminals in the background (if any), attach, dictate,
             // settings, and Stop at the very edge.

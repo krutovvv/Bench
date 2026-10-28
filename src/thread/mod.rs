@@ -26,6 +26,7 @@ pub(crate) mod drafts;
 mod extras;
 mod list;
 mod message;
+mod meters;
 mod open;
 mod panel;
 mod processes;
@@ -34,6 +35,7 @@ mod queued;
 mod rail;
 pub(crate) mod send;
 mod slash;
+pub(crate) mod speed;
 mod view;
 pub(crate) mod work;
 

@@ -1,4 +1,5 @@
-//! The bar over the center: the thread's title and its project's branch, the documents' project
+//! The bar over the center: the thread's title, its meters (`thread/meters.rs`) and its repo's
+//! branch, the documents' project
 //! (their tabs are the center's own bar, `explorer/view.rs`) with the thread-beside button, or a
 //! settings page's title and its close.
 
@@ -173,6 +174,8 @@ impl BenchApp {
                         .truncate()
                         .child(title),
                 )
+                // The thread's own meters, then its repo: what is this thread's, together.
+                .children(self.active_thread.read(cx).render_meters(self.context_length, cx))
                 .children(self.render_project_chip(cx))
                 .child(self.render_header_tail(cx))
                 .into_any_element();

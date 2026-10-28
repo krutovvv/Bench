@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use protocol::{StreamKind, ThreadEvent, ThreadId, ThreadItem};
 
 use crate::app::Live;
-use crate::statusbar::speed::Meter;
+use crate::thread::speed::Meter;
 
 pub struct ActiveThread {
     /// The agent that keeps it ("" = this Mac's).

@@ -109,6 +109,7 @@ pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
     ];
     // Where the demo's threads work: a folder, and the repo it is in.
     for (id, cwd, repo) in [
+        ("d-landing", "/Users/demo/code/storefront", Some("/Users/demo/code/storefront")),
         ("d-api", "/Users/demo/code/storefront", Some("/Users/demo/code/storefront")),
         ("d-tests", "/Users/demo/code/storefront", Some("/Users/demo/code/storefront")),
         ("d-audit-1", "/Users/demo/Research/Competitor audit", None),
@@ -193,6 +194,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         t.journal = landing;
         t.id = Some("d-landing".into());
         t.loaded = true;
+        t.repo = Some(crate::app::model::Repo::from_top("/Users/demo/code/storefront", "main"));
     });
     other_modes(app);
     subject_threads(app, now);
