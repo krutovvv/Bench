@@ -22,13 +22,23 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        // Its bar stands over the tree, level with the documents' tabs beside it (their height,
+        // the rule under them); the tree scrolls under it.
+        let bar = self.explorer_picker(cx);
         let rows = self.render_explorer(window, cx);
         v_flex()
-            .id("explorer")
             .size_full()
-            .overflow_y_scroll()
-            .pb_1()
-            .children(rows)
+            .child(bar)
+            .child(
+                v_flex()
+                    .id("explorer")
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .pt_1()
+                    .pb_1()
+                    .children(rows),
+            )
             .into_any_element()
     }
 
@@ -43,7 +53,7 @@ impl BenchApp {
             let id = self.explorer.project.clone();
             self.load_env(&id, window, cx);
         }
-        let mut out = vec![self.explorer_picker(cx)];
+        let mut out: Vec<AnyElement> = vec![];
         if self.explorer.threads {
             out.extend(self.explorer_threads(cx));
             return out;
@@ -156,10 +166,27 @@ impl BenchApp {
         .chain(self.places.projects.iter().map(|p| (p.id.clone(), p.name.clone())))
         .collect();
         let view = cx.entity();
+        // A pull-down, as a Mac's: the name and a chevron, so it reads as something to click.
         let picker = Button::new("ex-project")
             .ghost()
             .small()
-            .label(name)
+            .child(
+                h_flex()
+                    .gap_1()
+                    .items_center()
+                    .child(
+                        div()
+                            .text_size(px(bench_ui::BAR_TITLE))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(name),
+                    )
+                    .child(
+                        Ico::ChevronDown
+                            .icon()
+                            .xsmall()
+                            .text_color(cx.theme().muted_foreground),
+                    ),
+            )
             .dropdown_menu(move |menu, _, _| {
                 let mut menu = menu;
                 for (pid, pname) in &choices {
@@ -174,14 +201,16 @@ impl BenchApp {
                 }
                 menu
             });
-        // Its buttons end where the strip's above do: the same buttons, the same inset.
+        // The documents' tab bar's height and rule, its buttons at the sidebar's inset.
         h_flex()
             .flex_none()
-            .pl_1()
-            .pr(px(bench_ui::SIDEBAR_STRIP_PR))
-            .pb_1()
+            .h(bench_ui::bar_h(cx))
+            .pl(px(bench_ui::SIDEBAR_ROW_INSET - bench_ui::ICON_BUTTON_PAD))
+            .pr(px(bench_ui::SIDEBAR_ROW_INSET))
             .gap_1()
             .items_center()
+            .border_b_1()
+            .border_color(cx.theme().border)
             .child(div().min_w_0().child(picker))
             .child(div().flex_1())
             // What the panel lists, as Xcode's navigator picks it: two small glyphs, the shown one
