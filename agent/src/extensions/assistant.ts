@@ -22,6 +22,7 @@ import { machineOf } from "../repo.ts";
 import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../builtin/steps.ts";
+import { fitRequest, fitResult, seeUsage } from "../builtin/window.ts";
 import { seeRequest, seeResult } from "../builtin/turn.ts";
 import { judgeActive } from "../judge/client.ts";
 import { atAnswer, atResult } from "../judge/index.ts";
@@ -116,14 +117,19 @@ export const assistant = defineExtension({
 		compactWithoutReasoning,
 		// The turn as the step limit and the evaluator see it (`builtin/turn.ts`): every request
 		// notes the person's last message; past the step limit it carries the instruction to
-		// answer (`builtin/steps.ts`). The answer is the evaluator's to check once (`judge/done.ts`).
+		// answer (`builtin/steps.ts`). Every request fits the model's window (`builtin/window.ts`),
+		// the provider's count after it correcting the estimate. The answer is the evaluator's to
+		// check once (`judge/done.ts`).
 		hook(GenerationTask, {
 			beforeRequest: (request: any, api: any) => {
 				const conversation = String(api.conversationId);
 				seeRequest(conversation, request.messages);
 				const note = stepNote(conversation);
-				return note ? { messages: [...request.messages, note] } : undefined;
+				const messages = note ? [...request.messages, note] : request.messages;
+				const fitted = fitRequest(conversation, messages);
+				return fitted || note ? { messages: fitted ?? messages } : undefined;
 			},
+			afterResponse: (message: any, api: any) => seeUsage(String(api.conversationId), message?.usage),
 			onYield: async (answer: any, api: any, context: any) => {
 				const back = await atAnswer(String(api.conversationId), answer, context?.abortSignal).catch(() => undefined);
 				return back ? { continue: back } : undefined;
@@ -155,33 +161,40 @@ export const assistant = defineExtension({
 			// The plan left unchanged for several steps (`planNudge`): the model is reminded to update it.
 			// With the evaluator on (`judge/`), its points instead: a long search's matches come
 			// likeliest first, the plan's items are marked, the course is checked.
+			// Last, what the model reads is cut to its share of the window (`builtin/window.ts`).
 			afterTool: async (call: any, result: any, api: any, context: any) => {
-				const conversation = String(api.conversationId);
-				const top = !call.parent;
-				if (top) seeResult(conversation, call, result);
-				// Read before the evaluator is asked: when it fails now, this step still had the classic reminder's turn.
-				const evaluated = top && judgeActive();
-				const none: { result?: any; notes: string[] } = { notes: [] };
-				const judged = top ? await atResult(conversation, call, result, context?.abortSignal).catch(() => none) : none;
-				const ranked = !!judged.result;
-				if (judged.result) result = judged.result;
-				const nudge = planNudge(conversation, call);
-				const first = [evaluated ? undefined : nudge, ...judged.notes].filter((n): n is string => !!n);
-				const withNotes = (notes: string[]) =>
-					notes.length || ranked ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
-				if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(first);
-				const info = host().thread(api.conversationId);
-				if (!info) return withNotes(first);
-				const notes: string[] = [...first];
-				const spec = await specNote(info, String(api.conversationId), String(call.arguments?.path ?? "")).catch(() => undefined);
-				if (spec) notes.push(spec);
-				if (call.name !== "read") {
-					const at = await placeOf(info, String(call.arguments?.path ?? ""));
-					const diag = at ? await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text).catch(() => undefined) : undefined;
-					if (diag) notes.push(diag);
-				}
-				return withNotes(notes);
+				const done = await notesAfter(call, result, api, context);
+				return fitResult(done ?? result) ?? done;
 			},
 		} as any),
 	],
 } as any);
+
+/** The notes that come with a call's result, and the result as the evaluator left it; undefined: unchanged. */
+async function notesAfter(call: any, result: any, api: any, context: any): Promise<any> {
+	const conversation = String(api.conversationId);
+	const top = !call.parent;
+	if (top) seeResult(conversation, call, result);
+	// Read before the evaluator is asked: when it fails now, this step still had the classic reminder's turn.
+	const evaluated = top && judgeActive();
+	const none: { result?: any; notes: string[] } = { notes: [] };
+	const judged = top ? await atResult(conversation, call, result, context?.abortSignal).catch(() => none) : none;
+	const ranked = !!judged.result;
+	if (judged.result) result = judged.result;
+	const nudge = planNudge(conversation, call);
+	const first = [evaluated ? undefined : nudge, ...judged.notes].filter((n): n is string => !!n);
+	const withNotes = (notes: string[]) =>
+		notes.length || ranked ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
+	if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(first);
+	const info = host().thread(api.conversationId);
+	if (!info) return withNotes(first);
+	const notes: string[] = [...first];
+	const spec = await specNote(info, String(api.conversationId), String(call.arguments?.path ?? "")).catch(() => undefined);
+	if (spec) notes.push(spec);
+	if (call.name !== "read") {
+		const at = await placeOf(info, String(call.arguments?.path ?? ""));
+		const diag = at ? await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text).catch(() => undefined) : undefined;
+		if (diag) notes.push(diag);
+	}
+	return withNotes(notes);
+}

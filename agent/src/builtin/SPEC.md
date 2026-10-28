@@ -39,6 +39,10 @@ tool), and line-anchored read and edit (`hashline.ts`). Each tool's line in the 
   project is waited for 20 s, then said to be loading.
 - **A background process does not outlive the agent**: `background` (a run's Stop and end leave
   it alone) and `abandonOnRestart` (a restart ends it for good, "stopped by restart").
-- **Memory is per project**: a project's notes are its own (`memories/MEMORY.md` in its
-  environment); who the person is (`USER.md`) is the general agent's, shared.
+- **What is sent fits the model's window** (`window.ts`): a tool's result past its share (12%)
+  keeps its head and tail with a line on how to ask for less; a request that would overflow has
+  its largest old results and call arguments cut in that request only, the provider's own count
+  correcting the estimate. Pi's compaction still does the lasting work.
+- **Memory is per project**: a project's notes and what it knows of the person are its own
+  (`memories/MEMORY.md`, `memories/USER.md` in its environment); Host's are Host's.
 - The list of servers' agents is this Mac's agent's setting (`servers.ts`), not project rows.
