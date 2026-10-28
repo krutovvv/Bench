@@ -84,7 +84,7 @@ impl InsertKind for Tasks {
                     this.patch_insert(
                         &at,
                         &id,
-                        json!({ "state": { "list": list.name().to_lowercase() } }),
+                        crate::inserts::state::new_state(json!({ "list": list.name().to_lowercase() })),
                         cx,
                     );
                     this.select_task_list(list, window, cx);

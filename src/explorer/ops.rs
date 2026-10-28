@@ -157,7 +157,7 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path) = (f.machine.clone(), f.path.clone());
         self.background(
             window,
@@ -194,7 +194,7 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path) = (f.machine.clone(), f.path.clone());
         self.background(
             window,
@@ -328,7 +328,7 @@ impl BenchApp {
             .get(&project)
             .map(|e| e.dir.clone())
             .unwrap_or_default();
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         // What is called, and what opens after: the new file, or nothing.
         let (call, opens): (
             Box<dyn FnOnce() -> anyhow::Result<()> + Send>,
@@ -449,7 +449,7 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let body = json!({"path": f.path, "machine": f.machine});
         self.background(
             window,

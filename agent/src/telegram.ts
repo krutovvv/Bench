@@ -19,7 +19,7 @@ import { transcribe } from "./audio.ts";
 import { approvalsMode, BENCH_HOME, getSetting, homeAgent, profileEnv, reasoningEffort, resolveModel } from "./config.ts";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { projects } from "./builtin/projects.ts";
-import type { Emit, Runtime } from "./runtime.ts";
+import type { RunListener, Runtime } from "./runtime.ts";
 
 const MAX = 4096;
 const EDIT_EVERY_MS = 1500;
@@ -240,10 +240,10 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	};
 
 
-	const listener: Emit = (sessionId, type, payload) => {
+	const listener: RunListener = (sessionId, e) => {
 		const chat = chatOf(sessionId);
 		if (chat === undefined) return;
-		if (type === "message.start") {
+		if (e.kind === "start") {
 			const replyTo = replies.get(sessionId);
 			replies.delete(sessionId);
 			const t: Turn = { chat, replyTo, steps: 0, text: "", started: Date.now(), dirty: false, lastEdit: 0 };
@@ -251,28 +251,28 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			void editStatus(t);
 			api.sendChatAction(chat, "typing").catch(() => {});
 			t.typing = setInterval(() => api.sendChatAction(chat, "typing").catch(() => {}), 4500);
-		} else if (type === "message.delta") {
+		} else if (e.kind === "delta") {
 			const t = turns.get(sessionId);
 			if (!t) return;
-			t.text = (t.text ?? "") + String(payload.text ?? "");
+			t.text = (t.text ?? "") + e.text;
 			// Words win the line over the newest call's word.
 			t.word = undefined;
 			schedule(t);
-		} else if (type === "tool.start") {
+		} else if (e.kind === "tool") {
 			const t = turns.get(sessionId);
 			if (!t) return;
 			// Counted, not listed: the status line says the kind of the newest call, in a word.
 			t.steps++;
-			t.word = activityWord(String(payload.name ?? ""));
+			t.word = activityWord(e.name);
 			schedule(t);
-		} else if (type === "subagent.start") {
+		} else if (e.kind === "subagent") {
 			const t = turns.get(sessionId);
 			if (!t) return;
 			t.steps++;
 			// A delegation says what it delegated — it is a readable line in its own right.
-			t.text = `👥 ${String(payload.goal ?? "").slice(0, 110)}`;
+			t.text = `👥 ${e.goal.slice(0, 110)}`;
 			schedule(t);
-		} else if (type === "message.complete") {
+		} else if (e.kind === "complete") {
 			const t = turns.get(sessionId);
 			turns.delete(sessionId);
 			if (t) {
@@ -280,17 +280,15 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 				clearInterval(t.typing);
 				void editStatus(t, t.superseded ? "⏹ Stopped for your new message" : "✅ Done");
 			}
-			if (!t?.superseded) void sendAnswer(chat, String(payload.text ?? ""), t?.replyTo);
-		} else if (type === "clarify.request" || type === "approval.request") {
-			const choices: string[] = type === "approval.request" ? ["once", "session", "always", "deny"] : ((payload.choices as string[]) ?? []);
-			const text = type === "approval.request" ? `Approve this command?\n\n${payload.command}\n\n${payload.description ?? ""}` : String(payload.question ?? "");
-			const keyboard = choices.map((c, i) => [{ text: c, callback_data: `p:${i}` }]);
-			api.sendMessage(chat, text, keyboard.length ? { reply_markup: { inline_keyboard: keyboard } } : {})
-				.then((m) => prompts.set(`${chat}:${m.message_id}`, { session: sessionId, promptId: String(payload.prompt_id), kind: type, choices }))
+			if (!t?.superseded) void sendAnswer(chat, e.text, t?.replyTo);
+		} else if (e.kind === "ask") {
+			const keyboard = e.ask.choices.map((c, i) => [{ text: c, callback_data: `p:${i}` }]);
+			api.sendMessage(chat, e.question, keyboard.length ? { reply_markup: { inline_keyboard: keyboard } } : {})
+				.then((m) => prompts.set(`${chat}:${m.message_id}`, { session: sessionId, promptId: e.ask.id, kind: e.ask.kind, choices: e.ask.choices }))
 				.catch(() => {});
 		}
 	};
-	rt.listeners.add(listener);
+	rt.runs.add(listener);
 
 	// Files (photos, voice) come the way the bot's messages do: through the proxy where Telegram
 	// is reached only that way.
@@ -336,7 +334,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const session = await sessionFor(chat, nameOf(ctx));
 		const typed = m.text ?? m.caption ?? "";
 		// A typed answer to a pending question.
-		const pending = [...prompts.entries()].find(([k, p]) => k.startsWith(`${chat}:`) && p.session === session && p.kind === "clarify.request");
+		const pending = [...prompts.entries()].find(([k, p]) => k.startsWith(`${chat}:`) && p.session === session && p.kind === "clarify");
 		if (pending && typed) {
 			prompts.delete(pending[0]);
 			rt.respond(session, pending[1].promptId, typed);
@@ -469,7 +467,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		config: JSON.stringify(cfg),
 		stop: () => {
 			stopping = true;
-			rt.listeners.delete(listener);
+			rt.runs.delete(listener);
 			void bot.stop().catch(() => {});
 		},
 		send: (chat, text) => sendAnswer(chat, text),

@@ -14,7 +14,7 @@ impl BenchApp {
         let Some(conn) = self.local_conn() else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
@@ -37,14 +37,13 @@ impl BenchApp {
     /// A project's "+": a new thread in it (it works in the project's folder).
     pub fn new_thread_in(&mut self, project: String, cx: &mut Context<Self>) {
         self.project_form = None;
-        self.new_session(cx);
+        self.new_thread(cx);
         self.new_project = None;
-        self.new_subject = String::new();
         self.active_thread
-            .update(cx, |v, _| v.thread.thread_project = project);
+            .update(cx, |v, _| v.thread.project = project);
         // The thread exists at once ("Untitled" in the project until its first message).
         let at = self.thread_ref(cx);
-        self.create_thread_now(&at);
+        self.create_thread(&at, cx);
         cx.notify();
     }
 
@@ -68,7 +67,7 @@ impl BenchApp {
             return;
         };
         let path = format!("/api/projects/{}", key.id);
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
@@ -80,7 +79,7 @@ impl BenchApp {
                         list.retain(|p| p.id != id);
                     }
                     this.compose_projects();
-                    for s in this.sessions.iter_mut().filter(|s| s.project == id) {
+                    for s in this.threads.iter_mut().filter(|s| s.project == id) {
                         s.project.clear();
                     }
                     cx.notify();

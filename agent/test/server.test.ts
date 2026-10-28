@@ -18,7 +18,7 @@ test("the server starts and answers /api/projects", async () => {
 		assert.ok(fs.existsSync(file), `the server did not start:\n${err}`);
 		const { port, token } = JSON.parse(fs.readFileSync(file, "utf8"));
 		const call = (method: string, p: string, body?: unknown) =>
-			fetch(`http://127.0.0.1:${port}${p}`, { method, headers: { "X-Hermes-Session-Token": token, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.json());
+			fetch(`http://127.0.0.1:${port}${p}`, { method, headers: { "X-Bench-Token": token, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.json());
 		const made = await call("POST", "/api/projects", { name: "Site" });
 		assert.equal(made.project.name, "Site");
 		const env = await call("GET", `/api/projects/${made.project.id}/env`);
@@ -74,7 +74,7 @@ test("the server starts and answers /api/projects", async () => {
 		// A project's reasoning level and approvals are its own: they go into its agent's folder (a
 		// thread of the project runs with it), not into the machine's settings. The model and its
 		// fallback are one for every thread: they go to the general agent, from wherever they come.
-		await call("PUT", `/api/config?profile=${encodeURIComponent(`project:${made.project.id}`)}`, {
+		await call("PUT", `/api/config?agent=${encodeURIComponent(`project:${made.project.id}`)}`, {
 			config: { model: { provider: "p1", default: "m1" }, agent: { reasoning_effort: "low" }, approvals: { mode: "smart" } },
 		});
 		const own = JSON.parse(fs.readFileSync(path.join(env.dir, "settings.json"), "utf8"));
@@ -87,7 +87,7 @@ test("the server starts and answers /api/projects", async () => {
 		const hostOwn = JSON.parse(fs.readFileSync(path.join(home, "agents", "default", "settings.json"), "utf8"));
 		assert.notEqual(hostOwn.approvals, "smart");
 		assert.deepEqual([hostOwn.defaultProvider, hostOwn.defaultModel], ["p1", "m1"]);
-		const raw = await call("GET", `/api/config/raw?profile=${encodeURIComponent(`project:${made.project.id}`)}`);
+		const raw = await call("GET", `/api/config/raw?agent=${encodeURIComponent(`project:${made.project.id}`)}`);
 		assert.match(raw.yaml, /default: m1/);
 	} finally {
 		child.kill();
@@ -111,7 +111,7 @@ test("Check uses the saved key when the form did not change it", async () => {
 		for (let i = 0; i < 100 && !fs.existsSync(file); i++) await new Promise((r) => setTimeout(r, 200));
 		const { port, token } = JSON.parse(fs.readFileSync(file, "utf8"));
 		const call = (p: string, body: unknown) =>
-			fetch(`http://127.0.0.1:${port}${p}`, { method: "POST", headers: { "X-Hermes-Session-Token": token, "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
+			fetch(`http://127.0.0.1:${port}${p}`, { method: "POST", headers: { "X-Bench-Token": token, "content-type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json());
 		await call("/api/providers/custom-endpoints", { id: "dev", name: "dev", base_url: base, api_key: "sk-saved" });
 		const r = await call("/api/providers/custom-endpoints/validate", { id: "dev", base_url: base });
 		assert.equal(r.ok, true, r.message);

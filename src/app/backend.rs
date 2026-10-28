@@ -37,8 +37,10 @@ impl BenchApp {
         cx.notify();
     }
 
-    pub fn restart_gateway(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let target = self.target.clone();
+    /// Restart this Mac's agent, then reconnect. Its runs are durable: one it was in the middle
+    /// of resumes. A run it is in refuses the first press; a second within a minute interrupts
+    /// it.
+    pub fn restart_agent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let interrupt = self
             .restart_armed
             .take()
@@ -54,14 +56,15 @@ impl BenchApp {
             cx,
         );
         cx.spawn_in(window, async move |this, cx| {
-            let t = target.clone();
             let result = cx
-                .background_spawn(async move { connection::restart_gateway(&t, interrupt) })
+                .background_spawn(async move {
+                    connection::restart_agent(&crate::app::model::Target::Local, interrupt)
+                })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match result {
                 Ok(connection::Restart::Done) => {
                     this.toast(NotificationType::Success, "Agent restarted", window, cx);
-                    this.connect(target, window, cx);
+                    this.reconnect_agent(String::new(), window, cx);
                 }
                 Ok(connection::Restart::Busy(what)) => {
                     this.restart_armed = Some(Instant::now());
@@ -78,6 +81,28 @@ impl BenchApp {
                     window,
                     cx,
                 ),
+            });
+        })
+        .detach();
+    }
+
+    /// Drop the link to the agent under `host` and connect again.
+    pub fn reconnect_agent(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
+        self.agents.remove(&host);
+        self.connect_agent(host, window, cx);
+    }
+
+    /// The last lines of the open thread's agent's log, from where it runs.
+    pub fn load_agent_log(&mut self, cx: &mut Context<Self>) {
+        let at = self.thread_ref(cx);
+        let target = self.target_of(&self.thread_host(&at));
+        cx.spawn(async move |this, cx| {
+            let log = cx
+                .background_spawn(async move { connection::agent_log(&target, 12) })
+                .await;
+            let _ = this.update(cx, |this, cx| {
+                this.agent_log = log;
+                cx.notify();
             });
         })
         .detach();

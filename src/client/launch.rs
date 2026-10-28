@@ -1,6 +1,6 @@
 //! The agent Bench talks to: bench-agent (`agent/` in this repo), a server on Pi Durable. Bench
 //! installs and starts it on this Mac and, over SSH, on another machine, then speaks its
-//! protocol (JSON-RPC over `/api/ws?token=`, REST under `/api/` with `X-Hermes-Session-Token`).
+//! protocol (JSON-RPC over `/api/ws?token=`, REST under `/api/` with `X-Bench-Token`).
 //!
 //! * Its home is `~/.bench` on each machine: `bench.sqlite`, `pi.sqlite`, `profiles/`,
 //!   `extensions/`, and `app/` — the installed server, copied from the sources this app carries
@@ -194,7 +194,7 @@ fn saved() -> Option<Value> {
 
 fn status(port: u16, token: &str) -> Option<Value> {
     ureq::get(&format!("http://127.0.0.1:{port}/api/status"))
-        .set("X-Hermes-Session-Token", token)
+        .set("X-Bench-Token", token)
         .timeout(Duration::from_secs(3))
         .call()
         .ok()?
@@ -269,7 +269,7 @@ pub fn ensure() -> Result<(u16, String)> {
     if let Some(v) = saved() {
         if let (Some(port), Some(token)) = (v["port"].as_u64(), v["token"].as_str()) {
             if let Some(st) = status(port as u16, token) {
-                let idle = st["active_agents"].as_u64().unwrap_or(0) == 0;
+                let idle = st["active"].as_u64().unwrap_or(0) == 0;
                 // An orphan is restarted even mid-run: its runs are durable, and a bash call cut
                 // off (ship.sh, which quit the previous app) comes back to the model as
                 // `interrupted`, never rerun.

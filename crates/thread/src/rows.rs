@@ -3,8 +3,8 @@
 
 use std::collections::HashMap;
 
-use protocol::{Hold, PlanStep, Process, QueuedItem, ThreadItem};
-use serde_json::{Map, Value};
+use protocol::{Hold, Inserts, PlanStep, Process, QueuedItem, ThreadItem};
+use serde_json::Value;
 
 use crate::state::Pressed;
 
@@ -132,7 +132,7 @@ impl Step {
 /// at the `process` call that started each (docs/thread-objects.md).
 pub(crate) fn rows_of(
     log: &[ThreadItem],
-    inserts: &Map<String, Value>,
+    inserts: &Inserts,
     running: bool,
     holds: &[Hold],
     stream: &(String, String),
@@ -300,23 +300,16 @@ pub(crate) fn rows_of(
                 insert_key,
                 ..
             } => {
-                let removed = inserts
-                    .get(id)
-                    .and_then(|s| s.get("removed"))
-                    .and_then(Value::as_bool)
-                    .unwrap_or(false);
-                if !removed {
-                    let state = inserts.get(id);
-                    let insert_key = state
-                        .and_then(|s| s.get("key"))
-                        .and_then(Value::as_str)
-                        .unwrap_or(insert_key);
+                let state = inserts.get(id);
+                if !state.is_some_and(|s| s.removed) {
+                    // The document's key wins: an insert moved to another server keeps its entry.
+                    let insert_key = state.map_or(insert_key.as_str(), |s| s.key.as_str());
                     let row = Row::Insert {
                         key: key.clone(),
                         id: id.clone(),
                         insert_key: insert_key.to_string(),
                     };
-                    match state.and_then(|s| s.get("after")).and_then(Value::as_u64) {
+                    match state.and_then(|s| s.after) {
                         Some(n) if n as usize > users => moved.push((n as usize, row)),
                         _ => {
                             close(&mut rows, &mut work);

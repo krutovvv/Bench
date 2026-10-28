@@ -52,7 +52,7 @@ impl InsertKind for Tools {
                 label: t.name().to_string(),
                 detail: g.to_string(),
                 chosen: t == now,
-                to: json!({ "state": { "tool": tool_key(t) } }),
+                to: crate::inserts::state::new_state(json!({ "tool": tool_key(t) })),
             })
             .collect()
     }

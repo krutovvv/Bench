@@ -19,6 +19,7 @@ process.env.BENCH_AGENT_NO_MCP = "1";
 const { moveToFront } = await import("../src/queue.ts");
 const { saveProvider, writeAgent } = await import("../src/config.ts");
 const { Runtime } = await import("../src/runtime.ts");
+const { listen } = await import("./listen.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 
 // A model server that reads the request and never replies: the run lives, so messages sent
@@ -56,11 +57,13 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	const told: any[][] = [];
 	const requests: Record<string, string | undefined> = {};
 	const runs: boolean[] = [];
-	const rt = new Runtime((_sid, type, payload: any) => {
-		if (type === "thread.queue") told.push(payload.items.map((i: any) => i.text));
-		if (type === "thread.queue") for (const i of payload.items) requests[i.text] = i.request;
-		if (type === "thread.run") runs.push(payload.running);
-	});
+	const rt = new Runtime(
+		listen((e) => {
+			if (e.kind === "queue") told.push(e.value.map((i) => i.text));
+			if (e.kind === "queue") for (const i of e.value) requests[i.text] = i.request;
+			if (e.kind === "run") runs.push(e.value);
+		}),
+	);
 	await rt.open();
 	const { row } = await rt.create("default", undefined, "local");
 	const id = row.id;

@@ -119,7 +119,7 @@ impl BenchApp {
         };
         let servers = Rc::new(Servers {
             conn,
-            profile: self.current_profile(),
+            profile: crate::app::model::GENERAL_AGENT.to_string(),
             project,
             file: f.clone(),
         });
@@ -174,7 +174,7 @@ impl BenchApp {
         let Some((conn, project)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path) = (f.machine.clone(), f.path.clone());
         let project_key = f.project.clone();
         let task = cx.spawn_in(window, async move |this, cx| {

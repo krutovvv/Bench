@@ -3,7 +3,6 @@
 //! agent (Node 22.18+) show up as gateways by themselves; Bench installs and starts the agent
 //! there on connect.
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use gpui_kit::component::ActiveTheme as _;
@@ -11,8 +10,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::app::model::Target;
-use crate::client::connection::{self, HostCheck};
+use crate::client::connection;
 use crate::inserts::terminal::session::Session;
 use crate::system::sshconfig::{self, Server};
 
@@ -34,8 +32,6 @@ pub struct Tab {
 
 pub struct Ssh {
     pub servers: Vec<Server>,
-    /// alias -> whether the agent can run there (for the gateway list only); None while checking.
-    pub status: HashMap<String, Option<HostCheck>>,
     pub tabs: Vec<Tab>,
     next_tab: usize,
     /// Collapsed sidebar groups, both modes ("s:<group>" sessions, "srv:<folder>" servers);
@@ -49,7 +45,6 @@ impl Ssh {
     pub fn new() -> Self {
         Self {
             servers: sshconfig::load(),
-            status: HashMap::new(),
             tabs: vec![],
             next_tab: 0,
             collapsed: std::fs::read(collapsed_path())
@@ -105,29 +100,6 @@ impl BenchApp {
         }
         self.ssh.servers = sshconfig::load();
         cx.notify();
-    }
-
-    pub fn host_checked(&mut self, alias: String, r: HostCheck, cx: &mut Context<Self>) {
-        self.ssh.status.insert(alias, Some(r));
-        self.rebuild_targets();
-        cx.notify();
-    }
-
-    /// Gateways: This Mac + the servers of `~/.ssh/config` that answered with a Node the agent
-    /// runs on (+ the one in use, whatever it answers).
-    fn rebuild_targets(&mut self) {
-        let mut targets = vec![Target::Local];
-        targets.extend(
-            self.ssh
-                .servers
-                .iter()
-                .filter(|s| matches!(self.ssh.status.get(&s.alias), Some(Some(HostCheck::Ready))))
-                .map(|s| Target::Ssh(s.alias.clone())),
-        );
-        if !targets.contains(&self.target) {
-            targets.push(self.target.clone());
-        }
-        self.targets = targets;
     }
 
     /// A new terminal tab (ssh to `alias`, or a local shell for `term::LOCAL`); its index.

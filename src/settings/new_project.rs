@@ -134,7 +134,7 @@ impl BenchApp {
             );
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,

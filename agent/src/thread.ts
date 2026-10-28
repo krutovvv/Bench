@@ -22,7 +22,7 @@ export function preview(name: string, args: any): string {
 }
 
 // The items and the queue are typed in crates/protocol: Bench reads them with the same types.
-import type { PlanStep, Process, QueuedItem, ThreadItem } from "./protocol.gen.ts";
+import type { Inserts as InsertStates, PlanStep, Process, QueuedItem, ThreadItem } from "./protocol.gen.ts";
 export type { QueuedItem, ThreadItem };
 
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
@@ -175,7 +175,7 @@ export interface ThreadChange {
 	conversation: string;
 	append?: ThreadItem[];
 	queue?: QueuedItem[];
-	inserts?: Record<string, unknown>;
+	inserts?: InsertStates;
 	/** Background processes whose task records this commit changed, in id order. */
 	processes?: Process[];
 }

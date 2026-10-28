@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 use gpui_kit::*;
+use protocol::ThreadId;
 
 use crate::app::BenchApp;
 use crate::client::connection;
@@ -24,8 +25,8 @@ pub struct Mark {
     pub pinned: bool,
 }
 
-/// Where the next window should start: (target label, profile, session).
-pub static NEXT_WINDOW: Mutex<Option<(String, Option<String>, Option<String>)>> = Mutex::new(None);
+/// The thread the next window opens: its agent and its id.
+pub static NEXT_WINDOW: Mutex<Option<(String, ThreadId)>> = Mutex::new(None);
 
 fn path() -> std::path::PathBuf {
     connection::state_dir().join("session-marks.json")
@@ -67,9 +68,9 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// Another window on the same gateway and profile; with `session`, that chat open in it.
-    pub fn open_window(&mut self, session: Option<String>, cx: &mut Context<Self>) {
-        *NEXT_WINDOW.lock().unwrap() = Some((self.target.label(), self.profile.clone(), session));
+    /// Another window; with `thread`, that thread open in it (else the last one).
+    pub fn open_window(&mut self, thread: Option<(String, ThreadId)>, cx: &mut Context<Self>) {
+        *NEXT_WINDOW.lock().unwrap() = thread;
         crate::open_main_window(cx);
     }
 }

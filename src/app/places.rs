@@ -11,7 +11,6 @@ use serde_json::{Value, json};
 use crate::app::BenchApp;
 use crate::app::model::{Location, ProjectEntry, ProjectKey};
 use crate::client::rest;
-use crate::client::rpc::Cmd;
 
 /// A server's agent this Mac knows: its ~/.ssh/config alias and its Host project's name.
 #[derive(Clone, Debug, PartialEq)]
@@ -87,7 +86,7 @@ impl BenchApp {
                     this.server_agents.iter().map(|a| a.host.clone()).collect();
                 this.agents.retain(|h, _| h.is_empty() || known.contains(h));
                 this.server_projects.retain(|h, _| known.contains(h));
-                this.sessions
+                this.threads
                     .retain(|s| s.host.is_empty() || known.contains(&s.host));
                 this.compose_projects();
                 this.connect_remotes(window, cx);
@@ -123,9 +122,7 @@ impl BenchApp {
                 this.server_projects.insert(host.clone(), list);
                 this.compose_projects();
                 // Its threads were placed before its projects were known: again.
-                if let Some(a) = this.agents.get(&host) {
-                    a.gateway.send(Cmd::Sessions("default".into()));
-                }
+                this.list_threads(&host, cx);
                 cx.notify();
             },
         );
@@ -174,8 +171,8 @@ impl BenchApp {
     /// Where a thread (or the new one) lives: its agent is the one that keeps it.
     pub fn thread_location(&self, t: &crate::thread::ThreadRef) -> Location {
         let mut at = self.location(&t.project);
-        if let Some(id) = &t.session {
-            at.agent = self.host_of_session(id);
+        if t.id.is_some() {
+            at.agent = t.host.clone();
         }
         at
     }
@@ -185,10 +182,11 @@ impl BenchApp {
         self.thread_location(t).agent
     }
 
-    pub fn host_of_session(&self, id: &str) -> String {
-        self.sessions
+    /// The agent keeping a thread the sidebar lists ("" = this Mac's).
+    pub fn host_of_thread(&self, id: &protocol::ThreadId) -> String {
+        self.threads
             .iter()
-            .find(|s| s.id == id)
+            .find(|s| &s.id == id)
             .map(|s| s.host.clone())
             .unwrap_or_default()
     }
@@ -203,23 +201,6 @@ impl BenchApp {
     )> {
         let key = ProjectKey::parse(project);
         self.conn_of(&key.agent).map(|c| (c, key.id))
-    }
-
-    /// A new thread's creation, for the agent that will keep it, in the project as that agent
-    /// knows it (an agent's Host is its own environment: no project there).
-    pub fn create_cmd(&self, profile: String, cwd: Option<String>, project: &str) -> Cmd {
-        let key = ProjectKey::parse(project);
-        let remote = !key.agent.is_empty();
-        Cmd::Create {
-            profile: if remote { "default".into() } else { profile },
-            cwd,
-            subject: self.new_subject.clone(),
-            project: if key.is_host() || key.id.is_empty() {
-                String::new()
-            } else {
-                key.id
-            },
-        }
     }
 
     /// A project's new name, where it lives: an agent's Host is named in the list of agents (a
@@ -265,7 +246,7 @@ impl BenchApp {
             }
         }
         self.compose_projects();
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,

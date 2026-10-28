@@ -579,11 +579,13 @@ fn rule_5_inserts_where_put_removed_ones_gone() {
         ["insert:i0", "user:a", "insert:i1", "answer:x"]
     );
     t.apply(ThreadEvent::Inserts(
-        json!({"i1": {"key": "tasks", "removed": true}})
-            .as_object()
-            .unwrap()
-            .clone(),
+        serde_json::from_value(json!({"i1": {"key": "tasks", "removed": true}})).unwrap(),
     ));
+    assert_eq!(
+        t.insert_list().iter().map(|(id, _)| id.as_str()).collect::<Vec<_>>(),
+        ["i0"],
+        "the list the app keeps for the inserts' kinds is the journal's, less the removed"
+    );
     assert_eq!(kinds(&t.rows()), ["insert:i0", "user:a", "answer:x"]);
 }
 
@@ -708,10 +710,7 @@ fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
             text(5, 0, "B"),
             user(6, "c"),
         ],
-        inserts: json!({"i1": {"key": "tools", "after": 2}})
-            .as_object()
-            .unwrap()
-            .clone(),
+        inserts: serde_json::from_value(json!({"i1": {"key": "tools", "after": 2}})).unwrap(),
         ..Default::default()
     });
     assert_eq!(
@@ -728,10 +727,7 @@ fn rule_5_an_insert_put_while_a_message_waited_goes_after_that_message() {
     // Until "b" is in the journal, it waits at the end.
     t = Thread::open(ThreadOpen {
         items: vec![user(1, "a"), ins(3, "i1")],
-        inserts: json!({"i1": {"key": "tools", "after": 2}})
-            .as_object()
-            .unwrap()
-            .clone(),
+        inserts: serde_json::from_value(json!({"i1": {"key": "tools", "after": 2}})).unwrap(),
         ..Default::default()
     });
     assert_eq!(kinds(&t.rows()), ["user:a", "insert:i1"]);

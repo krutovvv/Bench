@@ -48,6 +48,13 @@ function table() {
 const row = (r: any): Task => ({ ...r, tags: JSON.parse(r.tags || "[]"), evening: !!r.evening, someday: !!r.someday, important: !!r.important });
 const today = () => new Date().toLocaleDateString("sv-SE");
 
+/** Told after every change of the tasks (the tool's, the REST routes', an import): the server
+ * publishes `tasks_changed`, so every Bench reads the list again instead of polling it. */
+let changed = () => {};
+export function onTasksChanged(fn: () => void): void {
+	changed = fn;
+}
+
 export const tasks = {
 	/** Open tasks, and the ones done since `doneSince` (YYYY-MM-DD). */
 	list(doneSince?: string): Task[] {
@@ -86,11 +93,13 @@ export const tasks = {
 				 spent=excluded.spent, timer=excluded.timer, project=excluded.project`,
 			)
 			.run(full.id, full.title, full.notes, JSON.stringify(full.tags), full.day, +full.evening, +full.someday, +full.important, full.completed, full.spent, full.timer, full.created, full.source_id, full.project);
+		changed();
 		return full;
 	},
 	remove(id: string): void {
 		table();
 		db().prepare("DELETE FROM tasks WHERE id = ?").run(id);
+		changed();
 	},
 	/** Imports tasks that carry a source id; ones already imported are skipped. Returns how many were new. */
 	import(items: (Partial<Task> & { title: string; source_id: string })[]): number {

@@ -19,7 +19,6 @@
 
 use std::time::Duration;
 
-use serde_json::{Value, json};
 use web_time::Instant;
 
 use crate::app::model::Usage;
@@ -58,49 +57,9 @@ pub const KEEP: usize = 180;
 
 /// What a thread keeps of the measurements: the chart of its last answer and the last speeds.
 /// Bench measures these, the agent keeps them with the thread (its store is what survives a
-/// restart), so reopening the thread or the app brings the numbers back.
-#[derive(Default, Clone, Debug)]
-pub struct Stat {
-    pub samples: Vec<f64>,
-    pub prefill: Option<f64>,
-    pub generation: Option<f64>,
-    pub ratio: Option<f64>,
-}
-
-impl Stat {
-    /// What the agent kept (`speed` of `session.resume`). Readings that are not readings — zero,
-    /// negative, a word — are dropped rather than trusted.
-    pub fn from_json(v: &Value) -> Self {
-        let num = |k: &str| v[k].as_f64().filter(|f| *f > 0.);
-        Self {
-            samples: v["samples"]
-                .as_array()
-                .map(|a| {
-                    a.iter()
-                        .filter_map(|x| x.as_f64().filter(|f| f.is_finite() && *f > 0.))
-                        .collect()
-                })
-                .unwrap_or_default(),
-            prefill: num("prefill"),
-            generation: num("generation"),
-            ratio: num("ratio"),
-        }
-    }
-
-    pub fn to_json(&self) -> Value {
-        json!({
-            "samples": self.samples,
-            "prefill": self.prefill,
-            "generation": self.generation,
-            "ratio": self.ratio,
-        })
-    }
-
-    /// A thread that never ran has nothing to show.
-    pub fn is_empty(&self) -> bool {
-        self.samples.is_empty() && self.prefill.is_none() && self.generation.is_none()
-    }
-}
+/// restart, and it drops readings that are not readings), so reopening the thread or the app
+/// brings the numbers back.
+pub use protocol::SpeedStat as Stat;
 
 /// Mixed Russian/English prose and code averages about this many characters per token.
 const DEFAULT_RATIO: f64 = 3.2;
@@ -137,16 +96,6 @@ impl Meter {
             ratio: DEFAULT_RATIO,
             ..Default::default()
         }
-    }
-
-    /// A new chat: counters from zero, the last measured speeds kept.
-    pub fn restart(&mut self) {
-        *self = Self {
-            prefill: self.prefill,
-            generation: self.generation,
-            ratio: self.ratio,
-            ..Self::fresh()
-        };
     }
 
     pub fn request(&mut self) {
@@ -339,30 +288,6 @@ mod tests {
         assert_eq!(fmt_secs(219), "3 min 39 s");
         assert_eq!(fmt_secs(60), "1 min 00 s");
         assert_eq!(fmt_secs(4325), "1 h 12 min");
-    }
-
-    #[test]
-    fn a_threads_numbers_survive_the_wire() {
-        let m = || Stat {
-            samples: vec![10., 20., 30.],
-            prefill: Some(1200.5),
-            generation: Some(990.25),
-            ratio: Some(3.1),
-        };
-        assert_eq!(Stat::from_json(&m().to_json()).samples, vec![10., 20., 30.]);
-        assert_eq!(Stat::from_json(&m().to_json()).generation, Some(990.25));
-    }
-
-    #[test]
-    fn a_reading_that_is_not_a_reading_is_not_kept() {
-        let s = Stat::from_json(
-            &json!({"samples": ["x", -5, 0, 40, null], "prefill": "fast", "generation": 0}),
-        );
-        assert_eq!(s.samples, vec![40.]);
-        assert_eq!(s.prefill, None);
-        assert_eq!(s.generation, None);
-        assert_eq!(Stat::from_json(&json!({})).samples, Vec::<f64>::new());
-        assert!(Stat::default().is_empty());
     }
 
     #[test]

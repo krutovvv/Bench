@@ -76,8 +76,9 @@ test("code mode is the project's choice: off, no codemode tool; on, one script r
 	saveProvider({ id: "stub", name: "Stub", base_url: `http://127.0.0.1:${port}/v1`, api_key: "k", api_mode: "chat_completions", models: { m: {} } });
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m" } as any);
 	let done = 0;
-	const rt = new Runtime((_sid, type) => {
-		if (type === "message.complete") done++;
+	const rt = new Runtime(() => {});
+	rt.runs.add((_id, e) => {
+		if (e.kind === "complete") done++;
 	});
 	await rt.open();
 	const { row } = await rt.create("default", home, "local");

@@ -2,8 +2,10 @@
 
 use std::collections::HashSet;
 
-use protocol::{Hold, Process, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
-use serde_json::{Map, Value};
+use protocol::{
+    Ask, Hold, InsertState, Inserts, Process, QueuedItem, StreamKind, ThreadEvent, ThreadInfo,
+    ThreadItem, ThreadOpen, Usage,
+};
 
 use crate::rows::{Row, rows_of};
 
@@ -20,12 +22,17 @@ pub struct Thread {
     log: Vec<ThreadItem>,
     keys: HashSet<String>,
     queue: Vec<QueuedItem>,
-    inserts: Map<String, Value>,
+    inserts: Inserts,
     running: bool,
     /// The live run's holds (the person's pauses); the last one open while it stands held.
     holds: Vec<Hold>,
     /// The background processes, as their last record said (`thread.process`).
     processes: Vec<Process>,
+    /// What the live run waits for the person to answer.
+    asks: Vec<Ask>,
+    /// Its settings (effort, the fallback answering) and its numbers.
+    info: ThreadInfo,
+    usage: Option<Usage>,
     /// The answer being written: (reasoning, text).
     stream: (String, String),
     /// Words the model wrote while working, whose message went on to call a tool: narration,
@@ -50,6 +57,9 @@ impl Thread {
             running: o.running,
             holds: o.holds,
             processes: o.processes,
+            asks: o.asks,
+            info: o.info,
+            usage: o.usage,
             head: o.head,
             ..Default::default()
         };
@@ -65,6 +75,9 @@ impl Thread {
         self.running = o.running;
         self.holds = o.holds;
         self.processes = o.processes;
+        self.asks = o.asks;
+        self.info = o.info;
+        self.usage = o.usage.or(self.usage.take());
         if !o.running {
             self.stream = Default::default();
         }
@@ -105,6 +118,7 @@ impl Thread {
                     self.stream = Default::default();
                     self.narrated.clear();
                     self.holds.clear();
+                    self.asks.clear();
                 }
             }
             ThreadEvent::Holds(h) => self.holds = h,
@@ -112,6 +126,9 @@ impl Thread {
                 Some(x) => *x = p,
                 None => self.processes.push(p),
             },
+            ThreadEvent::Asks(a) => self.asks = a,
+            ThreadEvent::Info(i) => self.info = i,
+            ThreadEvent::Usage(u) => self.usage = Some(u),
         }
         self.version += 1;
     }
@@ -230,8 +247,49 @@ impl Thread {
         &self.queue
     }
 
-    pub fn inserts(&self) -> &Map<String, Value> {
+    pub fn inserts(&self) -> &Inserts {
         &self.inserts
+    }
+
+    /// The inserts the thread shows, in the order they were put (their entries' order in the
+    /// journal): each with its state.
+    pub fn insert_list(&self) -> Vec<(String, InsertState)> {
+        self.log
+            .iter()
+            .filter_map(|it| match it {
+                ThreadItem::Insert { id, insert_key, .. } => {
+                    let state = self.inserts.get(id).cloned().unwrap_or_else(|| InsertState {
+                        key: insert_key.clone(),
+                        ..Default::default()
+                    });
+                    (!state.removed).then(|| (id.clone(), state))
+                }
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The words of the agent's last answer (its last text that is not narration).
+    pub fn last_answer(&self) -> Option<String> {
+        self.log.iter().rev().find_map(|it| match it {
+            ThreadItem::Text {
+                text, narration, ..
+            } if !narration.unwrap_or(false) && !text.trim().is_empty() => Some(text.clone()),
+            _ => None,
+        })
+    }
+
+    /// What the live run waits for the person to answer.
+    pub fn asks(&self) -> &[Ask] {
+        &self.asks
+    }
+
+    pub fn info(&self) -> &ThreadInfo {
+        &self.info
+    }
+
+    pub fn usage(&self) -> Option<&Usage> {
+        self.usage.as_ref()
     }
 
     pub fn is_empty(&self) -> bool {

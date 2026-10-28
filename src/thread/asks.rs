@@ -159,18 +159,7 @@ impl ThreadView {
         let settled = card.answer.is_some();
         // Only the question the agent is waiting for right now takes answers: the journal also
         // shows settled ones and, after a restart, ones nobody waits for.
-        let live = !settled
-            && if approve {
-                self.thread
-                    .approval
-                    .as_ref()
-                    .is_some_and(|a| a.prompt_id == card.id)
-            } else {
-                self.thread
-                    .clarify
-                    .as_ref()
-                    .is_some_and(|c| c.prompt_id == card.id)
-            };
+        let live = !settled && self.thread.journal.asks().iter().any(|a| a.id == card.id);
         let head = h_flex()
             .gap_2()
             .items_start()
@@ -250,6 +239,7 @@ impl ThreadView {
                     .child(h_flex().flex_wrap().gap_2().children(
                         card.choices.iter().enumerate().map(|(k, c)| {
                             let choice = c.clone();
+                            let id = card.id.clone();
                             let b = Button::new(("approve", k)).small().label(label(c));
                             let b = if k == 0 {
                                 b.primary()
@@ -259,7 +249,7 @@ impl ThreadView {
                                 b.outline()
                             };
                             b.on_click(cx.listener(move |this, _, _, cx| {
-                                this.answer_approval(choice.clone(), cx)
+                                this.answer_ask(id.clone(), choice.clone(), cx)
                             }))
                         }),
                     ))

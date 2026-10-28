@@ -58,7 +58,7 @@ impl BenchApp {
             for (g, (p, rows)) in groups.into_iter().enumerate() {
                 list.extend(self.render_project(g + 1, &p, rows, cx));
             }
-            if self.projects.is_empty() && !self.connecting {
+            if self.projects.is_empty() && self.local_conn().is_some() {
                 list.push(
                     self.sidebar_note("No projects yet. “New project” above starts one.", cx),
                 );
@@ -83,7 +83,8 @@ impl BenchApp {
                     .overflow_y_scroll()
                     .py_1()
                     .children(list)
-                    .when(self.connecting, |d| {
+                    // This Mac's agent not up yet, and nothing to list.
+                    .when(self.local_conn().is_none() && self.threads.is_empty(), |d| {
                         d.child(
                             div()
                                 .px_4()
@@ -235,13 +236,13 @@ impl BenchApp {
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
         let selected =
-            self.center == Center::Chat && self.thread(cx).session.as_deref() == Some(id);
+            self.center == Center::Chat && self.thread(cx).id.as_ref().map(|i| i.as_str()) == Some(id);
         let title = self
-            .sessions
+            .threads
             .iter()
-            .find(|s| s.id == id)
+            .find(|s| s.id.as_str() == id)
             .map(|s| s.title.clone())
-            .unwrap_or_else(|| "Untitled session".into());
+            .unwrap_or_else(|| "Untitled".into());
         let open_id = id.to_string();
         v_flex()
             .id(("hit", k))
@@ -265,6 +266,6 @@ impl BenchApp {
                     .line_clamp(2)
                     .child(snippet.replace(">>>", "").replace("<<<", "")),
             )
-            .on_click(cx.listener(move |this, _, _, cx| this.open_session(open_id.clone(), cx)))
+            .on_click(cx.listener(move |this, _, _, cx| this.open_listed(open_id.clone().into(), cx)))
     }
 }

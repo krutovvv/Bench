@@ -5,15 +5,15 @@
 
 use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::*;
+use protocol::ThreadId;
 
 use crate::app::BenchApp;
 use crate::app::model::ProjectEntry;
-use crate::client::rpc::Cmd;
 
 /// A row of the sidebar that can be pinned, colored, renamed and deleted.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Item {
-    Thread(String),
+    Thread(ThreadId),
     Project(String),
 }
 
@@ -21,7 +21,7 @@ impl Item {
     /// Its key among the marks (a project's are `p:<id>`).
     pub fn mark_key(&self) -> String {
         match self {
-            Item::Thread(id) => id.clone(),
+            Item::Thread(id) => id.to_string(),
             Item::Project(id) => format!("p:{id}"),
         }
     }
@@ -38,18 +38,18 @@ impl BenchApp {
     /// The threads as the sidebar groups them: the Host's (no project), then each project's,
     /// pinned projects and pinned threads first.
     pub fn sidebar_groups(&self) -> (Vec<usize>, Vec<(ProjectEntry, Vec<usize>)>) {
-        let visible = self.visible_sessions();
+        let visible = self.visible_threads();
         let mut loose: Vec<usize> = visible
             .iter()
             .copied()
             .filter(|&i| {
-                let s = &self.sessions[i];
+                let s = &self.threads[i];
                 s.host.is_empty()
                     && (s.project.is_empty() || !self.projects.iter().any(|p| p.id == s.project))
             })
             .collect();
         // Pinned first in the Host's group too: a new thread lands under them, never above.
-        loose.sort_by_key(|&i| !self.mark_of(&self.sessions[i].id).pinned);
+        loose.sort_by_key(|&i| !self.mark_of(self.threads[i].id.as_str()).pinned);
         let mut projects = self.projects.clone();
         projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
         let groups = projects
@@ -61,11 +61,11 @@ impl BenchApp {
                     .iter()
                     .copied()
                     .filter(|&i| {
-                        let s = &self.sessions[i];
+                        let s = &self.threads[i];
                         s.host == host && s.project == p.id
                     })
                     .collect();
-                rows.sort_by_key(|&i| !self.mark_of(&self.sessions[i].id).pinned);
+                rows.sort_by_key(|&i| !self.mark_of(self.threads[i].id.as_str()).pinned);
                 (p, rows)
             })
             .collect();
@@ -73,15 +73,15 @@ impl BenchApp {
     }
 
     /// The threads on screen in the sidebar, top to bottom (folded groups hide theirs).
-    pub fn drawn_threads(&self) -> Vec<String> {
+    pub fn drawn_threads(&self) -> Vec<ThreadId> {
         let (loose, groups) = self.sidebar_groups();
         let mut out = vec![];
         if self.ssh.collapsed.contains("open:loose") {
-            out.extend(loose.iter().map(|&i| self.sessions[i].id.clone()));
+            out.extend(loose.iter().map(|&i| self.threads[i].id.clone()));
         }
         for (p, rows) in groups {
             if !self.ssh.collapsed.contains(&format!("p:{}", p.id)) {
-                out.extend(rows.iter().map(|&i| self.sessions[i].id.clone()));
+                out.extend(rows.iter().map(|&i| self.threads[i].id.clone()));
             }
         }
         out
@@ -98,7 +98,7 @@ impl BenchApp {
     pub fn item_name(&self, item: &Item) -> String {
         match item {
             Item::Thread(id) => self
-                .sessions
+                .threads
                 .iter()
                 .find(|s| &s.id == id)
                 .map(|s| s.title.clone())
@@ -155,13 +155,11 @@ impl BenchApp {
         match r.item {
             // The thread's agent keeps its title; the sidebar shows it at once.
             Item::Thread(id) => {
-                if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
+                let host = self.host_of_thread(&id);
+                if let Some(s) = self.threads.iter_mut().find(|s| s.host == host && s.id == id) {
                     s.title = name.clone();
                 }
-                self.cmd(Cmd::Rename {
-                    session: id,
-                    title: name,
-                });
+                self.send(&host, protocol::RenameThread { thread: id, title: name }, cx);
             }
             Item::Project(id) => self.rename_project(id, name, window, cx),
         }
@@ -177,7 +175,7 @@ impl BenchApp {
         let order = self.drawn_threads();
         let at = self
             .thread(cx)
-            .session
+            .id
             .as_ref()
             .and_then(|id| order.iter().position(|o| o == id));
         match ks.key.as_str() {
@@ -189,7 +187,7 @@ impl BenchApp {
                     _ => None,
                 };
                 if let Some(n) = next {
-                    self.open_session(order[n].clone(), cx);
+                    self.open_listed(order[n].clone(), cx);
                 }
             }
             "backspace" | "delete" => {
@@ -199,7 +197,7 @@ impl BenchApp {
                 // The first ⌫ asks (the row shows Delete · Cancel), the second deletes: a stray
                 // key never takes a thread.
                 if self.confirm_delete.as_deref() != Some(order[k].as_str()) {
-                    self.arm_delete(order[k].clone(), cx);
+                    self.arm_delete(order[k].to_string(), cx);
                     return;
                 }
                 // The one after it opens (the one before, at the end): deleting goes on with ⌫.
@@ -207,9 +205,9 @@ impl BenchApp {
                     .get(k + 1)
                     .or(k.checked_sub(1).and_then(|p| order.get(p)));
                 let next = next.cloned();
-                self.delete_session(order[k].clone(), window, cx);
+                self.delete_listed(order[k].clone(), cx);
                 if let Some(n) = next {
-                    self.open_session(n, cx);
+                    self.open_listed(n, cx);
                 }
                 window.focus(&self.sidebar_focus, cx);
             }

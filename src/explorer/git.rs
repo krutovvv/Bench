@@ -108,7 +108,7 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path, f) = (f.machine.clone(), f.path.clone(), f.clone());
         self.background(
             window,

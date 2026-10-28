@@ -391,7 +391,7 @@ impl BenchApp {
         let Some((conn, eid)) = self.env_target(&id) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,

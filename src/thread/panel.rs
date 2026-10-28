@@ -12,9 +12,8 @@ use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// A thread's title as the sidebar has it.
-    pub(crate) fn session_title(&self, session: Option<&str>) -> SharedString {
-        session
-            .and_then(|id| self.sessions.iter().find(|s| s.id == id))
+    pub(crate) fn thread_title(&self, id: Option<&protocol::ThreadId>) -> SharedString {
+        id.and_then(|id| self.threads.iter().find(|s| &s.id == id))
             .map(|s| s.title.clone())
             .filter(|t| !t.is_empty())
             .unwrap_or_else(|| "New thread".into())
@@ -42,7 +41,7 @@ impl BenchApp {
         let Some(view) = self.panel_thread() else {
             return div().into_any_element();
         };
-        let title = self.session_title(view.read(cx).thread.session.as_deref());
+        let title = self.thread_title(view.read(cx).thread.id.as_ref());
         // Beside a thread: only Close (a new thread is the center's).
         if self.center == Center::Chat {
             let head = bench_ui::ide_head(

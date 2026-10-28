@@ -146,7 +146,7 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&root.project) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!(
             "/api/fs/grep?path={}&q={}{}",
             enc(&root.path),

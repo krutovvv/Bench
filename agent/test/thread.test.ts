@@ -2,6 +2,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { ThreadEvent, ThreadItem } from "../src/protocol.gen.ts";
 import { changesOf, compactionsOf, COMPACTION_KIND, FAIL_KIND, INBOX_KIND, INSERTS_KIND, itemsOf, itemsOfAll, queueOf, Requests } from "../src/thread.ts";
 
 const user = (id: number, text: string) => ({ id, conversationId: 7, kind: "pi.user", model: [{ role: "user", content: text, timestamp: 1000 + id }] });
@@ -172,34 +173,34 @@ test("on a real Pi: commits reach the thread as thread.* events, and thread.open
 	process.env.BENCH_AGENT_NO_MCP = "1";
 	const { Runtime } = await import("../src/runtime.ts");
 	const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
-	const events: [string, any][] = [];
-	const rt = new Runtime((_sid, type, payload) => {
-		if (type.startsWith("thread.")) events.push([type, payload]);
-	});
+	const { listen } = await import("./listen.ts");
+	const events: ThreadEvent[] = [];
+	const rt = new Runtime(listen((e) => events.push(e)));
+	const idOf = (i: ThreadItem) => (i.kind === "insert" ? i.id : undefined);
 	await rt.open();
 	const { row } = await rt.create("default", undefined, "local");
 	await rt.insert(row.id, "ia", "tasks", { list: "today" });
 	const first = await rt.thread(row.id);
-	assert.deepEqual(first.items.map((i) => [i.kind, i.id]), [["insert", "ia"]]);
+	assert.deepEqual(first.items.map((i) => [i.kind, idOf(i)]), [["insert", "ia"]]);
 	assert.deepEqual(first.queue, []);
 	assert.equal((first.inserts as any).ia.key, "tasks");
 	assert.equal(first.running, false);
 
 	await rt.insert(row.id, "ib", "ssh:local");
-	const appended = events.filter(([t]) => t === "thread.append").flatMap(([, p]) => p.items);
-	assert.deepEqual(appended.map((i: any) => i.id), ["ia", "ib"], "each entry was told once, in order");
-	assert.ok(events.some(([t, p]) => t === "thread.inserts" && p.items.ib), "the state document too");
+	const appended = events.flatMap((e) => (e.kind === "append" ? e.value : []));
+	assert.deepEqual(appended.map(idOf), ["ia", "ib"], "each entry was told once, in order");
+	assert.ok(events.some((e) => e.kind === "inserts" && e.value.ib), "the state document too");
 
 	const later = await rt.thread(row.id, first.head);
-	assert.deepEqual(later.items.map((i) => i.id), ["ib"], "only what came after the head");
+	assert.deepEqual(later.items.map(idOf), ["ib"], "only what came after the head");
 	assert.ok(later.head > first.head);
 
 	// A fork at the first insert: a thread of its own with the history through that entry, the
 	// first thread untouched.
 	const fork = await rt.fork(row.id, first.head);
 	assert.notEqual(fork.id, row.id);
-	assert.deepEqual((await rt.thread(fork.id)).items.map((i) => i.id), ["ia"], "history through the entry");
-	assert.deepEqual((await rt.thread(row.id)).items.map((i) => i.id), ["ia", "ib"], "the first thread is untouched");
+	assert.deepEqual((await rt.thread(fork.id)).items.map(idOf), ["ia"], "history through the entry");
+	assert.deepEqual((await rt.thread(row.id)).items.map(idOf), ["ia", "ib"], "the first thread is untouched");
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 	fs.rmSync(home, { recursive: true, force: true });
 });

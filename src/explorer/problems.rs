@@ -92,7 +92,7 @@ impl BenchApp {
         let Some((conn, id)) = self.env_target(&project) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.explorer
             .problems
             .entry(project.clone())

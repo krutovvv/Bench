@@ -13,6 +13,7 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-process-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
 const { Runtime } = await import("../src/runtime.ts");
+const { listen } = await import("./listen.ts");
 const { ProcessTask, keepTail } = await import("../src/builtin/process.ts");
 const { BACKGROUND_CONTEXT: ctx } = await import("@earendil-works/chord/context");
 
@@ -48,9 +49,11 @@ test("the tail keeps the last lines and bytes", () => {
 
 test("a process runs in the background: its output and exit reach the thread, Stop ends another", async () => {
 	const seen: any[] = [];
-	const rt = new Runtime((_sid, type, payload: any) => {
-		if (type === "thread.process") seen.push(payload.process);
-	});
+	const rt = new Runtime(
+		listen((e) => {
+			if (e.kind === "process") seen.push(e.value);
+		}),
+	);
 	await rt.open();
 	const { row } = await rt.create("default", home, "local");
 	await rt.thread(row.id);

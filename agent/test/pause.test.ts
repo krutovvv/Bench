@@ -16,6 +16,7 @@ process.env.BENCH_AGENT_NO_MCP = "1";
 
 const { saveProvider, writeAgent } = await import("../src/config.ts");
 const { Runtime } = await import("../src/runtime.ts");
+const { listen } = await import("./listen.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 
 const chunk = (delta: any, finish: string | null = null) =>
@@ -67,10 +68,14 @@ test("pause: a held run starts no tool until resumed; its holds are timed; a sto
 	const holds: any[] = [];
 	const tools: string[] = [];
 	const runs: boolean[] = [];
-	const rt = new Runtime((_sid, type, payload: any) => {
-		if (type === "thread.pause") holds.push(structuredClone(payload.holds));
-		if (type === "thread.run") runs.push(payload.running);
-		if (type === "tool.started" || type === "tool.start") tools.push(payload.name);
+	const rt = new Runtime(
+		listen((e) => {
+			if (e.kind === "holds") holds.push(structuredClone(e.value));
+			if (e.kind === "run") runs.push(e.value);
+		}),
+	);
+	rt.runs.add((_id, e) => {
+		if (e.kind === "tool") tools.push(e.name);
 	});
 	await rt.open();
 	const { row } = await rt.create("default", undefined, "local");
@@ -123,9 +128,11 @@ test("pause: a held run is still held after the agent restarts, and goes on when
 
 	// The agent goes away mid-hold; a new one opens the same Pi store.
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
-	const rt2 = new Runtime((_sid, type, payload: any) => {
-		if (type === "thread.run") runs.push(payload.running);
-	});
+	const rt2 = new Runtime(
+		listen((e) => {
+			if (e.kind === "run") runs.push(e.value);
+		}),
+	);
 	await rt2.open();
 	await rt2.session(id);
 	await new Promise((r) => setTimeout(r, 400));

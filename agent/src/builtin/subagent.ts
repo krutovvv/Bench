@@ -68,15 +68,13 @@ export const delegate = defineTool({
 		const results = await pool(
 			limit,
 			args.tasks.map((t, i) => async () => {
-				const id = `${api.callId}:${i}`;
-				host().emit(parent.id, "subagent.start", { subagent_id: id, goal: t.goal, task_index: i });
+				host().report(parent.id, { kind: "subagent", goal: t.goal });
 				const child = await api.conversation(children[i], context);
 				if (!child) return { task: i, status: "failed", answer: "the subagent's conversation is gone" };
 				const content = t.context ? `${t.goal}\n\nContext:\n${t.context}` : t.goal;
 				const settled: any = await (await child.submit({ type: "input", content, requestId: `delegate:${api.taskId}:${i}` }, context)).wait(context);
 				const entry = settled.status === "done" ? await api.commit((tx) => tx.entry(AssistantEntry, settled.answer), context) : undefined;
 				const answer = entry ? answerText(entry) : `unanswered: ${settled.reason ?? "?"}`;
-				host().emit(parent.id, "subagent.complete", { subagent_id: id, summary: answer, status: settled.status === "done" ? "completed" : "failed" });
 				return { task: i, status: settled.status === "done" ? "completed" : "failed", answer };
 			}),
 		);

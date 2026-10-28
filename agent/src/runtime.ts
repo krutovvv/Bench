@@ -20,11 +20,11 @@ import path from "node:path";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
 import { AGENT_HOME, agents, compactionAt, compactionPolicy, getSetting, readConfig, readAgent, reasoningEffort, resolveFallback, resolveModel, setSetting, type ModelChoice } from "./config.ts";
 import { fallbackProvider } from "./fallback.ts";
-import { totalsOf, usagePayload, type Totals } from "./usage.ts";
+import { speedOf, totalsOf, usagePayload, type Totals } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
 import { PROCESS_KIND, processOf } from "./builtin/process.ts";
 import { warmUp } from "./lsp.ts";
-import type { Process } from "./protocol.gen.ts";
+import type { Ask, Event, Process, ThreadEvent, ThreadInfo, ThreadOpen, Usage } from "./protocol.gen.ts";
 import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, compactionsOf, FAIL_KIND, itemsOfAll, preview, queueOf, Requests, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
@@ -36,13 +36,24 @@ import { Store, type SessionRow } from "./store.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
-/** One event for Bench: `{ session_id, type, payload }`. */
-export type Emit = (sessionId: string, type: string, payload: Record<string, unknown>) => void;
+/** Tell every connected Bench something (crates/protocol `Event`). */
+export type Publish = (event: Event) => void;
 
+/** What a run does, for listeners in this process (Telegram, scheduled runs, subagents' parents):
+ * not the wire — Bench reads a thread from its journal and its `ThreadEvent`s. */
+export type RunEvent =
+	| { kind: "start" }
+	| { kind: "delta"; text: string }
+	| { kind: "tool"; name: string }
+	| { kind: "subagent"; goal: string }
+	| { kind: "ask"; ask: Ask; question: string }
+	| { kind: "complete"; text: string };
+export type RunListener = (threadId: string, e: RunEvent) => void;
+
+/** A call waiting for the person's answer. */
 interface Pending {
 	resolve(answer: string): void;
-	kind: "clarify" | "approval";
-	payload: Record<string, unknown>;
+	ask: Ask;
 }
 
 /** What one open session keeps in memory while it lives. */
@@ -70,17 +81,6 @@ interface Live {
 	toolArgs: Map<string, any>;
 	/** The thread's inserts as last read from Pi (the tools' view of them). */
 	inserts: InsertView[];
-}
-
-/** An old thread's subject as an insert: "tasks:today" → tasks {list}, "tool:<name>" → tools {tool}… */
-function legacyInsert(subject: string): { key: string; state: JsonObject } | undefined {
-	const [kind, ...rest] = subject.split(":");
-	const value = rest.join(":");
-	if (kind === "ssh" && (!value || value === "local")) return { key: "ssh:local", state: {} };
-	if (kind === "tasks") return { key: "tasks", state: { list: value || "today" } };
-	if (kind === "tool" && value) return { key: "tools", state: { tool: value } };
-	if (kind === "browser") return { key: "browser", state: {} };
-	return undefined;
 }
 
 /** How a stopped run says so in the history: one quoted line, the same live and after a restart. */
@@ -120,17 +120,28 @@ export class Runtime {
 	/** Wake-ups of the calls waiting at a held run's gate (src/hold.ts). */
 	private gates = new Gates();
 
-	listeners = new Set<Emit>();
-	/** Every event goes to Bench's sockets (the sink) and to in-process listeners (cron, subagents). */
-	emit: Emit = (sessionId, type, payload) => {
-		this.sink(sessionId, type, payload);
-		for (const l of this.listeners) l(sessionId, type, payload);
-	};
+	/** In-process listeners of what runs do (`RunEvent`). */
+	runs = new Set<RunListener>();
 
-	private sink: Emit;
+	private publish: Publish;
 
-	constructor(sink: Emit) {
-		this.sink = sink;
+	constructor(publish: Publish) {
+		this.publish = publish;
+	}
+
+	/** A change of thread `id`, to every Bench. */
+	private tell(id: string, event: ThreadEvent): void {
+		this.publish({ type: "thread", thread: id, event });
+	}
+
+	/** What a run did, to the listeners in this process. */
+	report(id: string, e: RunEvent): void {
+		for (const l of this.runs) l(id, e);
+	}
+
+	/** The list of threads changed (made, renamed, deleted, a run started or ended). */
+	listChanged(): void {
+		this.publish({ type: "threads_changed" });
 	}
 
 	async open(): Promise<void> {
@@ -254,10 +265,21 @@ export class Runtime {
 	}
 
 	/** Whether this answer came from the fallback: the bar shows it in red, with why, until the main model answers again. */
-	private fallbackNote(live: Live, msg: any): { model: string; reason: string } | null {
+	/** The thread's settings as Bench shows them; with the message just answered, whether the
+	 * fallback model wrote it (and why the main one did not). */
+	info(live: Live, msg?: any): ThreadInfo {
 		const spare = resolveFallback();
-		if (!spare || msg.provider !== this.providerId(live.row.profile, spare) || msg.model !== spare.model) return null;
-		return { model: spare.model, reason: this.fallbackWhy };
+		const fell = msg && spare && msg.provider === this.providerId(live.row.profile, spare) && msg.model === spare.model;
+		return { effort: live.row.effort ?? "", ...(fell ? { fallback: { model: spare.model, reason: this.fallbackWhy } } : {}) };
+	}
+
+	/** The person changed the thread's reasoning effort. */
+	setEffort(id: string, effort: string): void {
+		this.store.update(id, { effort });
+		const live = this.live.get(id);
+		if (!live) return;
+		live.row = this.store.get(id)!;
+		this.tell(id, { kind: "info", value: this.info(live) });
 	}
 
 	/** Registers one model's provider with pi-ai. */
@@ -471,7 +493,7 @@ export class Runtime {
 			return JSON.parse(JSON.stringify(doc.holds)) as Hold[];
 		}, ctx);
 		live.holds = holds;
-		if (changed) this.emit(live.row.id, "thread.pause", { holds });
+		if (changed) this.tell(live.row.id, { kind: "holds", value: holds });
 	}
 
 	/** Called before every tool call (a subagent's with its parent's session): waits while the
@@ -564,7 +586,6 @@ export class Runtime {
 			provider: row.provider,
 			effort: row.effort,
 			title: row.title ? `${row.title} (fork)` : "",
-			...(row.subject ? { subject: row.subject } : {}),
 			...(row.project ? { project: row.project } : {}),
 		});
 		await this.attach(made, fork);
@@ -595,19 +616,25 @@ export class Runtime {
 	 * that wants approval). What waits is live state, not the journal's: the call is already in
 	 * the journal, and its result will be the answer. After a restart Pi runs the call again
 	 * (or its `beforeTool`), which asks again — nothing to restore. */
-	private prompt(live: Live, promptId: string, kind: "clarify" | "approval", payload: Record<string, unknown>, timeoutS: number): Promise<string> {
+	private prompt(live: Live, ask: Ask, question: string, timeoutS: number): Promise<string> {
+		const told = () => this.tell(live.row.id, { kind: "asks", value: this.asks(live) });
 		return new Promise<string>((resolve) => {
 			const timer = setTimeout(() => done(""), timeoutS * 1000);
 			const done = (answer: string) => {
 				clearTimeout(timer);
-				if (!live.prompts.delete(promptId)) return;
-				this.emit(live.row.id, `${kind}.settled`, { prompt_id: promptId });
+				if (!live.prompts.delete(ask.id)) return;
+				told();
 				resolve(answer);
 			};
-			const full = { ...payload, prompt_id: promptId, request_id: promptId, execution_generation: live.generation };
-			live.prompts.set(promptId, { resolve: done, kind, payload: full });
-			this.emit(live.row.id, `${kind}.request`, full);
+			live.prompts.set(ask.id, { resolve: done, ask });
+			told();
+			this.report(live.row.id, { kind: "ask", ask, question });
 		});
+	}
+
+	/** What the live run waits for the person to answer. */
+	private asks(live: Live): Ask[] {
+		return [...live.prompts.values()].map((p) => p.ask);
 	}
 
 	respond(id: string, promptId: string, answer: string): void {
@@ -627,12 +654,6 @@ export class Runtime {
 		view.dispose();
 		const doc = (await this.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
 		live.inserts = insertsOf(entries, doc);
-		// A thread from before inserts: its one tool ("subject") becomes its first insert.
-		const legacy = !live.inserts.length && !doc?.items ? legacyInsert(live.row.subject ?? "") : undefined;
-		if (legacy) {
-			this.setSubject(id, "");
-			return this.insert(id, randomBytes(4).toString("hex"), legacy.key, legacy.state);
-		}
 		return live.inserts;
 	}
 
@@ -675,13 +696,6 @@ export class Runtime {
 		return this.inserts(id);
 	}
 
-	/** The thread's block changes (a tool attached in it): stored, and the live turn's prompt sees it. */
-	setSubject(id: string, subject: string): void {
-		this.store.update(id, { subject });
-		const live = this.live.get(id);
-		if (live) live.row.subject = subject;
-	}
-
 	/** The execution environment of a conversation: this machine's, or its project's machine over SSH. */
 	private async envFor(conversationId: string, cwd: string | undefined): Promise<ExecutionEnv> {
 		const info = this.host().session(conversationId);
@@ -696,7 +710,7 @@ export class Runtime {
 	}
 
 	private sessionInfo(row: SessionRow): SessionInfo {
-		return { id: row.id, profile: row.profile, cwd: row.cwd, source: row.source, chat_id: row.chat_id, subject: row.subject, project: row.project ?? "", inserts: this.live.get(row.id)?.inserts ?? [] };
+		return { id: row.id, profile: row.profile, cwd: row.cwd, source: row.source, chat_id: row.chat_id, project: row.project ?? "", inserts: this.live.get(row.id)?.inserts ?? [] };
 	}
 
 	private host(): Host {
@@ -719,19 +733,19 @@ export class Runtime {
 			ask: async (sessionId, callId, question, choices, multiSelect, signal) => {
 				const live = await this.session(sessionId);
 				if (!live) return "";
-				const answer = this.prompt(live, callId, "clarify", { question, choices, multi_select: multiSelect }, Number(cfg()?.agent?.clarify_timeout ?? 600));
-				signal?.addEventListener("abort", () => [...live.prompts.values()].forEach((p) => p.kind === "clarify" && p.resolve("")));
+				const answer = this.prompt(live, { id: callId, kind: "clarify", choices, command: "", description: "" }, question, Number(cfg()?.agent?.clarify_timeout ?? 600));
+				signal?.addEventListener("abort", () => live.prompts.get(callId)?.resolve(""));
 				return answer;
 			},
 			approve: async (sessionId, callId, command, description) => {
 				const live = await this.session(sessionId);
 				if (!live) return "deny";
 				if (live.approvedForSession.has(command)) return "session";
-				const choice = await this.prompt(live, callId, "approval", { command, description, choices: ["once", "session", "always", "deny"], allow_session: true, allow_permanent: true }, Number(cfg()?.approvals?.timeout ?? 120));
+				const choice = await this.prompt(live, { id: callId, kind: "approve", choices: ["once", "session", "always", "deny"], command, description }, `Approve this command?\n\n${command}\n\n${description}`, Number(cfg()?.approvals?.timeout ?? 120));
 				if (choice === "session" || choice === "always") live.approvedForSession.add(command);
 				return choice || "deny";
 			},
-			emit: (sessionId, type, payload) => this.emit(sessionId, type, payload),
+			report: (sessionId, e) => this.report(sessionId, e),
 			search: (query, limit, profile) =>
 				this.store.search(query, limit, profile).map((h) => ({ session_id: h.session_id, title: this.store.get(h.session_id)?.title ?? "", snippet: h.snippet, when: new Date(h.ts * 1000).toISOString() })),
 			run: async (profile, prompt, opts) => {
@@ -801,7 +815,7 @@ export class Runtime {
 						live.usage.cached = msg.usage.cacheRead ?? 0;
 					}
 					if (msg.stopReason === "error") this.failTurn(live, msg.errorMessage ?? "the model stopped with an error");
-					else this.emit(id, "session.info", { fallback: this.fallbackNote(live, msg) });
+					else this.tell(id, { kind: "info", value: this.info(live, msg) });
 				}
 				live.blocks.clear();
 				live.narrating = false;
@@ -811,7 +825,7 @@ export class Runtime {
 				if (e.parentToolCallId) break;
 				const args = e.args as any;
 				live.toolArgs.set(e.toolCallId, args);
-				this.emit(id, "tool.start", { tool_id: e.toolCallId, name: e.toolName, args, context: preview(e.toolName, args) });
+				this.report(id, { kind: "tool", name: e.toolName });
 				this.store.addMessage(id, { role: "tool_call", text: JSON.stringify(args), tool_name: e.toolName, tool_call_id: e.toolCallId, args });
 				break;
 			}
@@ -834,7 +848,6 @@ export class Runtime {
 					const full = path.resolve(live.row.cwd, String(args.path).replace(/^~(?=\/)/, process.env.HOME ?? "~"));
 					result = { ...(typeof result === "object" ? result : { output: result }), resolved_path: full, ...(details?.patch ? { diff: details.patch } : {}) };
 				}
-				this.emit(id, "tool.complete", { tool_id: e.toolCallId, name: e.toolName, result });
 				this.store.addMessage(id, { role: "tool", text, tool_name: e.toolName, tool_call_id: e.toolCallId });
 				break;
 			}
@@ -866,21 +879,18 @@ export class Runtime {
 		const blockText = (b: any) => (b?.type === "text" ? b.text : b?.type === "thinking" ? b.thinking : undefined);
 		const push = (kind: string, text: string) => {
 			if (!text) return;
-			this.emit(id, kind === "thinking" ? "reasoning.delta" : "message.delta", { text });
-			// The answer being written, before its entry exists. The entry's `thread.append`
-			// replaces it. Once this message has begun a tool call its words are narration:
-			// they go to the work line, never to the answer's seat.
-			this.emit(id, "thread.stream", {
-				kind: kind === "thinking" ? "thought" : live.narrating ? "narration" : "text",
-				delta: text,
-			});
+			if (kind !== "thinking") this.report(id, { kind: "delta", text });
+			// The answer being written, before its entry exists. The entry's `append` replaces
+			// it. Once this message has begun a tool call its words are narration: they go to
+			// the work line, never to the answer's seat.
+			this.tell(id, { kind: "stream", value: [kind === "thinking" ? "thought" : live.narrating ? "narration" : "text", text] });
 		};
 		// Pi's own sign that these words will not be the answer: the model began a tool call
 		// in this very message. Empty delta: the text streamed so far is narration too.
 		const toolBegun = () => {
 			if (live.narrating) return;
 			live.narrating = true;
-			this.emit(id, "thread.stream", { kind: "narration", delta: "" });
+			this.tell(id, { kind: "stream", value: ["narration", ""] });
 		};
 		const cur = live.blocks.get(c.contentIndex);
 		if (c.type === "text_delta" || c.type === "thinking_delta") {
@@ -902,16 +912,15 @@ export class Runtime {
 		}
 	}
 
-	private usageFrame(live: Live): Record<string, unknown> {
-		const choice = resolveModel();
-		return usagePayload(live.row.model, live.usage, choice.contextLength);
+	usageOf(live: Live): Usage {
+		return usagePayload(live.row.model, live.usage, resolveModel().contextLength);
 	}
 
 	private emitUsage(live: Live): void {
 		const secs = Math.max(1, (Date.now() - live.usage.started) / 1000);
 		// Speed of the turn in progress; between turns, the last turn's.
 		if (live.busy) live.usage.tps = Math.round((live.usage.output / secs) * 10) / 10;
-		this.emit(live.row.id, "session.usage", { usage: this.usageFrame(live) });
+		this.tell(live.row.id, { kind: "usage", value: this.usageOf(live) });
 		// Between turns these are the thread's settled numbers: save them, so the bar is not
 		// empty when the thread or the app is reopened.
 		if (!live.busy) this.store.update(live.row.id, { usage: { ...live.usage } });
@@ -928,8 +937,9 @@ export class Runtime {
 		live.fail = undefined;
 		live.usage.started = Date.now();
 		live.usage.output = 0;
-		this.emit(live.row.id, "message.start", {});
-		this.emit(live.row.id, "thread.run", { running: true });
+		this.report(live.row.id, { kind: "start" });
+		this.tell(live.row.id, { kind: "run", value: true });
+		this.listChanged();
 	}
 
 	private failTurn(live: Live, why: unknown): void {
@@ -940,7 +950,6 @@ export class Runtime {
 			.slice(0, 400);
 		if (!text || live.fail?.includes(text)) return;
 		live.fail = live.fail ? `${live.fail}; ${text}` : text;
-		this.emit(live.row.id, "message.fail", { text: RUN_STOPPED + text });
 		// Kept in the journal, so a reopened thread still says why it stopped. Display-only: the
 		// model never sees it.
 		void live.conversation
@@ -954,7 +963,7 @@ export class Runtime {
 		// Whatever the person held, the run is over: the hold lets go, nobody waits on it.
 		if (held(live.holds)) void this.setHolds(live, (h) => closeHold(h, Date.now())).catch(() => {});
 		this.gates.wake(String(live.conversation.id), false);
-		this.emit(live.row.id, "thread.run", { running: false });
+		this.tell(live.row.id, { kind: "run", value: false });
 		// The turn's blended rate, as one number worth remembering.
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);
 		if (live.usage.output) live.usage.tps = Math.round((live.usage.output / turnSecs) * 10) / 10;
@@ -965,8 +974,8 @@ export class Runtime {
 		if (text) this.store.addMessage(id, { role: "assistant", text });
 		this.store.touch(id);
 		this.emitUsage(live);
-		this.emit(id, "message.complete", { text });
-		this.emit(id, "sessions.changed", {});
+		this.report(id, { kind: "complete", text });
+		this.listChanged();
 	}
 
 	// ---- titles ----------------------------------------------------------
@@ -1003,7 +1012,7 @@ export class Runtime {
 		} catch {
 			this.nameIfUnnamed(live.row.id, fallback);
 		}
-		this.emit(live.row.id, "sessions.changed", {});
+		this.listChanged();
 	}
 
 	// ---- thread (thread.open and the thread.* events) ------------------------
@@ -1013,10 +1022,10 @@ export class Runtime {
 		this.harness.subscribeCommits((publication: any) => {
 			for (const ch of changesOf(publication.changes, (c) => this.byConversation.has(c), this.requestsOf)) {
 				const id = this.byConversation.get(ch.conversation)!.row.id;
-				if (ch.append) this.emit(id, "thread.append", { items: ch.append });
-				if (ch.queue) this.emit(id, "thread.queue", { items: ch.queue });
-				if (ch.inserts) this.emit(id, "thread.inserts", { items: ch.inserts });
-				for (const p of ch.processes ?? []) this.emit(id, "thread.process", { process: p });
+				if (ch.append) this.tell(id, { kind: "append", value: ch.append });
+				if (ch.queue) this.tell(id, { kind: "queue", value: ch.queue });
+				if (ch.inserts) this.tell(id, { kind: "inserts", value: ch.inserts });
+				for (const p of ch.processes ?? []) this.tell(id, { kind: "process", value: p });
 			}
 		});
 	}
@@ -1026,7 +1035,7 @@ export class Runtime {
 	 * queue, the inserts' state, and whether a run is live. `head` is the last entry id: Bench asks
 	 * with `since: head` after a reconnect and gets only what it missed.
 	 */
-	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; holds: Hold[]; processes: Process[]; head: number }> {
+	async thread(id: string, since = 0): Promise<ThreadOpen> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const entries: any[] = [];
@@ -1062,6 +1071,11 @@ export class Runtime {
 			running: live.busy,
 			holds: live.busy ? live.holds : [],
 			processes: await this.processes(live.conversation.id),
+			asks: this.asks(live),
+			info: this.info(live),
+			...(live.usage.calls ? { usage: this.usageOf(live) } : {}),
+			// Read from the store: Bench saves it there at each answer's end (`thread.speed`).
+			speed: speedOf(this.store.get(id)?.speed),
 			head,
 		};
 	}
@@ -1086,28 +1100,23 @@ export class Runtime {
 		await this.harness.abortTask(Number(id) as any, ctx);
 	}
 
-	pendingPrompts(id: string): any[] {
-		const live = this.live.get(id);
-		return live ? [...live.prompts.values()].map((p) => ({ kind: p.kind, ...p.payload })) : [];
-	}
-
 	isBusy(id: string): boolean {
 		return this.live.get(id)?.busy ?? false;
 	}
 
 	/** Runs one prompt to its answer in a fresh session (cron jobs, subagents). */
-	async runToCompletion(profile: string, prompt: string, opts: { source: string; cwd?: string; title?: string; signal?: AbortSignal; onEvent?: (type: string, payload: any) => void }): Promise<{ sessionId: string; text: string; status: string }> {
-		const live = await this.create(profile, opts.cwd, opts.source, { title: opts.title ?? "" } as any);
+	async runToCompletion(profile: string, prompt: string, opts: { source: string; cwd?: string; title?: string; signal?: AbortSignal; onEvent?: (e: RunEvent) => void }): Promise<{ sessionId: string; text: string; status: string }> {
+		const live = await this.create(profile, opts.cwd, opts.source, { title: opts.title ?? "" });
 		const done = new Promise<{ text: string; status: string }>((resolve) => {
-			const listener: Emit = (sid, type, payload) => {
+			const listener: RunListener = (sid, e) => {
 				if (sid !== live.row.id) return;
-				opts.onEvent?.(type, payload);
-				if (type === "message.complete") {
-					this.listeners.delete(listener);
-					resolve({ text: String(payload.text ?? ""), status: opts.signal?.aborted ? "interrupted" : "completed" });
+				opts.onEvent?.(e);
+				if (e.kind === "complete") {
+					this.runs.delete(listener);
+					resolve({ text: e.text, status: opts.signal?.aborted ? "interrupted" : "completed" });
 				}
 			};
-			this.listeners.add(listener);
+			this.runs.add(listener);
 		});
 		opts.signal?.addEventListener("abort", () => void this.interrupt(live.row.id));
 		await this.submit(live.row.id, prompt);

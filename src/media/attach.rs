@@ -83,7 +83,6 @@ pub fn prepare(
     conn: &Connection,
     target: &Target,
     machine: Option<&str>,
-    profile: &str,
     files: &[PathBuf],
 ) -> Result<Prepared> {
     let mut out = Prepared::default();
@@ -99,7 +98,7 @@ pub fn prepare(
         let bytes = std::fs::read(file).with_context(|| format!("read {name}"))?;
         let path = if let Some(m) = machine {
             let dest = format!("/tmp/bench-attachments/{stamp}-{name}");
-            rest::upload_file_to(conn, profile, Some(m), &dest, &bytes)?;
+            rest::upload_file_to(conn, crate::app::model::GENERAL_AGENT, Some(m), &dest, &bytes)?;
             dest
         } else if *target == Target::Local
             && !is_temporary(file)
@@ -108,18 +107,15 @@ pub fn prepare(
             file.to_string_lossy().to_string()
         } else {
             if home.is_none() {
-                home = Some(rest::profile_home(conn, profile)?);
+                home = Some(rest::attachments_dir(conn)?);
             }
-            let dest = format!(
-                "{}/attachments/{stamp}-{name}",
-                home.as_deref().unwrap_or_default()
-            );
+            let dest = format!("{}/{stamp}-{name}", home.as_deref().unwrap_or_default());
             match target {
                 Target::Local => {
                     std::fs::create_dir_all(Path::new(&dest).parent().unwrap())?;
                     std::fs::write(&dest, &bytes)?;
                 }
-                Target::Ssh(_) => rest::upload_file(conn, profile, &dest, &bytes)?,
+                Target::Ssh(_) => rest::upload_file(conn, crate::app::model::GENERAL_AGENT, &dest, &bytes)?,
             }
             dest
         };

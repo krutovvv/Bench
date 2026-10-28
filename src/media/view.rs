@@ -121,7 +121,7 @@ impl BenchApp {
             return; // a fresh copy is already on its way
         }
         self.media.insert(key.clone(), Loaded::Pending);
-        let (target, profile) = (self.thread_target(at), self.current_profile());
+        let (target, profile) = (self.thread_target(at), crate::app::model::GENERAL_AGENT.to_string());
         let machine = self.files_machine(at);
         cx.spawn(async move |this, cx| {
             let r = cx
@@ -259,7 +259,8 @@ impl BenchApp {
                 p.to_string_lossy()
                     .replace(&std::env::var("HOME").unwrap_or_default(), "~")
             })
-            .filter(|_| matches!(self.target, crate::app::model::Target::Local))
+                        // A file fetched from another machine sits in Bench's cache: no folder to say.
+            .filter(|_| !local.starts_with(crate::client::connection::state_dir()))
             .unwrap_or_default();
 
         // A picture that opens the file: an image itself, or a video's frame or a document's page.

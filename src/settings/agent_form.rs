@@ -117,7 +117,7 @@ impl BenchApp {
         } else {
             typed_name
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
@@ -159,7 +159,7 @@ impl BenchApp {
             self.pv = Default::default();
             self.load_providers(window, cx);
         }
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!("/api/agents/{host}");
         self.background(
             window,

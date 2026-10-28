@@ -21,7 +21,6 @@ export interface SessionRow {
 	chat_id?: string;
 	display_name?: string;
 	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:local", "folder:<path>"; "" = a plain chat. */
-	subject?: string;
 	/** The project the thread belongs to (`projects.id`); "" = none. */
 	project?: string;
 	/** The thread's token counters as of its last finished turn; zeroes for a thread that has
@@ -54,7 +53,7 @@ export class Store {
 		`);
 		// usage: the thread's token counters, settled at every turn end (src/usage.ts);
 		// speed: how fast the model wrote, measured by Bench and sent over at the turn's end.
-		for (const col of ["subject", "project", "usage", "speed"])
+		for (const col of ["project", "usage", "speed"])
 			try {
 				this.db.exec(`ALTER TABLE sessions ADD COLUMN ${col} TEXT DEFAULT ''`);
 			} catch {}
@@ -85,8 +84,8 @@ export class Store {
 	): SessionRow {
 		const now = Date.now() / 1000;
 		this.db
-			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, subject, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-			.run(s.id, String(s.conversation), s.profile, s.title ?? "", s.source, s.cwd, s.model, s.provider, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.subject ?? "", s.project ?? "");
+			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+			.run(s.id, String(s.conversation), s.profile, s.title ?? "", s.source, s.cwd, s.model, s.provider, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.project ?? "");
 		return this.get(s.id)!;
 	}
 

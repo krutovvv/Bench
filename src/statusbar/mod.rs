@@ -112,12 +112,12 @@ impl BenchApp {
 
         // Context: the agent's numbers once a turn has run; before that (a reopened chat) a rough
         // estimate from the transcript, marked "~". The limit falls back to model.context_length.
-        let usage = self.thread(cx).usage.clone();
+        let usage = self.thread(cx).journal.usage().cloned();
         let real = usage.as_ref().filter(|u| u.context_used > 0);
         let max = real
             .map(|u| u.context_max)
             .filter(|m| *m > 0)
-            .unwrap_or(self.profile_context);
+            .unwrap_or(self.context_length);
         let (used, estimated) = match real {
             Some(u) => (u.context_used, false),
             None => (self.estimate_tokens(cx), true),
@@ -129,7 +129,7 @@ impl BenchApp {
         };
         let stats = self.session_stats(used, max, estimated, cx);
         let context = (max > 0
-            && (self.thread(cx).session.is_some() || !self.thread(cx).journal.is_empty()))
+            && (self.thread(cx).id.is_some() || !self.thread(cx).journal.is_empty()))
         .then(|| {
             let color = if percent > 85. {
                 theme.danger
@@ -193,20 +193,22 @@ impl BenchApp {
         // it vanishing between bursts read as the meter breaking; else the last call's measured
         // generation, else the agent's blended average. Prefill is not shown here: it is in the
         // panel this opens. Click: the chart of this answer.
-        let live = self.speed.live;
-        let recent = self.speed.samples.last().copied();
-        let label = match (live.or(recent), self.speed.generation) {
+        let meter = &self.thread(cx).speed;
+        let live = meter.live;
+        let recent = meter.samples.last().copied();
+        let label = match (live.or(recent), meter.generation) {
             (Some(l), _) => Some(format!("{} t/s", rate(l))),
             (None, Some(g)) => Some(format!("{} t/s", rate(g))),
             _ => self
                 .thread(cx)
-                .usage
-                .as_ref()
+                .journal
+                .usage()
                 .and_then(|u| u.avg_tps)
                 .map(|t| format!("{} t/s", rate(t))),
         };
-        let samples = self.speed.samples.clone();
-        let (prefill, generation) = (self.speed.prefill, self.speed.generation);
+        let meter = &self.thread(cx).speed;
+        let samples = meter.samples.clone();
+        let (prefill, generation) = (meter.prefill, meter.generation);
         let speed = label.map(|label| {
             gpui_kit::component::popover::Popover::new("speed-pop")
                 .anchor(gpui_kit::Anchor::BottomRight)
@@ -275,7 +277,7 @@ impl BenchApp {
             .children(context.map(|c| h_flex().h_full().items_center().pl_1().child(c)))
             .children(speed.map(|s| h_flex().h_full().items_center().pl_1().child(s)))
             // The fallback answering, in red: the main model failed, and why, until it answers again.
-            .children(self.thread(cx).fallback_on.clone().map(|(model, why)| {
+            .children(self.thread(cx).journal.info().fallback.clone().map(|protocol::Fallback { model, reason: why }| {
                 let tip = if why.is_empty() {
                     "The main model is unavailable: the fallback answers until it is back.".to_string()
                 } else {

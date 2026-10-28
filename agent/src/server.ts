@@ -1,7 +1,8 @@
-// bench-agent's server: Bench's protocol — JSON-RPC 2.0 over a WebSocket at /api/ws?token=, REST
-// under /api/ with the token in X-Hermes-Session-Token (a header name kept from an earlier agent,
-// so older agents on servers keep answering). Started by Bench (or `node src/server.ts`); writes its port and
-// token to ~/.bench-agent/server.json.
+// bench-agent's server: Bench's protocol (crates/protocol) — JSON-RPC 2.0 over a WebSocket at
+// /api/ws?token= (requests, and `event` notifications), REST under /api/ with the token in
+// X-Bench-Token. A server's agent is always the build of the Bench that installed it, so the
+// wire never speaks to an older one. Started by Bench (or `node src/server.ts`); writes its port
+// and token to ~/.bench/server.json.
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { onMachine } from "./modules/files.ts";
@@ -13,7 +14,8 @@ import { WebSocketServer, type WebSocket } from "ws";
 import pkg from "../package.json" with { type: "json" };
 import { AGENT_HOME, migrateProfiles, migrateProjectModels } from "./config.ts";
 import { migrateServerRows } from "./builtin/servers.ts";
-import { expand, HttpError, readBody, type Dynamic, type Module, type Req, type Route, type Rpc } from "./http.ts";
+import { expand, HttpError, readBody, type Dynamic, type Module, type Req, type Route } from "./http.ts";
+import type { Event } from "./protocol.gen.ts";
 import { connectMcp, mcpStatus } from "./mcp.ts";
 import agents from "./modules/agents.ts";
 import presetsModule from "./modules/presets.ts";
@@ -27,6 +29,7 @@ import settings from "./modules/settings.ts";
 import tasks from "./modules/tasks.ts";
 import threads from "./modules/threads.ts";
 import { Runtime } from "./runtime.ts";
+import { onTasksChanged } from "./builtin/tasks.ts";
 import { syncTelegram } from "./telegram.ts";
 
 const STATE = path.join(AGENT_HOME, "server.json");
@@ -43,16 +46,17 @@ const prior = (() => {
 const token: string = process.env.BENCH_AGENT_TOKEN || prior.token || randomBytes(32).toString("hex");
 
 const sockets = new Set<WebSocket>();
-function broadcast(sessionId: string, type: string, payload: Record<string, unknown>): void {
-	const live = rt.live.get(sessionId);
-	const frame = JSON.stringify({ jsonrpc: "2.0", method: "event", params: { session_id: sessionId, type, payload, execution_generation: live?.generation ?? 0 } });
+/** An event to every connected Bench: a JSON-RPC notification whose params are the `Event`. */
+function publish(event: Event): void {
+	const frame = JSON.stringify({ jsonrpc: "2.0", method: "event", params: event });
 	for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(frame);
 }
 
 for (const name of migrateProfiles()) console.log(`[migrate] profile ${name} → agents/${name}`);
 for (const row of migrateServerRows()) console.log(`[migrate] ${row} is a server's agent now, not a project row`);
 for (const id of migrateProjectModels()) console.log(`[migrate] project ${id} follows the general model now (its settings.json in backups/)`);
-const rt = new Runtime(broadcast);
+const rt = new Runtime(publish);
+onTasksChanged(() => publish({ type: "tasks_changed" }));
 await rt.open();
 
 
@@ -60,8 +64,8 @@ await rt.open();
 
 // Each module declares its RPC methods and REST routes (src/modules/*.ts); the server only
 // collects them. A new area of the agent is a new module and a line here.
-const modules: Module[] = [threads, commands, projects, agents, presetsModule, tasks, cron, files, lsp, audio, settings].map((m) => m({ rt, broadcast }));
-const methods: Record<string, Rpc> = Object.assign({}, ...modules.map((m) => m.rpc ?? {}));
+const modules: Module[] = [threads, commands, projects, agents, presetsModule, tasks, cron, files, lsp, audio, settings].map((m) => m({ rt, publish }));
+const methods: Record<string, (params: any) => unknown> = Object.assign({}, ...modules.map((m) => m.rpc ?? {}));
 const routes: Record<string, Route> = Object.assign({}, ...modules.map((m) => m.routes ?? {}));
 const dynamic: Dynamic[] = modules.flatMap((m) => m.dynamic ?? []);
 
@@ -71,7 +75,7 @@ const server = http.createServer(async (req, res) => {
 		res.writeHead(status, { "Content-Type": "application/json" });
 		res.end(JSON.stringify(body));
 	};
-	if (req.headers["x-hermes-session-token"] !== token && url.searchParams.get("token") !== token) return send(401, { detail: "unauthorized" });
+	if (req.headers["x-bench-token"] !== token && url.searchParams.get("token") !== token) return send(401, { detail: "unauthorized" });
 	try {
 		const r = req as Req;
 		r.query = url.searchParams;

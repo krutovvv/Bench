@@ -7,7 +7,6 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::ThreadView;
-use crate::client::rpc::Cmd;
 use bench_ui::icons::Ico;
 use gpui_kit::component::input::{InputEvent, TextareaState};
 
@@ -148,21 +147,14 @@ impl ThreadView {
 impl ThreadView {
     /// A waiting message (the thread's queue): sent now, into the running work, or taken back.
     pub fn queued(&mut self, id: String, send_now: bool, cx: &mut Context<Self>) {
-        let Some(session) = self.thread.runtime.clone() else {
+        let Some(thread) = self.thread.id.clone() else {
             return;
         };
-        let cmd = if send_now {
-            Cmd::QueueSend {
-                session: session.clone(),
-                id: id.clone(),
-            }
+        if send_now {
+            self.tell(protocol::SendQueuedNow { thread, sub: id }, cx);
         } else {
-            Cmd::QueueWithdraw {
-                session,
-                id: id.clone(),
-            }
-        };
-        self.cmd(cmd, cx);
+            self.tell(protocol::WithdrawQueued { thread, sub: id }, cx);
+        }
         cx.notify();
     }
 
@@ -207,10 +199,10 @@ impl ThreadView {
             return;
         };
         let text = field.read(cx).value().trim().to_string();
-        if let Some(session) = self.thread.runtime.clone() {
-            if !text.is_empty() {
-                self.cmd(Cmd::QueueEdit { session, id, text }, cx);
-            }
+        if let Some(thread) = self.thread.id.clone()
+            && !text.is_empty()
+        {
+            self.tell(protocol::EditQueued { thread, sub: id, text }, cx);
         }
         cx.notify();
     }

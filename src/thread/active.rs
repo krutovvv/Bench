@@ -1,18 +1,19 @@
-//! A thread's state: which session it is, its journal and the list showing it, its run, what
-//! waits in its queue, what the agent asks in it, its project. Its `ThreadView` (`view.rs`) holds
-//! it with the composer; the app routes each event to the view of its thread (`app/events.rs`).
+//! A thread's state: which thread of which agent it is, its journal and the list showing it, its
+//! run and how fast it writes, its project. Its `ThreadView` (`view.rs`) holds it with the
+//! composer; the app routes each of the thread's events to the views showing it (`app/events.rs`).
 
 use std::collections::HashSet;
 
+use protocol::{StreamKind, ThreadEvent, ThreadId, ThreadItem};
+
 use crate::app::Live;
-use crate::app::model::Usage;
-use crate::client::rpc::Evt;
+use crate::statusbar::speed::Meter;
 
 pub struct ActiveThread {
-    /// Stored id of the open session (what the session list shows).
-    pub session: Option<String>,
-    /// The id the gateway uses for prompts and events of the open session.
-    pub runtime: Option<String>,
+    /// The agent that keeps it ("" = this Mac's).
+    pub host: String,
+    /// Its id there; `None` for a new chat not made yet.
+    pub id: Option<ThreadId>,
     /// The open thread: its journal, what is being written, its queue (`crates/thread`).
     pub journal: ::thread::Thread,
     /// The open thread on screen: its list and rows (`ui::thread`).
@@ -29,6 +30,8 @@ pub struct ActiveThread {
     pub texts: crate::media::text::Texts,
     /// The open thread's history could not be read: why (shown with Retry instead of "Loading").
     pub history_error: Option<String>,
+    /// Its history came from the agent (or it was made here): "Loading…" until then.
+    pub loaded: bool,
     pub live: Option<Live>,
     /// The first message of a thread not made yet: its request id and words, sent once it is.
     pub queued: Option<(String, String)>,
@@ -38,34 +41,30 @@ pub struct ActiveThread {
     /// the process whose output is shown.
     pub processes_open: HashSet<String>,
     pub process_open: Option<String>,
-    pub usage: Option<Usage>,
-    /// The fallback model is answering the open thread: (its model, why the main one failed).
-    pub fallback_on: Option<(String, String)>,
+    /// How fast the model writes in it, measured from its stream.
+    pub speed: Meter,
     pub effort: usize,
     /// A level was chosen before the session existed: it goes with the first message.
     pub effort_pending: bool,
     /// The open session's effort when it is none of EFFORTS (set elsewhere, e.g. `high`; "" is the
     /// provider's default): shown as it is, nothing checked.
     pub effort_other: Option<String>,
-    /// The agent waits for an answer (approval mode manual/smart).
-    pub approval: Option<crate::app::model::ApprovalReq>,
-    /// A question the agent asks, the choices ticked so far (multi-select), the free answer.
-    pub clarify: Option<crate::app::model::ClarifyReq>,
+    /// The choices ticked so far in the question the agent asks (multi-select).
     pub clarify_picked: Vec<usize>,
     /// Which plans of the open thread are unfolded, by their journal id (the cards themselves
     /// are rows' data: `crates/thread`).
     pub plan_open: HashSet<String>,
-    /// The open session's project (None for chats that touch no repo).
-    pub project: Option<crate::app::model::Project>,
-    /// The project the open thread belongs to (a new one is created in it); "" = none.
-    pub thread_project: String,
+    /// The git repo it works in (None for a thread that touches no repo).
+    pub repo: Option<crate::app::model::Repo>,
+    /// The project it belongs to (a new one is created in it); "" = its agent's Host.
+    pub project: String,
 }
 
 impl Default for ActiveThread {
     fn default() -> Self {
         Self {
-            session: None,
-            runtime: None,
+            host: String::new(),
+            id: None,
             journal: Default::default(),
             tv: Default::default(),
             open_work: Default::default(),
@@ -74,34 +73,34 @@ impl Default for ActiveThread {
             open_source: None,
             texts: Default::default(),
             history_error: None,
+            loaded: false,
             live: None,
             queued: None,
             files_open: false,
             processes_open: HashSet::new(),
             process_open: None,
-            usage: None,
-            fallback_on: None,
+            speed: Meter::fresh(),
             effort: crate::app::model::EFFORTS.len() - 1,
             effort_pending: false,
             effort_other: None,
-            approval: None,
-            clarify: None,
             clarify_picked: Vec::new(),
             plan_open: Default::default(),
-            project: None,
-            thread_project: String::new(),
+            repo: None,
+            project: String::new(),
         }
     }
 }
 
-/// One thread as the app acts on it for its view: which session it is, where it lives, whether
-/// it runs. The view makes it (`ActiveThread::thread_ref`) and hands it to what it asks of the app
-/// — an insert's block, an answer's media, sending — so the app never has to read a view, which
-/// may be drawing at that moment.
+/// One thread as the app acts on it for its view: which thread of which agent it is, where it
+/// lives, whether it runs. The view makes it (`ActiveThread::thread_ref`) and hands it to what it
+/// asks of the app — an insert's block, an answer's media, sending — so the app never has to read
+/// a view, which may be drawing at that moment.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ThreadRef {
-    pub session: Option<String>,
-    pub runtime: Option<String>,
+    /// The agent that keeps it ("" = this Mac's).
+    pub host: String,
+    /// Its id there; `None` for a new chat not made yet.
+    pub id: Option<ThreadId>,
     /// The project it belongs to; "" = none (its agent's Host).
     pub project: String,
     /// A run is live in it.
@@ -109,10 +108,12 @@ pub struct ThreadRef {
 }
 
 impl ThreadRef {
-    /// Its key for what is kept per thread (inserts, references): its session, or "draft" for a
-    /// new chat.
+    /// Its key for what is kept per thread (inserts, references): its id, or "draft" for a new
+    /// chat.
     pub fn key(&self) -> String {
-        self.session.clone().unwrap_or_else(|| "draft".into())
+        self.id
+            .as_ref()
+            .map_or_else(|| "draft".into(), |id| id.to_string())
     }
 
     /// Its project as the Explorer and the environment name it: its own, or the Host.
@@ -128,9 +129,9 @@ impl ThreadRef {
 impl ActiveThread {
     pub fn thread_ref(&self) -> ThreadRef {
         ThreadRef {
-            session: self.session.clone(),
-            runtime: self.runtime.clone(),
-            project: self.thread_project.clone(),
+            host: self.host.clone(),
+            id: self.id.clone(),
+            project: self.project.clone(),
             live: self.live.is_some(),
         }
     }
@@ -142,77 +143,88 @@ impl ActiveThread {
             .flatten()
     }
 
-    /// What an event of this thread does to its own state (its journal, its run, what the agent
-    /// asks). What it does to the window — the status bar's speed, a notification, a field — is
-    /// the open thread's alone (`app/events.rs`).
-    pub fn on_event(&mut self, evt: &Evt) {
+    /// A change of this thread: its journal takes it; the status line says what the run does;
+    /// the speed meter counts what it writes.
+    pub fn on_thread_event(&mut self, e: &ThreadEvent) {
+        self.journal.apply(e.clone());
         let label = |live: &mut Option<Live>, text: &str| {
             if let Some(live) = live.as_mut() {
                 live.label = text.to_string().into();
             }
         };
-        match evt {
-            Evt::Thread(_, e) => self.journal.apply(e.clone()),
-            Evt::Fallback(_, note) => self.fallback_on = note.clone(),
-            Evt::Started(_) => {
+        match e {
+            // A run is a new answer: the chart starts over, the first call is under way.
+            ThreadEvent::Run(true) => {
                 if self.live.is_none() {
-                    self.live = Some(Live {
-                        label: "Thinking…".into(),
-                    });
+                    self.speed.begin_answer();
+                    self.speed.request();
+                }
+                self.live.get_or_insert(Live {
+                    label: "Thinking…".into(),
+                });
+            }
+            ThreadEvent::Run(false) => {
+                self.live = None;
+                self.speed.finish();
+            }
+            ThreadEvent::Stream(kind, delta) => {
+                label(
+                    &mut self.live,
+                    if *kind == StreamKind::Thought {
+                        "Thinking…"
+                    } else {
+                        "Writing…"
+                    },
+                );
+                self.speed.token(delta.chars().count());
+            }
+            ThreadEvent::Append(items) => {
+                for it in items {
+                    match it {
+                        ThreadItem::Tool { name, preview, .. } => {
+                            label(
+                                &mut self.live,
+                                &crate::thread::work::tool_label(name, preview),
+                            );
+                            self.speed.tool_call();
+                        }
+                        ThreadItem::Result { .. } => self.speed.request(),
+                        _ => {}
+                    }
                 }
             }
-            Evt::Delta(..) => label(&mut self.live, "Writing…"),
-            Evt::Reasoning(..) => label(&mut self.live, "Thinking…"),
-            Evt::ToolStart { name, detail, .. } => label(
-                &mut self.live,
-                &crate::thread::work::tool_label(name, detail),
-            ),
-            // A command that printed something (no prompt to send): the run is over.
-            Evt::Dispatched { send: None, .. } => self.live = None,
-            Evt::Approval(req) => {
-                label(&mut self.live, "Waiting for your approval…");
-                self.approval = Some(req.clone());
-            }
-            Evt::ApprovalDone(sid) => {
-                if self.approval.as_ref().is_some_and(|a| a.session == *sid) {
-                    self.approval = None;
-                }
-            }
-            Evt::Clarify(req) => {
-                label(&mut self.live, "Waiting for your answer…");
-                self.clarify = Some(req.clone());
+            ThreadEvent::Asks(asks) if !asks.is_empty() => {
+                let approve = asks.iter().any(|a| a.kind == protocol::AskKind::Approve);
+                label(
+                    &mut self.live,
+                    if approve {
+                        "Waiting for your approval…"
+                    } else {
+                        "Waiting for your answer…"
+                    },
+                );
                 self.clarify_picked.clear();
             }
-            Evt::ClarifyDone(sid) => {
-                if self.clarify.as_ref().is_some_and(|c| c.session == *sid) {
-                    self.clarify = None;
-                }
-            }
-            Evt::Usage(_, usage) => self.usage = Some(usage.clone()),
-            Evt::Complete { .. } => self.live = None,
+            ThreadEvent::Usage(u) => self.speed.usage(u),
             _ => {}
         }
     }
 
     /// Its history arrived (`thread.open`): a thread already on screen keeps what it has and only
     /// catches up. False: it is another thread's.
-    pub fn on_history(
-        &mut self,
-        session: &str,
-        runtime: String,
-        open: protocol::ThreadOpen,
-    ) -> bool {
-        if self.session.as_deref() != Some(session) {
+    pub fn on_history(&mut self, id: &ThreadId, open: protocol::ThreadOpen) -> bool {
+        if self.id.as_ref() != Some(id) {
             return false;
         }
         let running = open.running;
-        if self.runtime.as_deref() == Some(runtime.as_str()) || !self.journal.is_empty() {
+        self.speed.restore(open.speed.clone());
+        if !self.journal.is_empty() {
             self.journal.catch_up(open);
         } else {
             self.journal = ::thread::Thread::open(open);
         }
-        self.runtime = Some(runtime);
         self.history_error = None;
+        self.loaded = true;
         self.live = running.then(|| Live {
             label: "Working…".into(),
         });
@@ -223,25 +235,17 @@ impl ActiveThread {
 #[cfg(test)]
 mod tests {
     use super::ActiveThread;
-    use crate::client::rpc::Evt;
+    use protocol::{StreamKind, ThreadEvent};
 
     #[test]
     fn a_thread_follows_its_own_run() {
         let mut t = ActiveThread::default();
-        t.on_event(&Evt::Started("r".into()));
-        assert_eq!(
-            t.live.as_ref().map(|l| l.label.to_string()).as_deref(),
-            Some("Thinking…")
-        );
-        t.on_event(&Evt::Delta("r".into(), "Hi".into()));
-        assert_eq!(
-            t.live.as_ref().map(|l| l.label.to_string()).as_deref(),
-            Some("Writing…")
-        );
-        t.on_event(&Evt::Complete {
-            session: "r".into(),
-            text: "done".into(),
-        });
+        let label = |t: &ActiveThread| t.live.as_ref().map(|l| l.label.to_string());
+        t.on_thread_event(&ThreadEvent::Run(true));
+        assert_eq!(label(&t).as_deref(), Some("Thinking…"));
+        t.on_thread_event(&ThreadEvent::Stream(StreamKind::Text, "Hi".into()));
+        assert_eq!(label(&t).as_deref(), Some("Writing…"));
+        t.on_thread_event(&ThreadEvent::Run(false));
         assert!(t.live.is_none());
     }
 }

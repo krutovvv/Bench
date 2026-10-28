@@ -21,7 +21,7 @@ test("an MCP server reads as untried until something tries it", async () => {
 		assert.ok(fs.existsSync(file), `the server did not start:\n${err}`);
 		const { port, token } = JSON.parse(fs.readFileSync(file, "utf8"));
 		const call = (method: string, p: string, body?: unknown) =>
-			fetch(`http://127.0.0.1:${port}${p}`, { method, headers: { "X-Hermes-Session-Token": token, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.json());
+			fetch(`http://127.0.0.1:${port}${p}`, { method, headers: { "X-Bench-Token": token, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.json());
 		const made = await call("POST", "/api/projects", { name: "Shop" });
 		const id = made.project.id;
 		// One http server, at a port nothing listens on: Check will fail fast and honestly.

@@ -1,16 +1,16 @@
 //! The person's inserts: tools put into a thread with "/" (the terminal, the task lists, the
-//! utilities, the browser's tab). A thread is a document of messages and inserts;
-//! an insert is the person's, sits where it was put, and stays live. The agent keeps them (a Pi
-//! entry where each was put, a document of their state: agent/src/inserts.ts); Bench shows its
-//! list, changes it through the agent, and takes the agent's answer as the truth. Each kind's
-//! look and behaviour: `crate::inserts`.
+//! utilities, the browser's tab). A thread is a document of messages and inserts; an insert is
+//! the person's, sits where it was put, and stays live. The agent keeps them (a Pi entry where
+//! each was put, a document of their state: agent/src/inserts.ts); Bench changes them through
+//! the agent and reads them from the thread's journal — the app keeps that list for the inserts'
+//! kinds (`inserts_from`). Each kind's look and behaviour: `crate::inserts`.
 
 use gpui_kit::*;
+use protocol::InsertPatch;
 use serde_json::{Map, Value, json};
 
 use crate::app::BenchApp;
 use crate::app::model::Insert;
-use crate::client::rpc::Cmd;
 use crate::inserts::kind_of;
 use crate::thread::{ThreadRef, ThreadView};
 
@@ -37,7 +37,6 @@ impl ThreadView {
             key,
             state,
             folded: false,
-            after: self.thread.journal.messages() + usize::from(draft),
         };
         if draft {
             self.insert_draft.push(ins.id.clone());
@@ -58,14 +57,26 @@ impl ThreadView {
         self.app
             .update(cx, |app, cx| {
                 for id in ids {
-                    app.patch_insert(&at, &id, json!({ "after": after }), cx);
+                    let patch = InsertPatch {
+                        after: Some(after as u64),
+                        ..Default::default()
+                    };
+                    app.patch_insert(&at, &id, patch, cx);
                 }
             })
             .ok();
     }
 }
 
-/// A new chat's inserts until its session exists.
+/// A change of an insert's own state alone (its list, its tool, its tab).
+pub fn new_state(state: Value) -> InsertPatch {
+    InsertPatch {
+        state: state.as_object().cloned(),
+        ..Default::default()
+    }
+}
+
+/// A new chat's inserts until it is a thread.
 const DRAFT: &str = "draft";
 
 impl BenchApp {
@@ -107,7 +118,8 @@ impl BenchApp {
     ) {
         // An insert shows once the agent has written it into the thread: with no agent yet (just
         // started, or reconnecting) it would wait unseen.
-        if self.profile.is_none() {
+        let at = view.read(cx).thread_ref();
+        if self.conn_of(&self.thread_host(&at)).is_none() {
             self.toast(
                 gpui_kit::component::notification::NotificationType::Info,
                 "The agent is not connected yet",
@@ -124,9 +136,9 @@ impl BenchApp {
             return;
         };
         self.inserts.entry(at.key()).or_default().push(ins.clone());
-        match at.session.clone() {
-            Some(session) => self.send_insert(&at, &session, &ins),
-            None => self.create_thread_now(&at),
+        match at.id.is_some() {
+            true => self.send_insert(&at, &ins, cx),
+            false => self.create_thread(&at, cx),
         }
         // The newest of a shared kind is the live one.
         if let Some(name) = kind.shared() {
@@ -136,76 +148,104 @@ impl BenchApp {
         cx.notify();
     }
 
-    fn send_insert(&self, at: &ThreadRef, session: &str, ins: &Insert) {
-        self.cmd_at(
-            at,
-            Cmd::Insert {
-                session: session.to_string(),
-                id: ins.id.clone(),
-                key: ins.key.clone(),
-                state: Value::Object(ins.state.clone()),
-            },
-        );
-    }
-
-    /// A new chat's session, made before any message (an insert was put into it, or a
-    /// project's "+": the thread shows in the sidebar at once).
-    pub(crate) fn create_thread_now(&mut self, at: &ThreadRef) {
-        if self.creating || at.runtime.is_some() {
-            return;
-        }
-        let Some(profile) = self.profile.clone() else {
+    fn send_insert(&self, at: &ThreadRef, ins: &Insert, cx: &mut Context<Self>) {
+        let Some(thread) = at.id.clone() else {
             return;
         };
-        self.creating = true;
-        self.cmd_at(
-            at,
-            self.create_cmd(profile, self.new_project.clone(), &at.project),
-        );
+        let put = protocol::PutInsert {
+            thread,
+            id: ins.id.clone(),
+            key: ins.key.clone(),
+            state: ins.state.clone(),
+        };
+        let at = at.clone();
+        self.request(&self.thread_host(&at), put, cx, move |this, r, window, cx| {
+            if let Err(e) = r {
+                this.insert_refused(&at, e, window, cx);
+            }
+        });
     }
 
-    /// The new chat's session exists: its inserts go to the agent.
-    pub fn inserts_created(&mut self, at: &ThreadRef, session: &str) {
-        self.creating = false;
+    /// The agent refused an insert's change: said, and the thread is read again — its journal
+    /// is the truth.
+    fn insert_refused(
+        &mut self,
+        at: &ThreadRef,
+        e: anyhow::Error,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.toast(
+            gpui_kit::component::notification::NotificationType::Error,
+            format!("The insert didn't change: {e:#}"),
+            window,
+            cx,
+        );
+        self.fetch_thread(at.clone(), cx);
+    }
+
+    /// The new chat is a thread now: its inserts go to its agent.
+    pub fn inserts_created(&mut self, at: &ThreadRef, cx: &mut Context<Self>) {
         if let Some(list) = self.inserts.remove(DRAFT) {
             for ins in &list {
-                self.send_insert(at, session, ins);
+                self.send_insert(at, ins, cx);
             }
-            self.inserts.insert(session.to_string(), list);
+            self.inserts.insert(at.key(), list);
         }
     }
 
-    /// Change an insert (its key, state, folded, removed): at once on screen, then the agent's
-    /// answer replaces the list.
-    pub fn patch_insert(&mut self, at: &ThreadRef, id: &str, patch: Value, cx: &mut Context<Self>) {
+    /// The thread's inserts as its journal has them now (the view showing it read them), for
+    /// the inserts' kinds.
+    pub fn inserts_from(&mut self, view: &Entity<ThreadView>, cx: &mut Context<Self>) {
+        let v = view.read(cx);
+        let key = v.thread_ref().key();
+        let list = v
+            .thread
+            .journal
+            .insert_list()
+            .into_iter()
+            .map(|(id, s)| Insert::new(id, s))
+            .collect();
+        self.inserts.insert(key, list);
+    }
+
+    /// Change an insert (its key, state, folded, removed, place): at once on screen; the thread's
+    /// `inserts` event brings the agent's version.
+    pub fn patch_insert(
+        &mut self,
+        at: &ThreadRef,
+        id: &str,
+        patch: InsertPatch,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(list) = self.inserts.get_mut(&at.key()) {
-            if patch["removed"] == json!(true) {
+            if patch.removed == Some(true) {
                 list.retain(|i| i.id != id);
             } else if let Some(ins) = list.iter_mut().find(|i| i.id == id) {
-                if let Some(k) = patch["key"].as_str() {
-                    ins.key = k.to_string();
+                if let Some(k) = &patch.key {
+                    ins.key = k.clone();
                 }
-                if let Some(s) = patch["state"].as_object() {
+                if let Some(s) = &patch.state {
                     ins.state = s.clone();
                 }
-                if let Some(f) = patch["folded"].as_bool() {
+                if let Some(f) = patch.folded {
                     ins.folded = f;
-                }
-                if let Some(a) = patch["after"].as_u64() {
-                    ins.after = a as usize;
                 }
             }
         }
-        // A draft's inserts reach the agent when its session does (`inserts_created`).
-        if let Some(session) = at.session.clone() {
-            self.cmd_at(
-                at,
-                Cmd::PatchInsert {
-                    session,
-                    id: id.to_string(),
-                    patch,
-                },
-            );
+        // A new chat's inserts reach the agent when it is made (`inserts_created`).
+        if let Some(thread) = at.id.clone() {
+            let change = protocol::PatchInsert {
+                thread,
+                id: id.to_string(),
+                patch,
+            };
+            let at = at.clone();
+            self.request(&self.thread_host(&at), change, cx, move |this, r, window, cx| {
+                if let Err(e) = r {
+                    this.insert_refused(&at, e, window, cx);
+                }
+            });
         }
         cx.notify();
     }
@@ -217,13 +257,11 @@ impl BenchApp {
                 kind.removed(self, at, &ins, cx);
             }
         }
-        self.patch_insert(at, id, json!({ "removed": true }), cx);
-    }
-
-    /// The agent's list for a thread: the truth.
-    pub fn on_inserts(&mut self, session: String, list: Vec<Insert>, cx: &mut Context<Self>) {
-        self.inserts.insert(session, list);
-        cx.notify();
+        let patch = InsertPatch {
+            removed: Some(true),
+            ..Default::default()
+        };
+        self.patch_insert(at, id, patch, cx);
     }
 
     /// What every insert of a thread shows now, for the agent (sent with each message, never

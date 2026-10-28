@@ -31,6 +31,23 @@ impl BenchApp {
         }
     }
 
+    /// The slash commands threads offer, as this Mac's agent lists them.
+    pub(crate) fn load_commands(&mut self, cx: &mut Context<Self>) {
+        self.request("", protocol::ListCommands {}, cx, |this, r, _, _| {
+            if let Ok(list) = r {
+                this.catalog = list
+                    .into_iter()
+                    .map(|c| SlashCommand {
+                        name: c.name,
+                        desc: c.description,
+                        category: "Thread".into(),
+                        key: String::new(),
+                    })
+                    .collect();
+            }
+        });
+    }
+
     /// `/goal ship it` → ("/goal", "ship it") when `/goal` is a known command.
     pub fn parse_command(&self, text: &str) -> Option<(String, String)> {
         if !text.starts_with('/') {

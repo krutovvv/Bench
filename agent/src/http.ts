@@ -5,24 +5,28 @@ import fs from "node:fs";
 import type http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import type { Event, Methods } from "./protocol.gen.ts";
 import type { Runtime } from "./runtime.ts";
 
 export type Req = http.IncomingMessage & { body?: any; query: URLSearchParams; path: string };
 export type Route = (req: Req) => Promise<any> | any;
 /** A route with a path parameter: method, its pattern, the handler with the match. */
 export type Dynamic = [string, RegExp, (req: Req, m: RegExpMatchArray) => any];
-export type Rpc = (params: any) => Promise<any> | any;
-export type Emit = (sessionId: string, type: string, payload: Record<string, unknown>) => void;
+/** The JSON-RPC methods a module answers, typed by crates/protocol (`Methods`): each gets its
+ * params and returns its answer, as Bench reads them. */
+export type Handlers = { [M in keyof Methods]?: (params: Methods[M][0]) => Methods[M][1] | Promise<Methods[M][1]> };
+/** Tell every connected Bench something (crates/protocol `Event`). */
+export type Publish = (event: Event) => void;
 
 /** What a module gets from the server. */
 export interface Ctx {
 	rt: Runtime;
-	broadcast: Emit;
+	publish: Publish;
 }
 
 /** What a module gives the server: JSON-RPC methods, fixed REST routes ("GET /api/x"), routes with a parameter. */
 export interface Module {
-	rpc?: Record<string, Rpc>;
+	rpc?: Handlers;
 	routes?: Record<string, Route>;
 	dynamic?: Dynamic[];
 }
@@ -36,7 +40,8 @@ export class HttpError extends Error {
 }
 
 export const expand = (p: string) => (p.startsWith("~") ? path.join(os.homedir(), p.slice(1)) : p);
-export const profileOf = (req: Req) => req.query.get("profile") || "default";
+/** The agent settings a REST call is about: "default" (the general ones) or a project's `project:<id>`. */
+export const agentOf = (req: Req) => req.query.get("agent") || "default";
 
 export const required = (v: unknown, name: string): string => {
 	if (typeof v !== "string" || !v.trim()) throw new HttpError(400, `${name} is required`);

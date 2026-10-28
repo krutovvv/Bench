@@ -26,13 +26,13 @@ impl BenchApp {
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let s = &self.sessions[i];
+        let s = &self.threads[i];
         let selected =
-            self.center == Center::Chat && self.thread(cx).session.as_deref() == Some(&s.id);
+            self.center == Center::Chat && self.thread(cx).id.as_ref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
         // The open thread knows its hold first-hand; the others by the agent's list and the
         // holds their views heard.
-        let open = self.thread(cx).session.as_deref() == Some(s.id.as_str());
+        let open = self.thread(cx).id.as_ref() == Some(&s.id);
         let paused = if open {
             self.thread(cx).journal.paused()
         } else {
@@ -46,7 +46,12 @@ impl BenchApp {
             plural(s.messages as usize, "message", "messages", "messages")
         };
         // A chat in a branch of its own says which.
-        let meta = match self.project_of(&s.id).filter(|p| p.in_branch_folder()) {
+        let row_at = crate::thread::ThreadRef {
+            host: s.host.clone(),
+            id: Some(s.id.clone()),
+            ..Default::default()
+        };
+        let meta = match self.repo_of(&row_at).filter(|p| p.in_branch_folder()) {
             Some(p) if !p.branch.is_empty() => format!("{} · {count}", p.branch),
             _ => count,
         };
@@ -69,9 +74,9 @@ impl BenchApp {
                         .text_color(theme.danger_foreground)
                         .cursor_pointer()
                         .child("Delete")
-                        .on_click(cx.listener(move |this, _, window, cx| {
+                        .on_click(cx.listener(move |this, _, _, cx| {
                             cx.stop_propagation();
-                            this.delete_session(del_id.clone(), window, cx)
+                            this.delete_listed(del_id.clone(), cx)
                         })),
                 )
                 .child(
@@ -93,7 +98,7 @@ impl BenchApp {
             // "⋯" on hover: pin, color, rename, delete.
             let view = cx.entity();
             let id = s.id.clone();
-            let mark = self.mark_of(&s.id);
+            let mark = self.mark_of(s.id.as_str());
             div()
                 .opacity(0.)
                 .group_hover(group.clone(), |s| s.opacity(1.))
@@ -116,12 +121,12 @@ impl BenchApp {
         // A paused run stands still: no shimmer, as nothing moves.
         let working = !paused && (s.running || (open && self.thread(cx).live.is_some()));
         let stripe = self
-            .mark_of(&s.id)
+            .mark_of(s.id.as_str())
             .color
             .and_then(|c| crate::sidebar::marks::MARK_COLORS.get(c))
             .map(|c| -> Hsla { rgb(*c).into() });
 
-        let pinned = self.mark_of(&s.id).pinned;
+        let pinned = self.mark_of(s.id.as_str()).pinned;
         let menu_id = s.id.clone();
         h_flex()
             .id(("session", i))
@@ -231,7 +236,7 @@ impl BenchApp {
             .child(delete)
             // Opened, and the sidebar takes the keys: ↑ ↓ to the next, ⌫ deletes it.
             .on_click(cx.listener(move |this, _, window, cx| {
-                this.open_session(open_id.clone(), cx);
+                this.open_listed(open_id.clone(), cx);
                 window.focus(&this.sidebar_focus, cx);
             }))
             .context_menu(item_menu(cx.entity(), Item::Thread(menu_id), pinned))

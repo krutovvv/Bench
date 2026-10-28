@@ -153,7 +153,7 @@ pub(super) fn item_menu(
                 })
                 .icon(Ico::Trash.icon())
                 .on_click(act(Box::new(move |this, window, cx| match &del {
-                    Item::Thread(id) => this.arm_delete(id.clone(), cx),
+                    Item::Thread(id) => this.arm_delete(id.to_string(), cx),
                     Item::Project(id) => this.delete_project(id.clone(), window, cx),
                 }))),
             )

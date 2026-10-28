@@ -1,31 +1,29 @@
 //! The agent asks (the `clarify` tool): answer with a choice, several, your own words, or decline.
 
 use gpui_kit::*;
+use protocol::{Ask, AskKind};
 
 use super::ThreadView;
-use crate::client::rpc::Cmd;
 
 impl ThreadView {
+    /// The question the run waits for now, if any.
+    pub(crate) fn live_clarify(&self) -> Option<&Ask> {
+        self.thread
+            .journal
+            .asks()
+            .iter()
+            .find(|a| a.kind == AskKind::Clarify)
+    }
+
     /// `answer` empty = declined (the agent goes on without it).
     pub fn answer_clarify(&mut self, answer: String, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(req), Some(profile)) = (self.thread.clarify.take(), self.profile(cx)) else {
+        let Some(ask) = self.live_clarify().map(|a| a.id.clone()) else {
             return;
         };
-        if let Some(live) = self.thread.live.as_mut() {
-            live.label = "Working…".into();
-        }
         self.thread.clarify_picked.clear();
         self.clarify_input
             .update(cx, |s, cx| s.set_value("", window, cx));
-        self.cmd(
-            Cmd::Clarify {
-                profile,
-                req,
-                answer,
-            },
-            cx,
-        );
-        cx.notify();
+        self.answer_ask(ask, answer, cx);
     }
 
     /// Multi-select: tick or untick a choice.
@@ -41,14 +39,14 @@ impl ThreadView {
 
     /// Multi-select: send the ticked choices, comma-separated, in their order.
     pub fn send_clarify_picks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(req) = self.thread.clarify.as_ref() else {
+        let Some(ask) = self.live_clarify() else {
             return;
         };
         let mut picked = self.thread.clarify_picked.clone();
         picked.sort();
         let answer = picked
             .iter()
-            .filter_map(|k| req.choices.get(*k).cloned())
+            .filter_map(|k| ask.choices.get(*k).cloned())
             .collect::<Vec<_>>()
             .join(", ");
         if !answer.is_empty() {

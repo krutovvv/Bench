@@ -298,7 +298,7 @@ impl BenchApp {
             .as_ref()
             .map(|(p, m)| {
                 let group = self
-                    .profile_models
+                    .models
                     .iter()
                     .find(|c| c.provider == *p)
                     .map_or(p.clone(), |c| c.group.clone());
@@ -308,7 +308,7 @@ impl BenchApp {
         let mut choices: Vec<(Option<String>, String, Option<(String, String)>)> =
             vec![(None, "None".into(), None)];
         let mut last_group = String::new();
-        for c in self.profile_models.iter().filter(|c| c.tag != "main") {
+        for c in self.models.iter().filter(|c| c.tag != "main") {
             let header = (c.group != last_group).then(|| c.group.clone());
             last_group = c.group.clone();
             choices.push((

@@ -210,7 +210,7 @@ impl BenchApp {
             return;
         };
         let (tx, rx) = async_channel::unbounded();
-        self.tasks.store = Some(TaskStore::start(conn, self.current_profile(), tx));
+        self.tasks.store = Some(TaskStore::start(conn, crate::app::model::GENERAL_AGENT.to_string(), tx));
         cx.spawn(async move |this, cx| {
             while let Ok(evt) = rx.recv().await {
                 if this
@@ -274,8 +274,9 @@ impl BenchApp {
         self.tasks.send(Cmd::Load { done_since: since });
     }
 
-    /// From the window's ticker: save a card whose typing stopped, re-read the store now and
-    /// then (another device, the agent), keep a running timer's figure moving.
+    /// From the window's ticker: save a card whose typing stopped, keep a running timer's
+    /// figure moving. Changes made elsewhere (the agent, another client) come as the agent's
+    /// `tasks_changed` (`app/events.rs`).
     pub fn tick_tasks(&mut self, cx: &mut Context<Self>) {
         if self
             .tasks
@@ -284,22 +285,6 @@ impl BenchApp {
         {
             self.tasks.dirty = None;
             self.save_selected();
-        }
-        // The list is read again while a /tasks insert shows it.
-        let shown = self
-            .inserts_of(&self.thread_ref(cx))
-            .iter()
-            .any(|i| i.key == "tasks");
-        if !shown || self.tasks.store.is_none() {
-            return;
-        }
-        if self.tasks.dirty.is_none()
-            && self
-                .tasks
-                .last_load
-                .is_none_or(|t| t.elapsed().as_secs() >= 4)
-        {
-            self.load_tasks();
         }
         if self.tasks.items.iter().any(|t| t.timer.is_some()) {
             cx.notify();
@@ -347,19 +332,6 @@ impl BenchApp {
         self.tasks.loaded = false;
         self.start_task_store(cx);
         self.load_tasks();
-    }
-
-    /// What the open thread is about: its session's subject, or the new chat's.
-    pub fn current_subject(&self, cx: &App) -> String {
-        match &self.thread(cx).session {
-            Some(id) => self
-                .sessions
-                .iter()
-                .find(|s| &s.id == id)
-                .map(|s| s.subject.clone())
-                .unwrap_or_default(),
-            None => self.new_subject.clone(),
-        }
     }
 
     /// The task lists in a new thread, on `list`.

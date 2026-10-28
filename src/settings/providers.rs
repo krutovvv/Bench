@@ -79,13 +79,13 @@ impl BenchApp {
     /// first).
     pub(crate) fn add_picker_models(&mut self) {
         let mut order: Vec<String> = vec![];
-        for c in &self.profile_models {
+        for c in &self.models {
             if !order.contains(&c.group) {
                 order.push(c.group.clone());
             }
         }
         // A stable sort: inside a group the order stays (main, fallbacks, the rest).
-        self.profile_models
+        self.models
             .sort_by_key(|c| order.iter().position(|g| *g == c.group));
     }
 
@@ -263,7 +263,7 @@ impl BenchApp {
     /// After a save that changes what the profile offers: reload both lists.
     fn providers_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.load_providers(window, cx);
-        self.load_profile_effort(window, cx);
+        self.load_agent_settings(window, cx);
     }
 
     pub fn add_endpoint(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -437,7 +437,7 @@ impl BenchApp {
                 rest::merge_config(conn, profile, json!({"fallback_providers": list}))
             },
             |this, r, window, cx| match r {
-                Ok(()) => this.load_profile_effort(window, cx),
+                Ok(()) => this.load_agent_settings(window, cx),
                 Err(e) => this.toast(
                     NotificationType::Error,
                     format!("Fallback: {e:#}"),

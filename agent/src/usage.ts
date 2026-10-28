@@ -2,6 +2,8 @@
 // The agent owns these numbers (only it sees the API's usage frames), so it also keeps them:
 // Bench's status bar reads the same figures after a restart that it showed while the work ran.
 
+import type { SpeedStat, Usage } from "./protocol.gen.ts";
+
 /** The counters of one thread. `input` is the last call's window (≈ the context in use);
  *  `output` and `calls` add up over the thread; `tps` is the last turn's blended rate. */
 export interface Totals {
@@ -39,7 +41,7 @@ export function totalsOf(v: unknown): Totals {
 }
 
 /** The frame Bench shows: `max` is the model's context window. */
-export function usagePayload(model: string, u: Totals, max: number): Record<string, unknown> {
+export function usagePayload(model: string, u: Totals, max: number): Usage {
 	return {
 		model,
 		context_used: u.input,
@@ -52,18 +54,10 @@ export function usagePayload(model: string, u: Totals, max: number): Record<stri
 		avg_tps: u.tps ?? 0,
 	};
 }
-/** How fast the model wrote in this thread. Bench measures this (only it sees when each token
- *  of the stream arrived), so it sends it over at the end of an answer and the agent keeps it
- *  with the thread: reopening the thread or the app brings the chart back. */
-export interface SpeedStat {
-	/** Tokens per second, one sample for each second of the thread's last answer. */
-	samples: number[];
-	/** The last measured prefill and generation speeds, tokens per second. */
-	prefill: number | null;
-	generation: number | null;
-	/** Characters per token, learned on this thread's model. */
-	ratio: number | null;
-}
+/** How fast the model wrote in this thread (crates/protocol `SpeedStat`). Bench measures it (only
+ *  it sees when each token of the stream arrived), sends it at the end of an answer, and the agent
+ *  keeps it with the thread: reopening the thread or the app brings the chart back. */
+export type { SpeedStat };
 
 /** How many of the per-second samples to keep (the chart shows the last minute or so). */
 export const SPEED_SAMPLES = 180;
@@ -77,10 +71,8 @@ export function speedOf(v: unknown): SpeedStat {
 		.map(num)
 		.filter((x): x is number => x !== null)
 		.slice(-SPEED_SAMPLES);
-	return {
-		samples,
-		prefill: num(o.prefill),
-		generation: num(o.generation),
-		ratio: typeof o.ratio === "number" && isFinite(o.ratio) && o.ratio > 0 ? o.ratio : null,
-	};
+	const prefill = num(o.prefill);
+	const generation = num(o.generation);
+	const ratio = num(o.ratio);
+	return { samples, ...(prefill ? { prefill } : {}), ...(generation ? { generation } : {}), ...(ratio ? { ratio } : {}) };
 }

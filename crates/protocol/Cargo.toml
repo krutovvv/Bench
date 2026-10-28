@@ -2,7 +2,7 @@
 name = "protocol"
 version = "0.1.0"
 edition = "2024"
-description = "What Bench and its agent say to each other about a thread: thread.open and the thread.* events"
+description = "The wire between Bench and its agent: requests, events, a thread as the agent tells it"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

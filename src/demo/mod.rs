@@ -24,7 +24,7 @@ use threads::subject_threads;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::app::model::{Place, Profile, Target, Usage};
+use crate::app::model::Usage;
 use protocol::ThreadItem;
 use serde_json::json;
 
@@ -35,8 +35,9 @@ impl BenchApp {
     pub(crate) fn show_demo_thread(&mut self, id: &str, cx: &mut App) {
         let journal = self.demo_threads.get(id).cloned().unwrap_or_default();
         open_thread(self, cx, |t| {
-            t.session = Some(id.into());
+            t.id = Some(id.into());
             t.journal = journal;
+            t.loaded = true;
         });
     }
 }
@@ -49,98 +50,74 @@ fn open_thread(app: &mut BenchApp, cx: &mut App, f: impl FnOnce(&mut crate::thre
 pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
     let now = crate::app::now_secs();
     app.demo = true;
-    app.target = Target::Local;
-    app.connecting = false;
-    app.profiles = vec![Profile {
-        name: "default".into(),
-        label: "default".into(),
-        model: "Qwen3.8-Next-Flash".into(),
-    }];
-    app.profile = Some("default".into());
-    app.profile_ready = true;
+    app.settings_ready = true;
+    app.context_length = 131_072;
     app.approval_mode = Some("smart".into());
     app.default_cwd = Some("/Users/demo".into());
 
-    app.sessions = vec![
-        session(
+    app.threads = vec![
+        row(
             "d-landing",
             "Launch the spring landing page",
             42,
             false,
             "desktop",
         ),
-        session(
+        row(
             "d-notes",
             "Summarize this week's meeting notes",
             8,
             false,
             "desktop",
         ),
-        session(
+        row(
             "d-api",
             "Add rate limiting to the public API",
             23,
             false,
             "desktop",
         ),
-        session(
+        row(
             "d-tests",
             "Fix the flaky checkout test",
             15,
             false,
             "desktop",
         ),
-        session(
+        row(
             "d-audit-1",
             "Competitors: pricing pages",
             31,
             true,
             "desktop",
         ),
-        session(
+        row(
             "d-audit-2",
             "Competitors: onboarding flows",
             19,
             false,
             "desktop",
         ),
-        session(
+        row(
             "d-tg",
             "Invoice for March from the inbox",
             6,
             false,
             "telegram",
         ),
-        session("d-cron", "Daily digest of new issues", 4, false, "cron"),
+        row("d-cron", "Daily digest of new issues", 4, false, "cron"),
     ];
-    let place = |cwd: &str, repo: &str| Place {
-        cwd: cwd.into(),
-        repo: repo.into(),
-        branch: if repo.is_empty() {
-            String::new()
-        } else {
-            "main".into()
-        },
-    };
-    for (id, p) in [
-        (
-            "d-api",
-            place("/Users/demo/code/storefront", "/Users/demo/code/storefront"),
-        ),
-        (
-            "d-tests",
-            place("/Users/demo/code/storefront", "/Users/demo/code/storefront"),
-        ),
-        (
-            "d-audit-1",
-            place("/Users/demo/Research/Competitor audit", ""),
-        ),
-        (
-            "d-audit-2",
-            place("/Users/demo/Research/Competitor audit", ""),
-        ),
+    // Where the demo's threads work: a folder, and the repo it is in.
+    for (id, cwd, repo) in [
+        ("d-api", "/Users/demo/code/storefront", Some("/Users/demo/code/storefront")),
+        ("d-tests", "/Users/demo/code/storefront", Some("/Users/demo/code/storefront")),
+        ("d-audit-1", "/Users/demo/Research/Competitor audit", None),
+        ("d-audit-2", "/Users/demo/Research/Competitor audit", None),
     ] {
-        app.places.insert(id.into(), p);
+        if let Some(r) = app.threads.iter_mut().find(|r| r.id.as_str() == id) {
+            r.cwd = cwd.into();
+            r.repo = repo.map(str::to_string);
+        }
     }
 
     let (chart, flow, clips) = media();
@@ -214,7 +191,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
     app.demo_threads.insert("d-landing".into(), landing.clone());
     open_thread(app, cx, |t| {
         t.journal = landing;
-        t.session = Some("d-landing".into());
+        t.id = Some("d-landing".into());
+        t.loaded = true;
     });
     other_modes(app);
     subject_threads(app, now);
@@ -239,7 +217,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         project("p-audit", "Competitor audit", None),
         project("p-me", "Personal", None),
     ];
-    for s in app.sessions.iter_mut() {
+    for s in app.threads.iter_mut() {
         s.project = match s.id.as_str() {
             "d-site" => "p-blog",
             "d-landing" | "d-api" | "d-tests" => "p-store",
@@ -275,11 +253,11 @@ fewer form fields. Then check what it did to signups and give me a short summary
     };
     if let Some(id) = open {
         let journal = app.demo_threads.get(id).cloned().unwrap_or_default();
-        let project = app.project_of_session(id);
+        let project = app.project_of_thread("", &id.into());
         open_thread(app, cx, |t| {
-            t.session = Some(id.into());
+            t.id = Some(id.into());
             t.journal = journal;
-            t.thread_project = project;
+            t.project = project;
         });
     }
     // `BENCH_DEMO=long`: a thread of sixty exchanges, opened at its top.
@@ -298,7 +276,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
             );
         }
         open_thread(app, cx, |t| {
-            t.session = Some("d-landing".into());
+            t.id = Some("d-landing".into());
             t.journal = journal.thread();
         });
     }
@@ -385,9 +363,6 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 let at = app.active_thread.clone();
                 window.defer(cx, move |window, cx| {
                     at.update(cx, |v, cx| {
-                        if v.thread.runtime.is_none() {
-                            v.thread.runtime = Some("demo".into());
-                        }
                         if v.thread.live.is_none() {
                             v.thread.live = Some(crate::app::Live {
                                 label: "Thinking…".into(),
@@ -404,12 +379,12 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // `BENCH_DEMO=new`: a new thread, nothing in it but the composer.
     if std::env::var("BENCH_DEMO").as_deref() == Ok("new") {
         open_thread(app, cx, |t| {
-            t.session = None;
+            t.id = None;
             t.journal = Default::default();
         });
     }
     open_thread(app, cx, |t| {
-        t.usage = Some(Usage {
+        t.journal.apply(protocol::ThreadEvent::Usage(Usage {
             model: "Qwen3.8-Next-Flash".into(),
             context_used: 38_400,
             context_max: 131_072,
@@ -417,7 +392,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
             input: 212_000,
             output: 9_800,
             ..Default::default()
-        })
+        }))
     });
     if std::env::var("BENCH_DEMO_RUN").is_ok() {
         run(cx);
@@ -428,7 +403,6 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // — its journal item and the live prompt that lets it be answered — inside the work that
     // asked it, its choices long enough to show they wrap.
     if std::env::var("BENCH_CLARIFY").is_ok() {
-        let session = app.thread(cx).session.clone().unwrap_or_default();
         let multi = std::env::var("BENCH_CLARIFY_MULTI").is_ok();
         let question = "Как оформить разделы шестерни (Settings)?";
         let choices: Vec<String> = vec![
@@ -459,12 +433,12 @@ fewer form fields. Then check what it did to signups and give me a short summary
                     multi,
                 },
             ]));
-            t.clarify = Some(crate::app::model::ClarifyReq {
-                session,
-                prompt_id: "demo".into(),
-                generation: None,
+            t.journal.apply(protocol::ThreadEvent::Asks(vec![protocol::Ask {
+                id: "demo".into(),
+                kind: protocol::AskKind::Clarify,
                 choices,
-            });
+                ..Default::default()
+            }]));
         });
     }
     // `BENCH_DEMO=explorer`: the blog in the Explorer (`env` opens its documents); `BENCH_DEMO=env`:
@@ -618,41 +592,9 @@ fn run(cx: &mut Context<BenchApp>) {
             );
             if this
                 .update(cx, |app, cx| {
-                    // The run also feeds the speed meter, as a real stream does: the status
-                    // bar's live rate and chart live in the demo too.
-                    match &e {
-                        ThreadEvent::Run(true) => {
-                            app.speed.request();
-                            app.speed.begin_answer();
-                        }
-                        ThreadEvent::Stream(_, delta) => {
-                            app.speed.token(delta.chars().count());
-                        }
-                        ThreadEvent::Run(false) => app.speed.finish(),
-                        _ => {}
-                    }
                     app.active_thread.update(cx, |v, cx| {
-                        // And the thread runs live, so the meter is ticked and the sidebar
-                        // says "working…", as with a real agent.
-                        match &e {
-                            ThreadEvent::Run(true) => {
-                                v.thread.live = Some(crate::app::Live {
-                                    label: "Thinking…".into(),
-                                })
-                            }
-                            ThreadEvent::Stream(kind, _) => {
-                                if let Some(l) = v.thread.live.as_mut() {
-                                    l.label = match kind {
-                                        protocol::StreamKind::Text => "Writing…",
-                                        _ => "Thinking…",
-                                    }
-                                    .into();
-                                }
-                            }
-                            ThreadEvent::Run(false) => v.thread.live = None,
-                            _ => {}
-                        }
-                        v.thread.journal.apply(e);
+                        // As a real stream: the run's label, the speed meter, the journal.
+                        v.thread.on_thread_event(&e);
                         cx.notify();
                     })
                 })

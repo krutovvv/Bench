@@ -17,7 +17,6 @@ use gpui_kit::*;
 
 use super::{ActiveThread, ThreadRef};
 use crate::app::BenchApp;
-use crate::client::rpc::{Cmd, Evt};
 
 pub struct ThreadView {
     /// The window's app: what is one for the whole window (the connection, the sessions, the
@@ -141,23 +140,13 @@ impl ThreadView {
         Some(self.app.upgrade()?.read(cx))
     }
 
-    /// The profile the app talks to the agent as.
-    pub(crate) fn profile(&self, cx: &App) -> Option<String> {
-        self.app(cx)?.profile.clone()
-    }
-
-    /// A command of this thread to the agent keeping it.
-    pub(crate) fn cmd(&self, cmd: Cmd, cx: &App) {
-        if let Some(app) = self.app(cx) {
-            app.cmd_at(&self.thread_ref(), cmd);
-        }
-    }
-
-    /// Whether this is the center's view (the open thread), not the one beside it: what a thread
-    /// does to the window (the status bar's speed) is the open thread's only.
-    pub(crate) fn is_open_thread(&self, cx: &Context<Self>) -> bool {
-        self.app(cx)
-            .is_some_and(|a| a.active_thread.entity_id() == cx.entity_id())
+    /// Tell the agent keeping this thread something (its answer is only "done"; a failure is a
+    /// toast). Not while the app is borrowed: from a listener or a deferred call.
+    pub(crate) fn tell<R: protocol::Request>(&self, request: R, cx: &mut Context<Self>) {
+        let at = self.thread_ref();
+        self.app
+            .update(cx, |app, cx| app.send_at(&at, request, cx))
+            .ok();
     }
 
     /// A listener that acts on the app, not on this thread (`cx.listener` is this view's): the
@@ -176,36 +165,39 @@ impl ThreadView {
     /// keeps of its last one goes; `effort` is where a new chat starts. The composer's text is
     /// the drafts' (`sync_draft`).
     pub fn reset(&mut self, effort: usize, cx: &mut Context<Self>) {
-        let project = std::mem::take(&mut self.thread.thread_project);
+        let project = std::mem::take(&mut self.thread.project);
         self.thread = ActiveThread {
             effort,
-            thread_project: project,
+            project: project,
             ..Default::default()
         };
         self.queue_edit = None;
         cx.notify();
     }
 
-    /// An event of this thread: its state, and what the view keeps around it.
-    pub fn on_event(&mut self, evt: &Evt, window: &mut Window, cx: &mut Context<Self>) {
-        self.thread.on_event(evt);
-        match evt {
-            Evt::Thread(_, ::thread::ThreadEvent::Queue(items)) => {
-                // A message that left the queue (sent, taken back) has nothing left to fix.
-                if self
-                    .queue_edit
-                    .as_ref()
-                    .is_some_and(|(id, _)| !items.iter().any(|q| &q.sub == id))
-                {
-                    self.queue_edit = None;
-                }
+    /// A change of this thread: its state, and what the view keeps around it.
+    pub fn on_thread_event(
+        &mut self,
+        e: &protocol::ThreadEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let asked = matches!(e, protocol::ThreadEvent::Asks(a) if !a.is_empty());
+        self.thread.on_thread_event(e);
+        if let protocol::ThreadEvent::Queue(items) = e {
+            // A message that left the queue (sent, taken back) has nothing left to fix.
+            if self
+                .queue_edit
+                .as_ref()
+                .is_some_and(|(id, _)| !items.iter().any(|q| &q.sub == id))
+            {
+                self.queue_edit = None;
             }
-            // The free answer's field starts empty for a new question.
-            Evt::Clarify(_) => {
-                self.clarify_input
-                    .update(cx, |s, cx| s.set_value("", window, cx));
-            }
-            _ => {}
+        }
+        // The free answer's field starts empty for a new question.
+        if asked {
+            self.clarify_input
+                .update(cx, |s, cx| s.set_value("", window, cx));
         }
         cx.notify();
     }
@@ -217,7 +209,7 @@ impl Render for ThreadView {
         self.sync_draft(window, cx);
         // A new chat is a code editor's empty file: the caret alone (no avatars yet), focused.
         // The composer never has a placeholder: it is the thread's next text, not a form field.
-        let fresh = self.thread.journal.is_empty() && self.thread.session.is_none();
+        let fresh = self.thread.journal.is_empty() && self.thread.id.is_none();
         if fresh != self.composer_fresh {
             self.composer_fresh = fresh;
             if fresh {

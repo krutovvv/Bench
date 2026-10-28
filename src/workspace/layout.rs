@@ -44,13 +44,13 @@ impl BenchApp {
         // `BENCH_DEMO_BESIDE=<thread id>`: that thread beside the open one.
         static BESIDE: std::sync::Once = std::sync::Once::new();
         if let Ok(id) = std::env::var("BENCH_DEMO_BESIDE") {
-            BESIDE.call_once(|| self.open_beside(id, window, cx));
+            BESIDE.call_once(|| self.open_beside(id.into(), window, cx));
         }
         // `BENCH_DEMO_RENAME=<thread id>`: that thread being renamed.
         static RENAME: std::sync::Once = std::sync::Once::new();
         if let Ok(id) = std::env::var("BENCH_DEMO_RENAME") {
             RENAME.call_once(|| {
-                self.start_rename(crate::sidebar::items::Item::Thread(id), window, cx)
+                self.start_rename(crate::sidebar::items::Item::Thread(id.into()), window, cx)
             });
         }
     }
@@ -59,7 +59,7 @@ impl BenchApp {
 impl Render for BenchApp {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // The prompts offered with `@` follow the open thread's project.
-        let project = self.thread(cx).thread_project.clone();
+        let project = self.thread(cx).project.clone();
         if !self.demo
             && self.local_conn().is_some()
             && self.prompts_for.as_deref() != Some(project.as_str())

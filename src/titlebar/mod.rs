@@ -45,7 +45,7 @@ impl BenchApp {
     /// click opens what the repo is: uncommitted changes, the newest commits (a click copies
     /// the sha), its origin. Git itself stays the agent's: ask it to commit, or to undo.
     fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let p = self.thread(cx).project.clone()?;
+        let p = self.thread(cx).repo.clone()?;
         let label = if p.branch.is_empty() {
             p.name()
         } else {
@@ -151,9 +151,9 @@ impl BenchApp {
         if !self.center.is_settings() {
             let title: SharedString = self
                 .thread(cx)
-                .session
+                .id
                 .as_ref()
-                .and_then(|id| self.sessions.iter().find(|s| &s.id == id))
+                .and_then(|id| self.threads.iter().find(|s| &s.id == id))
                 .map(|s| s.title.clone())
                 .filter(|t| !t.is_empty())
                 // A thread about a task list is named after it until it has a title of its own.

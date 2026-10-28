@@ -22,14 +22,14 @@ fn on(machine: Option<&str>) -> String {
 
 pub fn read_text(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     machine: Option<&str>,
     path: &str,
 ) -> Result<TextFile> {
     let v = get(
         conn,
         &format!("/api/fs/read-text?path={}{}", enc(path), on(machine)),
-        profile,
+        agent,
     )?;
     Ok(TextFile {
         text: v["text"].as_str().unwrap_or_default().to_string(),
@@ -40,7 +40,7 @@ pub fn read_text(
 
 pub fn write_text(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     machine: Option<&str>,
     path: &str,
     content: &str,
@@ -49,7 +49,7 @@ pub fn write_text(
         conn,
         "POST",
         "/api/fs/write-text",
-        profile,
+        agent,
         json!({"path": path, "content": content, "machine": machine}),
         30,
     )?;
@@ -59,14 +59,14 @@ pub fn write_text(
 /// Directory entries: (name, full path, is_dir), directories first.
 pub fn list_dir(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     machine: Option<&str>,
     path: &str,
 ) -> Result<Vec<(String, String, bool)>> {
     let v = get(
         conn,
         &format!("/api/fs/list?path={}{}", enc(path), on(machine)),
-        profile,
+        agent,
     )?;
     if let Some(err) = v["error"].as_str() {
         return Err(anyhow!("{err}"));
@@ -88,15 +88,15 @@ pub fn list_dir(
 /// A file's bytes as the gateway's machine has them (at most `cap`).
 pub fn download(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     machine: Option<&str>,
     path: &str,
     cap: u64,
 ) -> Result<Vec<u8>> {
     use std::io::Read as _;
     let route = format!("/api/fs/download?path={}{}", enc(path), on(machine));
-    let (h, v) = conn.rest_auth(profile, "native-http")?;
-    let resp = match ureq::get(&url(conn, &route, profile))
+    let (h, v) = conn.auth();
+    let resp = match ureq::get(&url(conn, &route, agent))
         .set(h, &v)
         .timeout(Duration::from_secs(300))
         .call()
@@ -126,15 +126,15 @@ fn data_url(mime: &str, bytes: &[u8]) -> String {
     )
 }
 
-/// Write a file on the gateway's machine (inside the profile's managed files).
-pub fn upload_file(conn: &Connection, profile: &str, path: &str, bytes: &[u8]) -> Result<()> {
-    upload_file_to(conn, profile, None, path, bytes)
+/// Write a file on the gateway's machine (inside the agent's managed files).
+pub fn upload_file(conn: &Connection, agent: &str, path: &str, bytes: &[u8]) -> Result<()> {
+    upload_file_to(conn, agent, None, path, bytes)
 }
 
 /// Write a file on `machine` (None: the agent's own) through the agent.
 pub fn upload_file_to(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     machine: Option<&str>,
     path: &str,
     bytes: &[u8],
@@ -144,7 +144,7 @@ pub fn upload_file_to(
             conn,
             "POST",
             "/api/files/upload",
-            profile,
+            agent,
             json!({"path": path, "data_url": data_url("application/octet-stream", bytes), "overwrite": true, "machine": machine}),
             600,
         )?;
@@ -155,7 +155,7 @@ pub fn upload_file_to(
         conn,
         "POST",
         "/api/files/mkdir",
-        profile,
+        agent,
         json!({"path": dir}),
         30,
     );
@@ -163,7 +163,7 @@ pub fn upload_file_to(
         conn,
         "POST",
         "/api/files/upload",
-        profile,
+        agent,
         json!({"path": path, "data_url": data_url("application/octet-stream", bytes), "overwrite": true}),
         600,
     )?;
@@ -173,14 +173,14 @@ pub fn upload_file_to(
 /// A file's text at HEAD of its repository (`/api/git/head`); None: not in one, or not committed.
 pub fn git_head(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     machine: Option<&str>,
     path: &str,
 ) -> Result<Option<String>> {
     let v = get(
         conn,
         &format!("/api/git/head?path={}{}", enc(path), on(machine)),
-        profile,
+        agent,
     )?;
     Ok(v["text"].as_str().map(str::to_string))
 }
@@ -189,14 +189,14 @@ pub fn git_head(
 /// paths relative to it — a trailing '/' marks a folded folder. "": not a repository.
 pub fn git_ignored(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     machine: Option<&str>,
     path: &str,
 ) -> Result<(String, Vec<String>)> {
     let v = get(
         conn,
         &format!("/api/git/ignored?path={}{}", enc(path), on(machine)),
-        profile,
+        agent,
     )?;
     let ignored = v["ignored"]
         .as_array()

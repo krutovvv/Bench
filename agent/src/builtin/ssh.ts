@@ -21,12 +21,11 @@ export const sshRun = defineTool({
 	}),
 	execute: async (args, api, context) => {
 		const s = sessionOf(api.conversationId);
-		const onServer = s.subject?.startsWith("ssh:");
-		// "ssh:" alone is this machine's terminal.
-		// The terminal inserted in the thread (the last one, when there are several).
+		// The terminal inserted in the thread (the last one, when there are several); "ssh:" alone
+		// is this machine's.
 		const inserted = [...(s.inserts ?? [])].reverse().find((i) => i.key.startsWith("ssh:"))?.key.slice(4);
 		const insertedAlias = inserted === undefined ? "" : inserted || "local";
-		const alias = args.host || (onServer ? s.subject!.slice(4) || "local" : insertedAlias);
+		const alias = args.host || insertedAlias;
 		if (!alias) throw new Error("this thread is not about a server; pass host");
 		const local = alias === "local";
 		const [cmd, argv] = local ? ["/bin/zsh", ["-lc", args.command]] : ["ssh", ["-o", "BatchMode=yes", "-o", "ConnectTimeout=10", alias, args.command]];

@@ -54,13 +54,14 @@ impl BenchApp {
             // ⌘⌫ / ⌘⌦: delete the open thread — asked once, as ⌫ ⌫ in the sidebar
             // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's.
             ("backspace" | "delete", false)
-                if self.center == Center::Chat && self.thread(cx).session.is_some() =>
+                if self.center == Center::Chat && self.thread(cx).id.is_some() =>
             {
-                let id = self.thread(cx).session.clone().unwrap_or_default();
+                let at = self.thread_ref(cx);
+                let id = at.id.clone().unwrap_or_default();
                 if self.confirm_delete.as_deref() == Some(id.as_str()) {
-                    self.delete_session(id, window, cx);
+                    self.delete_thread(at.host, id, cx);
                 } else {
-                    self.arm_delete(id, cx);
+                    self.arm_delete(id.to_string(), cx);
                 }
             }
             // Dictation without its button: start, and again to stop and transcribe.

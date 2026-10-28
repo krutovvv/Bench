@@ -90,18 +90,6 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 	check(await rt.inserts(id));
 });
 
-test("an old thread's subject becomes its first insert", async () => {
-	const rt = new Runtime(() => {});
-	await rt.open();
-	const live = await rt.create("default", undefined, "local", { subject: "tool:base64" });
-	const list = await rt.inserts(live.row.id);
-	assert.deepEqual(
-		list.map((i) => [i.key, i.state]),
-		[["tools", { tool: "base64" }]],
-	);
-	assert.equal(rt.store.get(live.row.id)!.subject, "");
-});
-
 test("an insert whose saved state went missing is healed, not refused", async () => {
 	const rt = new Runtime(() => {});
 	await rt.open();

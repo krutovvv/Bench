@@ -114,64 +114,33 @@ test("a thread's turn goes on with the fallback when the main endpoint is dead",
 	const fs = await import("node:fs");
 	const os = await import("node:os");
 	const path = await import("node:path");
-	const { spawn } = await import("node:child_process");
-	const { default: WebSocket } = await import("ws");
+	const { startServer, message } = await import("./server.ts");
 	const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-fallback-"));
 	const spare = await endpoint("answered by the fallback");
-	const child = spawn(process.execPath, ["--no-warnings", "src/server.ts"], {
-		env: { ...process.env, BENCH_HOME: home, BENCH_AGENT_NO_MCP: "1" },
-		cwd: path.join(import.meta.dirname, ".."),
-		stdio: ["ignore", "ignore", "pipe"],
-	});
-	let err = "";
-	child.stderr.on("data", (d) => (err += d));
+	const s = await startServer(home);
 	try {
-		const file = path.join(home, "server.json");
-		for (let i = 0; i < 100 && !fs.existsSync(file); i++) await new Promise((r) => setTimeout(r, 200));
-		assert.ok(fs.existsSync(file), `the server did not start:\n${err}`);
-		const { port, token } = JSON.parse(fs.readFileSync(file, "utf8"));
-		const rest = (method: string, p: string, body?: unknown) =>
-			fetch(`http://127.0.0.1:${port}${p}`, { method, headers: { "X-Hermes-Session-Token": token, "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined }).then((r) => r.json());
 		// Two providers, as the gear adds them; the main one points at a port nobody listens on.
-		await rest("POST", "/api/providers/custom-endpoints", { name: "dead", base_url: "http://127.0.0.1:9/v1", api_key: "k", model: "m" });
-		await rest("POST", "/api/providers/custom-endpoints", { name: "spare", base_url: spare.base, api_key: "k", model: "m" });
-		const listed = (await rest("GET", "/api/providers/custom-endpoints")).endpoints;
+		await s.rest("POST", "/api/providers/custom-endpoints", { name: "dead", base_url: "http://127.0.0.1:9/v1", api_key: "k", model: "m" });
+		await s.rest("POST", "/api/providers/custom-endpoints", { name: "spare", base_url: spare.base, api_key: "k", model: "m" });
+		const listed = (await s.rest("GET", "/api/providers/custom-endpoints")).endpoints;
 		const id = (name: string) => listed.find((e: any) => e.name === name).id;
 		// The gear writes both: the main model, and the fallback as `fallback_providers`.
-		await rest("PUT", "/api/config", { config: { model: { provider: id("dead"), default: "m" }, fallback_providers: [{ provider: id("spare"), model: "m" }] } });
+		await s.rest("PUT", "/api/config", { config: { model: { provider: id("dead"), default: "m" }, fallback_providers: [{ provider: id("spare"), model: "m" }] } });
 
-		const ws = new WebSocket(`ws://127.0.0.1:${port}/api/ws?token=${token}`);
-		await new Promise((res, rej) => (ws.on("open", res), ws.on("error", rej)));
-		let n = 0;
-		const wait = new Map<number, (v: any) => void>();
-		const notes: any[] = [];
-		let finish: (v: any) => void = () => {};
-		const done = new Promise<any>((res) => (finish = res));
-		ws.on("message", (d) => {
-			const m = JSON.parse(String(d));
-			if (m.id && wait.has(m.id)) (wait.get(m.id) as any)(m);
-			if (m.method === "event" && m.params.type === "session.info" && "fallback" in m.params.payload) notes.push(m.params.payload.fallback);
-			if (m.method === "event" && m.params.type === "message.complete") finish(m.params.payload);
-		});
-		const call = (method: string, params: any = {}) =>
-			new Promise<any>((res, rej) => {
-				const i = ++n;
-				wait.set(i, (m) => (m.error ? rej(new Error(m.error.message)) : res(m.result)));
-				ws.send(JSON.stringify({ jsonrpc: "2.0", id: i, method, params }));
-			});
 		// A project's thread: the model is the general one for it too.
-		const project = (await rest("POST", "/api/projects", { name: "Site" })).project;
-		const sid = (await call("session.create", { profile: `project:${project.id}` })).session_id;
-		await call("prompt.submit", { session_id: sid, text: "say hello" });
-		const finished = await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error(`no turn ended:\n${err}`)), 60000))]);
-		assert.match(String(finished.text), /answered by the fallback/);
-		assert.match(err, /answering with/);
+		const project = (await s.rest("POST", "/api/projects", { name: "Site" })).project;
+		const { thread } = await s.call("thread.create", { project: project.id, cwd: null });
+		await s.call("thread.send", message(thread, "say hello"));
+		await s.until(() => s.of(thread).some((e) => e.kind === "run" && !e.value));
+		const answer = (await s.call("thread.open", { thread, since: 0 })).items.filter((i) => i.kind === "text").at(-1);
+		assert.match(answer?.kind === "text" ? answer.text : "", /answered by the fallback/);
+		assert.match(s.log(), /answering with/);
 		// The bar is told: the fallback answered, and why.
-		assert.equal(notes.at(-1)?.model, "m");
-		assert.match(String(notes.at(-1)?.reason), /Connection error|ECONNREFUSED|fetch failed/i);
-		ws.close();
+		const note = s.of(thread).flatMap((e) => (e.kind === "info" && e.value.fallback ? [e.value.fallback] : [])).at(-1);
+		assert.equal(note?.model, "m");
+		assert.match(String(note?.reason), /Connection error|ECONNREFUSED|fetch failed/i);
 	} finally {
-		child.kill();
+		s.close();
 		spare.close();
 		fs.rmSync(home, { recursive: true, force: true });
 	}

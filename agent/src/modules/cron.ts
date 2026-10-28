@@ -1,7 +1,7 @@
 // Scheduled jobs: change, pause, run now, delete. A project's new job is made in projects.ts.
 
 import { arm, describe, jobs, nextRun, runJob, type Job } from "../builtin/cron.ts";
-import { HttpError, profileOf, type Module } from "../http.ts";
+import { HttpError, agentOf, type Module } from "../http.ts";
 
 /** A job as Bench's schedule reads it. */
 export function cronView(j: Job) {
@@ -24,7 +24,7 @@ export function cronView(j: Job) {
 
 export default (): Module => ({
 	routes: {
-		"GET /api/cron/jobs": (req) => jobs.list(profileOf(req)).map(cronView),
+		"GET /api/cron/jobs": (req) => jobs.list(agentOf(req)).map(cronView),
 	},
 	dynamic: [
 		[

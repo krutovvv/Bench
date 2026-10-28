@@ -5,7 +5,6 @@
 use gpui_kit::*;
 
 use super::ThreadView;
-use crate::client::rpc::Cmd;
 use crate::media::text::plain_text;
 use ::thread::{Process, ProcessState};
 use bench_ui::clock;
@@ -16,15 +15,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 
 impl ThreadView {
     pub(crate) fn kill_process(&mut self, id: String, cx: &mut Context<Self>) {
-        if let (Some(profile), Some(session)) = (self.profile(cx), self.thread.runtime.clone()) {
-            self.cmd(
-                Cmd::KillProcess {
-                    profile: profile.clone(),
-                    session: session.clone(),
-                    id,
-                },
-                cx,
-            );
+        if let Some(thread) = self.thread.id.clone() {
+            self.tell(protocol::StopProcess { thread, process: id }, cx);
         }
         cx.notify();
     }

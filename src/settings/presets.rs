@@ -131,7 +131,7 @@ impl BenchApp {
         };
         let kind = ed.kind;
         let text = ed.text.read(cx).value().to_string();
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,

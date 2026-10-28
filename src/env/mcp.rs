@@ -412,7 +412,7 @@ impl BenchApp {
         }
         cx.notify();
         let path = format!("/api/projects/{eid}/mcp/check");
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
@@ -459,7 +459,7 @@ impl BenchApp {
             return;
         };
         let path = format!("/api/projects/{eid}/mcp/{}/authorize", enc(&name));
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,

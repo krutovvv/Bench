@@ -117,24 +117,6 @@ export function notes(s: SessionInfo): string | undefined {
 	return ["# Notes kept across sessions (change them with the memory tool, only when asked)", block("About the person", user, ul), block("Your notes", memory, ml)].filter(Boolean).join("\n\n");
 }
 
-/** The thread's subject: what its live block shows and what "this", "here" refer to. */
-export function subject(s: SessionInfo): string | undefined {
-	const [kind, ...rest] = (s.subject ?? "").split(":");
-	const value = rest.join(":");
-	if (kind === "tasks")
-		return `# This thread\nIt is about the person's tasks, the "${value}" view (Today, Upcoming, Anytime, Logbook), shown live above the conversation. "These", "this one", "here" mean those tasks. Read and change them with the tasks tool — the only place they live, never look for them in files; the view updates by itself, so don't repeat the list back unless asked. Time spent on something: list with status "completed", done_since / done_until and its tag; the result sums it (spent_minutes_total).`;
-	const block = "\nEach message of the person may end with <block-state>: what the block shows at that moment. Use it; never quote it back.";
-	if (kind === "browser")
-		return `# This thread\nIt works in the server's browser (the mcp__browser__* tools: Playwright on a shared Chrome, signed in to the person's sites). Use only those, even when other browsers are at hand (camoufox, a local Playwright…): Bench shows the person only this browser's pages. If they are not loaded yet, find them with tool_search ("browser") first. Each of your turns is one step, and the person sees each step's page live in your answer, where they can click and type too. Start every turn with mcp__browser__browser_tabs {action: "new"} and do the turn's work in that new tab (open the page there — the browser keeps the sign-ins); never close tabs, Bench closes old ones. The person already sees the page itself: don't take screenshots to show it to them (they can't see a tool's picture), read the page with snapshots. End the turn saying what is on the page now and what the next step would be.${block}`;
-	if (kind === "tool")
-		return `# This thread\nIt is about the ${value} tool, shown live above the conversation (its input and output come with each message). Do what is asked with the tool's content yourself (read, bash), and give the result in your answer.${block}`;
-	if (kind === "ssh")
-		return `# This thread\n${value === "local" || value === "" ? "It is about this machine's terminal, shown live above the conversation." : `It is about the server "${value}" (a ~/.ssh/config host), whose terminal is shown live above the conversation.`} Run commands there with ssh_run. Say what you will run before anything that changes it.${block}`;
-	if (kind === "folder")
-		return `# This thread\nIt is about the folder ${value}, shown above the conversation. Work in it with read, write, edit and bash.`;
-	return undefined;
-}
-
 /**
  * What the person inserted into the thread with "/" (src/inserts.ts), each as live as a window
  * next to the conversation. Built from the thread's `bench.inserts` document, so it changes only

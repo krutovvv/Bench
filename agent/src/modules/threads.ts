@@ -1,143 +1,120 @@
-// Threads: create, open, send, the queue, stop, the answers to the agent's questions, delete.
+// Threads: list, create, open, send, the queue, stop, pause, fork, the answers to what a run
+// asks, inserts, delete — the `thread.*` methods of crates/protocol.
 
-import { resolveModel } from "../config.ts";
 import { gitRoot, type Ctx, type Module } from "../http.ts";
 import { projects } from "../builtin/projects.ts";
-import { speedOf, usagePayload } from "../usage.ts";
+import { speedOf } from "../usage.ts";
 
-export default ({ rt, broadcast }: Ctx): Module => ({
+export default ({ rt }: Ctx): Module => ({
 	rpc: {
-		"session.list": ({ limit }) => ({
-			sessions: rt.store
-				// Every thread, whatever agent or project it runs with: the sidebar groups them by project.
-				.list({ limit: limit ?? 200 })
+		// Every thread, whatever project it belongs to: the sidebar groups them by project.
+		"threads.list": () =>
+			rt.store
+				.list({ limit: 1000 })
 				.filter((s) => s.source !== "subagent")
-				.map((s) => ({ id: s.id, title: s.title, message_count: s.message_count, model: s.model, running: rt.isBusy(s.id), paused: rt.isPaused(s.id), source: s.source, cwd: s.cwd, subject: s.subject ?? "", project: s.project ?? "", started_at: s.created, last_active: s.updated })),
-		}),
-		"session.create": async ({ profile, cwd, subject, project }) => {
-			// A thread in a project works in the project's folder unless it asked for another.
-			const dir = cwd || (project ? projects.dir(String(project)) : undefined);
-			// A project's thread runs with the project's environment (general + its own).
-			const agent = project ? `project:${project}` : profile || "default";
-			const live = await rt.create(agent, dir, "local", { ...(subject ? { subject: String(subject) } : {}), ...(project ? { project: String(project) } : {}) });
-			broadcast(live.row.id, "sessions.changed", {});
-			return { session_id: live.row.id, stored_session_id: live.row.id, revision: 0, execution_generation: 0 };
+				.map((s) => {
+					const repo = gitRoot(s.cwd);
+					return {
+						id: s.id,
+						title: s.title || "Untitled",
+						messages: s.message_count,
+						running: rt.isBusy(s.id),
+						paused: rt.isPaused(s.id),
+						source: s.source,
+						updated: s.updated,
+						cwd: s.cwd,
+						...(s.project ? { project: s.project } : {}),
+						...(repo ? { repo } : {}),
+						...(s.display_name ? { with: s.display_name } : {}),
+					};
+				}),
+		"thread.create": async ({ project, cwd }) => {
+			// A project's thread works in the project's folder unless it asked for another, with the
+			// project's environment (general + its own).
+			const dir = cwd || (project ? projects.dir(project) : undefined);
+			const live = await rt.create(project ? `project:${project}` : "default", dir, "local", project ? { project } : {});
+			rt.listChanged();
+			return { thread: live.row.id };
 		},
-		// The person renames a thread (its "⋯" → Rename).
-		"session.title": ({ session_id, title }) => {
-			rt.rename(String(session_id), String(title ?? ""));
-			broadcast(session_id, "sessions.changed", {});
-			return { ok: true };
+		// The thread as a journal (src/thread.ts) and its live run: items after `since`, the queue,
+		// the inserts, what it waits for, its numbers. Changes follow as `thread` events.
+		"thread.open": ({ thread, since }) => rt.thread(thread, since),
+		"thread.rename": ({ thread, title }) => {
+			rt.rename(thread, title);
+			rt.listChanged();
+			return {};
 		},
-		// The person's inserts (src/inserts.ts): put one where the thread is now, or change one.
-		"session.insert": async ({ session_id, id, key, state }) => {
-			const inserts = await rt.insert(String(session_id), String(id ?? ""), String(key ?? ""), state && typeof state === "object" ? state : {});
-			broadcast(session_id, "session.inserts", { inserts });
-			return { inserts };
-		},
-		"session.insert.patch": async ({ session_id, id, patch }) => {
-			const inserts = await rt.patchInsert(String(session_id), String(id ?? ""), patch && typeof patch === "object" ? patch : {});
-			broadcast(session_id, "session.inserts", { inserts });
-			return { inserts };
-		},
-		// How fast the model wrote in the answer that ended, as Bench measured it from the stream.
-		"session.speed": ({ session_id, speed }) => {
-			rt.store.update(String(session_id), { speed: speedOf(speed) });
-			return { ok: true };
-		},
-		// What a thread has besides its journal: questions waiting, settings, numbers, inserts.
-		"session.resume": async ({ session_id }) => {
-			const live = await rt.session(session_id);
-			if (!live) throw new Error(`session not found: ${session_id}`);
-			const row = rt.store.get(session_id)!;
-			return {
-				session_id,
-				stored_session_id: session_id,
-				revision: 0,
-				execution_generation: live.generation,
-				running: live.busy,
-				inserts: await rt.inserts(session_id),
-				prompts: rt.pendingPrompts(session_id),
-				info: { reasoning_effort: row.effort, model: row.model, cwd: row.cwd, revision: 0, execution_generation: live.generation },
-				usage: usagePayload(row.model, live.usage, resolveModel().contextLength),
-				speed: row.speed ?? speedOf(null),
-			};
-		},
-		// The thread as a journal (src/thread.ts): items after `since`, the queue, the inserts' state.
-		// Live changes follow as thread.append / thread.stream / thread.queue / thread.inserts / thread.run.
-		"thread.open": async ({ session_id, since }) => rt.thread(String(session_id), Number(since) || 0),
-		"session.close": async ({ session_id }) => {
-			if (!rt.isBusy(session_id)) await rt.close(session_id);
-			return { ok: true };
-		},
-		"session.delete": async ({ session_id }) => {
-			await rt.delete(session_id);
-			broadcast(session_id, "sessions.changed", {});
-			return { ok: true };
-		},
-		// `request_id`: Bench's id for the message, the one its row on Enter is matched by.
-		"prompt.submit": async ({ session_id, text, attachments, context, mode, request_id }) => {
-			await rt.submit(session_id, String(text ?? ""), attachments ?? [], String(context ?? ""), mode === "queue" ? "queue" : "steer", request_id ? String(request_id) : undefined);
-			return { ok: true };
-		},
-		// The messages waiting while the agent works (Pi's inbox): take one back, send it now, fix its words.
-		"session.queue.withdraw": async ({ session_id, id }) => ({ result: await rt.withdraw(String(session_id), String(id)) }),
-		"session.queue.send": async ({ session_id, id }) => {
-			await rt.sendNow(String(session_id), String(id));
-			return { ok: true };
-		},
-		"session.queue.edit": async ({ session_id, id, text }) => ({ result: await rt.edit(String(session_id), String(id), String(text ?? "")) }),
-		"session.interrupt": async ({ session_id }) => {
-			await rt.interrupt(session_id);
-			return { ok: true };
-		},
-		// The person's hold: stand the run at its next step boundary, then let it go on.
-		"session.pause": async ({ session_id }) => {
-			await rt.pause(String(session_id));
-			return { ok: true };
-		},
-		"session.unpause": async ({ session_id }) => {
-			await rt.resume(String(session_id));
-			return { ok: true };
+		"thread.delete": async ({ thread }) => {
+			await rt.delete(thread);
+			rt.listChanged();
+			return {};
 		},
 		// A new thread from this one's entry `at` (an answer's), Pi's fork: Bench opens it.
-		"session.fork": async ({ session_id, at }) => {
-			const row = await rt.fork(String(session_id), Number(at));
-			broadcast(row.id, "sessions.changed", {});
-			return { session_id: row.id };
+		"thread.fork": async ({ thread, at }) => {
+			const row = await rt.fork(thread, at);
+			rt.listChanged();
+			return { thread: row.id };
 		},
-		"clarify.respond": ({ session_id, prompt_id, request_id, answer }) => {
-			rt.respond(session_id, prompt_id ?? request_id, String(answer ?? ""));
-			return { ok: true };
+		// `request`: Bench's id for the message, the one its row on Enter is matched by.
+		"thread.send": async ({ thread, text, context, request, queue, effort }) => {
+			if (effort !== null) rt.setEffort(thread, effort);
+			await rt.submit(thread, text, [], context, queue ? "queue" : "steer", request ?? undefined);
+			return {};
 		},
-		"approval.respond": ({ session_id, prompt_id, request_id, choice }) => {
-			rt.respond(session_id, prompt_id ?? request_id, String(choice ?? "deny"));
-			return { ok: true };
+		"thread.stop": async ({ thread }) => {
+			await rt.interrupt(thread);
+			return {};
 		},
-		// A background process ends by its own stop only (`builtin/process.ts`); Bench sees it
-		// end in the thread's `thread.process` events.
-		"process.kill": async ({ process_id }) => {
-			await rt.stopProcess(String(process_id));
-			return { ok: true };
+		// The person's hold: stand the run at its next step boundary, then let it go on.
+		"thread.pause": async ({ thread, paused }) => {
+			await (paused ? rt.pause(thread) : rt.resume(thread));
+			return {};
+		},
+		// The messages waiting while the agent works (Pi's inbox): take one back, send it now, fix its words.
+		"thread.queue.withdraw": async ({ thread, sub }) => {
+			await rt.withdraw(thread, sub);
+			return {};
+		},
+		"thread.queue.send": async ({ thread, sub }) => {
+			await rt.sendNow(thread, sub);
+			return {};
+		},
+		"thread.queue.edit": async ({ thread, sub, text }) => {
+			await rt.edit(thread, sub, text);
+			return {};
+		},
+		// The person's inserts (src/inserts.ts): put one where the thread is now, or change one.
+		// Bench sees the result in the thread's `inserts` event.
+		"thread.insert": async ({ thread, id, key, state }) => {
+			await rt.insert(thread, id, key, state as any);
+			return {};
+		},
+		"thread.insert.patch": async ({ thread, id, patch }) => {
+			await rt.patchInsert(thread, id, patch);
+			return {};
+		},
+		"thread.answer": ({ thread, ask, answer }) => {
+			rt.respond(thread, ask, answer);
+			return {};
+		},
+		"thread.effort": ({ thread, effort }) => {
+			rt.setEffort(thread, effort);
+			return {};
+		},
+		// How fast the model wrote in the answer that ended, as Bench measured it from the stream.
+		"thread.speed": ({ thread, speed }) => {
+			rt.store.update(thread, { speed: speedOf(speed) });
+			return {};
+		},
+		// A background process ends by its own stop only (`builtin/process.ts`); Bench sees it end
+		// in the thread's `process` event.
+		"process.stop": async ({ process }) => {
+			await rt.stopProcess(process);
+			return {};
 		},
 	},
 	routes: {
-		"GET /api/sessions": (req) => {
-			const source = req.query.get("source") ?? undefined;
-			const rows = rt.store.list({ source, limit: Number(req.query.get("limit") ?? 100) }).filter((s) => s.source !== "subagent");
-			return { sessions: rows.map((s) => ({ id: s.id, title: s.title, cwd: s.cwd, source: s.source, git_repo_root: gitRoot(s.cwd), git_branch: null, chat_id: s.chat_id, user_id: s.chat_id, display_name: s.display_name })) };
-		},
-		"GET /api/sessions/search": (req) => ({ results: rt.store.search(req.query.get("q") ?? "", Number(req.query.get("limit") ?? 30)).map((r) => ({ session_id: r.session_id, snippet: r.snippet })) }),
+		// The threads whose titles or messages have the words: (thread, the snippet around them).
+		"GET /api/threads/search": (req) => ({ results: rt.store.search(req.query.get("q") ?? "", Number(req.query.get("limit") ?? 30)).map((r) => ({ thread: r.session_id, snippet: r.snippet })) }),
 	},
-	dynamic: [
-		[
-			"DELETE",
-			/^\/api\/sessions\/([^/]+)$/,
-			async (_req, m) => {
-				await rt.delete(decodeURIComponent(m[1]));
-				broadcast(m[1], "sessions.changed", {});
-				return { ok: true };
-			},
-		],
-	],
 });

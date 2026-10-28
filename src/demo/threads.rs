@@ -4,11 +4,11 @@
 use super::journal::*;
 use crate::app::BenchApp;
 use protocol::ThreadItem;
-use serde_json::json;
 
 /// A thread about something (`tasks:today`, `ssh:local`…): one turn, done.
 fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {
-    let row = session(id, title, 2, false, "desktop");
+    app.threads.push(row(id, title, 2, false, "desktop"));
+    let mut t = journal.thread();
     // A tool: an insert before the first message.
     if !subject.is_empty() {
         let spec = match subject.split_once(':') {
@@ -25,39 +25,26 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Jou
                 serde_json::json!("https://blog.example.com/admin/posts/new"),
             );
         }
-        app.inserts.insert(
-            id.into(),
-            vec![crate::app::model::Insert {
-                id: format!("i{id}"),
-                key,
-                state,
-                folded: false,
-                after: 0,
-            }],
-        );
-    }
-    app.sessions.push(row);
-    // The insert the thread is about stands first, before the first message.
-    let mut items = vec![];
-    if app.inserts.contains_key(id) {
-        items.push(ThreadItem::Insert {
+        // The insert the thread is about stands first, before the first message.
+        let insert = format!("i{id}");
+        t.apply(protocol::ThreadEvent::Append(vec![ThreadItem::Insert {
             key: "0".into(),
             seq: 0,
-            id: format!("i{id}"),
-            insert_key: String::new(),
-        });
-    }
-    let mut t = journal.thread();
-    let inserts = app.inserts.get(id).map(|list| {
-        list.iter()
-            .map(|i| (i.id.clone(), json!({ "key": i.key })))
-            .collect::<serde_json::Map<_, _>>()
-    });
-    if !items.is_empty() {
-        t.apply(protocol::ThreadEvent::Append(items));
-    }
-    if let Some(m) = inserts {
-        t.apply(protocol::ThreadEvent::Inserts(m));
+            id: insert.clone(),
+            insert_key: key.clone(),
+        }]));
+        let state = protocol::InsertState {
+            key,
+            state,
+            ..Default::default()
+        };
+        t.apply(protocol::ThreadEvent::Inserts([(insert, state)].into()));
+        let list = t
+            .insert_list()
+            .into_iter()
+            .map(|(id, s)| crate::app::model::Insert::new(id, s))
+            .collect();
+        app.inserts.insert(id.into(), list);
     }
     app.demo_threads.insert(id.into(), t);
 }

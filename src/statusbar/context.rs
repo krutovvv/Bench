@@ -46,8 +46,8 @@ impl BenchApp {
         // Which model this thread answers with; the project sets it in its environment.
         if let Some(m) = self
             .thread(cx)
-            .usage
-            .as_ref()
+            .journal
+            .usage()
             .map(|u| u.model.clone())
             .filter(|m| !m.is_empty())
         {
@@ -87,7 +87,7 @@ impl BenchApp {
         if !files.is_empty() {
             rows.push(("Files changed".into(), files.len().to_string()));
         }
-        if let Some(u) = self.thread(cx).usage.as_ref() {
+        if let Some(u) = self.thread(cx).journal.usage() {
             if u.calls > 0 {
                 rows.push(("Model calls".into(), u.calls.to_string()));
             }
@@ -102,10 +102,11 @@ impl BenchApp {
             }
             rows.push(("Compactions".into(), u.compressions.to_string()));
         }
-        if let Some(p) = self.speed.prefill {
+        let speed = &self.thread(cx).speed;
+        if let Some(p) = speed.prefill {
             rows.push(("Prefill".into(), format!("{p:.0} tok/s")));
         }
-        if let Some(g) = self.speed.generation {
+        if let Some(g) = speed.generation {
             rows.push(("Generation".into(), format!("{g:.0} tok/s")));
         }
         if estimated {

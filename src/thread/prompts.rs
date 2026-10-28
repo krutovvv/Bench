@@ -10,7 +10,7 @@ use crate::client::rest;
 impl BenchApp {
     /// The open thread's prompts (its project's and the general ones).
     pub(crate) fn load_prompts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let project = self.thread(cx).thread_project.clone();
+        let project = self.thread(cx).project.clone();
         let target = if project.is_empty() {
             self.local_conn()
                 .map(|c| (c, crate::app::model::ProjectKey::HOST.to_string()))
@@ -20,7 +20,7 @@ impl BenchApp {
         let Some((conn, eid)) = target else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!("/api/projects/{eid}/prompts");
         self.background(
             window,

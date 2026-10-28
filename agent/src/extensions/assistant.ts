@@ -19,7 +19,7 @@ import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { tasksTool } from "../builtin/tasks.ts";
 import { host } from "../host.ts";
-import { environment, inserted, notes, projectContext, skills, soul, subject } from "../prompt.ts";
+import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../inserts.ts";
 
 const of = (input: any) => host().session(input.conversationId);
@@ -74,7 +74,6 @@ export const assistant = defineExtension({
 	sections: [
 		section("soul", s(soul), { tag: false }),
 		section("environment", s(environment)),
-		section("subject", s(subject), { tag: false }),
 		// Read from the thread's own document: what the person inserted.
 		section(
 			"inserts",

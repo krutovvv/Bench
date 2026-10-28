@@ -1,7 +1,7 @@
 //! Where the agent lives and how to reach it: on this Mac `pi_agent::ensure()` starts it and
 //! names its port; over SSH `pi_agent::ensure_remote()` does the same on the host, reached
 //! through `ssh -L`. Either way it is a session token, sent as `?token=` on the WebSocket and as
-//! the `X-Hermes-Session-Token` header on REST. Port and token of a host are remembered so the
+//! the `X-Bench-Token` header on REST. Port and token of a host are remembered so the
 //! next launch reattaches.
 
 use std::io::Write;
@@ -69,17 +69,17 @@ impl Connection {
     /// The agent is running a turn now (or cannot say).
     fn busy(&self) -> bool {
         ureq::get(&format!("{}/api/status", self.base))
-            .set("X-Hermes-Session-Token", &self.token)
+            .set("X-Bench-Token", &self.token)
             .timeout(Duration::from_secs(5))
             .call()
             .ok()
             .and_then(|r| r.into_json::<Value>().ok())
-            .is_none_or(|st| st["active_agents"].as_u64().unwrap_or(0) > 0)
+            .is_none_or(|st| st["active"].as_u64().unwrap_or(0) > 0)
     }
 
-    /// Auth header for one REST call (the profile and purpose no longer matter).
-    pub fn rest_auth(&self, _profile: &str, _purpose: &str) -> Result<(&'static str, String)> {
-        Ok(("X-Hermes-Session-Token", self.token.clone()))
+    /// The header that lets a REST call in: the agent's session token.
+    pub fn auth(&self) -> (&'static str, String) {
+        ("X-Bench-Token", self.token.clone())
     }
 
     // ---- SSH -------------------------------------------------------------
@@ -146,7 +146,7 @@ impl Connection {
         loop {
             if TcpStream::connect(("127.0.0.1", local_port)).is_ok() {
                 let ok = ureq::get(&format!("{base}/api/status"))
-                    .set("X-Hermes-Session-Token", token)
+                    .set("X-Bench-Token", token)
                     .timeout(Duration::from_secs(5))
                     .call()
                     .is_ok();
@@ -235,7 +235,7 @@ pub enum Restart {
 }
 
 /// Restarts the agent (its unfinished runs continue after the start).
-pub fn restart_gateway(target: &Target, _interrupt: bool) -> Result<Restart> {
+pub fn restart_agent(target: &Target, _interrupt: bool) -> Result<Restart> {
     match target {
         Target::Local => crate::client::launch::restart()?,
         Target::Ssh(host) => {
@@ -289,7 +289,7 @@ fn tail_last(path: &std::path::Path, bytes: u64, lines: usize) -> String {
 
 /// The last lines of the agent's own log (`~/.bench/server.log` where it runs): what it says
 /// before the status has anything to say. Silent when there is no log yet or the host is away.
-pub fn gateway_log(target: &Target, lines: usize) -> Vec<String> {
+pub fn agent_log(target: &Target, lines: usize) -> Vec<String> {
     let raw = match target {
         Target::Local => tail_last(
             &crate::client::launch::agent_home().join("server.log"),
@@ -314,39 +314,6 @@ pub fn gateway_log(target: &Target, lines: usize) -> Vec<String> {
         .rev()
         .map(|s| s.to_string())
         .collect()
-}
-
-/// A group of chats with no project of its own ("Audit X", a few deep researches): a plain
-/// folder `~/Research/<name>` where the gateway lives, made if missing. The sidebar groups the
-/// chats by it, and what they write lands there. Returns the folder's absolute path.
-pub fn group_dir(target: &Target, name: &str) -> Result<String> {
-    let name = name.trim().replace('/', "-");
-    if name.is_empty() || name.starts_with('.') {
-        bail!("not a group name: {name:?}");
-    }
-    match target {
-        Target::Local => {
-            let dir = PathBuf::from(std::env::var("HOME").unwrap_or_default())
-                .join("Research")
-                .join(&name);
-            std::fs::create_dir_all(&dir)?;
-            Ok(dir.to_string_lossy().into_owned())
-        }
-        Target::Ssh(host) => {
-            let cmd = format!(
-                "d=\"$HOME\"/Research/{} && mkdir -p \"$d\" && cd \"$d\" && pwd",
-                shell_quote(&name)
-            );
-            let out = Command::new("ssh")
-                .args(["-o", "BatchMode=yes", host, &cmd])
-                .stdin(Stdio::null())
-                .output()?;
-            if !out.status.success() {
-                bail!("mkdir: {}", String::from_utf8_lossy(&out.stderr).trim());
-            }
-            Ok(String::from_utf8_lossy(&out.stdout).trim().to_string())
-        }
-    }
 }
 
 /// Run `git -C dir args…` where the gateway lives (this Mac, or the SSH host); stdout trimmed.
@@ -406,27 +373,6 @@ pub fn host_check(host: &str) -> HostCheck {
         let _ = writeln!(f, "{host}: {result:?}");
     }
     result
-}
-
-/// `Host` entries from ~/.ssh/config, without wildcards.
-pub fn ssh_hosts() -> Vec<String> {
-    let text = std::fs::read_to_string(home().join(".ssh/config")).unwrap_or_default();
-    let mut hosts = vec![];
-    for line in text.lines() {
-        let line = line.trim();
-        let Some(rest) = line
-            .strip_prefix("Host ")
-            .or_else(|| line.strip_prefix("Host\t"))
-        else {
-            continue;
-        };
-        for h in rest.split_whitespace() {
-            if !h.contains(['*', '?', '!']) && !hosts.contains(&h.to_string()) {
-                hosts.push(h.to_string());
-            }
-        }
-    }
-    hosts
 }
 
 #[cfg(test)]

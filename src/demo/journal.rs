@@ -1,7 +1,7 @@
 //! The made-up pieces of a thread: rows of the sidebar, steps of the agent's work, a journal as Pi
 //! gives it, the answer's media.
 
-use crate::app::model::SessionRow;
+use crate::app::model::ThreadRow;
 use ::thread::Thread;
 use protocol::{Process, ThreadItem, ThreadOpen};
 use serde_json::{Value, json};
@@ -10,23 +10,14 @@ pub(super) fn demo_file(name: &str) -> String {
     format!("{}/assets/demo/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
-pub(super) fn session(
-    id: &str,
-    title: &str,
-    messages: u64,
-    running: bool,
-    source: &str,
-) -> SessionRow {
-    SessionRow {
+pub(super) fn row(id: &str, title: &str, messages: u64, running: bool, source: &str) -> ThreadRow {
+    ThreadRow {
         id: id.into(),
         title: title.into(),
         messages,
         running,
-        paused: false,
         source: source.into(),
-        subject: String::new(),
-        project: String::new(),
-        host: String::new(),
+        ..Default::default()
     }
 }
 

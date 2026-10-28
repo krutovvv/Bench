@@ -3,6 +3,7 @@
 //! while it answers in that thread becomes the thread's, the insert streams it live, and a tab
 //! that went away is opened again at its address (or the agent opens a new one).
 
+use crate::inserts::state::new_state;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -163,7 +164,7 @@ impl BenchApp {
             }
             if let Some(new) = claim.filter(|t| *t != tab) {
                 self.sites.touched = Some(web_time::Instant::now());
-                self.patch_insert(&at, &id, json!({ "state": { "tab": new, "url": url } }), cx);
+                self.patch_insert(&at, &id, new_state(json!({ "tab": new, "url": url })), cx);
             }
             // The tab's address as it goes, for opening it again.
             if let Some(tab) = self.thread_tab(&at) {
@@ -177,7 +178,7 @@ impl BenchApp {
                     .map(|p| p.url.clone())
                     .unwrap_or_default();
                 if !now.is_empty() && now != url {
-                    self.patch_insert(&at, &id, json!({ "state": { "tab": tab, "url": now } }), cx);
+                    self.patch_insert(&at, &id, new_state(json!({ "tab": tab, "url": now })), cx);
                 }
             }
         }

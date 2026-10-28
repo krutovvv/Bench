@@ -7,7 +7,7 @@ import YAML from "yaml";
 import pkg from "../../package.json" with { type: "json" };
 import { agentDir, agents, deepMerge, deleteProvider, getSetting, providers, readAgent, readConfig, readEnv, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent } from "../config.ts";
 import { listSkills as skillsOf } from "../builtin/skills.ts";
-import { HttpError, profileOf, type Ctx, type Module } from "../http.ts";
+import { HttpError, agentOf, type Ctx, type Module } from "../http.ts";
 import { mcpStatus } from "../mcp.ts";
 
 /**
@@ -45,41 +45,23 @@ function setEnv(key: string, value: string | undefined): void {
 	storeEnv(key, value);
 }
 
-export default ({ rt, broadcast }: Ctx): Module => ({
-	rpc: {
-		"profiles.list": () => ({
-			profiles: agents().map((name) => ({ name, display_name: name, model: resolveModel(name).model })),
-		}),
-		"config.set": async ({ key, value, session_id, profile }) => {
-			if (key === "reasoning" && session_id) {
-				rt.store.update(session_id, { effort: String(value) });
-				broadcast(session_id, "session.info", { reasoning_effort: value });
-			} else if (key === "approvals.mode") {
-				writeAgent(profile || "default", { ...readAgent(profile || "default"), approvals: String(value) });
-			}
-			return { ok: true };
-		},
-	},
+export default ({ rt }: Ctx): Module => ({
 	routes: {
 		"GET /api/status": () => ({
 			version: `bench-agent ${pkg.version}`,
 			// The sources it runs (Bench installs its own on a server when they differ).
 			build: process.env.BENCH_AGENT_BUILD ?? null,
-			gateway_running: true,
-			gateway_state: "running",
-			overall: "ok",
-			active_agents: [...rt.live.values()].filter((l) => l.busy).length,
-			gateway_platforms: {},
-			backend: "pi",
+			// Threads with a run going: a restart waits for none of them, but Bench says so.
+			active: [...rt.live.values()].filter((l) => l.busy).length,
 			mcp: mcpStatus(),
 		}),
 		// The config Bench reads, built from Bench's own settings (read-only).
-		"GET /api/config/raw": (req) => ({ yaml: YAML.stringify(readConfig(profileOf(req))) }),
+		"GET /api/config/raw": (req) => ({ yaml: YAML.stringify(readConfig(agentOf(req))) }),
 		"PUT /api/config": (req) => {
-			patchConfig(profileOf(req), req.body?.config ?? {});
+			patchConfig(agentOf(req), req.body?.config ?? {});
 			return { ok: true };
 		},
-		"GET /api/skills": (req) => listSkills(profileOf(req)),
+		"GET /api/skills": (req) => listSkills(agentOf(req)),
 		"POST /api/providers/custom-endpoints": (req) => {
 			const b = req.body ?? {};
 			const id = String(b.id || b.name || "").trim();
@@ -133,7 +115,7 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			return { name };
 		},
 		"GET /api/env": (req) => {
-			const env = readEnv(profileOf(req));
+			const env = readEnv(agentOf(req));
 			return Object.fromEntries(Object.entries(env).map(([k, v]) => [k, { is_set: Boolean(v), redacted_value: v ?? "", description: "", category: "", channel_managed: false, custom: true }]));
 		},
 		"PUT /api/env": (req) => {

@@ -8,15 +8,10 @@ use crate::thread::{ThreadRef, ThreadView};
 use devtools::{GROUPS, Tool};
 
 impl BenchApp {
-    /// A thread with `key` in it, as the demo starts one: a new thread with that insert.
-    pub fn open_subject_key(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.new_thread_with(key, window, cx);
-    }
-
     /// A new thread with one insert in it (its session is made at once).
     pub fn new_thread_with(&mut self, key: String, window: &mut Window, cx: &mut Context<Self>) {
         self.center = crate::workspace::Center::Chat;
-        self.new_session(cx);
+        self.new_thread(cx);
         let view = self.active_thread.clone();
         self.put_insert(&view, key, window, cx);
     }
@@ -176,10 +171,7 @@ impl BenchApp {
 
     /// A thread's folder, when it works in one.
     fn folder_of_thread(&self, at: &ThreadRef) -> Option<String> {
-        at.session
-            .as_ref()
-            .and_then(|id| self.folder_of(id))
-            .or_else(|| self.new_project.clone())
+        self.folder_of(at).or_else(|| self.new_project.clone())
     }
 }
 

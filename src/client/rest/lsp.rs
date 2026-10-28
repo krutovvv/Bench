@@ -35,14 +35,14 @@ impl Asked<'_> {
 /// Its problems; None: no server of the project knows this kind of file (or none is up yet).
 pub fn diagnostics(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     a: &Asked,
 ) -> Result<Option<Vec<lsp_types::Diagnostic>>> {
     let v = send(
         conn,
         "POST",
         "/api/lsp/diagnostics",
-        profile,
+        agent,
         a.body(None),
         30,
     )?;
@@ -55,14 +55,14 @@ pub fn diagnostics(
 /// Every file's errors and warnings the project's servers know now: (path, its problems).
 pub fn problems(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     project: &str,
 ) -> Result<Vec<(String, Vec<lsp_types::Diagnostic>)>> {
     let v = send(
         conn,
         "POST",
         "/api/lsp/problems",
-        profile,
+        agent,
         json!({ "project": project }),
         30,
     )?;
@@ -80,7 +80,7 @@ pub fn problems(
 /// What a server says of the symbol at `at`, as Markdown; empty: nothing.
 pub fn hover(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     a: &Asked,
     at: lsp_types::Position,
 ) -> Result<String> {
@@ -88,7 +88,7 @@ pub fn hover(
         conn,
         "POST",
         "/api/lsp/hover",
-        profile,
+        agent,
         a.body(Some(at)),
         10,
     )?;
@@ -98,7 +98,7 @@ pub fn hover(
 /// Where the symbol at `at` is defined: a path on the file's machine and the range there.
 pub fn definition(
     conn: &Connection,
-    profile: &str,
+    agent: &str,
     a: &Asked,
     at: lsp_types::Position,
 ) -> Result<Vec<(String, lsp_types::Range)>> {
@@ -106,7 +106,7 @@ pub fn definition(
         conn,
         "POST",
         "/api/lsp/definition",
-        profile,
+        agent,
         a.body(Some(at)),
         10,
     )?;

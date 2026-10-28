@@ -17,34 +17,53 @@ impl Target {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct Profile {
-    pub name: String,
-    pub label: String,
-    pub model: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct SessionRow {
-    pub id: String,
+/// A thread as the sidebar lists it: what its agent says of it (`protocol::ThreadSummary`), and
+/// which agent that is.
+#[derive(Clone, Debug, Default)]
+pub struct ThreadRow {
+    pub id: protocol::ThreadId,
     pub title: String,
     pub messages: u64,
     pub running: bool,
     /// The person paused its run: it stands still until resumed.
     pub paused: bool,
-    /// Where the session lives: "local" (desktop/CLI), "telegram", "cron", …
+    /// Where it was started: "local" (Bench), "telegram", "cron", …
     pub source: String,
-    /// What the thread is about, its live block: "tasks:today", "ssh:local"; "" = a plain chat.
-    pub subject: String,
-    /// The project the thread belongs to (its id); "" = none.
+    /// The project it belongs to, as Bench keys projects (`ProjectKey`); its agent's Host when
+    /// it has none.
     pub project: String,
     /// The server whose agent keeps it (an ~/.ssh/config alias); "" = this Mac's.
     pub host: String,
+    /// The folder it works in, and the top of its git repo.
+    pub cwd: String,
+    pub repo: Option<String>,
+    /// Who it is with (a Telegram thread's person).
+    pub with: Option<String>,
+}
+
+impl ThreadRow {
+    /// The agent `host`'s summary of a thread, placed in the project `project`.
+    pub fn new(host: &str, project: String, t: protocol::ThreadSummary) -> Self {
+        Self {
+            id: t.id,
+            title: t.title,
+            messages: t.messages,
+            running: t.running,
+            paused: t.paused,
+            source: t.source,
+            project,
+            host: host.to_string(),
+            cwd: t.cwd,
+            repo: t.repo,
+            with: t.with,
+        }
+    }
 }
 
 /// A piece the person put into a thread with "/" (the terminal, the tasks, the utilities, the
-/// browser's tab): kept by the agent as a Pi entry where it was put and a
-/// document of its state (agent/src/inserts.ts). Its look and behaviour: `crate::inserts`.
+/// browser's tab): kept by the agent as a Pi entry where it was put and a document of its state
+/// (agent/src/inserts.ts), read from the thread's journal (`Thread::insert_list`). Its look and
+/// behaviour: `crate::inserts`.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Insert {
     pub id: String,
@@ -54,19 +73,16 @@ pub struct Insert {
     /// Its own state (the list, the tool, the browser's tab).
     pub state: serde_json::Map<String, Value>,
     pub folded: bool,
-    /// After how many of the person's messages it sits.
-    pub after: usize,
 }
 
 impl Insert {
-    pub fn from_json(v: &Value) -> Option<Self> {
-        Some(Self {
-            id: v["id"].as_str()?.to_string(),
-            key: v["key"].as_str()?.to_string(),
-            state: v["state"].as_object().cloned().unwrap_or_default(),
-            folded: v["folded"].as_bool().unwrap_or(false),
-            after: v["after"].as_u64().unwrap_or(0) as usize,
-        })
+    pub fn new(id: String, s: protocol::InsertState) -> Self {
+        Self {
+            id,
+            key: s.key,
+            state: s.state,
+            folded: s.folded,
+        }
     }
 
     /// A string field of its state.
@@ -78,6 +94,10 @@ impl Insert {
             .to_string()
     }
 }
+
+/// The agent settings that are no project's: the agent's general ones (`~/.bench/agents/default`).
+/// A REST call about them names no settings at all (`client::rest::url`).
+pub const GENERAL_AGENT: &str = "default";
 
 /// A project as Bench addresses it (`docs/remote-projects.md`): the agent that keeps it — "" for
 /// this Mac's, else a server's ~/.ssh/config alias — and its id there; `HOST` is an agent's own
@@ -234,88 +254,16 @@ pub struct CommitBrief {
     pub age: String,
 }
 
-/// The agent asks before running something (approval mode manual/smart): which pending
-/// prompt it is. The card — command and choices — is the journal's (`AskCard`).
-#[derive(Clone, Debug)]
-pub struct ApprovalReq {
-    pub session: String,
-    /// The id of the call that waits for the approval.
-    pub prompt_id: String,
-    /// What it wants to run, why it asks, and what the person may answer.
-    pub command: String,
-    pub description: String,
-    pub choices: Vec<String>,
-}
-
 pub const APPROVAL_MODES: &[&str] = &["off", "smart", "manual"];
 
-/// The agent asks the user a question (the `clarify` tool): the live prompt, so an answer
-/// reaches it. The question itself is the journal's (`AskCard`); these choices are what a
-/// multi-select answer picks from, by index.
-#[derive(Clone, Debug)]
-pub struct ClarifyReq {
-    pub session: String,
-    pub prompt_id: String,
-    pub generation: Option<i64>,
-    pub choices: Vec<String>,
-}
-
-/// Context/usage readout for the status bar.
-#[derive(Clone, Debug, Default)]
-pub struct Usage {
-    pub model: String,
-    pub context_used: u64,
-    pub context_max: u64,
-    pub compressions: u64,
-    pub cache_hit_pct: Option<u64>,
-    pub input: u64,
-    pub output: u64,
-    pub calls: u64,
-    /// The agent's own average: output tokens over whole-call time (prefill included).
-    pub avg_tps: Option<f64>,
-}
-
-impl Usage {
-    pub fn from_json(v: &Value) -> Self {
-        let n = |k: &str| {
-            v[k].as_u64()
-                .or_else(|| v[k].as_f64().map(|f| f as u64))
-                .unwrap_or(0)
-        };
-        Self {
-            model: v["model"].as_str().unwrap_or_default().to_string(),
-            context_used: n("context_used"),
-            context_max: n("context_max"),
-            compressions: n("compressions"),
-            cache_hit_pct: v["cache_hit_pct"].as_u64(),
-            input: n("input"),
-            output: n("output"),
-            calls: n("calls"),
-            avg_tps: v["avg_tps"].as_f64().filter(|t| *t > 0.),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct SkillRow {
-    pub name: String,
-    pub category: String,
-}
+/// A thread's numbers (the status bar's context and speed panels).
+pub use protocol::Usage;
 
 pub const EFFORTS: &[&str] = &["low", "medium", "xhigh"];
 
-/// Where a session works: its folder and, when that folder is in a git repo, the project.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct Place {
-    pub cwd: String,
-    /// The repo's top folder as the agent recorded it (for a branch folder, that folder itself).
-    pub repo: String,
-    pub branch: String,
-}
-
-/// A git project a session belongs to.
+/// The git repo a thread works in.
 #[derive(Clone, Debug, PartialEq)]
-pub struct Project {
+pub struct Repo {
     /// The main checkout: `~/code/app`, also for chats in `~/code/app/.worktrees/x`.
     pub root: String,
     /// Where this chat's files are: the main checkout or its branch folder.
@@ -323,7 +271,7 @@ pub struct Project {
     pub branch: String,
 }
 
-impl Project {
+impl Repo {
     /// From any folder inside a repo (`top` = `git rev-parse --show-toplevel` of it).
     pub fn from_top(top: &str, branch: &str) -> Self {
         let root = match top.find("/.worktrees/") {

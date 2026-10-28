@@ -55,7 +55,7 @@ impl ThreadView {
     fn sync_rows(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.thread.tv.reveal_after_send();
         let version = self.thread.journal.version();
-        let owner = self.thread.session.clone();
+        let owner = self.thread.id.as_ref().map(|i| i.to_string());
         if version != self.thread.tv.version || owner != self.thread.tv.owner {
             self.thread.tv.version = version;
             let rows = self.thread.journal.rows();
@@ -511,7 +511,7 @@ impl ThreadView {
             .map(|a| a.project_path.clone());
         if empty {
             if let (Some(_), Some(why)) = (
-                self.thread.session.clone(),
+                self.thread.id.clone(),
                 self.thread.history_error.clone(),
             ) {
                 rows.push(
@@ -536,7 +536,7 @@ impl ThreadView {
                         )
                         .into_any_element(),
                 );
-            } else if self.thread.session.is_some() && self.thread.runtime.is_none() {
+            } else if self.thread.id.is_some() && !self.thread.loaded {
                 rows.push(
                     h_flex()
                         .w_full()
@@ -570,13 +570,12 @@ impl ThreadView {
 
     /// The thread's history asked again (Retry): what it shows stays until it comes.
     fn reopen(&mut self, cx: &mut Context<Self>) {
-        let Some(session) = self.thread.session.clone() else {
+        if self.thread.id.is_none() {
             return;
-        };
-        self.thread.history_error = None;
-        if let Some(profile) = self.profile(cx) {
-            self.cmd(crate::client::rpc::Cmd::Open { profile, session }, cx);
         }
+        self.thread.history_error = None;
+        let at = self.thread_ref();
+        self.app.update(cx, |app, cx| app.fetch_thread(at, cx)).ok();
         cx.notify();
     }
 

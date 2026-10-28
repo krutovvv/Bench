@@ -11,7 +11,6 @@ export interface SessionInfo {
 	/** Telegram sessions: their chat. */
 	chat_id?: string;
 	/** What the thread is about ("tasks:today", "ssh:local", "folder:<path>"). */
-	subject?: string;
 	/** The project the thread belongs to; "" = none. */
 	project?: string;
 	/** What the person inserted into the thread, in order (src/inserts.ts). */
@@ -19,6 +18,7 @@ export interface SessionInfo {
 }
 
 import type { Process } from "./protocol.gen.ts";
+import type { RunEvent } from "./runtime.ts";
 
 export interface Host {
 	session(conversationId: string | number): SessionInfo | undefined;
@@ -34,7 +34,8 @@ export interface Host {
 	ask(sessionId: string, callId: string, question: string, choices: string[], multiSelect: boolean, signal?: AbortSignal): Promise<string>;
 	/** "once" | "session" | "always" | "deny". */
 	approve(sessionId: string, callId: string, command: string, description: string): Promise<string>;
-	emit(sessionId: string, type: string, payload: Record<string, unknown>): void;
+	/** What a run did, for the listeners in this process (`RunEvent`: a subagent started…). */
+	report(sessionId: string, e: RunEvent): void;
 	/** The background processes of a conversation, oldest first (`builtin/process.ts`). */
 	processes(conversationId: string | number): Promise<Process[]>;
 	/** Stop a background process by its task id. */

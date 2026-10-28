@@ -1,15 +1,13 @@
-//! Threads: open, new, delete, search, the profile, and where the app was left.
+//! Threads: open one, start a new one, delete one, search them, and where the app was left.
 
-use std::collections::HashMap;
 use std::time::Duration;
 
-use gpui_kit::component::IndexPath;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
+use protocol::ThreadId;
 
 use crate::client::connection;
 use crate::client::rest;
-use crate::client::rpc::Cmd;
 
 use crate::app::BenchApp;
 use crate::workspace::Center;
@@ -19,90 +17,51 @@ impl BenchApp {
     pub(crate) fn reset_chat(&mut self, cx: &mut Context<Self>) {
         self.inserts.remove("draft");
         self.creating = false;
-        // A new chat starts on the profile's level.
-        let effort = self.profile_effort;
+        // A new chat starts on the agent's default level.
+        let effort = self.default_effort;
         self.active_thread.update(cx, |v, cx| v.reset(effort, cx));
         self.playing = None;
         self.media_playing = None;
         self.stop_video(None, cx);
-        // Speeds describe the model and server, not the chat: keep them, restart the counters.
-        self.speed.restart();
         self.new_project = None;
         cx.notify();
     }
 
-    pub fn select_profile(&mut self, name: String, window: &mut Window, cx: &mut Context<Self>) {
-        let idx = self.profiles.iter().position(|p| p.name == name);
-        self.profile_choice.update(cx, |s, cx| {
-            s.set_selected_index(idx.map(IndexPath::new), window, cx)
-        });
-        self.profile = Some(name.clone());
-        self.load_profile_effort(window, cx);
-        if let Some(profile) = self.profile.clone() {
-            self.catalog.clear();
-            self.cmd(Cmd::Catalog { profile });
-        }
-        self.prompts.clear();
-        self.prompt_open = None;
-        self.load_prompts(window, cx);
-        self.sessions.clear();
-        self.tg_owner.clear();
-        self.tg_people.clear();
-        self.tg_visible = None;
-        self.skills.clear();
-        self.skill_open = None;
-        self.reset_chat(cx);
-        // Keep the session to resume across this reset (startup picks the profile first).
-        if self.resume_session.is_none() {
-            self.save_place(cx);
-        }
-        self.cmd(Cmd::Sessions(name));
-        if self.center != Center::Chat {
-            let panel = self.center;
-            self.open_center(panel, window, cx);
-        }
-        cx.notify();
-    }
-
-    pub fn open_session(&mut self, id: String, cx: &mut Context<Self>) {
-        let Some(profile) = self.profile.clone() else {
-            return;
-        };
+    /// Open the thread `id` of the agent `host` in the center.
+    pub fn open_thread(&mut self, host: String, id: ThreadId, cx: &mut Context<Self>) {
         self.center = Center::Chat;
-        // Asking again for the thread already on screen (its inserts fell out of step, a retry):
-        // keep what the person has — the turns they are reading, the draft, the messages waiting
-        // in the queue — and only fetch the history afresh. Resetting it first was felt as the
-        // thread changing under them: the queue and their own unwritten message vanished with it.
-        if self.thread(cx).session.as_deref() == Some(id.as_str()) {
-            self.cmd(Cmd::Open {
-                profile,
-                session: id,
-            });
+        // Asking again for the thread already on screen (a retry): keep what the person has —
+        // the turns they are reading, the draft, the messages waiting in the queue — and only
+        // fetch the history afresh.
+        let at = self.thread_ref(cx);
+        if at.host == host && at.id.as_ref() == Some(&id) {
+            self.fetch_thread(at, cx);
             cx.notify();
             return;
         }
         self.confirm_delete = None;
         self.project_form = None;
-        self.unbeside(&id, cx);
+        self.unbeside(&host, &id, cx);
         let prev = self.active_thread.update(cx, |v, _| {
             let journal = std::mem::take(&mut v.thread.journal);
-            v.thread.session.clone().map(|s| (s, journal))
+            v.thread.id.clone().map(|s| (s, journal))
         });
         if let Some((prev, journal)) = prev {
-            self.thread_cache.insert(prev, journal);
+            self.thread_cache.insert(prev.to_string(), journal);
         }
         self.reset_chat(cx);
         // A thread seen before shows its last state now, and catches up when its journal comes.
         let journal = if self.demo {
-            self.demo_threads.get(&id).cloned()
+            self.demo_threads.get(id.as_str()).cloned()
         } else {
-            self.thread_cache.remove(&id)
+            self.thread_cache.remove(id.as_str())
         };
-        let project = self.project_of_session(&id);
+        let project = self.project_of_thread(&host, &id);
         self.active_thread.update(cx, |v, cx| {
-            v.thread.session = Some(id.clone());
+            v.thread.host = host.clone();
+            v.thread.id = Some(id.clone());
             v.thread.journal = journal.unwrap_or_default();
-            v.thread.thread_project = project;
+            v.thread.project = project;
             cx.notify();
         });
         if self.demo {
@@ -110,14 +69,73 @@ impl BenchApp {
             return;
         }
         self.save_place(cx);
-        self.cmd(Cmd::Open {
-            profile,
-            session: id,
-        });
+        let at = self.thread_ref(cx);
+        self.fetch_thread(at, cx);
         cx.notify();
     }
 
-    pub fn new_session(&mut self, cx: &mut Context<Self>) {
+    /// A thread the sidebar lists, opened: its row says which agent keeps it.
+    pub fn open_listed(&mut self, id: ThreadId, cx: &mut Context<Self>) {
+        let host = self.host_of_thread(&id);
+        self.open_thread(host, id, cx);
+    }
+
+    /// A thread the sidebar lists, deleted by the agent its row names.
+    pub fn delete_listed(&mut self, id: ThreadId, cx: &mut Context<Self>) {
+        let host = self.host_of_thread(&id);
+        self.delete_thread(host, id, cx);
+    }
+
+    /// Read a thread from its agent (`thread.open`): every view showing it takes it; a view
+    /// that has it already only catches up from its head.
+    pub(crate) fn fetch_thread(&mut self, at: crate::thread::ThreadRef, cx: &mut Context<Self>) {
+        let Some(id) = at.id.clone() else {
+            return;
+        };
+        let since = self
+            .views_of(&at.host, &id, cx)
+            .first()
+            .map_or(0, |v| v.read(cx).thread.journal.head());
+        let host = at.host.clone();
+        self.request(
+            &host.clone(),
+            protocol::OpenThread {
+                thread: id.clone(),
+                since,
+            },
+            cx,
+            move |this, r, window, cx| {
+                let views = this.views_of(&host, &id, cx);
+                match r {
+                    Ok(open) => {
+                        for view in &views {
+                            view.update(cx, |v, cx| {
+                                v.thread.on_history(&id, open.clone());
+                                cx.notify();
+                            });
+                        }
+                        if let Some(view) = views.first() {
+                            this.inserts_from(view, cx);
+                        }
+                        if views.iter().any(|v| *v == this.active_thread) {
+                            this.resolve_repo(window, cx);
+                        }
+                    }
+                    // Its history could not be read: said where it would show.
+                    Err(e) => {
+                        for view in &views {
+                            view.update(cx, |v, cx| {
+                                v.thread.history_error = Some(format!("{e:#}"));
+                                cx.notify();
+                            });
+                        }
+                    }
+                }
+            },
+        );
+    }
+
+    pub fn new_thread(&mut self, cx: &mut Context<Self>) {
         self.center = Center::Chat;
         self.reset_chat(cx);
         self.save_place(cx);
@@ -126,7 +144,7 @@ impl BenchApp {
 
     /// A new thread where the open one is shown: a document in the middle, the thread in the
     /// right dock — the panel's "+" and ⌘N reset that thread to a new one and the document
-    /// stays. `new_session` is the same when no thread sits beside a document: the new one
+    /// stays. `new_thread` is the same when no thread sits beside a document: the new one
     /// becomes the center's.
     pub fn new_thread_in_panel(&mut self, cx: &mut Context<Self>) {
         self.reset_chat(cx);
@@ -143,15 +161,15 @@ impl BenchApp {
         {
             self.new_thread_in_panel(cx);
         } else {
-            self.new_session(cx);
+            self.new_thread(cx);
         }
     }
 
-    /// The project a session belongs to, as the sidebar lists it ("" = none).
-    pub(crate) fn project_of_session(&self, id: &str) -> String {
-        self.sessions
+    /// The project a thread belongs to, as the sidebar lists it ("" = its agent's Host).
+    pub(crate) fn project_of_thread(&self, host: &str, id: &ThreadId) -> String {
+        self.threads
             .iter()
-            .find(|s| s.id == id)
+            .find(|s| s.host == host && &s.id == id)
             .map(|s| s.project.clone())
             .unwrap_or_default()
     }
@@ -162,72 +180,28 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// The thread goes (after `arm_delete`, or ⌘⌫).
-    pub fn delete_session(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
+    /// The thread goes (after `arm_delete`, or ⌘⌫), by the agent that keeps it.
+    pub fn delete_thread(&mut self, host: String, id: ThreadId, cx: &mut Context<Self>) {
         self.confirm_delete = None;
-        let Some(profile) = self.profile.clone() else {
-            return;
-        };
-        // Whose thread it is, read before it leaves the list: a server's thread is its agent's to
-        // delete (asked after, it looked like this Mac's — this Mac's agent said done, and the
-        // server's list brought it back).
-        let host = self.host_of_session(&id);
-        if !host.is_empty() && self.conn_of(&host).is_none() {
-            self.toast(
-                NotificationType::Error,
-                format!("Could not delete: {host}'s agent is not connected"),
-                window,
-                cx,
-            );
-            return;
-        }
-        if self.thread(cx).session.as_deref() == Some(&id) {
+        let at = self.thread_ref(cx);
+        if at.host == host && at.id.as_ref() == Some(&id) {
             self.reset_chat(cx);
         }
-        self.sessions.retain(|s| s.id != id);
-        let runtime = self.opened.remove(&id);
-        let rid = id.clone();
-        let remote = (!host.is_empty()).then(|| self.conn_of(&host)).flatten();
-        if let Some(conn) = remote {
-            let p = profile.clone();
-            self.background(
-                window,
-                cx,
-                move || rest::delete_session(&conn, &p, &rid),
-                move |this, r, window, cx| match r {
-                    Ok(()) => this.refresh_sessions(),
-                    Err(e) => this.toast(
-                        NotificationType::Error,
-                        format!("Could not delete: {e:#}"),
-                        window,
-                        cx,
-                    ),
-                },
-            );
-            return;
-        }
-        self.rest(
-            window,
+        self.threads.retain(|s| !(s.host == host && s.id == id));
+        self.request(
+            &host.clone(),
+            protocol::DeleteThread { thread: id },
             cx,
-            move |c, p| rest::delete_session(c, p, &rid),
-            move |this, r, window, cx| match r {
-                Ok(()) => this.refresh_sessions(),
-                // Older gateways without the REST route: the JSON-RPC delete.
-                Err(e) if e.to_string().starts_with("404") || e.to_string().starts_with("405") => {
-                    this.cmd(Cmd::Delete {
-                        profile,
-                        session: id,
-                        runtime,
-                    })
-                }
-                Err(e) => {
+            move |this, r, window, cx| {
+                if let Err(e) = r {
                     this.toast(
                         NotificationType::Error,
                         format!("Could not delete: {e:#}"),
                         window,
                         cx,
                     );
-                    this.refresh_sessions();
+                    // The agent still has it: its list says so.
+                    this.list_threads(&host, cx);
                 }
             },
         );
@@ -240,7 +214,7 @@ impl BenchApp {
     }
 
     /// Debounced: only the last query typed within 300 ms goes to the gateway.
-    pub(crate) fn search_sessions(
+    pub(crate) fn search_threads(
         &mut self,
         q: String,
         window: &mut Window,
@@ -268,7 +242,7 @@ impl BenchApp {
                 this.rest(
                     window,
                     cx,
-                    move |conn, profile| rest::search_sessions(conn, profile, &q),
+                    move |conn, profile| rest::search_threads(conn, profile, &q),
                     move |this, r, _, cx| {
                         if this.search_seq == seq {
                             this.search_hits = Some(r.unwrap_or_default());
@@ -281,31 +255,24 @@ impl BenchApp {
         .detach();
     }
 
-    /// Where this target was last: (profile, open session).
-    pub(crate) fn last_place(&self) -> (Option<String>, Option<String>) {
-        let all: HashMap<String, (Option<String>, Option<String>)> =
-            std::fs::read(connection::state_dir().join("last-place.json"))
-                .ok()
-                .and_then(|b| serde_json::from_slice(&b).ok())
-                .unwrap_or_default();
-        all.get(&self.target.label()).cloned().unwrap_or_default()
+    /// The thread the app was last closed on: its agent and its id.
+    pub(crate) fn last_place() -> Option<(String, ThreadId)> {
+        std::fs::read(connection::state_dir().join("last-thread.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
     }
 
-    /// Remember the profile and session for this target (called whenever either changes).
+    /// Remember the open thread (called whenever it changes).
     pub(crate) fn save_place(&self, cx: &App) {
         if self.demo {
             return;
         }
-        let path = connection::state_dir().join("last-place.json");
-        let mut all: HashMap<String, (Option<String>, Option<String>)> = std::fs::read(&path)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-            .unwrap_or_default();
-        all.insert(
-            self.target.label(),
-            (self.profile.clone(), self.thread(cx).session.clone()),
-        );
+        let at = self.thread_ref(cx);
+        let place = at.id.map(|id| (at.host, id));
         let _ = std::fs::create_dir_all(connection::state_dir());
-        let _ = std::fs::write(path, serde_json::to_vec(&all).unwrap_or_default());
+        let _ = std::fs::write(
+            connection::state_dir().join("last-thread.json"),
+            serde_json::to_vec(&place).unwrap_or_default(),
+        );
     }
 }

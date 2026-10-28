@@ -219,7 +219,7 @@ impl BenchApp {
         let Some((conn, eid)) = self.env_target(id) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!("/api/projects/{eid}/env");
         let asked = id.to_string();
         // How it runs, read from the same agent its threads run with.
@@ -229,7 +229,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::profile_defaults(&conn2, &agent),
+            move || rest::agent_defaults(&conn2, &agent),
             move |this, r, _window, cx| {
                 let Ok((effort, _, _, approvals, _)) = r else {
                     return;
@@ -295,7 +295,7 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(id) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let id = id.to_string();
         self.background(
             window,
@@ -391,7 +391,7 @@ impl BenchApp {
         let Some(path) = p.remove_path(&eid, &name) else {
             return;
         };
-        let profile = self.current_profile();
+        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let id = id.to_string();
         self.background(
             window,

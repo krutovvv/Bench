@@ -176,13 +176,8 @@ impl ThreadView {
                             bench_ui::head_icon_button("work-stop", Ico::Square, "Stop", cx)
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     this.claim_click(cx);
-                                    if let (Some(profile), Some(session)) =
-                                        (this.profile(cx), stop_view.runtime.clone())
-                                    {
-                                        this.cmd(
-                                            crate::client::rpc::Cmd::Interrupt { profile, session },
-                                            cx,
-                                        );
+                                    if let Some(thread) = stop_view.id.clone() {
+                                        this.tell(protocol::StopThread { thread }, cx);
                                     }
                                     cx.notify();
                                 })),
@@ -294,16 +289,17 @@ impl ThreadView {
         // its steps.
         // A call of this work waiting for the person's approval: its card joins the questions.
         // The request is live state (the call is the journal's): it is asked again after a restart.
-        let approval = self.thread.approval.as_ref().filter(|a| {
-            steps
-                .iter()
-                .any(|s| matches!(s, Step::Tool { call_id, .. } if *call_id == a.prompt_id))
+        let approval = self.thread.journal.asks().iter().find(|a| {
+            a.kind == protocol::AskKind::Approve
+                && steps
+                    .iter()
+                    .any(|s| matches!(s, Step::Tool { call_id, .. } if *call_id == a.id))
         });
         let asks: Vec<AskCard> = asks
             .iter()
             .cloned()
             .chain(approval.map(|a| AskCard {
-                id: a.prompt_id.clone(),
+                id: a.id.clone(),
                 ask_kind: "approve".into(),
                 question: if a.description.is_empty() {
                     "The agent asks to run this".into()

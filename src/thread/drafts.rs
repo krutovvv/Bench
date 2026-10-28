@@ -29,7 +29,7 @@ impl ThreadView {
 
     /// Another chat is open here (or the new one): the composer shows its draft.
     pub(crate) fn sync_draft(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let key = self.thread.session.clone().unwrap_or_default();
+        let key = self.thread.id.as_ref().map(|i| i.to_string()).unwrap_or_default();
         if self.draft_key.as_ref() == Some(&key) {
             return;
         }

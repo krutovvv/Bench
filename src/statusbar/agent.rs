@@ -1,5 +1,6 @@
-//! The agent's item in the status bar: its state, ready or not, and on a click its state in
-//! detail, its messaging platforms, the last lines of its log, Reconnect and Restart.
+//! The agent's item in the status bar: the open thread's agent — connected or not, how many
+//! threads it is working on — and on a click Reconnect and Restart, whether macOS lets Bench say
+//! it is done, and the last lines of its log (read as the panel opens).
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -10,45 +11,34 @@ use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
-    /// The gateway's state — always, ready or not — and, on click, its state in detail, its
-    /// messaging platforms, the last lines of its log, Reconnect and Restart.
+    /// The open thread's agent — always, ready or not — and, on click, what more there is to
+    /// say about it.
     pub(super) fn render_backend(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let status = match &self.gw_status {
-            Some(Ok(s)) if self.online() => Some(s.clone()),
-            _ => None,
-        };
+        let at = self.thread_ref(cx);
+        let host = self.thread_host(&at);
+        let link = self.agents.get(&host);
+        let connected = link.is_some_and(|a| a.conn.is_some()) || self.demo;
+        let error = link.and_then(|a| a.error.clone());
         // Always shown, healthy or not: the person decides whether to look, not a late error.
-        let working = status.as_ref().map(|s| s.active_agents).unwrap_or(0);
-        let (label, color): (String, Hsla) = if self.connecting {
-            ("Connecting…".into(), muted)
-        } else if !self.online() {
-            ("Gateway offline".into(), theme.danger)
+        let working = self
+            .threads
+            .iter()
+            .filter(|t| t.host == host && t.running)
+            .count();
+        let (label, color): (String, Hsla) = if connected && working > 0 {
+            (format!("Agent · {working} working"), theme.primary)
+        } else if connected {
+            ("Agent".into(), theme.primary)
+        } else if error.is_some() {
+            ("Agent offline".into(), theme.danger)
         } else {
-            match (&self.gw_status, &status) {
-                (Some(Err(_)), _) => ("Gateway unreachable".into(), theme.danger),
-                (_, Some(s)) if !s.running => ("Gateway stopped".into(), theme.danger),
-                (_, Some(s)) if s.state != "running" && !s.state.is_empty() => {
-                    (format!("Gateway {}", s.state), theme.warning)
-                }
-                (_, Some(s)) if s.overall != "ok" => ("Gateway degraded".into(), theme.warning),
-                _ if working > 0 => (format!("Gateway · {working} working"), theme.primary),
-                _ => ("Gateway".into(), theme.primary),
-            }
+            ("Connecting…".into(), muted)
         };
-        let log = self.gw_log.clone();
-        let connected = self.online();
-        let error = match &self.gw_status {
-            Some(Err(e)) => Some(e.clone()),
-            _ => None,
-        };
-        // The open thread's agent: this Mac's, or its project's server's.
-        let where_ = format!(
-            "{} · {}",
-            self.thread_target(&self.thread_ref(cx)).label(),
-            self.current_profile()
-        );
+        let log = self.agent_log.clone();
+        // Where it runs: this Mac, or its project's server.
+        let where_ = self.target_of(&host).label();
         let view = cx.entity();
         Some(
             h_flex()
@@ -70,7 +60,10 @@ impl BenchApp {
                                     .child(div().text_xs().child(label))
                                     .text_color(color)
                                     .on_click(move |_, _, cx| {
-                                        v.update(cx, |this, cx| this.notif(false, cx))
+                                        v.update(cx, |this, cx| {
+                                            this.notif(false, cx);
+                                            this.load_agent_log(cx);
+                                        })
                                     })
                             }
                         )
@@ -110,6 +103,7 @@ impl BenchApp {
                                     })
                             };
                             let (v1, v2) = (view.clone(), view.clone());
+                            let (host, restart_host) = (host.clone(), host.clone());
                             let mut lines = vec![line(
                                 connected,
                                 false,
@@ -119,77 +113,9 @@ impl BenchApp {
                                     "Not connected".into()
                                 },
                             )];
-                            if let Some(s) = &status {
-                                let ok = s.running && s.state == "running";
-                                let mut text = if s.running {
-                                    format!(
-                                        "Gateway {}",
-                                        if s.state.is_empty() {
-                                            "running"
-                                        } else {
-                                            &s.state
-                                        }
-                                    )
-                                } else {
-                                    "Gateway stopped".to_string()
-                                };
-                                if !s.version.is_empty() {
-                                    text.push_str(&format!(" · v{}", s.version));
-                                }
-                                if s.active_agents > 0 {
-                                    text.push_str(&format!(" · {} working", s.active_agents));
-                                }
-                                lines.push(line(ok, s.running, text));
-                                if let Some(r) = &s.exit_reason {
-                                    lines.push(line(false, false, r.clone()));
-                                }
-                            } else if let Some(e) = &error {
+                            if let Some(e) = &error {
                                 lines.push(line(false, false, e.clone()));
                             }
-                            let platforms: Vec<AnyElement> = status
-                                .iter()
-                                .flat_map(|s| s.platforms.iter())
-                                .map(|(name, state, err)| {
-                                    // "inbox:telegram" → "inbox · Telegram"
-                                    let name = match name.split_once(':') {
-                                        Some((who, kind)) => {
-                                            let mut k = kind.to_string();
-                                            if let Some(f) = k.get_mut(0..1) {
-                                                f.make_ascii_uppercase();
-                                            }
-                                            format!("{who} · {k}")
-                                        }
-                                        None => name.replace('_', " "),
-                                    };
-                                    let ok = state == "connected";
-                                    v_flex()
-                                        .py_0p5()
-                                        .child(
-                                            h_flex()
-                                                .gap_2()
-                                                .items_center()
-                                                .text_sm()
-                                                .child(
-                                                    div().flex_1().min_w_0().truncate().child(name),
-                                                )
-                                                .child(dot(
-                                                    ok,
-                                                    state == "connecting" || state == "retrying",
-                                                ))
-                                                .child(
-                                                    div().text_color(muted).child(state.clone()),
-                                                ),
-                                        )
-                                        .children(err.clone().map(|e| {
-                                            div()
-                                                .text_sm()
-                                                .text_color(theme.danger)
-                                                .whitespace_normal()
-                                                .child(e.clone())
-                                        }))
-                                        .into_any_element()
-                                })
-                                .collect();
                             v_flex()
                                 .w(px(380.))
                                 // Whatever a line holds, the panel keeps it in: nothing paints
@@ -207,9 +133,9 @@ impl BenchApp {
                                         .child(
                                             icon("backend-reconnect", Ico::RefreshCw, "Reconnect")
                                                 .on_click(move |_, window, cx| {
+                                                    let h = host.clone();
                                                     v1.update(cx, |this, cx| {
-                                                        let t = this.target.clone();
-                                                        this.connect(t, window, cx)
+                                                        this.reconnect_agent(h, window, cx)
                                                     })
                                                 }),
                                         )
@@ -218,37 +144,17 @@ impl BenchApp {
                                             icon(
                                                 "backend-restart",
                                                 Ico::Power,
-                                                "Restart the gateway",
+                                                "Restart the agent",
                                             )
                                             .on_click(
                                                 move |_, window, cx| {
+                                                    let h = restart_host.clone();
                                                     v2.update(cx, |this, cx| {
-                                                        this.restart_gateway(window, cx)
+                                                        this.update_agent(h, window, cx)
                                                     })
                                                 },
                                             ),
                                         ),
-                                )
-                                .child(
-                                    v_flex()
-                                        .px_3()
-                                        .py_2()
-                                        .gap_1()
-                                        .child(
-                                            div()
-                                                .text_sm()
-                                                .text_color(muted)
-                                                .child("MESSAGING PLATFORMS"),
-                                        )
-                                        .when(platforms.is_empty(), |d| {
-                                            d.child(
-                                                div()
-                                                    .text_sm()
-                                                    .text_color(muted)
-                                                    .child("None connected"),
-                                            )
-                                        })
-                                        .children(platforms),
                                 )
                                 // Whether macOS lets Bench speak at all: the one thing that
                                 // stands between "the agent finished" and silence.

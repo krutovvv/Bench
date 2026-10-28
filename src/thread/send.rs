@@ -1,6 +1,7 @@
-//! Sending: the composer's message, copy, an approval (the view's); the reasoning
-//! level and Stop (the app's: the status bar's controls act on the open thread). The queue is
-//! `queued.rs`, drafts `drafts.rs`.
+//! Sending: the composer's message, a new chat made into a thread, a slash command, copy, an
+//! answer to what the run asks (the view's and the app's); the reasoning level and Stop (the
+//! app's: the status bar's controls act on the open thread). The queue is `queued.rs`, drafts
+//! `drafts.rs`.
 
 use std::sync::Arc;
 
@@ -9,11 +10,12 @@ use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::ThreadView;
-use crate::app::model::Target;
+use protocol::ThreadId;
+
+use super::{ThreadRef, ThreadView};
+use crate::app::model::{ProjectKey, Target};
 use crate::app::{BenchApp, Live};
-use crate::client::connection::{self, Connection};
-use crate::client::rpc::Cmd;
+use crate::client::connection::Connection;
 use crate::media::attach;
 
 impl BenchApp {
@@ -26,12 +28,12 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) {
         let current = self.efforts.get(self.thread(cx).effort).cloned();
-        let profile = self.efforts.get(self.profile_effort).cloned();
+        let default = self.efforts.get(self.default_effort).cloned();
         self.efforts = levels;
         let last = self.efforts.len().saturating_sub(1);
         let at = |v: Option<String>| v.and_then(|v| self.efforts.iter().position(|e| *e == v));
         let selected = at(current).unwrap_or(last);
-        self.profile_effort = at(profile).unwrap_or(last);
+        self.default_effort = at(default).unwrap_or(last);
         self.active_thread
             .update(cx, |v, _| v.thread.effort = selected);
         let labels: Vec<SharedString> = self
@@ -45,24 +47,19 @@ impl BenchApp {
         });
     }
 
-    /// An open session takes the level at once (its next turn runs on it, the gateway confirms
-    /// with session.info); a chat not created yet takes it with its first message.
+    /// An open thread takes the level at once (its next turn runs on it; the agent confirms
+    /// with its `info`); a chat not made yet takes it with its first message.
     pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
-        let runtime = self.active_thread.update(cx, |v, _| {
+        let id = self.active_thread.update(cx, |v, _| {
             v.thread.effort = i;
             v.thread.effort_other = None;
-            v.thread.effort_pending = v.thread.runtime.is_none();
-            v.thread.runtime.clone()
+            v.thread.effort_pending = v.thread.id.is_none();
+            v.thread.id.clone()
         });
-        if let Some(session) = runtime {
+        if let Some(thread) = id {
             let at = self.thread_ref(cx);
-            self.cmd_at(
-                &at,
-                Cmd::SetEffort {
-                    session,
-                    effort: self.efforts[i].clone(),
-                },
-            );
+            let effort = self.efforts[i].clone();
+            self.send_at(&at, protocol::SetEffort { thread, effort }, cx);
         }
         cx.notify();
     }
@@ -70,60 +67,145 @@ impl BenchApp {
     /// The status bar's Stop, ⌘.: the open thread's run.
     pub fn stop(&mut self, cx: &mut Context<Self>) {
         let at = self.thread_ref(cx);
-        if let (Some(profile), Some(session)) = (self.profile.clone(), at.runtime.clone()) {
-            self.cmd_at(&at, Cmd::Interrupt { profile, session });
+        if let Some(thread) = at.id.clone() {
+            self.send_at(&at, protocol::StopThread { thread }, cx);
         }
         cx.notify();
     }
 
-    /// A new thread's session, on its first message: in a group's folder when one was named (made
-    /// where the gateway lives), else in the new chat's project folder.
-    pub(crate) fn create_session(
-        &mut self,
-        profile: String,
-        at: &crate::thread::ThreadRef,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let group = self.group_name.read(cx).value().trim().to_string();
-        if self.new_project.is_none() && !group.is_empty() {
-            self.group_name
-                .update(cx, |s, cx| s.set_value("", window, cx));
-            let target = self.target.clone();
-            let at = at.clone();
-            self.background(
-                window,
-                cx,
-                move || connection::group_dir(&target, &group),
-                move |this, r, window, cx| match r {
-                    Ok(dir) => this.cmd_at(&at, this.create_cmd(profile, Some(dir), &at.project)),
-                    Err(e) => {
-                        this.toast(
-                            NotificationType::Error,
-                            format!("Couldn't make the group's folder: {e}"),
-                            window,
-                            cx,
-                        );
-                        this.cmd_at(&at, this.create_cmd(profile, None, &at.project));
-                    }
-                },
-            );
-            cx.notify();
+    /// A new chat becomes a thread of its agent, in its project (in the folder chosen for it, or
+    /// the project's); what waited for it — its first message, its inserts — goes to it then.
+    pub(crate) fn create_thread(&mut self, at: &ThreadRef, cx: &mut Context<Self>) {
+        if self.creating {
             return;
         }
-        self.cmd_at(
-            at,
-            self.create_cmd(profile, self.new_project.clone(), &at.project),
-        );
-        cx.notify();
+        self.creating = true;
+        let host = self.thread_host(at);
+        let key = ProjectKey::parse(&at.project);
+        let project = (!key.is_host() && !key.id.is_empty()).then(|| key.id.clone());
+        let request = protocol::CreateThread {
+            project,
+            cwd: self.new_project.clone(),
+        };
+        let at = at.clone();
+        self.request(&host.clone(), request, cx, move |this, r, window, cx| {
+            this.creating = false;
+            match r {
+                Ok(made) => this.thread_created(host, made.thread, &at, cx),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("The thread wasn't created: {e:#}"),
+                    window,
+                    cx,
+                ),
+            }
+        });
+    }
+
+    /// The new chat is a thread now: it shows in the sidebar at once, and what waited for it goes.
+    fn thread_created(&mut self, host: String, id: ThreadId, at: &ThreadRef, cx: &mut Context<Self>) {
+        if !self.threads.iter().any(|s| s.host == host && s.id == id) {
+            let row = crate::app::model::ThreadRow {
+                id: id.clone(),
+                title: "Untitled".into(),
+                running: true,
+                source: "local".into(),
+                project: at.project.clone(),
+                host: host.clone(),
+                ..Default::default()
+            };
+            self.threads.insert(0, row);
+        }
+        let efforts = self.efforts.clone();
+        let (queued, effort, made) = self.active_thread.update(cx, |v, cx| {
+            v.thread.host = host.clone();
+            v.thread.id = Some(id.clone());
+            v.thread.loaded = true;
+            let effort = v.thread.take_effort(&efforts);
+            cx.notify();
+            (v.thread.queued.take(), effort, v.thread.thread_ref())
+        });
+        self.inserts_created(&made, cx);
+        self.save_place(cx);
+        if let Some((request, text)) = queued {
+            let context = self.inserts_context(&made, cx);
+            self.say(&made, text, Some(request), context, effort, cx);
+        }
+    }
+
+    /// The person's words to a thread that exists: a slash command runs (what it prints is a
+    /// toast; what it becomes is sent), anything else is a message.
+    pub(crate) fn say(
+        &mut self,
+        at: &ThreadRef,
+        text: String,
+        request: Option<String>,
+        context: String,
+        effort: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(thread) = at.id.clone() else {
+            return;
+        };
+        let host = self.thread_host(at);
+        if self.parse_command(&text).is_some() {
+            let run = protocol::RunCommand {
+                thread: thread.clone(),
+                command: text,
+            };
+            self.request(&host.clone(), run, cx, move |this, r, window, cx| match r {
+                Ok(protocol::CommandResult::Send(message)) => {
+                    let at = ThreadRef {
+                        host: host.clone(),
+                        id: Some(thread),
+                        ..Default::default()
+                    };
+                    this.say(&at, message, None, String::new(), None, cx);
+                }
+                Ok(protocol::CommandResult::Output(out)) => {
+                    // A command that printed something: the run it would have been is not.
+                    for view in this.views_of(&host, &thread, cx) {
+                        view.update(cx, |v, _| v.thread.live = None);
+                    }
+                    if !out.trim().is_empty() {
+                        this.toast(NotificationType::Info, bench_ui::clip(&out, 300), window, cx);
+                    }
+                }
+                Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
+            });
+            return;
+        }
+        let message = protocol::SendMessage {
+            thread,
+            text,
+            context,
+            request,
+            queue: false,
+            effort,
+        };
+        self.request(&host, message, cx, |this, r, window, cx| {
+            if let Err(e) = r {
+                // A send that failed: no run started, and the message never reached the journal.
+                for view in this.thread_views() {
+                    view.update(cx, |v, cx| {
+                        if v.thread.live.is_some() && !v.thread.journal.running() {
+                            v.thread.live = None;
+                            v.thread.journal.clear_sent();
+                            cx.notify();
+                        }
+                    });
+                }
+                this.toast(NotificationType::Error, format!("{e:#}"), window, cx);
+            }
+        });
     }
 }
 
 impl ThreadView {
     /// The work row's hold: stand the run at its next step boundary, or let it go on.
     pub fn set_paused(&mut self, paused: bool, cx: &mut Context<Self>) {
-        if let Some(session) = self.thread_ref().runtime {
-            self.cmd(Cmd::SetPaused { session, paused }, cx);
+        if let Some(thread) = self.thread.id.clone() {
+            self.tell(protocol::PauseThread { thread, paused }, cx);
         }
         cx.notify();
     }
@@ -148,9 +230,6 @@ impl ThreadView {
             return;
         }
         let typed = self.composer.read(cx).value().trim().to_string();
-        let Some(profile) = self.profile(cx) else {
-            return;
-        };
         // The code sent from the Explorer goes under the words.
         let typed = super::attachments::with_references(typed, &self.thread_references(cx));
         let files = self.attachments.clone();
@@ -174,7 +253,7 @@ impl ThreadView {
         // over SSH), then the same queue. The old refusal ("files go with the next message")
         // was ours, not Pi's: the inbox takes a follow-up with attachments like any other.
         if self.thread.live.is_some() {
-            let Some(session) = self.thread.runtime.clone() else {
+            let Some(thread) = self.thread.id.clone() else {
                 return;
             };
             let text = typed;
@@ -191,12 +270,14 @@ impl ThreadView {
                     .journal
                     .queued_now(request.clone(), text.clone());
                 self.follow = true;
-                self.cmd(
-                    Cmd::Queue {
-                        session,
+                self.tell(
+                    protocol::SendMessage {
+                        thread,
                         text,
                         context,
-                        request,
+                        request: Some(request),
+                        queue: true,
+                        effort: None,
                     },
                     cx,
                 );
@@ -207,24 +288,25 @@ impl ThreadView {
             let Some((conn, target, machine)) = self.files_where(cx) else {
                 return;
             };
-            let profile2 = profile.clone();
             let keep = files.clone();
             cx.spawn_in(window, async move |this, cx| {
                 let prepared = cx
                     .background_spawn(async move {
-                        attach::prepare(&conn, &target, machine.as_deref(), &profile2, &files)
+                        attach::prepare(&conn, &target, machine.as_deref(), &files)
                     })
                     .await;
                 let _ = this.update_in(cx, |this, window, cx| match prepared {
                     Ok(prep) => {
-                        // The thread he sent from, even if another is open by now.
-                        let same = this.thread.runtime.as_deref() == Some(session.as_str());
-                        this.cmd(
-                            Cmd::Queue {
-                                session,
+                        // The thread it was sent from, even if another is open by now.
+                        let same = this.thread.id.as_ref() == Some(&thread);
+                        this.tell(
+                            protocol::SendMessage {
+                                thread,
                                 text: with_attachments(&text, &prep.lines),
                                 context,
-                                request,
+                                request: Some(request),
+                                queue: true,
+                                effort: None,
                             },
                             cx,
                         );
@@ -263,13 +345,8 @@ impl ThreadView {
         let after = self.thread.journal.messages();
         self.anchor_draft_inserts(after, cx);
         self.follow = true;
-        // The status bar's speed is the open thread's.
-        if self.is_open_thread(cx) {
-            app.update(cx, |app, _| {
-                app.speed.begin_answer();
-                app.speed.request();
-            });
-        }
+        self.thread.speed.begin_answer();
+        self.thread.speed.request();
         self.thread.live = Some(Live {
             label: if files.is_empty() {
                 "Sending…"
@@ -279,7 +356,7 @@ impl ThreadView {
             .into(),
         });
         if files.is_empty() {
-            self.submit(profile, text, request, window, cx);
+            self.submit(text, request, cx);
             return;
         }
         let Some((conn, target, machine)) = self.files_where(cx) else {
@@ -287,10 +364,9 @@ impl ThreadView {
         };
         let keep = files.clone();
         cx.spawn_in(window, async move |this, cx| {
-            let p = profile.clone();
             let prepared = cx
                 .background_spawn(async move {
-                    attach::prepare(&conn, &target, machine.as_deref(), &p, &files)
+                    attach::prepare(&conn, &target, machine.as_deref(), &files)
                 })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| match prepared {
@@ -300,7 +376,7 @@ impl ThreadView {
                     }
                     // Shown with the files where they were; sent with where they are now.
                     let full = with_attachments(&text, &prep.lines);
-                    this.submit(profile, full, request, window, cx);
+                    this.submit(full, request, cx);
                 }
                 Err(e) => {
                     this.thread.live = None;
@@ -350,55 +426,24 @@ impl ThreadView {
             .unwrap_or_default()
     }
 
-    /// The message (with its files named in the text) to the session, or to a new one.
-    pub(crate) fn submit(
-        &mut self,
-        profile: String,
-        text: String,
-        request: String,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        match self.thread.runtime.clone() {
-            Some(session) => {
-                let command = self.app(cx).and_then(|a| a.parse_command(&text));
-                match command {
-                    Some((name, arg)) => self.cmd(
-                        Cmd::Dispatch {
-                            profile,
-                            session,
-                            name,
-                            arg,
-                        },
-                        cx,
-                    ),
-                    None => {
-                        let efforts = self.app(cx).map(|a| a.efforts.clone()).unwrap_or_default();
-                        let effort = self.thread.take_effort(&efforts);
-                        let context = self.block_context(cx);
-                        self.cmd(
-                            Cmd::Send {
-                                profile,
-                                session,
-                                text,
-                                effort,
-                                context,
-                                request: Some(request),
-                            },
-                            cx,
-                        );
-                    }
-                }
-            }
-            None => {
-                // A new session is created on the first message; the effort goes with it.
-                self.thread.effort_pending = true;
-                self.thread.queued = Some((request, text));
-                let at = self.thread_ref();
-                self.app
-                    .update(cx, |app, cx| app.create_session(profile, &at, window, cx))
-                    .ok();
-            }
+    /// The message (with its files named in the text) to the thread, or — a new chat — to the
+    /// thread made for it now.
+    pub(crate) fn submit(&mut self, text: String, request: String, cx: &mut Context<Self>) {
+        let at = self.thread_ref();
+        if at.id.is_some() {
+            let efforts = self.app(cx).map(|a| a.efforts.clone()).unwrap_or_default();
+            let effort = self.thread.take_effort(&efforts);
+            let context = self.block_context(cx);
+            self.app
+                .update(cx, |app, cx| app.say(&at, text, Some(request), context, effort, cx))
+                .ok();
+        } else {
+            // The thread is made on the first message; the effort goes with it.
+            self.thread.effort_pending = true;
+            self.thread.queued = Some((request, text));
+            self.app
+                .update(cx, |app, cx| app.create_thread(&at, cx))
+                .ok();
         }
         cx.notify();
     }
@@ -406,13 +451,26 @@ impl ThreadView {
     /// A new thread that goes on from the answer in the row `key`: Pi forks the conversation
     /// through that answer's entry (the key's first part is the entry id), and it opens.
     pub fn fork_at(&mut self, key: &str, cx: &mut Context<Self>) {
-        let (Some(session), Some(at)) = (
-            self.thread.runtime.clone(),
+        let (Some(thread), Some(entry)) = (
+            self.thread.id.clone(),
             key.split('.').next().and_then(|s| s.parse::<u64>().ok()),
         ) else {
             return;
         };
-        self.cmd(Cmd::Fork { session, at }, cx);
+        let host = self.thread.host.clone();
+        self.app
+            .update(cx, |app, cx| {
+                let fork = protocol::ForkThread { thread, at: entry };
+                app.request(&host.clone(), fork, cx, move |app, r, window, cx| match r {
+                    // The fork opens where the person is: it is the thread they go on in.
+                    Ok(made) => {
+                        app.list_threads(&host, cx);
+                        app.open_thread(host, made.thread, cx);
+                    }
+                    Err(e) => app.toast(NotificationType::Error, format!("Fork: {e:#}"), window, cx),
+                });
+            })
+            .ok();
     }
 
     /// Copy what the agent said in the row `key`.
@@ -433,21 +491,15 @@ impl ThreadView {
         })
     }
 
-    pub fn answer_approval(&mut self, choice: String, cx: &mut Context<Self>) {
-        let (Some(req), Some(profile)) = (self.thread.approval.take(), self.profile(cx)) else {
+    /// The person's answer to what the run asks (`ask`: its id, the waiting call's).
+    pub fn answer_ask(&mut self, ask: String, answer: String, cx: &mut Context<Self>) {
+        let Some(thread) = self.thread.id.clone() else {
             return;
         };
         if let Some(live) = self.thread.live.as_mut() {
             live.label = "Working…".into();
         }
-        self.cmd(
-            Cmd::Approve {
-                profile,
-                req,
-                choice,
-            },
-            cx,
-        );
+        self.tell(protocol::AnswerAsk { thread, ask, answer }, cx);
         cx.notify();
     }
 }

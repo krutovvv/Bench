@@ -24,7 +24,6 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
-use serde_json::Value;
 
 use crate::app::BenchApp;
 use crate::app::model::{Insert, SlashCommand};
@@ -37,7 +36,7 @@ pub struct Switch {
     pub label: String,
     pub detail: String,
     pub chosen: bool,
-    pub to: Value,
+    pub to: protocol::InsertPatch,
 }
 
 /// A kind of insert. Its app-wide state (the terminals' shells, the browser, the task list, the
@@ -343,19 +342,18 @@ impl ThreadView {
             )
             .on_click(self.app_listener(move |this, _, _, cx| {
                 this.click_claimed = true;
-                this.patch_insert(
-                    &fold_at,
-                    &fold_id,
-                    serde_json::json!({ "folded": !folded }),
-                    cx,
-                );
+                let patch = protocol::InsertPatch {
+                    folded: Some(!folded),
+                    ..Default::default()
+                };
+                this.patch_insert(&fold_at, &fold_id, patch, cx);
             }));
         let title_el: AnyElement = if switches.is_empty() {
             div().px_1().child(title).into_any_element()
         } else {
             let app = self.app.clone();
             let (ins_id, at) = (ins.id.clone(), at.clone());
-            let items: Vec<(String, String, bool, Value)> = switches
+            let items: Vec<(String, String, bool, protocol::InsertPatch)> = switches
                 .into_iter()
                 .map(|s| (s.label, s.detail, s.chosen, s.to))
                 .collect();
