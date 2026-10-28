@@ -59,6 +59,12 @@ pub fn validate_endpoint(conn: &Connection, body: Value) -> Result<Value> {
     )
 }
 
+/// Ask the evaluator (a System One server) one question with these settings: `{ok, message}`.
+/// Long: a local server may start and load its model first.
+pub fn check_judge(conn: &Connection, body: Value) -> Result<Value> {
+    send(conn, "POST", "/api/judge/check", body, 170)
+}
+
 /// The agent's `.env` keys the agent knows or holds: name → `{is_set, redacted_value,
 /// description, category, channel_managed, custom}`.
 pub fn env_vars(conn: &Connection) -> Result<Value> {

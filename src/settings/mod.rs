@@ -458,6 +458,9 @@ impl BenchApp {
         // ---- the evaluator ----
         if let Some(j) = &self.gear.providers.judge {
             let (on, url, model, key) = (j.enabled, j.url.clone(), j.model.clone(), j.key.clone());
+            let check = j.check.clone();
+            let muted = cx.theme().muted_foreground;
+            let danger = cx.theme().danger;
             page.push(
                 bench_ui::settings_heading("Evaluator · System One API", vec![], cx)
                     .into_any_element(),
@@ -511,7 +514,18 @@ impl BenchApp {
             page.push(
                 h_flex()
                     .py_2()
-                    .child(div().flex_1())
+                    .gap_2()
+                    .items_center()
+                    .child(div().flex_1().min_w_0().truncate().text_sm().map(|d| match check {
+                        Some((ok, msg)) => d.text_color(if ok { muted } else { danger }).child(msg),
+                        None => d,
+                    }))
+                    .child(
+                        bench_ui::secondary_button("judge-check", "Check")
+                            .small()
+                            .on_click(cx.listener(|this, _, w, cx| this.check_judge(w, cx)))
+                            .into_any_element(),
+                    )
                     .child(
                         bench_ui::primary_button("judge-save", "Save")
                             .small()

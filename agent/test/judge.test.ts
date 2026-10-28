@@ -18,7 +18,7 @@ const { setHost } = await import("../src/host.ts");
 const { setSetting, writeAgent, readAgent } = await import("../src/config.ts");
 const { seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
 const { stepGate, stepNote } = await import("../src/builtin/steps.ts");
-const { endpointOf } = await import("../src/judge/client.ts");
+const { endpointOf, checkJudge } = await import("../src/judge/client.ts");
 const { rankSearch } = await import("../src/judge/search.ts");
 const { checkCourse, DRIFT_EVERY } = await import("../src/judge/drift.ts");
 const { checkDone } = await import("../src/judge/done.ts");
@@ -175,4 +175,17 @@ test("an unfinished answer after work is sent back once; a question, a short tur
 	writeAgent("project:p", { ...readAgent("project:p"), stepLimit: undefined });
 	assert.ok(counted.includes("call") && counted.includes("nudge"), "the thread's meters count both");
 	assert.ok(fs.readFileSync(path.join(home, "judge.log"), "utf8").includes('"point":"done"'));
+});
+
+test("the gear's Check asks one question with the fields as typed, the saved key when none is typed", async () => {
+	setSetting("judge", { enabled: false, base_url: base, api_key: "sk-saved" });
+	reply = () => ({ model: "h2oai/h2o-lightning-4b", answers: { billing: { type: "noul", noul: 0.93 } } });
+	const ok = await checkJudge({ base_url: base, model: "" });
+	assert.equal(ok.ok, true);
+	assert.match(ok.message, /^Works · h2oai\/h2o-lightning-4b · \d+ ms$/);
+	assert.equal(seen.at(-1).auth, "Bearer sk-saved");
+	reply = () => ({ answers: {} });
+	assert.deepEqual(await checkJudge({ base_url: base }), { ok: false, message: "It answered, but not as a System One server" });
+	assert.equal((await checkJudge({ base_url: "http://127.0.0.1:9" })).ok, false);
+	assert.equal((await checkJudge({})).ok, false);
 });

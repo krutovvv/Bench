@@ -51,6 +51,8 @@ pub struct Judge {
     pub url: Entity<InputState>,
     pub model: Entity<InputState>,
     pub key: Entity<InputState>,
+    /// The last check: (ok, what it said).
+    pub check: Option<(bool, String)>,
 }
 
 #[derive(Default)]
@@ -281,6 +283,7 @@ impl BenchApp {
                 &y(&["judge", "api_key"]),
                 "If the server asks for one",
             ),
+            check: None,
         });
 
         self.gear.providers.loaded = true;
@@ -525,6 +528,39 @@ impl BenchApp {
             "api_key": text(&j.key, cx),
         }});
         self.save_judge_config(config, window, cx);
+    }
+
+    /// Ask the server one question with the fields as typed, before or after saving them.
+    pub fn check_judge(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(j) = &mut self.gear.providers.judge else {
+            return;
+        };
+        let body = json!({
+            "base_url": text(&j.url, cx),
+            "model": text(&j.model, cx),
+            "api_key": text(&j.key, cx),
+        });
+        j.check = Some((true, "Checking… a local server may load its model first".into()));
+        cx.notify();
+        self.rest_on(
+            self.gear.agent.clone(),
+            window,
+            cx,
+            move |conn| rest::check_judge(conn, body),
+            |this, r, _, cx| {
+                let Some(j) = &mut this.gear.providers.judge else {
+                    return;
+                };
+                j.check = Some(match r {
+                    Ok(v) => (
+                        v["ok"].as_bool() == Some(true),
+                        v["message"].as_str().unwrap_or("Doesn't answer").to_string(),
+                    ),
+                    Err(e) => (false, format!("{e:#}")),
+                });
+                cx.notify();
+            },
+        );
     }
 
     fn save_judge_config(&mut self, config: Value, window: &mut Window, cx: &mut Context<Self>) {

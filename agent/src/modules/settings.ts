@@ -7,6 +7,7 @@ import { deepMerge, deleteProvider, getSetting, providers, readAgent, readConfig
 import { listSkills as skillsOf } from "../builtin/skills.ts";
 import { HttpError, agentOf, type Ctx, type Module } from "../http.ts";
 import { mcpStatus } from "../mcp/mcp.ts";
+import { checkJudge } from "../judge/client.ts";
 
 /**
  * `PUT /api/config`: each top-level key merges into its setting. The reasoning level and the
@@ -87,6 +88,8 @@ export default ({ rt }: Ctx): Module => ({
 				return { ok: false, message: String((e as Error).message), models: [] };
 			}
 		},
+		// The evaluator's Check in the gear, with the settings as typed (`judge/client.ts`).
+		"POST /api/judge/check": (req) => checkJudge(req.body ?? {}),
 		"GET /api/providers/custom-endpoints": () => {
 			const current = readAgent("default").defaultProvider;
 			const endpoints = providers().map((p) => ({

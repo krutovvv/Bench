@@ -90,6 +90,38 @@ export async function ask(
 	}
 }
 
+/**
+ * The gear's Check: one yes/no question to a server with these settings (the saved key when none
+ * is given), what it answered and how fast. The first request may wait while the server loads.
+ */
+export async function checkJudge(s: JudgeSettings): Promise<{ ok: boolean; message: string }> {
+	if (!s.base_url?.trim()) return { ok: false, message: "Enter the server's address" };
+	const key = s.api_key || (getSetting("judge") as JudgeSettings | undefined)?.api_key;
+	const started = Date.now();
+	try {
+		const r = await fetch(endpointOf(s.base_url), {
+			method: "POST",
+			headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },
+			body: JSON.stringify({
+				model: s.model?.trim() || "jev-latest",
+				state: "I was charged twice for my subscription this month.",
+				questions: { billing: { type: "noul", instructions: "Is this message about billing?" } },
+			}),
+			signal: AbortSignal.timeout(TIMEOUT_MS),
+		});
+		const text = await r.text();
+		if (!r.ok) return { ok: false, message: `HTTP ${r.status}: ${text.slice(0, 200)}` };
+		const j: any = JSON.parse(text);
+		const yes = j?.answers?.billing?.noul;
+		if (typeof yes !== "number") return { ok: false, message: "It answered, but not as a System One server" };
+		const ms = Date.now() - started;
+		return { ok: true, message: `Works · ${j.model ?? s.model ?? "model"} · ${ms < 2000 ? `${ms} ms` : `${Math.round(ms / 1000)} s, loading first`}` };
+	} catch (e) {
+		const c: any = (e as any)?.cause;
+		return { ok: false, message: String(c?.code ?? c?.message ?? (e as Error).message) };
+	}
+}
+
 /** The options of an answer from the likeliest. */
 export function ranked(a: ChoiceAnswer | undefined): [string, number][] {
 	return Object.entries(a?.probabilities ?? {}).sort((x, y) => y[1] - x[1]);
