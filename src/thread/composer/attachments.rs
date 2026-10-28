@@ -279,7 +279,7 @@ impl ThreadView {
 
 #[cfg(test)]
 mod tests {
-    use crate::thread::{CodeRef, ProblemsRef, Reference, TerminalRef, lines_of, with_references};
+    use super::{CodeRef, ProblemsRef, Reference, TerminalRef, lines_of, with_references};
 
     #[test]
     fn a_selection_names_its_lines() {

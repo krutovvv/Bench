@@ -219,7 +219,7 @@ impl BenchApp {
 
 #[cfg(test)]
 mod tests {
-    use crate::explorer::{Hunk, hunks, unified};
+    use super::{Hunk, hunks, unified};
 
     #[test]
     fn lines_since_head_are_added_changed_or_removed() {

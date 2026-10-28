@@ -102,7 +102,7 @@ pub fn language_for_text(path: &str, text: &str) -> &'static str {
 
 #[cfg(test)]
 mod language_tests {
-    use crate::explorer::{language_for, language_for_text};
+    use super::{language_for, language_for_text};
 
     #[test]
     fn by_name_and_shebang() {

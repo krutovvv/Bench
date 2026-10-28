@@ -202,7 +202,7 @@ impl BenchApp {
 
 #[cfg(test)]
 mod tests {
-    use crate::explorer::{DocKey, FileRef, Tab};
+    use super::{DocKey, FileRef, Tab};
 
     #[test]
     fn a_tab_comes_back_as_it_was_kept() {
