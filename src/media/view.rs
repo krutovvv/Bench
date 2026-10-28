@@ -45,11 +45,24 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         // Blank lines around a segment (models often start with "\n\n") would show as empty
-        // paragraphs: an answer is as tall as its text.
-        answer_segments(text)
-            .into_iter()
-            .enumerate()
-            .map(|(k, s)| match s {
+        // paragraphs: an answer is as tall as its text. Files that only open in their app
+        // (models, archives) are chips as wide as their names, side by side, wrapping.
+        let mut out: Vec<AnyElement> = vec![];
+        let mut chips: Vec<AnyElement> = vec![];
+        let flush = |chips: &mut Vec<AnyElement>, out: &mut Vec<AnyElement>| {
+            if !chips.is_empty() {
+                out.push(h_flex().flex_wrap().gap_2().children(chips.drain(..)).into_any_element());
+            }
+        };
+        for (k, s) in answer_segments(text).into_iter().enumerate() {
+            if let Segment::Media(path) = &s
+                && media::kind(path) == Kind::File
+            {
+                chips.push(self.render_media(at, key, k, path.clone(), cx));
+                continue;
+            }
+            flush(&mut chips, &mut out);
+            out.push(match s {
                 Segment::Text(text) => texts
                     .markdown(&format!("answer-{key}-{k}"), &text, cx)
                     .into_any_element(),
@@ -99,8 +112,10 @@ impl BenchApp {
                     });
                     render_code(body, key, k, lang, code, long && !open, more, cx)
                 }
-            })
-            .collect()
+            });
+        }
+        flush(&mut chips, &mut out);
+        out
     }
 
     /// Bring a thread's file here. `force` downloads again even when a copy is cached: a
@@ -192,16 +207,12 @@ impl BenchApp {
                 .text_base()
                 .child(icon.icon().xsmall().text_color(theme.muted_foreground))
                 .child(div().flex_none().child(name.clone()))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .truncate()
-                        .text_base()
-                        .text_color(theme.muted_foreground)
-                        .when_some(note, |d, (text, color)| d.text_color(color).child(text)),
-                )
-                .children(extra)
+                // As wide as what it says: no room kept for an empty note.
+                .when_some(note.filter(|(t, _)| !t.is_empty()), |d, (text, color)| {
+                    d.child(div().min_w_0().truncate().text_base().text_color(color).child(text))
+                })
+                // At the far end when the line is stretched (under a picture).
+                .children(extra.map(|e| div().flex_none().ml_auto().child(e)))
         };
         let open_button = |local: PathBuf, tip: &'static str| {
             div()

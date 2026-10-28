@@ -405,17 +405,18 @@ impl BenchApp {
             .child(hint(environment_holds))
             .child(div().h_4())
             .child(
+                // A long folder wraps inside the note, the icon at its first line.
                 h_flex()
                     .gap_2()
-                    .items_center()
+                    .items_start()
                     .px_3()
                     .py_2p5()
                     .rounded_lg()
                     .bg(theme.secondary)
                     .text_sm()
                     .text_color(muted)
-                    .child(Ico::Info.icon().small().text_color(muted))
-                    .child(summary),
+                    .child(div().flex_none().pt_0p5().child(Ico::Info.icon().small().text_color(muted)))
+                    .child(div().flex_1().min_w_0().child(summary)),
             )
             .child(
                 h_flex()

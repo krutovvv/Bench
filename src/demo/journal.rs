@@ -154,7 +154,8 @@ impl Journal {
 }
 
 /// The answer's media. On the desktop: files the agent delivered (`MEDIA:` lines), a Mermaid
-/// diagram drawn here, a video and a voice note that play inline. In the browser there is no
+/// diagram drawn here, a video and a voice note that play inline, two model files that open in
+/// their app. In the browser there is no
 /// disk and no ffmpeg: the chart and the (pre-drawn) diagram come by URL next to the page, and
 /// the clips are named instead.
 #[cfg(not(target_family = "wasm"))]
@@ -165,8 +166,10 @@ pub(super) fn media() -> (String, String, String) {
         format!("MEDIA:{}", demo_file("chart.png")),
         "```mermaid\ngraph LR\n  A[Visit] --> B[Hero]\n  B --> C[Quotes]\n  C --> D[Pricing]\n  D --> E[Signup]\n```".into(),
         format!(
-            "A 4-second preview of the hero animation, and the summary as a voice note:\n\nMEDIA:{video}\n\nMEDIA:{}\n",
-            demo_file("summary.m4a")
+            "A 4-second preview of the hero animation, and the summary as a voice note:\n\nMEDIA:{video}\n\nMEDIA:{}\n\nThe hero's badge as a model, to print:\n\nMEDIA:{}\n\nMEDIA:{}\n",
+            demo_file("summary.m4a"),
+            demo_file("badge.stl"),
+            demo_file("badge.obj")
         ),
     )
 }

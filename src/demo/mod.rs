@@ -307,7 +307,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         .detach();
     }
     // `BENCH_DEMO_PROJECT=1`: the new project's page; `=env` with an exported environment
-    // chosen for it (`env/backup.rs`).
+    // chosen for it (`env/backup.rs`); `=long` a server's project with a long folder on it.
     if let Ok(how) = std::env::var("BENCH_DEMO_PROJECT") {
         cx.spawn(async move |this, cx| {
             cx.background_executor()
@@ -315,6 +315,21 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 .await;
             this.update_in(cx, |app, window, cx| {
                 app.new_project_form(window, cx);
+                if how == "long" {
+                    if let Some(f) = app.new_project.form.as_mut() {
+                        f.place = crate::settings::new_project::Place::OverSsh;
+                        f.machine = Some("web".into());
+                        f.name.update(cx, |s, cx| s.set_value("Northwind", window, cx));
+                        f.server_folder.update(cx, |s, cx| {
+                            s.set_value(
+                                "/home/web/northwind.example/www/wp-content/themes/northwind-2026/templates/landing",
+                                window,
+                                cx,
+                            )
+                        });
+                    }
+                    return;
+                }
                 if how != "env" {
                     return;
                 }

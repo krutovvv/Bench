@@ -282,8 +282,8 @@ impl ThreadView {
         };
         // The steps as a Mac's grouped list (Xcode's build log, System Settings' lists): a soft
         // rounded ground, no rule, rows that light up whole — not a rule down their left with
-        // lines hung on it.
-        let list = open.then(|| {
+        // lines hung on it. Open with no steps yet (a run that has only begun): nothing.
+        let list = (!items.is_empty()).then(|| {
             v_flex()
                 .p_1()
                 .rounded_lg()
