@@ -199,7 +199,7 @@ test("usage: a thread's counters are kept and come back on a fresh store", () =>
 });
 
 test("a waiting message keeps its attachments and block state when its words are fixed", async () => {
-	const { withText } = await import("../src/runtime.ts");
+	const { withText } = await import("../src/queue.ts");
 	// Plain words.
 	assert.equal(withText("old", "new"), "new");
 	// The block state Bench sent with it stays for the model.
@@ -214,7 +214,7 @@ test("a waiting message keeps its attachments and block state when its words are
 		{ type: "image", data: "AAA", mimeType: "image/png" },
 	]);
 	// Reading what we wrote gives the new words back, without the block state.
-	const { stripBlock } = await import("../src/runtime.ts");
+	const { stripBlock } = await import("../src/thread.ts");
 	assert.equal(stripBlock(withText("old\n\n<block-state>\nx\n</block-state>", "new")), "new");
 });
 

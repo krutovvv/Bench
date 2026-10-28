@@ -74,7 +74,7 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	await rt.submit(id, "third", [], "", "queue", "bench-3");
 	assert.equal(rt.isBusy(id), true, "the stalled run is live");
 	assert.deepEqual(runs, [true], "Bench is told the run is live as soon as the message starts it");
-	const queue = async () => (await rt.thread(id)).queue;
+	const queue = async () => (await rt.journal.open(id)).queue;
 	const before = await queue();
 	// Pi keeps Bench's id with each submission, and the queue's rows carry it.
 	assert.equal(requests["second"], "bench-2");
@@ -83,30 +83,30 @@ test("send now: the message goes to the head of the queue, not its end", async (
 
 	// The person presses "send now" on the LAST one: it must be the next thing answered.
 	const third = before.find((i) => i.text === "third")!.sub;
-	await rt.sendNow(id, third);
+	await rt.queue.sendNow(id, third);
 	const after = await queue();
 	assert.deepEqual(after.map((i) => i.text), ["third", "second"], "it rose to the head");
 	assert.equal(after[0].mode, "steer", "and it joins the work that runs");
 
 	// The other one waits behind it, and is sent as itself, not doubled.
 	const second = after.find((i) => i.text === "second")!.sub;
-	await rt.sendNow(id, second);
+	await rt.queue.sendNow(id, second);
 	assert.deepEqual((await queue()).map((i) => i.text), ["second", "third"]);
 	// Bench hears each order as thread.queue, straight from the inbox's commits.
 	assert.deepEqual(told.at(-1), ["second", "third"]);
 	assert.ok(told.some((q) => q.join() === "third,second"));
 
 	// The person's name for the thread holds; a made-up one never replaces it.
-	rt.rename(id, "  Spring   landing ");
+	rt.titles.rename(id, "  Spring   landing ");
 	assert.equal(rt.store.get(id)?.title, "Spring landing");
-	(rt as any).nameIfUnnamed(id, "Made up");
+	(rt.titles as any).nameIfUnnamed(id, "Made up");
 	assert.equal(rt.store.get(id)?.title, "Spring landing");
 
 	// Compaction: one share of the window per profile, as Pi's policy under its own provider.
 	const { compactionPolicy } = await import("../src/config.ts");
-	assert.deepEqual(rt.compactionOverrides(), {}, "nothing set: Pi's own policy");
+	assert.deepEqual(rt.models.compactionOverrides(), {}, "nothing set: Pi's own policy");
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m", compaction: 0.9 } as any);
-	const over = rt.compactionOverrides();
+	const over = rt.models.compactionOverrides();
 	const key = Object.keys(over)[0]!;
 	assert.match(key, /^default\.stub.*\/m$/);
 	assert.deepEqual(over[key], compactionPolicy(0.9, 131072));

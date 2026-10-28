@@ -13,9 +13,14 @@
 // inserted from the `inserts` prompt section, and what each one shows from the <block-state>
 // Bench sends with each message.
 
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineDoc, defineEntry } from "@earendil-works/pi-durable";
 import type { JsonValue } from "@earendil-works/chord";
 import type { JsonObject } from "@earendil-works/pi-durable";
+import { randomUUID } from "node:crypto";
+import type { Live, Runtime } from "./runtime.ts";
+
+const ctx = BACKGROUND_CONTEXT;
 
 export type InsertState = {
 	key: string;
@@ -88,3 +93,67 @@ export function patchInsert(doc: { items: Record<string, InsertState> }, id: str
 export const kindOf = (key: string) => key.split(":")[0];
 
 export type { JsonValue };
+
+/** The runtime's threads' inserts: read, put, changed. */
+export class ThreadInserts {
+	private rt: Runtime;
+
+	constructor(rt: Runtime) {
+		this.rt = rt;
+	}
+
+	private async live(id: string): Promise<Live> {
+		const live = await this.rt.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		return live;
+	}
+
+	/** The thread's inserts in order, read from its transcript and its document. */
+	async list(id: string): Promise<InsertView[]> {
+		const live = this.rt.live.get(id) ?? (await this.rt.session(id));
+		if (!live) return [];
+		const view = await live.conversation.viewState(ctx);
+		const entries = ((view.value as any).entries ?? []) as any[];
+		view.dispose();
+		const doc = (await this.rt.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		live.inserts = insertsOf(entries, doc);
+		return live.inserts;
+	}
+
+	/** Put an insert into the thread, where the conversation is now. An id it already has changes nothing. */
+	async put(id: string, insertId: string, key: string, state: JsonObject = {}): Promise<InsertView[]> {
+		const live = await this.live(id);
+		if (!/^[\w-]{1,64}$/.test(insertId)) throw new Error("bad insert id");
+		if (!key) throw new Error("insert key missing");
+		const known = (await this.rt.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		if (known?.items?.[insertId]) return this.list(id);
+		// The state first: an entry is never without its state.
+		await live.conversation.commit(async (tx) => {
+			const doc = (await tx.doc(Inserts as any, live.conversation.id)) as any;
+			doc.items[insertId] = { key, state, folded: false, removed: false };
+		}, ctx);
+		const sub = await live.conversation.submit({ type: "write", entry: { kind: InsertEntry.kind ?? "bench.insert", data: { id: insertId, key } }, requestId: randomUUID() } as any, ctx);
+		await sub.wait(ctx);
+		return this.list(id);
+	}
+
+	/** Change an insert: its key (another server), its state, folded, or removed. */
+	async patch(id: string, insertId: string, patch: Record<string, unknown>): Promise<InsertView[]> {
+		const live = await this.live(id);
+		const found = await live.conversation.commit(async (tx) => patchInsert((await tx.doc(Inserts as any, live.conversation.id)) as any, insertId, patch), ctx);
+		if (found) return this.list(id);
+		// The item is gone from the document while its entry is in the transcript: the thread is
+		// from before the document, or a commit lost the item. Bench shows such an insert (the
+		// entry says it is there), so its next change writes the state again rather than failing —
+		// a failed insert made Bench read the whole thread anew, and that wiped the person's draft
+		// and the messages waiting in the queue.
+		const known = (await this.list(id)).find((v) => v.id === insertId);
+		if (!known) throw new Error(`no insert ${insertId}`);
+		await live.conversation.commit(async (tx) => {
+			const doc = (await tx.doc(Inserts as any, live.conversation.id)) as any;
+			doc.items[insertId] = { key: known.key, state: {}, folded: false, removed: false };
+			patchInsert(doc, insertId, patch);
+		}, ctx);
+		return this.list(id);
+	}
+}

@@ -4,6 +4,7 @@
 // built from its entry id and its place inside the entry. Bench orders items by key and nothing
 // else. Queued messages come after the whole journal, in the inbox's order.
 
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { InboxDoc } from "@earendil-works/pi-durable";
 import { processOf } from "./builtin/process.ts";
 import { Inserts } from "./inserts.ts";
@@ -22,7 +23,9 @@ export function preview(name: string, args: any): string {
 }
 
 // The items and the queue are typed in crates/protocol: Bench reads them with the same types.
-import type { Inserts as InsertStates, PlanStep, Process, QueuedItem, ThreadItem } from "./protocol.gen.ts";
+import type { Inserts as InsertStates, PlanStep, Process, QueuedItem, ThreadItem, ThreadOpen } from "./protocol.gen.ts";
+import type { Runtime } from "./runtime.ts";
+import { speedOf } from "./usage.ts";
 export type { QueuedItem, ThreadItem };
 
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
@@ -219,4 +222,84 @@ export function changesOf(changes: readonly any[], watched: (conversation: strin
 		(t.append ??= []).push(...items);
 	}
 	return [...by.values()];
+}
+
+const ctx = BACKGROUND_CONTEXT;
+
+/** The open threads' journals for Bench: each commit's news told to the thread it changed, and a
+ * thread read whole (`thread.open`). */
+export class Journal {
+	/** Bench's ids of the person's messages, from Pi's submission records, by conversation. */
+	private requests = new Map<string, Requests>();
+
+	private rt: Runtime;
+
+	constructor(rt: Runtime) {
+		this.rt = rt;
+	}
+
+	private requestsOf = (conversation: string) => this.requests.get(conversation) ?? this.requests.set(conversation, new Requests()).get(conversation)!;
+
+	/** Send each commit's new entries, queue, inserts and processes to the threads that are open. */
+	watch(): void {
+		this.rt.harness.subscribeCommits((publication: any) => {
+			for (const ch of changesOf(publication.changes, (c) => this.rt.byConversation.has(c), this.requestsOf)) {
+				const id = this.rt.byConversation.get(ch.conversation)!.row.id;
+				if (ch.append) this.rt.tell(id, { kind: "append", value: ch.append });
+				if (ch.queue) this.rt.tell(id, { kind: "queue", value: ch.queue });
+				if (ch.inserts) this.rt.tell(id, { kind: "inserts", value: ch.inserts });
+				for (const p of ch.processes ?? []) this.rt.tell(id, { kind: "process", value: p });
+			}
+		});
+	}
+
+	/**
+	 * The thread as Bench draws it: every journal item after `since` (all of them without it), the
+	 * queue, the inserts' state, and its live run. `head` is the last entry id: Bench asks with
+	 * `since: head` after a reconnect and gets only what it missed.
+	 */
+	async open(id: string, since = 0): Promise<ThreadOpen> {
+		const rt = this.rt;
+		const live = await rt.session(id);
+		if (!live) throw new Error(`session not found: ${id}`);
+		const entries: any[] = [];
+		let cursor: any;
+		do {
+			const page = await rt.storage.scanEntries({ conversationId: live.conversation.id, order: "ascending" }, 500, cursor, ctx);
+			entries.push(...page.items);
+			cursor = page.next;
+		} while (cursor);
+		const head = entries.reduce((m, e) => Math.max(m, Number(e.id)), since);
+		// How often the thread was compacted is a fact of its journal, and the journal is read
+		// here anyway: settle the number so a long thread's status bar says 22, not 0.
+		const compactions = compactionsOf(entries);
+		if (live.usage.compactions !== compactions) {
+			live.usage.compactions = compactions;
+			rt.stream.emitUsage(live);
+		}
+		const doc = (await rt.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		const inbox = await rt.harness.snapshot(InboxDoc as any, live.conversation.id, ctx);
+		// Pi's submission records name each message's request: the rows Bench showed on Enter.
+		const requests = this.requestsOf(String(live.conversation.id));
+		cursor = undefined;
+		do {
+			const page = await rt.storage.scanSubmissions({ conversationId: live.conversation.id }, 500, cursor, ctx);
+			for (const rec of page.items) requests.note(rec);
+			cursor = page.next;
+		} while (cursor);
+		return {
+			items: itemsOfAll(entries.filter((e) => Number(e.id) > since), requests),
+			queue: queueOf(inbox as any, requests),
+			inserts: doc?.items ?? {},
+			running: live.busy,
+			holds: live.busy ? live.holds : [],
+			processes: await rt.processes.list(live.conversation.id),
+			asks: rt.asks.of(live),
+			info: rt.models.info(live.row),
+			...(live.usage.calls ? { usage: rt.stream.usageOf(live) } : {}),
+			// Read from the store: Bench saves it there at each answer's end (`thread.speed`).
+			speed: speedOf(rt.store.get(id)?.speed),
+			head,
+		};
+	}
 }

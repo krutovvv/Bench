@@ -4,9 +4,13 @@
 // before it records a call's intent, so a run that resumes after a restart meets the gate
 // again: a held run stays held. The document is the truth; the waiters here only wake the gate.
 
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineDoc } from "@earendil-works/pi-durable";
 // A stretch the person held the run, ms; `to` absent while it still holds (crates/protocol).
 import type { Hold } from "./protocol.gen.ts";
+import type { Live, Runtime } from "./runtime.ts";
+
+const ctx = BACKGROUND_CONTEXT;
 
 export type { Hold };
 
@@ -63,5 +67,80 @@ export class Gates {
 		const set = this.waiting.get(conversation);
 		this.waiting.delete(conversation);
 		for (const r of set ?? []) r(go);
+	}
+}
+
+/** The holds of the runtime's threads: the person's pause and resume, the gate before each call. */
+export class Holds {
+	/** Wake-ups of the calls waiting at a held run's gate. */
+	private gates = new Gates();
+
+	private rt: Runtime;
+
+	constructor(rt: Runtime) {
+		this.rt = rt;
+	}
+
+	/** Stand the run at its next step boundary: the answer being written is let through —
+	 * stopping mid-sentence cuts Pi's turn — but no new call begins until the person lets it
+	 * go on. The actions phase is where the minutes go; that is what the hold answers to. */
+	async pause(id: string): Promise<void> {
+		const live = await this.rt.session(id);
+		if (!live?.busy) return;
+		await this.change(live, (h) => !held(h) && h.push({ from: Date.now() }) > 0);
+	}
+
+	/** Let the held run take its next step. */
+	async resume(id: string): Promise<void> {
+		const live = await this.rt.session(id);
+		if (!live) return;
+		await this.change(live, (h) => closeHold(h, Date.now()));
+		this.gates.wake(String(live.conversation.id), true);
+	}
+
+	/** A stop outranks a hold: the call waiting at the gate is told to stop, not to go on. */
+	async stop(live: Live): Promise<void> {
+		await this.change(live, (h) => closeHold(h, Date.now()));
+		this.gates.wake(String(live.conversation.id), false);
+	}
+
+	/** The run ended: whatever the person held lets go, nobody waits on it. */
+	end(live: Live): void {
+		if (held(live.holds)) void this.change(live, (h) => closeHold(h, Date.now())).catch(() => {});
+		this.gates.wake(String(live.conversation.id), false);
+	}
+
+	/** A fresh turn starts free: the holds belong to the turn they were made in. */
+	async clear(live: Live): Promise<void> {
+		await this.change(live, (h) => h.splice(0).length > 0);
+	}
+
+	/** Called before every tool call (a subagent's with its parent's session): waits while the
+	 * run's document says it is held; false when the person stopped it meanwhile. */
+	async wait(sessionId: string, signal?: AbortSignal): Promise<boolean> {
+		const row = this.rt.store.get(sessionId);
+		if (!row) return true;
+		const conversation = Number(row.conversation);
+		for (;;) {
+			const doc = (await this.rt.harness.snapshot(HoldDoc as any, conversation as any, ctx)) as any;
+			if (!held(doc?.holds)) return true;
+			if (!(await this.gates.next(String(conversation), signal))) return false;
+		}
+	}
+
+	isPaused(id: string): boolean {
+		return held(this.rt.live.get(id)?.holds);
+	}
+
+	/** Change the run's holds in a commit of their document; Bench hears the change. */
+	private async change(live: Live, change: (holds: Hold[]) => boolean): Promise<void> {
+		let changed = false;
+		const holds = await live.conversation.commit(async (tx) => {
+			const doc = (await tx.doc(HoldDoc as any, live.conversation.id)) as any;
+			changed = change(doc.holds);
+			return JSON.parse(JSON.stringify(doc.holds)) as Hold[];
+		}, ctx);
+		live.holds = holds;
+		if (changed) this.rt.tell(live.row.id, { kind: "holds", value: holds });
 	}
 }

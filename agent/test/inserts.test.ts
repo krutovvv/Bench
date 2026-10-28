@@ -56,17 +56,17 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 	await rt.open();
 	const live = await rt.create("default", undefined, "local");
 	const id = live.row.id;
-	await rt.insert(id, "ia", "ssh:local");
-	await rt.insert(id, "ib", "tools", { tool: "base64" });
+	await rt.inserts.put(id, "ia", "ssh:local");
+	await rt.inserts.put(id, "ib", "tools", { tool: "base64" });
 	// The same id twice is one insert.
-	await rt.insert(id, "ib", "tools");
-	await rt.patchInsert(id, "ib", { state: { tool: "json" } });
-	await rt.patchInsert(id, "ia", { removed: true });
-	await rt.insert(id, "ic", "tasks", { list: "today" });
+	await rt.inserts.put(id, "ib", "tools");
+	await rt.inserts.patch(id, "ib", { state: { tool: "json" } });
+	await rt.inserts.patch(id, "ia", { removed: true });
+	await rt.inserts.put(id, "ic", "tasks", { list: "today" });
 	// It was put while a message waited in the composer: it sits after that message.
-	await rt.patchInsert(id, "ic", { after: 3 });
-	await assert.rejects(rt.insert(id, "bad id!", "tasks"));
-	await assert.rejects(rt.patchInsert(id, "missing", { folded: true }));
+	await rt.inserts.patch(id, "ic", { after: 3 });
+	await assert.rejects(rt.inserts.put(id, "bad id!", "tasks"));
+	await assert.rejects(rt.inserts.patch(id, "missing", { folded: true }));
 	const check = (list: any[]) => {
 		assert.deepEqual(
 			list.map((i) => [i.id, i.key, i.after]),
@@ -77,9 +77,9 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 		);
 		assert.deepEqual(list[0].state, { tool: "json" });
 	};
-	check(await rt.inserts(id));
+	check(await rt.inserts.list(id));
 	// The prompt lists what is inserted.
-	const text = inserted((await rt.inserts(id)).map((i) => ({ key: i.key, state: i.state })))!;
+	const text = inserted((await rt.inserts.list(id)).map((i) => ({ key: i.key, state: i.state })))!;
 	assert.match(text, /everyday utilities, now on "json"/);
 	assert.match(text, /tasks tool/);
 	assert.doesNotMatch(text, /terminal/);
@@ -87,7 +87,7 @@ test("a thread's inserts: put, changed, removed, kept across a restart", async (
 	// Another process: the same, from Pi's storage.
 	rt = new Runtime(() => {});
 	await rt.open();
-	check(await rt.inserts(id));
+	check(await rt.inserts.list(id));
 });
 
 test("an insert whose saved state went missing is healed, not refused", async () => {
@@ -95,7 +95,7 @@ test("an insert whose saved state went missing is healed, not refused", async ()
 	await rt.open();
 	const live = await rt.create("default", undefined, "local");
 	const id = live.row.id;
-	await rt.insert(id, "ih", "ssh:local");
+	await rt.inserts.put(id, "ih", "ssh:local");
 	// The entry stayed while the document lost the item: a thread from before the document, or a
 	// commit that dropped it. Bench still shows the insert, because the entry says it is there.
 	await live.conversation.commit(
@@ -105,14 +105,14 @@ test("an insert whose saved state went missing is healed, not refused", async ()
 		},
 		BACKGROUND_CONTEXT,
 	);
-	assert.deepEqual((await rt.inserts(id)).map((i) => i.id), ["ih"], "shown from its entry");
+	assert.deepEqual((await rt.inserts.list(id)).map((i) => i.id), ["ih"], "shown from its entry");
 	// Its next change must heal the state. It used to throw, and Bench answered a failed insert by
 	// reading the whole thread again — which wiped the person's draft and their queue.
-	await rt.patchInsert(id, "ih", { folded: true });
-	const healed = (await rt.inserts(id)).find((i) => i.id === "ih")!;
+	await rt.inserts.patch(id, "ih", { folded: true });
+	const healed = (await rt.inserts.list(id)).find((i) => i.id === "ih")!;
 	assert.equal(healed.key, "ssh:local", "the entry's key is kept");
 	assert.equal(healed.folded, true);
 	// An id no entry knows is still nobody's insert.
-	await assert.rejects(rt.patchInsert(id, "ghost", { folded: true }));
+	await assert.rejects(rt.inserts.patch(id, "ghost", { folded: true }));
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 });

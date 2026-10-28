@@ -179,19 +179,19 @@ test("on a real Pi: commits reach the thread as thread.* events, and thread.open
 	const idOf = (i: ThreadItem) => (i.kind === "insert" ? i.id : undefined);
 	await rt.open();
 	const { row } = await rt.create("default", undefined, "local");
-	await rt.insert(row.id, "ia", "tasks", { list: "today" });
-	const first = await rt.thread(row.id);
+	await rt.inserts.put(row.id, "ia", "tasks", { list: "today" });
+	const first = await rt.journal.open(row.id);
 	assert.deepEqual(first.items.map((i) => [i.kind, idOf(i)]), [["insert", "ia"]]);
 	assert.deepEqual(first.queue, []);
 	assert.equal((first.inserts as any).ia.key, "tasks");
 	assert.equal(first.running, false);
 
-	await rt.insert(row.id, "ib", "ssh:local");
+	await rt.inserts.put(row.id, "ib", "ssh:local");
 	const appended = events.flatMap((e) => (e.kind === "append" ? e.value : []));
 	assert.deepEqual(appended.map(idOf), ["ia", "ib"], "each entry was told once, in order");
 	assert.ok(events.some((e) => e.kind === "inserts" && e.value.ib), "the state document too");
 
-	const later = await rt.thread(row.id, first.head);
+	const later = await rt.journal.open(row.id, first.head);
 	assert.deepEqual(later.items.map(idOf), ["ib"], "only what came after the head");
 	assert.ok(later.head > first.head);
 
@@ -199,8 +199,8 @@ test("on a real Pi: commits reach the thread as thread.* events, and thread.open
 	// first thread untouched.
 	const fork = await rt.fork(row.id, first.head);
 	assert.notEqual(fork.id, row.id);
-	assert.deepEqual((await rt.thread(fork.id)).items.map(idOf), ["ia"], "history through the entry");
-	assert.deepEqual((await rt.thread(row.id)).items.map(idOf), ["ia", "ib"], "the first thread is untouched");
+	assert.deepEqual((await rt.journal.open(fork.id)).items.map(idOf), ["ia"], "history through the entry");
+	assert.deepEqual((await rt.journal.open(row.id)).items.map(idOf), ["ia", "ib"], "the first thread is untouched");
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 	fs.rmSync(home, { recursive: true, force: true });
 });

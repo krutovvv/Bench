@@ -1,7 +1,7 @@
 // What the agent's tools may ask of the server: which session a conversation is, put a question
-// or an approval to the person (Bench's card, Telegram's buttons), update the session's plan, run
-// a prompt in a session of its own. The runtime installs itself here at start.
-
+// or an approval to the person (Bench's card, Telegram's buttons), run a prompt in a session of
+// its own. The runtime installs itself here at start (`tools-host.ts`). Light on purpose: every
+// tool imports it.
 
 export interface SessionInfo {
 	id: string;
@@ -10,7 +10,6 @@ export interface SessionInfo {
 	source: string;
 	/** Telegram sessions: their chat. */
 	chat_id?: string;
-	/** What the thread is about ("tasks:today", "ssh:local", "folder:<path>"). */
 	/** The project the thread belongs to; "" = none. */
 	project?: string;
 	/** What the person inserted into the thread, in order (src/inserts.ts). */
@@ -29,8 +28,8 @@ export interface Host {
 	adopt(conversationId: string | number, sessionId: string): void;
 	/** How many threads other than `sessionId` are running a turn now (each holds one of the model server's slots). */
 	busyElsewhere(sessionId: string): number;
-	/** The answer, or "" when declined or timed out. */
-	/** Ask the person; `callId` is the asking call's, the id their answer comes back to. */
+	/** Ask the person; `callId` is the asking call's, the id their answer comes back to. The
+	 * answer, or "" when declined or timed out. */
 	ask(sessionId: string, callId: string, question: string, choices: string[], multiSelect: boolean, signal?: AbortSignal): Promise<string>;
 	/** "once" | "session" | "always" | "deny". */
 	approve(sessionId: string, callId: string, command: string, description: string): Promise<string>;
@@ -64,3 +63,4 @@ export function sessionOf(conversationId: string | number): SessionInfo {
 	if (!s) throw new Error("this conversation has no session");
 	return s;
 }
+

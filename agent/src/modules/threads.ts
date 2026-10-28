@@ -19,7 +19,7 @@ export default ({ rt }: Ctx): Module => ({
 						title: s.title || "Untitled",
 						messages: s.message_count,
 						running: rt.isBusy(s.id),
-						paused: rt.isPaused(s.id),
+						paused: rt.holds.isPaused(s.id),
 						source: s.source,
 						updated: s.updated,
 						cwd: s.cwd,
@@ -38,9 +38,9 @@ export default ({ rt }: Ctx): Module => ({
 		},
 		// The thread as a journal (src/thread.ts) and its live run: items after `since`, the queue,
 		// the inserts, what it waits for, its numbers. Changes follow as `thread` events.
-		"thread.open": ({ thread, since }) => rt.thread(thread, since),
+		"thread.open": ({ thread, since }) => rt.journal.open(thread, since),
 		"thread.rename": ({ thread, title }) => {
-			rt.rename(thread, title);
+			rt.titles.rename(thread, title);
 			rt.listChanged();
 			return {};
 		},
@@ -67,34 +67,34 @@ export default ({ rt }: Ctx): Module => ({
 		},
 		// The person's hold: stand the run at its next step boundary, then let it go on.
 		"thread.pause": async ({ thread, paused }) => {
-			await (paused ? rt.pause(thread) : rt.resume(thread));
+			await (paused ? rt.holds.pause(thread) : rt.holds.resume(thread));
 			return {};
 		},
 		// The messages waiting while the agent works (Pi's inbox): take one back, send it now, fix its words.
 		"thread.queue.withdraw": async ({ thread, sub }) => {
-			await rt.withdraw(thread, sub);
+			await rt.queue.withdraw(thread, sub);
 			return {};
 		},
 		"thread.queue.send": async ({ thread, sub }) => {
-			await rt.sendNow(thread, sub);
+			await rt.queue.sendNow(thread, sub);
 			return {};
 		},
 		"thread.queue.edit": async ({ thread, sub, text }) => {
-			await rt.edit(thread, sub, text);
+			await rt.queue.edit(thread, sub, text);
 			return {};
 		},
 		// The person's inserts (src/inserts.ts): put one where the thread is now, or change one.
 		// Bench sees the result in the thread's `inserts` event.
 		"thread.insert": async ({ thread, id, key, state }) => {
-			await rt.insert(thread, id, key, state as any);
+			await rt.inserts.put(thread, id, key, state as any);
 			return {};
 		},
 		"thread.insert.patch": async ({ thread, id, patch }) => {
-			await rt.patchInsert(thread, id, patch);
+			await rt.inserts.patch(thread, id, patch);
 			return {};
 		},
 		"thread.answer": ({ thread, ask, answer }) => {
-			rt.respond(thread, ask, answer);
+			rt.asks.respond(thread, ask, answer);
 			return {};
 		},
 		"thread.effort": ({ thread, effort }) => {
@@ -109,7 +109,7 @@ export default ({ rt }: Ctx): Module => ({
 		// A background process ends by its own stop only (`builtin/process.ts`); Bench sees it end
 		// in the thread's `process` event.
 		"process.stop": async ({ process }) => {
-			await rt.stopProcess(process);
+			await rt.processes.stop(process);
 			return {};
 		},
 	},

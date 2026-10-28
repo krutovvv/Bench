@@ -37,7 +37,7 @@ export default ({ rt }: Ctx): Module => {
 				return output(`Reasoning effort: ${arg || row?.effort}`);
 			case "/title":
 				if (row && arg) {
-					rt.rename(session_id, arg);
+					rt.titles.rename(session_id, arg);
 					rt.listChanged();
 				}
 				return output(`Title: ${arg}`);

@@ -48,7 +48,7 @@ test("the counters of a turn are saved and read back after a restart", async () 
 	assert.equal(frame.calls, saved.calls);
 
 	// Reading the thread settles how often it was compacted (its journal is read there anyway).
-	await rt.thread(id);
+	await rt.journal.open(id);
 	assert.equal(totalsOf(new Store().get(id)!.usage).compactions, 0, "never compacted says 0, and is saved");
 });
 

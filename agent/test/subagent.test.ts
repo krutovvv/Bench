@@ -62,7 +62,7 @@ test("delegate: a child without delegate answers its task, and the call returns 
 	const { row } = await rt.create("default", home, "local");
 	await rt.submit(row.id, "how many files?");
 	// The parent's answer, read from its journal (a child's events reach the parent's session too).
-	const answered = async () => (await rt.thread(row.id)).items.some((i: any) => i.kind === "text" && i.text === "The subagent says 3.");
+	const answered = async () => (await rt.journal.open(row.id)).items.some((i: any) => i.kind === "text" && i.text === "The subagent says 3.");
 	const end = Date.now() + 20000;
 	while (!(await answered()) && Date.now() < end) await new Promise((r) => setTimeout(r, 50));
 	assert.ok(await answered(), "the parent answered with the child's answer");
@@ -70,7 +70,7 @@ test("delegate: a child without delegate answers its task, and the call returns 
 	assert.ok(child, "the child was asked");
 	assert.ok(!child.tools.includes("delegate"), "the child has no delegate of its own");
 	assert.ok(offered.find((o) => !o.child)?.tools.includes("delegate"), "the parent has it");
-	const opened = await rt.thread(row.id);
+	const opened = await rt.journal.open(row.id);
 	const result: any = opened.items.find((i: any) => i.kind === "result" && i.name === "delegate");
 	assert.match(result.output, /There are 3 files/);
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);

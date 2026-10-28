@@ -2,7 +2,7 @@
 // is typed, the hover at a place, where a symbol is defined, and all the problems they know. The editor sends the file's text as
 // it is (unsaved too); the servers are the ones the project's threads use, in the same folder.
 
-import { defaultCwd } from "../runtime.ts";
+import { defaultCwd } from "../config.ts";
 import { projects } from "../builtin/projects.ts";
 import { HttpError, required, type Module } from "../http.ts";
 import { definitionAt, hoverAt, knownProblems, problemsOf, type Spot } from "../lsp.ts";

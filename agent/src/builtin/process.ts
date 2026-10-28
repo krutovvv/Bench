@@ -10,9 +10,11 @@
 //   again; Pi marks the task with reason `restart` and its `abort` says so.
 
 import { Type } from "@earendil-works/pi-ai";
-import { withAbortSignal } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import { defineTask, defineTool } from "@earendil-works/pi-durable";
 import { host } from "../host.ts";
+import type { Process } from "../protocol.gen.ts";
+import type { Runtime } from "../runtime.ts";
 
 export const PROCESS_KIND = "bench.process";
 
@@ -142,3 +144,32 @@ export const processTool = defineTool({
 		return { output: [{ type: "text" as const, text: `${JSON.stringify(rest)}\n${tail || "(no output yet)"}` }] };
 	},
 });
+
+/** The runtime's background processes, read from Pi's task records. */
+export class Processes {
+	private rt: Runtime;
+
+	constructor(rt: Runtime) {
+		this.rt = rt;
+	}
+
+	/** A conversation's background processes, oldest first. */
+	async list(conversationId: string | number): Promise<Process[]> {
+		const out: Process[] = [];
+		let cursor: any;
+		do {
+			const page = await this.rt.storage.scanTasks({ conversationId: Number(conversationId), kind: PROCESS_KIND }, 200, cursor, BACKGROUND_CONTEXT);
+			for (const rec of page.items) {
+				const p = processOf(rec);
+				if (p) out.push(p);
+			}
+			cursor = page.next;
+		} while (cursor);
+		return out;
+	}
+
+	/** Stop a background process: Pi aborts its task, and its `abort` commits how it ended. */
+	async stop(id: string): Promise<void> {
+		await this.rt.harness.abortTask(Number(id) as any, BACKGROUND_CONTEXT);
+	}
+}

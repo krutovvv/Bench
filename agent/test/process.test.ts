@@ -56,7 +56,7 @@ test("a process runs in the background: its output and exit reach the thread, St
 	);
 	await rt.open();
 	const { row } = await rt.create("default", home, "local");
-	await rt.thread(row.id);
+	await rt.journal.open(row.id);
 
 	const done = await start(rt, row.id, "echo hello; echo world; exit 3", "c1");
 	const exited = await until(() => seen.find((p) => p.id === done && p.state !== "running"));
@@ -68,14 +68,14 @@ test("a process runs in the background: its output and exit reach the thread, St
 
 	const long = await start(rt, row.id, "echo up; sleep 3031", "c2");
 	await until(() => seen.find((p) => p.id === long && p.tail.includes("up")), 4000);
-	await rt.stopProcess(long);
+	await rt.processes.stop(long);
 	const stopped = await until(() => seen.find((p) => p.id === long && p.state !== "running"));
 	assert.equal(stopped.state, "stopped");
 	assert.match(stopped.tail, /up/, "what it said before it stopped is kept");
 	assert.ok(!alive("[s]leep 3031"), "the command itself is gone");
 
 	// thread.open has them, from Pi's records.
-	const open = await rt.thread(row.id);
+	const open = await rt.journal.open(row.id);
 	assert.deepEqual(open.processes.map((p) => [p.call_id, p.state]), [["c1", "exited"], ["c2", "stopped"]]);
 	await (rt.harness as any).close(ctx);
 });
@@ -93,9 +93,9 @@ test("a process running when the agent restarts ends with it and is not started 
 
 	const rt2 = new Runtime(() => {});
 	await rt2.open();
-	await rt2.thread(row.id);
+	await rt2.journal.open(row.id);
 	const conversation = (await (rt2 as any).session(row.id)).conversation.id;
-	const ended = await until(async () => (await rt2.processes(conversation)).find((p) => p.id === id && p.state !== "running"));
+	const ended = await until(async () => (await rt2.processes.list(conversation)).find((p) => p.id === id && p.state !== "running"));
 	assert.equal(ended.state, "restarted");
 	await new Promise((r) => setTimeout(r, 300));
 	assert.equal(fs.readFileSync(marker, "utf8").trim().split("\n").length, 1, "the command ran once");

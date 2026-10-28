@@ -337,7 +337,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const pending = [...prompts.entries()].find(([k, p]) => k.startsWith(`${chat}:`) && p.session === session && p.kind === "clarify");
 		if (pending && typed) {
 			prompts.delete(pending[0]);
-			rt.respond(session, pending[1].promptId, typed);
+			rt.asks.respond(session, pending[1].promptId, typed);
 			return;
 		}
 		const origin = forwardedFrom(m);
@@ -441,7 +441,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		if (!p || !msg) return;
 		const choice = p.choices[Number(ctx.callbackQuery.data.slice(2))] ?? "";
 		prompts.delete(key);
-		rt.respond(p.session, p.promptId, choice);
+		rt.asks.respond(p.session, p.promptId, choice);
 		await ctx.editMessageText(`${(msg as any).text ?? ""}\n\n→ ${choice.replace(/\s*\(Recommended\)$/, "")}`).catch(() => {});
 	});
 

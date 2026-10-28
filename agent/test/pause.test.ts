@@ -82,8 +82,8 @@ test("pause: a held run starts no tool until resumed; its holds are timed; a sto
 	const id = row.id;
 
 	await rt.submit(id, "look around");
-	await rt.pause(id);
-	assert.equal(rt.isPaused(id), true);
+	await rt.holds.pause(id);
+	assert.equal(rt.holds.isPaused(id), true);
 	assert.equal(holds.at(-1).length, 1);
 	assert.equal(holds.at(-1)[0].to, undefined, "the hold is open");
 	// The model asked for its call, but the call waits at the gate: no second request comes.
@@ -91,24 +91,24 @@ test("pause: a held run starts no tool until resumed; its holds are timed; a sto
 	await new Promise((r) => setTimeout(r, 300));
 	assert.equal(requests, 1, "held: the tool did not run, so the model was not asked again");
 	assert.equal(rt.isBusy(id), true, "the run lives on, standing still");
-	assert.equal((await rt.thread(id)).holds.length, 1, "a reopened thread sees the hold");
+	assert.equal((await rt.journal.open(id)).holds.length, 1, "a reopened thread sees the hold");
 
-	await rt.resume(id);
-	assert.equal(rt.isPaused(id), false);
+	await rt.holds.resume(id);
+	assert.equal(rt.holds.isPaused(id), false);
 	assert.ok(holds.at(-1)[0].to >= holds.at(-1)[0].from, "the hold is closed with its end");
 	await until(() => runs.at(-1) === false);
 	assert.equal(requests, 2, "let go: the tool ran and the model answered");
 
 	// A stop while held: the waiting call is refused, the run ends, nothing is asked again.
 	await rt.submit(id, "again");
-	await rt.pause(id);
+	await rt.holds.pause(id);
 	await until(() => requests >= 3);
 	await new Promise((r) => setTimeout(r, 200));
 	await rt.interrupt(id);
 	await until(() => !rt.isBusy(id));
 	await new Promise((r) => setTimeout(r, 200));
 	assert.equal(requests, 3, "stopped while held: the call never ran");
-	assert.equal(rt.isPaused(id), false);
+	assert.equal(rt.holds.isPaused(id), false);
 
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 });
@@ -121,7 +121,7 @@ test("pause: a held run is still held after the agent restarts, and goes on when
 	const id = row.id;
 	const before = requests;
 	await rt.submit(id, "look around");
-	await rt.pause(id);
+	await rt.holds.pause(id);
 	await until(() => requests >= before + 1);
 	await new Promise((r) => setTimeout(r, 200));
 	assert.equal(requests, before + 1, "held at the gate");
@@ -137,9 +137,9 @@ test("pause: a held run is still held after the agent restarts, and goes on when
 	await rt2.session(id);
 	await new Promise((r) => setTimeout(r, 400));
 	assert.equal(requests, before + 1, "Pi ran the call's gate again, and the document still holds it");
-	assert.equal(rt2.isPaused(id), true);
+	assert.equal(rt2.holds.isPaused(id), true);
 
-	await rt2.resume(id);
+	await rt2.holds.resume(id);
 	await until(() => requests >= before + 2);
 	await (rt2.harness as any).close(BACKGROUND_CONTEXT);
 });

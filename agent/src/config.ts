@@ -345,3 +345,12 @@ export function approvalsMode(profile: string): string {
 export function timezone(_profile?: string): string {
 	return getSetting("timezone") || Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
+
+/** The folder a thread of these settings works in when nothing chose one: `terminal.cwd` of its
+ * config when it exists, else home. */
+export function defaultCwd(settings: string): string {
+	const cwd = readConfig(settings)?.terminal?.cwd;
+	const home = process.env.HOME ?? "/";
+	if (typeof cwd === "string" && cwd && cwd !== "." && fs.existsSync(cwd.replace(/^~/, home))) return cwd.replace(/^~/, home);
+	return home;
+}
