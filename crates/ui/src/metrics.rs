@@ -65,9 +65,13 @@ pub fn bar_h(cx: &App) -> Pixels {
 }
 
 /// The window's header: a bar and the rule under it.
-pub fn header_h(cx: &App) -> Pixels {
-    bar_h(cx) + px(1.)
+pub fn header_h(_cx: &App) -> Pixels {
+    px(TITLE_BAR_H + HAIRLINE)
 }
+
+/// The window's top bar: a Mac's unified title bar with its tools (the title, the meters, Chat
+/// | Code) — taller than the status bar under the window (28), as a toolbar is over a status line.
+pub const TITLE_BAR_H: f32 = 40.;
 
 /// A page laid out for reading (the new project's): its column's width.
 pub const PAGE_W: f32 = 680.;

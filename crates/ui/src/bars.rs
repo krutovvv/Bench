@@ -58,9 +58,8 @@ pub fn mode_switch(
         .p(px(MODE_SWITCH_PAD))
         .gap(px(MODE_SWITCH_PAD))
         .rounded_md()
-        .bg(theme.secondary)
-        .border_1()
-        .border_color(theme.border)
+        // A Mac's segmented control: a grey track, no rule; the pressed segment a raised chip.
+        .bg(theme.foreground.opacity(0.06))
         .children(modes.iter().enumerate().map(|(k, &(icon, label, tip))| {
             let on = k == chosen;
             let pick = on_pick.clone();
@@ -71,18 +70,16 @@ pub fn mode_switch(
                 .gap_1()
                 .items_center()
                 .rounded_sm()
-                .border_1()
                 .text_size(px(crate::metrics::BAR_TEXT))
                 .font_weight(FontWeight::MEDIUM)
                 .cursor_pointer()
                 .map(|d| {
                     if on {
                         d.bg(theme.background)
-                            .border_color(theme.border)
+                            .shadow_xs()
                             .text_color(theme.foreground)
                     } else {
-                        d.border_color(theme.transparent)
-                            .text_color(theme.muted_foreground)
+                        d.text_color(theme.muted_foreground)
                             .hover(|s| s.text_color(theme.foreground))
                     }
                 })
