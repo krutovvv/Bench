@@ -171,32 +171,18 @@ impl ThreadView {
         // The chat's composer is pinned under the list: its tools are a line of their own at
         // the card's foot, always shown, with Send (or Stop while the agent works) at its end.
         let in_list = crate::thread::look::COMPOSER_IN_LIST;
-        let tools = h_flex()
-            .when(in_list, |d| d.absolute())
-            .when(in_list && empty, |d| {
-                // The messages' right column, not the window's edge: the icons end where
-                // the thread's text ends (`right_0` measures from the row's border box,
-                // past its right padding).
-                d.top(px(bench_ui::TURN_Y)).right(px(bench_ui::CHAT_RIGHT))
-            })
-            .when(in_list && !empty, |d| {
-                // Their line in the row's grown bottom band: bottom-anchored by their own
-                // height, at the text's left edge.
-                d.top(px(row_h - bench_ui::AVATAR - 2.))
-                    .left(px(bench_ui::CHAT_TEXT))
-            })
-            .h(px(bench_ui::AVATAR))
-            .items_center()
-            .gap_1()
-            .when(
-                in_list && !(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
-                |d| d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.)),
-            )
-            .child(
-                bench_ui::icon_button("composer-attach", Ico::Paperclip, "Attach files", false, cx)
-                    .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx))),
-            )
-            .child(if trans {
+        // Attach: a plus in the chat (Messages' and ChatGPT's apps button), the paperclip in
+        // the document.
+        let attach = bench_ui::icon_button(
+            "composer-attach",
+            if in_list { Ico::Paperclip } else { Ico::Plus },
+            "Attach files",
+            false,
+            cx,
+        )
+        .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx)))
+        .into_any_element();
+        let mic: AnyElement = if trans {
                 div()
                     .id("composer-mic")
                     .flex_none()
@@ -246,7 +232,30 @@ impl ThreadView {
                         }
                     }))
                     .into_any_element()
-            });
+            };
+        let (mut attach, mut mic) = (Some(attach), Some(mic));
+        let tools = h_flex()
+            .when(in_list, |d| d.absolute())
+            .when(in_list && empty, |d| {
+                // The messages' right column, not the window's edge: the icons end where
+                // the thread's text ends (`right_0` measures from the row's border box,
+                // past its right padding).
+                d.top(px(bench_ui::TURN_Y)).right(px(bench_ui::CHAT_RIGHT))
+            })
+            .when(in_list && !empty, |d| {
+                // Their line in the row's grown bottom band: bottom-anchored by their own
+                // height, at the text's left edge.
+                d.top(px(row_h - bench_ui::AVATAR - 2.))
+                    .left(px(bench_ui::CHAT_TEXT))
+            })
+            .h(px(bench_ui::AVATAR))
+            .items_center()
+            .gap_1()
+            .when(
+                in_list && !(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
+                |d| d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.)),
+            )
+            .when(in_list, |d| d.children(attach.take()).children(mic.take()));
         let tools = if in_list {
             tools
         } else {
@@ -269,8 +278,9 @@ impl ThreadView {
                                 .bg(theme.background),
                         )
                     } else if empty {
-                        d.bg(theme.foreground.opacity(0.12))
-                            .text_color(theme.background)
+                        // Nothing to send: a quiet grey disc, its arrow in the muted text.
+                        d.bg(theme.foreground.opacity(0.07))
+                            .text_color(theme.muted_foreground)
                             .child(Ico::ArrowUp.icon().xsmall())
                     } else {
                         d.bg(theme.primary)
@@ -292,10 +302,14 @@ impl ThreadView {
                 }));
             // The icons' glyphs on the text's edge (their buttons' own padding pulled back),
             // Send at the line's other end.
+            // Plus on the text's edge (its button's padding pulled back); the mic and Send at
+            // the line's other end, as Messages and ChatGPT have them.
             tools
                 .w_full()
                 .ml(px(-bench_ui::ICON_BUTTON_PAD))
+                .children(attach.take())
                 .child(div().flex_1())
+                .children(mic.take())
                 .child(send)
         };
         v_flex()
@@ -370,12 +384,14 @@ impl ThreadView {
                             .gap_1()
                             .px_3()
                             .pt(px(bench_ui::INPUT_PAD_Y))
-                            .pb_1p5()
+                            .pb(px(bench_ui::COMPOSER_CARD_PB_IN))
                             .rounded(px(bench_ui::COMPOSER_CARD_R))
                             .border_1()
                             .border_color(theme.border)
                             .bg(theme.background)
-                            .shadow_md()
+                            // No shadow: a Mac's text field is a rule on the page, not a card
+                            // over it; a soft lift only while it has the focus would be the
+                            // focus ring's job.
                     })
                     .text_base()
                     // The person's avatar even in a new chat: an empty sheet with no sign of whose

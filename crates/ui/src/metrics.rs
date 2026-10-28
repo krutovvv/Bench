@@ -62,10 +62,12 @@ pub const BUBBLE_PY: f32 = 8.;
 pub const BUBBLE_R: f32 = 16.;
 /// The pinned composer (the chat): its card's corner, its inset from the thread's sides, the
 /// air under it, its tools' line.
-pub const COMPOSER_CARD_R: f32 = 12.;
+pub const COMPOSER_CARD_R: f32 = 18.;
 pub const COMPOSER_CARD_PB: f32 = 12.;
+/// The air inside the card under its tools' line.
+pub const COMPOSER_CARD_PB_IN: f32 = 6.;
 /// The chat composer's Send: a round button, and Stop's square mark inside it.
-pub const SEND_BUTTON: f32 = 28.;
+pub const SEND_BUTTON: f32 = 26.;
 pub const STOP_MARK: f32 = 9.;
 /// Every thread row pads its top and bottom by this, so two rows are 2 × TURN_Y apart.
 pub const TURN_Y: f32 = 14.;
