@@ -15,7 +15,7 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-ssh-env-test-"));
 process.env.BENCH_HOME = home;
 after(() => fs.rmSync(home, { recursive: true, force: true }));
 
-const { SshExecutionEnv } = await import("../src/ssh-env.ts");
+const { SshExecutionEnv } = await import("../src/machine/ssh.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 
 const real = process.env.BENCH_TEST_SSH_HOST;
@@ -53,7 +53,7 @@ const cases = createEnvConformance({
 for (const c of cases) test(`ssh env: ${c.name}`, { timeout: c.timeoutMs ?? 20_000 }, () => c.run());
 
 test("a project on another machine: its environment is there, in its folder or the login directory", async () => {
-	const { machineEnv } = await import("../src/ssh-env.ts");
+	const { machineEnv } = await import("../src/machine/ssh.ts");
 	const host = real ?? "fake";
 	const home = await machineEnv(host, "");
 	assert.ok(home.cwd.startsWith("/"), `login directory: ${home.cwd}`);

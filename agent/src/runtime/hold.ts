@@ -7,7 +7,7 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineDoc, type ConversationId } from "@earendil-works/pi-durable";
 // A stretch the person held the run, ms; `to` absent while it still holds (crates/protocol).
-import type { Hold } from "./protocol.gen.ts";
+import type { Hold } from "../protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
 
 const ctx = BACKGROUND_CONTEXT;

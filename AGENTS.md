@@ -105,12 +105,11 @@ built this way: `docs/architecture.md`. In short:
   window cap shows and the pane scrolls what doesn't fit; the other hooks in
   `.agents/skills/bench-kit/references/build-verification.md`): `mod.rs` loads it, `journal.rs`, `threads.rs`, `env.rs`, `inserts.rs`, `drop.rs` |
 | `agent/src/server.ts`, `agent/src/modules/` | The agent's server: starts, collects the modules (each declares its RPC and REST routes) |
-| `agent/src/runtime.ts` and its parts | `Runtime`: the threads' core (make, open, send, stop, fork), its parts each a file reached as `rt.<part>`: `models.ts` (the model and its fallback), `stream.ts` (a run's events → what Bench hears), `thread.ts` (`Journal`: a thread read whole, each commit's news, the search index; the journal as the items Bench shows), `hold.ts`, `queue.ts`, `asks.ts` (questions, approvals: `bench.approvals`), `inserts.ts`, `title.ts`, `builtin/process.ts`; `tools-host.ts` the tools' host and where they work (`envFor`); `run.ts` a prompt run to its answer |
-| `agent/src/inserts.ts` | The insert entry and document |
+| `agent/src/runtime/` | `runtime.ts` `Runtime`: the threads' core (make, open, send, stop, fork); its parts, each a file reached as `rt.<part>`: `models.ts` (the model, its fallback `fallback.ts`), `stream.ts` (a run's events → what Bench hears), `journal.ts` (`Journal`: a thread read whole, each commit's news, the search index; the journal as the items Bench shows), `hold.ts`, `queue.ts`, `asks.ts` (questions, approvals: `bench.approvals`), `inserts.ts` (the insert entry and document), `title.ts`, `usage.ts`; `tools-host.ts` the tools' host and where they work (`envFor`); `run.ts` a prompt run to its answer |
 | `agent/src/prompt.ts`, `agent/src/extensions/assistant.ts` | The prompt sections and the default extension (tools, sections, hooks) |
 | `agent/src/builtin/` | The agent's own tools and stores: `tasks`, `ssh`, `process`, `cron`, `subagent`, `memory`, `skills`, `ask`, `projects`, `servers` (the servers' agents), `presets`, `search` (grep, glob, ls), `navigate` (`lsp`: definitions, references, outline, symbols, hover from the project's language servers), `hashline` (read and edit by line anchors) |
-| `agent/src/ssh-env.ts`, `confined-env.ts`, `lsp.ts` | A project's machine over SSH as Pi's `ExecutionEnv`; a project kept in its folder; its language servers (diagnostics after every edit) |
-| `agent/src/mcp.ts`, `mcp-oauth.ts`, `telegram.ts` | MCP servers (pi-mcp, OAuth), Telegram bots (grammY, a proxy where needed) |
+| `agent/src/machine/`, `agent/src/lsp/` | Where tools work: a project's machine over SSH as Pi's `ExecutionEnv` (`machine/ssh.ts`), a project kept in its folder (`machine/confined.ts`); its language servers (`lsp/lsp.ts`, diagnostics after every edit; `lsp/presets.ts`) |
+| `agent/src/mcp/` (`mcp.ts`, `oauth.ts`), `agent/src/telegram.ts` | MCP servers (pi-mcp, OAuth), Telegram bots (grammY, a proxy where needed) |
 
 ## How the agent uses Pi Durable
 
@@ -118,7 +117,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 
 | Piece | In Pi's terms |
 |---|---|
-| Thread | a Pi conversation in `~/.bench/pi.sqlite`; every step durable, a turn survives a restart. Bench shows its journal: `thread.open` (items after a head, the queue, the inserts' state) and the `thread.*` events from Pi's commits (`agent/src/thread.ts`) |
+| Thread | a Pi conversation in `~/.bench/pi.sqlite`; every step durable, a turn survives a restart. Bench shows its journal: `thread.open` (items after a head, the queue, the inserts' state) and the `thread.*` events from Pi's commits (`agent/src/runtime/journal.ts`) |
 | Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `session.insert`, `session.insert.patch` |
 | What the agent knows of inserts | the `inserts` prompt section, read with `input.read.snapshot(Inserts, conversationId)`, one line per kind (`prompt.ts` `inserted()`), plus `<block-state>` with each message |
 | Prompt | Pi sections (soul, environment, inserts, project, skills, notes), resent only when changed |
@@ -132,7 +131,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | `/tools` | no tool of its own: the utility's input and output come in `<block-state>` |
 | `/browser` | the Playwright MCP through `@earendil-works/pi-mcp` (`mcp__browser__*`), one tab per thread (state `{tab,url}`). The server browser is its own project, `~/Projects/browser-server-mcp` (github.com/krutovvv/browser-server-mcp) (an MCP server with a live view); Bench is one of its clients (`src/inserts/browser/gateway.rs`) |
 | Model | one for every thread of every project, set in the gear: the general agent's `defaultProvider`/`defaultModel`; a project has no model of its own. The fallback (`fallback_providers[0]`) is a pi-ai provider of ours (`fallback.ts`): the main model's error or silence sends the same request to it (Pi retries only with the same model), and the thread's `info {fallback}` shows a red chip by its repo |
-| Where tools work | Pi's `ExecutionEnv`, one per conversation (`tools-host.ts` `envFor`): `NodeExecutionEnv` on the agent's machine, `SshExecutionEnv` (`ssh-env.ts`) on a project's machine over SSH, wrapped by `confined-env.ts` for a project kept in its folder. Pi's read/write/edit/bash and our grep/glob/ls work through it unchanged |
+| Where tools work | Pi's `ExecutionEnv`, one per conversation (`runtime/tools-host.ts` `envFor`): `NodeExecutionEnv` on the agent's machine, `SshExecutionEnv` (`machine/ssh.ts`) on a project's machine over SSH, wrapped by `machine/confined.ts` for a project kept in its folder. Pi's read/write/edit/bash and our grep/glob/ls work through it unchanged |
 | Compaction | Pi's compaction policy; a project's share of the window becomes a per-model override under its own provider (`project_<id>.<provider>`), through a getter Pi reads at every use (`compactionOverrides`) |
 | After an edit | a `ToolTask` `afterTool` hook adds the file's diagnostics from the project's language servers (`lsp.ts`) to edit and write results |
 | Read and edit | Pi's `read` wrapped to show every line as `LINE:HASH|text`, and an `edit` of the same name that changes lines by those anchors (`builtin/hashline.ts`): no old text to reproduce, a stale anchor refused with the lines as they are now, the changed lines returned with new anchors. An edit with `oldText`/`newText` is Pi's own edit |
@@ -140,7 +139,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Schedule | a durable `defineTask` per job that sleeps until its next run (`builtin/cron.ts`) |
 | Background processes | `process` (`builtin/process.ts`): a background task of the conversation (`bench.process`, `background`, `abandonOnRestart`) that runs the command in its `ExecutionEnv`, its output's tail in the checkpoint, its exit the outcome; Bench reads the task records from Pi's commits (`thread.process`). A restart of the agent ends it for good ("stopped by restart") |
 | Subagents | `delegate`: child conversations owned by the tool's task (`builtin/subagent.ts`) |
-| MCP | `@earendil-works/pi-mcp`, a project's `mcp.json`; OAuth via `mcp-oauth.ts` (callback on `localhost:47823`) |
+| MCP | `@earendil-works/pi-mcp`, a project's `mcp.json`; OAuth via `mcp/oauth.ts` (callback on `localhost:47823`) |
 | Telegram | grammY, one bot per project, the same Pi conversations; `TELEGRAM_PROXY` or `HTTPS_PROXY` in the agent's env |
 
 Extend with Pi's packages and popular ones before writing your own. When something in Pi is

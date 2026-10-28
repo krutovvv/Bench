@@ -95,7 +95,7 @@ test("skills: a project's own, its folder's .agents/skills and .claude/skills up
 });
 
 test("a title asks a thinking-by-default server not to think; OpenRouter, OpenAI and Anthropic are left to Pi", async () => {
-	const { noThinking } = await import("../src/thinking.ts");
+	const { noThinking } = await import("../src/runtime/thinking.ts");
 	const local = { api: "openai-completions", baseUrl: "http://192.168.1.10:8000/v1" };
 	assert.deepEqual(noThinking({ model: "q", max_tokens: 400 }, local), { model: "q", max_tokens: 400, chat_template_kwargs: { enable_thinking: false } });
 	assert.equal(noThinking({}, { api: "openai-completions", baseUrl: "https://openrouter.ai/api/v1" }), undefined);
@@ -180,7 +180,7 @@ test("telegram: a batch keeps the order the messages came in and waits for voice
 });
 
 const { Store } = await import("../src/store.ts");
-const { totalsOf, usagePayload } = await import("../src/usage.ts");
+const { totalsOf, usagePayload } = await import("../src/runtime/usage.ts");
 
 test("usage: a thread's counters are kept and come back on a fresh store", () => {
 	const st = new Store();
@@ -199,7 +199,7 @@ test("usage: a thread's counters are kept and come back on a fresh store", () =>
 });
 
 test("a waiting message keeps its attachments and block state when its words are fixed", async () => {
-	const { withText } = await import("../src/queue.ts");
+	const { withText } = await import("../src/runtime/queue.ts");
 	// Plain words.
 	assert.equal(withText("old", "new"), "new");
 	// The block state Bench sent with it stays for the model.
@@ -214,7 +214,7 @@ test("a waiting message keeps its attachments and block state when its words are
 		{ type: "image", data: "AAA", mimeType: "image/png" },
 	]);
 	// Reading what we wrote gives the new words back, without the block state.
-	const { stripBlock } = await import("../src/thread.ts");
+	const { stripBlock } = await import("../src/runtime/journal.ts");
 	assert.equal(stripBlock(withText("old\n\n<block-state>\nx\n</block-state>", "new")), "new");
 });
 

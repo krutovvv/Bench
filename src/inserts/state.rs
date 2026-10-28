@@ -1,7 +1,7 @@
 //! The person's inserts: tools put into a thread with "/" (the terminal, the task lists, the
 //! utilities, the browser's tab). A thread is a document of messages and inserts; an insert is
 //! the person's, sits where it was put, and stays live. The agent keeps them (a Pi entry where
-//! each was put, a document of their state: agent/src/inserts.ts); Bench changes them through
+//! each was put, a document of their state: agent/src/runtime/inserts.ts); Bench changes them through
 //! the agent and reads them from the thread's journal — the app keeps that list for the inserts'
 //! kinds (`inserts_from`). Each kind's look and behaviour: `crate::inserts`.
 

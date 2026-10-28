@@ -36,14 +36,14 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change a /tools utility | `crates/devtools/src/` (pure functions with tests) |
 | change what Bench sends or receives | a method or an event: `crates/protocol` (`rpc.rs` one type per method with its answer, `event.rs`, `thread.rs`), its handler in `agent/src/modules/`, Bench's side `app.request`/`send`/`send_at` (`src/app/agents.rs`), events in `src/app/events.rs`; the socket `src/client/rpc/`; REST `src/client/rest/` |
 | change the agent's answer to an RPC or a REST route | `agent/src/modules/<area>.ts` |
-| change how the agent runs a thread | `agent/src/runtime.ts` (the core) and its part for the job (`stream.ts`, `queue.ts`, `hold.ts`, `asks.ts`, `inserts.ts`, `title.ts`, `models.ts`); what Bench reads of it: `agent/src/thread.ts` |
-| change how work is done on a server (a project's machine over SSH) | `agent/src/ssh-env.ts` (Pi's `ExecutionEnv`; its tests are Pi's conformance suite, `test/ssh-env.test.ts`) |
+| change how the agent runs a thread | `agent/src/runtime/runtime.ts` (the core) and its part for the job (`stream.ts`, `queue.ts`, `hold.ts`, `asks.ts`, `inserts.ts`, `title.ts`, `models.ts`); what Bench reads of it: `agent/src/runtime/journal.ts` |
+| change how work is done on a server (a project's machine over SSH) | `agent/src/machine/ssh.ts` (Pi's `ExecutionEnv`; its tests are Pi's conformance suite, `test/ssh-env.test.ts`) |
 | change the agents Bench talks to (this Mac's, servers') | `src/app/agents.rs` (links), the list of servers' agents in `agent/src/builtin/servers.ts`; adding/removing in `src/settings/agent_form.rs` |
 | change where a project lives (agent, machine, folder) or how the sidebar's projects are put together | `src/app/places.rs` (`ProjectKey`, `Location` in `src/app/model.rs`); its rows in `src/env/place.rs` |
-| keep a project's agent in its folder | `agent/src/confined-env.ts` |
+| keep a project's agent in its folder | `agent/src/machine/confined.ts` |
 | change the presets (MCP, LSP, compaction, reasoning levels) | defaults in `agent/src/builtin/presets.ts`; Bench's side `src/settings/presets.rs`, the gear's tab in `src/settings/mod.rs` |
 | change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts`; grep, glob, ls: `agent/src/builtin/search.ts` |
-| change a project's language servers (diagnostics after every edit; the editor's problems, hover, definition via `agent/src/modules/lsp.ts`) | `agent/src/lsp.ts`, the presets in `agent/src/lsp-presets.ts`; the section `src/env/lsp.rs` |
+| change a project's language servers (diagnostics after every edit; the editor's problems, hover, definition via `agent/src/modules/lsp.ts`) | `agent/src/lsp/lsp.ts`, the presets in `agent/src/lsp/presets.ts`; the section `src/env/lsp.rs` |
 | change when a project's conversations are compacted | `compactionPolicy` in `agent/src/config.ts`; the row in `src/env/run.rs` |
 | change the demo (screenshots) | `src/demo/` (`mod.rs` what each `BENCH_DEMO` opens, `threads.rs`, `env.rs` the blog project, `inserts.rs` servers and tasks, `journal.rs`) |
 

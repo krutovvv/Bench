@@ -5,7 +5,7 @@ import http from "node:http";
 import { test } from "node:test";
 import { createModels, createProvider, type Model } from "@earendil-works/pi-ai";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import { fallbackProvider } from "../src/fallback.ts";
+import { fallbackProvider } from "../src/runtime/fallback.ts";
 
 /** An OpenAI-compatible endpoint: `say` streams an answer, "500" refuses, "hang" never answers. */
 async function endpoint(say: string): Promise<{ base: string; hits: () => number; key: () => string; close: () => void }> {

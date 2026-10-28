@@ -13,10 +13,10 @@ process.env.BENCH_AGENT_NO_MCP = "1";
 process.env.PI_OFFLINE = "1";
 after(() => fs.rmSync(home, { recursive: true, force: true }));
 
-const { Runtime } = await import("../src/runtime.ts");
+const { Runtime } = await import("../src/runtime/runtime.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 const { Store } = await import("../src/store.ts");
-const { totalsOf, usagePayload } = await import("../src/usage.ts");
+const { totalsOf, usagePayload } = await import("../src/runtime/usage.ts");
 
 test("the counters of a turn are saved and read back after a restart", async () => {
 	let rt = new Runtime(() => {});

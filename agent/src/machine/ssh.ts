@@ -38,7 +38,7 @@ import {
 } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { BACKGROUND_CONTEXT as BACKGROUND } from "@earendil-works/chord/context";
-import { BENCH_HOME } from "./config.ts";
+import { BENCH_HOME } from "../config.ts";
 
 const posix = path.posix;
 

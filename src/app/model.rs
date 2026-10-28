@@ -62,7 +62,7 @@ impl ThreadRow {
 
 /// A piece the person put into a thread with "/" (the terminal, the tasks, the utilities, the
 /// browser's tab): kept by the agent as a Pi entry where it was put and a document of its state
-/// (agent/src/inserts.ts), read from the thread's journal (`Thread::insert_list`). Its look and
+/// (agent/src/runtime/inserts.ts), read from the thread's journal (`Thread::insert_list`). Its look and
 /// behaviour: `crate::inserts`.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Insert {

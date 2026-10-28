@@ -6,7 +6,7 @@ how to change it without breaking what it promises.
 ## The pipeline
 
 ```
-Pi's journal (agent)          agent/src/thread.ts     entries → ThreadItem (user, thought, tool, result, text, insert, fail)
+Pi's journal (agent)          agent/src/runtime/journal.ts     entries → ThreadItem (user, thought, tool, result, text, insert, fail)
   thread.open {since}         agent/src/modules/threads.ts   items after a head + the queue + the inserts' state
   thread.append/stream/…      from Pi's commits (subscribeCommits), one event per change
         ↓

@@ -12,7 +12,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-navigate-"));
 process.env.BENCH_HOME = home;
 
-const { writeLsp } = await import("../src/lsp.ts");
+const { writeLsp } = await import("../src/lsp/lsp.ts");
 const { lspTool, spotOf } = await import("../src/builtin/navigate.ts");
 const { setHost } = await import("../src/host.ts");
 const { NodeExecutionEnv } = await import("@earendil-works/pi-durable/env/node");

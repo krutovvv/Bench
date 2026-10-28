@@ -3,7 +3,7 @@
 
 import { gitRoot, type Ctx, type Module } from "../http.ts";
 import { projects } from "../builtin/projects.ts";
-import { speedOf } from "../usage.ts";
+import { speedOf } from "../runtime/usage.ts";
 
 export default ({ rt }: Ctx): Module => ({
 	rpc: {

@@ -24,7 +24,7 @@ lists what is Pi's, what is a package and what is ours.
   - `projects/<id>/` — a project's environment (wire name `project:<id>`, `agentDir` in
     `config.ts`: SYSTEM.md, mcp.json, lsp.json, skills/, prompts/ on top of the default agent's
     memory and settings);
-  - `ssh/` (the ControlMaster sockets, `ssh-env.ts`), `lsp/` (language servers installed here,
+  - `ssh/` (the ControlMaster sockets, `machine/ssh.ts`), `lsp/` (language servers installed here,
     `lsp.ts`), `mcp-oauth/` (MCP tokens), `backups/` (before a migration), `ui/` (Bench's own state),
     `attachments/`, `server.json`, `app/` (the installed server).
 - **Extensions** are the unit of behaviour (Pi's term; not "harness" — in Pi that word is the
@@ -79,7 +79,7 @@ lists what is Pi's, what is a package and what is ours.
 
 Each piece is Pi's own mechanism used as documented; only the glue is ours.
 
-- **Inserts** (`agent/src/inserts.ts`, `build-insert.md`): an entry `bench.insert` {id, key}
+- **Inserts** (`agent/src/runtime/inserts.ts`, `build-insert.md`): an entry `bench.insert` {id, key}
   written into the transcript where the person put it (a write, not a turn: never queued, lands
   mid-run), and the conversation's document `bench.inserts` ({items: {id: {key, state, folded,
   removed, after?}}}) changed in commits (`session.insert`, `session.insert.patch` in `modules/threads.ts`, broadcast
@@ -119,7 +119,7 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
 - **MCP** (`mcp.ts`): per agent dir, `mcp.json` in Pi's format, via `@earendil-works/pi-mcp`
   (stdio or streamable HTTP); tools named `mcp__<server>__<tool>`; `exposure` direct / deferred
   (behind `tool_search`) / hidden, big servers deferred by default. OAuth for HTTP servers that
-  ask for it: `mcp-oauth.ts` (pi-mcp's oauth: discovery, PKCE, registration, refresh; tokens in
+  ask for it: `mcp/oauth.ts` (pi-mcp's oauth: discovery, PKCE, registration, refresh; tokens in
   `~/.bench/mcp-oauth/`, callback on `localhost:47823`).
 - **Telegram** (`telegram.ts`, grammY): the general bot (Host) and one per project that has its own
   (`projects.telegram`); a project's bot runs with `project:<id>` and its chats are that project's
@@ -127,13 +127,13 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   `syncTelegram` starts and stops bots as settings change. Where Telegram is reachable only
   through a proxy: `TELEGRAM_PROXY`, else `HTTPS_PROXY`, in the agent's env.
 - **Where tools work** (`runtime.ts` `envFor`): Pi's `ExecutionEnv` per conversation —
-  `NodeExecutionEnv` here, `SshExecutionEnv` (`ssh-env.ts`, one OpenSSH ControlMaster connection
-  per server) on a project's machine, wrapped by `confined-env.ts` when the project is kept in its
+  `NodeExecutionEnv` here, `SshExecutionEnv` (`machine/ssh.ts`, one OpenSSH ControlMaster connection
+  per server) on a project's machine, wrapped by `machine/confined.ts` when the project is kept in its
   folder (paths outside refused; commands run in a sandbox that writes only there and in the temp
   folders: `sandbox-exec` on macOS, bubblewrap on Linux when installed). Pi's read/write/edit/bash and ours work through it unchanged.
 - **grep, glob, ls** (`builtin/search.ts`): code search without bash, through `api.env`.
 - **Diagnostics** (`lsp.ts`): the project's `lsp.json` names its language servers (presets in
-  `lsp-presets.ts`); a `ToolTask` `afterTool` hook (`extensions/assistant.ts`) adds the edited
+  `lsp/presets.ts`); a `ToolTask` `afterTool` hook (`extensions/assistant.ts`) adds the edited
   file's errors to `edit` and `write` results; a `diagnostics` tool asks for them.
 - **Approvals**: with approvals set to manual, a `beforeTool` hook asks the person
   (`host().approve`) before a dangerous `bash` command; "deny" blocks it.

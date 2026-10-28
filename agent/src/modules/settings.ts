@@ -6,7 +6,7 @@ import pkg from "../../package.json" with { type: "json" };
 import { deepMerge, deleteProvider, getSetting, providers, readAgent, readConfig, readEnv, saveProvider, setEnv as storeEnv, setSetting, writeAgent } from "../config.ts";
 import { listSkills as skillsOf } from "../builtin/skills.ts";
 import { HttpError, agentOf, type Ctx, type Module } from "../http.ts";
-import { mcpStatus } from "../mcp.ts";
+import { mcpStatus } from "../mcp/mcp.ts";
 
 /**
  * `PUT /api/config`: each top-level key merges into its setting. The reasoning level and the

@@ -9,7 +9,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { startServer } from "./server.ts";
 
-const { SPEED_SAMPLES } = await import("../src/usage.ts");
+const { SPEED_SAMPLES } = await import("../src/runtime/usage.ts");
 
 test("the speed of an answer is kept with the thread and comes back when it opens", async () => {
 	const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-speed-"));

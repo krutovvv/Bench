@@ -12,7 +12,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-process-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
-const { Runtime } = await import("../src/runtime.ts");
+const { Runtime } = await import("../src/runtime/runtime.ts");
 const { listen } = await import("./listen.ts");
 const { ProcessTask, keepTail } = await import("../src/builtin/process.ts");
 const { BACKGROUND_CONTEXT: ctx } = await import("@earendil-works/chord/context");

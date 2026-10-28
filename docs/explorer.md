@@ -110,7 +110,7 @@ Phases, each a thing of its own:
    to the left, to the right, saved, all; copy the path; add to the thread); the
    right dock's panels; references from the code to the thread.
 2. **Language servers through the agent** (in the editor: done). The servers the threads use
-   (`agent/src/lsp.ts`) answer the editor too: `POST /api/lsp/{diagnostics,hover,definition}`
+   (`agent/src/lsp/lsp.ts`) answer the editor too: `POST /api/lsp/{diagnostics,hover,definition}`
    (`agent/src/modules/lsp.ts`) with the file's text as typed; `explorer/lsp.rs` gives the
    editor its providers — problems underlined (checked on open, save and a pause in typing),
    the hover, ⌘-click or F12 to the definition (another file opens as a tab). The project's

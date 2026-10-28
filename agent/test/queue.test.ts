@@ -16,9 +16,9 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-queue-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
 
-const { moveToFront } = await import("../src/queue.ts");
+const { moveToFront } = await import("../src/runtime/queue.ts");
 const { saveProvider, writeAgent } = await import("../src/config.ts");
-const { Runtime } = await import("../src/runtime.ts");
+const { Runtime } = await import("../src/runtime/runtime.ts");
 const { listen } = await import("./listen.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 

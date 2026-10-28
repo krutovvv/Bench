@@ -8,7 +8,7 @@
 //!
 //! This file has the trait, `KINDS`, the words of the "/" list and the block every insert sits
 //! in (title, its menu, controls, fold, remove), drawn by the `ThreadView` it is in. `state.rs` here keeps the thread's inserts in
-//! step with the agent (agent/src/inserts.ts).
+//! step with the agent (agent/src/runtime/inserts.ts).
 //!
 //! A new kind: a folder like `tools/` whose unit struct implements `InsertKind` (its "/" word
 //! and what follows it are the trait's `word` and `choices`), a line in `KINDS`, its app-wide

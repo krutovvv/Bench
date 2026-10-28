@@ -31,9 +31,9 @@ and projects on servers: `docs/remote-projects.md` (and `build-projects.md`). In
   - `server.ts` collects `modules/*.ts` (each declares its RPC methods and REST routes);
   - `runtime.ts` runs Pi conversations (`envFor`: each one's `ExecutionEnv`); `thread.ts` turns
     Pi's journal into the items Bench shows;
-  - `ssh-env.ts` — a project's machine over SSH as Pi's `ExecutionEnv`; `confined-env.ts` — a
+  - `machine/ssh.ts` — a project's machine over SSH as Pi's `ExecutionEnv`; `machine/confined.ts` — a
     project kept in its folder; `lsp.ts` — its language servers (diagnostics after every edit),
-    `lsp-presets.ts` the ones it can take with one click;
+    `lsp/presets.ts` the ones it can take with one click;
   - `builtin/` — the agent's own tools and stores; among them `search.ts` (grep, glob, ls),
     `servers.ts` (the list of servers' agents, setting `agents`, `/api/agents`), `presets.ts`
     (the presets' defaults, setting `presets`).

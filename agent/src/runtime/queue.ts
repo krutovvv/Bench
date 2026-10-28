@@ -15,7 +15,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { InboxDoc, type SubmissionId } from "@earendil-works/pi-durable";
 import { randomUUID } from "node:crypto";
 import type { Live, Runtime } from "./runtime.ts";
-import { BLOCK_CLOSE, BLOCK_OPEN, textOf } from "./thread.ts";
+import { BLOCK_CLOSE, BLOCK_OPEN, textOf } from "./journal.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 

@@ -8,8 +8,8 @@
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { defineDoc } from "@earendil-works/pi-durable";
-import { allowCommand, readAgent, readConfig } from "./config.ts";
-import type { Ask } from "./protocol.gen.ts";
+import { allowCommand, readAgent, readConfig } from "../config.ts";
+import type { Ask } from "../protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
 
 const ctx = BACKGROUND_CONTEXT;

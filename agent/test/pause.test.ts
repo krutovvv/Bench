@@ -15,7 +15,7 @@ process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
 
 const { saveProvider, writeAgent } = await import("../src/config.ts");
-const { Runtime } = await import("../src/runtime.ts");
+const { Runtime } = await import("../src/runtime/runtime.ts");
 const { listen } = await import("./listen.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 

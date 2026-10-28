@@ -40,8 +40,8 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
   the end; no flash when an entry replaces what was streamed. `references/build-thread.md`.
 - **Projects and agents** — `ProjectKey` and `Location` (`src/app/model.rs`), `src/app/places.rs`
   the only place that says where a project lives, `src/app/agents.rs` the links to agents;
-  the agent works on a project's machine through Pi's `ExecutionEnv` (`agent/src/ssh-env.ts`,
-  `confined-env.ts`). `references/build-projects.md`.
+  the agent works on a project's machine through Pi's `ExecutionEnv` (`agent/src/machine/ssh.ts`,
+  `machine/confined.ts`). `references/build-projects.md`.
 
 ## The shape of every change
 

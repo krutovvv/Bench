@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { ThreadEvent, ThreadItem } from "../src/protocol.gen.ts";
-import { changesOf, compactionsOf, COMPACTION_KIND, FAIL_KIND, INBOX_KIND, INSERTS_KIND, itemsOf, itemsOfAll, queueOf, Requests } from "../src/thread.ts";
+import { changesOf, compactionsOf, COMPACTION_KIND, FAIL_KIND, INBOX_KIND, INSERTS_KIND, itemsOf, itemsOfAll, queueOf, Requests } from "../src/runtime/journal.ts";
 
 const user = (id: number, text: string) => ({ id, conversationId: 7, kind: "pi.user", model: [{ role: "user", content: text, timestamp: 1000 + id }] });
 const assistant = (id: number, content: any[], extra: any = {}) => ({ id, conversationId: 7, kind: "pi.assistant", model: [{ role: "assistant", content, timestamp: 1000 + id, ...extra }] });
@@ -171,7 +171,7 @@ test("on a real Pi: commits reach the thread as thread.* events, and thread.open
 	const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-thread-"));
 	process.env.BENCH_HOME = home;
 	process.env.BENCH_AGENT_NO_MCP = "1";
-	const { Runtime } = await import("../src/runtime.ts");
+	const { Runtime } = await import("../src/runtime/runtime.ts");
 	const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 	const { listen } = await import("./listen.ts");
 	const events: ThreadEvent[] = [];

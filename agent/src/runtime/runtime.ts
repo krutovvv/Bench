@@ -17,22 +17,22 @@ import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { Asks } from "./asks.ts";
-import { arm, jobs, setScheduler } from "./builtin/cron.ts";
-import { Processes } from "./builtin/process.ts";
-import { projects } from "./builtin/projects.ts";
-import { AGENT_HOME, agents, defaultCwd, getSetting, readAgent, readConfig, reasoningEffort, setSetting } from "./config.ts";
-import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
+import { arm, jobs, setScheduler } from "../builtin/cron.ts";
+import { Processes } from "../builtin/process.ts";
+import { projects } from "../builtin/projects.ts";
+import { AGENT_HOME, agents, defaultCwd, getSetting, readAgent, readConfig, reasoningEffort, setSetting } from "../config.ts";
+import { forAgent, installMcp, loadExtensions } from "../extensions.ts";
 import { HoldDoc, Holds, type Hold } from "./hold.ts";
-import { setHost } from "./host.ts";
+import { setHost } from "../host.ts";
 import { envFor, hostOf } from "./tools-host.ts";
 import { ThreadInserts, type InsertView } from "./inserts.ts";
-import { ensureMcp } from "./mcp.ts";
+import { ensureMcp } from "../mcp/mcp.ts";
 import { Models, thinking } from "./models.ts";
-import type { Ask, Event, ThreadEvent } from "./protocol.gen.ts";
+import type { Ask, Event, ThreadEvent } from "../protocol.gen.ts";
 import { Queue } from "./queue.ts";
-import { Store, type ThreadRow } from "./store.ts";
+import { Store, type ThreadRow } from "../store.ts";
 import { Stream } from "./stream.ts";
-import { BLOCK_CLOSE, BLOCK_OPEN, Journal } from "./thread.ts";
+import { BLOCK_CLOSE, BLOCK_OPEN, Journal } from "./journal.ts";
 import { Titles } from "./title.ts";
 import { totalsOf, type Totals } from "./usage.ts";
 
@@ -141,7 +141,7 @@ export class Runtime {
 			models: this.models.pi,
 			registry,
 			// Pi's coding tools work in the conversation's directory — on its project's machine, when
-			// that is another one (`ssh-env.ts`).
+			// that is another one (`machine/ssh.ts`).
 			env: ({ conversationId, cwd }: any) => envFor(String(conversationId), cwd),
 			identity: { attribution: { name: "bench-agent", url: "https://github.com/krutovvv/bench" } },
 			settings: {

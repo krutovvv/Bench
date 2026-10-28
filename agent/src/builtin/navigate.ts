@@ -11,8 +11,8 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { host } from "../host.ts";
-import { definitionAt, hoverAt, indexing, outlineOf, readLsp, referencesAt, symbolsNamed, type Place, type Spot, type Symbol } from "../lsp.ts";
-import { machineEnv, quote } from "../ssh-env.ts";
+import { definitionAt, hoverAt, indexing, outlineOf, readLsp, referencesAt, symbolsNamed, type Place, type Spot, type Symbol } from "../lsp/lsp.ts";
+import { machineEnv, quote } from "../machine/ssh.ts";
 import { projects } from "./projects.ts";
 
 /** A file a tool named, where it is and what it holds now (on the project's machine, if any). */

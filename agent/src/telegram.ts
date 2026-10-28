@@ -19,7 +19,7 @@ import { transcribe } from "./audio.ts";
 import { approvalsMode, BENCH_HOME, getSetting, homeAgent, agentEnv, reasoningEffort, resolveModel } from "./config.ts";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { projects } from "./builtin/projects.ts";
-import type { RunListener, Runtime } from "./runtime.ts";
+import type { RunListener, Runtime } from "./runtime/runtime.ts";
 
 const MAX = 4096;
 const EDIT_EVERY_MS = 1500;

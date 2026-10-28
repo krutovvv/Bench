@@ -7,7 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { adaptOAuthProvider, authorizeMcp, McpOAuthAuthorizationRequiredError, McpOAuthProvider, OAuthCallbackServer, type McpOAuthState } from "@earendil-works/pi-mcp/oauth";
-import { AGENT_HOME } from "./config.ts";
+import { AGENT_HOME } from "../config.ts";
 
 /** Where the browser comes back after signing in: fixed, so a registered client stays valid. */
 const CALLBACK_PORT = Number(process.env.BENCH_MCP_OAUTH_PORT ?? 47823);

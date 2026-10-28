@@ -6,7 +6,7 @@
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { InboxDoc } from "@earendil-works/pi-durable";
-import { processOf } from "./builtin/process.ts";
+import { processOf } from "../builtin/process.ts";
 import { Inserts } from "./inserts.ts";
 
 /** A tool call in one line: what it acts on (a command, a path, a query…). */
@@ -23,7 +23,7 @@ export function preview(name: string, args: any): string {
 }
 
 // The items and the queue are typed in crates/protocol: Bench reads them with the same types.
-import type { Inserts as InsertStates, PlanStep, Process, QueuedItem, ThreadItem, ThreadOpen } from "./protocol.gen.ts";
+import type { Inserts as InsertStates, PlanStep, Process, QueuedItem, ThreadItem, ThreadOpen } from "../protocol.gen.ts";
 import type { Runtime } from "./runtime.ts";
 import { speedOf } from "./usage.ts";
 export type { QueuedItem, ThreadItem };

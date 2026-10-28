@@ -9,8 +9,8 @@ import { projects } from "../builtin/projects.ts";
 import { listSkills } from "../builtin/skills.ts";
 import { readSkill, skillsFor } from "../repo.ts";
 import { HttpError, type Ctx, type Module } from "../http.ts";
-import { authorizeServer, connectMcp, mcpStatus } from "../mcp.ts";
-import { lspNeeds, lspStates, parseLspSpec, readLsp, writeLsp, writeLspServer } from "../lsp.ts";
+import { authorizeServer, connectMcp, mcpStatus } from "../mcp/mcp.ts";
+import { lspNeeds, lspStates, parseLspSpec, readLsp, writeLsp, writeLspServer } from "../lsp/lsp.ts";
 import { reconnectTelegram, syncTelegram, telegramStatus } from "../telegram.ts";
 import { cronView } from "./cron.ts";
 

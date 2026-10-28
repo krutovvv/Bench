@@ -4,7 +4,7 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import { db, renameOld } from "./config.ts";
-import { speedOf, totalsOf, type SpeedStat, type Totals } from "./usage.ts";
+import { speedOf, totalsOf, type SpeedStat, type Totals } from "./runtime/usage.ts";
 
 export interface ThreadRow {
 	id: string;

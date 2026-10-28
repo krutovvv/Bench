@@ -11,7 +11,7 @@ import { after, test } from "node:test";
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-lsp-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_SSH = path.join(import.meta.dirname, "fake-ssh.sh");
-const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates, parseLspSpec, writeLspServer, problemsOf, hoverAt, definitionAt, knownProblems } = await import("../src/lsp.ts");
+const { writeLsp, readLsp, diagnosticsFor, knownDiagnostics, lspNeeds, lspStates, parseLspSpec, writeLspServer, problemsOf, hoverAt, definitionAt, knownProblems } = await import("../src/lsp/lsp.ts");
 after(() => {
 	writeLsp("project:p1", {});
 	fs.rmSync(home, { recursive: true, force: true });

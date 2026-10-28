@@ -4,9 +4,9 @@
 // shows what is known now.
 //
 // A server runs where the project's files are: on this agent's machine, or — a project this agent
-// works on a server — on that server through the same SSH connection (`ssh-env.ts`), so its paths
+// works on a server — on that server through the same SSH connection (`machine/ssh.ts`), so its paths
 // are the files' own. Bench installs what a server needs there itself, once, into its own folder
-// (`~/.bench/lsp`, `${LSP}` in lsp.json): npm packages and stub files (`lsp-presets.ts` has the
+// (`~/.bench/lsp`, `${LSP}` in lsp.json): npm packages and stub files (`lsp/presets.ts` has the
 // usual ones). It starts on the first file it knows and stays while the agent runs. JSON-RPC is
 // Microsoft's vscode-jsonrpc, as VS Code speaks it.
 //
@@ -21,8 +21,8 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createMessageConnection, StreamMessageReader, StreamMessageWriter, type MessageConnection } from "vscode-jsonrpc/node.js";
-import { agentDir, BENCH_HOME } from "./config.ts";
-import { machineEnv, quote, sshOptions } from "./ssh-env.ts";
+import { agentDir, BENCH_HOME } from "../config.ts";
+import { machineEnv, quote, sshOptions } from "../machine/ssh.ts";
 
 /** One server of a project's lsp.json. `${LSP}` anywhere in it is Bench's folder for them there. */
 export interface LspSpec {

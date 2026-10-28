@@ -36,7 +36,7 @@ import { agentDir, agents, readAgent } from "./config.ts";
 import { createAnchoredEdit, createAnchoredRead } from "./builtin/hashline.ts";
 import { assistant, images } from "./extensions/assistant.ts";
 import { host } from "./host.ts";
-import { mcpTools } from "./mcp.ts";
+import { mcpTools } from "./mcp/mcp.ts";
 import * as prompt from "./prompt.ts";
 
 

@@ -1,5 +1,5 @@
 // The machine's files as Bench reads and writes them: /files, a skill's tree, attachments. /api/fs/* take an optional `machine` (an ~/.ssh/config alias): a project this agent
-// works on a server (`ssh-env.ts`) has its files there. Either way they go through Pi's
+// works on a server (`machine/ssh.ts`) has its files there. Either way they go through Pi's
 // `ExecutionEnv` — this machine's, or that one's over SSH.
 
 import { execFile } from "node:child_process";
@@ -9,7 +9,7 @@ import path from "node:path";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { dataUrl, expand, HttpError, isDir, required, type Module } from "../http.ts";
-import { machineEnv } from "../ssh-env.ts";
+import { machineEnv } from "../machine/ssh.ts";
 
 /** A path on `machine` (its `~` its login directory) and its environment there; None: this one's. */
 export async function onMachine(machine: string | null | undefined, p: string) {

@@ -16,7 +16,7 @@ const root = path.join(top, "project");
 fs.mkdirSync(root);
 fs.writeFileSync(path.join(top, "secret.txt"), "outside");
 after(() => fs.rmSync(top, { recursive: true, force: true }));
-const { confined } = await import("../src/confined-env.ts");
+const { confined } = await import("../src/machine/confined.ts");
 const env = confined(new NodeExecutionEnv({ cwd: root }), root, true);
 
 test("file tools: inside works, outside is refused — reading too", async () => {

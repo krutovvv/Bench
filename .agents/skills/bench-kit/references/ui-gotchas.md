@@ -3,7 +3,7 @@
 Read when something behaves oddly or doesn't compile. Paths: widgets `gpui_kit::component::*`,
 core `gpui_kit::*`. One exact name you can't find: the agent's `diagnostics` tool and the
 errors after each edit come from the project's language servers (rust-analyzer in its
-`lsp.json`, `agent/src/lsp.ts`) — read them before reading the framework's sources.
+`lsp.json`, `agent/src/lsp/lsp.ts`) — read them before reading the framework's sources.
 
 ## Compile errors that already happened (and the fix)
 

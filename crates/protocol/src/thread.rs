@@ -270,7 +270,7 @@ pub struct ThreadOpen {
     pub head: u64,
 }
 
-/// The thread's inserts by id (agent/src/inserts.ts, the `bench.inserts` document).
+/// The thread's inserts by id (agent/src/runtime/inserts.ts, the `bench.inserts` document).
 pub type Inserts = BTreeMap<String, InsertState>;
 
 /// One insert's state: what it is, what it shows, how it sits in the thread.

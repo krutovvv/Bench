@@ -8,7 +8,7 @@ built and how to grow it without patches.
 | | What | Where it is in code |
 |---|---|---|
 | **Agent** | a process of `agent/` that runs threads: this Mac's (key `""`) or a server's (its ~/.ssh/config alias) | links: `src/app/agents.rs` (`AgentLink`, `conn_of`, `route`); the list of servers' agents: kept by the Mac's agent, `agent/src/builtin/servers.ts`, `/api/agents` |
-| **Machine** | where a project's files and commands are: the agent's own, or a server this Mac's agent reaches over SSH | `agent/src/ssh-env.ts` (`SshExecutionEnv`, Pi's `ExecutionEnv` over one OpenSSH ControlMaster connection) |
+| **Machine** | where a project's files and commands are: the agent's own, or a server this Mac's agent reaches over SSH | `agent/src/machine/ssh.ts` (`SshExecutionEnv`, Pi's `ExecutionEnv` over one OpenSSH ControlMaster connection) |
 | **Project** | name, environment, its agent, its machine, its folder, kept in it or not | the agent's `projects` table (`agent/src/builtin/projects.ts`); in Bench `ProjectEntry` |
 
 In Bench:
@@ -27,7 +27,7 @@ In Bench:
 ## The agent side
 
 - A conversation's environment: `Runtime.envFor` — the project's machine (`SshExecutionEnv` or
-  `NodeExecutionEnv`), wrapped by `confined-env.ts` when the project is kept in its folder. Pi's
+  `NodeExecutionEnv`), wrapped by `machine/confined.ts` when the project is kept in its folder. Pi's
   tools and ours (grep, glob, ls) work through it and never know where they are.
 - `/api/fs/*` take `machine`: the same environment, so Bench's file views and a thread's media reach
   the project's machine through its agent (`agent/src/modules/files.ts`).
@@ -36,7 +36,7 @@ In Bench:
 - What the folder itself says — AGENTS.md / CLAUDE.md up to the repository's root, `.agents/skills`
   and `.claude/skills` — is read where the folder is: `agent/src/repo.ts` (one script over the
   connection, kept 30 s). Never `fs` a project's folder in the agent: it may be on a server.
-- One server's connection carries at most six commands at once (`ssh-env.ts` `Gate`: sshd's
+- One server's connection carries at most six commands at once (`machine/ssh.ts` `Gate`: sshd's
   MaxSessions is 10); a command whose connection dropped says so in its output.
 - What a machine lacks for a project's language servers (Node, a program) is the server's
   "failed: …" state before any starts (`lsp.ts` `lspNeeds`), red in the Language servers section.

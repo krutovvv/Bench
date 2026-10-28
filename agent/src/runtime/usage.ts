@@ -2,7 +2,7 @@
 // The agent owns these numbers (only it sees the API's usage frames), so it also keeps them:
 // Bench's status bar reads the same figures after a restart that it showed while the work ran.
 
-import type { SpeedStat, Usage } from "./protocol.gen.ts";
+import type { SpeedStat, Usage } from "../protocol.gen.ts";
 
 /** The counters of one thread. `input` is the last call's window (≈ the context in use);
  *  `output` and `calls` add up over the thread; `tps` is the last turn's blended rate. */

@@ -2,7 +2,7 @@
 // text in files, `glob` for files by name, `ls` for a folder's tree. Without them the model built
 // every search out of bash (grep, find, sed -n …p) and paged files in small windows — most of a
 // long thread's steps. They run through the conversation's execution environment, so on a
-// project's server they search the server (`ssh-env.ts`). ripgrep when it is there; grep and find
+// project's server they search the server (`machine/ssh.ts`). ripgrep when it is there; grep and find
 // otherwise. .git, node_modules, target and the like are left out.
 
 import { defineTool } from "@earendil-works/pi-durable";

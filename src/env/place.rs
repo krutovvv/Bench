@@ -1,7 +1,7 @@
 //! Where the project lives (`docs/remote-projects.md`), fields of General: its agent (this Mac's,
 //! or a server's — its address and whether it answers), the machine its work is on when that is
 //! another (this Mac's agent over SSH), and its folder — which can be changed, and the agent kept
-//! in it (`agent/src/confined-env.ts`). Agent and machine are chosen when the project is made.
+//! in it (`agent/src/machine/confined.ts`). Agent and machine are chosen when the project is made.
 
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::h_flex;

@@ -6,11 +6,11 @@
 import { createModels, createProvider, type Model } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
-import { projects } from "./builtin/projects.ts";
-import { agents, compactionAt, compactionPolicy, resolveFallback, resolveModel, type ModelChoice } from "./config.ts";
+import { projects } from "../builtin/projects.ts";
+import { agents, compactionAt, compactionPolicy, resolveFallback, resolveModel, type ModelChoice } from "../config.ts";
 import { fallbackProvider } from "./fallback.ts";
-import type { ThreadInfo } from "./protocol.gen.ts";
-import type { ThreadRow } from "./store.ts";
+import type { ThreadInfo } from "../protocol.gen.ts";
+import type { ThreadRow } from "../store.ts";
 
 /** A model as `configure()` names it. */
 export type ModelRef = { provider: string; modelId: string };

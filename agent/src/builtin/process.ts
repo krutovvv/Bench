@@ -14,7 +14,7 @@ import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/conte
 import { defineTask, defineTool, type ConversationId } from "@earendil-works/pi-durable";
 import { host } from "../host.ts";
 import type { Process } from "../protocol.gen.ts";
-import type { Runtime } from "../runtime.ts";
+import type { Runtime } from "../runtime/runtime.ts";
 
 export const PROCESS_KIND = "bench.process";
 

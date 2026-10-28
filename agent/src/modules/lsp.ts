@@ -5,7 +5,7 @@
 import { defaultCwd } from "../config.ts";
 import { projects } from "../builtin/projects.ts";
 import { HttpError, required, type Module } from "../http.ts";
-import { definitionAt, hoverAt, knownProblems, problemsOf, type Spot } from "../lsp.ts";
+import { definitionAt, hoverAt, knownProblems, problemsOf, type Spot } from "../lsp/lsp.ts";
 import { onMachine } from "./files.ts";
 
 /** A project's servers: its agent, the folder they run in, and its machine. "general" is Host. */

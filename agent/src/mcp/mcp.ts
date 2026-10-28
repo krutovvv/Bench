@@ -8,12 +8,12 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
 import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent } from "@earendil-works/pi-mcp";
-import { authorize, authProviderFor, needsAuth, oauthProvider } from "./mcp-oauth.ts";
+import { authorize, authProviderFor, needsAuth, oauthProvider } from "./oauth.ts";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, agentMcp, agents, agentEnv } from "./config.ts";
+import { agentDir, agentMcp, agents, agentEnv } from "../config.ts";
 
 /** Without `exposure`: servers with more tools than this are deferred behind tool_search. */
 const DEFER_OVER = 12;

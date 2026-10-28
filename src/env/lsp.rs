@@ -1,5 +1,5 @@
 //! The project's language servers (its lsp.json, as Crush's lsp section): after every edit the
-//! agent gets the file's errors from them (`agent/src/lsp.ts`). A row per server with a sign of
+//! agent gets the file's errors from them (`agent/src/lsp/lsp.ts`). A row per server with a sign of
 //! how it is doing — running, not started yet (it starts with the first file it knows), failed
 //! and why; its card is its own entry of lsp.json as JSON, as an MCP server's (`mcp.rs`). "+ Add"
 //! offers the usual ones (each installs itself on first use, on the machine where the project's

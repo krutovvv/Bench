@@ -6,7 +6,7 @@ import type http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import type { Event, Methods } from "./protocol.gen.ts";
-import type { Runtime } from "./runtime.ts";
+import type { Runtime } from "./runtime/runtime.ts";
 
 export type Req = http.IncomingMessage & { body?: any; query: URLSearchParams; path: string };
 export type Route = (req: Req) => Promise<any> | any;

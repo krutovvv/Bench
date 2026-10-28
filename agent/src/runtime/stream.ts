@@ -7,10 +7,10 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { AgentEvent } from "@earendil-works/pi-durable";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
-import { resolveModel } from "./config.ts";
-import type { Usage } from "./protocol.gen.ts";
+import { resolveModel } from "../config.ts";
+import type { Usage } from "../protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
-import { FAIL_KIND } from "./thread.ts";
+import { FAIL_KIND } from "./journal.ts";
 import { usagePayload } from "./usage.ts";
 
 const ctx = BACKGROUND_CONTEXT;

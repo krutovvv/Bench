@@ -5,7 +5,7 @@
 // spec, so a server's projects take this machine's presets too.
 
 import { getSetting, setSetting } from "../config.ts";
-import { LSP_PRESETS } from "../lsp-presets.ts";
+import { LSP_PRESETS } from "../lsp/presets.ts";
 
 export interface Presets {
 	/** name → { title, spec as in mcp.json } */

@@ -6,7 +6,7 @@
 // restart places the one already made; any failure leaves the compaction to Pi, as before.
 
 import { CompactionTask, DEFAULT_COMPACTION_POLICY, AgentDoc, hook } from "@earendil-works/pi-durable";
-import { noThinking } from "../thinking.ts";
+import { noThinking } from "../runtime/thinking.ts";
 
 const SYSTEM = `You are a context summarization assistant. Your task is to read a conversation between a user and an AI assistant, then produce a structured summary following the exact format specified.
 

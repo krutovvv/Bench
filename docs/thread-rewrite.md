@@ -177,7 +177,7 @@ crates/composer/       поле ввода, вложения, диктовка
 crates/sidebar/        проекты и треды
 crates/inserts/        по крейту на вставку: terminal, tasks, tools, browser
 crates/bench/          main.rs: собирает окно из крейтов выше, своего кода почти нет
-agent/src/thread.ts    журнал Pi → протокол
+agent/src/runtime/journal.ts    журнал Pi → протокол
 ```
 
 Правила для всего проекта:
@@ -196,7 +196,7 @@ agent/src/thread.ts    журнал Pi → протокол
 
 Каждый шаг — отдельный коммит, приложение собирается и работает между шагами.
 
-1. **Протокол в агенте** — `agent/src/thread.ts`, снимок + append + queue из журнала Pi, тесты
+1. **Протокол в агенте** — `agent/src/runtime/journal.ts`, снимок + append + queue из журнала Pi, тесты
    на порядок в `agent/test/`. Старые события пока шлются параллельно.
 2. **Ядро треда в Bench** — `crates/thread/` (первый крейт workspace), правила порядка как тесты.
 3. **Новая отрисовка** — `crates/thread_view/` + `crates/ui/` на `gpui::list`, переключение на новый протокол.

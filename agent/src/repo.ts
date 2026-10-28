@@ -1,6 +1,6 @@
 // What a project's own folder says to the agent: its instructions (AGENTS.md or CLAUDE.md) and its
 // skills (.agents/skills, .claude/skills), from the folder up to its repository's root — read where
-// the folder is. On this agent's machine from the disk; on a project's server (`ssh-env.ts`) with
+// the folder is. On this agent's machine from the disk; on a project's server (`machine/ssh.ts`) with
 // one script over the same connection, kept for a short while, since every turn's prompt asks.
 
 import { execFileSync } from "node:child_process";
@@ -10,7 +10,7 @@ import path from "node:path";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { projects } from "./builtin/projects.ts";
 import { frontMatter, listSkills, repoSkillDirs, skillsIn, type Skill } from "./builtin/skills.ts";
-import { machineEnv, quote } from "./ssh-env.ts";
+import { machineEnv, quote } from "./machine/ssh.ts";
 
 /** One instructions file: its path and what it says (at most 20 000 characters). */
 export interface Instructions {

@@ -22,7 +22,7 @@ Telegram bot, scheduled jobs) is not an insert: it is the project's Settings pag
 
 ## How it is kept: Pi's terms
 
-The agent keeps the inserts (`agent/src/inserts.ts`), so they are durable and every window sees
+The agent keeps the inserts (`agent/src/runtime/inserts.ts`), so they are durable and every window sees
 the same:
 - an **entry** `bench.insert` {id, key} in the conversation's transcript, written where it was
   put (a Pi *write*: the model doesn't see it, it is never queued, it lands at once even mid-run);

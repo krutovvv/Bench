@@ -12,9 +12,9 @@ process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
 after(() => fs.rmSync(home, { recursive: true, force: true }));
 
-const { Inserts, insertsOf, patchInsert } = await import("../src/inserts.ts");
+const { Inserts, insertsOf, patchInsert } = await import("../src/runtime/inserts.ts");
 const { inserted } = await import("../src/prompt.ts");
-const { Runtime } = await import("../src/runtime.ts");
+const { Runtime } = await import("../src/runtime/runtime.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 
 test("inserts sit after the messages they were put after", () => {
@@ -26,7 +26,7 @@ test("inserts sit after the messages they were put after", () => {
 		{ kind: "bench.insert", data: { id: "i3", key: "tools" } },
 		{ kind: "pi.user" },
 	];
-	const doc: { items: Record<string, import("../src/inserts.ts").InsertState> } = {
+	const doc: { items: Record<string, import("../src/runtime/inserts.ts").InsertState> } = {
 		items: {
 			// i1 sits where its entry says; i2 was moved down the thread (a message that went
 			// after it); i3's "after" is nonsense, so its entry decides.

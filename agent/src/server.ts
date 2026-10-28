@@ -16,7 +16,7 @@ import { AGENT_HOME, migrateProfiles, migrateProjectModels } from "./config.ts";
 import { migrateServerRows } from "./builtin/servers.ts";
 import { expand, HttpError, readBody, type Dynamic, type Module, type Req, type Route } from "./http.ts";
 import type { Event } from "./protocol.gen.ts";
-import { connectMcp, mcpStatus } from "./mcp.ts";
+import { connectMcp, mcpStatus } from "./mcp/mcp.ts";
 import agents from "./modules/agents.ts";
 import presetsModule from "./modules/presets.ts";
 import audio from "./modules/audio.ts";
@@ -28,7 +28,7 @@ import projects from "./modules/projects.ts";
 import settings from "./modules/settings.ts";
 import tasks from "./modules/tasks.ts";
 import threads from "./modules/threads.ts";
-import { Runtime } from "./runtime.ts";
+import { Runtime } from "./runtime/runtime.ts";
 import { onTasksChanged } from "./builtin/tasks.ts";
 import { syncTelegram } from "./telegram.ts";
 

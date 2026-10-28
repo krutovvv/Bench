@@ -20,7 +20,7 @@ import { sshRun } from "../builtin/ssh.ts";
 import { tasksTool } from "../builtin/tasks.ts";
 import { host } from "../host.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
-import { Inserts } from "../inserts.ts";
+import { Inserts } from "../runtime/inserts.ts";
 
 const of = (input: any) => host().thread(input.conversationId);
 const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined | Promise<string | undefined>) => (input: any) => {
@@ -41,7 +41,7 @@ const DANGEROUS: [RegExp, string][] = [
 import { globTool, grepTool, lsTool } from "../builtin/search.ts";
 import { createAnchoredEdit, createAnchoredRead } from "../builtin/hashline.ts";
 import { lspTool, placeOf } from "../builtin/navigate.ts";
-import { diagnosticsFor, knownDiagnostics } from "../lsp.ts";
+import { diagnosticsFor, knownDiagnostics } from "../lsp/lsp.ts";
 
 /** What the project's language servers say: about one file, or everything they have seen. */
 const diagnosticsTool = defineTool({

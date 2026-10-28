@@ -3,14 +3,14 @@
 
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
-import { projects } from "./builtin/projects.ts";
-import { confined } from "./confined-env.ts";
-import { host, type Host, type ThreadFacts } from "./host.ts";
-import { warmUp } from "./lsp.ts";
+import { projects } from "../builtin/projects.ts";
+import { confined } from "../machine/confined.ts";
+import { host, type Host, type ThreadFacts } from "../host.ts";
+import { warmUp } from "../lsp/lsp.ts";
 import { runToCompletion } from "./run.ts";
 import type { Runtime } from "./runtime.ts";
-import { machineEnv } from "./ssh-env.ts";
-import type { ThreadRow } from "./store.ts";
+import { machineEnv } from "../machine/ssh.ts";
+import type { ThreadRow } from "../store.ts";
 
 /** The runtime as its tools' host. */
 export function hostOf(rt: Runtime): Host {
@@ -59,6 +59,6 @@ export async function envFor(conversationId: string, cwd: string | undefined): P
 	// they know it when the agent asks (`lsp` tool, diagnostics after an edit).
 	if (s) warmUp(s.agent, s.cwd, p?.machine ?? undefined);
 	const env: ExecutionEnv = p?.machine ? await machineEnv(p.machine, cwd || p.folder || "") : new NodeExecutionEnv({ cwd: cwd || process.env.HOME || "/" });
-	// Kept in its folder: its tools and commands stay there (`confined-env.ts`).
+	// Kept in its folder: its tools and commands stay there (`machine/confined.ts`).
 	return p?.confined && p.folder ? confined(env, env.cwd, !p.machine) : env;
 }

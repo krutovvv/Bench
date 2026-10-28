@@ -1,6 +1,6 @@
 // What the agent's tools may ask of the server: which session a conversation is, put a question
 // or an approval to the person (Bench's card, Telegram's buttons), run a prompt in a session of
-// its own. The runtime installs itself here at start (`tools-host.ts`). Light on purpose: every
+// its own. The runtime installs itself here at start (`runtime/tools-host.ts`). Light on purpose: every
 // tool imports it.
 
 export interface ThreadFacts {
@@ -17,7 +17,7 @@ export interface ThreadFacts {
 }
 
 import type { Process } from "./protocol.gen.ts";
-import type { RunEvent } from "./runtime.ts";
+import type { RunEvent } from "./runtime/runtime.ts";
 
 export interface Host {
 	thread(conversationId: string | number): ThreadFacts | undefined;

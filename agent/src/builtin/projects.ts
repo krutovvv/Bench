@@ -18,10 +18,10 @@ export interface Project {
 	host?: string | null;
 	/**
 	 * The machine its work is done on, when not this agent's own: an ~/.ssh/config alias here. Its
-	 * threads' files and commands are there (`ssh-env.ts`), its folder is a path on it.
+	 * threads' files and commands are there (`machine/ssh.ts`), its folder is a path on it.
 	 */
 	machine?: string | null;
-	/** Its agent works in its folder and nowhere else (`confined-env.ts`). */
+	/** Its agent works in its folder and nowhere else (`machine/confined.ts`). */
 	confined?: boolean;
 	/** Its own Telegram bot: { token, allowed_users: [ids], username (once it ran) }. */
 	telegram?: { token: string; allowed_users: string[]; username?: string } | null;
