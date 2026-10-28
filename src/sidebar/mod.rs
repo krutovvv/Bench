@@ -55,8 +55,6 @@ impl BenchApp {
             for (g, (p, rows)) in groups.into_iter().enumerate() {
                 list.extend(self.render_project(g + 1, &p, rows, cx));
             }
-            // A new project is one more row of the list, where projects are: the last.
-            list.push(self.render_new_project_row(cx));
         }
 
         v_flex()
@@ -89,6 +87,9 @@ impl BenchApp {
                         )
                     }),
             )
+            // Pinned under the list, as Notes' "New Folder": always in the same place, however
+            // long the list is.
+            .child(self.render_new_project_row(cx))
             .into_any_element()
     }
 
@@ -196,16 +197,19 @@ impl BenchApp {
         out
     }
 
-    /// "New project": a row of the list's last group, muted, its "+" where a row's text starts.
+    /// "New project": the sidebar's foot, a "+" and the words where a row's text starts, muted
+    /// until hovered, over a hairline as a Mac's sidebar bottom bar.
     fn render_new_project_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let on = self.new_project.form.is_some();
         h_flex()
             .id("new-project")
+            .flex_none()
+            .h(px(bench_ui::STATUS_H))
             .pl(px(bench_ui::SIDEBAR_TEXT_X))
             .pr(px(bench_ui::SIDEBAR_ROW_INSET))
-            .pt(px(bench_ui::GROUP_GAP))
-            .pb(px(bench_ui::GROUP_HEAD_PB))
+            .border_t_1()
+            .border_color(theme.border.opacity(0.6))
             .gap_1p5()
             .items_center()
             .cursor_pointer()

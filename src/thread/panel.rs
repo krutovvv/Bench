@@ -2,8 +2,7 @@
 //! a document it is the open thread; beside the open thread it is a second one (`beside_thread`,
 //! `beside.rs`).
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, v_flex};
+use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
@@ -65,18 +64,14 @@ impl BenchApp {
                 .child(div().flex_1().min_h_0().child(view))
                 .into_any_element();
         }
-        // A document in the middle: the new thread is spelled out, as "New project" is —
-        // a bare plus said nothing. Closing is the status bar's sparkle pressed off (⌘J),
-        // not a cross of this panel's own.
+        // A document in the middle: a new thread is the compose button Mail and Notes have,
+        // its words in the tooltip. Closing is the status bar's sparkle pressed off (⌘J), not a
+        // cross of this panel's own.
         let head = bench_ui::ide_head(
             title,
             None,
             vec![
-                Button::new("thread-new")
-                    .ghost()
-                    .small()
-                    .child(div().text_xs().child("New Thread"))
-                    .text_color(theme.muted_foreground)
+                bench_ui::icon_button("thread-new", Ico::SquarePen, "New thread  ⌘N", false, cx)
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.new_thread_here(cx);
                         this.focus_composer(window, cx);

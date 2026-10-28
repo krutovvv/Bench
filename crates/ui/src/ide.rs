@@ -17,8 +17,8 @@ pub fn tree_pl(depth: usize) -> Pixels {
     px(8. + TREE_INDENT * depth as f32)
 }
 
-/// A group's title in the tree ("Prompts", "This project"): small, muted, its actions on the
-/// right, always shown.
+/// A group's title in the tree ("Agent", "Project"): a section header as the threads panel's
+/// (11 pt semibold, secondary, in its own case), its actions on the right, always shown.
 pub fn tree_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx: &App) -> Div {
     let theme = cx.theme();
     let title: SharedString = title.into();
@@ -28,7 +28,7 @@ pub fn tree_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx
         .px_3()
         .gap_1()
         .items_center()
-        .text_xs()
+        .text_size(px(crate::metrics::SIDEBAR_HEAD_TEXT))
         .font_weight(FontWeight::SEMIBOLD)
         .text_color(theme.muted_foreground)
         .child(
@@ -36,7 +36,7 @@ pub fn tree_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx
                 .flex_1()
                 .min_w_0()
                 .truncate()
-                .child(title.to_uppercase()),
+                .child(title),
         )
         .children(actions)
 }
@@ -141,16 +141,23 @@ pub fn ide_head(
         .gap_3()
         .items_center()
         .border_b_1()
-        .border_color(theme.border)
-        .bg(theme.muted.opacity(0.35))
-        .text_sm()
-        .child(div().flex_none().child(title.into()))
+        .border_color(theme.border.opacity(0.6))
+        // A pane's title as Xcode's: the bar's title size, semibold; its note quieter.
+        .text_size(px(crate::metrics::BAR_TEXT))
+        .child(
+            div()
+                .flex_none()
+                .max_w_2_3()
+                .truncate()
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(title.into()),
+        )
         .child(
             div()
                 .flex_1()
                 .min_w_0()
                 .truncate()
-                .text_color(theme.muted_foreground)
+                .text_color(crate::text::faint(theme))
                 .children(note),
         )
         .children(actions)

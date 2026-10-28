@@ -123,6 +123,7 @@ icons! {
     UserRound => "user-round",
     Volume => "volume-2",
     Search => "search",
+    SquarePen => "square-pen",
     X => "x",
     BookCheck => "book-check",
     Wrench => "wrench",
