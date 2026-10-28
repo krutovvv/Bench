@@ -41,10 +41,10 @@ test("one that would overflow has its largest old blocks cut, the last message n
 	const sizes = out.map((m: any) => JSON.stringify(m.content).length);
 	const total = Math.ceil(sizes.reduce((a: number, b: number) => a + b, 0) / CHARS_PER_TOKEN);
 	assert.ok(total < W * 0.88, `fits with room for the answer (${total})`);
-	assert.match(out[2].content[0].text, /kept whole in the thread, cut here/);
-	assert.equal(out[4].content[0].text, "small");
-	assert.equal(out[5].content[0].text.length, 30_000, "the last message whole");
-	assert.equal(msgs[2].content[0].text.length, 156_000, "the journal's messages untouched");
+	assert.match((out[2].content[0] as any).text, /kept whole in the thread, cut here/);
+	assert.equal((out[4].content[0] as any).text, "small");
+	assert.equal((out[5].content[0] as any).text.length, 30_000, "the last message whole");
+	assert.equal((msgs[2].content[0] as any).text.length, 156_000, "the journal's messages untouched");
 });
 
 test("what the provider counted beyond the estimate makes the next request cut sooner", () => {

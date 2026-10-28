@@ -38,6 +38,8 @@ interface Server {
 	error?: string;
 	/** It asked for OAuth: "Authorize" signs in. */
 	needsAuth?: boolean;
+	/** When it was last tried (ms): one that failed is tried again a while later (`ensureMcp`). */
+	tried?: number;
 }
 
 /** key: "<agent>/<server>" */
@@ -82,52 +84,71 @@ export async function connectMcp(agent?: string, timeoutMs = 30000): Promise<voi
 	}
 }
 
-/** An agent's servers connect with its first session, not all at the server's start. */
+/** A server that failed is tried again with a message this long after, no sooner. */
+const RETRY_MS = 60_000;
+/** How long such a retry may hold the message up. */
+const RETRY_TIMEOUT_MS = 5_000;
+
+/**
+ * An agent's servers connect with its first session, not all at the server's start; again when its
+ * mcp.json changed. A server that did not answer (down, restarting) is tried again with a later
+ * message, a minute apart: before, one that failed once stayed out until mcp.json changed, and
+ * its tools were missing from every thread (the browser on dev, down when the agent started).
+ */
 export async function ensureMcp(agent: string): Promise<boolean> {
-	if (connected.has(agent) && connectedAt.get(agent) === mcpMtime(agent)) return false;
-	await connectMcp(agent);
-	return true;
+	if (!connected.has(agent) || connectedAt.get(agent) !== mcpMtime(agent)) {
+		await connectMcp(agent);
+		return true;
+	}
+	const failed = [...servers.values()].filter((s) => s.agent === agent && !s.client && !s.needsAuth && Date.now() - (s.tried ?? 0) >= RETRY_MS);
+	if (!failed.length) return false;
+	const env = agentEnv(agent);
+	const specs = agentMcp(agent);
+	await Promise.all(failed.map((s) => connectServer(agent, s.name, specs[s.name], env, RETRY_TIMEOUT_MS)));
+	return failed.some((s) => servers.get(`${agent}/${s.name}`)?.client);
 }
 
 async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 	await Promise.all([...servers.entries()].filter(([, s]) => s.agent === agent).map(([k, s]) => (servers.delete(k), s.client?.close().catch(() => {}))));
 	const env = agentEnv(agent);
-	await Promise.all(
-		Object.entries(agentMcp(agent)).map(async ([name, raw]: [string, any]) => {
-			if (!raw || raw.enabled === false) return;
-			const spec = fill(raw, env);
-			const server: Server = { agent, name, tools: [] };
-			servers.set(`${agent}/${name}`, server);
-			try {
-				const client = new McpClient({ name: "bench", version: "1.0.0" });
-				const transport = spec.url
-					? httpTransport(agent, name, spec)
-					: stdioTransport(agent, spec, env);
-				await withTimeout(client.connect(transport), timeoutMs, "connect timed out");
-				server.client = client;
-				const listed = await withTimeout(client.listTools(), timeoutMs, "tools/list timed out");
-				server.tools = listed
-					.map((t: any) => ({ t, exposure: exposureOf(spec, t.name, listed.length) }))
-					.filter(({ exposure }) => exposure !== "hidden")
-					.map(({ t, exposure }) =>
-						defineTool({
-							name: mcpName(name, t.name),
-							description: t.description || `${t.name} (MCP server ${name})`,
-							parameters: Type.Unsafe({ ...t.inputSchema, type: "object", properties: t.inputSchema?.properties ?? {} }),
-							deferred: exposure !== "direct",
-							execute: async (args: any, _api: any, context: any) => {
-								const result = await client.callTool(t.name, args ?? {}, { signal: context?.abortSignal, timeout: (spec.timeout ?? 60) * 1000 } as any);
-								return { output: toLlmContent(result) as any, ...(result.isError ? { isError: true } : {}) };
-							},
-						} as any),
-					);
-			} catch (e) {
-				server.needsAuth = Boolean(spec.url) && needsAuth(e);
-				server.error = server.needsAuth ? "needs signing in" : explain(String((e as Error)?.message ?? e));
-				console.error(`[mcp] ${agent}/${name}: ${server.error}`);
-			}
-		}),
-	);
+	await Promise.all(Object.entries(agentMcp(agent)).map(([name, raw]: [string, any]) => connectServer(agent, name, raw, env, timeoutMs)));
+}
+
+/** One server of an agent, connected anew: its tools, or why not. */
+async function connectServer(agent: string, name: string, raw: any, env: Record<string, string>, timeoutMs: number): Promise<void> {
+	if (!raw || raw.enabled === false) return;
+	await servers.get(`${agent}/${name}`)?.client?.close().catch(() => {});
+	const spec = fill(raw, env);
+	const server: Server = { agent, name, tools: [], tried: Date.now() };
+	servers.set(`${agent}/${name}`, server);
+	try {
+		const client = new McpClient({ name: "bench", version: "1.0.0" });
+		const transport = spec.url
+			? httpTransport(agent, name, spec)
+			: stdioTransport(agent, spec, env);
+		await withTimeout(client.connect(transport), timeoutMs, "connect timed out");
+		server.client = client;
+		const listed = await withTimeout(client.listTools(), timeoutMs, "tools/list timed out");
+		server.tools = listed
+			.map((t: any) => ({ t, exposure: exposureOf(spec, t.name, listed.length) }))
+			.filter(({ exposure }) => exposure !== "hidden")
+			.map(({ t, exposure }) =>
+				defineTool({
+					name: mcpName(name, t.name),
+					description: t.description || `${t.name} (MCP server ${name})`,
+					parameters: Type.Unsafe({ ...t.inputSchema, type: "object", properties: t.inputSchema?.properties ?? {} }),
+					deferred: exposure !== "direct",
+					execute: async (args: any, _api: any, context: any) => {
+						const result = await client.callTool(t.name, args ?? {}, { signal: context?.abortSignal, timeout: (spec.timeout ?? 60) * 1000 } as any);
+						return { output: toLlmContent(result) as any, ...(result.isError ? { isError: true } : {}) };
+					},
+				} as any),
+			);
+	} catch (e) {
+		server.needsAuth = Boolean(spec.url) && needsAuth(e);
+		server.error = server.needsAuth ? "needs signing in" : explain(String((e as Error)?.message ?? e));
+		console.error(`[mcp] ${agent}/${name}: ${server.error}`);
+	}
 }
 
 /** A command server's transport. A project worked on a server runs it there, in its folder, through
