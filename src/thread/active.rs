@@ -2,7 +2,7 @@
 //! run and how fast it writes, its project. Its `ThreadView` (`view.rs`) holds it with the
 //! composer; the app routes each of the thread's events to the views showing it (`app/events.rs`).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use protocol::{StreamKind, ThreadEvent, ThreadId, ThreadItem};
 
@@ -35,10 +35,14 @@ pub struct ActiveThread {
     pub live: Option<Live>,
     /// The first message of a thread not made yet: its request id and words, sent once it is.
     pub queued: Option<(String, String)>,
-    /// The "Changed files" list under the last turn is unfolded (folded by default).
-    pub files_open: bool,
-    /// The changed files' list shows them all, past its first ten.
-    pub files_all: bool,
+    /// The "Changed files" blocks unfolded, by their row's key (folded by default;
+    /// `rows/changed_files.rs`), and those showing all their files past the first ten.
+    pub files_open: HashSet<String>,
+    pub files_all: HashSet<String>,
+    /// Files whose diff shows under their row: (block, path); the diffs read so far (None:
+    /// being read).
+    pub diffs_open: HashSet<(String, String)>,
+    pub diffs: HashMap<(String, String), Option<String>>,
     /// The works whose background processes' card is unfolded (`thread/processes.rs`), and
     /// the process whose output is shown.
     pub processes_open: HashSet<String>,
@@ -78,8 +82,10 @@ impl Default for ActiveThread {
             loaded: false,
             live: None,
             queued: None,
-            files_open: false,
-            files_all: false,
+            files_open: HashSet::new(),
+            files_all: HashSet::new(),
+            diffs_open: HashSet::new(),
+            diffs: HashMap::new(),
             processes_open: HashSet::new(),
             process_open: None,
             speed: Meter::fresh(),

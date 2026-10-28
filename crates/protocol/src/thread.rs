@@ -129,6 +129,17 @@ pub enum ThreadItem {
         #[serde(default)]
         multi: bool,
     },
+    /// What a turn changed in the repository the thread works in (`agent/src/runtime/turns.ts`):
+    /// the trees at its start and end, and each file that differs. Written after the turn's answer.
+    Changes {
+        key: String,
+        #[ts(type = "number")]
+        seq: u64,
+        root: String,
+        base: String,
+        head: String,
+        files: Vec<FileChange>,
+    },
     /// A question's answer ("" is a decline): it settles the [`ThreadItem::Ask`] of the same id.
     Asked {
         key: String,
@@ -139,6 +150,19 @@ pub enum ThreadItem {
         #[serde(default)]
         answer: Option<String>,
     },
+}
+
+/// A file a turn changed: its absolute path and lines added and removed.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+pub struct FileChange {
+    pub path: String,
+    #[ts(type = "number")]
+    pub add: u64,
+    #[ts(type = "number")]
+    pub del: u64,
+    #[ts(optional)]
+    #[serde(default)]
+    pub binary: Option<bool>,
 }
 
 /// One step of the agent's plan.
@@ -165,6 +189,7 @@ impl ThreadItem {
             | ThreadItem::Fail { key, .. }
             | ThreadItem::Plan { key, .. }
             | ThreadItem::Ask { key, .. }
+            | ThreadItem::Changes { key, .. }
             | ThreadItem::Asked { key, .. } => key,
         }
     }
@@ -180,6 +205,7 @@ impl ThreadItem {
             | ThreadItem::Fail { seq, .. }
             | ThreadItem::Plan { seq, .. }
             | ThreadItem::Ask { seq, .. }
+            | ThreadItem::Changes { seq, .. }
             | ThreadItem::Asked { seq, .. } => *seq,
         }
     }
@@ -196,6 +222,7 @@ impl ThreadItem {
             | ThreadItem::Fail { .. }
             | ThreadItem::Plan { .. }
             | ThreadItem::Ask { .. }
+            | ThreadItem::Changes { .. }
             | ThreadItem::Asked { .. } => None,
         }
     }

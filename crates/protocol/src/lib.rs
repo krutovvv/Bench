@@ -56,6 +56,7 @@ pub fn typescript() -> String {
     let mut decls = vec![
         ThreadItem::decl(),
         PlanStep::decl(),
+        FileChange::decl(),
         QueuedItem::decl(),
         QueueMode::decl(),
         ThreadOpen::decl(),

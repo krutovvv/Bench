@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use protocol::{Hold, Inserts, PlanStep, Process, QueuedItem, ThreadItem};
+use protocol::{FileChange, Hold, Inserts, PlanStep, Process, QueuedItem, ThreadItem};
 use serde_json::Value;
 
 use crate::state::Pressed;
@@ -50,6 +50,15 @@ pub enum Row {
     },
     /// Why a run stopped.
     Fail { key: String, text: String },
+    /// What a turn changed in its repository, under its answer: the trees at its start and end
+    /// (a file's diff of the turn is read from them) and the files.
+    Changes {
+        key: String,
+        root: String,
+        base: String,
+        head: String,
+        files: Vec<FileChange>,
+    },
     /// The answer being written now (its text; the model's reasoning is not shown while it streams).
     Writing { text: String },
     /// A message waiting for the agent.
@@ -99,6 +108,7 @@ impl Row {
             | Row::Answer { key, .. }
             | Row::Insert { key, .. }
             | Row::Fail { key, .. }
+            | Row::Changes { key, .. }
             | Row::Queued { key, .. } => key,
             Row::Writing { .. } => "writing",
         }
@@ -323,6 +333,23 @@ pub(crate) fn rows_of(
                 rows.push(Row::Fail {
                     key: key.clone(),
                     text: text.clone(),
+                });
+            }
+            ThreadItem::Changes {
+                key,
+                root,
+                base,
+                head,
+                files,
+                ..
+            } => {
+                close(&mut rows, &mut work);
+                rows.push(Row::Changes {
+                    key: key.clone(),
+                    root: root.clone(),
+                    base: base.clone(),
+                    head: head.clone(),
+                    files: files.clone(),
                 });
             }
             // The plan is the work's first `todo` call; a later one in the same work ticks it.

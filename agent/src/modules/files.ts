@@ -43,7 +43,7 @@ async function shIn(machine: string | null, dir: string, script: string, args: s
 }
 
 /** What a POSIX script run in `dir` printed, whole (`shIn` runs it). */
-async function shOut(machine: string | null, dir: string, script: string, args: string[]): Promise<string> {
+export async function shOut(machine: string | null, dir: string, script: string, args: string[]): Promise<string> {
 	const full = `cd "$1" || exit 1; shift; ${script}`;
 	const m = await onMachine(machine, dir);
 	let out = "";
@@ -176,6 +176,15 @@ export default (): Module => ({
 		},
 		// The Explorer's editor marks the lines changed since the last commit (`git show HEAD:`).
 		"GET /api/git/head": async (req) => ({ text: await textAtHead(req.query.get("machine"), required(req.query.get("path"), "path")) }),
+		// A file as a tree has it (a turn's start or end, `runtime/turns.ts`): its text, or null
+		// when the tree has no such file (made, or removed, in that turn).
+		"GET /api/git/show": async (req) => {
+			const root = required(req.query.get("root"), "root");
+			const rel = path.posix.relative(root, required(req.query.get("path"), "path"));
+			const script = `if git cat-file -e "$1:$2" 2>/dev/null; then printf T; git show "$1:$2"; else printf N; fi`;
+			const out = await shOut(req.query.get("machine"), root, script, [required(req.query.get("tree"), "tree"), rel]);
+			return { text: out.startsWith("T") ? out.slice(1) : null };
+		},
 		// The Explorer dims what git ignores: the ignored paths of the repository around a folder,
 		// from its root (--directory folds an ignored folder into one line: node_modules/). Not a
 		// repository: an empty list. Ignored-but-tracked files (-c -i) are dimmed too, as in Zed.

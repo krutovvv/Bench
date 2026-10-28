@@ -37,6 +37,12 @@ enum Tab {
         machine: Option<String>,
         path: String,
     },
+    TurnDiff {
+        project: String,
+        machine: Option<String>,
+        path: String,
+        turn: crate::explorer::pane::doc::Turn,
+    },
 }
 
 impl Tab {
@@ -62,6 +68,12 @@ impl Tab {
                 project: f.project,
                 machine: f.machine,
                 path: f.path,
+            },
+            DocKey::TurnDiff { file, turn } => Tab::TurnDiff {
+                project: file.project,
+                machine: file.machine,
+                path: file.path,
+                turn,
             },
         }
     }
@@ -98,6 +110,19 @@ impl Tab {
                 machine,
                 path,
             }),
+            Tab::TurnDiff {
+                project,
+                machine,
+                path,
+                turn,
+            } => DocKey::TurnDiff {
+                file: FileRef {
+                    project,
+                    machine,
+                    path,
+                },
+                turn,
+            },
         })
     }
 }

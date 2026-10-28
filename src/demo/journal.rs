@@ -131,6 +131,27 @@ impl Journal {
         });
     }
 
+    /// What the last turn changed in its repository (`bench.changes`): (path, added, removed).
+    pub(super) fn changes(&mut self, root: &str, files: &[(&str, u64, u64)]) {
+        let seq = self.next();
+        self.items.push(ThreadItem::Changes {
+            key: format!("{seq}"),
+            seq,
+            root: root.into(),
+            base: "demo-base".into(),
+            head: "demo-head".into(),
+            files: files
+                .iter()
+                .map(|(p, add, del)| protocol::FileChange {
+                    path: format!("{root}/{p}"),
+                    add: *add,
+                    del: *del,
+                    binary: None,
+                })
+                .collect(),
+        });
+    }
+
     /// Background processes, each at the next `process` call of the journal, in order.
     pub(super) fn started(&mut self, processes: Vec<Process>) {
         let calls = self.items.iter().filter_map(|it| match it {

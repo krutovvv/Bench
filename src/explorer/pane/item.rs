@@ -38,6 +38,9 @@ impl DocKey {
         match self.clone() {
             DocKey::File(f) => Box::new(crate::explorer::pane::file::FileItem(f)),
             DocKey::Diff(f) => Box::new(crate::explorer::code::git::DiffItem(f)),
+            DocKey::TurnDiff { file, turn } => {
+                Box::new(crate::explorer::code::turn_diff::TurnDiffItem { file, turn })
+            }
             DocKey::Settings { project } => Box::new(crate::env::page::SettingsItem(project)),
             DocKey::Part {
                 project,

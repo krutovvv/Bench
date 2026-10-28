@@ -31,6 +31,12 @@ Bench (`journal.ts`), the pause (`hold.ts`), the queue (`queue.ts`), questions a
 
 ## Decisions
 
+- **What a turn changed is git's view, not the tools'** (`turns.ts`): the working tree written as a
+  tree when a run starts and when it ends, through a copy of the index (the person's index,
+  branch and stash untouched), the differing files a display-only `bench.changes` entry after the
+  answer. It sees a formatter's or a script's changes as well as an edit's; outside a repository
+  nothing is written and Bench falls back to the file tools' own diffs.
+
 - **A message's id is Pi's `requestId`**, given by Bench: the row shown on Enter is matched to
   its entry by it, never by its words. A message sent while a run is live waits in Pi's inbox as a
   follow-up; "send now" steers it into the run after the current tool round.

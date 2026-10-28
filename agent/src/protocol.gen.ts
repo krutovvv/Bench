@@ -31,13 +31,15 @@ ask_kind: string, question: string,
 /**
  * Extra text under the question: the command an approval wants to run.
  */
-detail?: string, choices: Array<string>, multi: boolean, } | { "kind": "asked", key: string, seq: number, id: string, answer?: string, };
+detail?: string, choices: Array<string>, multi: boolean, } | { "kind": "changes", key: string, seq: number, root: string, base: string, head: string, files: Array<FileChange>, } | { "kind": "asked", key: string, seq: number, id: string, answer?: string, };
 
 export type PlanStep = { id: string, content: string, 
 /**
  * "pending", "in_progress", "completed", "cancelled".
  */
 status: string, parent?: string, };
+
+export type FileChange = { path: string, add: number, del: number, binary?: boolean, };
 
 export type QueuedItem = { key: string, sub: string, mode: QueueMode, text: string, 
 /**

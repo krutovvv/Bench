@@ -44,6 +44,16 @@ impl BenchApp {
 }
 
 /// The open thread's state, set up (before anything is drawn).
+/// A file's diff in the demo's turn (`thread/rows/changed_files.rs` reads a real one from git).
+pub fn turn_diff(path: &str) -> String {
+    match path.rsplit('/').next().unwrap_or(path) {
+        "landing.tsx" => "--- a/src/pages/landing.tsx\n+++ b/src/pages/landing.tsx\n@@ -12,9 +12,9 @@ export default function Landing() {\n   return (\n     <Page>\n-      <Hero title={long} subtitle={sub} />\n+      <Hero title=\"Ship faster\" />\n+      <Quotes />\n       <Features />\n-      <Quotes />\n       <Pricing />\n     </Page>\n   );\n",
+        "SignupForm.tsx" => "--- a/src/components/SignupForm.tsx\n+++ b/src/components/SignupForm.tsx\n@@ -28,8 +28,6 @@\n       <Field name=\"email\" />\n       <Field name=\"name\" />\n-      <Field name=\"companySize\" />\n-      <Field name=\"phone\" />\n       <Submit>Start free</Submit>\n",
+        _ => "No changes in text\n",
+    }
+    .to_string()
+}
+
 fn open_thread(app: &mut BenchApp, cx: &mut App, f: impl FnOnce(&mut crate::thread::ActiveThread)) {
     app.active_thread.update(cx, |v, _| f(&mut v.thread));
 }
@@ -157,6 +167,15 @@ fewer form fields. Then check what it did to signups and give me a short summary
         now - 312.0,
         252.0,
     );
+    // What the turn changed, git's view: the two edits and the lock file `npm install` rewrote.
+    journal.changes(
+        "/Users/demo/code/storefront",
+        &[
+            ("src/pages/landing.tsx", 2, 2),
+            ("src/components/SignupForm.tsx", 0, 2),
+            ("package-lock.json", 14, 9),
+        ],
+    );
     journal.started(threads::processes(now));
     let landing = journal.thread();
     if std::env::var("BENCH_DEMO").as_deref() == Ok("top") {
@@ -170,9 +189,23 @@ fewer form fields. Then check what it did to signups and give me a short summary
             });
         }
     }
-    // `BENCH_DEMO_FILES=1`: the changed files' list unfolded.
-    if std::env::var("BENCH_DEMO_FILES").is_ok() {
-        open_thread(app, cx, |t| t.files_open = true);
+    // `BENCH_DEMO_FILES=1`: the turn's changed files unfolded; `=diff` the first one's diff
+    // shown under its row.
+    if let Ok(how) = std::env::var("BENCH_DEMO_FILES") {
+        if let Some(::thread::Row::Changes { key, files, .. }) = landing
+            .rows()
+            .into_iter()
+            .find(|r| matches!(r, ::thread::Row::Changes { .. }))
+        {
+            let first = files[0].path.clone();
+            open_thread(app, cx, |t| {
+                t.files_open.insert(key.clone());
+                if how == "diff" {
+                    t.diffs_open.insert((key.clone(), first.clone()));
+                    t.diffs.insert((key, first.clone()), Some(turn_diff(&first)));
+                }
+            });
+        }
     }
     // `BENCH_DEMO_PROCS=1`: the background processes' card unfolded, its output shown.
     if std::env::var("BENCH_DEMO_PROCS").is_ok() {

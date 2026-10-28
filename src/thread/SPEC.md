@@ -56,3 +56,10 @@ deletes threads (`open.rs`).
 - Messages carry code, problems and terminal output as references (chips) that become fenced
   blocks with `path:lines` under the message's words — what the agent reads is what the thread
   shows (`explorer`).
+- **The person works in the chat; the Explorer is where they go when they choose to.** What a
+  turn changed shows under its answer as one folded line ("Changed files · N files +a −d",
+  `rows/changed_files.rs`, from `Row::Changes`); a file's diff opens in place under its row, and
+  only "Open in Code" on its hover takes it to a tab. Anything new the thread shows starts as such
+  a quiet line and unfolds on a click: no panels, no badges that ask for attention.
+- A review comment is a reference too (`Reference::Comment`, ⌘⇧L in the Explorer): `Comment <id>
+  on \`path:lines\`: <note>` with the lines fenced; the agent closes each with `resolve_comment`.

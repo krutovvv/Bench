@@ -31,6 +31,7 @@ import { Models, thinking } from "./models.ts";
 import type { Ask, Event, ThreadEvent } from "../protocol.gen.ts";
 import { Queue } from "./queue.ts";
 import { Store, type ThreadRow } from "../store.ts";
+import { Turns } from "./turns.ts";
 import { Stream } from "./stream.ts";
 import { BLOCK_CLOSE, BLOCK_OPEN, Journal } from "./journal.ts";
 import { Titles } from "./title.ts";
@@ -106,6 +107,7 @@ export class Runtime {
 	readonly inserts = new ThreadInserts(this);
 	readonly titles = new Titles(this);
 	readonly processes = new Processes(this);
+	readonly turns = new Turns(this);
 
 	private registry!: ReturnType<typeof createRegistry>;
 

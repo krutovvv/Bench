@@ -172,6 +172,28 @@ pub fn git_head(
     Ok(v["text"].as_str().map(str::to_string))
 }
 
+/// A file as a git tree has it (a turn's start or end, `agent/src/runtime/turns.ts`): its text,
+/// or None when the tree has no such file.
+pub fn git_show(
+    conn: &Connection,
+    machine: Option<&str>,
+    root: &str,
+    tree: &str,
+    path: &str,
+) -> Result<Option<String>> {
+    let v = get(
+        conn,
+        &format!(
+            "/api/git/show?root={}&tree={}&path={}{}",
+            enc(root),
+            enc(tree),
+            enc(path),
+            on(machine)
+        ),
+    )?;
+    Ok(v["text"].as_str().map(str::to_string))
+}
+
 /// The repository around `path` and what git ignores there (`/api/git/ignored`): the root, then
 /// paths relative to it — a trailing '/' marks a folded folder. "": not a repository.
 pub fn git_ignored(

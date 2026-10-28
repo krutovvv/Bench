@@ -85,13 +85,24 @@ pub enum DocKey {
     },
     /// A file's changes against HEAD, read only (`git.rs`).
     Diff(FileRef),
+    /// What one turn of a thread changed in a file: the repository's trees at its start and end
+    /// (`code/turn_diff.rs`), read only.
+    TurnDiff { file: FileRef, turn: Turn },
+}
+
+/// A turn's trees in the repository it changed (`agent/src/runtime/turns.ts`).
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Turn {
+    pub root: String,
+    pub base: String,
+    pub head: String,
 }
 
 impl DocKey {
     /// The project it belongs to.
     pub fn project(&self) -> &str {
         match self {
-            DocKey::File(f) | DocKey::Diff(f) => &f.project,
+            DocKey::File(f) | DocKey::Diff(f) | DocKey::TurnDiff { file: f, .. } => &f.project,
             DocKey::Settings { project }
             | DocKey::Part { project, .. }
             | DocKey::Problems { project } => project,

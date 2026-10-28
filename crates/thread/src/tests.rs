@@ -159,6 +159,7 @@ fn kinds(rows: &[Row]) -> Vec<String> {
             Row::Answer { text, .. } => format!("answer:{text}"),
             Row::Insert { id, .. } => format!("insert:{id}"),
             Row::Fail { text, .. } => format!("fail:{text}"),
+            Row::Changes { files, .. } => format!("changes:{}", files.len()),
             Row::Writing { text, .. } => format!("writing:{text}"),
             Row::Queued { text, .. } => format!("queued:{text}"),
         })
@@ -197,6 +198,40 @@ fn a_turn_is_message_work_answer() {
         "the result joins its call"
     );
     assert_eq!((*from, *to), (Some(2000.), Some(5000.)));
+}
+
+/// What a turn changed stands under its answer, its own row: the work and the answer before it
+/// keep their places, and the next message starts the next turn after it.
+#[test]
+fn a_turns_changes_follow_its_answer() {
+    let changes = ThreadItem::Changes {
+        key: "7".into(),
+        seq: 7,
+        root: "/p".into(),
+        base: "t0".into(),
+        head: "t1".into(),
+        files: vec![protocol::FileChange {
+            path: "/p/a.rs".into(),
+            add: 2,
+            del: 1,
+            binary: None,
+        }],
+    };
+    let t = Thread::open(ThreadOpen {
+        items: vec![
+            user(1, "go"),
+            tool(2, 0, "a"),
+            result(3, "a"),
+            text(6, 0, "Done."),
+            changes,
+            user(8, "more"),
+        ],
+        ..Default::default()
+    });
+    assert_eq!(
+        kinds(&t.rows()),
+        ["user:go", "work:1", "answer:Done.", "changes:1", "user:more"]
+    );
 }
 
 /// The plan lives in the work that wrote it: journal items, merged by id into one card that

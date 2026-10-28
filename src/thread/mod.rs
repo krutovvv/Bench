@@ -480,6 +480,18 @@ impl ThreadView {
             }
             Row::Writing { text } => self.render_writing(&text, after_work, cx),
             Row::Fail { text, .. } => self.render_fail(&text, cx),
+            Row::Changes {
+                key,
+                root,
+                base,
+                head,
+                files,
+            } => self.render_turn_changes(
+                &key,
+                crate::explorer::pane::doc::Turn { root, base, head },
+                &files,
+                cx,
+            ),
             Row::Insert { id, .. } => {
                 let els = self.render_insert_by_id(&id, window, cx);
                 v_flex().w_full().children(els).into_any_element()
