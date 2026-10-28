@@ -6,7 +6,7 @@
 // requests run side by side share its speed, so subagents beyond its slots only slow everyone.
 
 import { Type } from "@earendil-works/pi-ai";
-import { AssistantEntry, defineTool } from "@earendil-works/pi-durable";
+import { AssistantEntry, configure, defineTool, type ConversationId } from "@earendil-works/pi-durable";
 import { providers, resolveModel } from "../config.ts";
 import { host, sessionOf } from "../host.ts";
 
@@ -49,11 +49,14 @@ export const delegate = defineTool({
 	replay: "safe",
 	execute: async (args, api, context) => {
 		const parent = sessionOf(api.conversationId);
-		const children: string[] = await api.commit(async (tx: any) => {
-			const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, 16)).items.map((c: any) => c.id);
+		// The children are made and set up in one commit, as Pi's README shows: each starts as a
+		// copy of this conversation's agent, less `delegate` (no subagents of its own).
+		const children: ConversationId[] = await api.commit(async (tx) => {
+			const existing = (await tx.scanConversations({ ownerTaskId: api.taskId }, 16)).items.map((c) => c.id);
 			const ids = [...existing];
 			for (let i = existing.length; i < args.tasks.length; i++) {
 				const created = await tx.createConversation({ ownership: { kind: "task", taskId: api.taskId } });
+				await configure(tx, created.id, { tools: { remove: [delegate] } });
 				ids.push(created.id);
 			}
 			return ids;
@@ -69,10 +72,9 @@ export const delegate = defineTool({
 				host().emit(parent.id, "subagent.start", { subagent_id: id, goal: t.goal, task_index: i });
 				const child = await api.conversation(children[i], context);
 				if (!child) return { task: i, status: "failed", answer: "the subagent's conversation is gone" };
-				await child.configure({ tools: { remove: [delegate] } } as any, context);
 				const content = t.context ? `${t.goal}\n\nContext:\n${t.context}` : t.goal;
 				const settled: any = await (await child.submit({ type: "input", content, requestId: `delegate:${api.taskId}:${i}` }, context)).wait(context);
-				const entry = settled.status === "done" ? await child.commit((tx: any) => tx.entry(AssistantEntry, settled.answer), context) : undefined;
+				const entry = settled.status === "done" ? await api.commit((tx) => tx.entry(AssistantEntry, settled.answer), context) : undefined;
 				const answer = entry ? answerText(entry) : `unanswered: ${settled.reason ?? "?"}`;
 				host().emit(parent.id, "subagent.complete", { subagent_id: id, summary: answer, status: settled.status === "done" ? "completed" : "failed" });
 				return { task: i, status: settled.status === "done" ? "completed" : "failed", answer };
