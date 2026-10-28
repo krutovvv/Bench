@@ -79,6 +79,17 @@ test("the server starts and answers /api/projects", async () => {
 		});
 		const own = JSON.parse(fs.readFileSync(path.join(env.dir, "settings.json"), "utf8"));
 		assert.deepEqual([own.defaultProvider, own.defaultModel, own.defaultThinkingLevel, own.approvals], [undefined, undefined, "low", "smart"]);
+		// Its folder, changed apart from the rest: where its threads work follows it; a folder not on
+		// this machine is refused; the agent and machine it was made with stay.
+		assert.equal(env.cwd, path.join(env.dir, "files"));
+		const folder = fs.mkdtempSync(path.join(os.tmpdir(), "bench-folder-"));
+		await call("PUT", `/api/projects/${made.project.id}`, { folder, machine: "elsewhere" });
+		const moved = await call("GET", `/api/projects/${made.project.id}/env`);
+		assert.deepEqual([moved.cwd, moved.project.folder, moved.project.machine], [folder, folder, null]);
+		assert.match(String((await call("PUT", `/api/projects/${made.project.id}`, { folder: "/no/such/folder" })).detail ?? ""), /no folder/);
+		// The Host's folder is its agent's terminal.cwd.
+		await call("PUT", "/api/projects/general", { folder });
+		assert.equal((await call("GET", "/api/projects/general/env")).cwd, folder);
 		// A remote project shows the server agent's general environment.
 		const general = await call("GET", "/api/projects/general/env");
 		assert.equal(general.project.name, "Host");

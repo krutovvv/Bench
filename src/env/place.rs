@@ -2,6 +2,8 @@
 //! or a server's — its address and whether it answers), the machine its work is on when that is
 //! another (this Mac's agent over SSH), and its folder — which can be changed, and the agent kept
 //! in it (`agent/src/machine/confined.ts`). Agent and machine are chosen when the project is made.
+//! An agent's Host has a folder too: its agent's `terminal.cwd`, its home when none. A changed
+//! folder takes the threads that worked in the old one with it, from their next turn.
 
 use gpui_kit::component::h_flex;
 use gpui_kit::component::input::{Input, InputState};
@@ -20,6 +22,8 @@ pub struct PlaceEnv {
     pub folder: Entity<InputState>,
     /// Its agent works in the folder and nowhere else.
     pub confined: bool,
+    /// Where its threads work now, as its agent says: the folder, else the one it keeps for it.
+    pub cwd: String,
     pub dirty: bool,
 }
 
@@ -31,6 +35,7 @@ impl PlaceEnv {
         Self {
             folder,
             confined: false,
+            cwd: String::new(),
             dirty: false,
         }
     }
@@ -44,11 +49,17 @@ impl Section for Place {
     }
 
     fn apply(&self, e: &mut ProjectEnv, v: &Value, window: &mut Window, cx: &mut App) {
+        e.place.cwd = v["cwd"].as_str().unwrap_or_default().to_string();
         if !e.place.dirty {
-            let folder = v["project"]["folder"]
-                .as_str()
-                .unwrap_or_default()
-                .to_string();
+            // The Host's folder is where its threads work (its home unless set).
+            let folder = if ProjectKey::parse(&e.id).is_host() {
+                e.place.cwd.clone()
+            } else {
+                v["project"]["folder"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_string()
+            };
             e.place.confined = v["project"]["confined"].as_bool().unwrap_or(false);
             e.place
                 .folder
@@ -66,6 +77,13 @@ impl Section for Place {
     ) -> Option<Request> {
         let e = app.envs.get(id)?;
         let folder = e.place.folder.read(cx).value().trim().to_string();
+        if ProjectKey::parse(id).is_host() {
+            return Some((
+                "PUT",
+                format!("/api/projects/{eid}"),
+                json!({"folder": folder}),
+            ));
+        }
         Some((
             "PUT",
             format!("/api/projects/{eid}"),
@@ -153,20 +171,27 @@ impl SettingsForm for Place {
                 .into_any_element(),
             );
         }
-        // An agent's Host works in its home; any other project has a folder, or none.
-        if key.is_host() {
-            return Some(out);
-        }
+        // Where its threads work, on which machine; an agent's Host works in its home unless set.
         let local = at.machine_here().is_empty();
+        let on = if local {
+            String::new()
+        } else {
+            format!("On {} · ", at.machine_here())
+        };
+        let hint = if key.is_host() {
+            format!("{on}Its threads work in it; empty: the home folder")
+        } else if at.folder.is_some() {
+            format!("{on}Its threads work in it, and follow a change from their next turn")
+        } else if e.place.cwd.is_empty() {
+            format!("{on}None: a folder its agent keeps for it")
+        } else {
+            format!("{on}None: its threads work in {}", e.place.cwd)
+        };
         let pid = e.id.clone();
         out.push(
             settings_field(
                 "Folder",
-                if at.folder.is_some() {
-                    "Its threads work in it"
-                } else {
-                    "None: a folder its agent keeps for it"
-                },
+                hint,
                 h_flex()
                     .gap_2()
                     .child(div().flex_1().child(Input::new(&e.place.folder)))
@@ -183,6 +208,10 @@ impl SettingsForm for Place {
             )
             .into_any_element(),
         );
+        if key.is_host() {
+            out.extend(form_actions(&e.id, "place", e.place.dirty, cx));
+            return Some(out);
+        }
         let view = cx.entity();
         let pid = e.id.clone();
         // On or off, as a Mac's settings have it: a switch.

@@ -5,7 +5,7 @@
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { BENCH_HOME, db } from "../config.ts";
+import { BENCH_HOME, db, defaultCwd, getSetting, setSetting } from "../config.ts";
 
 export interface Project {
 	id: string;
@@ -85,6 +85,25 @@ export const projects = {
 		const own = path.join(projects.env(id), "files");
 		fs.mkdirSync(own, { recursive: true });
 		return own;
+	},
+	/** Where the threads of `id` work now ("general", the Host: the agent's `terminal.cwd`, else home). */
+	workDir(id: string): string {
+		return id === "general" ? defaultCwd("default") : projects.dir(id);
+	},
+	/** Its folder changed ("" none; the Host's is the agent's `terminal.cwd`). A folder on this
+	 * machine must be there. The threads that worked in the old folder work in the new one from
+	 * their next turn (a thread's `cwd` is read at every turn); one whose folder was chosen apart
+	 * stays where it is. The agent and the machine stay: they are chosen when it is made. */
+	setFolder(id: string, folder: string | null): void {
+		const want = folder?.trim() || null;
+		const p = id === "general" ? undefined : projects.get(id);
+		if (id !== "general" && !p) throw new Error("no such project");
+		if (want && !p?.machine && !fs.existsSync(want)) throw new Error(`no folder ${want} on this machine`);
+		const was = projects.workDir(id);
+		if (p) projects.save({ ...p, folder: want });
+		else setSetting("terminal", { ...(getSetting("terminal") ?? {}), cwd: want ?? undefined });
+		const now = projects.workDir(id);
+		if (now !== was) db().prepare("UPDATE threads SET cwd = ? WHERE agent = ? AND cwd = ?").run(now, p ? `project:${id}` : "default", was);
 	},
 	/** Its environment, an agent directory in Pi's terms: SYSTEM.md (its soul), mcp.json, skills/, prompts/. */
 	env(id: string): string {

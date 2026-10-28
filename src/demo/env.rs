@@ -12,7 +12,8 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
     };
     let v = serde_json::json!({
         "dir": "~/.bench/projects/p-blog",
-        "project": {"name": "Northwind blog"},
+        "cwd": "/Users/demo/code/blog",
+        "project": {"name": "Northwind blog", "folder": "/Users/demo/code/blog"},
         "soul": "The Northwind blog: product news and guides for our customers, published on Ghost.\n\nWrite plainly, for people who use the product, not for engineers. Every post gets a cover and two tags; drafts first, publish only when asked.",
         "mcp": [
             {"name": "ghost", "kind": "http", "enabled": true, "connected": true, "tools": 12},

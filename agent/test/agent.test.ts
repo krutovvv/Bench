@@ -209,6 +209,22 @@ test("usage: a thread's counters are kept and come back on a fresh store", () =>
 	st.delete("u1");
 });
 
+test("a project's new folder takes the threads that worked in its old one, not one set apart", async () => {
+	const { projects } = await import("../src/builtin/projects.ts");
+	const st = new Store();
+	const p = projects.save({ name: "Moves" });
+	const old = projects.dir(p.id);
+	const apart = fs.mkdtempSync(path.join(home, "apart-"));
+	st.create({ id: "f1", conversation: "11", agent: `project:${p.id}`, source: "local", cwd: old, effort: "" });
+	st.create({ id: "f2", conversation: "12", agent: `project:${p.id}`, source: "local", cwd: apart, effort: "" });
+	const folder = fs.mkdtempSync(path.join(home, "folder-"));
+	projects.setFolder(p.id, folder);
+	assert.deepEqual([st.get("f1")!.cwd, st.get("f2")!.cwd], [folder, apart]);
+	assert.throws(() => projects.setFolder(p.id, "/no/such/folder"), /no folder/);
+	projects.setFolder(p.id, null);
+	assert.equal(st.get("f1")!.cwd, old);
+});
+
 test("a waiting message keeps its attachments and block state when its words are fixed", async () => {
 	const { withText } = await import("../src/runtime/queue.ts");
 	// Plain words.

@@ -63,9 +63,22 @@ export default ({ rt, publish }: Ctx): Module => ({
 			"PUT",
 			/^\/api\/projects\/([^/]+)$/,
 			(req, m) => {
-				const prev = projects.get(id1(m));
-				if (!prev) throw new HttpError(404, "no such project");
-				return { project: projects.save({ ...prev, ...req.body, id: prev.id }) };
+				const id = id1(m);
+				const prev = id === "general" ? undefined : projects.get(id);
+				if (id !== "general" && !prev) throw new HttpError(404, "no such project");
+				// Its folder, set apart: the threads that worked in the old one follow it.
+				const { folder, ...rest } = req.body ?? {};
+				if (folder !== undefined) {
+					try {
+						projects.setFolder(id, folder);
+					} catch (e: any) {
+						throw new HttpError(400, e.message);
+					}
+				}
+				if (!prev) return { ok: true };
+				// Its agent and machine are chosen when it is made: never changed here.
+				const { host: _h, machine: _m, ...own } = rest;
+				return { project: projects.save({ ...projects.get(id)!, ...own, id }) };
 			},
 		],
 		[
@@ -95,6 +108,8 @@ export default ({ rt, publish }: Ctx): Module => ({
 					window: resolveModel().contextLength,
 					project: p,
 					dir,
+					// Where its threads work now: its folder, else the one its agent keeps for it.
+					cwd: projects.workDir(id),
 					soul: fs.existsSync(soulFile) ? fs.readFileSync(soulFile, "utf8") : "",
 					mcp: mcpView(agent),
 					// Every skill its threads can use, with where it lives: its own, its folder's (Host: the machine's).
