@@ -36,10 +36,7 @@ export default ({ rt }: Ctx): Module => {
 				if (row && arg) rt.setEffort(session_id, arg);
 				return output(`Reasoning effort: ${arg || row?.effort}`);
 			case "/title":
-				if (row && arg) {
-					rt.titles.rename(session_id, arg);
-					rt.listChanged();
-				}
+				if (row && arg) rt.titles.rename(session_id, arg);
 				return output(`Title: ${arg}`);
 			case "/stop":
 				await rt.interrupt(session_id);

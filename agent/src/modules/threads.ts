@@ -41,7 +41,6 @@ export default ({ rt }: Ctx): Module => ({
 		"thread.open": ({ thread, since }) => rt.journal.open(thread, since),
 		"thread.rename": ({ thread, title }) => {
 			rt.titles.rename(thread, title);
-			rt.listChanged();
 			return {};
 		},
 		"thread.delete": async ({ thread }) => {
