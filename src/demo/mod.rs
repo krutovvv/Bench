@@ -306,6 +306,41 @@ fewer form fields. Then check what it did to signups and give me a short summary
         })
         .detach();
     }
+    // `BENCH_DEMO_PROJECT=1`: the new project's page; `=env` with an exported environment
+    // chosen for it (`env/backup.rs`).
+    if let Ok(how) = std::env::var("BENCH_DEMO_PROJECT") {
+        cx.spawn(async move |this, cx| {
+            cx.background_executor()
+                .timer(std::time::Duration::from_secs(1))
+                .await;
+            this.update_in(cx, |app, window, cx| {
+                app.new_project_form(window, cx);
+                if how != "env" {
+                    return;
+                }
+                let file = serde_json::json!({
+                    "kind": "bench.environment",
+                    "name": "Northwind blog",
+                    "files": {
+                        "SYSTEM.md": {"text": ""},
+                        "skills/release-notes/SKILL.md": {"text": ""},
+                        "skills/cover-image/SKILL.md": {"text": ""},
+                        "prompts/brief.md": {"text": ""},
+                        "mcp.json": {"text": "{\"mcpServers\":{\"ghost\":{},\"figma\":{}}}"}
+                    },
+                    "cron": [{"name": "Weekly digest"}],
+                    "telegram": {"token": "demo"}
+                });
+                if let Some(f) = app.new_project.form.as_mut() {
+                    f.name
+                        .update(cx, |s, cx| s.set_value("Northwind blog", window, cx));
+                    f.environment = Some(("Northwind blog environment 2026-10-28.json".into(), file));
+                }
+            })
+            .ok();
+        })
+        .detach();
+    }
     // `BENCH_DEMO_NEW=1`: the dock panel's "+" pressed two seconds after opening — with
     // `BENCH_DEMO=explorer BENCH_EXPLORER=thread` it shows a new thread in the dock while
     // the document keeps the middle.

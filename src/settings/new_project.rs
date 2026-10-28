@@ -29,6 +29,9 @@ pub struct ProjectForm {
     pub folder: Option<String>,
     /// On a server: its folder there, typed (there is no picker for a server's disk).
     pub server_folder: Entity<InputState>,
+    /// An exported environment it starts with (`env/backup.rs`): the file's name and what it
+    /// holds, imported once it is made.
+    pub environment: Option<(String, serde_json::Value)>,
     /// Enter in either field creates the project — the dialog's commit.
     _enter: Vec<Subscription>,
 }
@@ -58,6 +61,7 @@ impl BenchApp {
             machine: None,
             folder: None,
             server_folder,
+            environment: None,
             _enter: enter,
         });
         self.center = crate::workspace::Center::NewProject;
@@ -104,6 +108,45 @@ impl BenchApp {
         .detach();
     }
 
+    /// The form's environment "Choose…": an exported one it starts with.
+    pub fn pick_project_environment(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let picked = cx.prompt_for_paths(PathPromptOptions {
+            files: true,
+            directories: false,
+            multiple: false,
+            prompt: Some("Start with it".into()),
+        });
+        cx.spawn_in(window, async move |this, cx| {
+            let Ok(Ok(Some(paths))) = picked.await else {
+                return;
+            };
+            let Some(path) = paths.into_iter().next() else {
+                return;
+            };
+            let file = crate::env::backup::read(&path);
+            let _ = this.update_in(cx, |this, window, cx| {
+                let Some(file) = file else {
+                    this.not_environment(window, cx);
+                    return;
+                };
+                if let Some(f) = this.new_project.form.as_mut() {
+                    // An empty name takes the project's it was exported from.
+                    if f.name.read(cx).value().trim().is_empty() {
+                        let from = file["name"].as_str().unwrap_or_default().to_string();
+                        f.name.update(cx, |s, cx| s.set_value(from, window, cx));
+                    }
+                    let shown = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+                    f.environment = Some((shown, file));
+                }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     /// Create the form's project on its agent and start its first thread.
     pub fn save_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(form) = self.new_project.form.as_ref() else {
@@ -132,6 +175,7 @@ impl BenchApp {
             // This Mac's agent on this Mac.
             _ => json!({"name": name, "folder": form.folder}),
         };
+        let environment = form.environment.as_ref().map(|(_, v)| v.clone());
         let Some(conn) = self.conn_of(&agent) else {
             let who = Self::agent_name(&agent);
             self.toast(
@@ -153,6 +197,10 @@ impl BenchApp {
                     let Some(id) = v["project"]["id"].as_str().map(str::to_string) else {
                         return;
                     };
+                    if let Some(file) = environment {
+                        let key = crate::app::model::ProjectKey::new(&agent, &id).to_string();
+                        this.env_import_file(key, file, window, cx);
+                    }
                     if agent.is_empty() {
                         this.load_projects(window, cx);
                         this.new_thread_in(id, cx);
@@ -186,6 +234,16 @@ impl BenchApp {
             form.machine.clone(),
             form.folder.clone(),
             form.server_folder.clone(),
+        );
+        let environment = form.environment.as_ref().map(|(file, _)| file.clone());
+        // What the chosen file holds, under it; else what one would hold.
+        let environment_holds = form.environment.as_ref().map_or_else(
+            || {
+                "Its soul, prompts, skills, servers, schedule and bot from a file another \
+                 project exported (its Settings → Backup)."
+                    .to_string()
+            },
+            |(_, v)| format!("{}.", crate::env::backup::contents(v)),
         );
         let servers: Vec<String> = self.inserts.ssh.servers.iter().map(|s| s.alias.clone()).collect();
         let agents: Vec<String> = self.places.server_agents.iter().map(|a| a.host.clone()).collect();
@@ -342,6 +400,10 @@ impl BenchApp {
             .child(bench_ui::field(&name).into_any_element())
             .when(!fields.is_empty(), |d| d.child(div().h_2()).children(fields))
             .child(div().h_4())
+            .child(label("Environment, optional"))
+            .child(self.environment_row(environment, cx))
+            .child(hint(environment_holds))
+            .child(div().h_4())
             .child(
                 h_flex()
                     .gap_2()
@@ -379,6 +441,39 @@ impl BenchApp {
     }
 
     /// A card picked: what the form keeps follows the place (a server or an agent chosen first).
+    /// The environment it starts with: the file and what it holds, or none; Choose… and Clear.
+    fn environment_row(&self, environment: Option<String>, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let has = environment.is_some();
+        h_flex()
+            .gap_2()
+            .items_center()
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .text_sm()
+                    .text_color(if has { theme.foreground } else { theme.muted_foreground })
+                    .child(environment.unwrap_or_else(|| "None — an empty one".into())),
+            )
+            .child(
+                bench_ui::form_action("project-env", if has { "Change…" } else { "Choose…" }, false, cx)
+                    .on_click(cx.listener(|this, _, window, cx| this.pick_project_environment(window, cx))),
+            )
+            .when(has, |d| {
+                d.child(bench_ui::form_action("project-env-clear", "Clear", false, cx).on_click(
+                    cx.listener(|this, _, _, cx| {
+                        if let Some(f) = this.new_project.form.as_mut() {
+                            f.environment = None;
+                        }
+                        cx.notify();
+                    }),
+                ))
+            })
+            .into_any_element()
+    }
+
     fn pick_project_place(&mut self, place: Place, cx: &mut Context<Self>) {
         let first_server = self.inserts.ssh.servers.iter().next().map(|s| s.alias.clone());
         let first_agent = self.places.server_agents.first().map(|a| a.host.clone());

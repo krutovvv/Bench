@@ -15,7 +15,7 @@ import { reconnectTelegram, syncTelegram, telegramStatus } from "../telegram.ts"
 import { cronView } from "./cron.ts";
 
 /** A project's environment: the agent its threads run with, its folder, the project row. */
-function envOf(id: string): { agent: string; dir: string; project: { id: string; name: string; telegram?: { token: string; allowed_users: string[]; username?: string; proxy?: string } | null } } {
+export function envOf(id: string): { agent: string; dir: string; project: { id: string; name: string; telegram?: { token: string; allowed_users: string[]; username?: string; proxy?: string } | null } } {
 	if (id === "general") {
 		const tg = getSetting("telegram");
 		return { agent: "default", dir: agentDir("default"), project: { id, name: "Host", telegram: tg?.token ? { token: tg.token, allowed_users: (tg.allowed_users ?? []).map(String), proxy: tg.proxy } : null } };

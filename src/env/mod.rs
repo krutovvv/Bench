@@ -9,6 +9,7 @@
 //!                     are made of
 //! env/page.rs         the Settings page: the `FORMS`
 //! env/instructions.rs the prompts and skills the environment lists (their texts are files)
+//! env/backup.rs      the environment exported to a file and imported from one
 //! env/<section>.rs    a section: its state (a part of `ProjectEnv`), form or items, card, save
 //! settings/new_project.rs the new project's page (the sidebar's "+")
 //! ```
@@ -17,6 +18,7 @@
 //! `Section` and either `SettingsForm` (a line in `FORMS`) or `ExplorerParts` (a line in
 //! `PARTS`), and its part of the agent's `/api/projects/<id>/env`.
 
+pub mod backup;
 pub mod instructions;
 pub mod lsp;
 pub mod mcp;
@@ -67,6 +69,7 @@ pub static FORMS: &[&dyn SettingsForm] = &[
     &place::Place,
     &run::Run,
     &telegram::Telegram,
+    &backup::Backup,
     &name::Danger,
 ];
 
