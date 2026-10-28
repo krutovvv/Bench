@@ -174,13 +174,15 @@ pub fn choice_row(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
         .id(id)
         .w_full()
         .min_w_0()
-        .px_2()
-        .py_1()
-        .border_1()
+        .px_2p5()
+        .py_1p5()
+        .text_size(px(crate::metrics::THREAD_META))
         .rounded_md()
-        .border_color(theme.input)
+        .bg(theme.background)
+        .border_1()
+        .border_color(theme.border)
         .cursor_pointer()
-        .hover(|s| s.border_color(theme.primary).bg(theme.list_hover))
+        .hover(|s| s.border_color(theme.primary))
 }
 
 /// A file's icon and color by its name, as an editor's tree shows them: by name when the name

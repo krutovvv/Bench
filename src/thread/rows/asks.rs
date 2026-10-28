@@ -151,6 +151,39 @@ impl ThreadView {
         // Only the question the agent is waiting for right now takes answers: the journal also
         // shows settled ones and, after a restart, ones nobody waits for.
         let live = !settled && self.thread.journal.asks().iter().any(|a| a.id == card.id);
+        // Answered: history, not a form — a quiet entry as a step of the work is: its icon, the
+        // question in grey, the answer under it (or "No answer", fainter). No frame.
+        if settled {
+            let faint = bench_ui::faint(&theme);
+            let answer = card.answer.clone().unwrap_or_default();
+            return h_flex()
+                .id(SharedString::from(format!("ask-card-{}", card.id)))
+                .w_full()
+                .min_w_0()
+                .gap_2()
+                .items_start()
+                .text_size(px(bench_ui::THREAD_META))
+                .child(
+                    if approve { Ico::CircleAlert } else { Ico::CircleHelp }
+                        .icon()
+                        .xsmall()
+                        .text_color(faint)
+                        .mt(px(bench_ui::ICON_ON_SMALL_LINE)),
+                )
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .gap_0p5()
+                        .child(div().text_color(muted).child(card.question.clone()))
+                        .child(if answer.is_empty() {
+                            div().text_color(faint).child("No answer")
+                        } else {
+                            div().text_color(theme.foreground).child(answer)
+                        }),
+                )
+                .into_any_element();
+        }
         let head = h_flex()
             .gap_2()
             .items_start()
@@ -344,8 +377,9 @@ impl ThreadView {
             .p_3()
             .gap_2()
             .border_1()
-            .rounded_md()
-            .border_color(if settled { theme.border } else { accent })
+            .rounded_lg()
+            .border_color(accent.opacity(0.5))
+            .bg(accent.opacity(0.04))
             .child(head)
             .when_some(card.detail.clone(), |d, cmd| {
                 d.child(
