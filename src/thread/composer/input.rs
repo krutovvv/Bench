@@ -173,20 +173,22 @@ impl ThreadView {
         let in_list = crate::thread::look::COMPOSER_IN_LIST;
         // Attach: a plus in the chat (Messages' and ChatGPT's apps button), the paperclip in
         // the document.
-        let attach = bench_ui::icon_button(
-            "composer-attach",
-            if in_list { Ico::Paperclip } else { Ico::Plus },
-            "Attach files",
-            false,
-            cx,
-        )
+        let attach = if in_list {
+            bench_ui::icon_button("composer-attach", Ico::Paperclip, "Attach files", false, cx)
+        } else {
+            bench_ui::round_icon_button("composer-attach", Ico::Plus, "Attach files", cx)
+        }
         .on_click(cx.listener(|this, _, window, cx| this.pick_attachments(window, cx)))
         .into_any_element();
         let mic: AnyElement = if trans {
                 div()
                     .id("composer-mic")
                     .flex_none()
-                    .p_1()
+                    // Send's size, as the mic at rest (`round_icon_button`).
+                    .size(px(bench_ui::SEND_BUTTON))
+                    .flex()
+                    .items_center()
+                    .justify_center()
                     .text_color(muted)
                     .child(
                         gpui_kit::component::spinner::Spinner::new()
@@ -199,8 +201,12 @@ impl ThreadView {
                 div()
                     .id("composer-mic")
                     .flex_none()
-                    .p_1()
-                    .rounded_md()
+                    // Send's size, as the mic at rest (`round_icon_button`).
+                    .size(px(bench_ui::SEND_BUTTON))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .rounded_full()
                     .cursor_pointer()
                     .text_color(muted)
                     .child(
@@ -225,7 +231,11 @@ impl ThreadView {
                     }))
                     .into_any_element()
             } else {
-                bench_ui::icon_button("composer-mic", Ico::Mic, "Dictate  ⌘⇧D", false, cx)
+                if in_list {
+                    bench_ui::icon_button("composer-mic", Ico::Mic, "Dictate  ⌘⇧D", false, cx)
+                } else {
+                    bench_ui::round_icon_button("composer-mic", Ico::Mic, "Dictate  ⌘⇧D", cx)
+                }
                     .on_click(cx.listener(|this, _, window, cx| {
                         if let Some(app) = this.app.upgrade() {
                             app.update(cx, |app, cx| app.toggle_mic(window, cx));
@@ -280,11 +290,11 @@ impl ThreadView {
                     } else if empty {
                         d.bg(theme.foreground.opacity(0.07))
                             .text_color(theme.muted_foreground)
-                            .child(Ico::ArrowUp.icon().xsmall())
+                            .child(Ico::ArrowUp.icon().small())
                     } else {
                         d.bg(theme.primary)
                             .text_color(theme.primary_foreground)
-                            .child(Ico::ArrowUp.icon().xsmall())
+                            .child(Ico::ArrowUp.icon().small())
                     }
                 })
                 .tooltip(move |window, cx| {
@@ -431,9 +441,7 @@ impl ThreadView {
                             .items_end()
                             .gap_1()
                             // The small buttons centred on Send's height, the line they share.
-                            .children(attach.take().map(|b| {
-                                h_flex().flex_none().h(px(bench_ui::SEND_BUTTON)).child(b)
-                            }))
+                            .children(attach.take())
                             // Its line centred on the buttons' height.
                             .child(
                                 v_flex()
@@ -443,9 +451,7 @@ impl ThreadView {
                                     .py(px((bench_ui::SEND_BUTTON - bench_ui::LEAD * 14.) / 2.))
                                     .child(field),
                             )
-                            .children(mic.take().map(|b| {
-                                h_flex().flex_none().h(px(bench_ui::SEND_BUTTON)).child(b)
-                            }))
+                            .children(mic.take())
                             .children(send),
                     )
                     .into_any_element()

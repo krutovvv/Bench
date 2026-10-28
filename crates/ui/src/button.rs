@@ -61,6 +61,30 @@ pub fn icon_button(
         .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }
 
+/// A composer's round button beside Send, as Claude's and Messages' plus and mic: Send's size,
+/// its glyph at the icon's own size, a soft disc on hover.
+pub fn round_icon_button(
+    id: impl Into<ElementId>,
+    icon: Ico,
+    tip: &'static str,
+    cx: &App,
+) -> Stateful<Div> {
+    let theme = cx.theme().clone();
+    div()
+        .id(id)
+        .flex_none()
+        .size(px(crate::metrics::SEND_BUTTON))
+        .flex()
+        .items_center()
+        .justify_center()
+        .rounded_full()
+        .cursor_pointer()
+        .text_color(theme.muted_foreground)
+        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+        .child(icon.icon())
+        .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
+}
+
 /// The small icon button inside a block's head or a row (an insert's controls, a tree row's
 /// actions): no ground until hovered.
 pub fn head_icon_button(id: &str, icon: Ico, tip: &'static str, cx: &App) -> Stateful<Div> {

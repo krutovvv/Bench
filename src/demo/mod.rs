@@ -243,7 +243,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 k.to_string(),
                 crate::sidebar::marks::Mark {
                     color: Some(c),
-                    pinned: false,
+                    pinned: k == "d-api",
                 },
             )
         })
