@@ -72,7 +72,7 @@ function settings(s: ThreadFacts): string | undefined {
 		`This project's settings live in ${dir}${machine ? `, on the machine you run on (not on ${machine}) — read, write and edit reach them there all the same` : ""}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), lsp.json (its language servers), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them).`,
 		machine &&
 			`What runs where: its language servers and its command MCP servers run on ${machine}, in its folder (an MCP server with "local": true runs here; URL ones are wherever they are); skills come from both places — the settings' skills/ here, and .agents/skills in its folder on ${machine}.`,
-		"A standing rule for this project goes into its SYSTEM.md; the memory notes are shared by every project.",
+		"A standing rule for this project goes into its SYSTEM.md; its memory notes are for facts worth keeping, not for the same rule again.",
 	]
 		.filter(Boolean)
 		.join(" ");

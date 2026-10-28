@@ -1,6 +1,8 @@
 // `memory`: two small notebooks of the agent, memories/MEMORY.md (the agent's notes) and
 // memories/USER.md (about the person), entries separated by "\n§\n". Both are
 // in the system prompt. Written only when the person asks; there is no automatic saving.
+// A project keeps its own notes in its environment: one project's facts are no other's. Who the
+// person is stays one, the general agent's.
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
@@ -17,8 +19,7 @@ export const LIMITS = () => {
 };
 
 export function memoryFile(agent: string, target: "memory" | "user"): string {
-	// One memory for every project's threads: the general agent's.
-	return path.join(agentDir(homeAgent(agent)), "memories", target === "user" ? "USER.md" : "MEMORY.md");
+	return target === "user" ? path.join(agentDir(homeAgent(agent)), "memories", "USER.md") : path.join(agentDir(agent), "memories", "MEMORY.md");
 }
 
 export function readEntries(agent: string, target: "memory" | "user"): string[] {
@@ -42,7 +43,7 @@ export const memoryTool = defineTool({
 		"target 'user' is about the person (who they are, preferences); 'memory' is everything else worth keeping across sessions " +
 		"(environment facts, conventions). Use only when the person asks you to remember something. Write facts, not instructions. " +
 		"Notes have a character budget: replace or merge old ones instead of piling up. " +
-		"They are shared by every project: a rule for one project goes into its SYSTEM.md instead, not into both.",
+		"'memory' notes are this project's own; a standing rule for it belongs in its SYSTEM.md, not in both.",
 	parameters: Type.Object({
 		action: Type.Union([Type.Literal("add"), Type.Literal("replace"), Type.Literal("remove")]),
 		target: Type.Union([Type.Literal("memory"), Type.Literal("user")]),

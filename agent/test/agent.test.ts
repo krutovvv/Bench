@@ -54,6 +54,24 @@ test("memory: add, replace, remove, budget; shown in the prompt", async () => {
 	await run(memoryTool, { action: "remove", target: "user", old_text: "yyy" });
 });
 
+test("memory: a project's notes are its own; who the person is stays shared", async () => {
+	await run(memoryTool, { action: "add", target: "memory", content: "General fact" });
+	await run(memoryTool, { action: "add", target: "user", content: "Likes tea" });
+	session.agent = "project:shop";
+	try {
+		assert.deepEqual(readEntries("project:shop", "memory"), [], "the general notes are not the project's");
+		await run(memoryTool, { action: "add", target: "memory", content: "Shop fact" });
+		assert.deepEqual(readEntries("project:shop", "memory"), ["Shop fact"]);
+		assert.deepEqual(readEntries("default", "memory"), ["General fact"]);
+		assert.match(notes(session)!, /Likes tea[\s\S]*Shop fact/);
+		assert.doesNotMatch(notes(session)!, /General fact/);
+	} finally {
+		session.agent = "default";
+	}
+	await run(memoryTool, { action: "remove", target: "memory", old_text: "General fact" });
+	await run(memoryTool, { action: "remove", target: "user", old_text: "Likes tea" });
+});
+
 test("skills: create, list in the prompt, view, patch, delete", async () => {
 	const body = "---\nname: deploy\ndescription: Ship the app to the server\n---\n\nRun ./ship.sh\n";
 	await run(skillManage, { action: "create", name: "deploy", category: "devops", content: body });
