@@ -70,6 +70,13 @@ test("the prompt says where a machine project's work is", async () => {
 	assert.strictEqual(projects.dir(p.id), "/var/www/shop", "its folder there, not looked for here");
 	const text = soul({ id: "s", agent: `project:${p.id}`, source: "local" } as any);
 	assert.match(text, /server `wp-prod`, in \/var\/www\/shop/);
+	// Its settings are here, not on the server, and its rules go there, not into shared notes.
+	const { environment } = await import("../src/prompt.ts");
+	const env = environment({ id: "s", agent: `project:${p.id}`, source: "local", project: p.id, cwd: "/var/www/shop" } as any);
+	assert.match(env, /on the machine you run on \(not on wp-prod\)/);
+	assert.match(env, /command MCP servers run on wp-prod/);
+	assert.match(env, /rule for this project goes into its SYSTEM\.md/);
+	assert.match(env, /Working directory: \/var\/www\/shop on wp-prod/);
 });
 
 test("/api/fs with a machine: read, write, list, rename and remove there", async () => {

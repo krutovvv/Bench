@@ -30,7 +30,7 @@ export function soul(s: ThreadFacts): string {
 		const name = p?.name ?? "this project";
 		// Worked on another machine: say where, so commands and paths are meant for it.
 		const where = p?.machine
-			? `\n\nIts work is on the server \`${p.machine}\`${p.folder ? `, in ${p.folder}` : ""}: read, write, edit and bash act there over SSH, not on the machine you run on. Paths are that server's.`
+			? `\n\nIts work is on the server \`${p.machine}\`${p.folder ? `, in ${p.folder}` : ""}: read, write, edit and bash act there over SSH, not on the machine you run on. Paths are that server's — except its settings folder, which is here (see the environment).`
 			: "";
 		const kept = p?.confined && p.folder ? `\n\nWork only in its folder ${p.folder}: your tools refuse anything outside it, and commands cannot write outside it.` : "";
 		parts.push(`# The project: ${name}\n\n${own || "(no description yet)"}${where}${kept}`);
@@ -50,7 +50,7 @@ export function environment(s: ThreadFacts): string {
 	const day = new Intl.DateTimeFormat("en-US", { timeZone: timezone(), weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
 	return [
 		`Today is ${day} (${timezone()}). For the exact time, run date.`,
-		`Machine: ${os.type() === "Darwin" ? "macOS" : os.type()}, home ${os.homedir()}. Working directory: ${s.cwd}.`,
+		`Machine: ${os.type() === "Darwin" ? "macOS" : os.type()}, home ${os.homedir()}. Working directory: ${s.cwd}${machineOf(s.project) ? ` on ${machineOf(s.project)}` : ""}.`,
 		"Bench's own data (threads, settings) is reached through your tools, not files.",
 		// The tools for code, said once: a long thread spent most of its steps reading files through
 		// bash in small windows and editing them with scripts.
@@ -67,7 +67,15 @@ export function environment(s: ThreadFacts): string {
 function settings(s: ThreadFacts): string | undefined {
 	if (!s.project) return undefined;
 	const dir = path.join(path.dirname(agentDir("project:x")), s.project);
-	return `This project's settings live in ${dir}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them).`;
+	const machine = machineOf(s.project);
+	return [
+		`This project's settings live in ${dir}${machine ? `, on the machine you run on (not on ${machine}) — read, write and edit reach them there all the same` : ""}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), lsp.json (its language servers), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them).`,
+		machine &&
+			`What runs where: its language servers and its command MCP servers run on ${machine}, in its folder (an MCP server with "local": true runs here; URL ones are wherever they are); skills come from both places — the settings' skills/ here, and .agents/skills in its folder on ${machine}.`,
+		"A standing rule for this project goes into its SYSTEM.md; the memory notes are shared by every project.",
+	]
+		.filter(Boolean)
+		.join(" ");
 }
 
 /** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory, read where

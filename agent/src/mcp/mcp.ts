@@ -3,7 +3,8 @@
 // are named mcp__<server>__<tool>, as in Pi. `exposure` as in Pi's docs/mcp.md: "direct" (declared
 // to the model), "deferred" (found with tool_search), "hidden" (not reachable); "codemode", Pi's
 // default, is treated as deferred here. `toolExposure` overrides it per tool (`*` patterns).
-// Without `exposure`, a server with many tools is deferred and a small one direct.
+// Without `exposure`, a server with many tools is deferred and a small one direct. A project worked
+// on a server runs its command servers there (`stdioTransport`).
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
@@ -13,7 +14,9 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, agentMcp, agents, agentEnv } from "../config.ts";
+import { agentDir, agentMcp, agents, agentEnv, isProject } from "../config.ts";
+import { projects } from "../builtin/projects.ts";
+import { quote, sshOptions } from "../machine/ssh.ts";
 
 /** Without `exposure`: servers with more tools than this are deferred behind tool_search. */
 const DEFER_OVER = 12;
@@ -99,7 +102,7 @@ async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 				const client = new McpClient({ name: "bench", version: "1.0.0" });
 				const transport = spec.url
 					? httpTransport(agent, name, spec)
-					: new StdioTransport({ command: home(spec.command) as string, args: (spec.args ?? []).map(home), env: { ...env, ...(spec.env ?? {}) }, cwd: home(spec.cwd) as string | undefined } as any);
+					: stdioTransport(agent, spec, env);
 				await withTimeout(client.connect(transport), timeoutMs, "connect timed out");
 				server.client = client;
 				const listed = await withTimeout(client.listTools(), timeoutMs, "tools/list timed out");
@@ -125,6 +128,22 @@ async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 			}
 		}),
 	);
+}
+
+/** A command server's transport. A project worked on a server runs it there, in its folder, through
+ * the same SSH as its language servers (`lsp/lsp.ts`): it acts on that server's files and programs.
+ * Only its own `env` goes along; `"local": true` keeps one on this machine (one that signs in
+ * through a browser here, or needs a program the server lacks). */
+function stdioTransport(agent: string, spec: any, env: Record<string, string>) {
+	const p = isProject(agent) ? projects.get(agent.slice(8)) : undefined;
+	if (p?.machine && !spec.local) {
+		const vars = Object.entries(spec.env ?? {}).map(([k, v]) => `export ${k}=${quote(String(v))}; `).join("");
+		const dir = spec.cwd || p.folder;
+		const run = `${vars}${dir ? `cd ${quote(dir)} && ` : ""}exec ${[spec.command, ...(spec.args ?? [])].map((a: unknown) => quote(String(a))).join(" ")}`;
+		// A login shell: node, npx and the like are found as in a terminal there.
+		return new StdioTransport({ command: process.env.BENCH_SSH ?? "ssh", args: [...sshOptions(p.machine), `bash -lc ${quote(run)}`], env: process.env } as any);
+	}
+	return new StdioTransport({ command: home(spec.command) as string, args: (spec.args ?? []).map(home), env: { ...env, ...(spec.env ?? {}) }, cwd: home(spec.cwd) as string | undefined } as any);
 }
 
 /** An HTTP server's transport: with its own headers as given; without an Authorization header,
