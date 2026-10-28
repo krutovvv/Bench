@@ -64,7 +64,9 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   What it *is set to* (name, where it lives, model, Telegram) is its **Settings** (the last row of its Explorer); what it
   *contains* (its folder, soul, prompts, skills, MCP and language servers, schedule) is the
   **Explorer** (`docs/explorer.md`). The agent changes the same files when asked, from any
-  thread of the project. **Host** is an agent's own environment: this Mac's is always first in the
+  thread of the project. Nothing of one project's environment reaches another, Host's
+  included: its soul, MCP servers, skills, prompts, memory and settings are its own threads'
+  alone (only the model is the gear's, one for all). **Host** is an agent's own environment: this Mac's is always first in the
   sidebar (installing, building, looking after the machine); a server's (e.g. Dev) names that
   server and is followed by the server's own projects. `/terminal` opens on the thread's machine
   (`thread_machine()`).

@@ -149,8 +149,6 @@ export const isProject = (agent: string): boolean => agent.startsWith("project:"
 /** The keys only the general agent has: the model is one for every thread (the gear). */
 const GLOBAL_KEYS = ["defaultProvider", "defaultModel"] as const;
 
-/** What a project's threads share with every other thread: the general agent's memory, model, settings. */
-export const homeAgent = (agent: string): string => (isProject(agent) ? "default" : agent);
 
 export function agentDir(agent: string): string {
 	if (isProject(agent)) return path.join(BENCH_HOME, "projects", agent.slice(8));
@@ -164,14 +162,16 @@ export function agents(): string[] {
 }
 
 export function readAgent(agent: string): AgentSettings {
-	// A project runs with the general agent's model and settings (its own settings.json may refine them).
+	// A project's settings are its own; only the model is the gear's, one for every thread (it is
+	// kept with the general agent's). Nothing else of Host's reaches a project.
 	if (isProject(agent)) {
 		let own: Partial<AgentSettings> = {};
 		try {
 			own = JSON.parse(fs.readFileSync(path.join(agentDir(agent), "settings.json"), "utf8"));
 		} catch {}
 		for (const k of GLOBAL_KEYS) delete own[k];
-		return { ...readAgent("default"), ...own };
+		const general = readAgent("default");
+		return { ...own, defaultProvider: general.defaultProvider, defaultModel: general.defaultModel };
 	}
 	try {
 		return JSON.parse(fs.readFileSync(path.join(agentDir(agent), "settings.json"), "utf8"));

@@ -1,14 +1,13 @@
 // `memory`: two small notebooks of the agent, memories/MEMORY.md (the agent's notes) and
 // memories/USER.md (about the person), entries separated by "\n§\n". Both are
 // in the system prompt. Written only when the person asks; there is no automatic saving.
-// A project keeps its own notes in its environment: one project's facts are no other's. Who the
-// person is stays one, the general agent's.
+// Each project keeps both in its environment, Host its own: one's notes are no other's.
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import fs from "node:fs";
 import path from "node:path";
-import { getSetting, agentDir, homeAgent } from "../config.ts";
+import { getSetting, agentDir } from "../config.ts";
 import { threadOf } from "../host.ts";
 
 const SEP = "\n§\n";
@@ -19,7 +18,7 @@ export const LIMITS = () => {
 };
 
 export function memoryFile(agent: string, target: "memory" | "user"): string {
-	return target === "user" ? path.join(agentDir(homeAgent(agent)), "memories", "USER.md") : path.join(agentDir(agent), "memories", "MEMORY.md");
+	return path.join(agentDir(agent), "memories", target === "user" ? "USER.md" : "MEMORY.md");
 }
 
 export function readEntries(agent: string, target: "memory" | "user"): string[] {

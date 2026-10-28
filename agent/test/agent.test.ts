@@ -54,7 +54,7 @@ test("memory: add, replace, remove, budget; shown in the prompt", async () => {
 	await run(memoryTool, { action: "remove", target: "user", old_text: "yyy" });
 });
 
-test("memory: a project's notes are its own; who the person is stays shared", async () => {
+test("memory: a project's notes and what it knows of the person are its own; Host's are Host's", async () => {
 	await run(memoryTool, { action: "add", target: "memory", content: "General fact" });
 	await run(memoryTool, { action: "add", target: "user", content: "Likes tea" });
 	session.agent = "project:shop";
@@ -63,8 +63,11 @@ test("memory: a project's notes are its own; who the person is stays shared", as
 		await run(memoryTool, { action: "add", target: "memory", content: "Shop fact" });
 		assert.deepEqual(readEntries("project:shop", "memory"), ["Shop fact"]);
 		assert.deepEqual(readEntries("default", "memory"), ["General fact"]);
-		assert.match(notes(session)!, /Likes tea[\s\S]*Shop fact/);
-		assert.doesNotMatch(notes(session)!, /General fact/);
+		assert.match(notes(session)!, /Shop fact/);
+		assert.doesNotMatch(notes(session)!, /General fact|Likes tea/);
+		await run(memoryTool, { action: "add", target: "user", content: "Buys for the shop" });
+		assert.deepEqual(readEntries("project:shop", "user"), ["Buys for the shop"]);
+		assert.ok(readEntries("default", "user").includes("Likes tea") && !readEntries("default", "user").includes("Buys for the shop"));
 	} finally {
 		session.agent = "default";
 	}

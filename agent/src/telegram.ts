@@ -16,7 +16,7 @@ import fs from "node:fs";
 import https from "node:https";
 import path from "node:path";
 import { transcribe } from "./audio.ts";
-import { approvalsMode, BENCH_HOME, getSetting, homeAgent, agentEnv, reasoningEffort, resolveModel } from "./config.ts";
+import { approvalsMode, BENCH_HOME, getSetting, agentEnv, reasoningEffort, resolveModel } from "./config.ts";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { projects } from "./builtin/projects.ts";
 import type { RunListener, Runtime } from "./runtime/runtime.ts";
@@ -427,8 +427,8 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			`◆ Model: <code>${esc(m.model)}</code>`,
 			`◆ Provider: ${esc(m.provider)}`,
 			`◆ Context: ${esc(ctx)}`,
-			`◆ Thinking: ${esc(row?.effort || reasoningEffort(homeAgent(runs)))}`,
-			`◆ Approvals: ${approvalsMode(homeAgent(runs)) === "manual" ? "asks before risky commands" : "off"}`,
+			`◆ Thinking: ${esc(row?.effort || reasoningEffort(runs))}`,
+			`◆ Approvals: ${approvalsMode(runs) === "manual" ? "asks before risky commands" : "off"}`,
 			"",
 			"Messages sent in a row (or forwarded together) are read as one. A new message stops what I'm doing, and I start over with everything you sent. /stop just stops.",
 		].join("\n");

@@ -345,7 +345,7 @@ export default ({ rt, publish }: Ctx): Module => ({
 				return { ok: true };
 			},
 		],
-		// Prompts a thread can insert (@ in the composer): the general ones and the project's own.
+		// Prompts a thread can insert (@ in the composer): the project's own (Host's for Host).
 		[
 			"GET",
 			/^\/api\/projects\/([^/]+)\/prompts$/,
@@ -354,8 +354,7 @@ export default ({ rt, publish }: Ctx): Module => ({
 				const read = (dir: string, own: boolean) =>
 					fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => f.endsWith(".md")).map((f) => ({ name: f.replace(/\.md$/, ""), text: fs.readFileSync(path.join(dir, f), "utf8"), own })) : [];
 				const own = read(path.join(envOf(id).dir, "prompts"), true);
-				const general = id === "general" ? [] : read(path.join(agentDir("default"), "prompts"), false).filter((g) => !own.some((o) => o.name === g.name));
-				return { prompts: [...own, ...general].sort((a, b) => a.name.localeCompare(b.name)) };
+				return { prompts: own.sort((a, b) => a.name.localeCompare(b.name)) };
 			},
 		],
 		[

@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, homeAgent, isProject, timezone } from "./config.ts";
+import { agentDir, isProject, timezone } from "./config.ts";
 import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
 import { machineOf, repoOf, skillsFor } from "./repo.ts";
@@ -18,11 +18,12 @@ const IDENTITY = "You are a capable assistant working on the person's own comput
 
 const read = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim() : "");
 
-/** The agent's SYSTEM.md (who it is), as in Pi; then its AGENTS.md (standing instructions). */
+/** The agent's SYSTEM.md (who it is), as in Pi; then its AGENTS.md (standing instructions). A
+ *  project's are its own: Host's soul is Host's and reaches no project. */
 export function soul(s: ThreadFacts): string {
-	const home = agentDir(homeAgent(s.agent));
+	const home = agentDir(s.agent);
 	const instructions = read(path.join(home, "AGENTS.md"));
-	const parts = [read(path.join(home, "SYSTEM.md")) || IDENTITY, instructions && `# Standing instructions\n\n${instructions}`];
+	const parts = [isProject(s.agent) ? IDENTITY : read(path.join(home, "SYSTEM.md")) || IDENTITY, instructions && `# Standing instructions\n\n${instructions}`];
 	// A project's own soul: what it is, how to work in it.
 	if (isProject(s.agent)) {
 		const own = read(path.join(agentDir(s.agent), "SYSTEM.md"));
