@@ -47,6 +47,11 @@ test("memory: add, replace, remove, budget; shown in the prompt", async () => {
 	await run(memoryTool, { action: "remove", target: "memory", old_text: "Qwen" });
 	assert.deepEqual(readEntries("default", "memory"), []);
 	await assert.rejects(() => run(memoryTool, { action: "add", target: "user", content: "x".repeat(5000) }), /budget/);
+	// The refusal says the room exactly: a note cut to it fits at once.
+	const room = 1375 - "Prefers short answers in Russian".length - "\n§\n".length;
+	await assert.rejects(() => run(memoryTool, { action: "add", target: "user", content: "y".repeat(room + 1) }), new RegExp(`${room} characters are free`));
+	await run(memoryTool, { action: "add", target: "user", content: "y".repeat(room) });
+	await run(memoryTool, { action: "remove", target: "user", old_text: "yyy" });
 });
 
 test("skills: create, list in the prompt, view, patch, delete", async () => {

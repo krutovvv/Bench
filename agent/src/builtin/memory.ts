@@ -41,7 +41,8 @@ export const memoryTool = defineTool({
 		"Save, replace or remove a short note that will be in your context in every future session. " +
 		"target 'user' is about the person (who they are, preferences); 'memory' is everything else worth keeping across sessions " +
 		"(environment facts, conventions). Use only when the person asks you to remember something. Write facts, not instructions. " +
-		"Notes have a character budget: replace or merge old ones instead of piling up.",
+		"Notes have a character budget: replace or merge old ones instead of piling up. " +
+		"They are shared by every project: a rule for one project goes into its SYSTEM.md instead, not into both.",
 	parameters: Type.Object({
 		action: Type.Union([Type.Literal("add"), Type.Literal("replace"), Type.Literal("remove")]),
 		target: Type.Union([Type.Literal("memory"), Type.Literal("user")]),
@@ -67,8 +68,12 @@ export const memoryTool = defineTool({
 		} else entries.splice(find(), 1);
 		const used = entries.join(SEP).length;
 		// Notes already over the budget (a lower limit, notes imported) can still shrink step by step.
-		if (used > limit && used > before)
-			throw new Error(`over the ${limit}-character budget: the notes take ${before} now and would take ${used}; shorten or remove old notes first`);
+		// The room said in characters: told only the totals, a model shortens its note by guesses.
+		if (used > limit && used > before) {
+			const size = args.content?.trim().length ?? 0;
+			const room = Math.max(0, limit - (used - size));
+			throw new Error(`over the ${limit}-character budget: ${room} characters are free and this note has ${size}; shorten it to ${room} or less, or shorten or remove an old note first`);
+		}
 		write(agent, args.target, entries);
 		return text({ success: true, target: args.target, entries: entries.length, usage: `${used}/${limit}` });
 	},
