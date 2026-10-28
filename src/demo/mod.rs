@@ -222,6 +222,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
         project("p-audit", "Competitor audit", None),
         project("p-me", "Personal", None),
     ];
+    // This Mac's agent has its general bot: the Host's head shows it.
+    app.places.host_bots.insert(String::new());
     for s in app.threads.list.iter_mut() {
         // The rate limiting asks to run a command: its row has the dot.
         s.waiting = s.id.as_str() == "d-api";

@@ -73,7 +73,9 @@ impl BenchApp {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .py_1()
+                    // Room under the last group before the foot's hairline.
+                    .pt_1()
+                    .pb_3()
                     .children(list)
                     // This Mac's agent not up yet, and nothing to list.
                     .when(self.local_conn().is_none() && self.threads.list.is_empty(), |d| {
@@ -126,6 +128,9 @@ impl BenchApp {
                         .child(crate::app::LOCAL_HOST),
                 )
                 .children(host_color.map(bench_ui::tag_dot))
+                .when(self.places.host_bots.contains(""), |d| {
+                    d.child(project_row::telegram_mark("host-tg", muted))
+                })
                 .child(div().flex_1())
                 // "⋯" (on hover), as a right click: its environment, its color — the same menu as
                 // a project's, without pin and remove (it is always first, and always there).
@@ -197,35 +202,28 @@ impl BenchApp {
         out
     }
 
-    /// "New project": the sidebar's foot, a "+" and the words where a row's text starts, muted
-    /// until hovered, over a hairline as a Mac's sidebar bottom bar.
+    /// "New project": the sidebar's foot, as Notes' "New Folder" — a borderless "+" and its words
+    /// on a bar over a hairline, never a row: no ground of a row on hover (that is a thread's
+    /// sign), only the words coming up from muted, and the accent while its page is open.
     fn render_new_project_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let on = self.new_project.form.is_some();
-        // The sidebar's foot (a rule over it), and in it a row as the list's rows are: set in,
-        // rounded, its ground on hover and while its page is open — a button by the same
-        // signs a thread row gives, not words left lying at the bottom.
         h_flex()
             .flex_none()
             .h(px(bench_ui::STATUS_H))
+            .px(px(bench_ui::SIDEBAR_TEXT_X))
             .items_center()
             .border_t_1()
             .border_color(theme.border.opacity(0.6))
             .child(
                 h_flex()
                     .id("new-project")
-                    .flex_1()
-                    .mx(px(bench_ui::SIDEBAR_ROW_INSET))
-                    .pl(px(bench_ui::SIDEBAR_TEXT_X - bench_ui::SIDEBAR_ROW_INSET))
-                    .py(px(bench_ui::THREAD_ROW_PY))
-                    .rounded_md()
                     .gap_1p5()
                     .items_center()
                     .cursor_pointer()
                     .text_size(px(bench_ui::SIDEBAR_TEXT))
-                    .text_color(if on { theme.foreground } else { theme.muted_foreground })
-                    .when(on, |d| d.bg(theme.sidebar_accent))
-                    .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                    .text_color(if on { theme.primary } else { theme.muted_foreground })
+                    .when(!on, |d| d.hover(|s| s.text_color(theme.foreground)))
                     .child(Ico::Plus.icon().small())
                     .child("New project")
                     .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx))),

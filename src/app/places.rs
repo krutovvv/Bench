@@ -46,6 +46,7 @@ impl BenchApp {
                 id: ProjectKey::host_of(&a.host).to_string(),
                 name: a.name.clone(),
                 agent: a.host.clone(),
+                telegram: self.places.host_bots.contains(&a.host),
                 ..Default::default()
             });
             all.extend(
@@ -120,6 +121,7 @@ impl BenchApp {
                     .flatten()
                     .filter_map(|p| entry_of(&host, p))
                     .collect();
+                this.places.note_host_bot(&host, &v);
                 this.places.server_projects.insert(host.clone(), list);
                 this.compose_projects();
                 // Its threads were placed before its projects were known: again.
@@ -273,4 +275,17 @@ pub struct Places {
     pub server_projects: std::collections::HashMap<String, Vec<crate::app::model::ProjectEntry>>,
     /// This Mac's agent (its Host) has the watchable server browser.
     pub host_browser: bool,
+    /// The agents whose general bot (their Host's) is set: "" this Mac's, else a server's alias.
+    pub host_bots: std::collections::HashSet<String>,
+}
+
+impl Places {
+    /// What an agent's `/api/projects` says of its Host's bot.
+    pub fn note_host_bot(&mut self, agent: &str, v: &Value) {
+        if v["host_telegram"].as_bool().unwrap_or(false) {
+            self.host_bots.insert(agent.to_string());
+        } else {
+            self.host_bots.remove(agent);
+        }
+    }
 }

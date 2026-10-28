@@ -91,18 +91,7 @@ impl BenchApp {
                 })
                 .children(tag.map(bench_ui::tag_dot))
                 // A bot of its own: its threads are written to from Telegram too.
-                .when(p.telegram, |d| {
-                    d.child(
-                        div()
-                            .id(("ptg", g))
-                            .flex_none()
-                            .text_color(muted)
-                            .child(Ico::Send.icon().xsmall())
-                            .tooltip(|window, cx| {
-                                Tooltip::new("Its Telegram bot is on").build(window, cx)
-                            }),
-                    )
-                })
+                .when(p.telegram, |d| d.child(telegram_mark(("ptg", g), muted)))
                 .child(div().flex_1())
                 // Removing asks first: its environment goes with it.
                 .when(armed, |d| {
@@ -192,4 +181,15 @@ impl BenchApp {
         }
         out
     }
+}
+
+/// A group head's sign that its project has a Telegram bot: its threads are written to from
+/// Telegram too.
+pub(super) fn telegram_mark(id: impl Into<ElementId>, muted: Hsla) -> impl IntoElement {
+    div()
+        .id(id)
+        .flex_none()
+        .text_color(muted)
+        .child(Ico::Send.icon().xsmall())
+        .tooltip(|window, cx| Tooltip::new("Its Telegram bot is on").build(window, cx))
 }

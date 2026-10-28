@@ -196,11 +196,14 @@ impl BenchApp {
             }
             None => main.into_any_element(),
         };
-        // The left dock: its panel, under the window's top bar.
+        // The left dock: its panel, under the window's top bar, a hairline between it and the
+        // center as a Mac's sidebar has (as the right dock's on its other side).
         let left = left.map(|panel| {
             v_flex()
                 .size_full()
                 .bg(theme.sidebar)
+                .border_r_1()
+                .border_color(theme.border)
                 .child(
                     div()
                         .flex_1()

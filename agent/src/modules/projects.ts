@@ -46,10 +46,12 @@ const id1 = (m: RegExpMatchArray) => decodeURIComponent(m[1]);
 export default ({ rt, publish }: Ctx): Module => ({
 	routes: {
 		// `browser`: the project has the watchable server browser among its MCP servers (Bench
-		// offers /browser only there); `host_browser`: the machine's own agent has it.
+		// offers /browser only there); `host_browser`: the machine's own agent has it;
+		// `host_telegram`: the agent's general bot (its Host's) is set.
 		"GET /api/projects": () => ({
 			projects: projects.list().map((p) => ({ ...p, browser: !p.host && "browser" in agentMcp(`project:${p.id}`) })),
 			host_browser: "browser" in agentMcp("default"),
+			host_telegram: !!getSetting("telegram")?.token,
 		}),
 		"POST /api/projects": (req) => {
 			if (!String(req.body?.name ?? "").trim()) throw new HttpError(400, "name is required");

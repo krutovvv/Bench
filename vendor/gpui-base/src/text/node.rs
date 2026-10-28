@@ -2449,10 +2449,15 @@ impl CodeBlock {
         // The language sits quietly in the top-right corner, where custom
         // actions go instead when the caller provides them; the top padding
         // keeps the first line clear of it. Like the actions, it stays out of
-        // the scrolled content so it holds its corner.
+        // the scrolled content so it holds its corner. A block whose caller sets its padding
+        // (an editor's hover, `p_0`) is compact code, as Zed's hover shows it: no corner for
+        // a label and no frame.
+        let compact = style.code_block().padding.top.is_some();
         let lang_label = self
             .lang()
-            .filter(|lang| !lang.is_empty() && node_cx.code_block_actions.is_none())
+            .filter(|lang| {
+                !lang.is_empty() && node_cx.code_block_actions.is_none() && !compact
+            })
             .map(|lang| {
                 div()
                     .absolute()
@@ -2476,8 +2481,7 @@ impl CodeBlock {
             })
             .pb(px(14.))
             .bg(style.code_background())
-            .border_1()
-            .border_color(style.border())
+            .when(!compact, |d| d.border_1().border_color(style.border()))
             .font_family(cx.theme().tokens.typography.mono.clone())
             .text_size(cx.theme().tokens.typography.mono_md.size)
             .line_height(relative(1.6))
