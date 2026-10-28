@@ -60,7 +60,7 @@ pub struct AgentDefaults {
     /// The default working folder (a thread started there has no folder of its own).
     pub cwd: Option<String>,
     /// The slash commands threads offer.
-    pub commands: Vec<crate::app::model::SlashCommand>,
+    pub commands: Vec<crate::thread::composer::slash::SlashCommand>,
 }
 
 impl Default for AgentDefaults {

@@ -6,7 +6,7 @@ use gpui_kit::*;
 use protocol::{Event, ThreadEvent, ThreadId};
 
 use super::*;
-use crate::app::model::ThreadRow;
+use crate::thread::store::ThreadRow;
 use crate::thread::ThreadView;
 
 impl BenchApp {
@@ -138,7 +138,7 @@ impl BenchApp {
     ) {
         for old in self.threads.list.iter().filter(|s| s.host == host && s.running) {
             let done = rows.iter().any(|r| r.id == old.id && !r.running);
-            let own = crate::app::model::source_label(&old.source) == "Bench";
+            let own = crate::thread::store::source_label(&old.source) == "Bench";
             let on_screen = !self.views_of(host, &old.id, cx).is_empty();
             if done && own && !on_screen {
                 let title = if old.title.is_empty() {

@@ -13,7 +13,8 @@ use gpui_kit::*;
 use protocol::Request;
 
 use crate::app::BenchApp;
-use crate::app::model::{ProjectKey, Target, ThreadRow};
+use crate::app::model::{ProjectKey, Target};
+use crate::thread::store::ThreadRow;
 use crate::client::connection::Connection;
 use crate::client::rpc::{Client, Incoming};
 use crate::thread::ThreadRef;

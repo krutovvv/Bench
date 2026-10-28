@@ -42,7 +42,7 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Jou
         let list = t
             .insert_list()
             .into_iter()
-            .map(|(id, s)| crate::app::model::Insert::new(id, s))
+            .map(|(id, s)| crate::inserts::state::Insert::new(id, s))
             .collect();
         app.inserts.by_thread.insert(id.into(), list);
     }

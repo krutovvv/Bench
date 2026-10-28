@@ -21,7 +21,7 @@ use std::time::Duration;
 
 use web_time::Instant;
 
-use crate::app::model::Usage;
+use protocol::Usage;
 
 #[derive(Default)]
 pub struct Meter {

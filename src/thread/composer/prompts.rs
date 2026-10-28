@@ -31,7 +31,7 @@ impl BenchApp {
                         .as_array()
                         .into_iter()
                         .flatten()
-                        .map(|p| crate::app::model::Prompt {
+                        .map(|p| crate::thread::composer::prompts::Prompt {
                             title: p["name"].as_str().unwrap_or_default().to_string(),
                             body: p["text"].as_str().unwrap_or_default().to_string(),
                             path: p["name"].as_str().unwrap_or_default().to_string(),
@@ -42,4 +42,14 @@ impl BenchApp {
             },
         );
     }
+}
+
+/// A saved text snippet (Settings → Prompts), inserted from the composer with `@`: a Markdown
+/// file `<agent home>/prompts/<title>.md` on the agent's machine.
+#[derive(Clone, Debug, Default)]
+pub struct Prompt {
+    pub title: String,
+    pub body: String,
+    /// Where it lives; empty until first saved.
+    pub path: String,
 }

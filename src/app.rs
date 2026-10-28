@@ -111,7 +111,7 @@ pub struct BenchApp {
     /// The Explorer's state (`src/explorer/`).
     pub explorer: crate::explorer::Explorer,
     /// Settings → Prompts.
-    pub prompts: Vec<crate::app::model::Prompt>,
+    pub prompts: Vec<crate::thread::composer::prompts::Prompt>,
     pub effort_choice: Entity<Choice>,
 
     /// Keeps the `/`-list keystroke interceptor alive (main.rs).

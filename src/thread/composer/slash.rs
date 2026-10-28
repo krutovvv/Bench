@@ -7,7 +7,6 @@ use gpui_kit::*;
 
 use crate::thread::{ThreadRef, ThreadView};
 use crate::app::BenchApp;
-use crate::app::model::SlashCommand;
 
 /// `@word` at the end of the composer text: (byte offset of the `@`, the word).
 fn prompt_token(text: &str) -> Option<(usize, String)> {
@@ -177,4 +176,16 @@ impl ThreadView {
         self.complete_slash(window, cx);
         self.composer.update(cx, |s, cx| s.focus(window, cx));
     }
+}
+
+/// A slash command from the agent's commands, a saved prompt, or a tool to attach to the
+/// thread (`/tasks today`).
+#[derive(Clone, Debug, Default)]
+pub struct SlashCommand {
+    /// "/goal".
+    pub name: String,
+    pub desc: String,
+    pub category: String,
+    /// A tool's subject key ("tasks:today"); empty for commands and prompts.
+    pub key: String,
 }

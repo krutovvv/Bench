@@ -19,7 +19,7 @@ use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::app::model::Insert;
+use crate::inserts::state::Insert;
 use crate::inserts::InsertKind;
 use crate::thread::ThreadRef;
 use bench_ui::icons::Ico;
@@ -44,7 +44,7 @@ impl InsertKind for Terminal {
     }
 
     /// The terminal where the thread's project runs: this Mac's, or its server's.
-    fn choices(&self, app: &BenchApp, at: &ThreadRef) -> Vec<crate::app::model::SlashCommand> {
+    fn choices(&self, app: &BenchApp, at: &ThreadRef) -> Vec<crate::thread::composer::slash::SlashCommand> {
         let host = app.thread_host(at);
         let mut row = self.word().command("Tool");
         row.desc = if host.is_empty() {

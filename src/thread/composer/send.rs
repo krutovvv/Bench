@@ -105,7 +105,7 @@ impl BenchApp {
     /// The new chat is a thread now: it shows in the sidebar at once, and what waited for it goes.
     fn thread_created(&mut self, host: String, id: ThreadId, at: &ThreadRef, cx: &mut Context<Self>) {
         if !self.threads.list.iter().any(|s| s.host == host && s.id == id) {
-            let row = crate::app::model::ThreadRow {
+            let row = crate::thread::store::ThreadRow {
                 id: id.clone(),
                 title: "Untitled".into(),
                 running: true,

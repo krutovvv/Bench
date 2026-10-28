@@ -11,7 +11,7 @@ use gpui_kit::*;
 use serde_json::json;
 
 use crate::app::BenchApp;
-use crate::app::model::Insert;
+use crate::inserts::state::Insert;
 use crate::inserts::InsertKind;
 use crate::inserts::tasks::model::{LISTS, List};
 use crate::thread::ThreadRef;
@@ -42,10 +42,10 @@ impl InsertKind for Tasks {
     }
 
     /// One row per list: the insert opens on it.
-    fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<crate::app::model::SlashCommand> {
+    fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<crate::thread::composer::slash::SlashCommand> {
         LISTS
             .iter()
-            .map(|l| crate::app::model::SlashCommand {
+            .map(|l| crate::thread::composer::slash::SlashCommand {
                 name: format!("/tasks {}", l.name()),
                 desc: "the task lists, on this one".into(),
                 category: "Tool".into(),

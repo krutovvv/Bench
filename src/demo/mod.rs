@@ -25,7 +25,7 @@ use threads::subject_threads;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::app::model::Usage;
+use protocol::Usage;
 use protocol::ThreadItem;
 use serde_json::json;
 
@@ -195,7 +195,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         t.journal = landing;
         t.id = Some("d-landing".into());
         t.loaded = true;
-        t.repo = Some(crate::app::model::Repo::from_top("/Users/demo/code/storefront", "main"));
+        t.repo = Some(crate::app::repo::Repo::from_top("/Users/demo/code/storefront", "main"));
     });
     other_modes(app);
     subject_threads(app, now);

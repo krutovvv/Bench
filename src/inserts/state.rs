@@ -10,7 +10,6 @@ use protocol::InsertPatch;
 use serde_json::{Map, Value, json};
 
 use crate::app::BenchApp;
-use crate::app::model::Insert;
 use crate::inserts::kind_of;
 use crate::thread::{ThreadRef, ThreadView};
 
@@ -316,5 +315,40 @@ impl InsertsState {
             sites: Default::default(),
             sites_error: None,
         }
+    }
+}
+
+/// A piece the person put into a thread with "/" (the terminal, the tasks, the utilities, the
+/// browser's tab): kept by the agent as a Pi entry where it was put and a document of its state
+/// (agent/src/runtime/inserts.ts), read from the thread's journal (`Thread::insert_list`). Its look and
+/// behaviour: `crate::inserts`.
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct Insert {
+    pub id: String,
+    /// What it is: "ssh:local" (the terminal on the thread's machine), "tasks", "tools",
+    /// "browser".
+    pub key: String,
+    /// Its own state (the list, the tool, the browser's tab).
+    pub state: serde_json::Map<String, Value>,
+    pub folded: bool,
+}
+
+impl Insert {
+    pub fn new(id: String, s: protocol::InsertState) -> Self {
+        Self {
+            id,
+            key: s.key,
+            state: s.state,
+            folded: s.folded,
+        }
+    }
+
+    /// A string field of its state.
+    pub fn get(&self, field: &str) -> String {
+        self.state
+            .get(field)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string()
     }
 }

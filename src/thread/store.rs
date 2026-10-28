@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 
-use crate::app::model::ThreadRow;
 use crate::thread::composer::attachments::Reference;
 
 pub struct ThreadStore {
@@ -31,6 +30,65 @@ impl ThreadStore {
             references: HashMap::new(),
             reopen,
             creating: false,
+        }
+    }
+}
+
+/// A thread as the sidebar lists it: what its agent says of it (`protocol::ThreadSummary`), and
+/// which agent that is.
+#[derive(Clone, Debug, Default)]
+pub struct ThreadRow {
+    pub id: protocol::ThreadId,
+    pub title: String,
+    pub messages: u64,
+    pub running: bool,
+    /// The person paused its run: it stands still until resumed.
+    pub paused: bool,
+    /// Where it was started: "local" (Bench), "telegram", "cron", …
+    pub source: String,
+    /// The project it belongs to, as Bench keys projects (`ProjectKey`); its agent's Host when
+    /// it has none.
+    pub project: String,
+    /// The server whose agent keeps it (an ~/.ssh/config alias); "" = this Mac's.
+    pub host: String,
+    /// The folder it works in, and the top of its git repo.
+    pub cwd: String,
+    pub repo: Option<String>,
+    /// Who it is with (a Telegram thread's person).
+    pub with: Option<String>,
+}
+
+impl ThreadRow {
+    /// The agent `host`'s summary of a thread, placed in the project `project`.
+    pub fn new(host: &str, project: String, t: protocol::ThreadSummary) -> Self {
+        Self {
+            id: t.id,
+            title: t.title,
+            messages: t.messages,
+            running: t.running,
+            paused: t.paused,
+            source: t.source,
+            project,
+            host: host.to_string(),
+            cwd: t.cwd,
+            repo: t.repo,
+            with: t.with,
+        }
+    }
+}
+
+/// Human name of a session source, for grouping the session list.
+pub fn source_label(source: &str) -> String {
+    match source {
+        "" | "local" | "desktop" | "tui" | "cli" | "dashboard" => "Bench".into(),
+        "telegram" => "Telegram".into(),
+        "cron" => "Cron".into(),
+        "api_server" | "api" => "API".into(),
+        other => {
+            let mut c = other.chars();
+            c.next()
+                .map(|f| f.to_uppercase().collect::<String>() + c.as_str())
+                .unwrap_or_default()
         }
     }
 }

@@ -55,7 +55,7 @@ pub struct ActiveThread {
     /// are rows' data: `crates/thread`).
     pub plan_open: HashSet<String>,
     /// The git repo it works in (None for a thread that touches no repo).
-    pub repo: Option<crate::app::model::Repo>,
+    pub repo: Option<crate::app::repo::Repo>,
     /// The project it belongs to (a new one is created in it); "" = its agent's Host.
     pub project: String,
 }

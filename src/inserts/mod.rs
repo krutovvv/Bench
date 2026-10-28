@@ -28,7 +28,8 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::app::model::{Insert, SlashCommand};
+use crate::inserts::state::Insert;
+use crate::thread::composer::slash::SlashCommand;
 use crate::thread::{ThreadRef, ThreadView};
 use bench_ui::icons::Ico;
 

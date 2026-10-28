@@ -5,6 +5,6 @@
 pub(crate) mod attachments;
 pub(crate) mod drafts;
 mod input;
-mod prompts;
+pub(crate) mod prompts;
 pub(crate) mod send;
-mod slash;
+pub(crate) mod slash;

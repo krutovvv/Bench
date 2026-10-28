@@ -23,7 +23,7 @@ impl BenchApp {
         &self,
         at: &ThreadRef,
         text: &str,
-    ) -> Option<Vec<crate::app::model::SlashCommand>> {
+    ) -> Option<Vec<crate::thread::composer::slash::SlashCommand>> {
         let rest = text.strip_prefix('/')?;
         let (word, q) = match rest.split_once(char::is_whitespace) {
             Some((w, q)) => (w, q.trim().to_lowercase()),
@@ -39,7 +39,7 @@ impl BenchApp {
     }
 
     /// The words that put an insert in, for the list of a bare `/word`.
-    pub fn tool_words() -> Vec<crate::app::model::SlashCommand> {
+    pub fn tool_words() -> Vec<crate::thread::composer::slash::SlashCommand> {
         crate::inserts::words()
     }
 

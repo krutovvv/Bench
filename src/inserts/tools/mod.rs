@@ -10,7 +10,7 @@ use gpui_kit::*;
 use serde_json::json;
 
 use crate::app::BenchApp;
-use crate::app::model::Insert;
+use crate::inserts::state::Insert;
 use crate::inserts::slash::tool_key;
 use crate::inserts::{InsertKind, Switch, clip};
 use crate::thread::ThreadRef;
@@ -45,11 +45,11 @@ impl InsertKind for Tools {
     }
 
     /// One row per utility, under its group's name.
-    fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<crate::app::model::SlashCommand> {
+    fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<crate::thread::composer::slash::SlashCommand> {
         GROUPS
             .iter()
             .flat_map(|g| g.tools.iter().map(move |t| (*t, g.name)))
-            .map(|(t, g)| crate::app::model::SlashCommand {
+            .map(|(t, g)| crate::thread::composer::slash::SlashCommand {
                 name: format!("/tools {}", t.name()),
                 desc: g.to_string(),
                 category: "Tool".into(),

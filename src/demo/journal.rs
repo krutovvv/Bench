@@ -1,7 +1,7 @@
 //! The made-up pieces of a thread: rows of the sidebar, steps of the agent's work, a journal as Pi
 //! gives it, the answer's media.
 
-use crate::app::model::ThreadRow;
+use crate::thread::store::ThreadRow;
 use ::thread::Thread;
 use protocol::{Process, ThreadItem, ThreadOpen};
 use serde_json::{Value, json};

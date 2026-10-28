@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::app::model::{CommitBrief, Repo, RepoInfo, Target};
+use crate::app::model::{Target};
 use crate::client::connection;
 use crate::thread::ThreadRef;
 
@@ -229,4 +229,63 @@ impl BenchApp {
 pub struct GitState {
     pub info: HashMap<String, RepoInfo>,
     pub reading: std::collections::HashSet<String>,
+}
+
+/// What the title bar's repository chip opens: the few things worth knowing about the repo the
+/// thread works in, read with git where it lives (this Mac, or over SSH).
+#[derive(Clone, Debug)]
+pub struct RepoInfo {
+    /// Files the working tree has changed since the last commit.
+    pub dirty: usize,
+    /// The newest commits, newest first.
+    pub commits: Vec<CommitBrief>,
+    /// The `origin` URL, when the repo has one.
+    pub remote: Option<String>,
+}
+
+/// One commit as the chip's menu shows it.
+#[derive(Clone, Debug)]
+pub struct CommitBrief {
+    pub sha: String,
+    pub subject: String,
+    /// "2 hours ago", git's own reckoning.
+    pub age: String,
+}
+
+/// The git repo a thread works in.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Repo {
+    /// The main checkout: `~/code/app`, also for chats in `~/code/app/.worktrees/x`.
+    pub root: String,
+    /// Where this chat's files are: the main checkout or its branch folder.
+    pub dir: String,
+    pub branch: String,
+}
+
+impl Repo {
+    /// From any folder inside a repo (`top` = `git rev-parse --show-toplevel` of it).
+    pub fn from_top(top: &str, branch: &str) -> Self {
+        let root = match top.find("/.worktrees/") {
+            Some(i) => top[..i].to_string(),
+            None => top.to_string(),
+        };
+        Self {
+            root,
+            dir: top.to_string(),
+            branch: branch.to_string(),
+        }
+    }
+
+    pub fn name(&self) -> String {
+        self.root
+            .rsplit('/')
+            .next()
+            .unwrap_or(&self.root)
+            .to_string()
+    }
+
+    /// The chat works in its own branch folder (not the main checkout).
+    pub fn in_branch_folder(&self) -> bool {
+        self.dir != self.root
+    }
 }
