@@ -20,13 +20,66 @@ pub fn search_band(input: &Entity<InputState>, cx: &App) -> Div {
         .pr_2()
         .items_center()
         .child(
-            Input::new(input).appearance(false).cleanable(true).prefix(
+            // The list's size: the field is the first line of the list under it.
+            Input::new(input).small().appearance(false).cleanable(true).prefix(
                 Ico::Search
                     .icon()
                     .small()
                     .text_color(theme.muted_foreground),
             ),
         )
+}
+
+/// Ways to look at one thing, one pressed in a track (the header's Chat | Code): an icon and a
+/// word each, `tip` on hover (its key). The pressed one stands on the background, the others are
+/// words in the muted colour.
+pub fn mode_switch(
+    id: &'static str,
+    modes: &[(Ico, &'static str, &'static str)],
+    chosen: usize,
+    cx: &App,
+    on_pick: crate::OnPick,
+) -> Div {
+    use crate::metrics::{MODE_SEGMENT_H, MODE_SWITCH_PAD};
+    let theme = cx.theme().clone();
+    h_flex()
+        .flex_none()
+        .p(px(MODE_SWITCH_PAD))
+        .gap(px(MODE_SWITCH_PAD))
+        .rounded_md()
+        .bg(theme.secondary)
+        .border_1()
+        .border_color(theme.border)
+        .children(modes.iter().enumerate().map(|(k, &(icon, label, tip))| {
+            let on = k == chosen;
+            let pick = on_pick.clone();
+            h_flex()
+                .id((id, k))
+                .h(px(MODE_SEGMENT_H))
+                .px_2()
+                .gap_1()
+                .items_center()
+                .rounded_sm()
+                .border_1()
+                .text_xs()
+                .font_weight(FontWeight::MEDIUM)
+                .cursor_pointer()
+                .map(|d| {
+                    if on {
+                        d.bg(theme.background)
+                            .border_color(theme.border)
+                            .text_color(theme.foreground)
+                    } else {
+                        d.border_color(theme.transparent)
+                            .text_color(theme.muted_foreground)
+                            .hover(|s| s.text_color(theme.foreground))
+                    }
+                })
+                .child(icon.icon().xsmall())
+                .child(label)
+                .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
+                .on_click(move |_, window, cx| pick(k, window, cx))
+        }))
 }
 
 /// The header over the main area: the title on the left (cut with "…"), `right` on the right.

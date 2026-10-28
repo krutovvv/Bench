@@ -50,6 +50,61 @@ pub fn field_row(label: impl Into<SharedString>, field: impl IntoElement, cx: &A
         .child(div().flex_1().max_w(px(560.)).child(field))
 }
 
+/// One of a few answers to one question, as a card in a row of them: an icon and a radio on top,
+/// a title, a line of what it means. `on`: picked (the accent's ring and tint); `off`: not
+/// available here (dimmed, and `text` says why).
+pub fn choice_card(
+    id: impl Into<ElementId>,
+    icon: crate::Ico,
+    title: impl Into<SharedString>,
+    text: impl Into<SharedString>,
+    on: bool,
+    off: bool,
+    cx: &App,
+) -> Stateful<Div> {
+    use crate::metrics::{CHOICE_CARD_MIN_H, RADIO, RADIO_ON_RING};
+    let theme = cx.theme().clone();
+    v_flex()
+        .id(id)
+        .flex_1()
+        .min_w_0()
+        .min_h(px(CHOICE_CARD_MIN_H))
+        .p_3()
+        .gap_1()
+        .rounded_lg()
+        .border_1()
+        .map(|d| {
+            if on {
+                d.border_color(theme.primary).bg(theme.primary.opacity(0.08))
+            } else {
+                d.border_color(theme.border).bg(theme.background)
+            }
+        })
+        .when(off, |d| d.opacity(0.5))
+        .when(!off && !on, |d| d.cursor_pointer().hover(|s| s.bg(theme.list_hover)))
+        .child(
+            h_flex()
+                .justify_between()
+                .items_center()
+                .pb_2()
+                .child(icon.icon().small().text_color(if on { theme.primary } else { theme.muted_foreground }))
+                .child(
+                    div()
+                        .size(px(RADIO))
+                        .rounded_full()
+                        .map(|d| {
+                            if on {
+                                d.border(px(RADIO_ON_RING)).border_color(theme.primary).bg(theme.background)
+                            } else {
+                                d.border_1().border_color(theme.border)
+                            }
+                        }),
+                ),
+        )
+        .child(div().text_sm().font_weight(FontWeight::SEMIBOLD).child(title.into()))
+        .child(div().text_xs().text_color(theme.muted_foreground).child(text.into()))
+}
+
 /// A settings page: its rows and headings, scrolled, as far from the edges as the thread's avatar.
 pub fn settings_page(id: &'static str, rows: Vec<AnyElement>) -> AnyElement {
     v_flex()

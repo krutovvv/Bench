@@ -24,12 +24,14 @@ pub enum Center {
     Doc,
     /// The gear: agents, presets, appearance.
     Settings,
+    /// The new project's page (`src/settings/new_project.rs`).
+    NewProject,
 }
 
 impl Center {
     /// A page with its own title and a close in the header (not a thread, not a document).
     pub fn is_settings(self) -> bool {
-        matches!(self, Center::Settings)
+        matches!(self, Center::Settings | Center::NewProject)
     }
 }
 

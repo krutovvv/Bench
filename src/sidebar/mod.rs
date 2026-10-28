@@ -56,11 +56,8 @@ impl BenchApp {
             for (g, (p, rows)) in groups.into_iter().enumerate() {
                 list.extend(self.render_project(g + 1, &p, rows, cx));
             }
-            if self.places.projects.is_empty() && self.local_conn().is_some() {
-                list.push(
-                    self.sidebar_note("No projects yet. “New project” above starts one.", cx),
-                );
-            }
+            // A new project is one more row of the list, where projects are: the last.
+            list.push(self.render_new_project_row(cx));
         }
 
         v_flex()
@@ -198,6 +195,27 @@ impl BenchApp {
             );
         }
         out
+    }
+
+    /// "New project" as a project's head looks: a folder with a "+", in the muted colour.
+    fn render_new_project_row(&self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let on = self.new_project.form.is_some();
+        h_flex()
+            .id("new-project")
+            .px_4()
+            .pt(px(bench_ui::GROUP_GAP))
+            .pb(px(bench_ui::GROUP_HEAD_PB))
+            .gap_1p5()
+            .items_center()
+            .cursor_pointer()
+            .text_size(px(bench_ui::SIDEBAR_TEXT))
+            .text_color(if on { theme.foreground } else { theme.muted_foreground })
+            .hover(|s| s.text_color(theme.foreground))
+            .child(bench_ui::head_icon_in(Ico::FolderPlus, None, cx))
+            .child("New project")
+            .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx)))
+            .into_any_element()
     }
 
     fn sidebar_note(&self, text: &'static str, cx: &mut Context<Self>) -> AnyElement {

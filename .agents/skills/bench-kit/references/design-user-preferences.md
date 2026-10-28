@@ -134,7 +134,7 @@ Dated where it changed. The person's later decisions win over earlier ones: a ru
   (⌘Enter, ⌘⇧D, drag-and-drop), no scroll of its own, there while history loads; the thread
   scrolls past its end like a code editor. The mic lives in the status bar.
 - **The sidebar is a tree** (projects and their threads, nothing else): no "New session"
-  button; "+" on a project is a new thread (⌘N), "+" in the top strip a new project.
+  button; "+" on a project is a new thread (⌘N), "New project", the last row of the projects, opens its page in the center.
 - **Fold strips (Background, Changed files) are as tall as a source chip.**
 - **One size in the thread** (2026-10-24): the thread is one document in one font size — the
   messages' (`text_base`). Step summaries ("Sending… · 17s", "Done · N actions"), step rows,

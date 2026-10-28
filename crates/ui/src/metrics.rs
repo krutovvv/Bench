@@ -66,6 +66,19 @@ pub fn header_h(cx: &App) -> Pixels {
     bar_h(cx) + px(1.)
 }
 
+/// A page laid out for reading (the new project's): its column's width.
+pub const PAGE_W: f32 = 680.;
+/// A choice drawn as a card (the new project's "where"): its least height, so a row of them
+/// lines up whatever their text.
+pub const CHOICE_CARD_MIN_H: f32 = 128.;
+/// A choice's radio: its ring, and the ring when picked (the dot is the hole left inside).
+pub const RADIO: f32 = 14.;
+pub const RADIO_ON_RING: f32 = 4.;
+
+/// The header's Chat | Code switch: the track's inset around its segments, and a segment's height.
+pub const MODE_SWITCH_PAD: f32 = 2.;
+pub const MODE_SEGMENT_H: f32 = 22.;
+
 /// Room left of the header for the window's buttons (macOS's three lights), when the sidebar
 /// that usually sits under them is folded away.
 pub const WINDOW_BUTTONS_W: f32 = 78.;
@@ -73,9 +86,6 @@ pub const WINDOW_BUTTONS_W: f32 = 78.;
 /// The sidebar's strip under the window buttons: its icons end at the sidebar's 16 px inset
 /// (an icon's 4 px box padding + this).
 pub const SIDEBAR_STRIP_PR: f32 = 12.;
-
-/// A card hung under a bar's button (the new project): wide enough for its fields' labels.
-pub const POPOVER_CARD_W: f32 = 400.;
 
 /// A row under a group header starts where the header's name does.
 pub fn nest_pl(cx: &App) -> Pixels {
@@ -136,8 +146,6 @@ pub const POPOVER_L: f32 = 380.;
 pub const SLASH_LIST_W: f32 = 560.;
 /// A path typed into the thread's head (a server's folder).
 pub const PATH_FIELD_W: f32 = 360.;
-/// A popover's distance under the bar it hangs from.
-pub const POPOVER_DROP: f32 = 2.;
 
 // ---- The sidebar ---------------------------------------------------------------------------
 

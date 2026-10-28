@@ -84,6 +84,7 @@ impl Render for BenchApp {
                 .child(self.active_thread.clone())
                 .into_any_element(),
             Center::Settings => self.render_settings(cx),
+            Center::NewProject => self.render_new_project_page(cx),
             Center::Doc => self.render_doc(window, cx),
         };
 
@@ -146,33 +147,7 @@ impl Render for BenchApp {
             }))
             .child(div().flex_1().min_h_0().child(content))
             .child(self.render_statusbar(window, cx));
-        // The new project's popover, hanging under the sidebar's strip where its button is —
-        // like the context panel over the status bar, not a takeover of the window. Behind it
-        // an invisible catcher: a click anywhere else closes it.
-        div()
-            .relative()
-            .size_full()
-            .child(base)
-            .when(self.new_project.form.is_some(), |d| {
-                // Its right edge under the strip's, where the button stands.
-                let left = (self.left_dock.size()
-                    - px(bench_ui::POPOVER_CARD_W + bench_ui::SIDEBAR_STRIP_PR))
-                .max(px(bench_ui::SIDEBAR_STRIP_PR));
-                d.child(
-                    div()
-                        .id("project-mask")
-                        .absolute()
-                        .inset_0()
-                        .on_click(cx.listener(|this, _, _, cx| this.cancel_project_form(cx)))
-                        .child(
-                            div()
-                                .absolute()
-                                .top(bench_ui::bar_h(cx) + px(bench_ui::POPOVER_DROP))
-                                .left(left)
-                                .child(self.render_project_dialog(cx)),
-                        ),
-                )
-            })
+        base
     }
 }
 

@@ -30,7 +30,7 @@ y ┌─────────────────────────
 
 | Area | Height | Inside | Inset | Code |
 |---|---|---|---|---|
-| Top strip (over the sidebar) | 35 | icon buttons, right-aligned: + (New project), Hide sidebar | right 16 (`pr 12` + the icon's 4) | `render_sidebar_top`, `src/sidebar/top.rs` |
+| Top strip (over the sidebar) | 35 | icon button, right-aligned: Hide sidebar (New project is the list's last row) | right 16 (`pr 12` + the icon's 4) | `render_sidebar_top`, `src/sidebar/top.rs` |
 | Search band | `bar_h + 1` | the search input, no frame | magnifier over the head icons (measured) | `bench_ui::search_band` (`crates/ui/src/bars.rs`), used in `src/sidebar/mod.rs` |
 | Sidebar list | rest | projects only: Host's threads first, then each project (pinned first) with its threads | nested rows `nest_pl` | `src/sidebar/mod.rs` (`render_loose`, `render_project`); order and acts `src/sidebar/items.rs` |
 | Header | 36 incl. its rule | the thread's title, the project chip; at the right end New window | left 16 (`pl_4`), right 8 (`pr_2`) | `render_header`, `src/titlebar/mod.rs`; its right end `render_header_tail`, `src/inserts/terminal/form.rs` |
@@ -52,7 +52,7 @@ bottom, and the same air over their tabs; their content fills that width, no max
 | A form a tool needs (a new server, a new host) | an agent-message card under the insert that asked for it | a dialog, a settings page |
 | A project's settings (name, where, model, Telegram) | its Settings page (`Center::Project`, `src/env/page.rs`) | a thread, a dialog |
 | What a project contains (files, soul, prompts, skills, MCP, schedule) | the Explorer (`src/explorer/`, `docs/explorer.md`) | a thread, a settings tab |
-| The sidebar's own buttons (new project, hide) | top strip, right | the status bar |
+| The sidebar's own buttons (hide) | top strip, right; New project: the list's last row | the status bar |
 | New window | the header's right end (`render_header_tail`) | — |
 | Settings (the gear), attach, dictate, Stop | status bar, right; Stop last | the composer |
 | Facts (where, model, counts) | status bar, left; text or pickers, not buttons | — |

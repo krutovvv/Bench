@@ -23,22 +23,25 @@ impl BenchApp {
             .flex_none()
             .gap_1()
             .items_center()
-            // The extreme corner, there whatever the center shows: one hop from a thread to its
-            // project's files, and back by the same pressed button.
-            .child(
-                bench_ui::icon_button(
-                    "ide-toggle",
-                    bench_ui::icons::Ico::FolderTree,
-                    if ide {
-                        "Close the Explorer  ⌘E"
-                    } else {
-                        "The project's files  ⌘E"
-                    },
-                    ide,
+            // The extreme corner, there whatever the center shows: the thread, or its project as
+            // an IDE shows it — one hop either way, and which one is on is plain to see.
+            .child({
+                let app = cx.entity().downgrade();
+                bench_ui::mode_switch(
+                    "mode",
+                    &[
+                        (bench_ui::icons::Ico::MessageSquare, "Chat", "The threads  ⌘E"),
+                        (bench_ui::icons::Ico::Code, "Code", "The project's files  ⌘E"),
+                    ],
+                    usize::from(ide),
                     cx,
+                    std::rc::Rc::new(move |k, window, cx| {
+                        if (k == 1) != ide {
+                            let _ = app.update(cx, |this, cx| this.toggle_side(window, cx));
+                        }
+                    }),
                 )
-                .on_click(cx.listener(|this, _, window, cx| this.toggle_side(window, cx))),
-            )
+            })
             .into_any_element()
     }
 
@@ -181,7 +184,7 @@ impl BenchApp {
                 .into_any_element();
         }
 
-        let title: SharedString = "Settings".into();
+        let title: SharedString = if self.center == Center::NewProject { "New project" } else { "Settings" }.into();
         bar.child(
             div()
                 .px_4()
@@ -203,8 +206,7 @@ impl BenchApp {
                 .child(bench_ui::icons::Ico::X.icon().small())
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.center = Center::Chat;
-                    this.new_project.form = None;
-                    cx.notify();
+                    this.cancel_project_form(cx);
                 })),
         )
         .into_any_element()
