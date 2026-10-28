@@ -246,7 +246,7 @@ impl BenchApp {
                 // The name is the sidebar's: a server's Host is named in this Mac's list of agents,
                 // not by the server (`places.rs`).
                 let name = this
-                    .projects
+                    .places.projects
                     .iter()
                     .find(|p| p.id == asked)
                     .map(|p| p.name.clone());

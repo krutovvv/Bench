@@ -39,8 +39,8 @@ impl BenchApp {
     /// The sidebar's projects from their sources: this Mac's, then each server's Host followed by
     /// the server's own projects.
     pub fn compose_projects(&mut self) {
-        let mut all = self.local_projects.clone();
-        for a in &self.server_agents {
+        let mut all = self.places.local.clone();
+        for a in &self.places.server_agents {
             all.push(ProjectEntry {
                 id: ProjectKey::host_of(&a.host).to_string(),
                 name: a.name.clone(),
@@ -48,13 +48,13 @@ impl BenchApp {
                 ..Default::default()
             });
             all.extend(
-                self.server_projects
+                self.places.server_projects
                     .get(&a.host)
                     .cloned()
                     .unwrap_or_default(),
             );
         }
-        self.projects = all;
+        self.places.projects = all;
     }
 
     /// The servers' agents this Mac knows (this Mac's agent keeps the list); each is connected.
@@ -70,7 +70,7 @@ impl BenchApp {
                 let Ok(v) = r else {
                     return;
                 };
-                this.server_agents = v["agents"]
+                this.places.server_agents = v["agents"]
                     .as_array()
                     .into_iter()
                     .flatten()
@@ -83,10 +83,10 @@ impl BenchApp {
                     .collect();
                 // An agent no longer listed is let go: its link, its threads, its projects.
                 let known: Vec<String> =
-                    this.server_agents.iter().map(|a| a.host.clone()).collect();
+                    this.places.server_agents.iter().map(|a| a.host.clone()).collect();
                 this.agents.retain(|h, _| h.is_empty() || known.contains(h));
-                this.server_projects.retain(|h, _| known.contains(h));
-                this.threads
+                this.places.server_projects.retain(|h, _| known.contains(h));
+                this.threads.list
                     .retain(|s| s.host.is_empty() || known.contains(&s.host));
                 this.compose_projects();
                 this.connect_remotes(window, cx);
@@ -119,7 +119,7 @@ impl BenchApp {
                     .flatten()
                     .filter_map(|p| entry_of(&host, p))
                     .collect();
-                this.server_projects.insert(host.clone(), list);
+                this.places.server_projects.insert(host.clone(), list);
                 this.compose_projects();
                 // Its threads were placed before its projects were known: again.
                 this.list_threads(&host, cx);
@@ -130,7 +130,7 @@ impl BenchApp {
 
     /// A project just made on a server: in the sidebar at once.
     pub fn add_server_project(&mut self, entry: ProjectEntry) {
-        self.server_projects
+        self.places.server_projects
             .entry(entry.agent.clone())
             .or_default()
             .push(entry);
@@ -139,12 +139,12 @@ impl BenchApp {
 
     /// The server has an agent this Mac knows: projects can be made there.
     pub fn has_agent_on(&self, host: &str) -> bool {
-        self.server_agents.iter().any(|a| a.host == host)
+        self.places.server_agents.iter().any(|a| a.host == host)
     }
 
     /// Where a project lives. A key not (yet) listed is placed by itself: its agent.
     pub fn location(&self, project: &str) -> Location {
-        match self.projects.iter().find(|p| p.id == project) {
+        match self.places.projects.iter().find(|p| p.id == project) {
             Some(p) => p.location(),
             None => Location {
                 agent: ProjectKey::parse(project).agent,
@@ -155,7 +155,7 @@ impl BenchApp {
 
     /// A project's name as the sidebar shows it (this Mac's Host when it is none of them).
     pub fn project_name(&self, id: &str) -> String {
-        self.projects
+        self.places.projects
             .iter()
             .find(|p| p.id == id)
             .map(|p| p.name.clone())
@@ -184,7 +184,7 @@ impl BenchApp {
 
     /// The agent keeping a thread the sidebar lists ("" = this Mac's).
     pub fn host_of_thread(&self, id: &protocol::ThreadId) -> String {
-        self.threads
+        self.threads.list
             .iter()
             .find(|s| &s.id == id)
             .map(|s| s.host.clone())
@@ -230,16 +230,16 @@ impl BenchApp {
             return;
         };
         for a in self
-            .server_agents
+            .places.server_agents
             .iter_mut()
             .filter(|a| key.is_host() && a.host == key.agent)
         {
             a.name = name.clone();
         }
         for p in self
-            .local_projects
+            .places.local
             .iter_mut()
-            .chain(self.server_projects.values_mut().flatten())
+            .chain(self.places.server_projects.values_mut().flatten())
         {
             if p.id == project {
                 p.name = name.clone();
@@ -259,4 +259,17 @@ impl BenchApp {
         );
         cx.notify();
     }
+}
+
+/// Where the sidebar's projects come from: this Mac's agent's projects, the servers' agents this
+/// Mac knows and each one's own projects as it last listed them, composed into `projects`.
+#[derive(Default)]
+pub struct Places {
+    /// The person's projects as the sidebar shows them (`compose_projects`).
+    pub projects: Vec<crate::app::model::ProjectEntry>,
+    pub local: Vec<crate::app::model::ProjectEntry>,
+    pub server_agents: Vec<ServerAgent>,
+    pub server_projects: std::collections::HashMap<String, Vec<crate::app::model::ProjectEntry>>,
+    /// This Mac's agent (its Host) has the watchable server browser.
+    pub host_browser: bool,
 }

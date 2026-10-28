@@ -7,7 +7,7 @@
 //! shown.
 
 pub mod dock;
-mod layout;
+pub(crate) mod layout;
 
 use gpui_kit::*;
 

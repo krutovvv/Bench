@@ -37,7 +37,7 @@ impl BenchApp {
     fn store_marks(&self) {
         // Another window may have changed other sessions' marks: merge into what is on disk.
         let mut all = load();
-        for (k, v) in &self.marks {
+        for (k, v) in &self.sidebar.marks {
             all.insert(k.clone(), *v);
         }
         all.retain(|_, m| m.pinned || m.color.is_some());
@@ -46,18 +46,18 @@ impl BenchApp {
     }
 
     pub fn mark_of(&self, session: &str) -> Mark {
-        self.marks.get(session).copied().unwrap_or_default()
+        self.sidebar.marks.get(session).copied().unwrap_or_default()
     }
 
     pub fn toggle_pin(&mut self, session: String, cx: &mut Context<Self>) {
-        let m = self.marks.entry(session).or_default();
+        let m = self.sidebar.marks.entry(session).or_default();
         m.pinned = !m.pinned;
         self.store_marks();
         cx.notify();
     }
 
     pub fn set_color(&mut self, session: String, color: Option<usize>, cx: &mut Context<Self>) {
-        self.marks.entry(session).or_default().color = color;
+        self.sidebar.marks.entry(session).or_default().color = color;
         self.store_marks();
         cx.notify();
     }

@@ -114,7 +114,7 @@ impl BenchApp {
             bool,
             Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>,
         )> = self
-            .ssh
+            .inserts.ssh
             .tabs
             .iter()
             .filter(|t| t.background)
@@ -123,7 +123,7 @@ impl BenchApp {
                 let id = t.id;
                 let f: Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)> =
                     Box::new(move |this, _, cx| {
-                        if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                        if let Some(t) = this.inserts.ssh.tabs.iter_mut().find(|t| t.id == id) {
                             t.background = false;
                             t.collapsed = false;
                         }
@@ -137,10 +137,10 @@ impl BenchApp {
                 "Stop all".into(),
                 false,
                 Box::new(|this, _, cx| {
-                    for t in this.ssh.tabs.iter().filter(|t| t.background) {
+                    for t in this.inserts.ssh.tabs.iter().filter(|t| t.background) {
                         t.session.kill();
                     }
-                    this.ssh.tabs.retain(|t| !t.background);
+                    this.inserts.ssh.tabs.retain(|t| !t.background);
                     cx.notify();
                 }),
             ));

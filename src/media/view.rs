@@ -70,7 +70,7 @@ impl BenchApp {
                     // A long block (a log dump) comes folded to its first lines; opening it is
                     // the person's, remembered while Bench runs, like an unfolded Markdown file.
                     let long = code.lines().count() > FOLD_AFTER_LINES;
-                    let open = self.media_open.contains(&state_key);
+                    let open = self.media.open.contains(&state_key);
                     let more = long.then(|| {
                         let k2 = state_key.clone();
                         let n = code.lines().count();
@@ -90,8 +90,8 @@ impl BenchApp {
                                 format!("Show all · {n} lines")
                             })
                             .on_click(cx.listener(move |this, _, _, cx| {
-                                if !this.media_open.remove(&k2) {
-                                    this.media_open.insert(k2.clone());
+                                if !this.media.open.remove(&k2) {
+                                    this.media.open.insert(k2.clone());
                                 }
                                 cx.notify();
                             }))
@@ -117,10 +117,10 @@ impl BenchApp {
         let Some(conn) = self.thread_conn(at) else {
             return; // still connecting: the next frame asks again
         };
-        if force && matches!(self.media.get(&key), Some(Loaded::Pending)) {
+        if force && matches!(self.media.files.get(&key), Some(Loaded::Pending)) {
             return; // a fresh copy is already on its way
         }
-        self.media.insert(key.clone(), Loaded::Pending);
+        self.media.files.insert(key.clone(), Loaded::Pending);
         let target = self.thread_target(at);
         let machine = self.files_machine(at);
         cx.spawn(async move |this, cx| {
@@ -132,13 +132,13 @@ impl BenchApp {
             let _ = this.update(cx, |this, cx| {
                 // A click waited on this copy: open it in its app now that it is here.
                 let open = match &r {
-                    Ok(f) if this.open_after_fetch.as_deref() == Some(key.as_str()) => {
-                        this.open_after_fetch = None;
+                    Ok(f) if this.media.open_after_fetch.as_deref() == Some(key.as_str()) => {
+                        this.media.open_after_fetch = None;
                         Some(f.local.clone())
                     }
                     _ => None,
                 };
-                this.media.insert(key, r.into());
+                this.media.files.insert(key, r.into());
                 if let Some(p) = open {
                     cx.open_with_system(&p);
                 }
@@ -159,10 +159,10 @@ impl BenchApp {
         // A thread's files are where its agent is: this Mac's, or its server's.
         let target = self.thread_target(at);
         let key = format!("{}\0{path}", target.label());
-        if !self.media.contains_key(&key) {
+        if !self.media.files.contains_key(&key) {
             match media::fetch_now(&target, &path) {
                 Some(f) => {
-                    self.media.insert(key.clone(), Loaded::Ready(f));
+                    self.media.files.insert(key.clone(), Loaded::Ready(f));
                 }
                 None => self.fetch_media(at, key.clone(), path.clone(), false, cx),
             }
@@ -215,7 +215,7 @@ impl BenchApp {
                 .on_click(move |_, _, cx| cx.open_with_system(&local))
         };
 
-        let fetched: Fetched = match self.media.get(&key).cloned().unwrap_or(Loaded::Pending) {
+        let fetched: Fetched = match self.media.files.get(&key).cloned().unwrap_or(Loaded::Pending) {
             // A video keeps a 16:9 frame while its first picture is made, so the chat barely moves.
             Loaded::Pending if kind == Kind::Video => {
                 return div()
@@ -245,7 +245,7 @@ impl BenchApp {
                     .cursor_pointer()
                     .tooltip(|window, cx| Tooltip::new("Click to try again").build(window, cx))
                     .on_click(cx.listener(move |this, _, _, cx| {
-                        this.media.remove(&retry);
+                        this.media.files.remove(&retry);
                         cx.notify();
                     }))
                     .into_any_element();
@@ -324,7 +324,7 @@ impl BenchApp {
                 }
             }
             Kind::Video => {
-                let player = self.video.as_ref().filter(|v| v.key == key);
+                let player = self.media.video.as_ref().filter(|v| v.key == key);
                 let elapsed = player.map(|v| bench_ui::clock(v.elapsed()));
                 let line = row(
                     Some(open_button(local.clone(), "Open in the player").into_any_element()),
@@ -338,7 +338,7 @@ impl BenchApp {
                 };
                 // Playing: its current frame; else the first one with a play badge.
                 let frame = player.and_then(|v| v.frame.clone());
-                let starting = self.video_loading.as_deref() == Some(&key);
+                let starting = self.media.video_loading.as_deref() == Some(&key);
                 let badge = |icon: AnyElement| {
                     div()
                         .p_3()
@@ -380,7 +380,7 @@ impl BenchApp {
                     .child(shown.on_click(cx.listener(move |this, _, window, cx| {
                         if !here {
                             cx.open_with_system(&l2);
-                        } else if this.video.as_ref().is_some_and(|v| v.key == k2) {
+                        } else if this.media.video.as_ref().is_some_and(|v| v.key == k2) {
                             this.stop_video(Some(window), cx);
                         } else {
                             this.start_video(k2.clone(), l2.clone(), box_size, window, cx);
@@ -390,7 +390,7 @@ impl BenchApp {
                     .into_any_element()
             }
             Kind::Audio => {
-                let playing = self.media_playing.as_ref().is_some_and(|(k, _)| *k == key);
+                let playing = self.media.audio.as_ref().is_some_and(|(k, _)| *k == key);
                 let (k2, l2) = (key.clone(), local.clone());
                 let play = div()
                     .id(id("play"))
@@ -422,7 +422,7 @@ impl BenchApp {
                             Some(open_button(local, "Open in the player").into_any_element()),
                             playing
                                 .then(|| {
-                                    let t = self.media_since.elapsed().as_secs();
+                                    let t = self.media.audio_since.elapsed().as_secs();
                                     (format!("playing · {}", bench_ui::clock(t)), theme.primary)
                                 })
                                 .or(Some((where_, theme.muted_foreground))),
@@ -436,7 +436,7 @@ impl BenchApp {
             Kind::Markdown => {
                 let text = fetched.text.unwrap_or_default();
                 let long = text.lines().count() > 14 || text.len() > 1400;
-                let open = self.media_open.contains(&key);
+                let open = self.media.open.contains(&key);
                 let k2 = key.clone();
                 v_flex()
                     .max_w(px(MAX_W + 160.))
@@ -492,8 +492,8 @@ impl BenchApp {
                                 .hover(|s| s.text_color(theme.foreground))
                                 .child(if open { "Show less" } else { "Show all" })
                                 .on_click(cx.listener(move |this, _, _, cx| {
-                                    if !this.media_open.remove(&k2) {
-                                        this.media_open.insert(k2.clone());
+                                    if !this.media.open.remove(&k2) {
+                                        this.media.open.insert(k2.clone());
                                     }
                                     cx.notify();
                                 })),
@@ -518,7 +518,7 @@ impl BenchApp {
                         cx.open_with_system(&local); // here already: this is the file itself
                         return;
                     }
-                    this.open_after_fetch = Some(k2.clone());
+                    this.media.open_after_fetch = Some(k2.clone());
                     this.fetch_media(&at2, k2.clone(), p2.clone(), true, cx);
                 }))
                 .into_any_element()
@@ -535,14 +535,14 @@ impl BenchApp {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let key = (code.clone(), theme.is_dark());
-        if !self.diagrams.contains_key(&key) {
+        if !self.media.diagrams.contains_key(&key) {
             // Drawn right here (milliseconds, then cached): the chat lays out at its final
             // height in the first frame.
             let r = media::mermaid_svg(&code, theme.is_dark());
-            self.diagrams.insert(key, r.into());
+            self.media.diagrams.insert(key, r.into());
         }
         let id = SharedString::from(format!("diagram-{i}-{k}"));
-        match self.diagrams.get(&(code.clone(), theme.is_dark())) {
+        match self.media.diagrams.get(&(code.clone(), theme.is_dark())) {
             Some(Loaded::Ready((svg, size))) => {
                 let (w, h) = fit(*size, MAX_W + 160., MAX_H + 200.);
                 let open = svg.clone();

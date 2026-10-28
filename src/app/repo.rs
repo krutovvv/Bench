@@ -34,7 +34,7 @@ impl BenchApp {
         let row = at
             .id
             .as_ref()
-            .and_then(|id| self.threads.iter().find(|r| r.host == at.host && &r.id == id));
+            .and_then(|id| self.threads.list.iter().find(|r| r.host == at.host && &r.id == id));
         if let Some(top) = row.and_then(|r| r.repo.clone()) {
             return Some(Repo::from_top(&top, ""));
         }
@@ -47,10 +47,10 @@ impl BenchApp {
     /// it).
     pub fn folder_of(&self, at: &ThreadRef) -> Option<String> {
         // Until the agent's default folder is known, nothing counts as chosen (and nothing is probed).
-        let default = self.default_cwd.as_ref()?;
+        let default = self.defaults.cwd.as_ref()?;
         let id = at.id.as_ref()?;
         let cwd = &self
-            .threads
+            .threads.list
             .iter()
             .find(|r| r.host == at.host && &r.id == id)?
             .cwd;
@@ -116,7 +116,7 @@ impl BenchApp {
                 this.active_thread
                     .update(cx, |v, _| v.thread.repo = Some(Repo::from_top(&top, &branch)));
                 // The branch may have moved: the chip reads the repo again.
-                this.git_info.remove(&top);
+                this.git.info.remove(&top);
                 cx.notify();
             },
         );
@@ -125,7 +125,7 @@ impl BenchApp {
     /// Read what the repo chip shows for one repo folder: uncommitted count, newest commits,
     /// origin URL. Once per folder until it is dropped again (a run ending, a new branch).
     pub(crate) fn refresh_git(&mut self, target: Target, dir: String, cx: &mut Context<Self>) {
-        if self.git_info.contains_key(&dir) || !self.git_reading.insert(dir.clone()) {
+        if self.git.info.contains_key(&dir) || !self.git.reading.insert(dir.clone()) {
             return;
         }
         cx.spawn(async move |this, cx| {
@@ -166,8 +166,8 @@ impl BenchApp {
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                this.git_reading.remove(&dir);
-                this.git_info.insert(dir, r);
+                this.git.reading.remove(&dir);
+                this.git.info.insert(dir, r);
                 cx.notify();
             });
         })
@@ -199,12 +199,12 @@ impl BenchApp {
             move |this, r, _, cx| {
                 match r {
                     Ok(top) => {
-                        this.new_project = Some(Repo::from_top(&top, "").root);
-                        this.new_project_repo = true;
+                        this.new_project.folder = Some(Repo::from_top(&top, "").root);
+                        this.new_project.in_repo = true;
                     }
                     Err(_) => {
-                        this.new_project = Some(path);
-                        this.new_project_repo = false;
+                        this.new_project.folder = Some(path);
+                        this.new_project.in_repo = false;
                     }
                 }
                 cx.notify();
@@ -216,9 +216,17 @@ impl BenchApp {
     pub(crate) fn title_of(&self, at: &ThreadRef) -> String {
         at.id
             .as_ref()
-            .and_then(|id| self.threads.iter().find(|s| s.host == at.host && &s.id == id))
+            .and_then(|id| self.threads.list.iter().find(|s| s.host == at.host && &s.id == id))
             .map(|s| s.title.clone())
             .filter(|t| !t.is_empty())
             .unwrap_or_else(|| "Bench".into())
     }
+}
+
+/// What the title bar's repo chip knows of each repo folder (read in the background; dropped when a
+/// run ends, as the agent may have committed), and the folders being read.
+#[derive(Default)]
+pub struct GitState {
+    pub info: HashMap<String, RepoInfo>,
+    pub reading: std::collections::HashSet<String>,
 }

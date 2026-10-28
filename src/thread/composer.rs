@@ -147,11 +147,11 @@ impl ThreadView {
         // the moving level bar already says "recording", red would only shout it twice.
         let app = self.app.upgrade();
         let muted = theme.muted_foreground;
-        let rec = app.as_ref().is_some_and(|a| a.read(cx).recorder.is_some());
-        let trans = app.as_ref().is_some_and(|a| a.read(cx).transcribing);
+        let rec = app.as_ref().is_some_and(|a| a.read(cx).media.recorder.is_some());
+        let trans = app.as_ref().is_some_and(|a| a.read(cx).media.transcribing);
         let level = app
             .as_ref()
-            .and_then(|a| a.read(cx).recorder.as_ref().map(|r| r.level().min(1.)))
+            .and_then(|a| a.read(cx).media.recorder.as_ref().map(|r| r.level().min(1.)))
             .unwrap_or(0.);
         let empty = self.composer.read(cx).value().trim().is_empty();
 

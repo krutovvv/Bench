@@ -28,7 +28,7 @@ pub struct AgentForm {
 impl BenchApp {
     /// The hosts of ~/.ssh/config that have no agent here yet.
     pub fn hosts_without_agent(&self) -> Vec<String> {
-        self.ssh
+        self.inserts.ssh
             .servers
             .iter()
             .map(|s| s.alias.clone())
@@ -41,7 +41,7 @@ impl BenchApp {
             let hint = hint.to_string();
             cx.new(|cx| InputState::new(window, cx).placeholder(hint))
         };
-        self.agent_form = Some(AgentForm {
+        self.gear.agent_form = Some(AgentForm {
             host: self.hosts_without_agent().into_iter().next(),
             name: field(
                 "How it shows in the sidebar (empty: the host's name)",
@@ -58,7 +58,7 @@ impl BenchApp {
 
     /// The server joins Bench: its row here, then its agent installed and connected.
     pub fn add_agent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(form)) = (self.local_conn(), self.agent_form.as_ref()) else {
+        let (Some(conn), Some(form)) = (self.local_conn(), self.gear.agent_form.as_ref()) else {
             return;
         };
         let v = |e: &Entity<InputState>| e.read(cx).value().trim().to_string();
@@ -131,7 +131,7 @@ impl BenchApp {
             },
             |this, r, window, cx| match r {
                 Ok(_) => {
-                    this.agent_form = None;
+                    this.gear.agent_form = None;
                     // Listed: it is connected (its agent installed there first).
                     this.load_server_agents(window, cx);
                 }
@@ -151,9 +151,9 @@ impl BenchApp {
         let Some(conn) = self.local_conn() else {
             return;
         };
-        if self.gear_agent == host {
-            self.gear_agent.clear();
-            self.providers = Default::default();
+        if self.gear.agent == host {
+            self.gear.agent.clear();
+            self.gear.providers = Default::default();
             self.load_providers(window, cx);
         }
         let path = format!("/api/agents/{host}");
@@ -177,7 +177,7 @@ impl BenchApp {
     /// "+ Agent on a server", or its form: a host of ~/.ssh/config (or a new one), its name.
     pub(super) fn render_agent_form(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
-        let Some(form) = self.agent_form.as_ref() else {
+        let Some(form) = self.gear.agent_form.as_ref() else {
             return vec![
                 h_flex()
                     .py_2()
@@ -211,7 +211,7 @@ impl BenchApp {
             at,
             cx,
             move |this, k, _, cx| {
-                if let Some(f) = this.agent_form.as_mut() {
+                if let Some(f) = this.gear.agent_form.as_mut() {
                     f.host = (k + 1 < names.len()).then(|| names[k].clone());
                 }
                 cx.notify();
@@ -276,7 +276,7 @@ impl BenchApp {
                     bench_ui::secondary_button("gear-agent-cancel", "Cancel")
                         .small()
                         .on_click(cx.listener(|this, _, _, cx| {
-                            this.agent_form = None;
+                            this.gear.agent_form = None;
                             cx.notify();
                         }))
                         .into_any_element(),

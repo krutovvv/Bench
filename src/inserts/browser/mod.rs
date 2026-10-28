@@ -26,7 +26,7 @@ fn tab_of(app: &BenchApp, ins: &Insert) -> Option<(String, String, String)> {
     if app.demo {
         return (!tab.is_empty()).then(|| (tab, ins.get("url"), "New post".into()));
     }
-    let b = app.sites.browser.as_ref()?;
+    let b = app.inserts.sites.browser.as_ref()?;
     let st = b.state.lock().unwrap();
     let page = st.pages.iter().find(|p| p.id == tab)?;
     Some((tab, page.url.clone(), page.title.clone()))
@@ -78,7 +78,7 @@ impl InsertKind for Browser {
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
         let muted = cx.theme().muted_foreground;
-        if let Some(e) = &app.sites_error {
+        if let Some(e) = &app.inserts.sites_error {
             return Some(
                 div()
                     .text_base()
@@ -87,14 +87,14 @@ impl InsertKind for Browser {
                     .into_any_element(),
             );
         }
-        if !app.demo && app.sites.browser.is_none() {
+        if !app.demo && app.inserts.sites.browser.is_none() {
             app.ensure_browser(cx);
         }
         if let Some((tab, _, _)) = tab_of(app, ins) {
             return Some(app.render_tab(at, tab, cx));
         }
         let ready = app
-            .sites
+            .inserts.sites
             .browser
             .as_ref()
             .is_some_and(|b| b.state.lock().unwrap().ready);
@@ -109,14 +109,14 @@ impl InsertKind for Browser {
         let url = ins.get("url");
         // The gateway refused (all tabs busy, a page it does not open…): say so, and offer again.
         let refused = app
-            .sites
+            .inserts.sites
             .browser
             .as_ref()
             .and_then(|b| b.state.lock().unwrap().error.clone());
         if let Some(e) = refused
-            .filter(|_| app.sites.reopening.as_deref() == Some(ins.id.as_str()) || url.is_empty())
+            .filter(|_| app.inserts.sites.reopening.as_deref() == Some(ins.id.as_str()) || url.is_empty())
         {
-            app.sites.reopening = None;
+            app.inserts.sites.reopening = None;
             return Some(
                 h_flex()
                     .gap_2()
@@ -144,7 +144,7 @@ impl InsertKind for Browser {
                     .into_any_element(),
             );
         }
-        if app.sites.reopening.as_deref() == Some(ins.id.as_str()) {
+        if app.inserts.sites.reopening.as_deref() == Some(ins.id.as_str()) {
             return Some(
                 ShimmerText::new("Opening the page again…")
                     .text_base()

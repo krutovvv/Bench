@@ -110,7 +110,7 @@ impl SettingsForm for Run {
         let reasoning = segmented(
             "env-reasoning",
             "reasoning",
-            app.efforts.clone(),
+            app.defaults.efforts.clone(),
             &e.run.effort,
             cx,
         );
@@ -132,7 +132,7 @@ impl SettingsForm for Run {
             cx,
         );
         // Pi's own first, then the presets' shares.
-        let names = app.presets.compaction.clone();
+        let names = app.gear.presets.compaction.clone();
         let shares: Vec<Option<f64>> = std::iter::once(None)
             .chain(names.iter().map(|(a, _)| Some(*a)))
             .collect();

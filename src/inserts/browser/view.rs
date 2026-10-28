@@ -47,7 +47,7 @@ impl BenchApp {
         };
         let size = frame.size(0);
         let (fw, fh) = (size.width.0 as f32, size.height.0 as f32);
-        let bounds = self.sites.bounds.clone();
+        let bounds = self.inserts.sites.bounds.clone();
         let key = tab.clone();
         // Width from the last layout (the thread's text column); height by the frame's aspect.
         let width = bounds
@@ -58,11 +58,11 @@ impl BenchApp {
         let height = (width * fh / fw.max(1.)).min(MAX_H);
         let (pw, ph) = if w > 0. { (w, h) } else { (fw, fh) };
         let focus = self
-            .sites
+            .inserts.sites
             .focus
             .get_or_insert_with(|| cx.focus_handle())
             .clone();
-        let b_down = self.sites.browser.clone();
+        let b_down = self.inserts.sites.browser.clone();
         let at = at.clone();
         let (b_up, b_move, b_wheel, b_key) = (
             b_down.clone(),
@@ -82,7 +82,7 @@ impl BenchApp {
         };
         let (tp_down, tp_up, tp_move, tp_wheel) =
             (to_page.clone(), to_page.clone(), to_page.clone(), to_page);
-        let paused = self.sites.browser.as_ref().is_some_and(|b| b.is_paused());
+        let paused = self.inserts.sites.browser.as_ref().is_some_and(|b| b.is_paused());
         v_flex()
             .w_full()
             .min_w_0()
@@ -132,7 +132,7 @@ impl BenchApp {
                         cx.listener(move |this, ev: &MouseDownEvent, window, cx| {
                             this.click_claimed = true;
                             let was_paused =
-                                this.sites.browser.as_ref().is_some_and(|b| b.is_paused());
+                                this.inserts.sites.browser.as_ref().is_some_and(|b| b.is_paused());
                             this.touch_browser(&at);
                             // The first click on a paused view only wakes it.
                             if live && was_paused {
@@ -174,7 +174,7 @@ impl BenchApp {
                         })
                         .on_key_down(cx.listener(
                             move |this, ev: &KeyDownEvent, _, cx| {
-                                this.sites.touched = Some(web_time::Instant::now());
+                                this.inserts.sites.touched = Some(web_time::Instant::now());
                                 if let Some(b) = &b_key {
                                     if send_key(b, &ev.keystroke, cx) {
                                         cx.stop_propagation();

@@ -1,6 +1,7 @@
 //! The threads panel (the left dock's): the projects, each with its threads, the Host first; the
 //! search over them.
 
+pub(crate) mod state;
 pub(crate) mod items;
 pub(crate) mod marks;
 mod menu;
@@ -35,9 +36,9 @@ impl BenchApp {
     ) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         let mut list: Vec<AnyElement> = vec![];
-        let searching = !self.search_query.is_empty();
+        let searching = !self.sidebar.query.is_empty();
         if searching {
-            match &self.search_hits {
+            match &self.sidebar.hits {
                 None => list.push(self.sidebar_note("Searching…", cx)),
                 Some(hits) if hits.is_empty() => list.push(self.sidebar_note("Nothing found", cx)),
                 Some(hits) => {
@@ -58,7 +59,7 @@ impl BenchApp {
             for (g, (p, rows)) in groups.into_iter().enumerate() {
                 list.extend(self.render_project(g + 1, &p, rows, cx));
             }
-            if self.projects.is_empty() && self.local_conn().is_some() {
+            if self.places.projects.is_empty() && self.local_conn().is_some() {
                 list.push(
                     self.sidebar_note("No projects yet. “New project” above starts one.", cx),
                 );
@@ -69,12 +70,12 @@ impl BenchApp {
             .size_full()
             // The search as a band, then the groups as an IDE's tree (a new chat: "+" on a
             // group, or in the top strip).
-            .child(bench_ui::search_band(&self.search, cx))
+            .child(bench_ui::search_band(&self.sidebar.search, cx))
             .child(
                 v_flex()
                     .id("sessions")
                     // After a click on a thread: ↑ ↓ open the next, ⌫ deletes (`sidebar_items.rs`).
-                    .track_focus(&self.sidebar_focus)
+                    .track_focus(&self.sidebar.focus)
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                         this.sidebar_key(&ev.keystroke, window, cx)
                     }))
@@ -84,7 +85,7 @@ impl BenchApp {
                     .py_1()
                     .children(list)
                     // This Mac's agent not up yet, and nothing to list.
-                    .when(self.local_conn().is_none() && self.threads.is_empty(), |d| {
+                    .when(self.local_conn().is_none() && self.threads.list.is_empty(), |d| {
                         d.child(
                             div()
                                 .px_4()
@@ -107,7 +108,7 @@ impl BenchApp {
             .color
             .and_then(bench_ui::mark_color);
         let key = "open:loose".to_string();
-        let open = self.ssh.collapsed.contains(&key);
+        let open = self.sidebar.collapsed.contains(&key);
         let group: SharedString = "loose-head".into();
         let mut out = vec![
             h_flex()
@@ -223,7 +224,7 @@ impl BenchApp {
         let selected =
             self.center == Center::Chat && self.thread(cx).id.as_ref().map(|i| i.as_str()) == Some(id);
         let title = self
-            .threads
+            .threads.list
             .iter()
             .find(|s| s.id.as_str() == id)
             .map(|s| s.title.clone())

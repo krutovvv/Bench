@@ -13,7 +13,7 @@ use bench_ui::icons::Ico;
 impl BenchApp {
     /// A thread's title as the sidebar has it.
     pub(crate) fn thread_title(&self, id: Option<&protocol::ThreadId>) -> SharedString {
-        id.and_then(|id| self.threads.iter().find(|s| &s.id == id))
+        id.and_then(|id| self.threads.list.iter().find(|s| &s.id == id))
             .map(|s| s.title.clone())
             .filter(|t| !t.is_empty())
             .unwrap_or_else(|| "New thread".into())

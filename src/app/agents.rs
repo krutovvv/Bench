@@ -67,7 +67,7 @@ impl BenchApp {
 
     /// Connect to the servers' agents this Mac knows (once each).
     pub fn connect_remotes(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let hosts: Vec<String> = self.server_agents.iter().map(|a| a.host.clone()).collect();
+        let hosts: Vec<String> = self.places.server_agents.iter().map(|a| a.host.clone()).collect();
         for host in hosts {
             self.connect_agent(host, window, cx);
         }
@@ -184,7 +184,7 @@ impl BenchApp {
         }
         let own = project.map(|p| ProjectKey::new(host, p).to_string());
         match own {
-            Some(key) if self.projects.iter().any(|p| p.id == key) => key,
+            Some(key) if self.places.projects.iter().any(|p| p.id == key) => key,
             _ => ProjectKey::host_of(host).to_string(),
         }
     }
@@ -222,7 +222,7 @@ impl BenchApp {
     /// The agents in the order the gear lists them: this Mac's, then the servers' as listed.
     pub fn agent_hosts(&self) -> Vec<String> {
         std::iter::once(String::new())
-            .chain(self.server_agents.iter().map(|a| a.host.clone()))
+            .chain(self.places.server_agents.iter().map(|a| a.host.clone()))
             .collect()
     }
 
@@ -238,7 +238,7 @@ impl BenchApp {
     /// An agent came up: what waited for it is asked now — its threads, the gear showing it, the
     /// servers this Mac knows and the tasks (this Mac's), a server's own projects.
     pub fn agent_up(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.center == super::Center::Settings && self.gear_agent == host && !self.providers.loaded {
+        if self.center == super::Center::Settings && self.gear.agent == host && !self.gear.providers.loaded {
             self.load_providers(window, cx);
         }
         if host.is_empty() {
@@ -247,9 +247,9 @@ impl BenchApp {
             self.load_projects(window, cx);
             self.load_agent_settings(window, cx);
             // The folder a thread works in when none is chosen: a thread elsewhere shows its own.
-            if self.default_cwd.is_none() {
+            if self.defaults.cwd.is_none() {
                 self.rest(window, cx, crate::client::rest::default_cwd, |this, r, _, _| {
-                    this.default_cwd = r.ok();
+                    this.defaults.cwd = r.ok();
                 });
             }
             self.load_commands(cx);

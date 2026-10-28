@@ -21,14 +21,14 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
-        let source = self.tools.html_source;
+        let source = self.inserts.tools.html_source;
         let toggle = segmented(
             "tool-html-view",
             &["Rendered", "HTML"],
             source as usize,
             cx,
             |this, k, _, cx| {
-                this.tools.html_source = k == 1;
+                this.inserts.tools.html_source = k == 1;
                 cx.notify();
             },
         );
@@ -36,9 +36,9 @@ impl BenchApp {
             div()
                 .flex_1()
                 .min_h_0()
-                .child(Editor::new(&self.tools.input).appearance(false).h_full())
+                .child(Editor::new(&self.inserts.tools.input).appearance(false).h_full())
                 .into_any_element()
-        } else if self.tools.preview.trim().is_empty() {
+        } else if self.inserts.tools.preview.trim().is_empty() {
             div()
                 .flex_1()
                 .px_4()
@@ -51,9 +51,9 @@ impl BenchApp {
         } else {
             crate::inserts::scroll_pane(
                 "tool-html",
-                &self.tools.html_scroll,
+                &self.inserts.tools.html_scroll,
                 div().px_4().py_3().text_base().child(
-                    TextView::html("tool-html-view-body", self.tools.preview.clone())
+                    TextView::html("tool-html-view-body", self.inserts.tools.preview.clone())
                         .selectable(true),
                 ),
             )
@@ -68,14 +68,14 @@ impl BenchApp {
 
     pub(crate) fn render_tools_body(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        let tool = self.tools.tool;
+        let tool = self.inserts.tools.tool;
         let input_bar = |extra: Vec<AnyElement>, cx: &mut Context<Self>| {
             let mut buttons = vec![
                 small_button("tool-paste", "Paste", cx, |this, window, cx| {
                     this.paste_tool_input(window, cx)
                 }),
                 small_button("tool-sample", "Sample", cx, |this, window, cx| {
-                    let s = this.tools.tool.sample().to_string();
+                    let s = this.inserts.tools.tool.sample().to_string();
                     this.tool_input(s, window, cx)
                 }),
                 small_button("tool-clear", "Clear", cx, |this, window, cx| {
@@ -107,13 +107,13 @@ impl BenchApp {
                 .min_h_0()
                 .child(Editor::new(state).appearance(false).h_full())
         };
-        let error = self.tools.error.clone();
+        let error = self.inserts.tools.error.clone();
         let input_pane = |extra: Vec<AnyElement>, this: &mut Self, cx: &mut Context<Self>| {
             v_flex()
                 .flex_1()
                 .min_w_0()
                 .child(input_bar(extra, cx))
-                .child(editor(&this.tools.input))
+                .child(editor(&this.inserts.tools.input))
         };
         // Panes fill the height (h_flex centers its children otherwise).
         let split = |left: AnyElement, right: AnyElement| {
@@ -137,7 +137,7 @@ impl BenchApp {
                     .flex_1()
                     .min_w_0()
                     .child(pane_bar("Output", error, vec![copy(cx)], cx))
-                    .child(editor(&self.tools.output))
+                    .child(editor(&self.inserts.tools.output))
                     .into_any_element();
                 split(left, right)
             }
@@ -149,14 +149,14 @@ impl BenchApp {
                     .child(pane_bar("Preview", None, vec![], cx))
                     .child(crate::inserts::scroll_pane(
                         "tool-preview",
-                        &self.tools.preview_scroll,
+                        &self.inserts.tools.preview_scroll,
                         div()
                             .px_4()
                             .py_3()
                             .text_base()
                             .child(crate::media::text::markdown(
                                 "tool-md",
-                                self.tools.preview.clone(),
+                                self.inserts.tools.preview.clone(),
                                 cx,
                             )),
                     ))
@@ -168,7 +168,7 @@ impl BenchApp {
                     Tool::Lorem => &[1, 3, 5, 10],
                     _ => &[1, 5, 10, 25],
                 };
-                let current = self.tools.count(tool);
+                let current = self.inserts.tools.count(tool);
                 let labels: Vec<String> = counts.iter().map(|n| n.to_string()).collect();
                 let chosen = counts.iter().position(|n| *n == current).unwrap_or(0);
                 let counts_vec = counts.to_vec();
@@ -191,7 +191,7 @@ impl BenchApp {
                             chosen,
                             cx,
                             move |this, k, window, cx| {
-                                this.tools.counts.insert(tool, counts_vec[k]);
+                                this.inserts.tools.counts.insert(tool, counts_vec[k]);
                                 this.run_tool(window, cx)
                             },
                         ),
@@ -205,11 +205,11 @@ impl BenchApp {
                 v_flex()
                     .size_full()
                     .child(bar)
-                    .child(editor(&self.tools.output))
+                    .child(editor(&self.inserts.tools.output))
                     .into_any_element()
             }
             Kind::Regex => {
-                let flags = self.tools.flags;
+                let flags = self.inserts.tools.flags;
                 let flag = |k: usize,
                             label: &'static str,
                             on: bool,
@@ -244,7 +244,7 @@ impl BenchApp {
                     .items_center()
                     .border_b_1()
                     .border_color(theme.border)
-                    .child(div().flex_1().child(Input::new(&self.tools.pattern)))
+                    .child(div().flex_1().child(Input::new(&self.inserts.tools.pattern)))
                     .child(flag(0, "i", flags.case_insensitive, "Ignore case", cx))
                     .child(flag(
                         1,
@@ -255,7 +255,7 @@ impl BenchApp {
                     ))
                     .child(flag(2, "s", flags.dot_all, ". matches newlines", cx));
                 let left = input_pane(vec![], self, cx).into_any_element();
-                let count = self.tools.matches;
+                let count = self.inserts.tools.matches;
                 let right = v_flex()
                     .flex_1()
                     .min_w_0()
@@ -268,7 +268,7 @@ impl BenchApp {
                         vec![copy(cx)],
                         cx,
                     ))
-                    .child(editor(&self.tools.output))
+                    .child(editor(&self.inserts.tools.output))
                     .into_any_element();
                 v_flex()
                     .size_full()
@@ -288,8 +288,8 @@ impl BenchApp {
                     cx,
                 )
                 .into_any_element();
-                let image = self.tools.image.clone();
-                let title = match &self.tools.image_info {
+                let image = self.inserts.tools.image.clone();
+                let title = match &self.inserts.tools.image_info {
                     Some(info) => format!("Image · {info}"),
                     None => "Image".into(),
                 };

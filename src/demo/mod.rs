@@ -51,12 +51,12 @@ fn open_thread(app: &mut BenchApp, cx: &mut App, f: impl FnOnce(&mut crate::thre
 pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
     let now = crate::app::now_secs();
     app.demo = true;
-    app.settings_ready = true;
-    app.context_length = 131_072;
-    app.approval_mode = Some("smart".into());
-    app.default_cwd = Some("/Users/demo".into());
+    app.defaults.ready = true;
+    app.defaults.context_length = 131_072;
+    app.defaults.approval_mode = Some("smart".into());
+    app.defaults.cwd = Some("/Users/demo".into());
 
-    app.threads = vec![
+    app.threads.list = vec![
         row(
             "d-landing",
             "Launch the spring landing page",
@@ -116,7 +116,7 @@ pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
         ("d-audit-1", "/Users/demo/Research/Competitor audit", None),
         ("d-audit-2", "/Users/demo/Research/Competitor audit", None),
     ] {
-        if let Some(r) = app.threads.iter_mut().find(|r| r.id.as_str() == id) {
+        if let Some(r) = app.threads.list.iter_mut().find(|r| r.id.as_str() == id) {
             r.cwd = cwd.into();
             r.repo = repo.map(str::to_string);
         }
@@ -213,14 +213,14 @@ fewer form fields. Then check what it did to signups and give me a short summary
         machine: Some("web-1".into()),
         ..project("p-web", "Production site", Some("/var/www/storefront"))
     };
-    app.projects = vec![
+    app.places.projects = vec![
         project("p-blog", "Northwind blog", Some("/Users/demo/code/blog")),
         project("p-store", "Storefront", Some("/Users/demo/code/storefront")),
         web,
         project("p-audit", "Competitor audit", None),
         project("p-me", "Personal", None),
     ];
-    for s in app.threads.iter_mut() {
+    for s in app.threads.list.iter_mut() {
         s.project = match s.id.as_str() {
             "d-site" => "p-blog",
             "d-landing" | "d-api" | "d-tests" => "p-store",
@@ -232,7 +232,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         .into();
     }
     // The demo's own marks, not the person's: two projects in colors, a thread in one.
-    app.marks = [("p:p-blog", 4), ("p:p-audit", 1), ("d-api", 2)]
+    app.sidebar.marks = [("p:p-blog", 4), ("p:p-audit", 1), ("d-api", 2)]
         .into_iter()
         .map(|(k, c)| {
             (
@@ -249,7 +249,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         app.armed.arm(key);
     }
     // The demo's own folds, not the person's: every group open but the long Tools.
-    app.ssh.collapsed = ["s:Tools".to_string()].into_iter().collect();
+    app.sidebar.collapsed = ["s:Tools".to_string()].into_iter().collect();
     // `BENCH_DEMO=tasks|tasks-open|server|browser|tool`: that thread open instead.
     let open = match std::env::var("BENCH_DEMO").as_deref() {
         Ok("tasks") | Ok("tasks-open") => Some("d-today"),
@@ -265,6 +265,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
             t.id = Some(id.into());
             t.journal = journal;
             t.project = project;
+            t.repo = None;
         });
     }
     // `BENCH_DEMO=long`: a thread of sixty exchanges, opened at its top.
@@ -458,7 +459,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         _ => {}
     }
     if std::env::var("BENCH_PANEL").as_deref() == Ok("providers") {
-        app.gear_tab = std::env::var("BENCH_GEAR_TAB")
+        app.gear.tab = std::env::var("BENCH_GEAR_TAB")
             .ok()
             .and_then(|t| t.parse().ok())
             .unwrap_or(0);

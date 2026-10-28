@@ -80,7 +80,7 @@ impl InsertKind for Tools {
             out.push(crate::inserts::tools::view::segmented(
                 "insert-tool-mode",
                 modes,
-                app.tools.mode(tool),
+                app.inserts.tools.mode(tool),
                 cx,
                 |this, k, window, cx| this.set_tool_mode(k, window, cx),
             ));
@@ -97,7 +97,7 @@ impl InsertKind for Tools {
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
         let tool = tool_of(ins);
-        if app.tools.tool != tool {
+        if app.inserts.tools.tool != tool {
             app.select_tool(tool, window, cx);
         }
         // As tall as its longer side (input or output): the thread scrolls, not the tool. But
@@ -106,7 +106,7 @@ impl InsertKind for Tools {
         let lines = |e: &Entity<gpui_kit::component::input::EditorState>| {
             e.read(cx).value().lines().count()
         };
-        let n = lines(&app.tools.input).max(lines(&app.tools.output)) + 2;
+        let n = lines(&app.inserts.tools.input).max(lines(&app.inserts.tools.output)) + 2;
         let want = px(n as f32 * bench_ui::editor_line(cx) + bench_ui::BLOCK_HEAD_H + 24.);
         let cap = window.bounds().size.height * 0.5;
         let h = want.max(px(MIN_H)).min(cap.max(px(MIN_H)));
@@ -122,11 +122,11 @@ impl InsertKind for Tools {
 
     fn context(&self, app: &BenchApp, _at: &ThreadRef, ins: &Insert, cx: &App) -> String {
         let tool = tool_of(ins);
-        if app.tools.tool != tool {
+        if app.inserts.tools.tool != tool {
             return String::new();
         }
-        let input = app.tools.input.read(cx).value().to_string();
-        let output = app.tools.output.read(cx).value().to_string();
+        let input = app.inserts.tools.input.read(cx).value().to_string();
+        let output = app.inserts.tools.output.read(cx).value().to_string();
         format!(
             "The tools insert is on {} ({}).\nIts input:\n```\n{}\n```\nIts output:\n```\n{}\n```",
             tool.name(),

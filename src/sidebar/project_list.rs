@@ -20,13 +20,13 @@ impl BenchApp {
             move || rest::get(&conn, "/api/projects"),
             |this, r, _window, cx| {
                 if let Ok(v) = r {
-                    this.local_projects = v["projects"]
+                    this.places.local = v["projects"]
                         .as_array()
                         .into_iter()
                         .flatten()
                         .filter_map(|p| crate::app::places::entry_of("", p))
                         .collect();
-                    this.host_browser = v["host_browser"].as_bool().unwrap_or(false);
+                    this.places.host_browser = v["host_browser"].as_bool().unwrap_or(false);
                     this.compose_projects();
                 }
                 cx.notify();
@@ -35,9 +35,9 @@ impl BenchApp {
     }
     /// A project's "+": a new thread in it (it works in the project's folder).
     pub fn new_thread_in(&mut self, project: String, cx: &mut Context<Self>) {
-        self.project_form = None;
+        self.new_project.form = None;
         self.new_thread(cx);
-        self.new_project = None;
+        self.new_project.folder = None;
         self.active_thread
             .update(cx, |v, _| v.thread.project = project);
         // The thread exists at once ("Untitled" in the project until its first message).
@@ -70,12 +70,12 @@ impl BenchApp {
             move || rest::send_json(&conn, "DELETE", &path, serde_json::Value::Null),
             move |this, r, window, cx| match r {
                 Ok(_) => {
-                    this.local_projects.retain(|p| p.id != id);
-                    for list in this.server_projects.values_mut() {
+                    this.places.local.retain(|p| p.id != id);
+                    for list in this.places.server_projects.values_mut() {
                         list.retain(|p| p.id != id);
                     }
                     this.compose_projects();
-                    for s in this.threads.iter_mut().filter(|s| s.project == id) {
+                    for s in this.threads.list.iter_mut().filter(|s| s.project == id) {
                         s.project.clear();
                     }
                     cx.notify();

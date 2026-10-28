@@ -178,7 +178,7 @@ impl BenchApp {
     /// A reference into the open thread's composer (once).
     pub fn add_reference(&mut self, r: Reference, cx: &mut Context<Self>) {
         let key = self.thread_ref(cx).key();
-        let list = self.references.entry(key).or_default();
+        let list = self.threads.references.entry(key).or_default();
         if !list.contains(&r) {
             list.push(r);
         }
@@ -191,7 +191,7 @@ impl ThreadView {
     pub fn thread_references(&self, cx: &App) -> Vec<Reference> {
         let key = self.thread_ref().key();
         self.app(cx)
-            .and_then(|a| a.references.get(&key).cloned())
+            .and_then(|a| a.threads.references.get(&key).cloned())
             .unwrap_or_default()
     }
 
@@ -199,7 +199,7 @@ impl ThreadView {
         let key = self.thread_ref().key();
         self.app
             .update(cx, |app, cx| {
-                if let Some(list) = app.references.get_mut(&key) {
+                if let Some(list) = app.threads.references.get_mut(&key) {
                     if k < list.len() {
                         list.remove(k);
                     }

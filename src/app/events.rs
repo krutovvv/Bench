@@ -79,8 +79,8 @@ impl BenchApp {
         // Every copy we cached of that agent's machine is stale now; the next look brings the
         // current one. It may also have committed in any repo the windows show: the chips re-read.
         let label = self.thread_target(&at).label();
-        self.media.retain(|k, _| !k.starts_with(&format!("{label}\0")));
-        self.git_info.clear();
+        self.media.files.retain(|k, _| !k.starts_with(&format!("{label}\0")));
+        self.git.info.clear();
         // Its speed is the thread's to keep: Bench measured it, the agent stores it.
         let speed = view.read(cx).thread.speed.stat();
         if let Some(id) = at.id.clone()
@@ -121,7 +121,7 @@ impl BenchApp {
 
     /// The sidebar's row of a thread.
     pub(crate) fn row_mut(&mut self, host: &str, thread: &ThreadId) -> Option<&mut ThreadRow> {
-        self.threads
+        self.threads.list
             .iter_mut()
             .find(|r| r.host == host && &r.id == thread)
     }
@@ -136,7 +136,7 @@ impl BenchApp {
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        for old in self.threads.iter().filter(|s| s.host == host && s.running) {
+        for old in self.threads.list.iter().filter(|s| s.host == host && s.running) {
             let done = rows.iter().any(|r| r.id == old.id && !r.running);
             let own = crate::app::model::source_label(&old.source) == "Bench";
             let on_screen = !self.views_of(host, &old.id, cx).is_empty();
@@ -149,13 +149,13 @@ impl BenchApp {
                 crate::system::notify::post(old.id.as_str(), title, "The agent finished");
             }
         }
-        self.threads.retain(|s| s.host != host);
-        self.threads.extend(rows);
-        if let Some((h, id)) = self.reopen.clone()
+        self.threads.list.retain(|s| s.host != host);
+        self.threads.list.extend(rows);
+        if let Some((h, id)) = self.threads.reopen.clone()
             && h == host
-            && self.threads.iter().any(|s| s.host == h && s.id == id)
+            && self.threads.list.iter().any(|s| s.host == h && s.id == id)
         {
-            self.reopen = None;
+            self.threads.reopen = None;
             if self.thread(cx).id.is_none() {
                 self.open_thread(h, id, cx);
             }

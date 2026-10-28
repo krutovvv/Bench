@@ -53,7 +53,7 @@ impl InsertKind for Tasks {
         // Only the lists that have something (and the one shown): an empty one needs no button.
         let lists: Vec<List> = LISTS
             .iter()
-            .filter(|l| **l == now || !app.tasks.shown(l).is_empty())
+            .filter(|l| **l == now || !app.inserts.tasks.shown(l).is_empty())
             .cloned()
             .collect();
         let chosen = lists.iter().position(|l| *l == now).unwrap_or(0);
@@ -102,7 +102,7 @@ impl InsertKind for Tasks {
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
         let list = list_of(ins);
-        if app.tasks.list != list {
+        if app.inserts.tasks.list != list {
             app.select_task_list(list, window, cx);
         }
         app.sync_task_project(at);
@@ -118,7 +118,7 @@ impl InsertKind for Tasks {
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
-        let task = app.tasks.selected_task().cloned()?;
+        let task = app.inserts.tasks.selected_task().cloned()?;
         let theme = cx.theme().clone();
         let title = if task.title.trim().is_empty() {
             "New task".to_string()

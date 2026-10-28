@@ -39,7 +39,7 @@ impl BenchApp {
         let journal = if self.demo {
             self.demo_threads.get(id.as_str()).cloned()
         } else {
-            self.thread_cache.remove(id.as_str())
+            self.threads.cache.remove(id.as_str())
         };
         let project = self.project_of_thread(&host, &id);
         view.update(cx, |v, _| {
@@ -47,7 +47,7 @@ impl BenchApp {
             v.thread.id = Some(id.clone());
             v.thread.journal = journal.unwrap_or_default();
             v.thread.project = project;
-            v.thread.effort = self.default_effort;
+            v.thread.effort = self.defaults.effort;
         });
         let at = view.read(cx).thread_ref();
         self.beside_thread = Some(view);
@@ -67,7 +67,7 @@ impl BenchApp {
                 v.thread.id.clone().map(|s| (s, journal))
             });
             if let Some((id, journal)) = kept {
-                self.thread_cache.insert(id.to_string(), journal);
+                self.threads.cache.insert(id.to_string(), journal);
             }
         }
         cx.notify();

@@ -37,7 +37,7 @@ pub struct Sites {
 impl BenchApp {
     /// The server's browser, connected on first use.
     pub fn ensure_browser(&mut self, cx: &mut Context<Self>) -> Option<Arc<Browser>> {
-        if let Some(b) = &self.sites.browser {
+        if let Some(b) = &self.inserts.sites.browser {
             return Some(b.clone());
         }
         // The demo's steps are pictures; nothing connects.
@@ -55,11 +55,11 @@ impl BenchApp {
                     }
                 })
                 .detach();
-                self.sites.browser = Some(b.clone());
+                self.inserts.sites.browser = Some(b.clone());
                 Some(b)
             }
             Err(e) => {
-                self.sites_error = Some(format!("{e:#}"));
+                self.inserts.sites_error = Some(format!("{e:#}"));
                 None
             }
         }
@@ -69,11 +69,11 @@ impl BenchApp {
     /// is working or the person touched the tab in the last IDLE. Otherwise the stream pauses
     /// (the last frame stays; a click resumes it).
     pub fn update_browser_stream(&mut self, at: &ThreadRef) {
-        let Some(b) = self.sites.browser.clone() else {
+        let Some(b) = self.inserts.sites.browser.clone() else {
             return;
         };
         let open = self.center == crate::workspace::Center::Chat && self.thread_has_browser(at);
-        let recent = self.sites.touched.is_some_and(|t| t.elapsed() < IDLE);
+        let recent = self.inserts.sites.touched.is_some_and(|t| t.elapsed() < IDLE);
         b.set_paused(!(open && (at.live || recent)));
         if let Some(tab) = self.thread_tab(at) {
             // Asleep on the server (memory): woken, its new id comes back in `woke`.
@@ -87,7 +87,7 @@ impl BenchApp {
 
     /// The person reached for a step in thread `at`: watch it live.
     pub fn touch_browser(&mut self, at: &ThreadRef) {
-        self.sites.touched = Some(web_time::Instant::now());
+        self.inserts.sites.touched = Some(web_time::Instant::now());
         self.update_browser_stream(at);
     }
 
@@ -99,7 +99,7 @@ impl BenchApp {
             .filter(|i| i.key == "browser")
             .collect();
         // Several in a thread: the live one (see `InsertKind::shared`).
-        let live = self.insert_live.get("browser");
+        let live = self.inserts.live.get("browser");
         let ins = all.iter().find(|i| Some(&i.id) == live).or(all.last())?;
         Some((ins.id.clone(), ins.get("tab"), ins.get("url")))
     }
@@ -107,7 +107,7 @@ impl BenchApp {
     /// A thread's tab, when it is open in the browser.
     pub fn thread_tab(&self, at: &ThreadRef) -> Option<String> {
         let (_, tab, _) = self.thread_browser(at)?;
-        let b = self.sites.browser.as_ref()?;
+        let b = self.inserts.sites.browser.as_ref()?;
         (!tab.is_empty() && b.is_open(&tab)).then_some(tab)
     }
 
@@ -118,10 +118,10 @@ impl BenchApp {
         else {
             return;
         };
-        if self.sites.reopening.is_some() {
+        if self.inserts.sites.reopening.is_some() {
             return;
         }
-        self.sites.reopening = Some(id);
+        self.inserts.sites.reopening = Some(id);
         self.touch_browser(at);
         // A new thread's tab starts on a search page (the gateway opens only http(s) pages); the
         // agent, or the person, takes it from there.
@@ -136,7 +136,7 @@ impl BenchApp {
     /// The browser changed: a tab the agent opened or moved while it answers in the open thread
     /// is that thread's tab from now on; a tab woken under a new id keeps its thread.
     fn on_browser(&mut self, cx: &mut Context<Self>) {
-        let Some(b) = self.sites.browser.clone() else {
+        let Some(b) = self.inserts.sites.browser.clone() else {
             return;
         };
         let (fresh, moved, woke) = {
@@ -152,9 +152,9 @@ impl BenchApp {
             let mut claim = None;
             if let Some(new) = fresh
                 .last()
-                .filter(|_| self.sites.reopening.as_deref() == Some(id.as_str()))
+                .filter(|_| self.inserts.sites.reopening.as_deref() == Some(id.as_str()))
             {
-                self.sites.reopening = None;
+                self.inserts.sites.reopening = None;
                 claim = Some(new.clone());
             } else if at.live {
                 claim = moved.last().or(fresh.last()).cloned();
@@ -163,7 +163,7 @@ impl BenchApp {
                 claim = Some(new.clone());
             }
             if let Some(new) = claim.filter(|t| *t != tab) {
-                self.sites.touched = Some(web_time::Instant::now());
+                self.inserts.sites.touched = Some(web_time::Instant::now());
                 self.patch_insert(&at, &id, new_state(json!({ "tab": new, "url": url })), cx);
             }
             // The tab's address as it goes, for opening it again.
@@ -189,9 +189,9 @@ impl BenchApp {
     /// The thread's tab's picture: the live frame (live: it streams now).
     pub fn tab_frame(&self, tab: &str) -> Option<(Arc<RenderImage>, f32, f32, bool)> {
         if self.demo {
-            return self.sites.demo_frame.clone().map(|f| (f, 0., 0., false));
+            return self.inserts.sites.demo_frame.clone().map(|f| (f, 0., 0., false));
         }
-        let b = self.sites.browser.as_ref()?;
+        let b = self.inserts.sites.browser.as_ref()?;
         let s = b.state.lock().unwrap();
         let shot = s.shots.get(tab)?;
         let live = s.pages.iter().any(|p| p.id == tab) && s.active.as_deref() == Some(tab);

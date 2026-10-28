@@ -25,8 +25,8 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let day = today();
-        let list = self.tasks.list.clone();
-        let shown = self.tasks.shown(&list);
+        let list = self.inserts.tasks.list.clone();
+        let shown = self.inserts.tasks.shown(&list);
         // Sections: (title, icon, tasks); an Upcoming day header is drawn big (number + name).
         let mut sections: Vec<(Option<String>, Option<Ico>, Vec<Task>)> = vec![];
         let month = |d: chrono::NaiveDate| {
@@ -36,7 +36,7 @@ impl BenchApp {
                 d.format("%B %Y").to_string()
             }
         };
-        if !self.tasks.query.is_empty() {
+        if !self.inserts.tasks.query.is_empty() {
             sections.push((None, None, shown));
         } else {
             match list {
@@ -118,8 +118,8 @@ impl BenchApp {
                 n += 1;
                 // The open task's card right under its row, whatever the list (the Logbook's
                 // thousand rows would push a card at the end out of sight).
-                if !inline && self.tasks.selected.as_deref() == Some(t.id.as_str()) {
-                    if let Some(open) = self.tasks.selected_task().cloned() {
+                if !inline && self.inserts.tasks.selected.as_deref() == Some(t.id.as_str()) {
+                    if let Some(open) = self.inserts.tasks.selected_task().cloned() {
                         let card = self.render_task_card(&open, cx);
                         rows.push(
                             div()
@@ -136,13 +136,13 @@ impl BenchApp {
                 }
             }
         }
-        let note = if let Some(e) = &self.tasks.error {
+        let note = if let Some(e) = &self.inserts.tasks.error {
             Some((e.clone(), theme.danger))
-        } else if !self.tasks.loaded {
+        } else if !self.inserts.tasks.loaded {
             Some(("Loading tasks…".to_string(), muted))
         } else if empty {
             Some((
-                if self.tasks.query.is_empty() {
+                if self.inserts.tasks.query.is_empty() {
                     "Nothing here".to_string()
                 } else {
                     "No task matches".to_string()
@@ -154,12 +154,12 @@ impl BenchApp {
         };
         // The list's tags, the most used first: "All · work · client-b…". A project's thread
         // opens on its project's tag (`sync_task_project`); "All" drops it.
-        let mut tags = if self.tasks.query.is_empty() {
-            self.tasks.tags_in(&list)
+        let mut tags = if self.inserts.tasks.query.is_empty() {
+            self.inserts.tasks.tags_in(&list)
         } else {
             vec![]
         };
-        let picked = self.tasks.tag_filter.clone();
+        let picked = self.inserts.tasks.tag_filter.clone();
         if let Some(p) = &picked {
             if !tags.iter().any(|g| g.eq_ignore_ascii_case(p)) {
                 tags.insert(0, p.clone());
@@ -244,7 +244,7 @@ impl BenchApp {
         let list_pane = v_flex().flex_1().min_w_0().h_full().children(strip).child(
             crate::inserts::scroll_pane(
                 "tasks-rows",
-                &self.tasks.rows_scroll,
+                &self.inserts.tasks.rows_scroll,
                 v_flex()
                     .pt_1()
                     .pb_4()
@@ -272,17 +272,17 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let day = today();
-        let selected = self.tasks.selected.as_deref() == Some(t.id.as_str());
+        let selected = self.inserts.tasks.selected.as_deref() == Some(t.id.as_str());
         let done = t.done();
         let (id_check, id_open) = (t.id.clone(), t.id.clone());
         let overdue = !done && t.day.is_some_and(|d| d < day);
         // The day, where the list doesn't say it already.
-        let logbook = self.tasks.list == List::Logbook && self.tasks.query.is_empty();
-        let when = match (&self.tasks.list, t.day, t.completed) {
+        let logbook = self.inserts.tasks.list == List::Logbook && self.inserts.tasks.query.is_empty();
+        let when = match (&self.inserts.tasks.list, t.day, t.completed) {
             (List::Logbook, _, _) if logbook => None,
             (_, _, Some(d)) => Some(tasks::show_date(d, day)),
             (List::Today, Some(d), _) if overdue => Some(tasks::show_date(d, day)),
-            (List::Today | List::Upcoming, _, _) if self.tasks.query.is_empty() => None,
+            (List::Today | List::Upcoming, _, _) if self.inserts.tasks.query.is_empty() => None,
             (_, Some(d), _) => Some(tasks::show_date(d, day)),
             _ => None,
         };
@@ -442,7 +442,7 @@ impl BenchApp {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .child(Input::new(&self.tasks.title)),
+                            .child(Input::new(&self.inserts.tasks.title)),
                     )
                     .child(
                         div()
@@ -462,9 +462,9 @@ impl BenchApp {
             .child(
                 div()
                     .px_1()
-                    .child(Textarea::new(&self.tasks.notes).appearance(false)),
+                    .child(Textarea::new(&self.inserts.tasks.notes).appearance(false)),
             )
-            .when_some(self.tasks.field_error.clone(), |d, e| {
+            .when_some(self.inserts.tasks.field_error.clone(), |d, e| {
                 d.child(div().px_1().text_sm().text_color(theme.danger).child(e))
             })
             .child(
@@ -518,14 +518,14 @@ impl BenchApp {
                         div()
                             .w(px(110.))
                             .flex_none()
-                            .child(Input::new(&self.tasks.day)),
+                            .child(Input::new(&self.inserts.tasks.day)),
                     )
                     .when(t.done(), |d| {
                         d.child(
                             div()
                                 .w(px(120.))
                                 .flex_none()
-                                .child(Input::new(&self.tasks.completed)),
+                                .child(Input::new(&self.inserts.tasks.completed)),
                         )
                     })
                     // The tags: the projects in a menu, ticked what is on the task; the field
@@ -533,7 +533,7 @@ impl BenchApp {
                     .child({
                         let lower: Vec<String> = t.tags.iter().map(|g| g.to_lowercase()).collect();
                         let mut items: Vec<(String, bool)> = self
-                            .projects
+                            .places.projects
                             .iter()
                             .map(|p| tasks::slug(&p.name))
                             .filter(|s| !s.is_empty())
@@ -594,14 +594,14 @@ impl BenchApp {
                         div()
                             .w(px(100.))
                             .flex_none()
-                            .child(Input::new(&self.tasks.tags)),
+                            .child(Input::new(&self.inserts.tasks.tags)),
                     )
                     .child(
                         h_flex()
                             .flex_none()
                             .gap_1()
                             .items_center()
-                            .child(div().w(px(64.)).child(Input::new(&self.tasks.spent)))
+                            .child(div().w(px(64.)).child(Input::new(&self.inserts.tasks.spent)))
                             .child(
                                 div()
                                     .id("task-timer")

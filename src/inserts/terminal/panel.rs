@@ -91,12 +91,12 @@ impl BenchApp {
     pub fn toggle_terminal_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.bottom_dock.toggle_panel(Panel::Terminal);
         if self.bottom_dock.shows(Panel::Terminal) {
-            if self.dock_terms.is_empty() {
+            if self.inserts.dock_terms.is_empty() {
                 let project = self.terminal_project(cx);
-                self.dock_terms.add(&project);
+                self.inserts.dock_terms.add(&project);
             }
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.ssh.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -105,11 +105,11 @@ impl BenchApp {
     /// ⌘T and the head's +: another terminal of the shown project, started and shown at once.
     pub fn dock_term_add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let project = self.terminal_project(cx);
-        self.dock_terms.add(&project);
+        self.inserts.dock_terms.add(&project);
         self.bottom_dock.activate(Panel::Terminal);
         if !self.demo {
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.ssh.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -117,13 +117,13 @@ impl BenchApp {
 
     /// Show tab `i`; its shell starts anew if it had ended.
     pub fn dock_term_show(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if i >= self.dock_terms.len() || i == self.dock_terms.active {
+        if i >= self.inserts.dock_terms.len() || i == self.inserts.dock_terms.active {
             return;
         }
-        self.dock_terms.active = i;
+        self.inserts.dock_terms.active = i;
         if !self.demo {
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.ssh.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -131,18 +131,18 @@ impl BenchApp {
 
     /// A tab's ×: its shell dies with it; closing the last one folds the dock.
     pub fn dock_term_close(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(t) = self.dock_terms.remove(i) else {
+        let Some(t) = self.inserts.dock_terms.remove(i) else {
             return;
         };
-        if let Some(ix) = self.ssh.tab_of_insert(&t.key) {
-            self.ssh.tabs[ix].session.kill();
-            self.ssh.tabs.remove(ix);
+        if let Some(ix) = self.inserts.ssh.tab_of_insert(&t.key) {
+            self.inserts.ssh.tabs[ix].session.kill();
+            self.inserts.ssh.tabs.remove(ix);
         }
-        if self.dock_terms.is_empty() {
+        if self.inserts.dock_terms.is_empty() {
             self.bottom_dock.open = false;
         } else if self.bottom_dock.shows(Panel::Terminal) {
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.ssh.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -151,7 +151,7 @@ impl BenchApp {
     /// The shown terminal's shell, started if it is new or its shell had ended (then cd'd into
     /// the project's folder once, as a new login shell would be).
     fn dock_active_shell(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<usize> {
-        let term = self.dock_terms.active_term()?.clone();
+        let term = self.inserts.dock_terms.active_term()?.clone();
         self.dock_shell(&term, window, cx)
     }
 
@@ -161,8 +161,8 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<usize> {
-        let fresh = self.ssh.tab_of_insert(&term.key).is_none_or(|t| {
-            self.ssh.tabs[t]
+        let fresh = self.inserts.ssh.tab_of_insert(&term.key).is_none_or(|t| {
+            self.inserts.ssh.tabs[t]
                 .session
                 .exited
                 .load(std::sync::atomic::Ordering::SeqCst)
@@ -179,7 +179,7 @@ impl BenchApp {
                     "cd {} && clear\r",
                     crate::inserts::subjects::shell_quote(&dir)
                 );
-                self.ssh.tabs[t].session.write(cd.as_bytes());
+                self.inserts.ssh.tabs[t].session.write(cd.as_bytes());
             }
         }
         Some(t)
@@ -187,7 +187,7 @@ impl BenchApp {
 
     /// The selection of the shown terminal, or its last lines, to the thread's composer.
     pub fn send_terminal_to_thread(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(term) = self.dock_terms.active_term().cloned() else {
+        let Some(term) = self.inserts.dock_terms.active_term().cloned() else {
             return;
         };
         let machine = match self.terminal_machine(&term.project) {
@@ -197,10 +197,10 @@ impl BenchApp {
         let text = if self.demo {
             crate::demo::terminal(&machine)
         } else {
-            let Some(t) = self.ssh.tab_of_insert(&term.key) else {
+            let Some(t) = self.inserts.ssh.tab_of_insert(&term.key) else {
                 return;
             };
-            let s = &self.ssh.tabs[t].session;
+            let s = &self.inserts.ssh.tabs[t].session;
             s.selection_text()
                 .filter(|t| !t.trim().is_empty())
                 .unwrap_or_else(|| s.screen_text(SENT_LINES))
@@ -228,13 +228,13 @@ impl BenchApp {
     /// The tab's label: what its shell calls itself, else its project; numbered among tabs of
     /// the same project. `ended` says its shell is gone.
     fn dock_term_label(&self, i: usize) -> (String, bool) {
-        let t = &self.dock_terms.items[i];
-        let same = self.dock_terms.items[..i]
+        let t = &self.inserts.dock_terms.items[i];
+        let same = self.inserts.dock_terms.items[..i]
             .iter()
             .filter(|o| o.project == t.project)
             .count();
-        let name = match self.ssh.tab_of_insert(&t.key) {
-            Some(ix) => self.ssh.tabs[ix]
+        let name = match self.inserts.ssh.tab_of_insert(&t.key) {
+            Some(ix) => self.inserts.ssh.tabs[ix]
                 .session
                 .title()
                 .map(|s| s.trim().to_string())
@@ -242,14 +242,14 @@ impl BenchApp {
                 .unwrap_or_else(|| self.project_name(&t.project)),
             None => self.project_name(&t.project),
         };
-        let ended = self.ssh.tab_of_insert(&t.key).is_some_and(|ix| {
-            self.ssh.tabs[ix]
+        let ended = self.inserts.ssh.tab_of_insert(&t.key).is_some_and(|ix| {
+            self.inserts.ssh.tabs[ix]
                 .session
                 .exited
                 .load(std::sync::atomic::Ordering::SeqCst)
         });
         let label = if self
-            .dock_terms
+            .inserts.dock_terms
             .items
             .iter()
             .filter(|o| o.project == t.project)
@@ -271,12 +271,12 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         // The demo shows made-up terminals, two so the tabs show as they really do.
-        if self.demo && self.dock_terms.is_empty() {
+        if self.demo && self.inserts.dock_terms.is_empty() {
             let project = self.terminal_project(cx);
-            self.dock_terms.add(&project);
-            self.dock_terms.add(&project);
+            self.inserts.dock_terms.add(&project);
+            self.inserts.dock_terms.add(&project);
         }
-        let Some(active) = self.dock_terms.active_term().cloned() else {
+        let Some(active) = self.inserts.dock_terms.active_term().cloned() else {
             return div().into_any_element();
         };
         let at = self.location(&active.project);
@@ -301,7 +301,7 @@ impl BenchApp {
             .on_click(cx.listener(|this, _, window, cx| this.dock_term_add(window, cx)))
             .into_any_element();
         let theme = cx.theme().clone();
-        let head = if self.dock_terms.len() <= 1 {
+        let head = if self.inserts.dock_terms.len() <= 1 {
             let mut acts = vec![plus];
             acts.extend(actions);
             bench_ui::ide_head(
@@ -311,7 +311,7 @@ impl BenchApp {
                 cx,
             )
         } else {
-            let tabs: Vec<AnyElement> = (0..self.dock_terms.len())
+            let tabs: Vec<AnyElement> = (0..self.inserts.dock_terms.len())
                 .map(|i| {
                     let (label, ended) = self.dock_term_label(i);
                     let close = bench_ui::head_icon_button(
@@ -327,7 +327,7 @@ impl BenchApp {
                     bench_ui::term_tab(
                         format!("term-tab-{i}"),
                         label,
-                        i == self.dock_terms.active,
+                        i == self.inserts.dock_terms.active,
                         ended,
                         close,
                         cx,

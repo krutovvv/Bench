@@ -23,7 +23,7 @@ impl BenchApp {
         let error = link.and_then(|a| a.error.clone());
         // Always shown, healthy or not: the person decides whether to look, not a late error.
         let working = self
-            .threads
+            .threads.list
             .iter()
             .filter(|t| t.host == host && t.running)
             .count();

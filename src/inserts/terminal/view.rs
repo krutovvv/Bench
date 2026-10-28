@@ -355,7 +355,7 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
-        let tab = &self.ssh.tabs[ix];
+        let tab = &self.inserts.ssh.tabs[ix];
         let session = tab.session.clone();
         let focus = tab.focus.clone();
         let focused = focus.is_focused(window);
@@ -491,9 +491,9 @@ impl BenchApp {
                 cx.stop_propagation();
                 let line_h = px(s_wheel.layout().line_h.max(1.));
                 let dy = f32::from(ev.delta.pixel_delta(line_h).y);
-                let acc = this.ssh.scroll_acc + dy / f32::from(line_h);
+                let acc = this.inserts.ssh.scroll_acc + dy / f32::from(line_h);
                 let lines = acc.trunc() as i32;
-                this.ssh.scroll_acc = acc - lines as f32;
+                this.inserts.ssh.scroll_acc = acc - lines as f32;
                 if lines == 0 {
                     return;
                 }

@@ -99,10 +99,10 @@ impl BenchApp {
     }
 
     fn set_presets(&mut self, p: Presets, window: &mut Window, cx: &mut Context<Self>) {
-        if !p.reasoning.is_empty() && p.reasoning != self.efforts {
+        if !p.reasoning.is_empty() && p.reasoning != self.defaults.efforts {
             self.set_efforts(p.reasoning.clone(), window, cx);
         }
-        self.presets = p;
+        self.gear.presets = p;
         cx.notify();
     }
 
@@ -113,21 +113,21 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.preset_editor.as_ref().is_some_and(|e| e.kind == kind) {
-            self.preset_editor = None;
+        if self.gear.preset_editor.as_ref().is_some_and(|e| e.kind == kind) {
+            self.gear.preset_editor = None;
             cx.notify();
             return;
         }
-        let text = serde_json::to_string_pretty(&self.presets.raw[kind]).unwrap_or_default();
+        let text = serde_json::to_string_pretty(&self.gear.presets.raw[kind]).unwrap_or_default();
         let editor = crate::env::editor("json", window, cx);
         editor.update(cx, |s, cx| s.set_value(text, window, cx));
-        self.preset_editor = Some(PresetEditor { kind, text: editor });
+        self.gear.preset_editor = Some(PresetEditor { kind, text: editor });
         cx.notify();
     }
 
     /// The open kind saved (`reset`: back to the built-in one).
     pub fn save_presets(&mut self, reset: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(conn), Some(ed)) = (self.local_conn(), self.preset_editor.as_ref()) else {
+        let (Some(conn), Some(ed)) = (self.local_conn(), self.gear.preset_editor.as_ref()) else {
             return;
         };
         let kind = ed.kind;
@@ -145,7 +145,7 @@ impl BenchApp {
             },
             |this, r, window, cx| match r {
                 Ok(v) => {
-                    this.preset_editor = None;
+                    this.gear.preset_editor = None;
                     this.set_presets(Presets::from(&v["presets"]), window, cx);
                 }
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
@@ -158,7 +158,7 @@ impl BenchApp {
     /// The Presets tab: each kind as a few lines, Edit opens its JSON (Save, Built-in, Cancel).
     pub(super) fn render_presets(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let muted = cx.theme().muted_foreground;
-        let p = self.presets.clone();
+        let p = self.gear.presets.clone();
         let mut out = vec![div()
             .pt_4()
             .text_sm()
@@ -210,7 +210,7 @@ impl BenchApp {
                 );
             }
             let open = self
-                .preset_editor
+                .gear.preset_editor
                 .as_ref()
                 .filter(|e| e.kind == kind)
                 .map(|e| e.text.clone());
@@ -255,7 +255,7 @@ impl BenchApp {
                                 )
                                 .small()
                                 .on_click(cx.listener(|this, _, _, cx| {
-                                    this.preset_editor = None;
+                                    this.gear.preset_editor = None;
                                     cx.notify();
                                 }))
                                 .into_any_element(),

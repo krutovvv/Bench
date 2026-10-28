@@ -3,6 +3,7 @@
 //! LaTeX. Files come through the agent, so a remote (SSH) agent's files show too. Diagrams
 //! and formulas are drawn in plain Rust: a diagram as SVG, a formula as Unicode text.
 
+pub(crate) mod state;
 pub(crate) mod attach;
 pub(crate) mod audio;
 pub(crate) mod chip;

@@ -99,8 +99,8 @@ impl ThreadView {
             .as_ref()
             .map_or((false, false), |(ak, _)| match self.app(cx) {
                 Some(a) => (
-                    a.playing.as_ref().is_some_and(|(j, _)| j == ak),
-                    a.speaking.as_deref() == Some(ak),
+                    a.media.playing.as_ref().is_some_and(|(j, _)| j == ak),
+                    a.media.speaking.as_deref() == Some(ak),
                 ),
                 None => (false, false),
             });

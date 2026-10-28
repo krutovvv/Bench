@@ -43,14 +43,14 @@ impl BenchApp {
             .iter()
             .copied()
             .filter(|&i| {
-                let s = &self.threads[i];
+                let s = &self.threads.list[i];
                 s.host.is_empty()
-                    && (s.project.is_empty() || !self.projects.iter().any(|p| p.id == s.project))
+                    && (s.project.is_empty() || !self.places.projects.iter().any(|p| p.id == s.project))
             })
             .collect();
         // Pinned first in the Host's group too: a new thread lands under them, never above.
-        loose.sort_by_key(|&i| !self.mark_of(self.threads[i].id.as_str()).pinned);
-        let mut projects = self.projects.clone();
+        loose.sort_by_key(|&i| !self.mark_of(self.threads.list[i].id.as_str()).pinned);
+        let mut projects = self.places.projects.clone();
         projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
         let groups = projects
             .into_iter()
@@ -61,11 +61,11 @@ impl BenchApp {
                     .iter()
                     .copied()
                     .filter(|&i| {
-                        let s = &self.threads[i];
+                        let s = &self.threads.list[i];
                         s.host == host && s.project == p.id
                     })
                     .collect();
-                rows.sort_by_key(|&i| !self.mark_of(self.threads[i].id.as_str()).pinned);
+                rows.sort_by_key(|&i| !self.mark_of(self.threads.list[i].id.as_str()).pinned);
                 (p, rows)
             })
             .collect();
@@ -76,12 +76,12 @@ impl BenchApp {
     pub fn drawn_threads(&self) -> Vec<ThreadId> {
         let (loose, groups) = self.sidebar_groups();
         let mut out = vec![];
-        if self.ssh.collapsed.contains("open:loose") {
-            out.extend(loose.iter().map(|&i| self.threads[i].id.clone()));
+        if self.sidebar.collapsed.contains("open:loose") {
+            out.extend(loose.iter().map(|&i| self.threads.list[i].id.clone()));
         }
         for (p, rows) in groups {
-            if !self.ssh.collapsed.contains(&format!("p:{}", p.id)) {
-                out.extend(rows.iter().map(|&i| self.threads[i].id.clone()));
+            if !self.sidebar.collapsed.contains(&format!("p:{}", p.id)) {
+                out.extend(rows.iter().map(|&i| self.threads.list[i].id.clone()));
             }
         }
         out
@@ -89,7 +89,7 @@ impl BenchApp {
 
     /// The field an item is being renamed in, if it is.
     pub fn renaming_field(&self, item: &Item) -> Option<Entity<InputState>> {
-        self.renaming
+        self.sidebar.renaming
             .as_ref()
             .filter(|r| &r.item == item)
             .map(|r| r.field.clone())
@@ -98,13 +98,13 @@ impl BenchApp {
     pub fn item_name(&self, item: &Item) -> String {
         match item {
             Item::Thread(id) => self
-                .threads
+                .threads.list
                 .iter()
                 .find(|s| &s.id == id)
                 .map(|s| s.title.clone())
                 .unwrap_or_default(),
             Item::Project(id) => self
-                .projects
+                .places.projects
                 .iter()
                 .find(|p| &p.id == id)
                 .map(|p| p.name.clone())
@@ -129,7 +129,7 @@ impl BenchApp {
                 _ => {}
             },
         );
-        self.renaming = Some(Renaming {
+        self.sidebar.renaming = Some(Renaming {
             item,
             field,
             _events: events,
@@ -138,13 +138,13 @@ impl BenchApp {
     }
 
     pub fn cancel_rename(&mut self, cx: &mut Context<Self>) {
-        if self.renaming.take().is_some() {
+        if self.sidebar.renaming.take().is_some() {
             cx.notify();
         }
     }
 
     fn commit_rename(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(r) = self.renaming.take() else {
+        let Some(r) = self.sidebar.renaming.take() else {
             return;
         };
         let name = r.field.read(cx).value().trim().to_string();
@@ -156,7 +156,7 @@ impl BenchApp {
             // The thread's agent keeps its title; the sidebar shows it at once.
             Item::Thread(id) => {
                 let host = self.host_of_thread(&id);
-                if let Some(s) = self.threads.iter_mut().find(|s| s.host == host && s.id == id) {
+                if let Some(s) = self.threads.list.iter_mut().find(|s| s.host == host && s.id == id) {
                     s.title = name.clone();
                 }
                 self.send(&host, protocol::RenameThread { thread: id, title: name }, cx);
@@ -209,7 +209,7 @@ impl BenchApp {
                 if let Some(n) = next {
                     self.open_listed(n, cx);
                 }
-                window.focus(&self.sidebar_focus, cx);
+                window.focus(&self.sidebar.focus, cx);
             }
             "escape" => self.cancel_delete(cx),
             "enter" => self.focus_composer(window, cx),

@@ -15,15 +15,15 @@ use crate::workspace::Center;
 impl BenchApp {
     /// The center's view back to a new chat (another thread is opened in it next, or none).
     pub(crate) fn reset_chat(&mut self, cx: &mut Context<Self>) {
-        self.inserts.remove("draft");
-        self.creating = false;
+        self.inserts.by_thread.remove("draft");
+        self.threads.creating = false;
         // A new chat starts on the agent's default level.
-        let effort = self.default_effort;
+        let effort = self.defaults.effort;
         self.active_thread.update(cx, |v, cx| v.reset(effort, cx));
-        self.playing = None;
-        self.media_playing = None;
+        self.media.playing = None;
+        self.media.audio = None;
         self.stop_video(None, cx);
-        self.new_project = None;
+        self.new_project.folder = None;
         cx.notify();
     }
 
@@ -40,21 +40,21 @@ impl BenchApp {
             return;
         }
         self.armed.clear();
-        self.project_form = None;
+        self.new_project.form = None;
         self.unbeside(&host, &id, cx);
         let prev = self.active_thread.update(cx, |v, _| {
             let journal = std::mem::take(&mut v.thread.journal);
             v.thread.id.clone().map(|s| (s, journal))
         });
         if let Some((prev, journal)) = prev {
-            self.thread_cache.insert(prev.to_string(), journal);
+            self.threads.cache.insert(prev.to_string(), journal);
         }
         self.reset_chat(cx);
         // A thread seen before shows its last state now, and catches up when its journal comes.
         let journal = if self.demo {
             self.demo_threads.get(id.as_str()).cloned()
         } else {
-            self.thread_cache.remove(id.as_str())
+            self.threads.cache.remove(id.as_str())
         };
         let project = self.project_of_thread(&host, &id);
         self.active_thread.update(cx, |v, cx| {
@@ -167,7 +167,7 @@ impl BenchApp {
 
     /// The project a thread belongs to, as the sidebar lists it ("" = its agent's Host).
     pub(crate) fn project_of_thread(&self, host: &str, id: &ThreadId) -> String {
-        self.threads
+        self.threads.list
             .iter()
             .find(|s| s.host == host && &s.id == id)
             .map(|s| s.project.clone())
@@ -187,7 +187,7 @@ impl BenchApp {
         if at.host == host && at.id.as_ref() == Some(&id) {
             self.reset_chat(cx);
         }
-        self.threads.retain(|s| !(s.host == host && s.id == id));
+        self.threads.list.retain(|s| !(s.host == host && s.id == id));
         self.request(
             &host.clone(),
             protocol::DeleteThread { thread: id },
@@ -220,13 +220,13 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if q == self.search_query {
+        if q == self.sidebar.query {
             return;
         }
-        self.search_seq += 1;
-        let seq = self.search_seq;
-        self.search_query = q.clone();
-        self.search_hits = None;
+        self.sidebar.seq += 1;
+        let seq = self.sidebar.seq;
+        self.sidebar.query = q.clone();
+        self.sidebar.hits = None;
         cx.notify();
         if q.is_empty() {
             return;
@@ -236,7 +236,7 @@ impl BenchApp {
                 .timer(Duration::from_millis(300))
                 .await;
             let _ = this.update_in(cx, |this, window, cx| {
-                if this.search_seq != seq {
+                if this.sidebar.seq != seq {
                     return;
                 }
                 this.rest(
@@ -244,8 +244,8 @@ impl BenchApp {
                     cx,
                     move |conn| rest::search_threads(conn, &q),
                     move |this, r, _, cx| {
-                        if this.search_seq == seq {
-                            this.search_hits = Some(r.unwrap_or_default());
+                        if this.sidebar.seq == seq {
+                            this.sidebar.hits = Some(r.unwrap_or_default());
                             cx.notify();
                         }
                     },

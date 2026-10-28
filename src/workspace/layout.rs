@@ -153,7 +153,7 @@ impl Render for BenchApp {
             .relative()
             .size_full()
             .child(base)
-            .when(self.project_form.is_some(), |d| {
+            .when(self.new_project.form.is_some(), |d| {
                 // Its right edge under the strip's, where the button stands.
                 let left = (self.left_dock.size()
                     - px(bench_ui::POPOVER_CARD_W + bench_ui::SIDEBAR_STRIP_PR))
@@ -190,10 +190,10 @@ impl BenchApp {
         let right = self.shown_panel(DockPosition::Right);
         let bottom = self.shown_panel(DockPosition::Bottom);
         let shape = (left.is_some(), right.is_some(), bottom.is_some());
-        if self.layout_synced != Some(shape) {
-            self.layout_synced = Some(shape);
-            self.layout_state = cx.new(|_| Default::default());
-            self.bottom_state = cx.new(|_| Default::default());
+        if self.layout.synced != Some(shape) {
+            self.layout.synced = Some(shape);
+            self.layout.across = cx.new(|_| Default::default());
+            self.layout.bottom = cx.new(|_| Default::default());
         }
         let theme = cx.theme().clone();
         // Every drag of a divider is its docks' size from now on (the center takes the rest).
@@ -228,7 +228,7 @@ impl BenchApp {
                     };
                 let pane = self.render_panel(panel, window, cx);
                 v_resizable("center-bottom")
-                    .with_state(&self.bottom_state)
+                    .with_state(&self.layout.bottom)
                     .with_handle_appearance(quiet_divider(true))
                     .on_resize(remember_bottom)
                     .child(resizable_panel().child(main))
@@ -266,7 +266,7 @@ impl BenchApp {
         let right = right.map(|panel| self.render_panel(panel, window, cx));
         // Fixed: a window resize goes to the center; the docks keep their sizes.
         h_resizable("layout")
-            .with_state(&self.layout_state)
+            .with_state(&self.layout.across)
             .with_handle_appearance(quiet_divider(false))
             .on_resize(remember)
             .when_some(left, |d, pane| {
@@ -296,5 +296,23 @@ impl BenchApp {
                 )
             })
             .into_any_element()
+    }
+}
+
+/// The docks' dividers: across the window, and over the bottom dock; which docks were drawn when
+/// they last took their sizes (another set takes them again).
+pub struct LayoutState {
+    pub across: Entity<gpui_kit::component::resizable::ResizableState>,
+    pub bottom: Entity<gpui_kit::component::resizable::ResizableState>,
+    pub synced: Option<(bool, bool, bool)>,
+}
+
+impl LayoutState {
+    pub fn new(cx: &mut App) -> Self {
+        Self {
+            across: cx.new(|_| Default::default()),
+            bottom: cx.new(|_| Default::default()),
+            synced: None,
+        }
     }
 }

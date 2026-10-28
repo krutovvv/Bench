@@ -54,12 +54,12 @@ impl BenchApp {
         };
         let at = self.thread_ref(cx);
         let dir = p.dir.clone();
-        if !self.git_info.contains_key(&dir) {
+        if !self.git.info.contains_key(&dir) {
             let target = self.thread_target(&at);
             self.refresh_git(target, dir.clone(), cx);
         }
         let theme = cx.theme();
-        let info = self.git_info.get(&dir).cloned();
+        let info = self.git.info.get(&dir).cloned();
         let app = cx.entity().downgrade();
         let copy = |app: gpui::WeakEntity<BenchApp>, shown: String, what: String| {
             PopupMenuItem::new(shown).on_click(move |_, window, cx| {
@@ -154,7 +154,7 @@ impl BenchApp {
                 .thread(cx)
                 .id
                 .as_ref()
-                .and_then(|id| self.threads.iter().find(|s| &s.id == id))
+                .and_then(|id| self.threads.list.iter().find(|s| &s.id == id))
                 .map(|s| s.title.clone())
                 .filter(|t| !t.is_empty())
                 // A thread about a task list is named after it until it has a title of its own.
@@ -175,7 +175,7 @@ impl BenchApp {
                         .child(title),
                 )
                 // The thread's own meters, then its repo: what is this thread's, together.
-                .children(self.active_thread.read(cx).render_meters(self.context_length, cx))
+                .children(self.active_thread.read(cx).render_meters(self.defaults.context_length, cx))
                 .children(self.render_project_chip(cx))
                 .child(self.render_header_tail(cx))
                 .into_any_element();
@@ -203,7 +203,7 @@ impl BenchApp {
                 .child(bench_ui::icons::Ico::X.icon().small())
                 .on_click(cx.listener(|this, _, _, cx| {
                     this.center = Center::Chat;
-                    this.project_form = None;
+                    this.new_project.form = None;
                     cx.notify();
                 })),
         )

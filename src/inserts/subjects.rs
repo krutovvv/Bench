@@ -98,16 +98,16 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<usize> {
-        if let Some(t) = self.ssh.tab_of_insert(insert) {
-            let tab = &self.ssh.tabs[t];
+        if let Some(t) = self.inserts.ssh.tab_of_insert(insert) {
+            let tab = &self.inserts.ssh.tabs[t];
             if tab.alias == alias && !tab.session.exited.load(std::sync::atomic::Ordering::SeqCst) {
                 return Some(t);
             }
-            self.ssh.tabs[t].session.kill();
-            self.ssh.tabs.remove(t);
+            self.inserts.ssh.tabs[t].session.kill();
+            self.inserts.ssh.tabs.remove(t);
         }
         let t = self.spawn_terminal_tab(alias, window, cx)?;
-        self.ssh.tabs[t].insert = insert.to_string();
+        self.inserts.ssh.tabs[t].insert = insert.to_string();
         Some(t)
     }
 
@@ -153,25 +153,25 @@ impl BenchApp {
             // Start where the thread works.
             if fresh {
                 if let Some(dir) = self.folder_of_thread(&at) {
-                    self.ssh.tabs[t]
+                    self.inserts.ssh.tabs[t]
                         .session
                         .write(format!("cd {}\r", shell_quote(&dir)).as_bytes());
                 }
             }
             if !command.is_empty() {
-                self.ssh.tabs[t]
+                self.inserts.ssh.tabs[t]
                     .session
                     .write(format!("{command}\r").as_bytes());
             }
-            self.ssh.tabs[t].background = false;
-            self.ssh.tabs[t].focus.focus(window, cx);
+            self.inserts.ssh.tabs[t].background = false;
+            self.inserts.ssh.tabs[t].focus.focus(window, cx);
         }
         cx.notify();
     }
 
     /// A thread's folder, when it works in one.
     fn folder_of_thread(&self, at: &ThreadRef) -> Option<String> {
-        self.folder_of(at).or_else(|| self.new_project.clone())
+        self.folder_of(at).or_else(|| self.new_project.folder.clone())
     }
 }
 

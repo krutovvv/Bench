@@ -14,6 +14,7 @@
 //! level), `open.rs` (opening, creating and deleting threads: the app's), `panel.rs` (the right
 //! dock's thread panel: its head over a view), `beside.rs` (a second thread beside the open one).
 
+pub(crate) mod store;
 mod active;
 mod answer;
 mod asks;
@@ -394,8 +395,8 @@ impl ThreadView {
         let empty = self.thread.tv.rows.is_empty();
         let path_entry = self
             .app(cx)
-            .filter(|a| a.path_entry)
-            .map(|a| a.project_path.clone());
+            .filter(|a| a.new_project.path_entry)
+            .map(|a| a.new_project.path.clone());
         if empty {
             if let (Some(_), Some(why)) = (
                 self.thread.id.clone(),

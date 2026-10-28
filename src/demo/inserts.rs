@@ -35,7 +35,7 @@ fn task(
 
 /// Made-up ~/.ssh/config servers and tasks, so the demo never shows the person's own.
 pub(super) fn other_modes(app: &mut BenchApp) {
-    app.ssh.servers = vec![
+    app.inserts.ssh.servers = vec![
         server("web-1", "203.0.113.10", "Production"),
         server("web-2", "203.0.113.11", "Production"),
         server("db-main", "203.0.113.20", "Production"),
@@ -63,7 +63,7 @@ pub(super) fn other_modes(app: &mut BenchApp) {
     );
     timed.spent = 135 * 60;
     timed.notes = "Token bucket per API key; 429 with Retry-After.".into();
-    app.tasks.items = vec![
+    app.inserts.tasks.items = vec![
         flagged,
         timed,
         task(
@@ -89,7 +89,7 @@ pub(super) fn other_modes(app: &mut BenchApp) {
         ),
         done,
     ];
-    app.tasks.loaded = true;
+    app.inserts.tasks.loaded = true;
 }
 
 /// The demo server's terminal: its last screen (no shell runs in the demo).

@@ -27,17 +27,17 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let current = self.efforts.get(self.thread(cx).effort).cloned();
-        let default = self.efforts.get(self.default_effort).cloned();
-        self.efforts = levels;
-        let last = self.efforts.len().saturating_sub(1);
-        let at = |v: Option<String>| v.and_then(|v| self.efforts.iter().position(|e| *e == v));
+        let current = self.defaults.efforts.get(self.thread(cx).effort).cloned();
+        let default = self.defaults.efforts.get(self.defaults.effort).cloned();
+        self.defaults.efforts = levels;
+        let last = self.defaults.efforts.len().saturating_sub(1);
+        let at = |v: Option<String>| v.and_then(|v| self.defaults.efforts.iter().position(|e| *e == v));
         let selected = at(current).unwrap_or(last);
-        self.default_effort = at(default).unwrap_or(last);
+        self.defaults.effort = at(default).unwrap_or(last);
         self.active_thread
             .update(cx, |v, _| v.thread.effort = selected);
         let labels: Vec<SharedString> = self
-            .efforts
+            .defaults.efforts
             .iter()
             .map(|e| SharedString::from(e.clone()))
             .collect();
@@ -58,7 +58,7 @@ impl BenchApp {
         });
         if let Some(thread) = id {
             let at = self.thread_ref(cx);
-            let effort = self.efforts[i].clone();
+            let effort = self.defaults.efforts[i].clone();
             self.send_at(&at, protocol::SetEffort { thread, effort }, cx);
         }
         cx.notify();
@@ -76,20 +76,20 @@ impl BenchApp {
     /// A new chat becomes a thread of its agent, in its project (in the folder chosen for it, or
     /// the project's); what waited for it — its first message, its inserts — goes to it then.
     pub(crate) fn create_thread(&mut self, at: &ThreadRef, cx: &mut Context<Self>) {
-        if self.creating {
+        if self.threads.creating {
             return;
         }
-        self.creating = true;
+        self.threads.creating = true;
         let host = self.thread_host(at);
         let key = ProjectKey::parse(&at.project);
         let project = (!key.is_host() && !key.id.is_empty()).then(|| key.id.clone());
         let request = protocol::CreateThread {
             project,
-            cwd: self.new_project.clone(),
+            cwd: self.new_project.folder.clone(),
         };
         let at = at.clone();
         self.request(&host.clone(), request, cx, move |this, r, window, cx| {
-            this.creating = false;
+            this.threads.creating = false;
             match r {
                 Ok(made) => this.thread_created(host, made.thread, &at, cx),
                 Err(e) => this.toast(
@@ -104,7 +104,7 @@ impl BenchApp {
 
     /// The new chat is a thread now: it shows in the sidebar at once, and what waited for it goes.
     fn thread_created(&mut self, host: String, id: ThreadId, at: &ThreadRef, cx: &mut Context<Self>) {
-        if !self.threads.iter().any(|s| s.host == host && s.id == id) {
+        if !self.threads.list.iter().any(|s| s.host == host && s.id == id) {
             let row = crate::app::model::ThreadRow {
                 id: id.clone(),
                 title: "Untitled".into(),
@@ -114,9 +114,9 @@ impl BenchApp {
                 host: host.clone(),
                 ..Default::default()
             };
-            self.threads.insert(0, row);
+            self.threads.list.insert(0, row);
         }
-        let efforts = self.efforts.clone();
+        let efforts = self.defaults.efforts.clone();
         let (queued, effort, made) = self.active_thread.update(cx, |v, cx| {
             v.thread.host = host.clone();
             v.thread.id = Some(id.clone());
@@ -217,12 +217,12 @@ impl ThreadView {
         // While dictating, Send stops the recording and sends what it recognizes.
         let dictating = {
             let a = app.read(cx);
-            a.recorder.is_some() || a.transcribing
+            a.media.recorder.is_some() || a.media.transcribing
         };
         if dictating {
             app.update(cx, |app, cx| {
-                app.send_after_transcribe = true;
-                if app.recorder.is_some() {
+                app.media.send_after_transcribe = true;
+                if app.media.recorder.is_some() {
                     app.toggle_mic(window, cx);
                 }
                 cx.notify();
@@ -404,7 +404,7 @@ impl ThreadView {
         self.attachments.clear();
         let key = self.thread_ref().key();
         self.app
-            .update(cx, |app, _| app.references.remove(&key))
+            .update(cx, |app, _| app.threads.references.remove(&key))
             .ok();
     }
 
@@ -431,7 +431,7 @@ impl ThreadView {
     pub(crate) fn submit(&mut self, text: String, request: String, cx: &mut Context<Self>) {
         let at = self.thread_ref();
         if at.id.is_some() {
-            let efforts = self.app(cx).map(|a| a.efforts.clone()).unwrap_or_default();
+            let efforts = self.app(cx).map(|a| a.defaults.efforts.clone()).unwrap_or_default();
             let effort = self.thread.take_effort(&efforts);
             let context = self.block_context(cx);
             self.app

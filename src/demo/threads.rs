@@ -7,7 +7,7 @@ use protocol::ThreadItem;
 
 /// A thread about something (`tasks:today`, `ssh:local`…): one turn, done.
 fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {
-    app.threads.push(row(id, title, 2, false, "desktop"));
+    app.threads.list.push(row(id, title, 2, false, "desktop"));
     let mut t = journal.thread();
     // A tool: an insert before the first message.
     if !subject.is_empty() {
@@ -44,7 +44,7 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Jou
             .into_iter()
             .map(|(id, s)| crate::app::model::Insert::new(id, s))
             .collect();
-        app.inserts.insert(id.into(), list);
+        app.inserts.by_thread.insert(id.into(), list);
     }
     app.demo_threads.insert(id.into(), t);
 }
@@ -135,7 +135,7 @@ is published.\n\nThe page is right here — click and type in it if something ne
             48.0,
         ),
     );
-    app.sites.demo_frame =
+    app.inserts.sites.demo_frame =
         crate::inserts::browser::gateway::image_of(include_bytes!("../../assets/demo/site.jpg"));
     thread(
         app,
@@ -156,7 +156,7 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
             4.0,
         ),
     );
-    app.tools
+    app.inserts.tools
         .inputs
         .insert(devtools::Tool::Cron, "*/15 9-18 * * 1-5".into());
     // `BENCH_DEMO_TOOL=html|preview`: the insert shows the pane that scrolls inside the thread
@@ -168,8 +168,8 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
                 .map(|n| format!("<div class=\"post\">{n} <!DOCTYPE html><h1>413 Request Entity Too Large</h1> openresty/1.15.8.2</div>"))
                 .collect::<Vec<_>>()
                 .join("\n");
-            app.tools.inputs.insert(devtools::Tool::Base64, one.clone());
-            app.tools.preview = one;
+            app.inserts.tools.inputs.insert(devtools::Tool::Base64, one.clone());
+            app.inserts.tools.preview = one;
         }
         Ok("html") | Ok("preview") => {
             let lines = (1..=40)
@@ -181,8 +181,8 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
             } else {
                 devtools::Tool::MarkdownPreview
             };
-            app.tools.inputs.insert(tool, lines.clone());
-            app.tools.preview = lines;
+            app.inserts.tools.inputs.insert(tool, lines.clone());
+            app.inserts.tools.preview = lines;
         }
         _ => {}
     }

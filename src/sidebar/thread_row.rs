@@ -25,7 +25,7 @@ impl BenchApp {
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let s = &self.threads[i];
+        let s = &self.threads.list[i];
         let selected =
             self.center == Center::Chat && self.thread(cx).id.as_ref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
@@ -207,7 +207,7 @@ impl BenchApp {
             // Opened, and the sidebar takes the keys: ↑ ↓ to the next, ⌫ deletes it.
             .on_click(cx.listener(move |this, _, window, cx| {
                 this.open_listed(open_id.clone(), cx);
-                window.focus(&this.sidebar_focus, cx);
+                window.focus(&this.sidebar.focus, cx);
             }))
             .context_menu(item_menu(cx.entity(), Item::Thread(menu_id), pinned))
     }

@@ -41,8 +41,8 @@ impl InsertKind for Terminal {
         } else {
             a
         };
-        match app.ssh.tab_of_insert(&ins.id) {
-            Some(t) => app.ssh.tabs[t]
+        match app.inserts.ssh.tab_of_insert(&ins.id) {
+            Some(t) => app.inserts.ssh.tabs[t]
                 .session
                 .title()
                 .filter(|t| !t.trim().is_empty())
@@ -60,12 +60,12 @@ impl InsertKind for Terminal {
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> Vec<AnyElement> {
-        let Some(t) = app.ssh.tab_of_insert(&ins.id) else {
+        let Some(t) = app.inserts.ssh.tab_of_insert(&ins.id) else {
             return vec![];
         };
         let theme = cx.theme().clone();
-        let id = app.ssh.tabs[t].id;
-        if app.ssh.tabs[t].background {
+        let id = app.inserts.ssh.tabs[t].id;
+        if app.inserts.ssh.tabs[t].background {
             return vec![
                 h_flex()
                     .id(("term-bg-badge", id))
@@ -81,7 +81,7 @@ impl InsertKind for Terminal {
                     .child("Background")
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.click_claimed = true;
-                        if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                        if let Some(t) = this.inserts.ssh.tabs.iter_mut().find(|t| t.id == id) {
                             t.background = false;
                         }
                         cx.notify();
@@ -98,7 +98,7 @@ impl InsertKind for Terminal {
             )
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.click_claimed = true;
-                if let Some(t) = this.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                if let Some(t) = this.inserts.ssh.tabs.iter_mut().find(|t| t.id == id) {
                     t.background = true;
                 }
                 cx.notify();
@@ -132,7 +132,7 @@ impl InsertKind for Terminal {
             );
         }
         let ix = app.insert_terminal(&ins.id, &alias, window, cx)?;
-        let tab = &app.ssh.tabs[ix];
+        let tab = &app.inserts.ssh.tabs[ix];
         if tab.background {
             return None;
         }
@@ -162,10 +162,10 @@ impl InsertKind for Terminal {
         } else {
             alias
         };
-        match app.ssh.tab_of_insert(&ins.id) {
+        match app.inserts.ssh.tab_of_insert(&ins.id) {
             Some(t) => format!(
                 "The terminal of {name} shows (its last lines):\n```\n{}\n```",
-                app.ssh.tabs[t].session.screen_text(60)
+                app.inserts.ssh.tabs[t].session.screen_text(60)
             ),
             None => String::new(),
         }
@@ -181,8 +181,8 @@ impl InsertKind for Terminal {
     ) {
         let a = app.thread_machine(at);
         if let Some(t) = app.insert_terminal(&ins.id, &a, window, cx) {
-            app.ssh.tabs[t].background = false;
-            app.ssh.tabs[t].focus.focus(window, cx);
+            app.inserts.ssh.tabs[t].background = false;
+            app.inserts.ssh.tabs[t].focus.focus(window, cx);
         }
     }
 
@@ -194,9 +194,9 @@ impl InsertKind for Terminal {
         ins: &Insert,
         _cx: &mut Context<BenchApp>,
     ) {
-        if let Some(t) = app.ssh.tab_of_insert(&ins.id) {
-            app.ssh.tabs[t].session.kill();
-            app.ssh.tabs.remove(t);
+        if let Some(t) = app.inserts.ssh.tab_of_insert(&ins.id) {
+            app.inserts.ssh.tabs[t].session.kill();
+            app.inserts.ssh.tabs.remove(t);
         }
     }
 }

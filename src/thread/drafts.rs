@@ -16,12 +16,12 @@ impl ThreadView {
         self.app
             .update(cx, |app, _| {
                 let changed = if text.trim().is_empty() {
-                    app.drafts.remove(&key).is_some()
+                    app.threads.drafts.remove(&key).is_some()
                 } else {
-                    app.drafts.insert(key, text.clone()).as_deref() != Some(text.as_str())
+                    app.threads.drafts.insert(key, text.clone()).as_deref() != Some(text.as_str())
                 };
                 if changed {
-                    save_drafts(&app.drafts);
+                    save_drafts(&app.threads.drafts);
                 }
             })
             .ok();
@@ -33,7 +33,7 @@ impl ThreadView {
         if self.draft_key.as_ref() == Some(&key) {
             return;
         }
-        let Some(drafts) = self.app(cx).map(|a| &a.drafts) else {
+        let Some(drafts) = self.app(cx).map(|a| &a.threads.drafts) else {
             return;
         };
         // The new chat just became this thread (an insert, a message): what is typed stays.

@@ -82,7 +82,7 @@ const DRAFT: &str = "draft";
 impl BenchApp {
     /// A thread's inserts, in order.
     pub fn inserts_of(&self, at: &ThreadRef) -> Vec<Insert> {
-        self.inserts.get(&at.key()).cloned().unwrap_or_default()
+        self.inserts.by_thread.get(&at.key()).cloned().unwrap_or_default()
     }
 
     /// What a "/" row puts in: "tasks:<list>", "tools:<tool>"; the rest as they are
@@ -135,14 +135,14 @@ impl BenchApp {
         let Some(kind) = kind_of(&ins.key) else {
             return;
         };
-        self.inserts.entry(at.key()).or_default().push(ins.clone());
+        self.inserts.by_thread.entry(at.key()).or_default().push(ins.clone());
         match at.id.is_some() {
             true => self.send_insert(&at, &ins, cx),
             false => self.create_thread(&at, cx),
         }
         // The newest of a shared kind is the live one.
         if let Some(name) = kind.shared() {
-            self.insert_live.insert(name.to_string(), ins.id.clone());
+            self.inserts.live.insert(name.to_string(), ins.id.clone());
         }
         kind.opened(self, &at, &ins, window, cx);
         cx.notify();
@@ -186,11 +186,11 @@ impl BenchApp {
 
     /// The new chat is a thread now: its inserts go to its agent.
     pub fn inserts_created(&mut self, at: &ThreadRef, cx: &mut Context<Self>) {
-        if let Some(list) = self.inserts.remove(DRAFT) {
+        if let Some(list) = self.inserts.by_thread.remove(DRAFT) {
             for ins in &list {
                 self.send_insert(at, ins, cx);
             }
-            self.inserts.insert(at.key(), list);
+            self.inserts.by_thread.insert(at.key(), list);
         }
     }
 
@@ -206,7 +206,7 @@ impl BenchApp {
             .into_iter()
             .map(|(id, s)| Insert::new(id, s))
             .collect();
-        self.inserts.insert(key, list);
+        self.inserts.by_thread.insert(key, list);
     }
 
     /// Change an insert (its key, state, folded, removed, place): at once on screen; the thread's
@@ -218,7 +218,7 @@ impl BenchApp {
         patch: InsertPatch,
         cx: &mut Context<Self>,
     ) {
-        if let Some(list) = self.inserts.get_mut(&at.key()) {
+        if let Some(list) = self.inserts.by_thread.get_mut(&at.key()) {
             if patch.removed == Some(true) {
                 list.retain(|i| i.id != id);
             } else if let Some(ins) = list.iter_mut().find(|i| i.id == id) {
@@ -280,5 +280,41 @@ impl BenchApp {
         self.inserts_of(at)
             .iter()
             .any(|i| i.key == "browser" && !i.folded)
+    }
+}
+
+/// What the window keeps of the inserts: each thread's list as its journal has them, the live one
+/// of the kinds that are live once, and each kind's own state (the terminals and servers, the
+/// utilities, the tasks, the server browser's sites).
+pub struct InsertsState {
+    /// By `ThreadRef::key` ("draft" for a new chat).
+    pub by_thread: std::collections::HashMap<String, Vec<Insert>>,
+    /// Of the kinds whose state is app-wide (tasks, tools), the live insert per kind.
+    pub live: std::collections::HashMap<String, String>,
+    /// /terminal: the servers of ~/.ssh/config and the shells.
+    pub ssh: crate::inserts::terminal::servers::Ssh,
+    /// The bottom dock's terminals (`terminal/panel.rs`).
+    pub dock_terms: crate::inserts::terminal::panel::DockTerms,
+    /// /tools: the utilities of `devtools`.
+    pub tools: crate::inserts::tools::state::Tools,
+    /// /tasks: the tasks and the card.
+    pub tasks: crate::inserts::tasks::state::TasksMode,
+    /// /browser: each thread's tab on the server's browser, live or as its last frame.
+    pub sites: crate::inserts::browser::state::Sites,
+    pub sites_error: Option<String>,
+}
+
+impl InsertsState {
+    pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
+        Self {
+            by_thread: Default::default(),
+            live: Default::default(),
+            ssh: crate::inserts::terminal::servers::Ssh::new(),
+            dock_terms: Default::default(),
+            tools: crate::inserts::tools::state::Tools::new(window, cx),
+            tasks: crate::inserts::tasks::state::TasksMode::new(window, cx),
+            sites: Default::default(),
+            sites_error: None,
+        }
     }
 }

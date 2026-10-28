@@ -270,7 +270,7 @@ impl ExplorerParts for Mcp {
             let have: Vec<&str> = e.mcp.servers.iter().map(|m| m.name.as_str()).collect();
             let theme = cx.theme().clone();
             let chips = app
-                .presets
+                .gear.presets
                 .mcp
                 .iter()
                 .filter(|(n, _, _)| !have.contains(&n.as_str()))

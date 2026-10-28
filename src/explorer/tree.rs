@@ -125,7 +125,7 @@ impl BenchApp {
     fn explorer_picker(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let id = self.explorer.project.clone();
         let name = self
-            .projects
+            .places.projects
             .iter()
             .find(|p| p.id == id)
             .map(|p| p.name.clone())
@@ -134,7 +134,7 @@ impl BenchApp {
             crate::app::model::ProjectKey::HOST.to_string(),
             crate::app::LOCAL_HOST.to_string(),
         ))
-        .chain(self.projects.iter().map(|p| (p.id.clone(), p.name.clone())))
+        .chain(self.places.projects.iter().map(|p| (p.id.clone(), p.name.clone())))
         .collect();
         let view = cx.entity();
         let picker = Button::new("ex-project")

@@ -44,7 +44,7 @@ impl BenchApp {
                 self.dock_term_add(window, cx)
             }
             ("3", false) if crate::app::shortcuts::TOOLS => {
-                let tool = self.tools.tool;
+                let tool = self.inserts.tools.tool;
                 self.open_tool_thread(tool, window, cx)
             }
             ("4", false) if crate::app::shortcuts::TASKS => {
@@ -96,11 +96,11 @@ impl BenchApp {
     /// form or the settings. Otherwise it belongs to whatever has focus.
     fn escape(&mut self, cx: &mut Context<Self>) -> bool {
         // The new project's card is the topmost layer while it is open.
-        if self.project_form.is_some() {
+        if self.new_project.form.is_some() {
             self.cancel_project_form(cx);
             return true;
         }
-        if self.renaming.is_some() {
+        if self.sidebar.renaming.is_some() {
             self.cancel_rename(cx);
             return true;
         }
@@ -114,9 +114,9 @@ impl BenchApp {
             cx.notify();
             return true;
         }
-        if self.recorder.take().is_some() {
-            self.wave_ticker = None;
-            self.send_after_transcribe = false;
+        if self.media.recorder.take().is_some() {
+            self.media.wave_ticker = None;
+            self.media.send_after_transcribe = false;
         } else if self.center.is_settings() {
             self.center = Center::Chat;
         } else {
@@ -128,7 +128,7 @@ impl BenchApp {
 
     /// ⌘F or the sidebar's magnifier: focus the sidebar's search.
     pub(crate) fn open_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let search = self.search.clone();
+        let search = self.sidebar.search.clone();
         // A hidden sidebar comes back to show its search.
         self.left_dock.open = true;
         search.update(cx, |s, cx| s.focus(window, cx));

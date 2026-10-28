@@ -75,7 +75,7 @@ impl TasksMode {
             vec![
                 cx.subscribe_in(&search, window, |this, state, ev: &InputEvent, _, cx| {
                     if let InputEvent::Change = ev {
-                        this.tasks.query = state.read(cx).value().trim().to_lowercase();
+                        this.inserts.tasks.query = state.read(cx).value().trim().to_lowercase();
                         cx.notify();
                     }
                 }),
@@ -199,7 +199,7 @@ impl BenchApp {
     /// The store's thread (`store.rs`, the agent's `/api/tasks`), started the first time /tasks opens.
     pub(crate) fn start_task_store(&mut self, cx: &mut Context<Self>) {
         // The demo's tasks are made up; the store stays untouched.
-        if self.tasks.store.is_some() || self.demo {
+        if self.inserts.tasks.store.is_some() || self.demo {
             return;
         }
         // The tasks live in the agent's store: wait for the connection.
@@ -207,7 +207,7 @@ impl BenchApp {
             return;
         };
         let (tx, rx) = async_channel::unbounded();
-        self.tasks.store = Some(TaskStore::start(conn, tx));
+        self.inserts.tasks.store = Some(TaskStore::start(conn, tx));
         cx.spawn(async move |this, cx| {
             while let Ok(evt) = rx.recv().await {
                 if this
@@ -226,49 +226,49 @@ impl BenchApp {
             Evt::Loaded(items) => {
                 // A card being typed into keeps its own copy until it is saved.
                 let editing = self
-                    .tasks
+                    .inserts.tasks
                     .dirty
                     .is_some()
-                    .then(|| self.tasks.selected_task().cloned())
+                    .then(|| self.inserts.tasks.selected_task().cloned())
                     .flatten();
                 // A new task not yet in the store (nothing typed, or its save still on the way)
                 // only exists here: a re-read must not drop it, or its open card closes.
                 let pending: Vec<Task> = self
-                    .tasks
+                    .inserts.tasks
                     .items
                     .iter()
                     .filter(|t| t.id.starts_with("new:"))
                     .cloned()
                     .collect();
-                self.tasks.items = items;
-                self.tasks.items.extend(pending);
+                self.inserts.tasks.items = items;
+                self.inserts.tasks.items.extend(pending);
                 if let Some(t) = editing {
-                    if let Some(slot) = self.tasks.items.iter_mut().find(|x| x.id == t.id) {
+                    if let Some(slot) = self.inserts.tasks.items.iter_mut().find(|x| x.id == t.id) {
                         *slot = t;
                     }
                 }
-                self.tasks.loaded = true;
-                self.tasks.error = None;
+                self.inserts.tasks.loaded = true;
+                self.inserts.tasks.error = None;
             }
             Evt::Created { token, id } => {
                 let temp = format!("new:{token}");
-                if let Some(t) = self.tasks.items.iter_mut().find(|t| t.id == temp) {
+                if let Some(t) = self.inserts.tasks.items.iter_mut().find(|t| t.id == temp) {
                     t.id = id.clone();
                 }
-                if self.tasks.selected.as_deref() == Some(temp.as_str()) {
-                    self.tasks.selected = Some(id);
+                if self.inserts.tasks.selected.as_deref() == Some(temp.as_str()) {
+                    self.inserts.tasks.selected = Some(id);
                 }
                 self.load_tasks();
             }
-            Evt::Error(e) => self.tasks.error = Some(e),
+            Evt::Error(e) => self.inserts.tasks.error = Some(e),
         }
         cx.notify();
     }
 
     pub fn load_tasks(&mut self) {
-        self.tasks.last_load = Some(Instant::now());
-        let since = self.tasks.done_since();
-        self.tasks.send(Cmd::Load { done_since: since });
+        self.inserts.tasks.last_load = Some(Instant::now());
+        let since = self.inserts.tasks.done_since();
+        self.inserts.tasks.send(Cmd::Load { done_since: since });
     }
 
     /// From the window's ticker: save a card whose typing stopped, keep a running timer's
@@ -276,20 +276,20 @@ impl BenchApp {
     /// `tasks_changed` (`app/events.rs`).
     pub fn tick_tasks(&mut self, cx: &mut Context<Self>) {
         if self
-            .tasks
+            .inserts.tasks
             .dirty
             .is_some_and(|t| t.elapsed().as_millis() > 700)
         {
-            self.tasks.dirty = None;
+            self.inserts.tasks.dirty = None;
             self.save_selected();
         }
-        if self.tasks.items.iter().any(|t| t.timer.is_some()) {
+        if self.inserts.tasks.items.iter().any(|t| t.timer.is_some()) {
             cx.notify();
         }
     }
 
     fn save_selected(&mut self) {
-        if let Some(t) = self.tasks.selected_task().cloned() {
+        if let Some(t) = self.inserts.tasks.selected_task().cloned() {
             self.save_task(t);
         }
     }
@@ -304,19 +304,19 @@ impl BenchApp {
         if token != 0 {
             t.id = String::new();
         }
-        self.tasks.send(Cmd::Save { task: t, token });
-        self.tasks.last_load = Some(Instant::now());
+        self.inserts.tasks.send(Cmd::Save { task: t, token });
+        self.inserts.tasks.last_load = Some(Instant::now());
     }
 
     /// Change one task (in place, then in the store).
     fn change_task(&mut self, id: &str, f: impl FnOnce(&mut Task), cx: &mut Context<Self>) {
-        let Some(t) = self.tasks.items.iter_mut().find(|t| t.id == id) else {
+        let Some(t) = self.inserts.tasks.items.iter_mut().find(|t| t.id == id) else {
             return;
         };
         f(t);
         let t = t.clone();
-        if self.tasks.selected.as_deref() == Some(id) {
-            self.tasks.dirty = None;
+        if self.inserts.tasks.selected.as_deref() == Some(id) {
+            self.inserts.tasks.dirty = None;
         }
         self.save_task(t);
         cx.notify();
@@ -324,9 +324,9 @@ impl BenchApp {
 
     /// A new connection (another machine, or the agent restarted): read its tasks.
     pub fn restart_tasks(&mut self, cx: &mut Context<Self>) {
-        self.tasks.store = None;
-        self.tasks.items.clear();
-        self.tasks.loaded = false;
+        self.inserts.tasks.store = None;
+        self.inserts.tasks.items.clear();
+        self.inserts.tasks.loaded = false;
         self.start_task_store(cx);
         self.load_tasks();
     }
@@ -338,28 +338,28 @@ impl BenchApp {
 
     pub fn select_task_list(&mut self, list: List, window: &mut Window, cx: &mut Context<Self>) {
         self.flush_task(cx);
-        self.tasks.list = list;
-        self.tasks.tag_filter = None;
-        self.tasks.selected = None;
+        self.inserts.tasks.list = list;
+        self.inserts.tasks.tag_filter = None;
+        self.inserts.tasks.selected = None;
         self.drop_blank_new();
-        self.tasks
+        self.inserts.tasks
             .search
             .update(cx, |s, cx| s.set_value("", window, cx));
-        self.tasks.query.clear();
+        self.inserts.tasks.query.clear();
         cx.notify();
     }
 
     /// Save the open card now, if it was edited.
     fn flush_task(&mut self, _cx: &mut Context<Self>) {
-        if self.tasks.dirty.take().is_some() {
+        if self.inserts.tasks.dirty.take().is_some() {
             self.save_selected();
         }
     }
 
     /// A new task left without a title was never written anywhere: leaving it drops it.
     fn drop_blank_new(&mut self) {
-        let open = self.tasks.selected.clone();
-        self.tasks.items.retain(|t| {
+        let open = self.inserts.tasks.selected.clone();
+        self.inserts.tasks.items.retain(|t| {
             !(t.id.starts_with("new:") && t.title.trim().is_empty() && open.as_ref() != Some(&t.id))
         });
     }
@@ -367,14 +367,14 @@ impl BenchApp {
     /// The open card closes (saved first).
     pub fn close_task(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         self.flush_task(cx);
-        self.tasks.selected = None;
+        self.inserts.tasks.selected = None;
         self.drop_blank_new();
         cx.notify();
     }
 
     pub fn select_task(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         self.flush_task(cx);
-        self.tasks.selected = Some(id);
+        self.inserts.tasks.selected = Some(id);
         self.drop_blank_new();
         self.armed.clear();
         self.fill_task_card(window, cx);
@@ -383,11 +383,11 @@ impl BenchApp {
 
     /// The card's fields from the open task (setting them does not count as editing).
     fn fill_task_card(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(t) = self.tasks.selected_task().cloned() else {
+        let Some(t) = self.inserts.tasks.selected_task().cloned() else {
             return;
         };
         let day = today();
-        let m = &self.tasks;
+        let m = &self.inserts.tasks;
         m.title
             .update(cx, |s, cx| s.set_value(t.title.clone(), window, cx));
         m.notes
@@ -410,13 +410,13 @@ impl BenchApp {
             .map(|d| d.format("%d.%m.%Y").to_string())
             .unwrap_or_default();
         m.completed.update(cx, |s, cx| s.set_value(c, window, cx));
-        self.tasks.field_error = None;
+        self.inserts.tasks.field_error = None;
     }
 
     /// The card was typed into: take its fields into the task; saved once the typing stops.
     fn task_fields_changed(&mut self, cx: &mut Context<Self>) {
         let day = today();
-        let m = &self.tasks;
+        let m = &self.inserts.tasks;
         let title = m.title.read(cx).value().to_string();
         let notes = m.notes.read(cx).value().to_string();
         let tags = tasks::parse_tags(&m.tags.read(cx).value());
@@ -424,7 +424,7 @@ impl BenchApp {
         let spent_text = m.spent.read(cx).value().to_string();
         let done_text = m.completed.read(cx).value().to_string();
         let mut error = None;
-        let Some(t) = self.tasks.selected_mut() else {
+        let Some(t) = self.inserts.tasks.selected_mut() else {
             return;
         };
         t.title = title;
@@ -450,15 +450,15 @@ impl BenchApp {
                 None => error = Some(format!("Done on: “{}” is not a day", done_text.trim())),
             }
         }
-        self.tasks.field_error = error;
-        self.tasks.dirty = Some(Instant::now());
+        self.inserts.tasks.field_error = error;
+        self.inserts.tasks.dirty = Some(Instant::now());
         cx.notify();
     }
 
     /// A new task in the open list, its card open with the title field focused.
     /// A project's tag (`tasks::slug` of its name); None for Host.
     pub fn project_tag(&self, project: &str) -> Option<String> {
-        self.projects
+        self.places.projects
             .iter()
             .find(|p| p.id == project)
             .map(|p| tasks::slug(&p.name))
@@ -468,27 +468,27 @@ impl BenchApp {
     /// The tasks follow the open thread: in a project its tag filters the list (dropped with a
     /// click on "All"); in Host every task shows.
     pub fn sync_task_project(&mut self, at: &ThreadRef) {
-        if self.tasks.project != at.project {
-            self.tasks.project = at.project.clone();
-            self.tasks.tag_filter = self.project_tag(&at.project);
+        if self.inserts.tasks.project != at.project {
+            self.inserts.tasks.project = at.project.clone();
+            self.inserts.tasks.tag_filter = self.project_tag(&at.project);
         }
     }
 
     pub fn set_task_tag_filter(&mut self, tag: Option<String>, cx: &mut Context<Self>) {
-        self.tasks.tag_filter = tag;
+        self.inserts.tasks.tag_filter = tag;
         cx.notify();
     }
 
     /// The card's project chips: the project's tag on the open task, or off it again.
     pub fn toggle_task_tag(&mut self, tag: String, window: &mut Window, cx: &mut Context<Self>) {
-        let mut tags = tasks::parse_tags(&self.tasks.tags.read(cx).value());
+        let mut tags = tasks::parse_tags(&self.inserts.tasks.tags.read(cx).value());
         match tags.iter().position(|g| g.eq_ignore_ascii_case(&tag)) {
             Some(i) => {
                 tags.remove(i);
             }
             None => tags.push(tag),
         }
-        self.tasks
+        self.inserts.tasks
             .tags
             .update(cx, |s, cx| s.set_value(tags.join(", "), window, cx));
         self.task_fields_changed(cx);
@@ -497,7 +497,7 @@ impl BenchApp {
 
     /// The tags menu's "Clear": empties the card's tags field.
     pub fn clear_task_tags(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.tasks
+        self.inserts.tasks
             .tags
             .update(cx, |s, cx| s.set_value(String::new(), window, cx));
         self.task_fields_changed(cx);
@@ -506,27 +506,27 @@ impl BenchApp {
 
     pub fn new_task(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.flush_task(cx);
-        let token = self.tasks.next_token;
-        self.tasks.next_token += 1;
+        let token = self.inserts.tasks.next_token;
+        self.inserts.tasks.next_token += 1;
         let mut t = Task {
             id: format!("new:{token}"),
             created: tasks::now(),
             ..Default::default()
         };
-        let list = if self.tasks.list == List::Logbook {
+        let list = if self.inserts.tasks.list == List::Logbook {
             List::Anytime
         } else {
-            self.tasks.list.clone()
+            self.inserts.tasks.list.clone()
         };
         list.place(&mut t, today());
-        if let Some(tag) = self.tasks.tag_filter.clone() {
+        if let Some(tag) = self.inserts.tasks.tag_filter.clone() {
             t.tags = vec![tag];
         }
-        self.tasks.items.push(t.clone());
-        self.tasks.selected = Some(t.id.clone());
+        self.inserts.tasks.items.push(t.clone());
+        self.inserts.tasks.selected = Some(t.id.clone());
         self.drop_blank_new();
         self.fill_task_card(window, cx);
-        self.tasks.title.update(cx, |s, cx| s.focus(window, cx));
+        self.inserts.tasks.title.update(cx, |s, cx| s.focus(window, cx));
         cx.notify();
     }
 
@@ -542,7 +542,7 @@ impl BenchApp {
             },
             cx,
         );
-        if self.tasks.selected.as_deref() == Some(id.as_str()) {
+        if self.inserts.tasks.selected.as_deref() == Some(id.as_str()) {
             self.fill_task_card(window, cx);
         }
     }
@@ -573,7 +573,7 @@ impl BenchApp {
             },
             cx,
         );
-        if self.tasks.selected.as_deref() == Some(id.as_str()) {
+        if self.inserts.tasks.selected.as_deref() == Some(id.as_str()) {
             self.fill_task_card(window, cx);
         }
     }
@@ -581,7 +581,7 @@ impl BenchApp {
     /// One timer at a time: starting one stops the others (their time is kept).
     pub fn toggle_task_timer(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         let running: Vec<String> = self
-            .tasks
+            .inserts.tasks
             .items
             .iter()
             .filter(|t| t.timer.is_some() && t.id != id)
@@ -606,7 +606,7 @@ impl BenchApp {
             },
             cx,
         );
-        if self.tasks.selected.as_deref() == Some(id.as_str()) {
+        if self.inserts.tasks.selected.as_deref() == Some(id.as_str()) {
             self.fill_task_card(window, cx);
         }
     }
@@ -617,13 +617,13 @@ impl BenchApp {
             cx.notify();
             return;
         }
-        self.tasks.items.retain(|t| t.id != id);
-        if self.tasks.selected.as_deref() == Some(id.as_str()) {
-            self.tasks.selected = None;
-            self.tasks.dirty = None;
+        self.inserts.tasks.items.retain(|t| t.id != id);
+        if self.inserts.tasks.selected.as_deref() == Some(id.as_str()) {
+            self.inserts.tasks.selected = None;
+            self.inserts.tasks.dirty = None;
         }
         if !id.starts_with("new:") {
-            self.tasks.send(Cmd::Delete(id));
+            self.inserts.tasks.send(Cmd::Delete(id));
         }
         cx.notify();
     }

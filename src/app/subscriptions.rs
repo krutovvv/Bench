@@ -44,7 +44,7 @@ impl BenchApp {
                     if let InputEvent::PressEnter { .. } = ev {
                         let path = state.read(cx).value().trim().to_string();
                         if !path.is_empty() {
-                            this.path_entry = false;
+                            this.new_project.path_entry = false;
                             this.set_new_project(path, window, cx);
                         }
                     }
@@ -57,7 +57,7 @@ impl BenchApp {
                     let SelectEvent::Confirm(Some(label)) = ev else {
                         return;
                     };
-                    if let Some(i) = this.efforts.iter().position(|e| e == label.as_ref()) {
+                    if let Some(i) = this.defaults.efforts.iter().position(|e| e == label.as_ref()) {
                         this.set_effort(i, cx);
                     }
                 },
@@ -73,18 +73,18 @@ impl BenchApp {
                     .timer(Duration::from_millis(500))
                     .await;
                 let alive = this.update(cx, |this, cx| {
-                    if this.playing.as_ref().is_some_and(|(_, p)| p.is_done()) {
-                        this.playing = None;
+                    if this.media.playing.as_ref().is_some_and(|(_, p)| p.is_done()) {
+                        this.media.playing = None;
                         cx.notify();
                     }
                     if this
-                        .media_playing
+                        .media.audio
                         .as_ref()
                         .is_some_and(|(_, p)| p.is_done())
                     {
-                        this.media_playing = None;
+                        this.media.audio = None;
                     }
-                    if this.media_playing.is_some() {
+                    if this.media.audio.is_some() {
                         cx.notify(); // the elapsed time
                     }
                     let live = this.thread(cx).live.is_some();
@@ -96,7 +96,7 @@ impl BenchApp {
                             }
                         });
                     }
-                    if live || this.recorder.is_some() {
+                    if live || this.media.recorder.is_some() {
                         cx.notify();
                     }
                     this.tick_tasks(cx);

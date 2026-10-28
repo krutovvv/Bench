@@ -55,8 +55,8 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
     });
     crate::env::apply(e, &v, window, cx);
     // The presets the gear would have read from the agent (there is none in a demo copy).
-    if app.presets.lsp.is_empty() {
-        app.presets.lsp = vec![
+    if app.gear.presets.lsp.is_empty() {
+        app.gear.presets.lsp = vec![
             (
                 "typescript".into(),
                 "typescript-language-server".into(),

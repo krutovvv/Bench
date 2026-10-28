@@ -25,9 +25,9 @@ impl BenchApp {
         if self.demo {
             return true;
         }
-        match self.projects.iter().find(|p| p.id == at.project) {
+        match self.places.projects.iter().find(|p| p.id == at.project) {
             Some(p) => p.browser,
-            None => self.host_browser,
+            None => self.places.host_browser,
         }
     }
 
@@ -35,7 +35,7 @@ impl BenchApp {
     pub(crate) fn load_commands(&mut self, cx: &mut Context<Self>) {
         self.request("", protocol::ListCommands {}, cx, |this, r, _, _| {
             if let Ok(list) = r {
-                this.catalog = list
+                this.defaults.commands = list
                     .into_iter()
                     .map(|c| SlashCommand {
                         name: c.name,
@@ -54,7 +54,7 @@ impl BenchApp {
             return None;
         }
         let (name, arg) = text.split_once(char::is_whitespace).unwrap_or((text, ""));
-        self.catalog
+        self.defaults.commands
             .iter()
             .any(|c| c.name.eq_ignore_ascii_case(name))
             .then(|| (name.to_string(), arg.trim().to_string()))

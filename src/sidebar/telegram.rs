@@ -27,12 +27,12 @@ impl BenchApp {
             !me().is_empty() && name.to_lowercase().split_whitespace().any(|w| w == me())
         };
         let anyone_mine = self
-            .threads
+            .threads.list
             .iter()
             .any(|s| s.source == "telegram" && s.with.as_deref().is_some_and(mine));
-        (0..self.threads.len())
+        (0..self.threads.list.len())
             .filter(|&i| {
-                let s = &self.threads[i];
+                let s = &self.threads.list[i];
                 !anyone_mine || s.source != "telegram" || s.with.as_deref().is_some_and(mine)
             })
             .collect()

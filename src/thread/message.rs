@@ -84,8 +84,8 @@ impl ThreadView {
         let group: SharedString = format!("answer-{key}").into();
         let (playing, speaking) = self.app(cx).map_or((false, false), |a| {
             (
-                a.playing.as_ref().is_some_and(|(j, _)| j == key),
-                a.speaking.as_deref() == Some(key),
+                a.media.playing.as_ref().is_some_and(|(j, _)| j == key),
+                a.media.speaking.as_deref() == Some(key),
             )
         });
         let (copy_key, speak_key, fork_key) = (key.to_string(), key.to_string(), key.to_string());

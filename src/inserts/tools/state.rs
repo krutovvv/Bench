@@ -104,7 +104,7 @@ impl Tools {
 
 impl BenchApp {
     pub fn select_tool(&mut self, tool: Tool, window: &mut Window, cx: &mut Context<Self>) {
-        let t = &mut self.tools;
+        let t = &mut self.inserts.tools;
         let old = t.input.read(cx).value().to_string();
         t.inputs.insert(t.tool, old);
         t.tool = tool;
@@ -132,11 +132,11 @@ impl BenchApp {
     }
 
     pub fn set_tool_mode(&mut self, mode: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let tool = self.tools.tool;
-        self.tools.modes.insert(tool, mode);
+        let tool = self.inserts.tools.tool;
+        self.inserts.tools.modes.insert(tool, mode);
         if tool == Tool::CurlToCode {
             let lang = ["javascript", "python", "php"][mode.min(2)];
-            self.tools
+            self.inserts.tools
                 .output
                 .update(cx, |s, cx| s.set_highlighter(lang, cx));
         }
@@ -144,7 +144,7 @@ impl BenchApp {
     }
 
     pub fn toggle_regex_flag(&mut self, k: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let f = &mut self.tools.flags;
+        let f = &mut self.inserts.tools.flags;
         match k {
             0 => f.case_insensitive = !f.case_insensitive,
             1 => f.multi_line = !f.multi_line,
@@ -155,39 +155,39 @@ impl BenchApp {
 
     /// The output for the current input (as you type).
     pub fn run_tool(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let tool = self.tools.tool;
-        let input = self.tools.input.read(cx).value().to_string();
+        let tool = self.inserts.tools.tool;
+        let input = self.inserts.tools.input.read(cx).value().to_string();
         if tool == Tool::HtmlToMarkdown {
-            self.tools.preview = input.clone();
+            self.inserts.tools.preview = input.clone();
         }
         let (out, error) = match tool.kind() {
-            Kind::Transform => match devtools::transform(tool, &input, self.tools.mode(tool)) {
+            Kind::Transform => match devtools::transform(tool, &input, self.inserts.tools.mode(tool)) {
                 Ok(out) => (Some(out), None),
                 Err(e) => (Some(String::new()), Some(e)),
             },
             Kind::Regex => {
-                let pattern = self.tools.pattern.read(cx).value().to_string();
-                match devtools::regex_matches(&pattern, &input, self.tools.flags) {
+                let pattern = self.inserts.tools.pattern.read(cx).value().to_string();
+                match devtools::regex_matches(&pattern, &input, self.inserts.tools.flags) {
                     Ok((n, list, _)) => {
-                        self.tools.matches = n;
+                        self.inserts.tools.matches = n;
                         (Some(list), None)
                     }
                     Err(e) => {
-                        self.tools.matches = 0;
+                        self.inserts.tools.matches = 0;
                         (Some(String::new()), Some(e))
                     }
                 }
             }
             Kind::Preview => {
-                self.tools.preview = input;
+                self.inserts.tools.preview = input;
                 (None, None)
             }
             Kind::Image => {
                 // A new file for each image (the image cache keys on the path); the old one goes.
-                if let Some(old) = self.tools.image.take() {
+                if let Some(old) = self.inserts.tools.image.take() {
                     let _ = std::fs::remove_file(old);
                 }
-                self.tools.image_info = None;
+                self.inserts.tools.image_info = None;
                 if input.trim().is_empty() {
                     (None, None)
                 } else {
@@ -203,12 +203,12 @@ impl BenchApp {
                                     let dims = imagesize::blob_size(&bytes)
                                         .map(|d| format!(" · {}×{} px", d.width, d.height))
                                         .unwrap_or_default();
-                                    self.tools.image_info = Some(format!(
+                                    self.inserts.tools.image_info = Some(format!(
                                         "{}{dims} · {}",
                                         ext.to_uppercase(),
                                         human_bytes(bytes.len())
                                     ));
-                                    self.tools.image = Some(file);
+                                    self.inserts.tools.image = Some(file);
                                     (None, None)
                                 }
                                 Err(e) => (None, Some(e.to_string())),
@@ -219,13 +219,13 @@ impl BenchApp {
                 }
             }
             Kind::Generator => {
-                let out = devtools::generate(tool, self.tools.mode(tool), self.tools.count(tool));
+                let out = devtools::generate(tool, self.inserts.tools.mode(tool), self.inserts.tools.count(tool));
                 (Some(out), None)
             }
         };
-        self.tools.error = error;
+        self.inserts.tools.error = error;
         if let Some(out) = out {
-            self.tools
+            self.inserts.tools
                 .output
                 .update(cx, |s, cx| s.set_value(out, window, cx));
         }
@@ -233,16 +233,16 @@ impl BenchApp {
     }
 
     pub fn generate_tool(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let tool = self.tools.tool;
-        let out = devtools::generate(tool, self.tools.mode(tool), self.tools.count(tool));
-        self.tools
+        let tool = self.inserts.tools.tool;
+        let out = devtools::generate(tool, self.inserts.tools.mode(tool), self.inserts.tools.count(tool));
+        self.inserts.tools
             .output
             .update(cx, |s, cx| s.set_value(out, window, cx));
         cx.notify();
     }
 
     pub fn tool_input(&mut self, text: String, window: &mut Window, cx: &mut Context<Self>) {
-        self.tools
+        self.inserts.tools
             .input
             .update(cx, |s, cx| s.set_value(text, window, cx));
         self.run_tool(window, cx);
@@ -255,7 +255,7 @@ impl BenchApp {
             .read_from_clipboard()
             .and_then(|c| c.text())
             .unwrap_or_default();
-        if self.tools.tool != Tool::HtmlToMarkdown {
+        if self.inserts.tools.tool != Tool::HtmlToMarkdown {
             self.tool_input(plain, window, cx);
             return;
         }
@@ -267,7 +267,7 @@ impl BenchApp {
                 let none = html.is_none();
                 this.tool_input(html.unwrap_or(plain), window, cx);
                 if none {
-                    this.tools.error = Some(
+                    this.inserts.tools.error = Some(
                         "The clipboard holds plain text only (no formatting to convert)".into(),
                     );
                     cx.notify();
@@ -278,7 +278,7 @@ impl BenchApp {
     }
 
     pub fn copy_tool_output(&mut self, cx: &mut Context<Self>) {
-        let text = self.tools.output.read(cx).value().to_string();
+        let text = self.inserts.tools.output.read(cx).value().to_string();
         cx.write_to_clipboard(ClipboardItem::new_string(text));
     }
 
@@ -313,7 +313,7 @@ impl BenchApp {
 
     /// Base64 Image: the decoded image to a file the user picks.
     pub fn save_tool_image(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(src) = self.tools.image.clone() else {
+        let Some(src) = self.inserts.tools.image.clone() else {
             return;
         };
         let ext = src

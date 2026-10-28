@@ -293,7 +293,7 @@ fn new_lsp_card(app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> C
     let theme = cx.theme().clone();
     let have: Vec<&str> = e.lsp.servers.iter().map(|s| s.name.as_str()).collect();
     let chips: Vec<AnyElement> = app
-        .presets
+        .gear.presets
         .lsp
         .iter()
         .filter(|(key, _, _)| !have.contains(&key.as_str()))

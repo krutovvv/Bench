@@ -8,7 +8,6 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::client::connection;
 use crate::inserts::terminal::session::Session;
 use crate::system::sshconfig::{self, Server};
 
@@ -32,9 +31,6 @@ pub struct Ssh {
     pub servers: Vec<Server>,
     pub tabs: Vec<Tab>,
     next_tab: usize,
-    /// Collapsed sidebar groups, both modes ("s:<group>" sessions, "srv:<folder>" servers);
-    /// remembered in `collapsed.json`.
-    pub collapsed: std::collections::HashSet<String>,
     /// Fractional wheel lines not yet scrolled.
     pub scroll_acc: f32,
 }
@@ -45,10 +41,6 @@ impl Ssh {
             servers: sshconfig::load(),
             tabs: vec![],
             next_tab: 0,
-            collapsed: std::fs::read(collapsed_path())
-                .ok()
-                .and_then(|b| serde_json::from_slice(&b).ok())
-                .unwrap_or_default(),
             scroll_acc: 0.,
         }
     }
@@ -59,33 +51,11 @@ impl Ssh {
     }
 }
 
-fn collapsed_path() -> std::path::PathBuf {
-    connection::state_dir().join("collapsed.json")
-}
-
 impl BenchApp {
-    /// Fold or unfold a sidebar group (its header was clicked).
-    pub fn toggle_group(&mut self, key: String, cx: &mut Context<Self>) {
-        if !self.ssh.collapsed.remove(&key) {
-            self.ssh.collapsed.insert(key);
-        }
-        // The demo folds and unfolds in memory: the person's own folds stay as they were.
-        if self.demo {
-            cx.notify();
-            return;
-        }
-        let _ = std::fs::create_dir_all(connection::state_dir());
-        let _ = std::fs::write(
-            collapsed_path(),
-            serde_json::to_vec(&self.ssh.collapsed).unwrap_or_default(),
-        );
-        cx.notify();
-    }
-
     /// Terminals answer color queries (vim's background check) in the current theme.
     pub fn repaint_terminals(&mut self, cx: &mut Context<Self>) {
         let palette = crate::inserts::terminal::view::palette(cx.theme());
-        for t in &self.ssh.tabs {
+        for t in &self.inserts.ssh.tabs {
             t.session.set_palette(palette);
         }
     }
@@ -96,7 +66,7 @@ impl BenchApp {
         if self.demo {
             return;
         }
-        self.ssh.servers = sshconfig::load();
+        self.inserts.ssh.servers = sshconfig::load();
         cx.notify();
     }
 
@@ -122,9 +92,9 @@ impl BenchApp {
                         }
                     }
                 });
-                self.ssh.next_tab += 1;
-                self.ssh.tabs.push(Tab {
-                    id: self.ssh.next_tab,
+                self.inserts.ssh.next_tab += 1;
+                self.inserts.ssh.tabs.push(Tab {
+                    id: self.inserts.ssh.next_tab,
                     alias: alias.to_string(),
                     session,
                     focus: cx.focus_handle(),
@@ -133,7 +103,7 @@ impl BenchApp {
                     insert: String::new(),
                     _wake: wake,
                 });
-                Some(self.ssh.tabs.len() - 1)
+                Some(self.inserts.ssh.tabs.len() - 1)
             }
             Err(e) => {
                 self.toast(

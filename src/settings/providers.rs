@@ -77,13 +77,13 @@ impl BenchApp {
     /// first).
     pub(crate) fn add_picker_models(&mut self) {
         let mut order: Vec<String> = vec![];
-        for c in &self.models {
+        for c in &self.defaults.models {
             if !order.contains(&c.group) {
                 order.push(c.group.clone());
             }
         }
         // A stable sort: inside a group the order stays (main, fallbacks, the rest).
-        self.models
+        self.defaults.models
             .sort_by_key(|c| order.iter().position(|g| *g == c.group));
     }
 
@@ -97,18 +97,18 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if host == self.gear_agent {
+        if host == self.gear.agent {
             return;
         }
-        self.gear_agent = host;
-        self.providers = Default::default();
+        self.gear.agent = host;
+        self.gear.providers = Default::default();
         self.load_providers(window, cx);
         cx.notify();
     }
 
     pub(crate) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.rest_on(
-            self.gear_agent.clone(),
+            self.gear.agent.clone(),
             window,
             cx,
             move |conn| {
@@ -156,7 +156,7 @@ impl BenchApp {
                 )
             })
             .collect();
-        self.providers.endpoints = endpoints["endpoints"]
+        self.gear.providers.endpoints = endpoints["endpoints"]
             .as_array()
             .into_iter()
             .flatten()
@@ -198,7 +198,7 @@ impl BenchApp {
             .collect();
 
         let f = &yaml["fallback_providers"][0];
-        self.providers.fallback = f["model"].as_str().map(|m| {
+        self.gear.providers.fallback = f["model"].as_str().map(|m| {
             (
                 f["provider"].as_str().unwrap_or_default().to_string(),
                 m.to_string(),
@@ -212,7 +212,7 @@ impl BenchApp {
             }
             v.as_str().unwrap_or_default().to_string()
         };
-        self.providers.voice = Some(Voice {
+        self.gear.providers.voice = Some(Voice {
             stt_url: field(
                 window,
                 cx,
@@ -252,7 +252,7 @@ impl BenchApp {
             tts_voice: field(window, cx, &y(&["tts", "openai", "voice"]), "e.g. alloy"),
         });
 
-        self.providers.loaded = true;
+        self.gear.providers.loaded = true;
         cx.notify();
     }
 
@@ -265,7 +265,7 @@ impl BenchApp {
     }
 
     pub fn add_endpoint(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.providers.endpoints.push(EndpointForm {
+        self.gear.providers.endpoints.push(EndpointForm {
             id: String::new(),
             current: false,
             key_value: String::new(),
@@ -282,7 +282,7 @@ impl BenchApp {
     }
 
     fn endpoint_body(&self, i: usize, cx: &App) -> Value {
-        let e = &self.providers.endpoints[i];
+        let e = &self.gear.providers.endpoints[i];
         let mut body = json!({
             "id": e.id,
             "name": text(&e.name, cx),
@@ -308,12 +308,12 @@ impl BenchApp {
         if body["name"].as_str().unwrap_or_default().is_empty()
             || body["base_url"].as_str().unwrap_or_default().is_empty()
         {
-            self.providers.endpoints[i].check = Some((false, "Enter a name and an address".into()));
+            self.gear.providers.endpoints[i].check = Some((false, "Enter a name and an address".into()));
             cx.notify();
             return;
         }
         self.rest_on(
-            self.gear_agent.clone(),
+            self.gear.agent.clone(),
             window,
             cx,
             move |conn| rest::save_endpoint(conn, body),
@@ -334,15 +334,15 @@ impl BenchApp {
 
     pub fn check_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         let body = self.endpoint_body(i, cx);
-        self.providers.endpoints[i].check = Some((true, "Checking…".into()));
+        self.gear.providers.endpoints[i].check = Some((true, "Checking…".into()));
         cx.notify();
         self.rest_on(
-            self.gear_agent.clone(),
+            self.gear.agent.clone(),
             window,
             cx,
             move |conn| rest::validate_endpoint(conn, body),
             move |this, r, _, cx| {
-                let Some(e) = this.providers.endpoints.get_mut(i) else {
+                let Some(e) = this.gear.providers.endpoints.get_mut(i) else {
                     return;
                 };
                 e.check = Some(match r {
@@ -365,9 +365,9 @@ impl BenchApp {
     }
 
     pub fn make_endpoint_default(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let id = self.providers.endpoints[i].id.clone();
+        let id = self.gear.providers.endpoints[i].id.clone();
         self.rest_on(
-            self.gear_agent.clone(),
+            self.gear.agent.clone(),
             window,
             cx,
             move |conn| rest::activate_endpoint(conn, &id),
@@ -385,9 +385,9 @@ impl BenchApp {
 
     /// Delete a provider: a form not saved yet just goes; a saved one goes on the second click.
     pub fn delete_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let id = self.providers.endpoints[i].id.clone();
+        let id = self.gear.providers.endpoints[i].id.clone();
         if id.is_empty() {
-            self.providers.endpoints.remove(i);
+            self.gear.providers.endpoints.remove(i);
             cx.notify();
             return;
         }
@@ -396,7 +396,7 @@ impl BenchApp {
             return;
         }
         self.rest_on(
-            self.gear_agent.clone(),
+            self.gear.agent.clone(),
             window,
             cx,
             move |conn| rest::delete_endpoint(conn, &id),
@@ -423,10 +423,10 @@ impl BenchApp {
             Some((p, m)) => json!([{"provider": p, "model": m}]),
             None => json!([]),
         };
-        self.providers.fallback = pick;
+        self.gear.providers.fallback = pick;
         cx.notify();
         self.rest_on(
-            self.gear_agent.clone(),
+            self.gear.agent.clone(),
             window,
             cx,
             move |conn| rest::merge_config(conn, json!({"fallback_providers": list})),
@@ -443,7 +443,7 @@ impl BenchApp {
     }
 
     pub fn save_voice(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(v) = &self.providers.voice else {
+        let Some(v) = &self.gear.providers.voice else {
             return;
         };
         let mut stt = json!({
@@ -462,7 +462,7 @@ impl BenchApp {
             "tts": {"provider": "openai", "openai": tts},
         });
         self.rest_on(
-            self.gear_agent.clone(),
+            self.gear.agent.clone(),
             window,
             cx,
             move |conn| rest::merge_config(conn, config),

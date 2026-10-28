@@ -50,7 +50,7 @@ impl BenchApp {
                 }),
             );
         }
-        self.project_form = Some(ProjectForm {
+        self.new_project.form = Some(ProjectForm {
             name,
             agent: String::new(),
             machine: None,
@@ -63,7 +63,7 @@ impl BenchApp {
 
     /// Close the card: Escape, its ✕, Cancel, a click beside it.
     pub fn cancel_project_form(&mut self, cx: &mut Context<Self>) {
-        self.project_form = None;
+        self.new_project.form = None;
         cx.notify();
     }
 
@@ -84,7 +84,7 @@ impl BenchApp {
             };
             let _ = this.update_in(cx, |this, window, cx| {
                 let folder = path.to_string_lossy().to_string();
-                if let Some(f) = this.project_form.as_mut() {
+                if let Some(f) = this.new_project.form.as_mut() {
                     // An empty name takes the folder's.
                     if f.name.read(cx).value().trim().is_empty() {
                         let base = folder.rsplit('/').next().unwrap_or(&folder).to_string();
@@ -100,7 +100,7 @@ impl BenchApp {
 
     /// Create the form's project on its agent and start its first thread.
     pub fn save_project(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(form) = self.project_form.as_ref() else {
+        let Some(form) = self.new_project.form.as_ref() else {
             return;
         };
         let name = form.name.read(cx).value().trim().to_string();
@@ -140,7 +140,7 @@ impl BenchApp {
             move || rest::send_json(&conn, "POST", "/api/projects", body),
             move |this, r, window, cx| match r {
                 Ok(v) => {
-                    this.project_form = None;
+                    this.new_project.form = None;
                     let Some(id) = v["project"]["id"].as_str().map(str::to_string) else {
                         return;
                     };
@@ -166,7 +166,7 @@ impl BenchApp {
     pub(crate) fn render_project_dialog(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let Some(form) = self.project_form.as_ref() else {
+        let Some(form) = self.new_project.form.as_ref() else {
             return div().into_any_element();
         };
         let (name, agent, machine, folder, server_folder) = (
@@ -194,7 +194,7 @@ impl BenchApp {
                     at,
                     cx,
                     move |this, k, _, cx| {
-                        if let Some(f) = this.project_form.as_mut() {
+                        if let Some(f) = this.new_project.form.as_mut() {
                             f.agent = hosts[k].clone();
                             f.machine = None;
                         }
@@ -205,9 +205,9 @@ impl BenchApp {
         });
         // Where its files and commands are, when this Mac's agent runs it.
         let machine_row =
-            (agent.is_empty() && self.ssh.servers.iter().next().is_some()).then(|| {
+            (agent.is_empty() && self.inserts.ssh.servers.iter().next().is_some()).then(|| {
                 let mut labels = vec!["This Mac".to_string()];
-                labels.extend(self.ssh.servers.iter().map(|s| s.alias.clone()));
+                labels.extend(self.inserts.ssh.servers.iter().map(|s| s.alias.clone()));
                 let at = machine
                     .as_ref()
                     .and_then(|m| labels.iter().position(|l| l == m))
@@ -222,7 +222,7 @@ impl BenchApp {
                         at,
                         cx,
                         move |this, k, _, cx| {
-                            if let Some(f) = this.project_form.as_mut() {
+                            if let Some(f) = this.new_project.form.as_mut() {
                                 f.machine = (k > 0).then(|| names[k].clone());
                             }
                             cx.notify();
@@ -280,7 +280,7 @@ impl BenchApp {
                             d.child(
                                 bench_ui::form_action("project-folder-clear", "Clear", false, cx)
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        if let Some(f) = this.project_form.as_mut() {
+                                        if let Some(f) = this.new_project.form.as_mut() {
                                             f.folder = None;
                                         }
                                         cx.notify();
@@ -348,5 +348,30 @@ impl BenchApp {
                     ),
             )
             .into_any_element()
+    }
+}
+
+/// The new project's page and where the next new chat works: its form, the folder chosen, whether
+/// that folder is a git repo, and the path typed for a server (which has no folder dialog here).
+pub struct NewProject {
+    pub form: Option<ProjectForm>,
+    pub folder: Option<String>,
+    pub in_repo: bool,
+    pub path_entry: bool,
+    pub path: Entity<gpui_kit::component::input::InputState>,
+}
+
+impl NewProject {
+    pub fn new(window: &mut Window, cx: &mut Context<crate::app::BenchApp>) -> Self {
+        Self {
+            form: None,
+            folder: None,
+            in_repo: true,
+            path_entry: false,
+            path: cx.new(|cx| {
+                gpui_kit::component::input::InputState::new(window, cx)
+                    .placeholder("/home/you/project — Enter")
+            }),
+        }
     }
 }

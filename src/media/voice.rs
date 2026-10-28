@@ -12,17 +12,17 @@ use crate::app::BenchApp;
 
 impl BenchApp {
     pub fn toggle_mic(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(rec) = self.recorder.take() {
+        if let Some(rec) = self.media.recorder.take() {
             match rec.finish() {
                 Ok(wav) => {
-                    self.transcribing = true;
+                    self.media.transcribing = true;
                     self.rest(
                         window,
                         cx,
                         move |c| rest::transcribe(c, &wav),
                         |this, r, window, cx| {
-                            this.transcribing = false;
-                            let send = std::mem::take(&mut this.send_after_transcribe);
+                            this.media.transcribing = false;
+                            let send = std::mem::take(&mut this.media.send_after_transcribe);
                             match r {
                                 // Into the open thread's composer; sent by its view once
                                 // this is done (the view reads the app as it sends).
@@ -62,7 +62,7 @@ impl BenchApp {
                     );
                 }
                 Err(e) => {
-                    self.send_after_transcribe = false;
+                    self.media.send_after_transcribe = false;
                     self.toast(
                         NotificationType::Warning,
                         format!("Recording: {e:#}"),
@@ -74,15 +74,15 @@ impl BenchApp {
         } else {
             match Recorder::start() {
                 Ok(r) => {
-                    self.recorder = Some(r);
-                    self.wave_ticker = Some(cx.spawn(async move |this, cx| {
+                    self.media.recorder = Some(r);
+                    self.media.wave_ticker = Some(cx.spawn(async move |this, cx| {
                         loop {
                             cx.background_executor()
                                 .timer(Duration::from_millis(33))
                                 .await;
                             let alive = this.update(cx, |this, cx| {
                                 cx.notify();
-                                this.recorder.is_some()
+                                this.media.recorder.is_some()
                             });
                             if !matches!(alive, Ok(true)) {
                                 break;
@@ -109,26 +109,26 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.playing.as_ref().is_some_and(|(j, _)| j == key) {
-            self.playing = None;
+        if self.media.playing.as_ref().is_some_and(|(j, _)| j == key) {
+            self.media.playing = None;
             cx.notify();
             return;
         }
-        self.playing = None;
-        self.media_playing = None;
+        self.media.playing = None;
+        self.media.audio = None;
         if text.is_empty() {
             return;
         }
         let key = key.to_string();
-        self.speaking = Some(key.clone());
+        self.media.speaking = Some(key.clone());
         self.rest(
             window,
             cx,
             move |c| rest::speak(c, &text),
             move |this, r, window, cx| {
-                this.speaking = None;
+                this.media.speaking = None;
                 match r {
-                    Ok(bytes) => this.playing = Some((key, Playback::start(bytes))),
+                    Ok(bytes) => this.media.playing = Some((key, Playback::start(bytes))),
                     Err(e) => this.toast(
                         NotificationType::Error,
                         format!("Text-to-speech: {e:#}"),

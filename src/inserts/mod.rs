@@ -189,7 +189,7 @@ impl BenchApp {
             .filter(|i| kind.owns(&i.key))
             .map(|i| i.id)
             .collect();
-        match self.insert_live.get(name).filter(|id| same.contains(id)) {
+        match self.inserts.live.get(name).filter(|id| same.contains(id)) {
             Some(id) => *id == ins.id,
             None => same.last() == Some(&ins.id),
         }
@@ -300,7 +300,7 @@ impl ThreadView {
                     .child("Shown in another insert of this thread — click to show it here")
                     .on_click(self.app_listener(move |this, _, window, cx| {
                         this.click_claimed = true;
-                        this.insert_live.insert(name.to_string(), claim_id.clone());
+                        this.inserts.live.insert(name.to_string(), claim_id.clone());
                         this.insert_opened(&at, &claim_id, window, cx);
                     }))
                     .into_any_element(),

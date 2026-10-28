@@ -1,5 +1,6 @@
 //! Settings → Providers (models, fallback, voice, service keys) and Messages (Telegram).
 
+pub(crate) mod state;
 pub(crate) mod agent_form;
 pub(crate) mod appearance;
 pub(crate) mod new_project;
@@ -25,7 +26,7 @@ impl BenchApp {
         let pick: bench_ui::OnPick = std::rc::Rc::new(move |k, _, cx| {
             let view = view.clone();
             view.update(cx, |this, cx| {
-                this.gear_tab = k;
+                this.gear.tab = k;
                 cx.notify();
             });
         });
@@ -36,7 +37,7 @@ impl BenchApp {
                 (bench_ui::Ico::Layers, "Presets"),
                 (bench_ui::Ico::Moon, "Appearance"),
             ],
-            self.gear_tab,
+            self.gear.tab,
             cx,
             pick,
         );
@@ -47,7 +48,7 @@ impl BenchApp {
                 .child(tabs)
                 .into_any_element(),
         );
-        match self.gear_tab {
+        match self.gear.tab {
             1 => {
                 page.extend(self.render_presets(cx));
                 return bench_ui::settings_page("settings", page);
@@ -76,7 +77,7 @@ impl BenchApp {
                     current.as_deref(),
                 ),
             };
-            let shown = host == self.gear_agent;
+            let shown = host == self.gear.agent;
             let pick = host.clone();
             // A server's agent can be forgotten here (asked once); this Mac's is always there.
             let armed = self.armed.is(&format!("agent:{host}"));
@@ -130,13 +131,13 @@ impl BenchApp {
         page.extend(self.render_agent_form(cx));
 
         // The shown agent's settings, once read.
-        if !self.providers.loaded {
+        if !self.gear.providers.loaded {
             page.push(
                 div()
                     .py_2p5()
                     .text_base()
                     .text_color(muted)
-                    .child(if self.conn_of(&self.gear_agent).is_some() {
+                    .child(if self.conn_of(&self.gear.agent).is_some() {
                         "Loading…"
                     } else {
                         "Not connected: its settings show once it answers."
@@ -153,15 +154,15 @@ impl BenchApp {
                 // fallback below.
                 format!(
                     "MODELS · {} · its projects",
-                    Self::agent_name(&self.gear_agent)
+                    Self::agent_name(&self.gear.agent)
                 ),
                 vec![],
                 cx,
             )
             .into_any_element(),
         );
-        for i in 0..self.providers.endpoints.len() {
-            let e = &self.providers.endpoints[i];
+        for i in 0..self.gear.providers.endpoints.len() {
+            let e = &self.gear.providers.endpoints[i];
             let (name, url, model, context, parallel, key) = (
                 e.name.clone(),
                 e.url.clone(),
@@ -306,12 +307,12 @@ impl BenchApp {
 
         // ---- fallback ----
         page.push(bench_ui::settings_heading("FALLBACK", vec![], cx).into_any_element());
-        let current = self.providers.fallback.clone();
+        let current = self.gear.providers.fallback.clone();
         let label = current
             .as_ref()
             .map(|(p, m)| {
                 let group = self
-                    .models
+                    .defaults.models
                     .iter()
                     .find(|c| c.provider == *p)
                     .map_or(p.clone(), |c| c.group.clone());
@@ -321,7 +322,7 @@ impl BenchApp {
         let mut choices: Vec<(Option<String>, String, Option<(String, String)>)> =
             vec![(None, "None".into(), None)];
         let mut last_group = String::new();
-        for c in self.models.iter().filter(|c| c.tag != "main") {
+        for c in self.defaults.models.iter().filter(|c| c.tag != "main") {
             let header = (c.group != last_group).then(|| c.group.clone());
             last_group = c.group.clone();
             choices.push((
@@ -363,7 +364,7 @@ impl BenchApp {
         );
 
         // ---- voice ----
-        if let Some(v) = &self.providers.voice {
+        if let Some(v) = &self.gear.providers.voice {
             let v = (
                 v.stt_url.clone(),
                 v.stt_model.clone(),

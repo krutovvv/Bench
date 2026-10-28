@@ -27,7 +27,7 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let key = format!("p:{}", p.id);
-        let collapsed = self.ssh.collapsed.contains(&key);
+        let collapsed = self.sidebar.collapsed.contains(&key);
         let group: SharedString = format!("phead{g}").into();
         let remote = !p.agent.is_empty();
         let icon = match (remote, &p.folder) {
