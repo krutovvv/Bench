@@ -5,13 +5,15 @@
 // stands for the pair, and its stream asks the main model first and, when that ends in an error
 // (a refused connection, a 5xx, a broken stream) or goes silent, asks the fallback with the same
 // context and options. Pi sees one response and keeps its own retries, history and usage as they
-// are. A false switch costs one answer from the cheap fallback, so the watch is short.
+// are. A false switch costs one answer from the cheap fallback, so the watch before the first
+// event is short. Once the answer flows, a pause is long: some servers (TabbyAPI with qwen3_coder)
+// send a tool call only whole, and a file written in one call keeps them silent for minutes.
 
 import { createAssistantMessageEventStream, createProvider, type AssistantMessageEvent, type Model, type Models, type Provider } from "@earendil-works/pi-ai";
 import { isContextOverflow } from "@earendil-works/pi-ai/utils/overflow";
 
 /** How long the main model may stay silent: before its first event, then between two events. */
-export const WATCH = { firstMs: 120_000, idleMs: 60_000 };
+export const WATCH = { firstMs: 120_000, idleMs: 300_000 };
 
 /** A provider whose model `main.id` answers with `main`, or with `fallback` when `main` fails. */
 export function fallbackProvider(id: string, models: Models, main: Model<any>, fallback: Model<any>, watch = WATCH, onFallback: (why: string) => void = () => {}): Provider {
