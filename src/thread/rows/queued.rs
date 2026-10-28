@@ -42,7 +42,7 @@ impl ThreadView {
             .flex_none()
             .gap_1()
             .items_center()
-            .text_base()
+            .text_size(px(bench_ui::THREAD_META))
             .text_color(theme.muted_foreground)
             .child(if field.is_some() {
                 "Editing"

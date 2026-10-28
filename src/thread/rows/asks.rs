@@ -33,7 +33,7 @@ impl ThreadView {
         els
     }
 
-    /// The plan: a block with the chevron, "PLAN · 3/7" and, folded, the step in progress; the
+    /// The plan: a block with the chevron, "Plan · 3/7" and, folded, the step in progress; the
     /// steps under the head when open. Folded per plan, by its id.
     fn render_plan_frame(
         &mut self,
@@ -43,6 +43,7 @@ impl ThreadView {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        let faint = bench_ui::faint(&theme);
         let open = self.thread.plan_open.contains(id);
         let done = todos.iter().filter(|t| t.status == "completed").count();
         let total = todos.iter().filter(|t| t.status != "cancelled").count();
@@ -62,24 +63,27 @@ impl ThreadView {
             todos
                 .iter()
                 .map(|t| {
-                    let (icon, color, strike) = match t.status.as_str() {
-                        "completed" => (Ico::CircleCheck, theme.success, true),
-                        "in_progress" => (Ico::CircleDot, theme.primary, false),
-                        "cancelled" => (Ico::X, muted, true),
-                        _ => (Ico::CircleEmpty, muted, false),
+                    // Done: a check and the step quieter — struck through, every finished plan
+                    // read as crossed out. Only a cancelled step is struck: it did not happen.
+                    let (icon, color, text, strike) = match t.status.as_str() {
+                        "completed" => (Ico::CircleCheck, theme.success, muted, false),
+                        "in_progress" => (Ico::CircleDot, theme.primary, theme.foreground, false),
+                        "cancelled" => (Ico::X, faint, faint, true),
+                        _ => (Ico::CircleEmpty, faint, theme.foreground, false),
                     };
                     h_flex()
                         .gap_2()
                         .py_0p5()
                         .pl(px(16. * depth(t) as f32))
                         .items_center()
-                        .text_base()
+                        .text_size(px(bench_ui::THREAD_META))
                         .child(icon.icon().xsmall().text_color(color))
                         .child(
                             div()
                                 .flex_1()
                                 .min_w_0()
-                                .when(strike, |d| d.line_through().text_color(muted))
+                                .text_color(text)
+                                .when(strike, |d| d.line_through())
                                 .when(t.status == "in_progress", |d| {
                                     d.text_color(theme.foreground)
                                         .font_weight(FontWeight::SEMIBOLD)
@@ -96,7 +100,7 @@ impl ThreadView {
             SharedString::from(format!("plan-head-{id}")),
             open,
             Some(Ico::ListChecks),
-            format!("PLAN · {done}/{total}"),
+            format!("Plan · {done}/{total}"),
             cx,
         )
         // As short as the thread's other small rows, not as tall as a block's head.
@@ -150,7 +154,7 @@ impl ThreadView {
         let head = h_flex()
             .gap_2()
             .items_start()
-            .text_base()
+            .text_size(px(bench_ui::THREAD_META))
             .child(
                 if approve {
                     Ico::CircleAlert
@@ -257,7 +261,7 @@ impl ThreadView {
                                 .gap_2()
                                 .py_1()
                                 .items_start()
-                                .text_base()
+                                .text_size(px(bench_ui::THREAD_META))
                                 .cursor_pointer()
                                 .hover(|s| s.text_color(theme.foreground))
                                 .child(
@@ -349,7 +353,7 @@ impl ThreadView {
                         .p_2()
                         .bg(theme.secondary)
                         .font_family(bench_ui::theme::MONO)
-                        .text_base()
+                        .text_size(px(bench_ui::THREAD_META))
                         .child(cmd),
                 )
             })

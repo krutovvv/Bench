@@ -79,7 +79,7 @@ impl BenchApp {
                 d.child(
                     div()
                         .flex_none()
-                        .text_base()
+                        .text_size(px(bench_ui::THREAD_META))
                         .text_color(theme.primary)
                         .child(on),
                 )
@@ -89,7 +89,7 @@ impl BenchApp {
                     .flex_shrink(1.)
                     .min_w_0()
                     .truncate()
-                    .text_base()
+                    .text_size(px(bench_ui::THREAD_META))
                     .when(done && !logbook, |d| d.text_color(muted))
                     .child(if t.title.trim().is_empty() {
                         "New task".to_string()

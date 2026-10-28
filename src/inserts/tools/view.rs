@@ -43,7 +43,7 @@ impl BenchApp {
                 .flex_1()
                 .px_4()
                 .py_3()
-                .text_base()
+                .text_size(px(bench_ui::THREAD_META))
                 .whitespace_normal()
                 .text_color(theme.muted_foreground)
                 .child("Copy part of a web page, a Word document or a note, then press ⌘V")
@@ -52,7 +52,7 @@ impl BenchApp {
             crate::inserts::scroll_pane(
                 "tool-html",
                 &self.inserts.tools.html_scroll,
-                div().px_4().py_3().text_base().child(
+                div().px_4().py_3().text_size(px(bench_ui::THREAD_META)).child(
                     TextView::html("tool-html-view-body", self.inserts.tools.preview.clone())
                         .selectable(true),
                 ),
@@ -153,7 +153,7 @@ impl BenchApp {
                         div()
                             .px_4()
                             .py_3()
-                            .text_base()
+                            .text_size(px(bench_ui::THREAD_META))
                             .child(crate::media::text::markdown(
                                 "tool-md",
                                 self.inserts.tools.preview.clone(),
@@ -325,7 +325,7 @@ impl BenchApp {
                                     img(path).size_full().object_fit(ObjectFit::Contain),
                                 ),
                                 None => d
-                                    .text_base()
+                                    .text_size(px(bench_ui::THREAD_META))
                                     .text_color(theme.muted_foreground)
                                     .child("Paste Base64 or load an image"),
                             }),

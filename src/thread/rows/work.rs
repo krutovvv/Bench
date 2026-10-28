@@ -395,7 +395,9 @@ impl ThreadView {
         } else {
             vec![]
         };
+        // A step is the thread's own line, as the work line over it: its size, not the answer's.
         v_flex()
+            .text_size(px(bench_ui::THREAD_META))
             .child(
                 h_flex()
                     .id(SharedString::from(format!("step-{key}-{k}")))
@@ -431,6 +433,7 @@ impl ThreadView {
                                 .rounded_md()
                                 .border_color(theme.border)
                                 .font_family(bench_ui::theme::MONO)
+                                .text_size(theme.mono_font_size)
                                 .text_color(theme.foreground)
                                 .child(body),
                         )

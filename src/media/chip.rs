@@ -98,7 +98,7 @@ impl ThreadView {
                 .rounded_md()
                 .border_color(theme.border)
                 .bg(theme.background)
-                .text_base()
+                .text_size(px(bench_ui::THREAD_META))
                 .child(
                     div()
                         .size(px(bench_ui::ATTACHMENT_ICON))

@@ -121,7 +121,7 @@ impl ThreadView {
                             .py_1()
                             .gap_2()
                             .items_center()
-                            .text_base()
+                            .text_size(px(bench_ui::THREAD_META))
                             .cursor_pointer()
                             .hover(|s| s.bg(theme.list_hover))
                             .child(if live {
@@ -146,6 +146,7 @@ impl ThreadView {
                                     .min_w_0()
                                     .truncate()
                                     .font_family(bench_ui::theme::MONO)
+                                    .text_size(theme.mono_font_size)
                                     .child(shown_cmd)
                                     .tooltip(move |window, cx| {
                                         Tooltip::new(full_cmd.clone()).build(window, cx)
@@ -193,16 +194,16 @@ impl ThreadView {
                     )
                     .when(shown, |d| {
                         d.child(
+                            // The output under its command, a strip of the block (a box in the box
+                            // was one frame too many), in the code's own size.
                             div()
-                                .mx_2()
-                                .mb_2()
-                                .p_2()
-                                .bg(theme.secondary)
-                                .border_1()
-                                .rounded_md()
-                                .border_color(theme.border)
+                                .px_3()
+                                .py_2()
+                                .bg(theme.secondary.opacity(0.6))
+                                .border_t_1()
+                                .border_color(theme.border.opacity(0.6))
                                 .font_family(bench_ui::theme::MONO)
-                                .text_base()
+                                .text_size(theme.mono_font_size)
                                 .text_color(theme.foreground)
                                 .child(if tail.trim().is_empty() {
                                     div()

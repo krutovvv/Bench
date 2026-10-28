@@ -63,6 +63,7 @@ impl ThreadView {
                     .py_0p5()
                     .border_1()
                     .rounded_md()
+                    .text_size(px(bench_ui::THREAD_META))
                     .border_color(if active { theme.primary } else { theme.border })
                     .text_color(if active {
                         theme.foreground

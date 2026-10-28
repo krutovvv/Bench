@@ -51,7 +51,7 @@ impl ThreadView {
                     .px_2()
                     .py_1()
                     .items_center()
-                    .text_base()
+                    .text_size(px(bench_ui::THREAD_META))
                     .cursor_pointer()
                     .border_l_2()
                     .border_color(if selected {
@@ -66,7 +66,7 @@ impl ThreadView {
                         div()
                             .flex_1()
                             .min_w_0()
-                            .text_base()
+                            .text_size(px(bench_ui::THREAD_META))
                             .text_color(theme.muted_foreground)
                             .truncate()
                             .child(dir),
@@ -74,7 +74,7 @@ impl ThreadView {
                     .when(add > 0, |d| {
                         d.child(
                             div()
-                                .text_base()
+                                .text_size(px(bench_ui::THREAD_META))
                                 .text_color(theme.success)
                                 .child(format!("+{add}")),
                         )
@@ -82,7 +82,7 @@ impl ThreadView {
                     .when(del > 0, |d| {
                         d.child(
                             div()
-                                .text_base()
+                                .text_size(px(bench_ui::THREAD_META))
                                 .text_color(theme.danger)
                                 .child(format!("−{del}")),
                         )
@@ -90,7 +90,7 @@ impl ThreadView {
                     .when(diffs.is_empty(), |d| {
                         d.child(
                             div()
-                                .text_base()
+                                .text_size(px(bench_ui::THREAD_META))
                                 .text_color(theme.muted_foreground)
                                 .child("written"),
                         )
@@ -125,7 +125,7 @@ impl ThreadView {
                         cx,
                     )
                     // The thread's one text size: the head reads like the rows under it.
-                    .text_base()
+                    .text_size(px(bench_ui::THREAD_META))
                     .when(all_add > 0, |d| {
                         d.child(div().text_color(theme.success).child(format!("+{all_add}")))
                     })

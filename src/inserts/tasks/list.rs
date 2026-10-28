@@ -233,7 +233,7 @@ impl BenchApp {
                 .children(strip)
                 .child(v_flex().children(rows).when_some(note, |d, (text, color)| {
                     // One line, as an empty terminal is.
-                    d.child(div().px_6().text_base().text_color(color).child(text))
+                    d.child(div().px_6().text_size(px(bench_ui::THREAD_META)).text_color(color).child(text))
                 }))
                 .into_any_element();
         }
@@ -250,7 +250,7 @@ impl BenchApp {
                             div()
                                 .px_6()
                                 .py_3()
-                                .text_base()
+                                .text_size(px(bench_ui::THREAD_META))
                                 .text_color(color)
                                 .child(text),
                         )
