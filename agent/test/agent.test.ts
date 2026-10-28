@@ -184,7 +184,7 @@ const { totalsOf, usagePayload } = await import("../src/usage.ts");
 
 test("usage: a thread's counters are kept and come back on a fresh store", () => {
 	const st = new Store();
-	const row = st.create({ id: "u1", conversation: "1", profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
+	const row = st.create({ id: "u1", conversation: "1", profile: "default", source: "local", cwd: home, effort: "" });
 	assert.deepEqual(row.usage, { input: 0, output: 0, calls: 0 });
 	st.update("u1", { usage: { input: 1200, output: 340, calls: 2, cached: 900, tps: 31.4 } });
 	// A new Store = the agent process restarted: the same numbers are still there.
@@ -218,17 +218,22 @@ test("a waiting message keeps its attachments and block state when its words are
 	assert.equal(stripBlock(withText("old\n\n<block-state>\nx\n</block-state>", "new")), "new");
 });
 
-test("history keeps the fixed words of a message taken back from the queue", async () => {
+test("search finds the words of a thread's messages, a fork's through its entry", async () => {
 	const { Store } = await import("../src/store.ts");
 	const st = new Store();
-	st.create({ id: "q1", conversation: "3", profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
-	st.addMessage("q1", { role: "user", text: "send the log" });
-	st.addMessage("q1", { role: "assistant", text: "ok" });
-	st.addMessage("q1", { role: "user", text: "send the log" });
-	st.editUserMessage("q1", "send the log", "send the ERROR log");
-	const texts = st.messages("q1").map((m) => m.text);
-	assert.deepEqual(texts, ["send the log", "ok", "send the ERROR log"], "the newest one with those words is theirs");
+	st.create({ id: "q1", conversation: "3", profile: "default", source: "local", cwd: home, effort: "" });
+	st.create({ id: "q2", conversation: "4", profile: "default", source: "local", cwd: home, effort: "" });
+	st.index("q1", 5, "user", "send the error log", 1);
+	st.index("q1", 6, "assistant", "the log is attached", 2);
+	st.index("q1", 9, "user", "and the access log", 3);
+	assert.equal(st.get("q1")?.message_count, 3);
+	assert.deepEqual(st.search("error log").map((h) => h.session_id), ["q1"]);
+	st.copyIndex("q1", "q2", 6);
+	assert.equal(st.get("q2")?.message_count, 2, "a fork has its words through the entry it was made at");
+	st.cutIndex("q1", 6);
+	assert.deepEqual(st.search("access").map((h) => h.session_id), [], "an exchange taken back is not found");
 	st.delete("q1");
+	st.delete("q2");
 });
 
 test("server agents: a list of their own; the old project rows with a host move into it once", async () => {

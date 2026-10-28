@@ -74,7 +74,7 @@ export class Queue {
 		const live = await this.live(id);
 		let edited = false;
 		await live.conversation.commit(async (tx) => {
-			const inbox = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
+			const inbox = await tx.doc(InboxDoc, live.conversation.id);
 			const at = inbox.items.findIndex((i: any) => String(i.id) === submission);
 			if (at < 0 || inbox.items[at].mode === "write") return;
 			inbox.items[at] = { ...inbox.items[at], content: withText(inbox.items[at].content, text) };
@@ -88,18 +88,19 @@ export class Queue {
 	 * old one, just aborted, would be answered again instead of a new one made. */
 	async sendNow(id: string, submission: string): Promise<void> {
 		const live = await this.live(id);
-		const inbox = (await this.rt.harness.snapshot(InboxDoc as any, live.conversation.id, ctx)) as any;
-		const item = (inbox?.items ?? []).find((i: any) => String(i.id) === submission);
-		if (!item) return;
+		const inbox = await this.rt.harness.snapshot(InboxDoc, live.conversation.id, ctx);
+		// A write is no message: only an input waiting can be sent.
+		const item = (inbox?.items ?? []).find((i) => String(i.id) === submission);
+		if (!item || item.mode === "write") return;
 		if ((await this.rt.harness.abortSubmission(Number(submission) as SubmissionId, ctx, live.conversation.id)) !== "aborted") return;
 		// Its turn shows when Pi places it (after the current tools, or when the run answers).
-		const sub = await live.conversation.submit({ type: "input", content: item.content, ...(live.busy ? { whenBusy: "steer" } : {}), requestId: randomUUID() } as any, ctx);
+		const sub = await live.conversation.submit({ type: "input", content: item.content, ...(live.busy ? { whenBusy: "steer" as const } : {}), requestId: randomUUID() }, ctx);
 		// A new submission lands at the END of the inbox, and a boundary places what stands first
 		// of its kind — so without this move "send now" sends the message last, which is its
 		// opposite. It is the message the person just chose, so it goes to the head, ahead of
 		// whatever waited before it (those keep their order behind it).
 		await live.conversation.commit(async (tx) => {
-			const box = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
+			const box = await tx.doc(InboxDoc, live.conversation.id);
 			moveToFront(box.items, String(sub.id));
 		}, ctx);
 	}

@@ -124,10 +124,15 @@ export const CronTask = defineTask<{ jobId: string }, Phase, null>({
 			const job = jobs.get(task.input.jobId);
 			if (job?.enabled) {
 				// A run is decided once: after a restart mid-run it is not started a second time.
-				const done = await runtime.memo<boolean>(`fired:${task.state.checkpoint.at}`, context);
+				const at = task.state.checkpoint.at;
+				const done = await runtime.memo<boolean>(`fired:${at}`, context);
 				if (!done) {
-					await runtime.memo(`fired:${task.state.checkpoint.at}`, true, context);
+					await runtime.memo(`fired:${at}`, true, context);
 					await runJob(job);
+				} else if (job.next_run === at) {
+					// The agent restarted while this run worked: it is said so, and the job goes on
+					// at its next time instead of waking for this one again.
+					settle(job, at, "interrupted by restart");
 				}
 			}
 			const fresh = jobs.get(task.input.jobId);
@@ -156,14 +161,20 @@ export async function runJob(job: Job): Promise<void> {
 	} catch (e) {
 		job.last_status = `error: ${(e as Error).message}`;
 	}
+	settle(job, started, job.last_status ?? "ok");
+}
+
+/** A run of the job is over (or lost): when and how it went, and its next time. */
+function settle(job: Job, started: number, status: string): void {
 	job.last_run = started;
+	job.last_status = status;
 	try {
 		job.next_run = nextRun(job.schedule, Date.now(), started);
 	} catch {
 		job.next_run = null;
 	}
 	if (job.next_run === null) job.enabled = false;
-	jobs.save({ ...job, ...pick(jobs.get(job.id), ["enabled", "schedule", "prompt", "name", "deliver"]) , last_run: job.last_run, last_status: job.last_status, last_output: job.last_output, last_session: job.last_session, next_run: job.next_run });
+	jobs.save({ ...job, ...pick(jobs.get(job.id), ["enabled", "schedule", "prompt", "name", "deliver"]), last_run: job.last_run, last_status: job.last_status, last_output: job.last_output, last_session: job.last_session, next_run: job.next_run });
 }
 
 const pick = (o: any, keys: string[]) => (o ? Object.fromEntries(keys.map((k) => [k, o[k]])) : {});

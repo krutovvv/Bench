@@ -5,7 +5,7 @@
 // again: a held run stays held. The document is the truth; the waiters here only wake the gate.
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { defineDoc } from "@earendil-works/pi-durable";
+import { defineDoc, type ConversationId } from "@earendil-works/pi-durable";
 // A stretch the person held the run, ms; `to` absent while it still holds (crates/protocol).
 import type { Hold } from "./protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
@@ -23,7 +23,7 @@ export const HoldDoc = defineDoc<{ holds: Hold[] }>({
 	fork: "initial",
 	initial: () => ({ holds: [] }),
 	checkpointWhen: () => true,
-} as any);
+});
 
 /** Whether the last hold is still open. */
 export const held = (holds: readonly Hold[] | undefined) => {
@@ -122,7 +122,7 @@ export class Holds {
 		if (!row) return true;
 		const conversation = Number(row.conversation);
 		for (;;) {
-			const doc = (await this.rt.harness.snapshot(HoldDoc as any, conversation as any, ctx)) as any;
+			const doc = await this.rt.harness.snapshot(HoldDoc, conversation as ConversationId, ctx);
 			if (!held(doc?.holds)) return true;
 			if (!(await this.gates.next(String(conversation), signal))) return false;
 		}
@@ -136,7 +136,7 @@ export class Holds {
 	private async change(live: Live, change: (holds: Hold[]) => boolean): Promise<void> {
 		let changed = false;
 		const holds = await live.conversation.commit(async (tx) => {
-			const doc = (await tx.doc(HoldDoc as any, live.conversation.id)) as any;
+			const doc = await tx.doc(HoldDoc, live.conversation.id);
 			changed = change(doc.holds);
 			return JSON.parse(JSON.stringify(doc.holds)) as Hold[];
 		}, ctx);

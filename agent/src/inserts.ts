@@ -46,7 +46,7 @@ export const Inserts = defineDoc<{ items: Record<string, InsertState> }>({
 	initial: () => ({ items: {} }),
 	// Small: every change is a complete base.
 	checkpointWhen: () => true,
-} as any);
+});
 
 /** An insert as Bench draws it: where it sits (after how many of the person's messages) and its state. */
 export interface InsertView extends InsertState {
@@ -60,7 +60,7 @@ export function insertsOf(entries: readonly any[], doc: { items: Record<string, 
 	let users = 0;
 	for (const e of entries) {
 		if (e.kind === "pi.user") users++;
-		if (e.kind !== InsertEntry.kind && e.kind !== "bench.insert") continue;
+		if (e.kind !== InsertEntry.kind) continue;
 		const data = e.data as { id: string; key: string };
 		const s = doc?.items?.[data.id];
 		if (s?.removed) continue;
@@ -115,7 +115,7 @@ export class ThreadInserts {
 		const view = await live.conversation.viewState(ctx);
 		const entries = ((view.value as any).entries ?? []) as any[];
 		view.dispose();
-		const doc = (await this.rt.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		const doc = await this.rt.harness.snapshot(Inserts, live.conversation.id, ctx);
 		live.inserts = insertsOf(entries, doc);
 		return live.inserts;
 	}
@@ -125,14 +125,14 @@ export class ThreadInserts {
 		const live = await this.live(id);
 		if (!/^[\w-]{1,64}$/.test(insertId)) throw new Error("bad insert id");
 		if (!key) throw new Error("insert key missing");
-		const known = (await this.rt.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
+		const known = await this.rt.harness.snapshot(Inserts, live.conversation.id, ctx);
 		if (known?.items?.[insertId]) return this.list(id);
 		// The state first: an entry is never without its state.
 		await live.conversation.commit(async (tx) => {
-			const doc = (await tx.doc(Inserts as any, live.conversation.id)) as any;
+			const doc = await tx.doc(Inserts, live.conversation.id);
 			doc.items[insertId] = { key, state, folded: false, removed: false };
 		}, ctx);
-		const sub = await live.conversation.submit({ type: "write", entry: { kind: InsertEntry.kind ?? "bench.insert", data: { id: insertId, key } }, requestId: randomUUID() } as any, ctx);
+		const sub = await live.conversation.submit({ type: "write", entry: { kind: InsertEntry.kind, data: { id: insertId, key } }, requestId: randomUUID() } as any, ctx);
 		await sub.wait(ctx);
 		return this.list(id);
 	}
@@ -140,7 +140,7 @@ export class ThreadInserts {
 	/** Change an insert: its key (another server), its state, folded, or removed. */
 	async patch(id: string, insertId: string, patch: Record<string, unknown>): Promise<InsertView[]> {
 		const live = await this.live(id);
-		const found = await live.conversation.commit(async (tx) => patchInsert((await tx.doc(Inserts as any, live.conversation.id)) as any, insertId, patch), ctx);
+		const found = await live.conversation.commit(async (tx) => patchInsert(await tx.doc(Inserts, live.conversation.id), insertId, patch), ctx);
 		if (found) return this.list(id);
 		// The item is gone from the document while its entry is in the transcript: the thread is
 		// from before the document, or a commit lost the item. Bench shows such an insert (the
@@ -150,7 +150,7 @@ export class ThreadInserts {
 		const known = (await this.list(id)).find((v) => v.id === insertId);
 		if (!known) throw new Error(`no insert ${insertId}`);
 		await live.conversation.commit(async (tx) => {
-			const doc = (await tx.doc(Inserts as any, live.conversation.id)) as any;
+			const doc = await tx.doc(Inserts, live.conversation.id);
 			doc.items[insertId] = { key: known.key, state: {}, folded: false, removed: false };
 			patchInsert(doc, insertId, patch);
 		}, ctx);

@@ -10,8 +10,9 @@
 // - the tools' host and where they work (tools-host.ts).
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { createRegistry, Harness, watchEvents, type Conversation } from "@earendil-works/pi-durable";
+import { createRegistry, Harness, watchEvents, type Conversation, type ConversationId, type TaskId } from "@earendil-works/pi-durable";
 import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
+import type { SqliteStorage } from "@earendil-works/pi-durable/storage/sqlite";
 import { randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -19,7 +20,7 @@ import { Asks } from "./asks.ts";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
 import { Processes } from "./builtin/process.ts";
 import { projects } from "./builtin/projects.ts";
-import { AGENT_HOME, agents, defaultCwd, getSetting, readAgent, readConfig, reasoningEffort, resolveModel, setSetting } from "./config.ts";
+import { AGENT_HOME, agents, defaultCwd, getSetting, readAgent, readConfig, reasoningEffort, setSetting } from "./config.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { HoldDoc, Holds, type Hold } from "./hold.ts";
 import { setHost } from "./host.ts";
@@ -77,9 +78,6 @@ export interface Live {
 	prompts: Map<string, Pending>;
 	stop?: () => Promise<unknown>;
 	usage: Totals & { started: number };
-	approvedForSession: Set<string>;
-	/** Arguments of the running tool calls, by call id. */
-	toolArgs: Map<string, any>;
 	/** The thread's inserts as last read from Pi (the tools' view of them). */
 	inserts: InsertView[];
 }
@@ -91,7 +89,7 @@ export class Runtime {
 	store = new Store();
 	harness!: Harness;
 	/** Pi's storage: the whole transcript for Bench (the conversation's view is what the model sees, compacted). */
-	storage!: any;
+	storage!: SqliteStorage;
 	live = new Map<string, Live>();
 	byConversation = new Map<string, Live>();
 	/** In-process listeners of what runs do (`RunEvent`). */
@@ -183,13 +181,13 @@ export class Runtime {
 		setScheduler({
 			conversation: async () => {
 				const id = getSetting<number>("scheduler_conversation");
-				const found = id !== undefined ? await this.harness.conversation(id as any, ctx) : undefined;
+				const found = id !== undefined ? await this.harness.conversation(id as ConversationId, ctx) : undefined;
 				if (found) return found;
-				const created = await this.harness.createConversation({ ownership: { kind: "ownerless" } } as any, ctx);
+				const created = await this.harness.createConversation({ ownership: { kind: "ownerless" as const } }, ctx);
 				setSetting("scheduler_conversation", created.id);
 				return created;
 			},
-			abortTask: async (id) => void (await this.harness.abortTask(Number(id) as any, ctx)),
+			abortTask: async (id) => void (await this.harness.abortTask(Number(id) as TaskId, ctx)),
 		});
 		for (const job of jobs.list()) if (job.enabled && !job.task_id) await arm(job).catch((e) => console.error("[cron]", job.name, e));
 	}
@@ -201,7 +199,7 @@ export class Runtime {
 	}
 
 	private reconfigureAll(): void {
-		for (const live of this.live.values()) void live.conversation.configure({ extensions: forAgent(readAgent(live.row.profile).extensions, live.row.profile) } as any, ctx).catch(() => {});
+		for (const live of this.live.values()) void live.conversation.configure({ extensions: forAgent(readAgent(live.row.profile).extensions, live.row.profile) }, ctx).catch(() => {});
 	}
 
 	/** The agent's MCP servers, connected before its first turn. */
@@ -215,7 +213,6 @@ export class Runtime {
 
 	async create(profile: string, cwd: string | undefined, source = "local", extra: Partial<SessionRow> = {}): Promise<Live> {
 		await this.mcpFor(profile);
-		const choice = resolveModel();
 		// A session with a project's environment (a thread, a cron run) belongs to the project and
 		// works in its folder.
 		const project = profile.startsWith("project:") ? profile.slice(8) : "";
@@ -223,10 +220,10 @@ export class Runtime {
 		const machine = project ? projects.get(project)?.machine : undefined;
 		const dir = machine ? (cwd ?? projects.dir(project)) : cwd && fs.existsSync(cwd) ? cwd : project ? projects.dir(project) : defaultCwd(profile);
 		const conversation = await this.harness.createConversation(
-			{ ownership: { kind: "ownerless" }, agent: { model: this.models.ref(profile), thinkingLevel: thinking(reasoningEffort(profile)), cwd: dir, extensions: forAgent(readAgent(profile).extensions, profile) } } as any,
+			{ ownership: { kind: "ownerless" }, agent: { model: this.models.ref(profile), thinkingLevel: thinking(reasoningEffort(profile)), cwd: dir, extensions: forAgent(readAgent(profile).extensions, profile) } },
 			ctx,
 		);
-		const row = this.store.create({ id: newId(), conversation: String(conversation.id), profile, source, cwd: dir, model: choice.model, provider: choice.provider, effort: reasoningEffort(profile), ...extra });
+		const row = this.store.create({ id: newId(), conversation: String(conversation.id), profile, source, cwd: dir, effort: reasoningEffort(profile), ...extra });
 		return this.attach(row, conversation);
 	}
 
@@ -236,13 +233,13 @@ export class Runtime {
 		if (open) return open;
 		const row = this.store.get(id);
 		if (!row) return undefined;
-		const conversation = await this.harness.conversation(Number(row.conversation) as any, ctx);
+		const conversation = await this.harness.conversation(Number(row.conversation) as ConversationId, ctx);
 		if (!conversation) return undefined;
 		return this.attach(row, conversation);
 	}
 
 	private async attach(row: SessionRow, conversation: Conversation): Promise<Live> {
-		const hold = (await this.harness.snapshot(HoldDoc as any, conversation.id, ctx)) as any;
+		const hold = await this.harness.snapshot(HoldDoc, conversation.id, ctx);
 		const live: Live = {
 			row,
 			conversation,
@@ -255,8 +252,6 @@ export class Runtime {
 			// The counters survive in the row: reopening the thread continues the same numbers
 			// rather than starting from zero (a fresh turn re-reads the window anyway).
 			usage: { ...totalsOf(row.usage), started: Date.now() },
-			approvedForSession: new Set(),
-			toolArgs: new Map(),
 			inserts: [],
 		};
 		this.live.set(row.id, live);
@@ -312,19 +307,13 @@ export class Runtime {
 		live.row = row;
 		await this.mcpFor(row.profile);
 		// The model (one for every thread, the gear's), effort and extensions follow at every turn.
-		const choice = resolveModel();
-		if (row.model !== choice.model || row.provider !== choice.provider) {
-			this.store.update(id, { model: choice.model, provider: choice.provider });
-			live.row = this.store.get(id)!;
-		}
-		await live.conversation.configure({ model: this.models.ref(row.profile, choice), thinkingLevel: thinking(row.effort || reasoningEffort(row.profile)), cwd: row.cwd, extensions: forAgent(readAgent(row.profile).extensions, row.profile) } as any, ctx);
+		await live.conversation.configure({ model: this.models.ref(row.profile), thinkingLevel: thinking(row.effort || reasoningEffort(row.profile)), cwd: row.cwd, extensions: forAgent(readAgent(row.profile).extensions, row.profile) }, ctx);
 		const images = attachments
 			.filter((a) => a.mime.startsWith("image/") && fs.existsSync(a.path))
 			.map((a) => ({ type: "image" as const, data: fs.readFileSync(a.path).toString("base64"), mimeType: a.mime }));
 		// What the thread's live block shows, for the model only (Bench's history drops it).
 		const said = context.trim() ? `${text}\n\n${BLOCK_OPEN}\n${context.trim()}\n${BLOCK_CLOSE}` : text;
 		const content: any = images.length ? [{ type: "text", text: said }, ...images] : said;
-		this.store.addMessage(id, { role: "user", text });
 		if (live.busy) {
 			// Queued: Pi keeps it in the inbox until the run answers. Steered: placed after the
 			// current tool round. `request` is Bench's id for the message (docs/thread-objects.md):
@@ -360,7 +349,7 @@ export class Runtime {
 	async fork(id: string, at: number): Promise<SessionRow> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
-		const fork = await live.conversation.fork(at as any, { ownership: { kind: "ownerless" } } as any, ctx);
+		const fork = await live.conversation.fork(at as any, { ownership: { kind: "ownerless" as const } }, ctx);
 		const row = live.row;
 		const made = this.store.create({
 			id: newId(),
@@ -368,12 +357,11 @@ export class Runtime {
 			profile: row.profile,
 			source: "local",
 			cwd: row.cwd,
-			model: row.model,
-			provider: row.provider,
 			effort: row.effort,
 			title: row.title ? `${row.title} (fork)` : "",
 			...(row.project ? { project: row.project } : {}),
 		});
+		this.store.copyIndex(row.id, made.id, at);
 		await this.attach(made, fork);
 		return made;
 	}
@@ -388,10 +376,9 @@ export class Runtime {
 		let last = -1;
 		for (let i = entries.length - 1; i >= 0; i--) if (entries[i].kind === "pi.user") { last = i; break; }
 		if (last <= 0) return;
-		const fork = await live.conversation.fork(entries[last - 1].id, { ownership: { kind: "ownerless" } } as any, ctx);
-		const msgs = this.store.messages(id);
-		const lastUser = [...msgs].reverse().find((m) => m.role === "user");
-		if (lastUser) this.store.truncateMessages(id, lastUser.timestamp);
+		const at = entries[last - 1].id;
+		const fork = await live.conversation.fork(at, { ownership: { kind: "ownerless" as const } }, ctx);
+		this.store.cutIndex(id, Number(at));
 		await this.close(id);
 		this.store.update(id, { conversation: String(fork.id) });
 	}

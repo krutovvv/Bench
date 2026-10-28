@@ -1,5 +1,6 @@
-// bench-agent's session index: what Bench lists and searches (titles, sources, folders, a
-// searchable copy of the text). The transcripts themselves are Pi Durable's, in pi.sqlite.
+// bench-agent's session index: what Bench lists and searches (titles, sources, folders, and the
+// words of the person's messages and the agent's answers, indexed from Pi's commits by
+// `Journal.watch`). The transcripts themselves are Pi Durable's, in pi.sqlite.
 
 import type { DatabaseSync } from "node:sqlite";
 import { db } from "./config.ts";
@@ -12,15 +13,14 @@ export interface SessionRow {
 	title: string;
 	source: string;
 	cwd: string;
-	model: string;
-	provider: string;
+	/** The person's reasoning effort for it; "" its settings' own. (The model is one for every
+	 * thread: the general agent's, `resolveModel`.) */
 	effort: string;
 	created: number;
 	updated: number;
 	message_count: number;
 	chat_id?: string;
 	display_name?: string;
-	/** What the thread is about, shown as a live block at its top: "tasks:today", "ssh:local", "folder:<path>"; "" = a plain chat. */
 	/** The project the thread belongs to (`projects.id`); "" = none. */
 	project?: string;
 	/** The thread's token counters as of its last finished turn; zeroes for a thread that has
@@ -45,12 +45,19 @@ export class Store {
 				chat_id TEXT, display_name TEXT,
 				deleted INTEGER DEFAULT 0
 			);
-			CREATE TABLE IF NOT EXISTS messages (
-				session_id TEXT NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, ts REAL NOT NULL,
-				tool_name TEXT, tool_call_id TEXT, args TEXT
+			CREATE TABLE IF NOT EXISTS search (
+				session_id TEXT NOT NULL, entry INTEGER NOT NULL, role TEXT NOT NULL, text TEXT NOT NULL, ts REAL NOT NULL,
+				PRIMARY KEY (session_id, entry, role)
 			);
-			CREATE INDEX IF NOT EXISTS messages_session ON messages(session_id, ts);
 		`);
+		// The first index was a copy written beside the journal: its words stay searchable, under
+		// entries of their own (negative, before any of Pi's), and the copy goes.
+		const old = this.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'messages'").get();
+		if (old) {
+			this.db.exec(`INSERT OR IGNORE INTO search (session_id, entry, role, text, ts)
+				SELECT session_id, -rowid, role, text, ts FROM messages WHERE role IN ('user', 'assistant');
+				DROP TABLE messages;`);
+		}
 		// usage: the thread's token counters, settled at every turn end (src/usage.ts);
 		// speed: how fast the model wrote, measured by Bench and sent over at the turn's end.
 		for (const col of ["project", "usage", "speed"])
@@ -74,8 +81,9 @@ export class Store {
 		} catch {
 			speed = speedOf(null);
 		}
-		// The plan is the journal's (the `todo` calls), not the row's: old rows' columns stay unread.
-		const { todos: _t, todos_at: _a, plan_id: _p, ...rest } = r;
+		// The plan is the journal's (the `todo` calls), the model the general agent's: old rows'
+		// columns stay unread.
+		const { todos: _t, todos_at: _a, plan_id: _p, model: _m, provider: _v, ...rest } = r;
 		return { ...rest, usage, speed };
 	}
 
@@ -84,8 +92,8 @@ export class Store {
 	): SessionRow {
 		const now = Date.now() / 1000;
 		this.db
-			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, model, provider, effort, created, updated, chat_id, display_name, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
-			.run(s.id, String(s.conversation), s.profile, s.title ?? "", s.source, s.cwd, s.model, s.provider, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.project ?? "");
+			.prepare("INSERT INTO sessions (id, conversation, profile, title, source, cwd, effort, created, updated, chat_id, display_name, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
+			.run(s.id, String(s.conversation), s.profile, s.title ?? "", s.source, s.cwd, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.project ?? "");
 		return this.get(s.id)!;
 	}
 
@@ -127,37 +135,28 @@ export class Store {
 
 	delete(id: string): void {
 		this.db.prepare("UPDATE sessions SET deleted = 1 WHERE id = ?").run(id);
-		this.db.prepare("DELETE FROM messages WHERE session_id = ?").run(id);
+		this.db.prepare("DELETE FROM search WHERE session_id = ?").run(id);
 	}
 
-	addMessage(sessionId: string, m: { role: string; text: string; tool_name?: string; tool_call_id?: string; args?: unknown }): void {
+	/** The words of one journal entry, for search: the person's message or the agent's answer.
+	 * The thread's count of messages follows. */
+	index(sessionId: string, entry: number, role: "user" | "assistant", text: string, ts: number): void {
+		this.db.prepare("INSERT OR REPLACE INTO search (session_id, entry, role, text, ts) VALUES (?,?,?,?,?)").run(sessionId, entry, role, text, ts);
 		this.db
-			.prepare("INSERT INTO messages (session_id, role, text, ts, tool_name, tool_call_id, args) VALUES (?,?,?,?,?,?,?)")
-			.run(sessionId, m.role, m.text, Date.now() / 1000, m.tool_name ?? null, m.tool_call_id ?? null, m.args === undefined ? null : JSON.stringify(m.args));
-		if (m.role === "user" || m.role === "assistant")
-			this.db.prepare("UPDATE sessions SET message_count = message_count + 1, updated = ? WHERE id = ?").run(Date.now() / 1000, sessionId);
+			.prepare("UPDATE sessions SET message_count = (SELECT COUNT(*) FROM search WHERE session_id = ?), updated = ? WHERE id = ?")
+			.run(sessionId, Date.now() / 1000, sessionId);
 	}
 
-	/** The words of a message taken back from the queue: history must not keep the old ones. The
-	 * newest user message with those words is the one they edited. */
-	editUserMessage(sessionId: string, from: string, to: string): void {
-		this.db
-			.prepare(
-				"UPDATE messages SET text = ? WHERE rowid = (SELECT rowid FROM messages WHERE session_id = ? AND role = 'user' AND text = ? ORDER BY rowid DESC LIMIT 1)",
-			)
-			.run(to, sessionId, from);
+	/** A fork's index: the words of the thread it came from, through entry `at`. */
+	copyIndex(from: string, to: string, at: number): void {
+		this.db.prepare("INSERT OR IGNORE INTO search (session_id, entry, role, text, ts) SELECT ?, entry, role, text, ts FROM search WHERE session_id = ? AND entry <= ?").run(to, from, at);
+		this.db.prepare("UPDATE sessions SET message_count = (SELECT COUNT(*) FROM search WHERE session_id = ?) WHERE id = ?").run(to, to);
 	}
 
-	messages(sessionId: string): { role: string; text: string; timestamp: number; tool_name?: string; tool_call_id?: string; args?: unknown }[] {
-		return this.db
-			.prepare("SELECT role, text, ts, tool_name, tool_call_id, args FROM messages WHERE session_id = ? ORDER BY rowid")
-			.all(sessionId)
-			.map((r: any) => ({ role: r.role, text: r.text, timestamp: r.ts, tool_name: r.tool_name ?? undefined, tool_call_id: r.tool_call_id ?? undefined, args: r.args ? JSON.parse(r.args) : undefined }));
-	}
-
-	/** Drops the index's copy from the given time on (a regenerated turn). */
-	truncateMessages(sessionId: string, fromTs: number): void {
-		this.db.prepare("DELETE FROM messages WHERE session_id = ? AND ts >= ?").run(sessionId, fromTs);
+	/** The index after entry `at` goes (an exchange taken back). */
+	cutIndex(sessionId: string, at: number): void {
+		this.db.prepare("DELETE FROM search WHERE session_id = ? AND entry > ?").run(sessionId, at);
+		this.db.prepare("UPDATE sessions SET message_count = (SELECT COUNT(*) FROM search WHERE session_id = ?) WHERE id = ?").run(sessionId, sessionId);
 	}
 
 	/** Full-text-ish search: every word must appear (case-insensitive), newest sessions first. */
@@ -167,8 +166,8 @@ export class Store {
 		const cond = words.map(() => "lower(m.text) LIKE ?").join(" AND ");
 		const rows = this.db
 			.prepare(
-				`SELECT m.session_id, m.text, m.role, m.ts FROM messages m JOIN sessions s ON s.id = m.session_id
-				 WHERE s.deleted = 0 ${profile ? "AND s.profile = ?" : ""} AND m.role IN ('user','assistant') AND ${cond}
+				`SELECT m.session_id, m.text, m.role, m.ts FROM search m JOIN sessions s ON s.id = m.session_id
+				 WHERE s.deleted = 0 ${profile ? "AND s.profile = ?" : ""} AND ${cond}
 				 ORDER BY m.ts DESC LIMIT ?`,
 			)
 			.all(...(profile ? [profile] : []), ...words.map((w) => `%${w}%`), limit * 4) as any[];

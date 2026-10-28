@@ -80,6 +80,9 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	assert.equal(requests["second"], "bench-2");
 	assert.equal(requests["third"], "bench-3");
 	assert.deepEqual(before.map((i) => i.text), ["second", "third"]);
+	// The placed message's words are found by search: the index is fed by Pi's commits.
+	assert.deepEqual(rt.store.search("first message").map((h) => h.session_id), [id]);
+	assert.equal(rt.store.get(id)?.message_count, 1, "the waiting ones are not messages of the thread yet");
 
 	// The person presses "send now" on the LAST one: it must be the next thing answered.
 	const third = before.find((i) => i.text === "third")!.sub;
@@ -95,6 +98,23 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	// Bench hears each order as thread.queue, straight from the inbox's commits.
 	assert.deepEqual(told.at(-1), ["second", "third"]);
 	assert.ok(told.some((q) => q.join() === "third,second"));
+
+	// An approval for the thread is kept in its document: the same command is not asked again; one
+	// for always goes into its settings.
+	const waits = async (call: string) => {
+		while (!rt.live.get(id)!.prompts.has(call)) await new Promise((r) => setTimeout(r, 10));
+	};
+	const asked = rt.asks.approve(id, "c1", "rm -rf build", "deletes");
+	await waits("c1");
+	rt.asks.respond(id, "c1", "session");
+	assert.equal(await asked, "session");
+	assert.equal(await rt.asks.approve(id, "c2", "rm -rf build", "deletes"), "session", "not asked again");
+	const always = rt.asks.approve(id, "c3", "git push -f", "rewrites");
+	await waits("c3");
+	rt.asks.respond(id, "c3", "always");
+	assert.equal(await always, "always");
+	const { readAgent } = await import("../src/config.ts");
+	assert.deepEqual(readAgent("default").allowed, ["git push -f"]);
 
 	// The person's name for the thread holds; a made-up one never replaces it.
 	rt.titles.rename(id, "  Spring   landing ");

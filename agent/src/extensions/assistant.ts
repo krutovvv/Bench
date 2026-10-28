@@ -78,7 +78,7 @@ export const assistant = defineExtension({
 		section(
 			"inserts",
 			async (input: any, context: any) => {
-				const doc = (await input.read.snapshot(Inserts as any, input.conversationId, context).catch(() => undefined)) as any;
+				const doc = (await input.read.snapshot(Inserts, input.conversationId, context).catch(() => undefined)) as any;
 				return inserted(Object.values<any>(doc?.items ?? {}).filter((i) => !i.removed));
 			},
 			{ tag: false },

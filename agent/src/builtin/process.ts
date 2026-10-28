@@ -11,7 +11,7 @@
 
 import { Type } from "@earendil-works/pi-ai";
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
-import { defineTask, defineTool } from "@earendil-works/pi-durable";
+import { defineTask, defineTool, type ConversationId } from "@earendil-works/pi-durable";
 import { host } from "../host.ts";
 import type { Process } from "../protocol.gen.ts";
 import type { Runtime } from "../runtime.ts";
@@ -158,7 +158,7 @@ export class Processes {
 		const out: Process[] = [];
 		let cursor: any;
 		do {
-			const page = await this.rt.storage.scanTasks({ conversationId: Number(conversationId), kind: PROCESS_KIND }, 200, cursor, BACKGROUND_CONTEXT);
+			const page = await this.rt.storage.scanTasks({ conversationId: Number(conversationId) as ConversationId, kind: PROCESS_KIND }, 200, cursor, BACKGROUND_CONTEXT);
 			for (const rec of page.items) {
 				const p = processOf(rec);
 				if (p) out.push(p);

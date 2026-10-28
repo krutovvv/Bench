@@ -34,8 +34,8 @@ export const FAIL_KIND = "bench.fail";
 /** Pi's compaction summary: a new context, with the older entries left out of what the model reads. */
 export const COMPACTION_KIND = "pi.compaction";
 
-export const INBOX_KIND = (InboxDoc as any).kind ?? "pi.inbox";
-export const INSERTS_KIND = (Inserts as any).kind ?? "bench.inserts";
+export const INBOX_KIND = InboxDoc.definition.kind;
+export const INSERTS_KIND = Inserts.definition.kind;
 
 export const BLOCK_OPEN = "<block-state>";
 export const BLOCK_CLOSE = "</block-state>";
@@ -240,9 +240,11 @@ export class Journal {
 
 	private requestsOf = (conversation: string) => this.requests.get(conversation) ?? this.requests.set(conversation, new Requests()).get(conversation)!;
 
-	/** Send each commit's new entries, queue, inserts and processes to the threads that are open. */
+	/** Send each commit's new entries, queue, inserts and processes to the threads that are open;
+	 * index the words of every thread's new messages and answers for search. */
 	watch(): void {
 		this.rt.harness.subscribeCommits((publication: any) => {
+			for (const ch of publication.changes) if (ch.type === "entry") this.index(ch.value);
 			for (const ch of changesOf(publication.changes, (c) => this.rt.byConversation.has(c), this.requestsOf)) {
 				const id = this.rt.byConversation.get(ch.conversation)!.row.id;
 				if (ch.append) this.rt.tell(id, { kind: "append", value: ch.append });
@@ -251,6 +253,18 @@ export class Journal {
 				for (const p of ch.processes ?? []) this.rt.tell(id, { kind: "process", value: p });
 			}
 		});
+	}
+
+	/** One entry's words into the search index: the person's message, the agent's answer (not its
+	 * narration, thinking or calls). */
+	private index(entry: any): void {
+		const row = this.rt.store.byConversation(String(entry.conversationId));
+		if (!row) return;
+		for (const it of itemsOf(entry)) {
+			const ts = (it.kind === "user" || it.kind === "text" ? it.at : undefined) ?? Date.now();
+			if (it.kind === "user") this.rt.store.index(row.id, it.seq, "user", it.text, ts / 1000);
+			else if (it.kind === "text" && !it.narration && !it.error && it.text.trim()) this.rt.store.index(row.id, it.seq, "assistant", it.text, ts / 1000);
+		}
 	}
 
 	/**
@@ -277,8 +291,8 @@ export class Journal {
 			live.usage.compactions = compactions;
 			rt.stream.emitUsage(live);
 		}
-		const doc = (await rt.harness.snapshot(Inserts as any, live.conversation.id, ctx)) as any;
-		const inbox = await rt.harness.snapshot(InboxDoc as any, live.conversation.id, ctx);
+		const doc = await rt.harness.snapshot(Inserts, live.conversation.id, ctx);
+		const inbox = await rt.harness.snapshot(InboxDoc, live.conversation.id, ctx);
 		// Pi's submission records name each message's request: the rows Bench showed on Enter.
 		const requests = this.requestsOf(String(live.conversation.id));
 		cursor = undefined;
@@ -289,7 +303,7 @@ export class Journal {
 		} while (cursor);
 		return {
 			items: itemsOfAll(entries.filter((e) => Number(e.id) > since), requests),
-			queue: queueOf(inbox as any, requests),
+			queue: queueOf(inbox, requests),
 			inserts: doc?.items ?? {},
 			running: live.busy,
 			holds: live.busy ? live.holds : [],

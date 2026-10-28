@@ -125,6 +125,8 @@ export interface AgentSettings {
 	extensions?: string[];
 	/** "off" | "manual": ask before dangerous commands. */
 	approvals?: string;
+	/** Commands the person approved "always": never asked again in these settings' threads. */
+	allowed?: string[];
 	/**
 	 * Code mode: its threads also get Pi's `codemode` tool, a script that calls the other tools
 	 * (`extensions.ts`). A project's choice; its threads take it from their next turn.
@@ -340,6 +342,13 @@ export function compactionPolicy(at: number, window: number): { reserveTokens: n
 
 export function approvalsMode(profile: string): string {
 	return readAgent(profile).approvals ?? getSetting<{ mode?: string }>("approvals", {})?.mode ?? "off";
+}
+
+/** The person approved `command` "always" in these settings' threads. */
+export function allowCommand(profile: string, command: string): void {
+	const a = readAgent(profile);
+	if (a.allowed?.includes(command)) return;
+	writeAgent(profile, { ...a, allowed: [...(a.allowed ?? []), command] });
 }
 
 export function timezone(_profile?: string): string {

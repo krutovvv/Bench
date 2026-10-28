@@ -1,13 +1,12 @@
 // A run as it happens: Pi's events of a conversation (`watchEvents`) turned into what Bench and
 // the listeners in this process hear — the answer being written (`stream`), the run starting and
-// ending, its numbers, why it failed. What stays is the journal's: Bench reads entries from Pi's
-// commits (`thread.ts`), never from here.
+// ending, its numbers, why it failed. What stays is the journal's: Bench reads entries, and the
+// search index its words, from Pi's commits (`thread.ts`), never from here.
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { AgentEvent } from "@earendil-works/pi-durable";
 import { randomUUID } from "node:crypto";
 import fs from "node:fs";
-import path from "node:path";
 import { resolveModel } from "./config.ts";
 import type { Usage } from "./protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
@@ -36,7 +35,6 @@ export class Stream {
 				// far stays with the message before. Bench sees the entry through the journal.
 				const rec: any = e.record;
 				if (rec?.type !== "input" || rec.status !== "placed" || !live.busy) break;
-				if (live.answer) this.rt.store.addMessage(id, { role: "assistant", text: live.answer });
 				live.answer = "";
 				live.blocks.clear();
 				live.narrating = false;
@@ -81,36 +79,9 @@ export class Stream {
 				live.narrating = false;
 				break;
 			}
-			case "tool_execution_start": {
-				if (e.parentToolCallId) break;
-				const args = e.args as any;
-				live.toolArgs.set(e.toolCallId, args);
-				this.rt.report(id, { kind: "tool", name: e.toolName });
-				this.rt.store.addMessage(id, { role: "tool_call", text: JSON.stringify(args), tool_name: e.toolName, tool_call_id: e.toolCallId, args });
+			case "tool_execution_start":
+				if (!e.parentToolCallId) this.rt.report(id, { kind: "tool", name: e.toolName });
 				break;
-			}
-			case "tool_execution_end": {
-				if (e.parentToolCallId) break;
-				const m: any = e.entry?.model?.[0];
-				const text = (m?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
-				const details = (e.entry?.data as any)?.details ?? m?.details;
-				let result: any = text;
-				try {
-					const parsed = JSON.parse(text);
-					if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) result = parsed;
-				} catch {}
-				if (details && typeof details === "object") result = typeof result === "object" ? { ...result, ...details } : { output: result, ...details };
-				if (m?.isError && typeof result === "object") result.success = false;
-				// A file edit: the path and the diff Bench shows (Pi's edit gives a unified patch).
-				const args = live.toolArgs.get(e.toolCallId);
-				live.toolArgs.delete(e.toolCallId);
-				if ((e.toolName === "edit" || e.toolName === "write") && args?.path && !m?.isError) {
-					const full = path.resolve(live.row.cwd, String(args.path).replace(/^~(?=\/)/, process.env.HOME ?? "~"));
-					result = { ...(typeof result === "object" ? result : { output: result }), resolved_path: full, ...(details?.patch ? { diff: details.patch } : {}) };
-				}
-				this.rt.store.addMessage(id, { role: "tool", text, tool_name: e.toolName, tool_call_id: e.toolCallId });
-				break;
-			}
 			case "usage_changed":
 				this.emitUsage(live);
 				break;
@@ -174,7 +145,7 @@ export class Stream {
 
 	/** The thread's numbers as Bench shows them. */
 	usageOf(live: Live): Usage {
-		return usagePayload(live.row.model, live.usage, resolveModel().contextLength);
+		return usagePayload(resolveModel().model, live.usage, resolveModel().contextLength);
 	}
 
 	emitUsage(live: Live): void {
@@ -231,7 +202,6 @@ export class Stream {
 		// The failure travels with the answer: half an answer plus the reason it stopped is the
 		// truth of the turn, and it is what a reopened thread has to show.
 		const text = live.answer + (live.fail ? `${live.answer ? "\n\n" : ""}${RUN_STOPPED}${live.fail}` : "");
-		if (text) this.rt.store.addMessage(id, { role: "assistant", text });
 		this.rt.store.touch(id);
 		this.emitUsage(live);
 		this.rt.report(id, { kind: "complete", text });

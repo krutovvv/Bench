@@ -2,10 +2,27 @@
 // What waits is live state, not the journal's: the call is already in the journal, and its result
 // will be the answer. After a restart Pi runs the call again (or its `beforeTool`), which asks
 // again — nothing to restore.
+//
+// What the person approved stays: "session" in the thread's document `bench.approvals` (a fork
+// keeps what its thread allowed), "always" in its agent settings (`allowed`).
 
-import { readConfig } from "./config.ts";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
+import { defineDoc } from "@earendil-works/pi-durable";
+import { allowCommand, readAgent, readConfig } from "./config.ts";
 import type { Ask } from "./protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
+
+const ctx = BACKGROUND_CONTEXT;
+
+export const ApprovalsDoc = defineDoc<{ commands: string[] }>({
+	kind: "bench.approvals",
+	version: 1,
+	scope: "conversation",
+	history: "latest",
+	fork: "current",
+	initial: () => ({ commands: [] }),
+	checkpointWhen: () => true,
+});
 
 export class Asks {
 	private rt: Runtime;
@@ -41,19 +58,26 @@ export class Asks {
 		return answer;
 	}
 
-	/** A command to approve: "once" | "session" | "always" | "deny". One approved for the session
-	 * is not asked again while the thread is open. */
+	/** A command to approve: "once" | "session" | "always" | "deny". One approved for the thread or
+	 * for always is not asked again. */
 	async approve(sessionId: string, callId: string, command: string, description: string): Promise<string> {
 		const live = await this.rt.session(sessionId);
 		if (!live) return "deny";
-		if (live.approvedForSession.has(command)) return "session";
+		if (readAgent(live.row.profile).allowed?.includes(command)) return "always";
+		const doc = await this.rt.harness.snapshot(ApprovalsDoc, live.conversation.id, ctx);
+		if (doc?.commands?.includes(command)) return "session";
 		const choice = await this.wait(
 			live,
 			{ id: callId, kind: "approve", choices: ["once", "session", "always", "deny"], command, description },
 			`Approve this command?\n\n${command}\n\n${description}`,
 			Number(readConfig("default")?.approvals?.timeout ?? 120),
 		);
-		if (choice === "session" || choice === "always") live.approvedForSession.add(command);
+		if (choice === "always") allowCommand(live.row.profile, command);
+		if (choice === "session")
+			await live.conversation.commit(async (tx) => {
+				const d = await tx.doc(ApprovalsDoc, live.conversation.id);
+				if (!d.commands.includes(command)) d.commands.push(command);
+			}, ctx);
 		return choice || "deny";
 	}
 
