@@ -10,7 +10,7 @@ import { projects } from "./builtin/projects.ts";
 import { agents, compactionAt, compactionPolicy, resolveFallback, resolveModel, type ModelChoice } from "./config.ts";
 import { fallbackProvider } from "./fallback.ts";
 import type { ThreadInfo } from "./protocol.gen.ts";
-import type { SessionRow } from "./store.ts";
+import type { ThreadRow } from "./store.ts";
 
 /** A model as `configure()` names it. */
 export type ModelRef = { provider: string; modelId: string };
@@ -65,9 +65,9 @@ export class Models {
 
 	/** The thread's settings as Bench shows them; with the message just answered, whether the
 	 * fallback model wrote it (and why the main one did not). */
-	info(row: SessionRow, msg?: any): ThreadInfo {
+	info(row: ThreadRow, msg?: any): ThreadInfo {
 		const spare = resolveFallback();
-		const fell = msg && spare && msg.provider === this.providerId(row.profile, spare) && msg.model === spare.model;
+		const fell = msg && spare && msg.provider === this.providerId(row.agent, spare) && msg.model === spare.model;
 		return { effort: row.effort ?? "", ...(fell ? { fallback: { model: spare.model, reason: this.fallbackWhy } } : {}) };
 	}
 

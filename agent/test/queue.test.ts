@@ -81,7 +81,7 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	assert.equal(requests["third"], "bench-3");
 	assert.deepEqual(before.map((i) => i.text), ["second", "third"]);
 	// The placed message's words are found by search: the index is fed by Pi's commits.
-	assert.deepEqual(rt.store.search("first message").map((h) => h.session_id), [id]);
+	assert.deepEqual(rt.store.search("first message").map((h) => h.thread_id), [id]);
 	assert.equal(rt.store.get(id)?.message_count, 1, "the waiting ones are not messages of the thread yet");
 
 	// The person presses "send now" on the LAST one: it must be the next thing answered.
@@ -122,7 +122,7 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	(rt.titles as any).nameIfUnnamed(id, "Made up");
 	assert.equal(rt.store.get(id)?.title, "Spring landing");
 
-	// Compaction: one share of the window per profile, as Pi's policy under its own provider.
+	// Compaction: one share of the window per agent, as Pi's policy under its own provider.
 	const { compactionPolicy } = await import("../src/config.ts");
 	assert.deepEqual(rt.models.compactionOverrides(), {}, "nothing set: Pi's own policy");
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m", compaction: 0.9 } as any);

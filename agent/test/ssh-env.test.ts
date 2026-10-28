@@ -68,7 +68,7 @@ test("the prompt says where a machine project's work is", async () => {
 	const p = projects.save({ name: "Shop", folder: "/var/www/shop", machine: "wp-prod" });
 	assert.strictEqual(projects.get(p.id)?.machine, "wp-prod");
 	assert.strictEqual(projects.dir(p.id), "/var/www/shop", "its folder there, not looked for here");
-	const text = soul({ id: "s", profile: `project:${p.id}`, source: "local" } as any);
+	const text = soul({ id: "s", agent: `project:${p.id}`, source: "local" } as any);
 	assert.match(text, /server `wp-prod`, in \/var\/www\/shop/);
 });
 
@@ -130,7 +130,7 @@ test("a server folder's own instructions and skills are read there", async () =>
 		assert.deepStrictEqual(await skillFiles(acf), ["references/api.md"]);
 		await assert.rejects(readSkill(acf, "../../x"), /outside/);
 
-		const info = { id: "t", profile: `project:${p.id}`, cwd: theme, source: "bench", project: p.id };
+		const info = { id: "t", agent: `project:${p.id}`, cwd: theme, source: "bench", project: p.id };
 		assert.match((await projectContext(info))!, /Root rules\.[\s\S]*Theme rules\./);
 		assert.match((await skills(info))!, /acf-fields: How fields are added/);
 		forgetRepos();

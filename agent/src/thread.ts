@@ -274,8 +274,8 @@ export class Journal {
 	 */
 	async open(id: string, since = 0): Promise<ThreadOpen> {
 		const rt = this.rt;
-		const live = await rt.session(id);
-		if (!live) throw new Error(`session not found: ${id}`);
+		const live = await rt.thread(id);
+		if (!live) throw new Error(`thread not found: ${id}`);
 		const entries: any[] = [];
 		let cursor: any;
 		do {

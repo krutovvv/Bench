@@ -12,21 +12,21 @@ import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
 import { machineOf, repoOf, skillsFor } from "./repo.ts";
 import { projects } from "./builtin/projects.ts";
-import type { SessionInfo } from "./host.ts";
+import type { ThreadFacts } from "./host.ts";
 
 const IDENTITY = "You are a capable assistant working on the person's own computer through tools.";
 
 const read = (f: string) => (fs.existsSync(f) ? fs.readFileSync(f, "utf8").trim() : "");
 
 /** The agent's SYSTEM.md (who it is), as in Pi; then its AGENTS.md (standing instructions). */
-export function soul(s: SessionInfo): string {
-	const home = agentDir(homeAgent(s.profile));
+export function soul(s: ThreadFacts): string {
+	const home = agentDir(homeAgent(s.agent));
 	const instructions = read(path.join(home, "AGENTS.md"));
 	const parts = [read(path.join(home, "SYSTEM.md")) || IDENTITY, instructions && `# Standing instructions\n\n${instructions}`];
 	// A project's own soul: what it is, how to work in it.
-	if (isProject(s.profile)) {
-		const own = read(path.join(agentDir(s.profile), "SYSTEM.md"));
-		const p = projects.get(s.profile.slice(8));
+	if (isProject(s.agent)) {
+		const own = read(path.join(agentDir(s.agent), "SYSTEM.md"));
+		const p = projects.get(s.agent.slice(8));
 		const name = p?.name ?? "this project";
 		// Worked on another machine: say where, so commands and paths are meant for it.
 		const where = p?.machine
@@ -46,7 +46,7 @@ const PLATFORM: Record<string, string> = {
 	cron: "You run as a scheduled job: nobody is there to answer questions. Do the task and put the result in your answer; it is delivered as is.",
 };
 
-export function environment(s: SessionInfo): string {
+export function environment(s: ThreadFacts): string {
 	const day = new Intl.DateTimeFormat("en-US", { timeZone: timezone(), weekday: "long", year: "numeric", month: "long", day: "numeric" }).format(new Date());
 	return [
 		`Today is ${day} (${timezone()}). For the exact time, run date.`,
@@ -64,7 +64,7 @@ export function environment(s: SessionInfo): string {
 
 /** Where the thread's project keeps its settings, which the person edits in the project's
  * Settings in Bench, and the agent when asked. */
-function settings(s: SessionInfo): string | undefined {
+function settings(s: ThreadFacts): string | undefined {
 	if (!s.project) return undefined;
 	const dir = path.join(path.dirname(agentDir("project:x")), s.project);
 	return `This project's settings live in ${dir}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them).`;
@@ -72,7 +72,7 @@ function settings(s: SessionInfo): string | undefined {
 
 /** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory, read where
  * it is (a project's server too: `repo.ts`). */
-export async function projectContext(s: SessionInfo): Promise<string | undefined> {
+export async function projectContext(s: ThreadFacts): Promise<string | undefined> {
 	const machine = machineOf(s.project);
 	if (machine) {
 		const { instructions } = await repoOf(s.cwd, machine).catch(() => ({ instructions: [] }));
@@ -101,16 +101,16 @@ export async function projectContext(s: SessionInfo): Promise<string | undefined
 	return parts.length ? `# Project instructions\n\n${parts.join("\n\n")}` : undefined;
 }
 
-export async function skills(s: SessionInfo): Promise<string | undefined> {
-	const list = await skillsFor(s.profile, s.cwd, machineOf(s.project)).catch(() => listSkills(s.profile, s.cwd, []));
+export async function skills(s: ThreadFacts): Promise<string | undefined> {
+	const list = await skillsFor(s.agent, s.cwd, machineOf(s.project)).catch(() => listSkills(s.agent, s.cwd, []));
 	if (!list.length) return undefined;
 	const lines = list.map((k) => `- ${k.name}: ${k.description.replace(/\s+/g, " ").slice(0, 120)}`);
 	return `# Skills\nThe person's own procedures. When one fits the task, load it with skill_view first and follow it.\n${lines.join("\n")}`;
 }
 
-export function notes(s: SessionInfo): string | undefined {
-	const user = readEntries(s.profile, "user");
-	const memory = readEntries(s.profile, "memory");
+export function notes(s: ThreadFacts): string | undefined {
+	const user = readEntries(s.agent, "user");
+	const memory = readEntries(s.agent, "memory");
 	if (!user.length && !memory.length) return undefined;
 	const { memory: ml, user: ul } = LIMITS();
 	const block = (title: string, entries: string[], limit: number) => (entries.length ? `## ${title} (${entries.join("\n§\n").length}/${limit} chars)\n${entries.join("\n§\n")}` : "");

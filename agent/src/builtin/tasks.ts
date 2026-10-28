@@ -7,7 +7,7 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { randomBytes } from "node:crypto";
 import { db } from "../config.ts";
-import { sessionOf } from "../host.ts";
+import { threadOf } from "../host.ts";
 import { projects } from "./projects.ts";
 
 export interface Task {
@@ -159,7 +159,7 @@ export const tasksTool = defineTool({
 		// In a project's thread its tag is the default filter, and new tasks get it.
 		let projectTag = "";
 		try {
-			const id = sessionOf(api.conversationId).project ?? "";
+			const id = threadOf(api.conversationId).project ?? "";
 			const name = id ? projects.get(id)?.name : undefined;
 			if (name) projectTag = slug(name);
 		} catch {}

@@ -1,11 +1,9 @@
-// The gear and the agent's own settings: providers and models, profiles, the config, keys in
+// The gear and the agent's own settings: providers and models, the config, keys in
 // the environment, the general skills and MCP servers, the agent's status.
 
-import fs from "node:fs";
-import path from "node:path";
 import YAML from "yaml";
 import pkg from "../../package.json" with { type: "json" };
-import { agentDir, agents, deepMerge, deleteProvider, getSetting, providers, readAgent, readConfig, readEnv, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent } from "../config.ts";
+import { deepMerge, deleteProvider, getSetting, providers, readAgent, readConfig, readEnv, saveProvider, setEnv as storeEnv, setSetting, writeAgent } from "../config.ts";
 import { listSkills as skillsOf } from "../builtin/skills.ts";
 import { HttpError, agentOf, type Ctx, type Module } from "../http.ts";
 import { mcpStatus } from "../mcp.ts";
@@ -15,29 +13,29 @@ import { mcpStatus } from "../mcp.ts";
  * approvals are the agent's own (a project's thread reads `project:<id>`); the model is one for
  * every thread and goes to the general agent; the fallback is a setting like the rest.
  */
-function patchConfig(profile: string, patch: any): void {
+function patchConfig(agent: string, patch: any): void {
 	for (const [k, v] of Object.entries(patch ?? {})) {
 		const m = v as any;
 		if (k === "model" && m && typeof m === "object") {
 			const p = readAgent("default");
 			writeAgent("default", { ...p, defaultProvider: m.provider ?? p.defaultProvider, defaultModel: m.default ?? m.name ?? p.defaultModel });
 		} else if (k === "agent" && m && typeof m === "object" && m.reasoning_effort) {
-			writeAgent(profile, { ...readAgent(profile), defaultThinkingLevel: String(m.reasoning_effort) });
+			writeAgent(agent, { ...readAgent(agent), defaultThinkingLevel: String(m.reasoning_effort) });
 		} else if (k === "compaction" && m && typeof m === "object") {
 			// A share of the window (0.9), or null: Pi's own policy again.
 			const at = m.at === null || m.at === undefined ? undefined : Number(m.at);
-			writeAgent(profile, { ...readAgent(profile), compaction: at });
+			writeAgent(agent, { ...readAgent(agent), compaction: at });
 		} else if (k === "code_mode" && m && typeof m === "object" && m.enabled !== undefined) {
-			writeAgent(profile, { ...readAgent(profile), codeMode: Boolean(m.enabled) || undefined });
+			writeAgent(agent, { ...readAgent(agent), codeMode: Boolean(m.enabled) || undefined });
 		} else if (k === "approvals" && m && typeof m === "object" && m.mode !== undefined) {
-			writeAgent(profile, { ...readAgent(profile), approvals: String(m.mode) });
+			writeAgent(agent, { ...readAgent(agent), approvals: String(m.mode) });
 		} else setSetting(k, deepMerge(getSetting(k), v));
 	}
 }
 
-function listSkills(profile: string) {
-	const disabled = new Set<string>(readConfig(profile)?.skills?.disabled ?? []);
-	return skillsOf(profile).map((k) => ({ name: k.name, category: k.category, description: k.description, enabled: !disabled.has(k.name) }));
+function listSkills(agent: string) {
+	const disabled = new Set<string>(readConfig(agent)?.skills?.disabled ?? []);
+	return skillsOf(agent).map((k) => ({ name: k.name, category: k.category, description: k.description, enabled: !disabled.has(k.name) }));
 }
 
 function setEnv(key: string, value: string | undefined): void {
@@ -102,18 +100,6 @@ export default ({ rt }: Ctx): Module => ({
 			}));
 			return { endpoints, current };
 		},
-		"GET /api/profiles": () => ({
-			profiles: agents().map((name) => ({ name, display_name: name, model: resolveModel(name).model, skill_count: listSkills(name).length, is_default: name === "default" })),
-		}),
-		"POST /api/profiles": (req) => {
-			const name = String(req.body?.name ?? "").trim();
-			if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name)) throw new HttpError(400, "invalid profile name");
-			if (agents().includes(name)) throw new HttpError(409, "profile exists");
-			const from = req.body?.clone_from ? String(req.body.clone_from) : "default";
-			writeAgent(name, readAgent(from));
-			for (const f of ["SYSTEM.md", "AGENTS.md", "mcp.json"]) if (fs.existsSync(path.join(agentDir(from), f))) fs.copyFileSync(path.join(agentDir(from), f), path.join(agentDir(name), f));
-			return { name };
-		},
 		"GET /api/env": (req) => {
 			const env = readEnv(agentOf(req));
 			return Object.fromEntries(Object.entries(env).map(([k, v]) => [k, { is_set: Boolean(v), redacted_value: v ?? "", description: "", category: "", channel_managed: false, custom: true }]));
@@ -145,44 +131,6 @@ export default ({ rt }: Ctx): Module => ({
 			/^\/api\/providers\/custom-endpoints\/([^/]+)$/,
 			(_req, m) => {
 				deleteProvider(decodeURIComponent(m[1]));
-				return { ok: true };
-			},
-		],
-		[
-			"GET",
-			/^\/api\/profiles\/([^/]+)\/soul$/,
-			(_req, m) => {
-				const f = path.join(agentDir(decodeURIComponent(m[1])), "SYSTEM.md");
-				return { content: fs.existsSync(f) ? fs.readFileSync(f, "utf8") : "" };
-			},
-		],
-		[
-			"PUT",
-			/^\/api\/profiles\/([^/]+)\/soul$/,
-			(req, m) => {
-				const f = path.join(agentDir(decodeURIComponent(m[1])), "SYSTEM.md");
-				fs.mkdirSync(path.dirname(f), { recursive: true });
-				fs.writeFileSync(f, String(req.body?.content ?? ""));
-				return { ok: true };
-			},
-		],
-		[
-			"PATCH",
-			/^\/api\/profiles\/([^/]+)$/,
-			(req, m) => {
-				const from = agentDir(decodeURIComponent(m[1]));
-				const name = String(req.body?.new_name ?? "");
-				if (!/^[a-z0-9][a-z0-9_-]*$/i.test(name) || m[1] === "default") throw new HttpError(400, "invalid rename");
-				fs.renameSync(from, agentDir(name));
-				return { name };
-			},
-		],
-		[
-			"DELETE",
-			/^\/api\/profiles\/([^/]+)$/,
-			(_req, m) => {
-				if (m[1] === "default") throw new HttpError(400, "the default profile cannot be deleted");
-				fs.rmSync(agentDir(decodeURIComponent(m[1])), { recursive: true, force: true });
 				return { ok: true };
 			},
 		],

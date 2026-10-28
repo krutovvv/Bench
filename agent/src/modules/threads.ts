@@ -114,6 +114,6 @@ export default ({ rt }: Ctx): Module => ({
 	},
 	routes: {
 		// The threads whose titles or messages have the words: (thread, the snippet around them).
-		"GET /api/threads/search": (req) => ({ results: rt.store.search(req.query.get("q") ?? "", Number(req.query.get("limit") ?? 30)).map((r) => ({ thread: r.session_id, snippet: r.snippet })) }),
+		"GET /api/threads/search": (req) => ({ results: rt.store.search(req.query.get("q") ?? "", Number(req.query.get("limit") ?? 30)).map((r) => ({ thread: r.thread_id, snippet: r.snippet })) }),
 	},
 });

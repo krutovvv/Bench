@@ -1,6 +1,6 @@
 // Scheduled jobs. Each enabled job is a durable Pi task that sleeps until its next run
 // (`sleepUntil`), so it survives restarts and a run missed while the server was down happens when
-// it starts again. A run is a fresh session of the job's profile (source "cron"); its answer goes
+// it starts again. A run is a fresh session of the job's agent (source "cron"); its answer goes
 // to `deliver` ("telegram:<chat>"), or stays in that session for Bench.
 //
 // Schedules: cron expressions ("0 8 * * 1", croner), intervals ("30m", "every 2h"), one-shot
@@ -10,12 +10,12 @@ import { Type } from "@earendil-works/pi-ai";
 import { defineTask, defineTool, type Conversation } from "@earendil-works/pi-durable";
 import { Cron } from "croner";
 import { randomBytes } from "node:crypto";
-import { db, timezone } from "../config.ts";
-import { host, sessionOf } from "../host.ts";
+import { db, renameOld, timezone } from "../config.ts";
+import { host, threadOf } from "../host.ts";
 
 export interface Job {
 	id: string;
-	profile: string;
+	agent: string;
 	name: string;
 	prompt: string;
 	schedule: string;
@@ -25,26 +25,28 @@ export interface Job {
 	last_run: number | null;
 	last_status: string | null;
 	last_output: string | null;
-	last_session: string | null;
+	last_thread: string | null;
 	/** The Pi task that sleeps until its next run. */
 	task_id: string | null;
 	created: number;
 }
 
 function table() {
+	renameOld("ALTER TABLE cron_jobs RENAME COLUMN profile TO agent");
+	renameOld("ALTER TABLE cron_jobs RENAME COLUMN last_session TO last_thread");
 	db().exec(`CREATE TABLE IF NOT EXISTS cron_jobs (
-		id TEXT PRIMARY KEY, profile TEXT NOT NULL, name TEXT NOT NULL, prompt TEXT NOT NULL, schedule TEXT NOT NULL,
+		id TEXT PRIMARY KEY, agent TEXT NOT NULL, name TEXT NOT NULL, prompt TEXT NOT NULL, schedule TEXT NOT NULL,
 		deliver TEXT DEFAULT '', enabled INTEGER DEFAULT 1, next_run REAL, last_run REAL, last_status TEXT,
-		last_output TEXT, last_session TEXT, task_id TEXT, created REAL
+		last_output TEXT, last_thread TEXT, task_id TEXT, created REAL
 	)`);
 }
 
 const row = (r: any): Job => ({ ...r, enabled: Boolean(r.enabled) });
 
 export const jobs = {
-	list(profile?: string): Job[] {
+	list(agent?: string): Job[] {
 		table();
-		return (db().prepare(`SELECT * FROM cron_jobs ${profile ? "WHERE profile = ?" : ""} ORDER BY created`).all(...(profile ? [profile] : [])) as any[]).map(row);
+		return (db().prepare(`SELECT * FROM cron_jobs ${agent ? "WHERE agent = ?" : ""} ORDER BY created`).all(...(agent ? [agent] : [])) as any[]).map(row);
 	},
 	get(id: string): Job | undefined {
 		table();
@@ -52,8 +54,8 @@ export const jobs = {
 		return r ? row(r) : undefined;
 	},
 	/** By id, or a unique case-insensitive name. */
-	resolve(ref: string, profile?: string): Job {
-		const all = jobs.list(profile);
+	resolve(ref: string, agent?: string): Job {
+		const all = jobs.list(agent);
 		const hit = all.find((j) => j.id === ref) ?? all.filter((j) => j.name.toLowerCase() === ref.toLowerCase());
 		if (Array.isArray(hit)) {
 			if (hit.length === 1) return hit[0];
@@ -65,12 +67,12 @@ export const jobs = {
 		table();
 		db()
 			.prepare(
-				`INSERT INTO cron_jobs (id, profile, name, prompt, schedule, deliver, enabled, next_run, last_run, last_status, last_output, last_session, task_id, created)
-				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET profile=excluded.profile, name=excluded.name, prompt=excluded.prompt,
+				`INSERT INTO cron_jobs (id, agent, name, prompt, schedule, deliver, enabled, next_run, last_run, last_status, last_output, last_thread, task_id, created)
+				 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET agent=excluded.agent, name=excluded.name, prompt=excluded.prompt,
 				 schedule=excluded.schedule, deliver=excluded.deliver, enabled=excluded.enabled, next_run=excluded.next_run, last_run=excluded.last_run,
-				 last_status=excluded.last_status, last_output=excluded.last_output, last_session=excluded.last_session, task_id=excluded.task_id`,
+				 last_status=excluded.last_status, last_output=excluded.last_output, last_thread=excluded.last_thread, task_id=excluded.task_id`,
 			)
-			.run(j.id, j.profile, j.name, j.prompt, j.schedule, j.deliver, j.enabled ? 1 : 0, j.next_run, j.last_run, j.last_status, j.last_output, j.last_session, j.task_id ?? null, j.created);
+			.run(j.id, j.agent, j.name, j.prompt, j.schedule, j.deliver, j.enabled ? 1 : 0, j.next_run, j.last_run, j.last_status, j.last_output, j.last_thread, j.task_id ?? null, j.created);
 	},
 	remove(id: string): void {
 		table();
@@ -150,12 +152,12 @@ export const CronTask = defineTask<{ jobId: string }, Phase, null>({
 export async function runJob(job: Job): Promise<void> {
 	const started = Date.now();
 	try {
-		const r = await host().run(job.profile, job.prompt, { source: "cron", title: `Cron: ${job.name}` });
+		const r = await host().run(job.agent, job.prompt, { source: "cron", title: `Cron: ${job.name}` });
 		job.last_status = "ok";
 		job.last_output = r.text;
-		job.last_session = r.sessionId;
+		job.last_thread = r.threadId;
 		// A project's job answers through that project's bot ("telegram:<project>/<chat>").
-		const project = job.profile.startsWith("project:") ? job.profile.slice(8) : "";
+		const project = job.agent.startsWith("project:") ? job.agent.slice(8) : "";
 		const target = project && job.deliver.startsWith("telegram:") && !job.deliver.includes("/") ? `telegram:${project}/${job.deliver.slice(9)}` : job.deliver;
 		if (target && r.text.trim()) await host().deliver(target, r.text).catch((e) => (job.last_status = `delivery failed: ${(e as Error).message}`));
 	} catch (e) {
@@ -174,7 +176,7 @@ function settle(job: Job, started: number, status: string): void {
 		job.next_run = null;
 	}
 	if (job.next_run === null) job.enabled = false;
-	jobs.save({ ...job, ...pick(jobs.get(job.id), ["enabled", "schedule", "prompt", "name", "deliver"]), last_run: job.last_run, last_status: job.last_status, last_output: job.last_output, last_session: job.last_session, next_run: job.next_run });
+	jobs.save({ ...job, ...pick(jobs.get(job.id), ["enabled", "schedule", "prompt", "name", "deliver"]), last_run: job.last_run, last_status: job.last_status, last_output: job.last_output, last_thread: job.last_thread, next_run: job.next_run });
 }
 
 const pick = (o: any, keys: string[]) => (o ? Object.fromEntries(keys.map((k) => [k, o[k]])) : {});
@@ -207,9 +209,9 @@ export async function arm(job: Job): Promise<void> {
 	jobs.save({ ...current, task_id: String(taskId) });
 }
 
-export function newJob(o: { profile: string; name: string; prompt: string; schedule: string; deliver?: string }): Job {
+export function newJob(o: { agent: string; name: string; prompt: string; schedule: string; deliver?: string }): Job {
 	const next = nextRun(o.schedule);
-	return { id: randomBytes(6).toString("hex"), profile: o.profile, name: o.name, prompt: o.prompt, schedule: o.schedule, deliver: o.deliver ?? "", enabled: next !== null, next_run: next, last_run: null, last_status: null, last_output: null, last_session: null, task_id: null, created: Date.now() };
+	return { id: randomBytes(6).toString("hex"), agent: o.agent, name: o.name, prompt: o.prompt, schedule: o.schedule, deliver: o.deliver ?? "", enabled: next !== null, next_run: next, last_run: null, last_status: null, last_output: null, last_thread: null, task_id: null, created: Date.now() };
 }
 
 // ---- the tool --------------------------------------------------------------
@@ -231,17 +233,17 @@ export const cronTool = defineTool({
 		schedule: Type.Optional(Type.String()),
 	}),
 	execute: async (args, api) => {
-		const s = sessionOf(api.conversationId);
-		if (args.action === "list") return text({ jobs: jobs.list(s.profile).map(view) });
+		const s = threadOf(api.conversationId);
+		if (args.action === "list") return text({ jobs: jobs.list(s.agent).map(view) });
 		if (args.action === "create") {
 			if (!args.prompt || !args.schedule) throw new Error("prompt and schedule are required");
 			const chat = s.source === "telegram" ? s.chat_id : undefined;
-			const job = newJob({ profile: s.profile, name: args.name || args.prompt.slice(0, 40), prompt: args.prompt, schedule: args.schedule, deliver: chat ? `telegram:${String(chat).split(":")[0]}` : "" });
+			const job = newJob({ agent: s.agent, name: args.name || args.prompt.slice(0, 40), prompt: args.prompt, schedule: args.schedule, deliver: chat ? `telegram:${String(chat).split(":")[0]}` : "" });
 			jobs.save(job);
 			await arm(job);
 			return text({ success: true, job: view(job) });
 		}
-		const job = jobs.resolve(String(args.job ?? ""), s.profile);
+		const job = jobs.resolve(String(args.job ?? ""), s.agent);
 		if (args.action === "remove") {
 			await arm({ ...job, enabled: false });
 			jobs.remove(job.id);

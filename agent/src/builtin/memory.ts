@@ -1,4 +1,4 @@
-// `memory`: two small notebooks of the profile, memories/MEMORY.md (the agent's notes) and
+// `memory`: two small notebooks of the agent, memories/MEMORY.md (the agent's notes) and
 // memories/USER.md (about the person), entries separated by "\n§\n". Both are
 // in the system prompt. Written only when the person asks; there is no automatic saving.
 
@@ -7,7 +7,7 @@ import { defineTool } from "@earendil-works/pi-durable";
 import fs from "node:fs";
 import path from "node:path";
 import { getSetting, agentDir, homeAgent } from "../config.ts";
-import { sessionOf } from "../host.ts";
+import { threadOf } from "../host.ts";
 
 const SEP = "\n§\n";
 
@@ -16,18 +16,18 @@ export const LIMITS = () => {
 	return { memory: Number(m.memory_char_limit ?? 2200), user: Number(m.user_char_limit ?? 1375) };
 };
 
-export function memoryFile(profile: string, target: "memory" | "user"): string {
+export function memoryFile(agent: string, target: "memory" | "user"): string {
 	// One memory for every project's threads: the general agent's.
-	return path.join(agentDir(homeAgent(profile)), "memories", target === "user" ? "USER.md" : "MEMORY.md");
+	return path.join(agentDir(homeAgent(agent)), "memories", target === "user" ? "USER.md" : "MEMORY.md");
 }
 
-export function readEntries(profile: string, target: "memory" | "user"): string[] {
-	const f = memoryFile(profile, target);
+export function readEntries(agent: string, target: "memory" | "user"): string[] {
+	const f = memoryFile(agent, target);
 	return fs.existsSync(f) ? fs.readFileSync(f, "utf8").split(SEP).map((e) => e.trim()).filter(Boolean) : [];
 }
 
-function write(profile: string, target: "memory" | "user", entries: string[]): void {
-	const f = memoryFile(profile, target);
+function write(agent: string, target: "memory" | "user", entries: string[]): void {
+	const f = memoryFile(agent, target);
 	fs.mkdirSync(path.dirname(f), { recursive: true });
 	fs.writeFileSync(f + ".tmp", entries.join(SEP));
 	fs.renameSync(f + ".tmp", f);
@@ -49,8 +49,8 @@ export const memoryTool = defineTool({
 		old_text: Type.Optional(Type.String({ description: "A unique part of the note to replace or remove" })),
 	}),
 	execute: async (args, api) => {
-		const { profile } = sessionOf(api.conversationId);
-		const entries = readEntries(profile, args.target);
+		const { agent } = threadOf(api.conversationId);
+		const entries = readEntries(agent, args.target);
 		const limit = LIMITS()[args.target];
 		const find = () => {
 			const hits = entries.map((e, i) => [e, i] as const).filter(([e]) => args.old_text && e.includes(args.old_text));
@@ -66,7 +66,7 @@ export const memoryTool = defineTool({
 		} else entries.splice(find(), 1);
 		const used = entries.join(SEP).length;
 		if (used > limit) throw new Error(`over the ${limit}-character budget (${used}); replace or remove an old note first`);
-		write(profile, args.target, entries);
+		write(agent, args.target, entries);
 		return text({ success: true, target: args.target, entries: entries.length, usage: `${used}/${limit}` });
 	},
 });

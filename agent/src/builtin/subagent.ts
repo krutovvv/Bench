@@ -8,7 +8,7 @@
 import { Type } from "@earendil-works/pi-ai";
 import { AssistantEntry, configure, defineTool, type ConversationId } from "@earendil-works/pi-durable";
 import { providers, resolveModel } from "../config.ts";
-import { host, sessionOf } from "../host.ts";
+import { host, threadOf } from "../host.ts";
 
 /**
  * How many subagents may run at once: the main model's provider's slots (`parallel`) less the
@@ -48,7 +48,7 @@ export const delegate = defineTool({
 	}),
 	replay: "safe",
 	execute: async (args, api, context) => {
-		const parent = sessionOf(api.conversationId);
+		const parent = threadOf(api.conversationId);
 		// The children are made and set up in one commit, as Pi's README shows: each starts as a
 		// copy of this conversation's agent, less `delegate` (no subagents of its own).
 		const children: ConversationId[] = await api.commit(async (tx) => {

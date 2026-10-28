@@ -23,7 +23,7 @@ export class Titles {
 	/** The person's name for a thread: it stays (no title is made up over it). */
 	rename(id: string, title: string): void {
 		const t = title.replace(/\s+/g, " ").trim().slice(0, 120);
-		if (!t || !this.rt.store.get(id)) throw new Error(`session not found: ${id}`);
+		if (!t || !this.rt.store.get(id)) throw new Error(`thread not found: ${id}`);
 		this.rt.store.update(id, { title: t });
 		const live = this.rt.live.get(id);
 		if (live) live.row = this.rt.store.get(id)!;
@@ -34,7 +34,7 @@ export class Titles {
 	async name(live: Live, message: string): Promise<void> {
 		const fallback = message.replace(/\s+/g, " ").trim().slice(0, 60);
 		try {
-			const model = this.rt.models.model(this.rt.models.ref(live.row.profile));
+			const model = this.rt.models.model(this.rt.models.ref(live.row.agent));
 			const context = { systemPrompt: TITLE_PROMPT, messages: [{ role: "user", content: message.slice(0, 2000), timestamp: Date.now() }] };
 			// A title needs no reasoning: off, also on a server that thinks unless told not to.
 			const ask = (onPayload?: (p: any, m: any) => any) => (this.rt.models.pi as any).complete(model, context, { reasoningEffort: undefined, maxTokens: 400, onPayload });

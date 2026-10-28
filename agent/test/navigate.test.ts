@@ -28,7 +28,7 @@ fs.writeFileSync(path.join(root, "a.ts"), "class Outer {\n  inner() { return Out
 execFileSync("git", ["init", "-q", root]);
 execFileSync("git", ["-C", root, "add", "a.ts"]);
 writeLsp("project:nav", { fake: { command: process.execPath, args: [path.join(import.meta.dirname, "fake-lsp.mjs")], extensions: ["ts"] } });
-setHost({ session: () => ({ id: "s", profile: "project:nav", cwd: root, source: "local", project: "", inserts: [] }) } as any);
+setHost({ thread: () => ({ id: "s", agent: "project:nav", cwd: root, source: "local", project: "", inserts: [] }) } as any);
 
 const call = async (args: any) => {
 	const r: any = await lspTool.execute(args, { conversationId: "c", env: new NodeExecutionEnv({ cwd: root }) } as any, ctx);

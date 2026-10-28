@@ -42,9 +42,9 @@ export interface LspSpec {
 }
 
 /** A project's servers (`<its agent dir>/lsp.json`, `{"servers": {name: spec}}`). */
-export function readLsp(profile: string): Record<string, LspSpec> {
+export function readLsp(agent: string): Record<string, LspSpec> {
 	try {
-		const v = JSON.parse(fs.readFileSync(path.join(agentDir(profile), "lsp.json"), "utf8"));
+		const v = JSON.parse(fs.readFileSync(path.join(agentDir(agent), "lsp.json"), "utf8"));
 		return v?.servers && typeof v.servers === "object" ? v.servers : {};
 	} catch {
 		return {};
@@ -52,11 +52,11 @@ export function readLsp(profile: string): Record<string, LspSpec> {
 }
 
 /** The project's servers anew; the running ones stop (the next file starts the new ones). */
-export function writeLsp(profile: string, servers: Record<string, LspSpec>): void {
-	const dir = agentDir(profile);
+export function writeLsp(agent: string, servers: Record<string, LspSpec>): void {
+	const dir = agentDir(agent);
 	fs.mkdirSync(dir, { recursive: true });
 	fs.writeFileSync(path.join(dir, "lsp.json"), JSON.stringify({ servers }, null, 2));
-	for (const [key, c] of clients) if (key.startsWith(`${profile}|`)) (c.stop(), clients.delete(key));
+	for (const [key, c] of clients) if (key.startsWith(`${agent}|`)) (c.stop(), clients.delete(key));
 }
 
 /**
@@ -81,14 +81,14 @@ export function parseLspSpec(input: unknown): LspSpec {
 }
 
 /** One server of the project set anew (or added); the project's running servers stop, as `writeLsp`. */
-export function writeLspServer(profile: string, name: string, spec: LspSpec): void {
-	writeLsp(profile, { ...readLsp(profile), [name]: spec });
+export function writeLspServer(agent: string, name: string, spec: LspSpec): void {
+	writeLsp(agent, { ...readLsp(agent), [name]: spec });
 }
 
 /** How the project's servers are doing: running, installing, or why they failed. */
-export function lspStates(profile: string): Record<string, string> {
+export function lspStates(agent: string): Record<string, string> {
 	const out: Record<string, string> = {};
-	for (const [key, c] of clients) if (key.startsWith(`${profile}|`)) out[key.split("|")[3]!] = c.state();
+	for (const [key, c] of clients) if (key.startsWith(`${agent}|`)) out[key.split("|")[3]!] = c.state();
 	return out;
 }
 
@@ -97,8 +97,8 @@ export function lspStates(profile: string): Record<string, string> {
  * packages need node and npm there, any other server its own program, fetched files curl. Read
  * in a login shell, as `install` runs; kept a little while (the environment asks on every open).
  */
-export async function lspNeeds(profile: string, machine: string | undefined): Promise<Record<string, string>> {
-	const servers = Object.entries(readLsp(profile));
+export async function lspNeeds(agent: string, machine: string | undefined): Promise<Record<string, string>> {
+	const servers = Object.entries(readLsp(agent));
 	if (!servers.length) return {};
 	const needs = (s: LspSpec) => [...(s.npm?.length ? ["node", "npm"] : s.command.includes("${LSP}") ? [] : [s.command]), ...(s.fetch?.length ? ["curl"] : [])];
 	const programs = [...new Set(servers.flatMap(([, s]) => needs(s)))];
@@ -356,32 +356,32 @@ class LspClient {
 
 const clients = new Map<string, LspClient>();
 
-/** The servers of `profile` still loading the project, with how long they have been at it (s): an
+/** The servers of `agent` still loading the project, with how long they have been at it (s): an
  * empty answer from one of them is not yet the truth. */
-export function indexing(profile: string): { name: string; secs: number }[] {
+export function indexing(agent: string): { name: string; secs: number }[] {
 	const out: { name: string; secs: number }[] = [];
-	for (const [key, c] of clients) if (key.startsWith(`${profile}|`) && c.indexing()) out.push({ name: key.split("|").pop()!, secs: Math.round((Date.now() - c.born) / 1000) });
+	for (const [key, c] of clients) if (key.startsWith(`${agent}|`) && c.indexing()) out.push({ name: key.split("|").pop()!, secs: Math.round((Date.now() - c.born) / 1000) });
 	return out;
 }
 
 /** Start every server of the project now, so it has loaded the project by the time it is asked
  * (rust-analyzer takes minutes on a large workspace). Started ones are left as they are. */
-export function warmUp(profile: string, root: string, machine: string | undefined): void {
-	for (const [name, spec] of Object.entries(readLsp(profile))) {
+export function warmUp(agent: string, root: string, machine: string | undefined): void {
+	for (const [name, spec] of Object.entries(readLsp(agent))) {
 		const ext = (spec.extensions ?? [])[0]?.replace(/^\./, "");
-		if (spec?.command && ext) clientsFor(profile, root, machine, `${root}/.${name}.${ext}`);
+		if (spec?.command && ext) clientsFor(agent, root, machine, `${root}/.${name}.${ext}`);
 	}
 }
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const uriOf = (p: string) => `file://${p.split("/").map(encodeURIComponent).join("/")}`;
 
-/** The servers of `profile` that know `file`, started on first use. */
-function clientsFor(profile: string, root: string, machine: string | undefined, file: string): [string, LspClient][] {
+/** The servers of `agent` that know `file`, started on first use. */
+function clientsFor(agent: string, root: string, machine: string | undefined, file: string): [string, LspClient][] {
 	const ext = path.extname(file).slice(1).toLowerCase();
 	const out: [string, LspClient][] = [];
-	for (const [name, spec] of Object.entries(readLsp(profile))) {
+	for (const [name, spec] of Object.entries(readLsp(agent))) {
 		if (!spec?.command || !(spec.extensions ?? []).map((e) => e.replace(/^\./, "").toLowerCase()).includes(ext)) continue;
-		const key = `${profile}|${machine ?? ""}|${root}|${name}`;
+		const key = `${agent}|${machine ?? ""}|${root}|${name}`;
 		let c = clients.get(key);
 		if (!c || c.failed) {
 			c?.stop();
@@ -395,14 +395,14 @@ function clientsFor(profile: string, root: string, machine: string | undefined, 
 
 /** A file's errors and warnings as lines for the model, at most 20; undefined: no server knows it. */
 export async function diagnosticsFor(
-	profile: string,
+	agent: string,
 	root: string,
 	machine: string | undefined,
 	file: string,
 	text: string,
 	ms = 8000,
 ): Promise<string | undefined> {
-	const servers = clientsFor(profile, root, machine, file);
+	const servers = clientsFor(agent, root, machine, file);
 	if (servers.length === 0) return undefined;
 	const lines: string[] = [];
 	let looked = false;
@@ -423,10 +423,10 @@ export async function diagnosticsFor(
 }
 
 /** What the project's running servers know now, for the diagnostics tool. */
-export function knownDiagnostics(profile: string): string {
+export function knownDiagnostics(agent: string): string {
 	const lines: string[] = [];
 	for (const [key, c] of clients) {
-		if (!key.startsWith(`${profile}|`)) continue;
+		if (!key.startsWith(`${agent}|`)) continue;
 		for (const [uri, d] of c.known())
 			for (const x of d.filter((x) => (x.severity ?? 1) <= 2))
 				lines.push(`${decodeURIComponent(uri.replace(/^file:\/\//, ""))}:${x.range.start.line + 1}:${x.range.start.character + 1} ${x.severity === 2 ? "warning" : "error"}: ${x.message.split("\n")[0]}`);
@@ -449,10 +449,10 @@ export interface Problem {
 }
 
 /** A file's problems from every server that knows it; undefined: none knows it, or none is up. */
-export async function problemsOf(profile: string, root: string, machine: string | undefined, file: string, text: string, ms = 8000): Promise<Problem[] | undefined> {
+export async function problemsOf(agent: string, root: string, machine: string | undefined, file: string, text: string, ms = 8000): Promise<Problem[] | undefined> {
 	let looked = false;
 	const out: Problem[] = [];
-	for (const [, c] of clientsFor(profile, root, machine, file)) {
+	for (const [, c] of clientsFor(agent, root, machine, file)) {
 		const d = await c.check(file, text, ms);
 		if (d === undefined) continue;
 		looked = true;
@@ -462,10 +462,10 @@ export async function problemsOf(profile: string, root: string, machine: string 
 }
 
 /** Errors and warnings the project's running servers know now, by file (a path where they run). */
-export function knownProblems(profile: string): { path: string; problems: Problem[] }[] {
+export function knownProblems(agent: string): { path: string; problems: Problem[] }[] {
 	const out = new Map<string, Problem[]>();
 	for (const [key, c] of clients) {
-		if (!key.startsWith(`${profile}|`)) continue;
+		if (!key.startsWith(`${agent}|`)) continue;
 		for (const [uri, d] of c.known()) {
 			const found = d.filter((x) => (x.severity ?? 1) <= 2);
 			if (!found.length) continue;
@@ -487,8 +487,8 @@ function markdownOf(c: any): string {
 }
 
 /** What the first server that answers says of the symbol at `at`, as Markdown; "" for nothing. */
-export async function hoverAt(profile: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 4000): Promise<string> {
-	for (const [, c] of clientsFor(profile, root, machine, file)) {
+export async function hoverAt(agent: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 4000): Promise<string> {
+	for (const [, c] of clientsFor(agent, root, machine, file)) {
 		const h = await c.ask("textDocument/hover", file, text, { position: at }, ms);
 		const md = markdownOf(h?.contents).trim();
 		if (md) return md;
@@ -506,8 +506,8 @@ const pathOf = (uri: string) => decodeURIComponent(uri.replace(/^file:\/\//, "")
 
 /** Where the symbol at `at` is defined, from the first server that knows: Location, Location[]
  * or LocationLink[] as the places themselves. */
-export async function definitionAt(profile: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 4000): Promise<Place[]> {
-	for (const [, c] of clientsFor(profile, root, machine, file)) {
+export async function definitionAt(agent: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 4000): Promise<Place[]> {
+	for (const [, c] of clientsFor(agent, root, machine, file)) {
 		const places = placesOf(await c.ask("textDocument/definition", file, text, { position: at }, ms));
 		if (places.length) return places;
 	}
@@ -524,8 +524,8 @@ function placesOf(d: any): Place[] {
 }
 
 /** Every place the symbol at `at` is used, its definition among them, from the first server that knows. */
-export async function referencesAt(profile: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 8000): Promise<Place[]> {
-	for (const [, c] of clientsFor(profile, root, machine, file)) {
+export async function referencesAt(agent: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 8000): Promise<Place[]> {
+	for (const [, c] of clientsFor(agent, root, machine, file)) {
 		const places = placesOf(await c.ask("textDocument/references", file, text, { position: at, context: { includeDeclaration: true } }, ms));
 		if (places.length) return places;
 	}
@@ -547,8 +547,8 @@ export interface Symbol {
 const KINDS = ["", "file", "module", "namespace", "package", "class", "method", "property", "field", "constructor", "enum", "interface", "function", "variable", "constant", "string", "number", "boolean", "array", "object", "key", "null", "enum member", "struct", "event", "operator", "type parameter"];
 
 /** A file's outline, in order: DocumentSymbol trees flattened with their depth, or SymbolInformation as given. */
-export async function outlineOf(profile: string, root: string, machine: string | undefined, file: string, text: string, ms = 8000): Promise<Symbol[]> {
-	for (const [, c] of clientsFor(profile, root, machine, file)) {
+export async function outlineOf(agent: string, root: string, machine: string | undefined, file: string, text: string, ms = 8000): Promise<Symbol[]> {
+	for (const [, c] of clientsFor(agent, root, machine, file)) {
 		const d = await c.ask("textDocument/documentSymbol", file, text, {}, ms);
 		if (!Array.isArray(d) || !d.length) continue;
 		const out: Symbol[] = [];
@@ -574,7 +574,7 @@ export async function outlineOf(profile: string, root: string, machine: string |
  * needs one to know the project.
  */
 export async function symbolsNamed(
-	profile: string,
+	agent: string,
 	root: string,
 	machine: string | undefined,
 	query: string,
@@ -582,11 +582,11 @@ export async function symbolsNamed(
 	ms = 8000,
 ): Promise<Symbol[]> {
 	const out: Symbol[] = [];
-	for (const [name, spec] of Object.entries(readLsp(profile))) {
+	for (const [name, spec] of Object.entries(readLsp(agent))) {
 		const exts = (spec.extensions ?? []).map((e) => e.replace(/^\./, "").toLowerCase());
 		const files = await open(exts);
 		if (!files.length) continue;
-		const c = clientsFor(profile, root, machine, files[0].file).find(([n]) => n === name)?.[1];
+		const c = clientsFor(agent, root, machine, files[0].file).find(([n]) => n === name)?.[1];
 		const d = await c?.request("workspace/symbol", { query }, ms, files);
 		for (const s of Array.isArray(d) ? d : []) {
 			const uri = s.location?.uri;

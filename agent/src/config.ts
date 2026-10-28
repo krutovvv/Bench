@@ -40,6 +40,13 @@ export function db(): DatabaseSync {
 
 // ---- settings ----------------------------------------------------------------
 
+/** Rename a table or a column of an older layout, once: nothing when it is already done. */
+export function renameOld(sql: string): void {
+	try {
+		db().exec(sql);
+	} catch {}
+}
+
 export function getSetting<T = any>(key: string, fallback?: T): T {
 	const r = db().prepare("SELECT value FROM settings WHERE key = ?").get(key) as any;
 	return r ? JSON.parse(r.value) : (fallback as T);
@@ -65,9 +72,9 @@ export function setEnv(key: string, value: string | undefined): void {
 	else db().prepare("INSERT INTO env (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
 }
 
-/** The environment a profile's tools and providers see: the process env, then the stored keys. */
-export function profileEnv(profile: string): Record<string, string> {
-	return { ...(process.env as Record<string, string>), ...readEnv(profile) };
+/** The environment a agent's tools and providers see: the process env, then the stored keys. */
+export function agentEnv(agent: string): Record<string, string> {
+	return { ...(process.env as Record<string, string>), ...readEnv(agent) };
 }
 
 // ---- providers ---------------------------------------------------------------
@@ -110,7 +117,7 @@ export function deleteProvider(id: string): void {
 //   mcp.json        { "mcpServers": { … } } — this agent's MCP servers, with Pi's `exposure`
 //   SYSTEM.md       who it is (replaces the default identity); AGENTS.md: standing instructions
 //   skills/, prompts/, extensions/   as in Pi; memories/ (MEMORY.md, USER.md) is Bench's
-// The protocol still calls an agent a "profile" (Bench's wire names).
+// The protocol still calls an agent a "agent" (Bench's wire names).
 
 export interface AgentSettings {
 	defaultProvider: string;
@@ -225,7 +232,7 @@ export function migrateProjectModels(): string[] {
 	return log;
 }
 
-/** The first layout (profiles/<name>/profile.json, SOUL.md, a global mcp_servers setting) moves to agents/. */
+/** The first layout (profiles/<name>/agent.json, SOUL.md, a global mcp_servers setting) moves to agents/. */
 export function migrateProfiles(): string[] {
 	const old = path.join(BENCH_HOME, "profiles");
 	if (!fs.existsSync(old)) return [];
@@ -239,10 +246,10 @@ export function migrateProfiles(): string[] {
 		const dir = agentDir(name);
 		let p: any = {};
 		try {
-			p = JSON.parse(fs.readFileSync(path.join(dir, "profile.json"), "utf8"));
+			p = JSON.parse(fs.readFileSync(path.join(dir, "agent.json"), "utf8"));
 		} catch {}
 		writeAgent(name, { defaultProvider: p.provider ?? "", defaultModel: p.model ?? "", ...(p.reasoning_effort ? { defaultThinkingLevel: p.reasoning_effort } : {}), extensions: p.extensions ?? ["assistant"], ...(p.approvals ? { approvals: p.approvals } : {}) });
-		fs.rmSync(path.join(dir, "profile.json"), { force: true });
+		fs.rmSync(path.join(dir, "agent.json"), { force: true });
 		if (fs.existsSync(path.join(dir, "SOUL.md")) && !fs.existsSync(path.join(dir, "SYSTEM.md"))) fs.renameSync(path.join(dir, "SOUL.md"), path.join(dir, "SYSTEM.md"));
 		if (!fs.existsSync(path.join(dir, "mcp.json"))) writeAgentMcp(name, globalMcp);
 		log.push(name);
@@ -255,14 +262,14 @@ export function migrateProfiles(): string[] {
 // ---- the config view the tool ports read --------------------------------------
 
 /** One config object, assembled from the settings and the agent. */
-export function readConfig(profile: string): any {
+export function readConfig(agent: string): any {
 	const s = allSettings();
-	const p = readAgent(profile);
+	const p = readAgent(agent);
 	const provs = providers();
 	return {
 		...s,
 		model: { provider: p.defaultProvider, default: p.defaultModel },
-		mcp_servers: agentMcp(profile),
+		mcp_servers: agentMcp(agent),
 		providers: Object.fromEntries(provs.map((x) => [x.id, { name: x.name, base_url: x.base_url, api_key: x.api_key, api_mode: x.api_mode, models: x.models, context_length: x.context_length }])),
 		custom_providers: provs.map((x) => ({ name: x.id, base_url: x.base_url, model: Object.keys(x.models)[0] })),
 		agent: { ...(s.agent ?? {}), reasoning_effort: p.defaultThinkingLevel ?? s.agent?.reasoning_effort ?? "medium" },
@@ -315,13 +322,13 @@ function choiceOf(providerId: string, model: string): ModelChoice {
 	};
 }
 
-export function reasoningEffort(profile: string): string {
-	return readAgent(profile).defaultThinkingLevel ?? getSetting<{ reasoning_effort?: string }>("agent", {})?.reasoning_effort ?? "medium";
+export function reasoningEffort(agent: string): string {
+	return readAgent(agent).defaultThinkingLevel ?? getSetting<{ reasoning_effort?: string }>("agent", {})?.reasoning_effort ?? "medium";
 }
 
-/** A profile's compaction share, if it set one that makes sense. */
-export function compactionAt(profile: string): number | undefined {
-	const v = readAgent(profile).compaction;
+/** A agent's compaction share, if it set one that makes sense. */
+export function compactionAt(agent: string): number | undefined {
+	const v = readAgent(agent).compaction;
 	return typeof v === "number" && v >= 0.4 && v <= 0.95 ? v : undefined;
 }
 
@@ -340,15 +347,15 @@ export function compactionPolicy(at: number, window: number): { reserveTokens: n
 	};
 }
 
-export function approvalsMode(profile: string): string {
-	return readAgent(profile).approvals ?? getSetting<{ mode?: string }>("approvals", {})?.mode ?? "off";
+export function approvalsMode(agent: string): string {
+	return readAgent(agent).approvals ?? getSetting<{ mode?: string }>("approvals", {})?.mode ?? "off";
 }
 
 /** The person approved `command` "always" in these settings' threads. */
-export function allowCommand(profile: string, command: string): void {
-	const a = readAgent(profile);
+export function allowCommand(agent: string, command: string): void {
+	const a = readAgent(agent);
 	if (a.allowed?.includes(command)) return;
-	writeAgent(profile, { ...a, allowed: [...(a.allowed ?? []), command] });
+	writeAgent(agent, { ...a, allowed: [...(a.allowed ?? []), command] });
 }
 
 export function timezone(_profile?: string): string {

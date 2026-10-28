@@ -17,7 +17,7 @@ export function cronView(j: Job) {
 		last_run_at: j.last_run ? new Date(j.last_run).toISOString() : null,
 		last_status: j.last_status,
 		last_output: (j.last_output ?? "").slice(0, 400),
-		last_session: j.last_session,
+		last_thread: j.last_thread,
 		deliver: j.deliver,
 	};
 }

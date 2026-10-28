@@ -74,11 +74,11 @@ const ENTRIES = /(^|\/)(index|main|server|app|lib|mod)\.[a-z]+$/;
  * answers nothing, or too late, until it has indexed a large workspace — minutes the first
  * time). Empty after the wait: `still` says which servers are still at it.
  */
-async function settled<T>(profile: string, ask: () => Promise<T[]>): Promise<{ got: T[]; still: string }> {
+async function settled<T>(agent: string, ask: () => Promise<T[]>): Promise<{ got: T[]; still: string }> {
 	const end = Date.now() + WAIT_MS;
 	for (;;) {
 		const got = await ask();
-		const busy = indexing(profile);
+		const busy = indexing(agent);
 		if (got.length || !busy.length) return { got, still: "" };
 		if (Date.now() > end)
 			return { got, still: `${busy.map((b) => `${b.name} has been loading the project for ${b.secs} s`).join(", ")}: ask again in a minute, or use grep and read meanwhile.` };
@@ -102,10 +102,10 @@ export const lspTool = defineTool({
 	}),
 	replay: "safe",
 	async execute(args, api, context) {
-		const info = host().session(api.conversationId);
+		const info = host().thread(api.conversationId);
 		if (!info) throw new Error("no session");
-		const profile = info.profile;
-		if (!Object.keys(readLsp(profile)).length) throw new Error("this project has no language servers (its lsp.json, in Settings → Language servers); use grep and read");
+		const agent = info.agent;
+		if (!Object.keys(readLsp(agent)).length) throw new Error("this project has no language servers (its lsp.json, in Settings → Language servers); use grep and read");
 		const machine = info.project ? (projects.get(info.project)?.machine ?? undefined) : undefined;
 		const root = info.cwd;
 		const rel = (p: string) => (p.startsWith(root + "/") ? p.slice(root.length + 1) : p);
@@ -125,7 +125,7 @@ export const lspTool = defineTool({
 				const files = await Promise.all([...new Set(picked)].map((f) => placeOf(info, f)));
 				return files.filter((f) => f !== undefined);
 			};
-			const { got: found, still } = await settled(profile, () => symbolsNamed(profile, root, machine, query, open));
+			const { got: found, still } = await settled(agent, () => symbolsNamed(agent, root, machine, query, open));
 			if (!found.length) return text(still || `No symbol named like "${query}".`);
 			// The exact name first, then those that start with it, then the rest the server matched.
 			const q = query.toLowerCase();
@@ -139,7 +139,7 @@ export const lspTool = defineTool({
 		if (!at) throw new Error(args.path ? `cannot read ${args.path}` : "path is required");
 
 		if (args.action === "outline") {
-			const { got: list, still } = await settled(profile, () => outlineOf(profile, root, machine, at.file, at.text));
+			const { got: list, still } = await settled(agent, () => outlineOf(agent, root, machine, at.file, at.text));
 			if (!list.length) return text(still || `No outline for ${rel(at.file)}: no language server of this project knows it, or it has no symbols.`);
 			return text(list.map((s) => `${"  ".repeat(s.depth ?? 0)}${s.line}  ${s.kind} ${s.name}`).join("\n"));
 		}
@@ -148,12 +148,12 @@ export const lspTool = defineTool({
 		if (!spot) throw new Error(args.symbol ? `"${args.symbol}" is not ${args.line ? `on line ${args.line} of` : "in"} ${rel(at.file)}` : "symbol or line is required");
 
 		if (args.action === "hover") {
-			const md = await hoverAt(profile, root, machine, at.file, at.text, spot, 8000);
+			const md = await hoverAt(agent, root, machine, at.file, at.text, spot, 8000);
 			return text(md ? md.slice(0, 3000) : "The language server says nothing about it.");
 		}
 
-		const ask = args.action === "definition" ? () => definitionAt(profile, root, machine, at.file, at.text, spot, 8000) : () => referencesAt(profile, root, machine, at.file, at.text, spot);
-		const { got: places, still } = await settled(profile, ask);
+		const ask = args.action === "definition" ? () => definitionAt(agent, root, machine, at.file, at.text, spot, 8000) : () => referencesAt(agent, root, machine, at.file, at.text, spot);
+		const { got: places, still } = await settled(agent, ask);
 		if (!places.length) return text(still || `No ${args.action === "definition" ? "definition" : "references"} found for "${args.symbol ?? "it"}".`);
 		return text(await withLines(info, places.slice(0, MAX_REFERENCES), rel) + (places.length > MAX_REFERENCES ? `\n… ${places.length - MAX_REFERENCES} more` : ""));
 	},

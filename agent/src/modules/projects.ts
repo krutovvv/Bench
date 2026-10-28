@@ -370,7 +370,7 @@ export default ({ rt, publish }: Ctx): Module => ({
 				if (!name || !prompt || !schedule) throw new HttpError(400, "name, prompt and schedule are required");
 				let job: Job;
 				try {
-					job = newJob({ profile: agent, name, prompt, schedule });
+					job = newJob({ agent: agent, name, prompt, schedule });
 				} catch (e) {
 					throw new HttpError(400, `the schedule: ${(e as Error).message}`);
 				}

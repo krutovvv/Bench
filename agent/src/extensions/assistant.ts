@@ -22,7 +22,7 @@ import { host } from "../host.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../inserts.ts";
 
-const of = (input: any) => host().session(input.conversationId);
+const of = (input: any) => host().thread(input.conversationId);
 const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined | Promise<string | undefined>) => (input: any) => {
 	const info = of(input);
 	return info ? render(info) : undefined;
@@ -50,12 +50,12 @@ const diagnosticsTool = defineTool({
 		"Errors and warnings from the project's language servers (its lsp.json): for one file, checked now, or for every file they have seen. After edit and write they come with the result by themselves.",
 	parameters: Type.Object({ path: Type.Optional(Type.String({ description: "A file; empty: every file seen" })) }),
 	async execute(args: any, api: any) {
-		const info = host().session(api.conversationId);
+		const info = host().thread(api.conversationId);
 		if (!info) throw new Error("no session");
-		if (!args.path) return { output: [{ type: "text" as const, text: knownDiagnostics(info.profile) }] };
+		if (!args.path) return { output: [{ type: "text" as const, text: knownDiagnostics(info.agent) }] };
 		const at = await placeOf(info, String(args.path));
 		if (!at) throw new Error(`cannot read ${args.path}`);
-		const d = await diagnosticsFor(info.profile, info.cwd, at.machine, at.file, at.text);
+		const d = await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text);
 		return { output: [{ type: "text" as const, text: d ?? "No language server of this project knows this kind of file (its lsp.json)." }] };
 	},
 });
@@ -94,9 +94,9 @@ export const assistant = defineExtension({
 				// The person's hold, felt before any next step — the current answer and the step
 				// already running are let through; nothing new begins until the hold lifts.
 				// The conversation is the hook's `api`'s, not the call's (Pi's ToolCall has no id of it).
-				const info = host().session(api.conversationId);
+				const info = host().thread(api.conversationId);
 				if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
-				if (call.name !== "bash" || !info || approvalsMode(info.profile) !== "manual") return undefined;
+				if (call.name !== "bash" || !info || approvalsMode(info.agent) !== "manual") return undefined;
 				const command = String(call.arguments?.command ?? call.args?.command ?? "");
 				const hit = DANGEROUS.find(([re]) => re.test(command));
 				if (!hit) return undefined;
@@ -107,11 +107,11 @@ export const assistant = defineExtension({
 			// (`lsp.ts`): the model sees them as an editor shows them, without asking.
 			afterTool: async (call: any, result: any, api: any) => {
 				if ((call.name !== "edit" && call.name !== "write") || result?.isError) return undefined;
-				const info = host().session(api.conversationId);
+				const info = host().thread(api.conversationId);
 				if (!info) return undefined;
 				const at = await placeOf(info, String(call.arguments?.path ?? ""));
 				if (!at) return undefined;
-				const diag = await diagnosticsFor(info.profile, info.cwd, at.machine, at.file, at.text).catch(() => undefined);
+				const diag = await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text).catch(() => undefined);
 				return diag ? { ...result, output: [...(result.output ?? []), { type: "text", text: diag }] } : undefined;
 			},
 		} as any),

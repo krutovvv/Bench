@@ -50,8 +50,8 @@ export class Asks {
 	}
 
 	/** A question to the person; the answer, or "" when declined or timed out. */
-	async question(sessionId: string, callId: string, question: string, choices: string[], signal?: AbortSignal): Promise<string> {
-		const live = await this.rt.session(sessionId);
+	async question(threadId: string, callId: string, question: string, choices: string[], signal?: AbortSignal): Promise<string> {
+		const live = await this.rt.thread(threadId);
 		if (!live) return "";
 		const answer = this.wait(live, { id: callId, kind: "clarify", choices, command: "", description: "" }, question, Number(readConfig("default")?.agent?.clarify_timeout ?? 600));
 		signal?.addEventListener("abort", () => live.prompts.get(callId)?.resolve(""));
@@ -60,10 +60,10 @@ export class Asks {
 
 	/** A command to approve: "once" | "session" | "always" | "deny". One approved for the thread or
 	 * for always is not asked again. */
-	async approve(sessionId: string, callId: string, command: string, description: string): Promise<string> {
-		const live = await this.rt.session(sessionId);
+	async approve(threadId: string, callId: string, command: string, description: string): Promise<string> {
+		const live = await this.rt.thread(threadId);
 		if (!live) return "deny";
-		if (readAgent(live.row.profile).allowed?.includes(command)) return "always";
+		if (readAgent(live.row.agent).allowed?.includes(command)) return "always";
 		const doc = await this.rt.harness.snapshot(ApprovalsDoc, live.conversation.id, ctx);
 		if (doc?.commands?.includes(command)) return "session";
 		const choice = await this.wait(
@@ -72,7 +72,7 @@ export class Asks {
 			`Approve this command?\n\n${command}\n\n${description}`,
 			Number(readConfig("default")?.approvals?.timeout ?? 120),
 		);
-		if (choice === "always") allowCommand(live.row.profile, command);
+		if (choice === "always") allowCommand(live.row.agent, command);
 		if (choice === "session")
 			await live.conversation.commit(async (tx) => {
 				const d = await tx.doc(ApprovalsDoc, live.conversation.id);

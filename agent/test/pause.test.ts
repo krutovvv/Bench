@@ -134,7 +134,7 @@ test("pause: a held run is still held after the agent restarts, and goes on when
 		}),
 	);
 	await rt2.open();
-	await rt2.session(id);
+	await rt2.thread(id);
 	await new Promise((r) => setTimeout(r, 400));
 	assert.equal(requests, before + 1, "Pi ran the call's gate again, and the document still holds it");
 	assert.equal(rt2.holds.isPaused(id), true);

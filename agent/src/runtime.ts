@@ -30,7 +30,7 @@ import { ensureMcp } from "./mcp.ts";
 import { Models, thinking } from "./models.ts";
 import type { Ask, Event, ThreadEvent } from "./protocol.gen.ts";
 import { Queue } from "./queue.ts";
-import { Store, type SessionRow } from "./store.ts";
+import { Store, type ThreadRow } from "./store.ts";
 import { Stream } from "./stream.ts";
 import { BLOCK_CLOSE, BLOCK_OPEN, Journal } from "./thread.ts";
 import { Titles } from "./title.ts";
@@ -60,7 +60,7 @@ interface Pending {
 
 /** What one open session keeps in memory while it lives. */
 export interface Live {
-	row: SessionRow;
+	row: ThreadRow;
 	conversation: Conversation;
 	busy: boolean;
 	/** The run's holds as last committed to its `bench.hold` document (src/hold.ts). */
@@ -163,7 +163,7 @@ export class Runtime {
 		// Every model a stored session uses must be known before Pi resumes unfinished runs.
 		for (const row of this.store.list({ limit: 10000 })) {
 			try {
-				this.models.ref(row.profile);
+				this.models.ref(row.agent);
 			} catch {}
 		}
 		this.journal.watch();
@@ -175,7 +175,7 @@ export class Runtime {
 		graph.dispose?.();
 		for (const c of conversations) {
 			const row = this.store.byConversation(c);
-			if (row) await this.session(row.id).catch(() => undefined);
+			if (row) await this.thread(row.id).catch(() => undefined);
 		}
 		// Scheduled jobs: their sleeping tasks live in one hidden conversation.
 		setScheduler({
@@ -199,7 +199,7 @@ export class Runtime {
 	}
 
 	private reconfigureAll(): void {
-		for (const live of this.live.values()) void live.conversation.configure({ extensions: forAgent(readAgent(live.row.profile).extensions, live.row.profile) }, ctx).catch(() => {});
+		for (const live of this.live.values()) void live.conversation.configure({ extensions: forAgent(readAgent(live.row.agent).extensions, live.row.agent) }, ctx).catch(() => {});
 	}
 
 	/** The agent's MCP servers, connected before its first turn. */
@@ -211,24 +211,24 @@ export class Runtime {
 
 	// ---- threads ------------------------------------------------------------
 
-	async create(profile: string, cwd: string | undefined, source = "local", extra: Partial<SessionRow> = {}): Promise<Live> {
-		await this.mcpFor(profile);
+	async create(agent: string, cwd: string | undefined, source = "local", extra: Partial<ThreadRow> = {}): Promise<Live> {
+		await this.mcpFor(agent);
 		// A session with a project's environment (a thread, a cron run) belongs to the project and
 		// works in its folder.
-		const project = profile.startsWith("project:") ? profile.slice(8) : "";
+		const project = agent.startsWith("project:") ? agent.slice(8) : "";
 		if (project && !extra.project) extra = { ...extra, project };
 		const machine = project ? projects.get(project)?.machine : undefined;
-		const dir = machine ? (cwd ?? projects.dir(project)) : cwd && fs.existsSync(cwd) ? cwd : project ? projects.dir(project) : defaultCwd(profile);
+		const dir = machine ? (cwd ?? projects.dir(project)) : cwd && fs.existsSync(cwd) ? cwd : project ? projects.dir(project) : defaultCwd(agent);
 		const conversation = await this.harness.createConversation(
-			{ ownership: { kind: "ownerless" }, agent: { model: this.models.ref(profile), thinkingLevel: thinking(reasoningEffort(profile)), cwd: dir, extensions: forAgent(readAgent(profile).extensions, profile) } },
+			{ ownership: { kind: "ownerless" }, agent: { model: this.models.ref(agent), thinkingLevel: thinking(reasoningEffort(agent)), cwd: dir, extensions: forAgent(readAgent(agent).extensions, agent) } },
 			ctx,
 		);
-		const row = this.store.create({ id: newId(), conversation: String(conversation.id), profile, source, cwd: dir, effort: reasoningEffort(profile), ...extra });
+		const row = this.store.create({ id: newId(), conversation: String(conversation.id), agent, source, cwd: dir, effort: reasoningEffort(agent), ...extra });
 		return this.attach(row, conversation);
 	}
 
 	/** The open session for `id`, attaching to its conversation on first use. */
-	async session(id: string): Promise<Live | undefined> {
+	async thread(id: string): Promise<Live | undefined> {
 		const open = this.live.get(id);
 		if (open) return open;
 		const row = this.store.get(id);
@@ -238,7 +238,7 @@ export class Runtime {
 		return this.attach(row, conversation);
 	}
 
-	private async attach(row: SessionRow, conversation: Conversation): Promise<Live> {
+	private async attach(row: ThreadRow, conversation: Conversation): Promise<Live> {
 		const hold = await this.harness.snapshot(HoldDoc, conversation.id, ctx);
 		const live: Live = {
 			row,
@@ -301,13 +301,13 @@ export class Runtime {
 	 * sent when the agent answers) or joins the running work after its current tools ("steer").
 	 */
 	async submit(id: string, text: string, attachments: { path: string; mime: string }[] = [], context = "", mode: "queue" | "steer" = "steer", request: string = randomUUID()): Promise<void> {
-		const live = await this.session(id);
-		if (!live) throw new Error(`session not found: ${id}`);
+		const live = await this.thread(id);
+		if (!live) throw new Error(`thread not found: ${id}`);
 		const row = this.store.get(id)!;
 		live.row = row;
-		await this.mcpFor(row.profile);
+		await this.mcpFor(row.agent);
 		// The model (one for every thread, the gear's), effort and extensions follow at every turn.
-		await live.conversation.configure({ model: this.models.ref(row.profile), thinkingLevel: thinking(row.effort || reasoningEffort(row.profile)), cwd: row.cwd, extensions: forAgent(readAgent(row.profile).extensions, row.profile) }, ctx);
+		await live.conversation.configure({ model: this.models.ref(row.agent), thinkingLevel: thinking(row.effort || reasoningEffort(row.agent)), cwd: row.cwd, extensions: forAgent(readAgent(row.agent).extensions, row.agent) }, ctx);
 		const images = attachments
 			.filter((a) => a.mime.startsWith("image/") && fs.existsSync(a.path))
 			.map((a) => ({ type: "image" as const, data: fs.readFileSync(a.path).toString("base64"), mimeType: a.mime }));
@@ -333,7 +333,7 @@ export class Runtime {
 	}
 
 	async interrupt(id: string): Promise<void> {
-		const live = await this.session(id);
+		const live = await this.thread(id);
 		if (!live) return;
 		live.abort?.abort();
 		await this.holds.stop(live);
@@ -346,15 +346,15 @@ export class Runtime {
 	 * entry, the documents as their semantics say (the pause starts free). The thread it came
 	 * from is untouched. Its first message is the person's next one.
 	 */
-	async fork(id: string, at: number): Promise<SessionRow> {
-		const live = await this.session(id);
-		if (!live) throw new Error(`session not found: ${id}`);
+	async fork(id: string, at: number): Promise<ThreadRow> {
+		const live = await this.thread(id);
+		if (!live) throw new Error(`thread not found: ${id}`);
 		const fork = await live.conversation.fork(at as any, { ownership: { kind: "ownerless" as const } }, ctx);
 		const row = live.row;
 		const made = this.store.create({
 			id: newId(),
 			conversation: String(fork.id),
-			profile: row.profile,
+			agent: row.agent,
 			source: "local",
 			cwd: row.cwd,
 			effort: row.effort,
@@ -368,7 +368,7 @@ export class Runtime {
 
 	/** Regenerate: drop the last exchange (a fork before the last user message) so the next prompt replaces it. */
 	async undo(id: string): Promise<void> {
-		const live = await this.session(id);
+		const live = await this.thread(id);
 		if (!live) return;
 		const view = await live.conversation.viewState(ctx);
 		const entries = (view.value as any).entries as any[];

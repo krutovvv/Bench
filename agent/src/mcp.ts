@@ -13,7 +13,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, agentMcp, agents, profileEnv } from "./config.ts";
+import { agentDir, agentMcp, agents, agentEnv } from "./config.ts";
 
 /** Without `exposure`: servers with more tools than this are deferred behind tool_search. */
 const DEFER_OVER = 12;
@@ -88,7 +88,7 @@ export async function ensureMcp(agent: string): Promise<boolean> {
 
 async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 	await Promise.all([...servers.entries()].filter(([, s]) => s.agent === agent).map(([k, s]) => (servers.delete(k), s.client?.close().catch(() => {}))));
-	const env = profileEnv(agent);
+	const env = agentEnv(agent);
 	await Promise.all(
 		Object.entries(agentMcp(agent)).map(async ([name, raw]: [string, any]) => {
 			if (!raw || raw.enabled === false) return;
@@ -137,7 +137,7 @@ function httpTransport(agent: string, name: string, spec: any, provider = oauthP
 
 /** Sign in to an agent's HTTP MCP server: the page to open in the browser ("" when no sign-in was needed). */
 export async function authorizeServer(agent: string, name: string, connected?: () => void): Promise<string> {
-	let spec = fill(agentMcp(agent)[name], profileEnv(agent));
+	let spec = fill(agentMcp(agent)[name], agentEnv(agent));
 	if (!spec?.url) throw new Error(`no HTTP MCP server "${name}"`);
 	// Its own Authorization header the server refuses (an expired key): signing in replaces it with
 	// OAuth, so the header goes from mcp.json.

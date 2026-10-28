@@ -69,7 +69,7 @@ export const projects = {
 	remove(id: string): void {
 		table();
 		db().prepare("DELETE FROM projects WHERE id = ?").run(id);
-		db().prepare("UPDATE sessions SET project = '' WHERE project = ?").run(id);
+		db().prepare("UPDATE threads SET project = '' WHERE project = ?").run(id);
 	},
 	/** The bot's @name, learned when it started (for the block to show). */
 	setBotName(id: string, username: string): void {

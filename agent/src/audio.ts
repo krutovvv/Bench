@@ -3,10 +3,10 @@
 
 import { readConfig, readEnv } from "./config.ts";
 
-function endpoint(profile: string, section: "stt" | "tts") {
-	const cfg = readConfig(profile)?.[section] ?? {};
+function endpoint(agent: string, section: "stt" | "tts") {
+	const cfg = readConfig(agent)?.[section] ?? {};
 	const o = cfg[cfg.provider ?? "openai"] ?? cfg.openai ?? {};
-	const env = readEnv(profile);
+	const env = readEnv(agent);
 	return {
 		o,
 		base: String(o.base_url ?? "https://api.openai.com/v1").replace(/\/$/, ""),
@@ -32,8 +32,8 @@ async function post(url: string, init: RequestInit): Promise<Response> {
 	}
 }
 
-export async function transcribe(profile: string, audio: Buffer, mime: string, filename = mime.includes("wav") ? "audio.wav" : "audio.ogg"): Promise<string> {
-	const { o, base, key } = endpoint(profile, "stt");
+export async function transcribe(agent: string, audio: Buffer, mime: string, filename = mime.includes("wav") ? "audio.wav" : "audio.ogg"): Promise<string> {
+	const { o, base, key } = endpoint(agent, "stt");
 	const form = new FormData();
 	form.append("file", new Blob([new Uint8Array(audio)], { type: mime }), filename);
 	form.append("model", String(o.model ?? "whisper-1"));
@@ -44,8 +44,8 @@ export async function transcribe(profile: string, audio: Buffer, mime: string, f
 	return String(j.text ?? "").trim();
 }
 
-export async function speak(profile: string, text: string): Promise<{ type: string; audio: Buffer }> {
-	const { o, base, key } = endpoint(profile, "tts");
+export async function speak(agent: string, text: string): Promise<{ type: string; audio: Buffer }> {
+	const { o, base, key } = endpoint(agent, "tts");
 	const r = await post(`${base}/audio/speech`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json", ...(key ? { Authorization: `Bearer ${key}` } : {}) },

@@ -33,8 +33,8 @@ async function until<T>(what: () => T | undefined | Promise<T | undefined>, ms =
 }
 
 /** What a `process start` call does: a background task of the conversation, given up on a restart. */
-async function start(rt: any, sessionId: string, command: string, call: string): Promise<string> {
-	const live = await rt.session(sessionId);
+async function start(rt: any, threadId: string, command: string, call: string): Promise<string> {
+	const live = await rt.thread(threadId);
 	const id = await live.conversation.commit((tx: any) => tx.createTask(ProcessTask, { command, call }, { ownership: { kind: "conversation" }, background: true, abandonOnRestart: true }), ctx);
 	return String(id);
 }
@@ -94,7 +94,7 @@ test("a process running when the agent restarts ends with it and is not started 
 	const rt2 = new Runtime(() => {});
 	await rt2.open();
 	await rt2.journal.open(row.id);
-	const conversation = (await (rt2 as any).session(row.id)).conversation.id;
+	const conversation = (await (rt2 as any).thread(row.id)).conversation.id;
 	const ended = await until(async () => (await rt2.processes.list(conversation)).find((p) => p.id === id && p.state !== "running"));
 	assert.equal(ended.state, "restarted");
 	await new Promise((r) => setTimeout(r, 300));

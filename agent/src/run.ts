@@ -7,7 +7,7 @@ export async function runToCompletion(
 	settings: string,
 	prompt: string,
 	opts: { source: string; cwd?: string; title?: string; signal?: AbortSignal; onEvent?: (e: RunEvent) => void },
-): Promise<{ sessionId: string; text: string; status: string }> {
+): Promise<{ threadId: string; text: string; status: string }> {
 	const live = await rt.create(settings, opts.cwd, opts.source, { title: opts.title ?? "" });
 	const done = new Promise<{ text: string; status: string }>((resolve) => {
 		const listener: RunListener = (sid, e) => {
@@ -23,5 +23,5 @@ export async function runToCompletion(
 	opts.signal?.addEventListener("abort", () => void rt.interrupt(live.row.id));
 	await rt.submit(live.row.id, prompt);
 	const r = await done;
-	return { sessionId: live.row.id, ...r };
+	return { threadId: live.row.id, ...r };
 }

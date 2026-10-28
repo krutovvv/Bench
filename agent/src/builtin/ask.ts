@@ -3,7 +3,7 @@
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
-import { host, sessionOf } from "../host.ts";
+import { host, threadOf } from "../host.ts";
 
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
 
@@ -22,7 +22,7 @@ export const clarify = defineTool({
 	// The call is the question and its result the answer (docs/thread-objects.md): the card in
 	// Bench reads both from the journal. The id the person answers to is the call's.
 	execute: async (args, api, context) => {
-		const s = sessionOf(api.conversationId);
+		const s = threadOf(api.conversationId);
 		const choices = (args.choices ?? []).map((c) => c.trim()).filter(Boolean).slice(0, 4);
 		const answer = await host().ask(s.id, api.callId, args.question, choices, Boolean(args.multi_select) && choices.length > 0, context?.abortSignal);
 		return {
@@ -60,10 +60,10 @@ export const sessionSearch = defineTool({
 	description: "Search the person's past sessions (their text) when they refer to earlier work: 'what did we do about X'.",
 	parameters: Type.Object({ query: Type.String(), limit: Type.Optional(Type.Number({ minimum: 1, maximum: 10 })) }),
 	execute: async (args, api) => {
-		const s = sessionOf(api.conversationId);
+		const s = threadOf(api.conversationId);
 		const hits = host()
-			.search(args.query, args.limit ?? 5, s.profile)
-			.filter((h) => h.session_id !== s.id);
+			.search(args.query, args.limit ?? 5, s.agent)
+			.filter((h) => h.thread_id !== s.id);
 		return text(hits.length ? hits : { results: [], note: "Nothing found in past sessions." });
 	},
 });

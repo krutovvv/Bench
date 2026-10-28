@@ -6,7 +6,7 @@
 // Questions (clarify) and approvals are buttons; voice is transcribed with the stt settings;
 // photos go to the model; MEDIA:/path files are sent as attachments; /new and /stop.
 //
-// Bots: the general one ("telegram" in bench.sqlite { token, allowed_users: [ids], profile }) and
+// Bots: the general one ("telegram" in bench.sqlite { token, allowed_users: [ids], agent }) and
 // one per project that has its own (`projects.telegram`): a project's bot answers with the
 // project's environment and its chats are the project's threads. `syncTelegram` starts and stops
 // them as their settings change.
@@ -16,7 +16,7 @@ import fs from "node:fs";
 import https from "node:https";
 import path from "node:path";
 import { transcribe } from "./audio.ts";
-import { approvalsMode, BENCH_HOME, getSetting, homeAgent, profileEnv, reasoningEffort, resolveModel } from "./config.ts";
+import { approvalsMode, BENCH_HOME, getSetting, homeAgent, agentEnv, reasoningEffort, resolveModel } from "./config.ts";
 import { HttpsProxyAgent } from "https-proxy-agent";
 import { projects } from "./builtin/projects.ts";
 import type { RunListener, Runtime } from "./runtime.ts";
@@ -67,7 +67,7 @@ interface Config {
 	allowed_users: string[];
 	/** Proxy URL (http://host:port) for this bot; beats the agent's TELEGRAM_PROXY. */
 	proxy?: string;
-	profile?: string;
+	agent?: string;
 }
 
 interface Turn {
@@ -138,7 +138,7 @@ export async function syncTelegram(rt: Runtime): Promise<void> {
 	const wanted = new Map<string, Config>();
 	const general: Config | undefined = getSetting("telegram");
 	if (general?.token) wanted.set("", general);
-	for (const p of projects.list()) if (p.telegram?.token) wanted.set(p.id, { ...p.telegram, profile: `project:${p.id}` });
+	for (const p of projects.list()) if (p.telegram?.token) wanted.set(p.id, { ...p.telegram, agent: `project:${p.id}` });
 	for (const [key, bot] of running)
 		if (JSON.stringify(wanted.get(key) ?? null) !== bot.config) {
 			bot.stop();
@@ -164,31 +164,32 @@ export async function syncTelegram(rt: Runtime): Promise<void> {
 }
 
 async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void> {
-	const profile = cfg.profile || "default";
+	// The general bot's settings were first written with `profile`.
+	const agent = cfg.agent || (cfg as { profile?: string }).profile || "default";
 	const allowed = new Set(cfg.allowed_users.map(String));
 	// Where Telegram is reached only through a proxy: the bot's own URL when it has one, else
 	// the agent's env (TELEGRAM_PROXY, else HTTPS_PROXY).
-	const env = profileEnv("default");
+	const env = agentEnv("default");
 	const proxy = cfg.proxy || env.TELEGRAM_PROXY || env.HTTPS_PROXY || env.https_proxy;
 	const bot = new Bot(cfg.token, proxy ? { client: { baseFetchConfig: { agent: new HttpsProxyAgent(proxy), compress: true } } } : undefined);
 	const api = bot.api;
 
-	const turns = new Map<string, Turn>(); // session id -> its running turn
-	const replies = new Map<string, number>(); // session id -> the message its next turn answers
+	const turns = new Map<string, Turn>(); // thread id -> its running turn
+	const replies = new Map<string, number>(); // thread id -> the message its next turn answers
 	const gathering = new Map<number, Batch>(); // chat -> the messages gathered for its next turn
-	const prompts = new Map<string, { session: string; promptId: string; kind: string; choices: string[] }>(); // "chat:message"
+	const prompts = new Map<string, { thread: string; promptId: string; kind: string; choices: string[] }>(); // "chat:message"
 
 	// This bot's chats only: a chat with another bot is another thread.
 	const ours = (s: { project?: string }) => (s.project ?? "") === project;
-	const chatOf = (sessionId: string): number | undefined => {
-		const row = rt.store.get(sessionId);
+	const chatOf = (threadId: string): number | undefined => {
+		const row = rt.store.get(threadId);
 		const id = row?.chat_id;
 		return row && ours(row) && row.source === "telegram" && id && !id.includes(":") ? Number(id) : undefined;
 	};
-	const sessionFor = async (chat: number, name: string): Promise<string> => {
+	const threadFor = async (chat: number, name: string): Promise<string> => {
 		const row = rt.store.list({ source: "telegram", limit: 1000 }).find((s) => s.chat_id === String(chat) && ours(s));
 		if (row) return row.id;
-		return (await rt.create(profile, undefined, "telegram", { chat_id: String(chat), display_name: name } as any)).row.id;
+		return (await rt.create(agent, undefined, "telegram", { chat_id: String(chat), display_name: name } as any)).row.id;
 	};
 
 	const statusText = (t: Turn, done?: string) => {
@@ -240,41 +241,41 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	};
 
 
-	const listener: RunListener = (sessionId, e) => {
-		const chat = chatOf(sessionId);
+	const listener: RunListener = (threadId, e) => {
+		const chat = chatOf(threadId);
 		if (chat === undefined) return;
 		if (e.kind === "start") {
-			const replyTo = replies.get(sessionId);
-			replies.delete(sessionId);
+			const replyTo = replies.get(threadId);
+			replies.delete(threadId);
 			const t: Turn = { chat, replyTo, steps: 0, text: "", started: Date.now(), dirty: false, lastEdit: 0 };
-			turns.set(sessionId, t);
+			turns.set(threadId, t);
 			void editStatus(t);
 			api.sendChatAction(chat, "typing").catch(() => {});
 			t.typing = setInterval(() => api.sendChatAction(chat, "typing").catch(() => {}), 4500);
 		} else if (e.kind === "delta") {
-			const t = turns.get(sessionId);
+			const t = turns.get(threadId);
 			if (!t) return;
 			t.text = (t.text ?? "") + e.text;
 			// Words win the line over the newest call's word.
 			t.word = undefined;
 			schedule(t);
 		} else if (e.kind === "tool") {
-			const t = turns.get(sessionId);
+			const t = turns.get(threadId);
 			if (!t) return;
 			// Counted, not listed: the status line says the kind of the newest call, in a word.
 			t.steps++;
 			t.word = activityWord(e.name);
 			schedule(t);
 		} else if (e.kind === "subagent") {
-			const t = turns.get(sessionId);
+			const t = turns.get(threadId);
 			if (!t) return;
 			t.steps++;
 			// A delegation says what it delegated — it is a readable line in its own right.
 			t.text = `👥 ${e.goal.slice(0, 110)}`;
 			schedule(t);
 		} else if (e.kind === "complete") {
-			const t = turns.get(sessionId);
-			turns.delete(sessionId);
+			const t = turns.get(threadId);
+			turns.delete(threadId);
 			if (t) {
 				clearTimeout(t.timer);
 				clearInterval(t.typing);
@@ -284,7 +285,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		} else if (e.kind === "ask") {
 			const keyboard = e.ask.choices.map((c, i) => [{ text: c, callback_data: `p:${i}` }]);
 			api.sendMessage(chat, e.question, keyboard.length ? { reply_markup: { inline_keyboard: keyboard } } : {})
-				.then((m) => prompts.set(`${chat}:${m.message_id}`, { session: sessionId, promptId: e.ask.id, kind: e.ask.kind, choices: e.ask.choices }))
+				.then((m) => prompts.set(`${chat}:${m.message_id}`, { thread: threadId, promptId: e.ask.id, kind: e.ask.kind, choices: e.ask.choices }))
 				.catch(() => {});
 		}
 	};
@@ -317,11 +318,11 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const chat = ctx.chat.id;
 		const old = rt.store.list({ source: "telegram", limit: 1000 }).find((s) => s.chat_id === String(chat) && ours(s));
 		if (old) rt.store.update(old.id, { chat_id: `${chat}:${Date.now()}` } as any);
-		const id = await sessionFor(chat, nameOf(ctx));
-		await ctx.reply(sessionCard(id), { parse_mode: "HTML", ...replyOpts(ctx.message?.message_id) });
+		const id = await threadFor(chat, nameOf(ctx));
+		await ctx.reply(threadCard(id), { parse_mode: "HTML", ...replyOpts(ctx.message?.message_id) });
 	});
 	bot.command("stop", async (ctx) => {
-		await rt.interrupt(await sessionFor(ctx.chat.id, nameOf(ctx)));
+		await rt.interrupt(await threadFor(ctx.chat.id, nameOf(ctx)));
 		await ctx.reply("Stopped.");
 	});
 
@@ -331,13 +332,13 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 	bot.on("message", async (ctx) => {
 		const m = ctx.message;
 		const chat = ctx.chat.id;
-		const session = await sessionFor(chat, nameOf(ctx));
+		const thread = await threadFor(chat, nameOf(ctx));
 		const typed = m.text ?? m.caption ?? "";
 		// A typed answer to a pending question.
-		const pending = [...prompts.entries()].find(([k, p]) => k.startsWith(`${chat}:`) && p.session === session && p.kind === "clarify");
+		const pending = [...prompts.entries()].find(([k, p]) => k.startsWith(`${chat}:`) && p.thread === thread && p.kind === "clarify");
 		if (pending && typed) {
 			prompts.delete(pending[0]);
-			rt.asks.respond(session, pending[1].promptId, typed);
+			rt.asks.respond(thread, pending[1].promptId, typed);
 			return;
 		}
 		const origin = forwardedFrom(m);
@@ -347,10 +348,10 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		const slot = g.reserve(m.message_id, !!origin);
 		api.sendChatAction(chat, "typing").catch(() => {});
 		// What was sent last matters more than what the agent is doing: stop it now.
-		if (rt.isBusy(session)) {
-			const t = turns.get(session);
+		if (rt.isBusy(thread)) {
+			const t = turns.get(thread);
 			if (t) t.superseded = true;
-			void rt.interrupt(session).catch(() => {});
+			void rt.interrupt(thread).catch(() => {});
 		}
 		void (async () => {
 			let part: string | undefined;
@@ -376,7 +377,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		if (voice) {
 			const { data, name } = await download(voice.file_id);
 			try {
-				text = await transcribe(profile, data, voice.mime_type ?? "audio/ogg", name.replace(/\.oga$/, ".ogg"));
+				text = await transcribe(agent, data, voice.mime_type ?? "audio/ogg", name.replace(/\.oga$/, ".ogg"));
 			} catch (e) {
 				throw new Error(`Could not transcribe: ${(e as Error).message}`);
 			}
@@ -405,29 +406,29 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		gathering.delete(chat);
 		const text = g.text();
 		if (!text) return;
-		const session = await sessionFor(chat, g.name);
-		for (let i = 0; i < 100 && rt.isBusy(session); i++) await new Promise((r) => setTimeout(r, 100));
-		replies.set(session, g.last);
-		await rt.submit(session, text, g.attachments).catch((e) => api.sendMessage(chat, `Could not send: ${(e as Error).message}`).catch(() => {}));
+		const thread = await threadFor(chat, g.name);
+		for (let i = 0; i < 100 && rt.isBusy(thread); i++) await new Promise((r) => setTimeout(r, 100));
+		replies.set(thread, g.last);
+		await rt.submit(thread, text, g.attachments).catch((e) => api.sendMessage(chat, `Could not send: ${(e as Error).message}`).catch(() => {}));
 	};
 
-	/** What a session runs with, as /new shows it. */
-	const sessionCard = (id: string): string => {
+	/** What a thread runs with, as /new shows it. */
+	const threadCard = (id: string): string => {
 		const row = rt.store.get(id);
-		const agent = row?.profile ?? profile;
+		const runs = row?.agent ?? agent;
 		const m = resolveModel();
 		const name = project ? (projects.get(project)?.name ?? project) : "Host";
 		// The exact number, with the familiar short form beside it: 131072 tokens is the same
 		// window people call 128K, and showing one of the two alone reads as a different setting.
 		const ctx = `${m.contextLength.toLocaleString("en-US")} tokens (${Math.round(m.contextLength / 1024)}K)`;
 		return [
-			`✨ <b>New session</b> · ${esc(name)}`,
+			`✨ <b>New thread</b> · ${esc(name)}`,
 			"",
 			`◆ Model: <code>${esc(m.model)}</code>`,
 			`◆ Provider: ${esc(m.provider)}`,
 			`◆ Context: ${esc(ctx)}`,
-			`◆ Thinking: ${esc(row?.effort || reasoningEffort(homeAgent(agent)))}`,
-			`◆ Approvals: ${approvalsMode(homeAgent(agent)) === "manual" ? "asks before risky commands" : "off"}`,
+			`◆ Thinking: ${esc(row?.effort || reasoningEffort(homeAgent(runs)))}`,
+			`◆ Approvals: ${approvalsMode(homeAgent(runs)) === "manual" ? "asks before risky commands" : "off"}`,
 			"",
 			"Messages sent in a row (or forwarded together) are read as one. A new message stops what I'm doing, and I start over with everything you sent. /stop just stops.",
 		].join("\n");
@@ -441,7 +442,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		if (!p || !msg) return;
 		const choice = p.choices[Number(ctx.callbackQuery.data.slice(2))] ?? "";
 		prompts.delete(key);
-		rt.asks.respond(p.session, p.promptId, choice);
+		rt.asks.respond(p.thread, p.promptId, choice);
 		await ctx.editMessageText(`${(msg as any).text ?? ""}\n\n→ ${choice.replace(/\s*\(Recommended\)$/, "")}`).catch(() => {});
 	});
 
@@ -451,7 +452,7 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 		(e as any).ctx?.reply(`Could not handle that: ${String((e as any).error?.message ?? e.message)}`).catch(() => {});
 	});
 	await bot.api.setMyCommands([
-		{ command: "new", description: "Start a new session" },
+		{ command: "new", description: "Start a new thread" },
 		{ command: "stop", description: "Stop the running turn" },
 	]).catch(() => {});
 	const me = await bot.api.getMe();

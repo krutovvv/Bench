@@ -11,7 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import YAML from "yaml";
 import { agentDir, isProject } from "../config.ts";
-import { sessionOf } from "../host.ts";
+import { threadOf } from "../host.ts";
 import { projects } from "./projects.ts";
 import { machineOf, readSkill, skillFiles, skillFor } from "../repo.ts";
 
@@ -38,16 +38,16 @@ export function frontMatter(text: string): Record<string, any> {
 }
 
 /**
- * Every skill a thread of `profile` can use, working in `folder` (a project's own folder when not
+ * Every skill a thread of `agent` can use, working in `folder` (a project's own folder when not
  * given). One name, one skill: the project's own win, then the folder's. The Host project's skills
  * (the machine's: its tools, its builds) are Host's alone; another project does not see them.
  */
-export function listSkills(profile: string, folder?: string, repoSkills?: Skill[]): Skill[] {
-	const own = isProject(profile) ? skillsIn(path.join(agentDir(profile), "skills"), "project") : [];
-	const work = folder ?? (isProject(profile) ? (projects.get(profile.slice(8))?.folder ?? "") : "");
+export function listSkills(agent: string, folder?: string, repoSkills?: Skill[]): Skill[] {
+	const own = isProject(agent) ? skillsIn(path.join(agentDir(agent), "skills"), "project") : [];
+	const work = folder ?? (isProject(agent) ? (projects.get(agent.slice(8))?.folder ?? "") : "");
 	// A folder on a project's server is read there (`repo.ts`), and its skills are given.
 	const repo = repoSkills ?? repoSkillDirs(work).flatMap((d) => skillsIn(d, "repo"));
-	const general = isProject(profile) ? [] : skillsIn(path.join(agentDir(profile), "skills"), "general");
+	const general = isProject(agent) ? [] : skillsIn(path.join(agentDir(agent), "skills"), "general");
 	const out: Skill[] = [];
 	for (const k of [...own, ...repo, ...general]) if (!out.some((o) => o.name === k.name)) out.push(k);
 	return out.sort((a, b) => a.name.localeCompare(b.name));
@@ -82,8 +82,8 @@ export function skillsIn(root: string, scope: SkillScope): Skill[] {
 	return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function findSkill(profile: string, name: string, folder?: string): Skill | undefined {
-	return listSkills(profile, folder).find((s) => s.name === name || path.basename(s.dir) === name);
+export function findSkill(agent: string, name: string, folder?: string): Skill | undefined {
+	return listSkills(agent, folder).find((s) => s.name === name || path.basename(s.dir) === name);
 }
 
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
@@ -96,8 +96,8 @@ export const skillView = defineTool({
 		file: Type.Optional(Type.String({ description: "A file inside the skill folder, e.g. references/api.md" })),
 	}),
 	execute: async (args, api) => {
-		const { profile, cwd, project } = sessionOf(api.conversationId);
-		const skill = await skillFor(profile, args.name, cwd, machineOf(project));
+		const { agent, cwd, project } = threadOf(api.conversationId);
+		const skill = await skillFor(agent, args.name, cwd, machineOf(project));
 		if (!skill) throw new Error(`no skill "${args.name}"; see the skills list`);
 		const body = await readSkill(skill, args.file ?? "SKILL.md");
 		const files = args.file ? [] : await skillFiles(skill);
@@ -120,15 +120,15 @@ export const skillManage = defineTool({
 		file: Type.Optional(Type.String({ description: "Path inside the skill (write_file)" })),
 	}),
 	execute: async (args, api) => {
-		const { profile, cwd, project } = sessionOf(api.conversationId);
+		const { agent, cwd, project } = threadOf(api.conversationId);
 		if (!/^[a-z0-9][a-z0-9._-]*$/i.test(args.name)) throw new Error("name: letters, digits, '.', '_', '-'");
-		const existing = await skillFor(profile, args.name, cwd, machineOf(project));
+		const existing = await skillFor(agent, args.name, cwd, machineOf(project));
 		if (existing?.machine && args.action !== "create")
 			throw new Error(`"${args.name}" is in the project's folder on ${existing.machine}: change its files there with edit or write (${existing.dir})`);
 		if (args.action === "create") {
 			if (existing) throw new Error(`skill "${args.name}" exists; use edit or patch`);
 			if (!args.content?.startsWith("---")) throw new Error("content must start with front matter (---)");
-			const dir = path.join(agentDir(profile), "skills", args.category ?? "", args.name);
+			const dir = path.join(agentDir(agent), "skills", args.category ?? "", args.name);
 			fs.mkdirSync(dir, { recursive: true });
 			fs.writeFileSync(path.join(dir, "SKILL.md"), args.content);
 			return text({ success: true, path: path.join(dir, "SKILL.md") });

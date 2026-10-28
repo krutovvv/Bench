@@ -19,10 +19,10 @@ const COMMANDS: Command[] = [
 const output = (text: string): CommandResult => ({ kind: "output", text });
 
 export default ({ rt }: Ctx): Module => {
-	async function slash(session_id: string, command: string): Promise<CommandResult> {
+	async function slash(thread_id: string, command: string): Promise<CommandResult> {
 		const [name, ...rest] = String(command).trim().split(/\s+/);
 		const arg = rest.join(" ");
-		const row = session_id ? rt.store.get(session_id) : undefined;
+		const row = thread_id ? rt.store.get(thread_id) : undefined;
 		switch (name) {
 			case "/model": {
 				const m = arg.match(/^(\S+)(?:\s+--provider\s+(\S+))?/);
@@ -33,25 +33,25 @@ export default ({ rt }: Ctx): Module => {
 				return output(`Model set to ${m[1]}${m[2] ? ` (${m[2]})` : ""} for every thread`);
 			}
 			case "/reasoning":
-				if (row && arg) rt.setEffort(session_id, arg);
+				if (row && arg) rt.setEffort(thread_id, arg);
 				return output(`Reasoning effort: ${arg || row?.effort}`);
 			case "/title":
-				if (row && arg) rt.titles.rename(session_id, arg);
+				if (row && arg) rt.titles.rename(thread_id, arg);
 				return output(`Title: ${arg}`);
 			case "/stop":
-				await rt.interrupt(session_id);
+				await rt.interrupt(thread_id);
 				return output("Stopped.");
 			case "/retry":
-				await rt.undo(session_id);
+				await rt.undo(thread_id);
 				return output("Last exchange removed; send it again.");
 			case "/compact": {
-				const live = await rt.session(session_id);
+				const live = await rt.thread(thread_id);
 				if (live) await live.conversation.compact(arg || undefined, BACKGROUND);
 				return output("Compacting the context.");
 			}
 			default: {
 				// A skill: its body becomes the turn (/skill-name).
-				const skill = await skillFor(row?.profile || "default", name.slice(1), row?.cwd || undefined, machineOf(row?.project ?? undefined));
+				const skill = await skillFor(row?.agent || "default", name.slice(1), row?.cwd || undefined, machineOf(row?.project ?? undefined));
 				if (skill) {
 					const body = await readSkill(skill);
 					return { kind: "send", text: `[SYSTEM: The user has invoked the "${name.slice(1)}" skill, indicating they want you to follow its instructions. The full skill content is loaded below.]\n\n${body}${arg ? `\n\nThe user has provided the following instruction alongside the skill invocation: ${arg}` : ""}` };

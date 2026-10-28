@@ -20,8 +20,8 @@ const { notes, skills } = await import("../src/prompt.ts");
 
 setSetting("timezone", "Asia/Yekaterinburg");
 writeAgent("default", { defaultProvider: "dev", defaultModel: "m" });
-const session = { id: "s1", profile: "default", cwd: home, source: "local" };
-setHost({ session: () => session } as any);
+const session = { id: "s1", agent: "default", cwd: home, source: "local" };
+setHost({ thread: () => session } as any);
 const run = async (tool: any, args: any) => {
 	const r = await tool.execute(args, { conversationId: 1 }, undefined);
 	return JSON.parse(r.output[0].text);
@@ -83,14 +83,14 @@ test("skills: a project's own, its folder's .agents/skills and .claude/skills up
 	assert.deepEqual(list.map((k: any) => [k.name, k.scope]), [["claude-one", "repo"], ["kit", "repo"], ["own", "project"], ["shared", "repo"]]);
 	assert.deepEqual(listSkills("default").map((k: any) => [k.name, k.scope]), [["general-only", "general"], ["shared", "general"]]);
 	// A thread working in the folder has them in its prompt and loads them, files and all.
-	const thread = { id: "s2", profile: `project:${p.id}`, cwd: sub, source: "local" };
-	setHost({ session: () => thread } as any);
+	const thread = { id: "s2", agent: `project:${p.id}`, cwd: sub, source: "local" };
+	setHost({ thread: () => thread } as any);
 	try {
 		assert.match((await skills(thread))!, /- kit: the repo's kit/);
 		const r = await skillView.execute({ name: "kit" }, { conversationId: 1 } as any, undefined as any);
 		assert.match((r as any).output[0].text, /Steps\.[\s\S]*references\/more\.md/);
 	} finally {
-		setHost({ session: () => session } as any);
+		setHost({ thread: () => session } as any);
 	}
 });
 
@@ -184,7 +184,7 @@ const { totalsOf, usagePayload } = await import("../src/usage.ts");
 
 test("usage: a thread's counters are kept and come back on a fresh store", () => {
 	const st = new Store();
-	const row = st.create({ id: "u1", conversation: "1", profile: "default", source: "local", cwd: home, effort: "" });
+	const row = st.create({ id: "u1", conversation: "1", agent: "default", source: "local", cwd: home, effort: "" });
 	assert.deepEqual(row.usage, { input: 0, output: 0, calls: 0 });
 	st.update("u1", { usage: { input: 1200, output: 340, calls: 2, cached: 900, tps: 31.4 } });
 	// A new Store = the agent process restarted: the same numbers are still there.
@@ -221,17 +221,17 @@ test("a waiting message keeps its attachments and block state when its words are
 test("search finds the words of a thread's messages, a fork's through its entry", async () => {
 	const { Store } = await import("../src/store.ts");
 	const st = new Store();
-	st.create({ id: "q1", conversation: "3", profile: "default", source: "local", cwd: home, effort: "" });
-	st.create({ id: "q2", conversation: "4", profile: "default", source: "local", cwd: home, effort: "" });
+	st.create({ id: "q1", conversation: "3", agent: "default", source: "local", cwd: home, effort: "" });
+	st.create({ id: "q2", conversation: "4", agent: "default", source: "local", cwd: home, effort: "" });
 	st.index("q1", 5, "user", "send the error log", 1);
 	st.index("q1", 6, "assistant", "the log is attached", 2);
 	st.index("q1", 9, "user", "and the access log", 3);
 	assert.equal(st.get("q1")?.message_count, 3);
-	assert.deepEqual(st.search("error log").map((h) => h.session_id), ["q1"]);
+	assert.deepEqual(st.search("error log").map((h) => h.thread_id), ["q1"]);
 	st.copyIndex("q1", "q2", 6);
 	assert.equal(st.get("q2")?.message_count, 2, "a fork has its words through the entry it was made at");
 	st.cutIndex("q1", 6);
-	assert.deepEqual(st.search("access").map((h) => h.session_id), [], "an exchange taken back is not found");
+	assert.deepEqual(st.search("access").map((h) => h.thread_id), [], "an exchange taken back is not found");
 	st.delete("q1");
 	st.delete("q2");
 });

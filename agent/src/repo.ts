@@ -139,13 +139,13 @@ async function readRemote(machine: string, folder: string): Promise<Repo> {
 	return { instructions, skills };
 }
 
-/** Every skill a thread of `profile` can use, working in `folder` (on `machine`, or here). */
-export async function skillsFor(profile: string, folder: string | undefined, machine?: string): Promise<Skill[]> {
-	return machine && folder ? listSkills(profile, folder, (await repoOf(folder, machine)).skills) : listSkills(profile, folder);
+/** Every skill a thread of `agent` can use, working in `folder` (on `machine`, or here). */
+export async function skillsFor(agent: string, folder: string | undefined, machine?: string): Promise<Skill[]> {
+	return machine && folder ? listSkills(agent, folder, (await repoOf(folder, machine)).skills) : listSkills(agent, folder);
 }
 
-export async function skillFor(profile: string, name: string, folder: string | undefined, machine?: string): Promise<Skill | undefined> {
-	return (await skillsFor(profile, folder, machine)).find((s) => s.name === name || path.basename(s.dir) === name);
+export async function skillFor(agent: string, name: string, folder: string | undefined, machine?: string): Promise<Skill | undefined> {
+	return (await skillsFor(agent, folder, machine)).find((s) => s.name === name || path.basename(s.dir) === name);
 }
 
 /** A file of a skill (SKILL.md by default), wherever the skill is. */

@@ -53,8 +53,8 @@ export class Queue {
 	}
 
 	private async live(id: string): Promise<Live> {
-		const live = await this.rt.session(id);
-		if (!live) throw new Error(`session not found: ${id}`);
+		const live = await this.rt.thread(id);
+		if (!live) throw new Error(`thread not found: ${id}`);
 		return live;
 	}
 

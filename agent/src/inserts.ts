@@ -103,14 +103,14 @@ export class ThreadInserts {
 	}
 
 	private async live(id: string): Promise<Live> {
-		const live = await this.rt.session(id);
-		if (!live) throw new Error(`session not found: ${id}`);
+		const live = await this.rt.thread(id);
+		if (!live) throw new Error(`thread not found: ${id}`);
 		return live;
 	}
 
 	/** The thread's inserts in order, read from its transcript and its document. */
 	async list(id: string): Promise<InsertView[]> {
-		const live = this.rt.live.get(id) ?? (await this.rt.session(id));
+		const live = this.rt.live.get(id) ?? (await this.rt.thread(id));
 		if (!live) return [];
 		const view = await live.conversation.viewState(ctx);
 		const entries = ((view.value as any).entries ?? []) as any[];

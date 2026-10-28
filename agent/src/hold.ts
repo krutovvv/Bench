@@ -85,14 +85,14 @@ export class Holds {
 	 * stopping mid-sentence cuts Pi's turn — but no new call begins until the person lets it
 	 * go on. The actions phase is where the minutes go; that is what the hold answers to. */
 	async pause(id: string): Promise<void> {
-		const live = await this.rt.session(id);
+		const live = await this.rt.thread(id);
 		if (!live?.busy) return;
 		await this.change(live, (h) => !held(h) && h.push({ from: Date.now() }) > 0);
 	}
 
 	/** Let the held run take its next step. */
 	async resume(id: string): Promise<void> {
-		const live = await this.rt.session(id);
+		const live = await this.rt.thread(id);
 		if (!live) return;
 		await this.change(live, (h) => closeHold(h, Date.now()));
 		this.gates.wake(String(live.conversation.id), true);
@@ -117,8 +117,8 @@ export class Holds {
 
 	/** Called before every tool call (a subagent's with its parent's session): waits while the
 	 * run's document says it is held; false when the person stopped it meanwhile. */
-	async wait(sessionId: string, signal?: AbortSignal): Promise<boolean> {
-		const row = this.rt.store.get(sessionId);
+	async wait(threadId: string, signal?: AbortSignal): Promise<boolean> {
+		const row = this.rt.store.get(threadId);
 		if (!row) return true;
 		const conversation = Number(row.conversation);
 		for (;;) {

@@ -5,7 +5,7 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { execFile } from "node:child_process";
-import { sessionOf } from "../host.ts";
+import { threadOf } from "../host.ts";
 
 const MAX = 30_000;
 
@@ -20,7 +20,7 @@ export const sshRun = defineTool({
 		host: Type.Optional(Type.String({ description: "Another ~/.ssh/config host, only when the person names one" })),
 	}),
 	execute: async (args, api, context) => {
-		const s = sessionOf(api.conversationId);
+		const s = threadOf(api.conversationId);
 		// The terminal inserted in the thread (the last one, when there are several); "ssh:" alone
 		// is this machine's.
 		const inserted = [...(s.inserts ?? [])].reverse().find((i) => i.key.startsWith("ssh:"))?.key.slice(4);

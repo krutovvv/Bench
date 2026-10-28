@@ -15,7 +15,7 @@ import { type ExecutionEnv, ExecutionError, FileError, type Result, type ShellEx
 
 const posix = path.posix;
 
-/** The macOS sandbox profile: everything but writing outside `root` and the temp folders. */
+/** The macOS sandbox agent: everything but writing outside `root` and the temp folders. */
 function seatbelt(root: string): string {
 	const q = (p: string) => JSON.stringify(p);
 	return `(version 1)(allow default)(deny file-write* (require-not (require-any (subpath ${q(root)}) (subpath "/private/tmp") (subpath "/private/var/folders") (subpath "/dev") (subpath ${q(path.join(os.homedir(), ".bench", "lsp"))}))))`;

@@ -35,7 +35,7 @@ test("the counters of a turn are saved and read back after a restart", async () 
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 	rt = new Runtime(() => {});
 	await rt.open();
-	const again = await rt.session(id);
+	const again = await rt.thread(id);
 	assert.deepEqual(
 		{ input: again!.usage.input, output: again!.usage.output, calls: again!.usage.calls },
 		{ input: saved.input, output: saved.output, calls: saved.calls },

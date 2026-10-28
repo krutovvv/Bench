@@ -52,7 +52,7 @@ function publish(event: Event): void {
 	for (const ws of sockets) if (ws.readyState === ws.OPEN) ws.send(frame);
 }
 
-for (const name of migrateProfiles()) console.log(`[migrate] profile ${name} → agents/${name}`);
+for (const name of migrateProfiles()) console.log(`[migrate] agent ${name} → agents/${name}`);
 for (const row of migrateServerRows()) console.log(`[migrate] ${row} is a server's agent now, not a project row`);
 for (const id of migrateProjectModels()) console.log(`[migrate] project ${id} follows the general model now (its settings.json in backups/)`);
 const rt = new Runtime(publish);
