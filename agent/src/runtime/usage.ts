@@ -3,6 +3,7 @@
 // Bench's status bar reads the same figures after a restart that it showed while the work ran.
 
 import type { SpeedStat, Usage } from "../protocol.gen.ts";
+import { judgeSettings } from "../judge/client.ts";
 
 /** The counters of one thread. `input` is the last call's window (≈ the context in use);
  *  `output` and `calls` add up over the thread; `tps` is the last turn's blended rate. */
@@ -61,7 +62,8 @@ export function usagePayload(model: string, u: Totals, max: number): Usage {
 		output: u.output,
 		calls: u.calls,
 		avg_tps: u.tps ?? 0,
-		...(u.judge ? { judge_calls: u.judge, judge_nudges: u.nudges ?? 0 } : {}),
+		// While the evaluator is on, its counts even at zero: the meters say it is there.
+		...(u.judge || judgeSettings() ? { judge_calls: u.judge ?? 0, judge_nudges: u.nudges ?? 0 } : {}),
 	};
 }
 /** How fast the model wrote in this thread (crates/protocol `SpeedStat`). Bench measures it (only
