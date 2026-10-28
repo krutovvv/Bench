@@ -8,7 +8,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::ThreadView;
-use super::work::{host_of, tool_urls};
+use super::tool_labels::{host_of, tool_urls};
 use bench_ui::icons::Ico;
 
 impl ThreadView {

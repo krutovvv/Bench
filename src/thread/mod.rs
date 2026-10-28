@@ -35,6 +35,7 @@ mod queued;
 mod rail;
 pub(crate) mod send;
 mod slash;
+pub(crate) mod tool_labels;
 pub(crate) mod speed;
 mod view;
 pub(crate) mod work;
