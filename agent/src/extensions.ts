@@ -33,6 +33,7 @@ import * as skills from "./builtin/skills.ts";
 import * as subagent from "./builtin/subagent.ts";
 import * as taskStore from "./builtin/tasks.ts";
 import { agentDir, agents, readAgent } from "./config.ts";
+import { createAnchoredEdit, createAnchoredRead } from "./builtin/hashline.ts";
 import { assistant, images } from "./extensions/assistant.ts";
 import { host } from "./host.ts";
 import { mcpTools } from "./mcp.ts";
@@ -49,9 +50,9 @@ export const blocks = () => {
 		host,
 		prompt,
 		tools: {
-			read: byName.read,
+			read: createAnchoredRead({ images }),
 			write: byName.write,
-			edit: byName.edit,
+			edit: createAnchoredEdit(),
 			bash: byName.bash,
 			clarify: ask.clarify,
 			todo: ask.todo,

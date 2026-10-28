@@ -39,6 +39,7 @@ const DANGEROUS: [RegExp, string][] = [
 ];
 
 import { globTool, grepTool, lsTool } from "../builtin/search.ts";
+import { createAnchoredEdit, createAnchoredRead } from "../builtin/hashline.ts";
 import { lspTool, placeOf } from "../builtin/navigate.ts";
 import { diagnosticsFor, knownDiagnostics } from "../lsp.ts";
 
@@ -62,11 +63,13 @@ const diagnosticsTool = defineTool({
 // Pictures the read tool shrinks to the model's limits: a shot of a Retina window (2480×1600) is
 // over them, and without a processor Pi refuses the file instead of resizing it.
 export const images = await createNodePhotonImages();
+// Pi's coding tools, with read and edit by line anchors (`builtin/hashline.ts`).
 const Coding = createCodingTools({ images });
+const coding = (Coding.tools ?? []).map((t: any) => (t.name === "read" ? createAnchoredRead({ images }) : t.name === "edit" ? createAnchoredEdit() : t));
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, processTool],
+	tools: [...coding, grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, processTool],
 	tasks: [CronTask, ProcessTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),
