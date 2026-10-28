@@ -124,13 +124,25 @@ impl SettingsForm for Run {
             &e.run.approvals,
             cx,
         );
-        let code_mode = segmented(
-            "env-code-mode",
-            "code_mode",
-            vec!["Off".into(), "On".into()],
-            if e.run.code_mode { "On" } else { "Off" },
-            cx,
-        );
+        // On or off: a switch, as a Mac's settings have it (saved as the choices are, "On"/"Off").
+        let code_mode = {
+            let (view, pid) = (view.clone(), pid.clone());
+            div()
+                .flex()
+                .justify_end()
+                .child(
+                    gpui_kit::component::switch::Switch::new("env-code-mode")
+                        .checked(e.run.code_mode)
+                        .on_click(move |on, window, cx| {
+                            let value = if *on { "On" } else { "Off" }.to_string();
+                            let pid = pid.clone();
+                            view.update(cx, |this, cx| {
+                                this.env_set_run(&pid, "code_mode", value, window, cx)
+                            });
+                        }),
+                )
+                .into_any_element()
+        };
         // Pi's own first, then the presets' shares.
         let names = app.gear.presets.compaction.clone();
         let shares: Vec<Option<f64>> = std::iter::once(None)

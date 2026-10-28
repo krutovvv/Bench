@@ -120,6 +120,8 @@ pub fn form_action(
         .h(px(FIELD_H))
         .flex()
         .items_center()
+        // A control's size, as the segmented ones beside it — not the row's text it sits in.
+        .text_size(px(crate::metrics::SIDEBAR_TEXT))
         .cursor_pointer()
         .when(primary, |d| {
             d.px_3()

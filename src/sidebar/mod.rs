@@ -202,23 +202,34 @@ impl BenchApp {
     fn render_new_project_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let on = self.new_project.form.is_some();
+        // The sidebar's foot (a rule over it), and in it a row as the list's rows are: set in,
+        // rounded, its ground on hover and while its page is open — a button by the same
+        // signs a thread row gives, not words left lying at the bottom.
         h_flex()
-            .id("new-project")
             .flex_none()
             .h(px(bench_ui::STATUS_H))
-            .pl(px(bench_ui::SIDEBAR_TEXT_X))
-            .pr(px(bench_ui::SIDEBAR_ROW_INSET))
+            .items_center()
             .border_t_1()
             .border_color(theme.border.opacity(0.6))
-            .gap_1p5()
-            .items_center()
-            .cursor_pointer()
-            .text_size(px(bench_ui::SIDEBAR_TEXT))
-            .text_color(if on { theme.foreground } else { theme.muted_foreground })
-            .hover(|s| s.text_color(theme.foreground))
-            .child(Ico::Plus.icon().xsmall())
-            .child("New project")
-            .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx)))
+            .child(
+                h_flex()
+                    .id("new-project")
+                    .flex_1()
+                    .mx(px(bench_ui::SIDEBAR_ROW_INSET))
+                    .pl(px(bench_ui::SIDEBAR_TEXT_X - bench_ui::SIDEBAR_ROW_INSET))
+                    .py(px(bench_ui::THREAD_ROW_PY))
+                    .rounded_md()
+                    .gap_1p5()
+                    .items_center()
+                    .cursor_pointer()
+                    .text_size(px(bench_ui::SIDEBAR_TEXT))
+                    .text_color(if on { theme.foreground } else { theme.muted_foreground })
+                    .when(on, |d| d.bg(theme.sidebar_accent))
+                    .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
+                    .child(Ico::Plus.icon().small())
+                    .child("New project")
+                    .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx))),
+            )
             .into_any_element()
     }
 
