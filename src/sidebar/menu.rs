@@ -88,13 +88,22 @@ pub(super) fn item_menu(
         let (rename, del) = (item.clone(), item.clone());
         let menu = match &item {
             Item::Project(id) => {
-                // Its files, prompts, skills and tools in the Explorer, here.
+                // Its files, prompts, skills and tools in the Explorer, here; its Settings (name,
+                // where it lives, model, Telegram) — the gear the row had, kept in its menu.
                 menu.item({
                     let id = id.clone();
                     PopupMenuItem::new("Explorer")
                         .icon(Ico::FolderTree.icon())
                         .on_click(act(Box::new(move |this, window, cx| {
                             this.show_explorer(id.clone(), window, cx)
+                        })))
+                })
+                .item({
+                    let id = id.clone();
+                    PopupMenuItem::new("Settings")
+                        .icon(Ico::Settings.icon())
+                        .on_click(act(Box::new(move |this, window, cx| {
+                            this.open_project_settings(id.clone(), window, cx)
                         })))
                 })
                 .separator()

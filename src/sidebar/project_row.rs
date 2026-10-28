@@ -1,6 +1,7 @@
-//! A project in the sidebar: its head (an icon for what it is, the name, and on hover "⋯", the
-//! gear (its environment in the Explorer) and "+" for a new thread in it; the fold is always
-//! shown), then its threads on the head's guide.
+//! A project in the sidebar: its head (an icon for what it is, the name, and on hover "⋯" — its
+//! Settings among its items — and "+" for a new thread in it; the fold is always shown), then
+//! its threads on the head's guide. Its files and environment are the Code view's (the switch
+//! over the window).
 
 use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
@@ -16,7 +17,7 @@ use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// A project: its head and its threads on the head's guide (the controls of the head are in
-    /// `menu.rs`'s notes: hover "⋯", gear, "+", and the fold always shown).
+    /// `menu.rs`'s notes: hover "⋯", "+", and the fold always shown).
     pub(super) fn render_project(
         &mut self,
         g: usize,
@@ -44,7 +45,7 @@ impl BenchApp {
                     ),
                     None => Some(format!("{h}: not connected")),
                 });
-        let (new_id, menu_id, set_id) = (p.id.clone(), p.id.clone(), p.id.clone());
+        let (new_id, menu_id) = (p.id.clone(), p.id.clone());
         let mark = self.mark_of(&format!("p:{}", p.id));
         let pinned = mark.pinned;
         // A chosen color is a tag's dot after the name (as Finder's); the name stays the text's.
@@ -116,20 +117,6 @@ impl BenchApp {
                                     Item::Project(menu_id.clone()),
                                     pinned,
                                 )),
-                        ),
-                )
-                // The gear (on hover): the project's environment, in the Explorer. On the row, not
-                // in the menu — a door to Settings that only shows on a right click is a door
-                // nobody finds; the gear says settings, and what it opens says there is more.
-                .child(
-                    bench_ui::on_group_hover(group.clone())
-                        .child(
-                            bench_ui::row_icon_button(("pset", g), Ico::Settings)
-                                .tooltip("Settings")
-                                .on_click(cx.listener(move |this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    this.open_project_settings(set_id.clone(), window, cx)
-                                })),
                         ),
                 )
                 .child(
