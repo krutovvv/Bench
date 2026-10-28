@@ -58,7 +58,7 @@ pub struct BenchApp {
     pub gear: crate::settings::state::Gear,
     /// The new project's page (`settings/new_project.rs`).
     pub new_project: crate::settings::new_project::NewProject,
-    /// The tab bar's corner for the open file: caret, indent, language (`explorer/pane/cursor.rs`).
+    /// The Code status bar's corner for the open file: caret, indent, language (`explorer/pane/cursor.rs`).
     pub cursor_item: Entity<crate::explorer::pane::cursor::CursorItem>,
     /// The docks' dividers (`workspace/layout.rs`).
     pub layout: crate::workspace::layout::LayoutState,

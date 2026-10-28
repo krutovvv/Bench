@@ -1,4 +1,4 @@
-//! A thread's meters, in the title bar by its repo: how full its context is (what it used and
+//! A thread's meters, under its composer by its repo (`composer/foot.rs`): how full its context is (what it used and
 //! did, in a panel), how fast the model writes in it (the chart of its last answer), and the
 //! fallback model answering. They are the thread's — its view's journal and speed — so another
 //! thread opened shows its own, never a global bar's.

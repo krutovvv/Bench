@@ -223,6 +223,7 @@ impl ThreadView {
         // wait said over it while the person is elsewhere in the thread.
         let waiting = !self.thread.journal.asks().is_empty() && below;
         let composer = self.render_composer(cx);
+        let foot = self.render_composer_foot(cx);
         let view = cx.entity();
         let side = if self.narrow {
             bench_ui::CHAT_LEFT_NARROW
@@ -262,7 +263,8 @@ impl ThreadView {
                         .pb(px(bench_ui::COMPOSER_CARD_PB))
                         .gap_2()
                         .when(waiting, |d| d.child(self.render_waiting_line(cx)))
-                        .child(composer),
+                        .child(composer)
+                        .child(foot),
                 ),
             )
             .into_any_element()

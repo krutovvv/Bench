@@ -23,8 +23,9 @@ its name alone (`.agents/skills/bench-structure/SKILL.md` §2 owns that rule and
 rule).
 
 - **By place in the window**: `workspace/` (docks and center), `titlebar/`, `sidebar/`,
-  `thread/`, `settings/` (the gear and the new project's page). There is no status bar: the window's
-  toggles are the title bar's right end, its agent the left dock's foot.
+  `thread/`, `settings/` (the gear and the new project's page). The chat has no status bar (the thread's
+  project, repo and meters are its composer's foot, the agent the left dock's foot); the Code
+  view's is `explorer/statusbar.rs`.
 - **By feature, spanning places**: `explorer/`, `inserts/`, `env/`.
 - **Services that draw nothing**: `client/` (the agent), `media/`, `system/` (ssh, the
   `~/.ssh/config` servers, notifications).

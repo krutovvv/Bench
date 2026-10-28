@@ -15,7 +15,7 @@ result to the pixel. The change cycle itself (build, screenshot, measure, ship) 
 ```
 x: 0                         280 (sidebar, resizable)                                   1240
 y ┌──────────────────────────────────────────────────────────────────────────────────────┐
-0 │ ● ● ●  ◧ │ TITLE (13 semibold) [/ second thread ×]  meters · repo ⌨ ✦ ▭ [Chat|Code] │ 0–40
+0 │ ● ● ●  ◧ │ TITLE (13 semibold) [/ second thread ×]                  [Chat|Code] │ 0–40
 40│━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│ rule
   │ ✎ New thread       ⌘N    │ THE THREAD (gpui::list, the only scroll), centred ≤ 860:│
   │ ⊞ New project            │   bubbles, "N actions", answers, inserts where put,     │
@@ -28,12 +28,14 @@ y ┌─────────────────────────
 
 | Area | Height | Inside | Inset | Code |
 |---|---|---|---|---|
-| Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), the thread's meters and repo chip, Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header` in `src/titlebar/mod.rs`; the right end's toggles (running terminals, ✦ ⌘J in Code, ▭ ⌃`) `src/titlebar/tail.rs` |
+| Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), the thread's meters and repo chip, Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header` in `src/titlebar/mod.rs`; Chat \| Code `src/titlebar/tail.rs` |
 | Actions | three rows | New thread, New project, Search (⌘K opens a list over the window) | `nav_row`, text at `SIDEBAR_TEXT_X` | `render_actions` in `src/sidebar/mod.rs`; the list `src/sidebar/search.rs` |
 | Sidebar list | rest | Host's threads first, then each project (pinned first) with its threads | rows at `SIDEBAR_ROW_INSET`, text at `SIDEBAR_TEXT_X` | `src/sidebar/mod.rs`; order and acts `src/sidebar/items.rs` |
 | Left dock's foot | `SIDEBAR_FOOT_H` 40 incl. its rule | the open thread's agent (where, a dot, "N working") and its popover; the gear (⌘,) | `SIDEBAR_ROW_INSET` | `render_foot`, `src/sidebar/agent.rs`, under any left panel (`workspace/layout.rs`) |
 | The thread | rest | rows from `crates/thread`, centred in `THREAD_MAX_W`; inserts where the journal puts them | `CHAT_LEFT` (`CHAT_LEFT_NARROW` in a dock) | `src/thread/mod.rs`; inserts `src/inserts/mod.rs` |
 | Composer | its text | plus, text, mic, Send in one rounded field; chips over the text | the column's sides | `src/thread/composer/input.rs` |
+| Composer's foot | `COMPOSER_FOOT_H` | the thread's project (a new thread's to choose), its repo chip; running terminals and the meters (context, speed) on the right | the column's sides | `src/thread/composer/foot.rs` |
+| Code status bar | `STATUS_H` 29 incl. its rule, only under the Code view's documents and terminal | the caret (Ln, Col · indent · language), ✦ the thread beside ⌘J, ▭ the terminal ⌃` | `px_1` | `src/explorer/statusbar.rs` |
 | Explorer bar (Code) | `bar_h` + its rule, level with the tabs | the project pull-down, Files \| Threads glyphs, Refresh, ⌘P | `SIDEBAR_ROW_INSET` | `explorer_picker`, `src/explorer/tree/view.rs` |
 
 Every rule that crosses the window is one pixel row. Settings pages are a centred column of
@@ -50,10 +52,10 @@ Every rule that crosses the window is one pixel row. Settings pages are a centre
 | The sidebar's fold | the title bar, right after the traffic lights; New project: a row over the sidebar's list | a bar under the window |
 | New window, Settings, and every other command | the menu bar (`app/menu.rs`), with its key | a button in a bar |
 | Attach, dictate, Send / Stop | the composer's field | a bar |
-| The thread's facts (context, speed, repo) | the title bar, by the title | — |
 | The agent's state | the left dock's foot; its popover | — |
-| The window's toggles (terminal, thread beside) | the title bar's right end, before Chat \| Code | a status bar (Bench has none) |
-| An open file's caret, indent, language | its tab bar's right end | — |
+| The Code view's toggles (terminal, thread beside) | its status bar | the title bar, the chat |
+| An open file's caret, indent, language | the Code status bar | — |
+| The thread's facts (project, repo, context, speed) | the line under its composer | the title bar |
 | Rare actions on a thread or project | its row's hover "⋯" and right-click (one `item_menu`) | the header |
 | Quick actions on a row (a new thread "+") | on the row, shown on hover | always visible |
 | Actions on an answer (copy, read aloud) | at the end of its work line, on hover | a row of their own |

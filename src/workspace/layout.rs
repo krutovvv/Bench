@@ -210,6 +210,17 @@ impl BenchApp {
             }
             None => main.into_any_element(),
         };
+        // The Code view: its status bar under the documents and the terminal, not under the
+        // docks beside them; the chat has none.
+        let center = if self.center == Center::Doc {
+            v_flex()
+                .size_full()
+                .child(div().flex_1().min_h_0().child(center))
+                .child(self.render_code_statusbar(cx))
+                .into_any_element()
+        } else {
+            center
+        };
         // The left dock: its panel, under the window's top bar, a hairline between it and the
         // center as a Mac's sidebar has (as the right dock's on its other side).
         let left = left.map(|panel| {

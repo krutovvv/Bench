@@ -46,8 +46,9 @@ is separate).
 
 - English UI throughout.
 - No dialogs for simple things: defaults + inline editing + arm-to-confirm for deletes.
-- No status bar (2026-10-28, after Claude Desktop): the agent is the sidebar's foot, the
-  window's toggles the title bar's right end. The thread's own readouts (context, speed) sit in
+- No status bar in the chat (2026-10-28, after Claude Desktop): the agent is the sidebar's
+  foot; the thread's project, repo and meters the line under its composer; the title bar's right
+  end only Chat | Code. The Code view keeps an IDE status bar under its documents only. The thread's own readouts (context, speed) sit in
   the title bar by its repo and open detail popovers on click (stats, speed chart).
 - Elapsed time of a running job counts from the job's own start time (from the backend), never
   from when the view was opened: switching chats or restarting the app must not reset it

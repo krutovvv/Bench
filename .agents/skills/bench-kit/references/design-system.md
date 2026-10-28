@@ -58,6 +58,8 @@ Leading: the thread's prose `LEAD` (1.5rem), shared with the composer.
 | Name | Value | What |
 |---|---|---|
 | `TITLE_BAR_H` | 40 | the title bar across the window |
+| `STATUS_H` | 29 | the Code view's status bar with its rule |
+| `COMPOSER_FOOT_H` | 28 | the line under the composer |
 | `SIDEBAR_FOOT_H` | 40 | the left dock's foot (agent, gear) with its rule |
 | `bar_h(cx)` | font × 2.5 | the Explorer's bar, the documents' tabs, IDE heads |
 | `FIELD_H` | 28 | a field; form actions match it |

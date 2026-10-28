@@ -35,7 +35,8 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
 | change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu, `top.rs` the strip over it; loading projects: `project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
 | the agent's item, the gear (the left dock's foot) | `src/sidebar/agent.rs` |
-| the window's toggles (terminal, thread beside) | `src/titlebar/tail.rs` |
+| the Code view's status bar (caret, thread beside, terminal) | `src/explorer/statusbar.rs` |
+| the line under the composer (project, repo, meters) | `src/thread/composer/foot.rs` |
 | ⌘K, the search over threads and projects | `src/sidebar/search.rs` |
 | change a thread's meters (context, speed, fallback, by its repo) | `src/thread/meters.rs`, the speed meter `src/thread/speed.rs` |
 | change the gear (tabs Agents, Presets, Appearance) | `src/settings/mod.rs` (the tabs, built from `bench_ui::settings_*`), `src/settings/providers.rs`, `src/settings/agent_form.rs` (add/remove a server's agent), `src/settings/presets.rs`, `src/settings/appearance.rs` (Appearance) |

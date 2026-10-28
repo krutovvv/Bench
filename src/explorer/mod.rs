@@ -10,6 +10,7 @@
 //! explorer/pane/    the middle: documents, tabs, a file's editor, kept between starts
 //! explorer/search/  ⌘P a file by name, ⌘⇧F a text in the folder
 //! explorer/specs/   the project's specs: their tree by parent, a spec as a tab with its links
+//! explorer/statusbar.rs  its status bar: the caret, the thread beside, the terminal
 //! explorer/code/    language servers (problems, hover, definition), Problems, git, languages
 //! ```
 
@@ -18,6 +19,7 @@ pub mod code;
 pub mod pane;
 pub mod search;
 pub mod specs;
+mod statusbar;
 pub mod tree;
 
 use std::collections::{HashMap, HashSet};

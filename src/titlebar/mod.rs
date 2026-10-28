@@ -1,11 +1,8 @@
-//! The bar over the center: the thread's title, its meters (`thread/meters.rs`) and its repo's
-//! branch, or the documents' project (their tabs are the center's own bar, `explorer/pane/view.rs`),
-//! then the window's toggles at its right end (`tail.rs`); or a settings page's title and its
-//! close.
+//! The bar over the center: the thread's title (its meters, project and repo are the composer's
+//! foot, `thread/composer/foot.rs`), or the documents' project (their tabs are the center's own
+//! bar, `explorer/pane/view.rs`), then Chat | Code at its right end (`tail.rs`); or a settings
+//! page's title and its close.
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
-use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -16,79 +13,6 @@ use crate::workspace::Center;
 mod tail;
 
 impl BenchApp {
-    /// "app · main": the thread works in a git repository (its folder's name and branch). A
-    /// click opens what the repo is: uncommitted changes, the newest commits (a click copies
-    /// the sha), its origin. Git itself stays the agent's: ask it to commit, or to undo.
-    fn render_project_chip(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let p = self.thread(cx).repo.clone()?;
-        let label = if p.branch.is_empty() {
-            p.name()
-        } else {
-            format!("{} · {}", p.name(), p.branch)
-        };
-        let at = self.thread_ref(cx);
-        let dir = p.dir.clone();
-        if !self.git.info.contains_key(&dir) {
-            let target = self.thread_target(&at);
-            self.refresh_git(target, dir.clone(), cx);
-        }
-        let theme = cx.theme();
-        let info = self.git.info.get(&dir).cloned();
-        let app = cx.entity().downgrade();
-        let copy = |app: gpui::WeakEntity<BenchApp>, shown: String, what: String| {
-            PopupMenuItem::new(shown).on_click(move |_, window, cx| {
-                let what = what.clone();
-                let _ = app.update(cx, |this, cx| {
-                    cx.write_to_clipboard(ClipboardItem::new_string(what.clone()));
-                    this.toast(NotificationType::Info, format!("Copied {what}"), window, cx);
-                });
-            })
-        };
-        Some(
-            Button::new("repo-chip")
-                .ghost()
-                .small()
-                .text_color(theme.muted_foreground)
-                .icon(bench_ui::icons::Ico::GitBranch.icon().xsmall())
-                // A Button's `.label()` takes the control's size: the bars' size is set here.
-                .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
-                .dropdown_menu(move |menu, _, _| {
-                    // One line each, clipped: a long subject or path must not grow the menu
-                    // wider than the window (clicking still copies the whole thing).
-                    let mut menu = menu.item(PopupMenuItem::label(bench_ui::clip(&dir, 64)));
-                    let Some(info) = info.clone() else {
-                        return menu.item(PopupMenuItem::new("Reading the repo…").disabled(true));
-                    };
-                    menu = menu.item(
-                        PopupMenuItem::new(if info.dirty == 0 {
-                            "Nothing uncommitted".to_string()
-                        } else {
-                            format!("{} uncommitted", info.dirty)
-                        })
-                        .icon(bench_ui::icons::Ico::CircleDot.icon())
-                        .disabled(true),
-                    );
-                    if !info.commits.is_empty() {
-                        menu = menu.separator();
-                        for c in info.commits {
-                            let line = format!("{}  {} · {}", c.sha, c.subject, c.age);
-                            menu = menu.item(
-                                copy(app.clone(), bench_ui::clip(&line, 56), line).disabled(false),
-                            );
-                        }
-                    }
-                    if let Some(url) = info.remote {
-                        menu = menu.separator().item(
-                            copy(app.clone(), bench_ui::clip(&url, 56), url)
-                                .icon(bench_ui::icons::Ico::Globe.icon()),
-                        );
-                    }
-                    menu
-                })
-                .into_any_element(),
-        )
-    }
-
     /// The top bar's lead, left of the center's header: room for the window's buttons, the
     /// sidebar's fold (hide or show, ⌘\), a short rule; the title follows it, as a Mac's
     /// unified title bar has it, whether the sidebar is shown or not.
@@ -220,9 +144,6 @@ impl BenchApp {
                                 )
                         }),
                 )
-                // The thread's own meters, then its repo: what is this thread's, together.
-                .children(self.active_thread.read(cx).render_meters(self.defaults.context_length, cx))
-                .children(self.render_project_chip(cx))
                 .child(self.render_header_tail(cx))
                 .into_any_element();
         }

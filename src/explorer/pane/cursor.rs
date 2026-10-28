@@ -1,4 +1,4 @@
-//! The tab bar's right corner for the open file: where the caret is, how the file is indented,
+//! The Code status bar's corner for the open file (`explorer/statusbar.rs`): where the caret is, how the file is indented,
 //! its language — as an editor's status bar says them. A view of its own that watches
 //! the file's editor, so a caret that moves redraws these words and not the window.
 

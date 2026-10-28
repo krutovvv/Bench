@@ -26,8 +26,8 @@ deletes threads (`open.rs`).
   app names the thread with a `ThreadRef` and never reads a view (the view asking may be drawing
   at that moment). What the app asks of a view never reads the app; when a view's click needs
   the app to come back to it, the call is deferred.
-- A thread's meters (context, speed, fallback) are the thread's, shown by its repo in the title
-  bar — not the window's.
+- A thread's meters (context, speed, fallback) are the thread's, shown under its composer with
+  its project and repo (`composer/foot.rs`) — not the window's.
 
 ## Invariants
 

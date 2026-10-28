@@ -71,6 +71,8 @@ pub const BUBBLE_R: f32 = 16.;
 /// mic and Send — its corner, the air under it in the window.
 pub const COMPOSER_CARD_R: f32 = 14.;
 pub const COMPOSER_CARD_PB: f32 = 12.;
+/// The line under the composer (its project, repo, meters), as Claude's: a field's height.
+pub const COMPOSER_FOOT_H: f32 = FIELD_H;
 /// The air inside the card around its line (the buttons'; the text is centred on their height).
 pub const COMPOSER_CARD_PY: f32 = 8.;
 /// Its sides: the plus and Send set in by this from the card's rule.
@@ -210,6 +212,8 @@ pub const ROW_STRIPE: f32 = 2.;
 /// A sidebar row is set in from the sidebar's edges by this, so its rounded ground (the open
 /// thread's, a hover's) floats in the list.
 pub const SIDEBAR_ROW_INSET: f32 = 10.;
+/// The Code view's status bar with the rule over it (none in the chat).
+pub const STATUS_H: f32 = 29.;
 /// The sidebar's foot (its agent and the gear) with the rule over it, as Claude's account row.
 pub const SIDEBAR_FOOT_H: f32 = 40.;
 /// A mark's dot beside a name (Finder's tag).

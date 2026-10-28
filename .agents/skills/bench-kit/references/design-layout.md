@@ -7,7 +7,7 @@ Sizes are `bench_ui` names (`crates/ui/src/metrics.rs`, `design-system.md`).
 
 ```
 ┌──────────────────────────────── title bar 40, across the window ─────────────────────────┐
-│ ● ● ●  ◧ │ Thread title  /  second thread ×     38k/131k · storefront · main  [Chat|Code] │
+│ ● ● ●  ◧ │ Thread title  /  second thread ×                                      [Chat|Code] │
 ├ sidebar 280 ─────────────┬───────────────────────────────────────────────────────────────┤
 │ ✎ New thread        ⌘N   │         the thread, a centred column (≤ 860)                  │
 │ ⊞ New project            │                           ┌ the person's bubble ┐             │
@@ -16,6 +16,7 @@ Sizes are `bench_ui` names (`crates/ui/src/metrics.rs`, `design-system.md`).
 │ Storefront               │                                                               │
 │ (Launch the spring …)    │  ┌ + Write to the agent · / for a tool          🎤  (↑) ┐     │
 │──────────────────────────│  └──────────────────────────────────────────────────────┘     │
+│                          │  ⌂ Storefront  ⑂ storefront · main          38k/131k · 29%    │
 │ ● This Mac  1 working  ⚙ │                                                               │
 └──────────────────────────┴───────────────────────────────────────────────────────────────┘
 ```
@@ -30,9 +31,8 @@ actions are on the window's root (`app/menu.rs` `listen`).
 `TITLE_BAR_H` 40 across the window. Left: room for the traffic lights (`WINDOW_BUTTONS_W`), the
 sidebar's fold (⌘\), a short rule (`BAR_SEPARATOR_H`), then the title at `BAR_TITLE` semibold.
 A second thread beside the open one adds its title after a faint "/", muted medium, and its ×
-(no head of its own over the dock). Right: the thread's meters and repo chip at `BAR_TEXT`, then
-the window's toggles (`tail.rs`: running terminals ⌨, the thread beside ✦ ⌘J in Code, the
-terminal ▭ ⌃`), then `mode_switch` Chat | Code (⌘E) at the window's corner. Settings and the new project's page put
+(no head of its own over the dock). Right: only `mode_switch` Chat | Code (⌘E) at the window's corner
+(`tail.rs`), as Claude's. Settings and the new project's page put
 their title and a close × here.
 
 ## Sidebar (`src/sidebar/`)
@@ -55,8 +55,9 @@ their title and a close × here.
   hairlines, 13pt lines with state dots, 11pt semibold section titles, the log at 11; the gear
   (⌘,) at the right end.
 
-There is no status bar. An open file's caret, indent and language sit at its tab bar's right
-end (`explorer/pane/cursor.rs`).
+The chat has no status bar. The Code view has one (`explorer/statusbar.rs`), `STATUS_H` 29,
+only under its documents and the terminal (not under the thread beside): the caret
+(`pane/cursor.rs`), the thread beside ✦ ⌘J, the terminal ▭ ⌃`.
 
 ## The thread (chat look, `src/thread/look.rs` `Chat`)
 
@@ -85,6 +86,11 @@ line of a field, as Claude's: the card (`COMPOSER_CARD_R`, a hairline, no shadow
 three `SEND_BUTTON` round, on the text's last line; the text grows upward. Files to send ride
 over the text as chips. Send: the accent with words, a faint disc without, a dark disc with a
 square (Stop) while the agent works. Placeholder "Write to the agent · / for a tool".
+
+**Its foot** (`foot.rs`), `COMPOSER_FOOT_H` under the card, as Claude's: the thread's project
+(a folder glyph and its name; a menu: a new thread moves there, a thread with messages starts a
+new one there) and its repo chip on the left; running terminals and the meters (`meters.rs`) on
+the right, `BAR_TEXT` muted.
 
 **The `/` list** (`render_completions`): a Mac completion list right over the field and as
 wide, `COMPLETION_GAP` above it, `rounded_lg`, popover ground and shadow, rows

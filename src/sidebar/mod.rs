@@ -191,7 +191,8 @@ impl BenchApp {
         v_flex()
             .flex_none()
             .pt_2()
-            .pb_1()
+            // Air under them before the first group, as Claude's before its sections.
+            .pb_3()
             .gap_px()
             .child(
                 bench_ui::nav_row("nav-new-thread", Ico::SquarePen, "New thread", "⌘N", false, cx)
