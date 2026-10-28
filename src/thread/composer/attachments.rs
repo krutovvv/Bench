@@ -15,6 +15,7 @@ use crate::media::attach;
 #[derive(Clone, Debug, PartialEq)]
 pub enum Reference {
     Code(CodeRef),
+    Comment(CommentRef),
     Problems(ProblemsRef),
     Terminal(TerminalRef),
 }
@@ -24,6 +25,7 @@ impl Reference {
     pub fn label(&self) -> String {
         match self {
             Reference::Code(c) => c.label(),
+            Reference::Comment(c) => c.label(),
             Reference::Problems(p) => p.label(),
             Reference::Terminal(t) => t.label(),
         }
@@ -33,17 +35,59 @@ impl Reference {
     pub fn message(&self) -> String {
         match self {
             Reference::Code(c) => c.message(),
+            Reference::Comment(c) => c.message(),
             Reference::Problems(p) => p.message(),
             Reference::Terminal(t) => t.message(),
         }
     }
 
-    /// Its chip's icon: the file's, or the problems'.
+    /// Its chip's icon: the file's, a comment's, or the problems'.
     pub fn icon(&self, theme: &gpui_kit::component::Theme) -> (bench_ui::icons::Ico, Hsla) {
         match self {
             Reference::Code(c) => bench_ui::file_icon(&c.path, false, theme),
+            Reference::Comment(_) => (bench_ui::icons::Ico::MessageSquare, theme.primary),
             Reference::Problems(_) => (bench_ui::icons::Ico::CircleAlert, theme.danger),
             Reference::Terminal(_) => (bench_ui::icons::Ico::Terminal, theme.muted_foreground),
+        }
+    }
+}
+
+/// The person's remark on lines of the project's code, as a reviewer leaves one (⌘⇧L in the
+/// Explorer, `explorer/pane/comment.rs`). Several go in one message; the agent addresses each and
+/// closes it with `resolve_comment` and its id (`agent/src/builtin/review.ts`), a step of its
+/// work the thread shows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CommentRef {
+    /// Short and unique enough in a thread: what `resolve_comment` names.
+    pub id: String,
+    /// The lines, with their text as they were when the comment was written.
+    pub code: CodeRef,
+    pub note: String,
+}
+
+impl CommentRef {
+    /// A new comment's id: four hex digits from the time and the place.
+    pub fn new_id(code: &CodeRef, note: &str) -> String {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (std::time::SystemTime::now(), &code.path, code.lines, note).hash(&mut h);
+        format!("c{:04x}", h.finish() & 0xffff)
+    }
+
+    /// `a.rs:12–20 · rename this`.
+    pub fn label(&self) -> String {
+        format!("{} · {}", self.code.label(), bench_ui::clip(self.note.trim(), 28))
+    }
+
+    /// `Comment c3f1 on `path:lines`: the note`, then the lines it is about, fenced.
+    pub fn message(&self) -> String {
+        let code = self.code.message();
+        let (at, fenced) = code.split_once('\n').unwrap_or((&code, ""));
+        let head = format!("Comment {} on {at}: {}", self.id, self.note.trim());
+        if fenced.is_empty() {
+            head
+        } else {
+            format!("{head}\n{fenced}")
         }
     }
 }
@@ -312,6 +356,24 @@ mod tests {
         assert_eq!(
             with_references("look".into(), &[Reference::Code(f)]),
             "look\n\n`/p/README`"
+        );
+    }
+
+    #[test]
+    fn a_comment_reads_as_its_id_place_note_and_code() {
+        let c = super::CommentRef {
+            id: "c3f1".into(),
+            code: CodeRef {
+                path: "/p/src/a.rs".into(),
+                lines: Some((3, 5)),
+                text: Some("fn a() {}\n".into()),
+            },
+            note: "  name it for what it does ".into(),
+        };
+        assert_eq!(c.label(), "a.rs:3–5 · name it for what it does");
+        assert_eq!(
+            Reference::Comment(c).message(),
+            "Comment c3f1 on `/p/src/a.rs:3-5`: name it for what it does\n```rs\nfn a() {}\n```"
         );
     }
 

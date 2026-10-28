@@ -163,6 +163,31 @@ pub fn ide_head(
         .children(actions)
 }
 
+/// A band under an open document's editor, a field in it: a comment being written on its
+/// lines (Xcode's find bar has the same place). `label` says what it is about.
+pub fn ide_band(label: impl Into<SharedString>, field: AnyElement, actions: Vec<AnyElement>, cx: &App) -> Div {
+    let theme = cx.theme();
+    h_flex()
+        .flex_none()
+        .min_h(px(BLOCK_HEAD_H))
+        .px_3()
+        .py_1()
+        .gap_3()
+        .items_center()
+        .border_t_1()
+        .border_color(theme.border.opacity(0.6))
+        .bg(theme.title_bar)
+        .text_size(px(crate::metrics::BAR_TEXT))
+        .child(
+            div()
+                .flex_none()
+                .text_color(crate::text::faint(theme))
+                .child(label.into()),
+        )
+        .child(div().flex_1().min_w_0().child(field))
+        .children(actions)
+}
+
 /// A tab of an open document in the header: its icon, name, a dot while it has unsaved changes,
 /// its × (on hover, always on the open one).
 pub fn doc_tab(

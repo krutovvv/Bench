@@ -17,6 +17,8 @@ export function preview(name: string, args: any): string {
 		const line = args.code.split("\n").map((l: string) => l.trim()).find((l: string) => l && !l.startsWith("//")) ?? "";
 		return line.length > 160 ? line.slice(0, 157) + "..." : line;
 	}
+	// A review comment closed: its id and what was done (builtin/review.ts).
+	if (name === "resolve_comment") return `${args.id ?? ""} — ${args.note ?? ""}`.slice(0, 160);
 	const pick = args.command ?? args.path ?? args.query ?? args.url ?? args.urls?.[0] ?? args.name ?? args.goal ?? args.pattern ?? args.action;
 	const text = typeof pick === "string" ? pick : JSON.stringify(args);
 	return text.length > 160 ? text.slice(0, 157) + "..." : text;

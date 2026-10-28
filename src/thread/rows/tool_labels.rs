@@ -188,6 +188,7 @@ pub(crate) fn activity_word(name: &str, preview: &str) -> String {
         "memory" => "taking notes…".to_string(),
         "cron" => "the schedule…".to_string(),
         "clarify" => "asking you…".to_string(),
+        "resolve_comment" => "resolving a comment…".to_string(),
         "skill_view" | "skill_manage" => "a skill…".to_string(),
         _ if name.starts_with("mcp__") => {
             let tool = name.rsplit("__").next().unwrap_or(name).replace('_', " ");

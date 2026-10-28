@@ -15,6 +15,7 @@ import { ProcessTask, processTool } from "../builtin/process.ts";
 import { memoryTool } from "../builtin/memory.ts";
 import { skillManage, skillView } from "../builtin/skills.ts";
 import { delegate } from "../builtin/subagent.ts";
+import { resolveComment } from "../builtin/review.ts";
 import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { host } from "../host.ts";
@@ -68,7 +69,7 @@ const coding = (Coding.tools ?? []).map((t: any) => (t.name === "read" ? createA
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...coding, grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, sshRun, processTool],
+	tools: [...coding, grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, resolveComment, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, sshRun, processTool],
 	tasks: [CronTask, ProcessTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),

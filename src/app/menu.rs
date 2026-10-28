@@ -38,6 +38,7 @@ actions!(
         StopThread,
         Dictate,
         SendSelection,
+        CommentSelection,
         DeleteThread,
         Minimize,
         Zoom,
@@ -75,6 +76,7 @@ pub fn install(cx: &mut App) {
         KeyBinding::new("cmd-.", StopThread, None),
         KeyBinding::new("cmd-shift-d", Dictate, None),
         KeyBinding::new("cmd-l", SendSelection, None),
+        KeyBinding::new("cmd-shift-l", CommentSelection, None),
         KeyBinding::new("cmd-m", Minimize, None),
     ]);
     cx.on_action(|_: &Quit, cx| cx.quit());
@@ -133,6 +135,7 @@ pub fn install(cx: &mut App) {
             MenuItem::action("Stop", StopThread),
             MenuItem::action("Dictate", Dictate),
             MenuItem::action("Send Selection to Thread", SendSelection),
+            MenuItem::action("Comment on Selection…", CommentSelection),
             MenuItem::separator(),
             MenuItem::action("Delete Thread…", DeleteThread),
         ]),
@@ -195,6 +198,11 @@ pub fn listen(root: Div, cx: &mut Context<BenchApp>) -> Div {
         .on_action(cx.listener(|this, _: &SendSelection, window, cx| {
             if this.focused_doc().is_some() {
                 this.send_selection_to_thread(window, cx)
+            }
+        }))
+        .on_action(cx.listener(|this, _: &CommentSelection, window, cx| {
+            if this.focused_doc().is_some() {
+                this.start_comment(window, cx)
             }
         }))
         // Asked once, as ⌫ ⌫ in the sidebar (`sidebar/items.rs`): the item arms it, a second

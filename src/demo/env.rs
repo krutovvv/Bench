@@ -97,7 +97,7 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         .detach();
     }
     // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
-    // `BENCH_EXPLORER=settings` its settings, `=part` an MCP server, `=lsp` a language
+    // `BENCH_EXPLORER=comment` a review comment being written, `=settings` its settings, `=part` an MCP server, `=lsp` a language
     // server that failed, `=lsp-new` the "Add a server" card with its preset chips, `=thread` the
     // thread beside it
     // with lines sent to it. `BENCH_DEMO=env` is `explorer` with its settings open.
@@ -191,6 +191,31 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
                 }),
                 cx,
             );
+        }
+        // Review comments: one already in the composer, the next being written under the post.
+        "comment" => {
+            use crate::thread::composer::attachments::{CodeRef, CommentRef, Reference};
+            app.show_demo_thread("d-site", cx);
+            app.right_dock.activate(crate::workspace::Panel::Thread);
+            app.add_reference(
+                Reference::Comment(CommentRef {
+                    id: "c3f1".into(),
+                    code: CodeRef {
+                        path: "/Users/demo/code/blog/content/posts/release-2-4.md".into(),
+                        lines: Some((3, 3)),
+                        text: Some("date: 2026-10-20".into()),
+                    },
+                    note: "The release is on the 28th".into(),
+                }),
+                cx,
+            );
+            app.start_comment(window, cx);
+            if let Some(c) = app.explorer.comment.as_mut() {
+                c.code.lines = Some((11, 15));
+                c.input.update(cx, |s, cx| {
+                    s.set_value("Shorter: one line per change, no marketing words", window, cx)
+                });
+            }
         }
         _ => {}
     }

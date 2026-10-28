@@ -1,6 +1,6 @@
 //! A file of the Explorer as a document (`DocKey::File`): read into an editor of its own — on the
 //! project's machine, or the agent's own (its soul, prompts, skills are files there) — saved with
-//! ⌘S, reverted, drawn with its head (where it is, Save, its changes, Finder).
+//! ⌘S, reverted, drawn with its head (where it is, Save, a comment, its changes, Finder).
 
 use gpui_kit::component::input::{Editor, InputEvent};
 use gpui_kit::component::notification::NotificationType;
@@ -236,6 +236,19 @@ impl BenchApp {
                 )
                 .into_any_element(),
         );
+        // A comment on the selected lines, for the agent (`comment.rs`).
+        if !binary && !loading {
+            actions.push(
+                bench_ui::head_icon_button(
+                    "doc-comment",
+                    Ico::MessageSquare,
+                    "Comment on the selection  ⌘⇧L",
+                    cx,
+                )
+                .on_click(cx.listener(|this, _, window, cx| this.start_comment(window, cx)))
+                .into_any_element(),
+            );
+        }
         // Its changes since HEAD, when it is in a repository.
         if d.head.is_some() {
             let g = f.clone();
@@ -285,6 +298,7 @@ impl BenchApp {
             .size_full()
             .child(head)
             .child(div().flex_1().min_h_0().child(body))
+            .children(self.render_comment(f, cx))
             .into_any_element()
     }
 }

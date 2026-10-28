@@ -63,10 +63,11 @@ impl BenchApp {
             self.cancel_rename(cx);
             return true;
         }
-        // The Explorer's ⌘P, a name being typed in its tree, ⌘⇧F's results: the latest first.
+        // The Explorer's ⌘P, a name being typed in its tree, a comment, ⌘⇧F's results: the latest first.
         let ex = &mut self.explorer;
         if ex.quick.take().is_some()
             || ex.naming.take().is_some()
+            || ex.comment.take().is_some()
             || ex.find.take().is_some()
             || self.armed.clear()
         {

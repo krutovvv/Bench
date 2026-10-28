@@ -112,6 +112,12 @@ one click away) and grows by putting the same parts in more places, not by new c
   "Add to thread", sends the file. A message carries them under its words as fenced blocks with
   `path:lines` — what the agent reads, what the thread shows. The same chips will carry a
   language server's problems and a terminal's output.
+- **Review comments.** ⌘⇧L (Thread → Comment on Selection…, the file head's speech bubble) opens
+  a band under the editor naming the selected lines; Enter puts the comment in the composer as a
+  chip (`Reference::Comment`, `src/explorer/pane/comment.rs`), the caret back in the code for the
+  next one. The message carries each as `Comment <id> on \`path:lines\`: <note>` with the lines
+  fenced; the agent addresses each and closes it with `resolve_comment` (`agent/src/builtin/review.ts`),
+  a step of its work in the thread.
 
 Phases, each a thing of its own:
 

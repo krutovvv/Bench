@@ -89,6 +89,8 @@ pub struct Explorer {
     pub tabs: Vec<DocKey>,
     pub active: Option<DocKey>,
     pub naming: Option<Naming>,
+    /// A comment being typed on lines of a file (⌘⇧L, `pane/comment.rs`).
+    pub comment: Option<pane::comment::Commenting>,
     pub quick: Option<Quick>,
     /// Each project's Problems as last read (None: being read): (path, its problems).
     pub problems: HashMap<String, Option<Vec<(String, Vec<lsp_types::Diagnostic>)>>>,
