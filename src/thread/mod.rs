@@ -310,7 +310,23 @@ impl ThreadView {
     }
 
     /// One item of the list.
+    /// A row of the list in the thread's column: as wide as the pane up to `THREAD_MAX_W`, then
+    /// centered — past a width, a line is too long to read and the thread stops growing.
     fn render_item(
+        &mut self,
+        ix: usize,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let item = self.render_list_item(ix, window, cx);
+        h_flex()
+            .w_full()
+            .justify_center()
+            .child(div().w_full().max_w(px(bench_ui::THREAD_MAX_W)).child(item))
+            .into_any_element()
+    }
+
+    fn render_list_item(
         &mut self,
         ix: usize,
         window: &mut Window,

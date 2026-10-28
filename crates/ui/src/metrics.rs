@@ -53,6 +53,9 @@ pub const CHAT_LEFT: f32 = 2. * TURN_Y;
 pub const AVATAR: f32 = 24.;
 pub const CHAT_TEXT: f32 = CHAT_LEFT + AVATAR + 14.;
 pub const CHAT_RIGHT: f32 = CHAT_TEXT;
+/// The thread's column at its widest, its margins with it (a text of ~720 px): a wider pane
+/// centres it rather than lengthening its lines.
+pub const THREAD_MAX_W: f32 = 860.;
 /// Every thread row pads its top and bottom by this, so two rows are 2 × TURN_Y apart.
 pub const TURN_Y: f32 = 14.;
 
