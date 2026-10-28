@@ -238,16 +238,9 @@ impl ThreadView {
                 cx.notify();
             })
         });
-        let frame = v_flex()
+        let frame = bench_ui::block_frame(cx)
             .id("procs-block")
-            .w_full()
-            .min_w_0()
             .flex_none()
-            .bg(theme.background)
-            .border_1()
-            .border_color(theme.border)
-            .rounded_md()
-            .overflow_hidden()
             .child(head)
             .when(open, |d| d.children(rows));
         // It stands in the work row, beside the plan and the questions: no avatar of its own.

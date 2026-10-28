@@ -5,7 +5,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::icons::Ico;
-use crate::metrics::{AVATAR, BLOCK_HEAD_H};
+use crate::metrics::{AVATAR, BLOCK_HEAD_H, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, TURN_Y};
 
 /// A block's head: one height, a faint ground, small muted text. `over_body`: a rule under it.
 pub fn block_head(theme: &Theme, over_body: bool) -> Div {
@@ -21,6 +21,20 @@ pub fn block_head(theme: &Theme, over_body: bool) -> Div {
         .text_color(theme.muted_foreground)
 }
 
+/// A block's frame: the page's ground, a thin border, the theme's corners; what is inside is cut
+/// to them. Every block of the thread is one (an insert, a card, the processes, the changed files).
+pub fn block_frame(cx: &App) -> Div {
+    let theme = cx.theme();
+    v_flex()
+        .w_full()
+        .min_w_0()
+        .bg(theme.background)
+        .border_1()
+        .border_color(theme.border)
+        .rounded_md()
+        .overflow_hidden()
+}
+
 /// A whole block: the frame, a head with `title` and `actions` on the right, then `body`.
 pub fn block(
     title: impl Into<SharedString>,
@@ -29,12 +43,7 @@ pub fn block(
     cx: &App,
 ) -> Div {
     let theme = cx.theme();
-    v_flex()
-        .w_full()
-        .rounded_md()
-        .border_1()
-        .border_color(theme.border)
-        .overflow_hidden()
+    block_frame(cx)
         .child(
             block_head(theme, body.is_some())
                 .child(div().flex_1().min_w_0().truncate().child(title.into()))
@@ -69,6 +78,25 @@ pub fn avatar(agent: bool, theme: &Theme) -> Div {
                     .child(Ico::UserRound.icon().xsmall())
             }
         })
+}
+
+/// A turn of the thread: who speaks in the gutter (`Some(true)` the agent, `Some(false)` the
+/// person, `None` the gutter left empty), what they say in the text column.
+pub fn turn_row(agent: Option<bool>, body: impl IntoElement, cx: &App) -> Div {
+    let theme = cx.theme();
+    h_flex()
+        .w_full()
+        .pl(px(CHAT_LEFT))
+        .pr(px(CHAT_RIGHT))
+        .py(px(TURN_Y))
+        .gap(px(CHAT_TEXT - CHAT_LEFT - AVATAR))
+        .items_start()
+        .text_base()
+        .child(match agent {
+            Some(agent) => avatar(agent, theme).into_any_element(),
+            None => div().flex_none().w(px(AVATAR)).into_any_element(),
+        })
+        .child(div().flex_1().min_w_0().child(body))
 }
 
 /// What an empty area says: one muted line.

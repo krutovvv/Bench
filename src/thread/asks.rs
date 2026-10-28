@@ -92,21 +92,15 @@ impl ThreadView {
         } else {
             vec![]
         };
-        let fold = if open {
-            Ico::ChevronDown
-        } else {
-            Ico::ChevronRight
-        };
-        let head = bench_ui::block_head(&theme, open)
-            .id(SharedString::from(format!("plan-head-{id}")))
-            // As short as the thread's other small rows, not as tall as a block's head.
-            .h(px(bench_ui::CHIP_H))
-            .gap_1p5()
-            .cursor_pointer()
-            .hover(|s| s.text_color(theme.foreground))
-            .child(fold.icon().xsmall())
-            .child(Ico::ListChecks.icon().xsmall())
-            .child(div().flex_none().child(format!("PLAN · {done}/{total}")))
+        let head = bench_ui::fold_head(
+            SharedString::from(format!("plan-head-{id}")),
+            open,
+            Some(Ico::ListChecks),
+            format!("PLAN · {done}/{total}"),
+            cx,
+        )
+        // As short as the thread's other small rows, not as tall as a block's head.
+        .h(px(bench_ui::CHIP_H))
             .when_some(current.filter(|_| !open), |d, step| {
                 d.child(
                     div()
@@ -127,16 +121,9 @@ impl ThreadView {
                     cx.notify();
                 }
             }));
-        v_flex()
+        bench_ui::block_frame(cx)
             .id(SharedString::from(format!("plan-block-{id}")))
-            .w_full()
-            .min_w_0()
             .flex_none()
-            .bg(theme.background)
-            .border_1()
-            .border_color(theme.border)
-            .rounded_md()
-            .overflow_hidden()
             .child(head)
             .when(open, |d| {
                 d.child(v_flex().px_3().py_2().gap_0p5().children(steps))

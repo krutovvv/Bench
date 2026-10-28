@@ -22,7 +22,7 @@ pub mod tools;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _};
 use gpui_kit::*;
 
 use crate::app::BenchApp;
@@ -246,31 +246,16 @@ impl ThreadView {
 
     /// A block in the agent's row (its avatar), at the thread's column: what an insert opened.
     pub(crate) fn agent_row(&mut self, content: AnyElement, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        h_flex()
-            .w_full()
-            .pl(px(bench_ui::CHAT_LEFT))
-            .pr(px(bench_ui::CHAT_RIGHT))
-            .py(px(bench_ui::TURN_Y))
-            .gap(px(bench_ui::CHAT_TEXT
-                - bench_ui::CHAT_LEFT
-                - bench_ui::AVATAR))
-            .items_start()
-            .child(bench_ui::avatar(true, &theme))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|this, _, _, cx| {
-                            this.claim_click(cx);
-                            this.follow = false;
-                        }),
-                    )
-                    .child(content),
+        let body = div()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.claim_click(cx);
+                    this.follow = false;
+                }),
             )
-            .into_any_element()
+            .child(content);
+        bench_ui::turn_row(Some(true), body, cx).into_any_element()
     }
 
     /// The block an insert sits in — its head (fold, title and its menu, controls, remove), its
@@ -403,43 +388,22 @@ impl ThreadView {
                 })),
             );
         // Light, as the page: a thin border, round corners, the head on a faint strip.
-        let frame = v_flex()
+        let frame = bench_ui::block_frame(cx)
             .id(id)
-            .w_full()
-            .min_w_0()
-            .bg(theme.background)
-            .border_1()
-            .border_color(theme.border)
-            .rounded_md()
-            .overflow_hidden()
             .child(head)
             .children(body.map(|b| div().px_3().py_2().child(b)));
-        h_flex()
-            .w_full()
-            .pl(px(bench_ui::CHAT_LEFT))
-            .pr(px(bench_ui::CHAT_RIGHT))
-            .py(px(bench_ui::TURN_Y))
-            .gap(px(bench_ui::CHAT_TEXT
-                - bench_ui::CHAT_LEFT
-                - bench_ui::AVATAR))
-            .items_start()
-            .child(bench_ui::avatar(false, &theme))
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    // Working in an insert keeps the focus there, and doesn't pull the thread
-                    // to its end when it grows.
-                    .on_mouse_down(
-                        MouseButton::Left,
-                        cx.listener(|this, _, _, cx| {
-                            this.claim_click(cx);
-                            this.follow = false;
-                        }),
-                    )
-                    .child(frame),
+        // Working in an insert keeps the focus there, and doesn't pull the thread to its end
+        // when it grows.
+        let body = div()
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| {
+                    this.claim_click(cx);
+                    this.follow = false;
+                }),
             )
-            .into_any_element()
+            .child(frame);
+        bench_ui::turn_row(Some(false), body, cx).into_any_element()
     }
 }
 
@@ -454,15 +418,8 @@ pub(crate) fn clip(s: &str, n: usize) -> String {
 
 /// A block an insert opened (a file, a task): a border, round corners, `block_head` on top with
 /// its title and buttons, the content under it at its full height.
-pub(crate) fn card(head: Div, body: AnyElement, theme: &gpui_kit::component::Theme) -> AnyElement {
-    v_flex()
-        .w_full()
-        .min_w_0()
-        .border_1()
-        .rounded_md()
-        .border_color(theme.border)
-        .overflow_hidden()
-        .bg(theme.background)
+pub(crate) fn card(head: Div, body: AnyElement, cx: &App) -> AnyElement {
+    bench_ui::block_frame(cx)
         .child(head)
         .child(body)
         .into_any_element()

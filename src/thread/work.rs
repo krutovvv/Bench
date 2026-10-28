@@ -9,7 +9,6 @@ use gpui_kit::*;
 use serde_json::Value;
 
 use super::ThreadView;
-use super::message::speaker_row;
 use crate::app::now_secs;
 use bench_ui::icons::Ico;
 use bench_ui::{clip, clock, plural};
@@ -316,7 +315,7 @@ impl ThreadView {
         artifacts.extend(self.processes_frame(key, processes, cx));
         // Work that only asked or only planned has no "N actions" line to open: the cards are it.
         let no_steps = steps.is_empty() && !live;
-        speaker_row(
+        bench_ui::turn_row(
             Some(true),
             v_flex()
                 .gap_3()

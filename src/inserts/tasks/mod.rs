@@ -140,7 +140,7 @@ impl InsertKind for Tasks {
                 })),
             );
         let body = app.render_task_card(&task, cx);
-        Some(crate::inserts::card(head, body, &theme))
+        Some(crate::inserts::card(head, body, cx))
     }
 
     fn context(&self, _app: &BenchApp, _at: &ThreadRef, ins: &Insert, _cx: &App) -> String {

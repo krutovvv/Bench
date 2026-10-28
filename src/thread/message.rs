@@ -7,25 +7,7 @@ use gpui_kit::*;
 
 use super::ThreadView;
 use bench_ui::icons::Ico;
-use bench_ui::{AVATAR, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, TURN_Y, avatar};
-
-/// The row frame: the avatar (or its empty place) in the gutter, `body` at the text column.
-pub(crate) fn speaker_row(agent: Option<bool>, body: impl IntoElement, cx: &App) -> Div {
-    let theme = cx.theme();
-    h_flex()
-        .w_full()
-        .pl(px(CHAT_LEFT))
-        .pr(px(CHAT_RIGHT))
-        .py(px(TURN_Y))
-        .gap(px(CHAT_TEXT - CHAT_LEFT - AVATAR))
-        .items_start()
-        .text_base()
-        .child(match agent {
-            Some(agent) => avatar(agent, theme).into_any_element(),
-            None => div().flex_none().w(px(AVATAR)).into_any_element(),
-        })
-        .child(div().flex_1().min_w_0().child(body))
-}
+use bench_ui::TURN_Y;
 
 impl ThreadView {
     pub(crate) fn render_user(
@@ -75,7 +57,7 @@ impl ThreadView {
                 )
             });
         let body = body.when_some(actions, |d, a| d.child(div().pt_2().child(a)));
-        speaker_row(Some(false), body, cx).into_any_element()
+        bench_ui::turn_row(Some(false), body, cx).into_any_element()
     }
 
     /// What the agent said. `k` is the row's place (the last answer gets Regenerate);
@@ -183,7 +165,7 @@ impl ThreadView {
                 }))
             })
             .child(
-                speaker_row(if after_work { None } else { Some(true) }, body, cx)
+                bench_ui::turn_row(if after_work { None } else { Some(true) }, body, cx)
                     .when(after_work, |d| d.pt_0()),
             )
             // A pure chat answer carries its two where they are; an answer after work wears
@@ -213,7 +195,7 @@ impl ThreadView {
         let body = v_flex()
             .gap_3()
             .children(self.answer_body("writing", text, cx));
-        speaker_row(if after_work { None } else { Some(true) }, body, cx)
+        bench_ui::turn_row(if after_work { None } else { Some(true) }, body, cx)
             .when(after_work, |d| d.pt_0())
             .into_any_element()
     }
@@ -221,7 +203,7 @@ impl ThreadView {
     /// Why a run stopped, kept in the journal.
     pub(crate) fn render_fail(&mut self, text: &str, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        speaker_row(
+        bench_ui::turn_row(
             Some(true),
             div()
                 .text_color(theme.danger)

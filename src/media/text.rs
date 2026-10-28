@@ -7,7 +7,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::text::{
     MarkdownNode, MarkdownParseContext, MarkdownPlugin, TextView, TextViewState, markdown_ast,
 };
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, WindowExt as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -250,12 +250,7 @@ pub(super) fn render_code(
                 ),
         );
     let copy = code.trim_end_matches('\n').to_string();
-    v_flex()
-        .w_full()
-        .border_1()
-        .rounded_md()
-        .overflow_hidden()
-        .border_color(theme.border)
+    bench_ui::block_frame(cx)
         .child(
             // As tall as the changed-files card's line: small text, 4 above and below.
             bench_ui::block_head(&theme, true)
@@ -266,18 +261,14 @@ pub(super) fn render_code(
                     lang
                 })
                 .child(
-                    h_flex()
-                        .id(SharedString::from(format!("code-copy-{i}-{k}")))
-                        .p_1()
-                        .rounded_sm()
-                        .items_center()
-                        .cursor_pointer()
-                        .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                        .tooltip(|window, cx| {
-                            gpui_kit::component::tooltip::Tooltip::new("Copy").build(window, cx)
-                        })
-                        .child(Ico::Copy.icon().small())
-                        .on_click(move |_, window, cx| {
+                    bench_ui::icon_button(
+                        SharedString::from(format!("code-copy-{i}-{k}")),
+                        Ico::Copy,
+                        "Copy",
+                        false,
+                        cx,
+                    )
+                    .on_click(move |_, window, cx| {
                             cx.write_to_clipboard(ClipboardItem::new_string(copy.clone()));
                             window.push_notification(
                                 (NotificationType::Success, SharedString::from("Copied")),
