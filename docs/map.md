@@ -12,7 +12,6 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change how a message, an answer or "N actions" looks | `src/thread/rows/message.rs`, `src/thread/rows/work.rs` (a call's line: `rows/tool_labels.rs`) |
 | change what the thread shows or in what order | `crates/thread/src/rows.rs` (the rules are tests in `tests.rs`) |
 | change a queued message's row or its buttons | `src/thread/rows/queued.rs` (the row and its actions: `queued`, `queue_edit_*`) |
-| change the ticks on the right of the thread | `src/thread/rail.rs` |
 | change the composer | `src/thread/composer/` (`input.rs` the field, its pop-up `slash.rs`, prompts `prompts.rs`, files and references `attachments.rs`, drafts `drafts.rs`, sending `send.rs`) |
 | change a kind of row in the thread (a question, the plan, processes, changed files, pages read) | `src/thread/rows/` (`asks.rs`, `answer.rs`, `processes.rs`, `changed_files.rs`, `extras.rs`) |
 | change the bottom dock's terminals (⌃`, ⌘T, the tabs) | `src/inserts/terminal/panel.rs` (the shell itself: `session.rs`, `view.rs`) |

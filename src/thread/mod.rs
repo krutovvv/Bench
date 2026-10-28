@@ -6,8 +6,8 @@
 //! lets the last row reach the top, as in an editor. Only what is on screen is laid out.
 //!
 //! Files: `view.rs` (the view: its state, composer, events), `active.rs` (the thread's state, one
-//! struct, and `ThreadRef`), `list.rs` (the list's state and scroll), `rail.rs` (the ticks on the
-//! right), `meters.rs` and `speed.rs` (its context and speed, in the title bar); `rows/` what the
+//! struct, and `ThreadRef`), `list.rs` (the list's state and scroll; its scrollbar is the kit's),
+//! `meters.rs` and `speed.rs` (its context and speed, in the title bar); `rows/` what the
 //! list shows, `composer/` the next message; `open.rs` (opening, creating and deleting threads:
 //! the app's), `store.rs` (every agent's threads, drafts, the journals seen), `panel.rs` (the
 //! right dock's thread panel), `beside.rs` (a second thread beside the open one).
@@ -21,7 +21,6 @@ mod list;
 mod meters;
 mod open;
 mod panel;
-mod rail;
 pub(crate) mod speed;
 mod view;
 
@@ -134,7 +133,6 @@ impl ThreadView {
             self.thread.tv.below = b;
         }
         let below = self.thread.tv.below;
-        let rail = self.render_rail(cx);
         let list = list(
             self.thread.tv.list.clone(),
             cx.processor(|this, ix: usize, window, cx| this.render_item(ix, window, cx)),
@@ -178,7 +176,8 @@ impl ThreadView {
                     )
                     .child(list),
             )
-            .children(rail)
+            // A plain scrollbar, as a Mac's: thin, over the edge, shown while scrolling.
+            .child(gpui_kit::component::scroll::Scrollbar::vertical(&self.thread.tv.list))
             .when(below, |d| {
                 // A small round pill over the thread's middle, as macOS shows "new messages":
                 // it floats, so it is a popover's ground and shadow, not a bordered button.

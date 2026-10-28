@@ -16,7 +16,7 @@ crates/thread                 Thread::open / apply / rows(): the rows — User, 
         ↓                     the rules of order are tests (crates/thread/src/tests.rs)
 src/thread/                ThreadView (view.rs), an entity: its ActiveThread, composer, events;
                               its list (list.rs) on gpui::list: sync rows by diff, render each row (mod.rs)
-                              message.rs (user, answer), work.rs ("N actions"), queued.rs, rail.rs, extras.rs (tail)
+                              message.rs (user, answer), work.rs ("N actions"), queued.rs, extras.rs (tail)
 ```
 
 What the thread shows and in what order is decided in `crates/thread` and nowhere else; the view
@@ -35,7 +35,7 @@ renderer in `src/thread/`.
 - **Nothing moves the thread but the person.** No following: an answer growing, a run ending, a
   row changing never scroll it. Only the person's own acts do: sending (the composer is brought
   up once, after the new rows are laid out, and only if they pushed it off), "Jump to latest",
-  the rail. `View::reveal`, `to_end` in `mod.rs`.
+  the scrollbar. `View::reveal`, `to_end` in `mod.rs`.
 - **Rows keep their place while measured again.** Changed rows are `remeasure_items`d, only the
   count changes by `splice`, at the end (`thread::diff`). Splicing a range resets the list's
   offset inside it — that was the jitter.

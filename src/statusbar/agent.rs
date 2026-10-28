@@ -27,15 +27,18 @@ impl BenchApp {
             .iter()
             .filter(|t| t.host == host && t.running)
             .count();
-        let (label, color): (String, Hsla) = if connected && working > 0 {
-            (format!("Agent · {working} working"), theme.primary)
+        // A status bar's item, as Xcode's: muted words and a small dot that says the state —
+        // green up, grey connecting, red down; the words in the accent read as a link.
+        let (label, dot): (String, Hsla) = if connected && working > 0 {
+            (format!("Agent · {working} working"), theme.success)
         } else if connected {
-            ("Agent".into(), theme.primary)
+            ("Agent".into(), theme.success)
         } else if error.is_some() {
             ("Agent offline".into(), theme.danger)
         } else {
-            ("Connecting…".into(), muted)
+            ("Connecting…".into(), bench_ui::faint(&theme))
         };
+        let color = if error.is_some() && !connected { theme.danger } else { muted };
         let log = self.agent_log.clone();
         // Where it runs: this Mac, or its project's server.
         let where_ = self.target_of(&host).label();
@@ -56,8 +59,13 @@ impl BenchApp {
                                 Button::new("backend")
                                     .ghost()
                                     .small()
-                                    .icon(Ico::Activity.icon().xsmall())
-                                    .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
+                                    .child(
+                                        h_flex()
+                                            .gap_1p5()
+                                            .items_center()
+                                            .child(bench_ui::dot(dot))
+                                            .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label)),
+                                    )
                                     .text_color(color)
                                     .on_click(move |_, _, cx| {
                                         v.update(cx, |this, cx| {
