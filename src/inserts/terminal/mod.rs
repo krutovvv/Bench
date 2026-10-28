@@ -1,6 +1,7 @@
 //! `/terminal`: a terminal in the thread ("ssh:local"), on the machine the thread's project runs
 //! on (`thread_machine()`). As tall as its text (its program still sees a whole screen); "to the
-//! background" leaves its head, and the status bar lists it.
+//! background" leaves its head, and the title bar lists it
+//! (`titlebar/tail.rs`).
 
 pub mod panel;
 pub mod servers;

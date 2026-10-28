@@ -429,3 +429,42 @@ mod tests {
         assert_eq!(kind("content", true), (Ico::Folder, Tone::Blue));
     }
 }
+
+/// A sidebar's action row over its lists, as Claude's "New" and "Search": an icon in its 16 px
+/// square, the words, the shortcut quieter at the right end on hover; the sidebar's selected
+/// ground while `on` (its page or panel is open).
+pub fn nav_row(
+    id: impl Into<ElementId>,
+    icon: Ico,
+    label: &'static str,
+    keys: &'static str,
+    on: bool,
+    cx: &App,
+) -> Stateful<Div> {
+    let theme = cx.theme().clone();
+    let group: SharedString = format!("nav-{label}").into();
+    h_flex()
+        .id(id)
+        .group(group.clone())
+        .mx(px(crate::metrics::SIDEBAR_ROW_INSET))
+        .rounded_md()
+        .pl(px(crate::metrics::SIDEBAR_TEXT_X - crate::metrics::SIDEBAR_ROW_INSET))
+        .pr_2()
+        .py(px(crate::metrics::THREAD_ROW_PY))
+        .gap_2()
+        .items_center()
+        .cursor_pointer()
+        .text_size(px(crate::metrics::SIDEBAR_TEXT))
+        .when(on, |d| d.bg(theme.sidebar_accent))
+        .when(!on, |d| d.hover(|h| h.bg(theme.list_hover)))
+        .child(head_icon_in(icon, Some(theme.foreground), cx))
+        .child(div().flex_1().min_w_0().truncate().child(label))
+        .child(
+            div()
+                .flex_none()
+                .text_color(crate::faint(&theme))
+                .opacity(0.)
+                .group_hover(group, |s| s.opacity(1.))
+                .child(keys),
+        )
+}

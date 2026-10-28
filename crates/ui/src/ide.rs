@@ -1,8 +1,8 @@
 //! The Explorer's pieces (`src/explorer/`): the rows and headings of a tree, an open document's
-//! head, its tab, ⌘P's list, the right dock's width. Documents fill their pane and scroll inside,
+//! head, its tab, the quick list (⌘P, ⌘K), the right dock's width. Documents fill their pane and scroll inside,
 //! as in an IDE.
 
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -243,6 +243,27 @@ pub const SPEC_COLUMN_W: f32 = 760.;
 /// The width of a spec's link labels ("Under", "Referred to by").
 pub const SPEC_LINK_LABEL_W: f32 = 110.;
 pub const QUICK_MAX_H: f32 = 420.;
+
+/// ⌘K's list: how far under the window's top it opens, and how wide a row's name may grow
+/// before the quieter words after it.
+pub const SEARCH_TOP: f32 = 96.;
+pub const SEARCH_NAME_W: f32 = 320.;
+
+/// A list over the window to choose from as one types (⌘P's files, ⌘K's threads and projects):
+/// a popover's box `QUICK_W` wide, growing to `QUICK_MAX_H`; its field and rows are the caller's.
+pub fn quick_frame(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme();
+    v_flex()
+        .id(id)
+        .w(px(QUICK_W))
+        .max_h(px(QUICK_MAX_H))
+        .rounded_md()
+        .border_1()
+        .border_color(theme.border)
+        .bg(theme.popover)
+        .shadow_lg()
+        .overflow_hidden()
+}
 
 /// A dock's size (a side dock's width, the bottom dock's height): at first, and how far it can be
 /// dragged.

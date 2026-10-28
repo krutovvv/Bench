@@ -40,8 +40,6 @@ pub const BLOCK_HEAD_H: f32 = 32.;
 pub const CHIP_H: f32 = FIELD_H;
 /// A row of a list inside a block (the changed files): a Mac list's medium row.
 pub const LIST_ROW_H: f32 = 26.;
-/// The status bar with the rule over it.
-pub const STATUS_H: f32 = 29.;
 /// The thread's leading, in lines: messages and the composer share it.
 pub const LEAD: f32 = 1.5;
 /// The code editor's leading, Zed's "comfortable" (1.618 × the font): the library's 1.5 set code
@@ -212,6 +210,8 @@ pub const ROW_STRIPE: f32 = 2.;
 /// A sidebar row is set in from the sidebar's edges by this, so its rounded ground (the open
 /// thread's, a hover's) floats in the list.
 pub const SIDEBAR_ROW_INSET: f32 = 10.;
+/// The sidebar's foot (its agent and the gear) with the rule over it, as Claude's account row.
+pub const SIDEBAR_FOOT_H: f32 = 40.;
 /// A mark's dot beside a name (Finder's tag).
 pub const TAG_DOT: f32 = 8.;
 pub const THREAD_ROW_PY: f32 = 4.;

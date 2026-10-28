@@ -34,7 +34,9 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change the second thread beside the open one ("Open beside") or the right dock's thread head | `src/thread/beside.rs`, `src/thread/panel.rs`; the menu item in `src/sidebar/menu.rs` |
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
 | change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu, `top.rs` the strip over it; loading projects: `project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
-| change the status bar | `src/statusbar/` (`mod.rs` the bar, `agent.rs` the agent's item) |
+| the agent's item, the gear (the left dock's foot) | `src/sidebar/agent.rs` |
+| the window's toggles (terminal, thread beside) | `src/titlebar/tail.rs` |
+| ⌘K, the search over threads and projects | `src/sidebar/search.rs` |
 | change a thread's meters (context, speed, fallback, by its repo) | `src/thread/meters.rs`, the speed meter `src/thread/speed.rs` |
 | change the gear (tabs Agents, Presets, Appearance) | `src/settings/mod.rs` (the tabs, built from `bench_ui::settings_*`), `src/settings/providers.rs`, `src/settings/agent_form.rs` (add/remove a server's agent), `src/settings/presets.rs`, `src/settings/appearance.rs` (Appearance) |
 | change a keyboard shortcut | `src/app/keys.rs` (the built-in inserts' shortcuts on or off: `src/app/shortcuts.rs`); the macOS menu (Settings… ⌘,, New Window ⌘⇧N) `src/app/menu.rs` |
@@ -71,7 +73,6 @@ src/
   sidebar/       the threads panel: projects, threads, their menu and marks
   thread/        a thread on screen, its own entity (ThreadView) on gpui::list: rows, what hangs around them, the composer, sending
   settings/      the gear's tabs, the new project's page
-  statusbar/     the bar under everything: the agent's item, context and speed
   inserts/       one folder per insert kind, the registry in mod.rs
   env/           a project's environment: one file per section, the registry in mod.rs, the Settings page page.rs
   explorer/      the Explorer: tree, documents, tabs, ⌘P, ⌘⇧F (docs/explorer.md)

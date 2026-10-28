@@ -63,6 +63,7 @@ pub fn install(cx: &mut App) {
         KeyBinding::new("cmd-shift-f", FindInProject, None),
         KeyBinding::new("cmd-s", Save, None),
         KeyBinding::new("cmd-w", CloseTab, None),
+        KeyBinding::new("cmd-k", FindThreads, None),
         KeyBinding::new("cmd-f", FindThreads, None),
         KeyBinding::new("cmd-e", ToggleCode, None),
         KeyBinding::new("cmd-\\", ToggleSidebar, None),
@@ -117,7 +118,7 @@ pub fn install(cx: &mut App) {
             MenuItem::os_action("Paste", text::Paste, OsAction::Paste),
             MenuItem::os_action("Select All", text::SelectAll, OsAction::SelectAll),
             MenuItem::separator(),
-            MenuItem::action("Find Threads…", FindThreads),
+            MenuItem::action("Search…", FindThreads),
         ]),
         Menu::new("View").items([
             MenuItem::action("Chat or Code", ToggleCode),

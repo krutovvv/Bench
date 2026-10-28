@@ -4,6 +4,7 @@
 //! between starts (`persistence.rs`).
 
 pub mod comment;
+pub mod cursor;
 pub mod doc;
 pub mod file;
 pub mod item;

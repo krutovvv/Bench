@@ -59,6 +59,9 @@ impl BenchApp {
             self.cancel_project_form(cx);
             return true;
         }
+        if self.close_search(cx) {
+            return true;
+        }
         if self.sidebar.renaming.is_some() {
             self.cancel_rename(cx);
             return true;
@@ -84,15 +87,6 @@ impl BenchApp {
         }
         cx.notify();
         true
-    }
-
-    /// ⌘F or the sidebar's magnifier: focus the sidebar's search.
-    pub(crate) fn open_search(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let search = self.sidebar.search.clone();
-        // A hidden sidebar comes back to show its search.
-        self.left_dock.open = true;
-        search.update(cx, |s, cx| s.focus(window, cx));
-        cx.notify();
     }
 
     /// ⌘\ or the toggle in the sidebar's top strip (the header's, while it is hidden).

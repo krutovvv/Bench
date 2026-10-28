@@ -18,12 +18,13 @@ what can be pure and tested without GPUI is pushed down into `crates/` (`thread-
 ## How it is cut
 
 Only `main.rs` and `app.rs` are loose in `src/`; every other file is in a folder named for where
-it is in the window or what it does, so a request ("fix the status bar") leads to a folder by
+it is in the window or what it does, so a request ("fix the title bar") leads to a folder by
 its name alone (`.agents/skills/bench-structure/SKILL.md` §2 owns that rule and the file-size
 rule).
 
 - **By place in the window**: `workspace/` (docks and center), `titlebar/`, `sidebar/`,
-  `thread/`, `settings/` (the gear and the new project's page), `statusbar/`.
+  `thread/`, `settings/` (the gear and the new project's page). There is no status bar: the window's
+  toggles are the title bar's right end, its agent the left dock's foot.
 - **By feature, spanning places**: `explorer/`, `inserts/`, `env/`.
 - **Services that draw nothing**: `client/` (the agent), `media/`, `system/` (ssh, the
   `~/.ssh/config` servers, notifications).

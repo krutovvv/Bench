@@ -365,7 +365,7 @@ impl Render for Story {
             ))
             .child(
                 row(Gap::Xs)
-                    .h(px(STATUS_H))
+                    .h(px(SIDEBAR_FOOT_H))
                     .bg(theme.status_bar)
                     .text_xs()
                     .text_color(theme.muted_foreground)

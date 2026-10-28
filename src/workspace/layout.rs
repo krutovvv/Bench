@@ -1,5 +1,5 @@
 //! The window as one element: the title bar over the center, the docks around it
-//! (`render_layout`), the status bar under everything; the keys for the whole window see every
+//! (`render_layout`); the keys for the whole window see every
 //! key first.
 
 use gpui_kit::component::resizable::{h_resizable, resizable_panel, v_resizable};
@@ -35,7 +35,8 @@ fn quiet_divider(vertical: bool) -> gpui_kit::base::ResizeHandleRenderer {
 }
 
 impl BenchApp {
-    /// The demo's hooks on the window (`BENCH_DEMO=new-project`, `BENCH_DEMO_RENAME`), once.
+    /// The demo's hooks on the window (`BENCH_DEMO=new-project`, `BENCH_DEMO_RENAME`,
+    /// `BENCH_DEMO_SEARCH`), once.
     fn demo_hooks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.subject_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
             self.subject_opened = true;
@@ -45,6 +46,17 @@ impl BenchApp {
         static BESIDE: std::sync::Once = std::sync::Once::new();
         if let Ok(id) = std::env::var("BENCH_DEMO_BESIDE") {
             BESIDE.call_once(|| self.open_beside(id.into(), window, cx));
+        }
+        // `BENCH_DEMO_SEARCH=1|<words>`: ⌘K open, with those words typed.
+        static SEARCH: std::sync::Once = std::sync::Once::new();
+        if let Ok(q) = std::env::var("BENCH_DEMO_SEARCH") {
+            SEARCH.call_once(|| {
+                self.open_search(window, cx);
+                if q != "1" {
+                    self.sidebar.search.update(cx, |s, cx| s.set_value(q.clone(), window, cx));
+                    self.search_threads(q, window, cx);
+                }
+            });
         }
         // `BENCH_DEMO_RENAME=<thread id>`: that thread being renamed.
         static RENAME: std::sync::Once = std::sync::Once::new();
@@ -104,6 +116,7 @@ impl Render for BenchApp {
         // The menu bar's items act on this window (`app/menu.rs`).
         let base = crate::app::menu::listen(
             v_flex()
+                .relative()
                 .size_full()
                 .bg(theme.background)
                 .text_color(theme.foreground),
@@ -117,7 +130,8 @@ impl Render for BenchApp {
             }))
             .child(header)
             .child(div().flex_1().min_h_0().child(content))
-            .child(self.render_statusbar(window, cx));
+            // ⌘K's list, over everything while it is open (`sidebar/search.rs`).
+            .children(self.render_search(cx));
         base
     }
 }
@@ -210,6 +224,8 @@ impl BenchApp {
                         .min_h_0()
                         .child(self.render_panel(panel, window, cx)),
                 )
+                // Under whichever panel it shows: the agent and the gear (`sidebar/agent.rs`).
+                .child(self.render_foot(cx))
         });
         let right = right.map(|panel| self.render_panel(panel, window, cx));
         // Fixed: a window resize goes to the center; the docks keep their sizes.

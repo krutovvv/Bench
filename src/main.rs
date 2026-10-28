@@ -17,7 +17,6 @@ mod inserts;
 mod media;
 mod settings;
 mod sidebar;
-mod statusbar;
 mod system;
 mod thread;
 mod titlebar;

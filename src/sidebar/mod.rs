@@ -1,6 +1,9 @@
-//! The threads panel (the left dock's): the projects, each with its threads, the Host first; the
-//! search over them.
+//! The threads panel (the left dock's), as Claude's sidebar: "New thread" and "Search" over the
+//! list (`search.rs`, ⌘K), the projects, each with its threads, the Host first. The left dock's
+//! foot, under this panel or the Explorer's, is the agent and the gear (`agent.rs`).
 
+mod agent;
+mod search;
 pub(crate) mod state;
 pub(crate) mod items;
 pub(crate) mod marks;
@@ -19,7 +22,6 @@ use gpui_kit::*;
 use self::menu::item_menu;
 use crate::app::BenchApp;
 use crate::sidebar::items::Item;
-use crate::workspace::Center;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -32,36 +34,19 @@ impl BenchApp {
     ) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         let mut list: Vec<AnyElement> = vec![];
-        let searching = !self.sidebar.query.is_empty();
-        if searching {
-            match &self.sidebar.hits {
-                None => list.push(self.sidebar_note("Searching…", cx)),
-                Some(hits) if hits.is_empty() => list.push(self.sidebar_note("Nothing found", cx)),
-                Some(hits) => {
-                    for (k, (id, snippet)) in hits.iter().enumerate() {
-                        list.push(
-                            self.render_search_hit(k, id, snippet, cx)
-                                .into_any_element(),
-                        );
-                    }
-                }
-            }
-        } else {
-            // Projects, each with its threads: the sidebar's only unit. Host first, always: this
-            // machine's own project, with the threads of no project, Telegram's and cron's; then
-            // the projects, pinned ones first (`sidebar_items.rs` — ↑ ↓ walk the same order).
-            let (loose, groups) = self.sidebar_groups();
-            list.extend(self.render_loose(loose, cx));
-            for (g, (p, rows)) in groups.into_iter().enumerate() {
-                list.extend(self.render_project(g + 1, &p, rows, cx));
-            }
+        // Projects, each with its threads: the sidebar's only unit. Host first, always: this
+        // machine's own project, with the threads of no project, Telegram's and cron's; then
+        // the projects, pinned ones first (`items.rs` — ↑ ↓ walk the same order).
+        let (loose, groups) = self.sidebar_groups();
+        list.extend(self.render_loose(loose, cx));
+        for (g, (p, rows)) in groups.into_iter().enumerate() {
+            list.extend(self.render_project(g + 1, &p, rows, cx));
         }
 
         v_flex()
             .size_full()
-            // The search as a band, then the groups as an IDE's tree (a new chat: "+" on a
-            // group, or in the top strip).
-            .child(bench_ui::search_band(&self.sidebar.search, cx))
+            // What is made and found, over the list, as Claude's "New" and "Search".
+            .child(self.render_actions(cx))
             .child(
                 v_flex()
                     .id("threads")
@@ -89,9 +74,6 @@ impl BenchApp {
                         )
                     }),
             )
-            // Pinned under the list, as Notes' "New Folder": always in the same place, however
-            // long the list is.
-            .child(self.render_new_project_row(cx))
             .into_any_element()
     }
 
@@ -202,31 +184,29 @@ impl BenchApp {
         out
     }
 
-    /// "New project": the sidebar's foot, as Notes' "New Folder" — a borderless "+" and its words
-    /// on a bar over a hairline, never a row: no ground of a row on hover (that is a thread's
-    /// sign), only the words coming up from muted, and the accent while its page is open.
-    fn render_new_project_row(&self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let on = self.new_project.form.is_some();
-        h_flex()
+    /// The rows over the list: a new thread (where a thread lives now), a new project, the search.
+    fn render_actions(&self, cx: &mut Context<Self>) -> AnyElement {
+        let new_project = self.new_project.form.is_some();
+        let finding = self.sidebar.finding.is_some();
+        v_flex()
             .flex_none()
-            .h(px(bench_ui::STATUS_H))
-            .px(px(bench_ui::SIDEBAR_TEXT_X))
-            .items_center()
-            .border_t_1()
-            .border_color(theme.border.opacity(0.6))
+            .pt_2()
+            .pb_1()
+            .gap_px()
             .child(
-                h_flex()
-                    .id("new-project")
-                    .gap_1p5()
-                    .items_center()
-                    .cursor_pointer()
-                    .text_size(px(bench_ui::SIDEBAR_TEXT))
-                    .text_color(if on { theme.primary } else { theme.muted_foreground })
-                    .when(!on, |d| d.hover(|s| s.text_color(theme.foreground)))
-                    .child(Ico::Plus.icon().small())
-                    .child("New project")
+                bench_ui::nav_row("nav-new-thread", Ico::SquarePen, "New thread", "⌘N", false, cx)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.new_thread_here(cx);
+                        this.focus_composer(window, cx);
+                    })),
+            )
+            .child(
+                bench_ui::nav_row("nav-new-project", Ico::FolderPlus, "New project", "", new_project, cx)
                     .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx))),
+            )
+            .child(
+                bench_ui::nav_row("nav-search", Ico::Search, "Search", "⌘K", finding, cx)
+                    .on_click(cx.listener(|this, _, window, cx| this.open_search(window, cx))),
             )
             .into_any_element()
     }
@@ -239,48 +219,5 @@ impl BenchApp {
             .text_color(cx.theme().muted_foreground)
             .child(text)
             .into_any_element()
-    }
-
-    /// A search result: the session's title (if it is in the list) and the matching snippet.
-    fn render_search_hit(
-        &self,
-        k: usize,
-        id: &str,
-        snippet: &str,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let theme = cx.theme().clone();
-        let selected =
-            self.center == Center::Chat && self.thread(cx).id.as_ref().map(|i| i.as_str()) == Some(id);
-        let title = self
-            .threads.list
-            .iter()
-            .find(|s| s.id.as_str() == id)
-            .map(|s| s.title.clone())
-            .unwrap_or_else(|| "Untitled".into());
-        let open_id = id.to_string();
-        v_flex()
-            .id(("hit", k))
-            .pl(px(bench_ui::HIT_PL))
-            .pr_3()
-            .py_2()
-            .cursor_pointer()
-            .border_l_2()
-            .border_color(if selected {
-                theme.primary
-            } else {
-                theme.transparent
-            })
-            .when(selected, |d| d.bg(theme.sidebar_accent))
-            .hover(|s| s.bg(theme.sidebar_accent))
-            .child(div().text_size(px(bench_ui::SIDEBAR_TEXT)).truncate().child(title))
-            .child(
-                div()
-                    .text_xs()
-                    .text_color(theme.muted_foreground)
-                    .line_clamp(2)
-                    .child(snippet.replace(">>>", "").replace("<<<", "")),
-            )
-            .on_click(cx.listener(move |this, _, _, cx| this.open_listed(open_id.clone().into(), cx)))
     }
 }

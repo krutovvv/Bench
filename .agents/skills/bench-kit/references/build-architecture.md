@@ -21,7 +21,7 @@ and projects on servers: `docs/remote-projects.md` (and `build-projects.md`). In
     rename, ⌫⌫, ↑↓); `sidebar/marks.rs` the pins and colors, kept on this Mac;
   - `settings/presets.rs` — the person's presets, edited in the gear;
   - the window by area: `workspace/` (docks and center, the layout), `titlebar/`, `sidebar/`,
-    `thread/` (the open thread, the composer), `settings/` (the gear), `statusbar/`;
+    `thread/` (the open thread, the composer), `settings/` (the gear);
     `media/` an answer's media; `system/` ssh and notifications; `demo/` the made-up session;
   - `inserts/` — one folder per insert kind; `env/` — a project's environment, one file per section;
   - `client/` — the protocol to the agent: `rpc/` (WebSocket JSON-RPC) and `rest/` (REST);

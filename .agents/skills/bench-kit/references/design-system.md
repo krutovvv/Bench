@@ -27,7 +27,7 @@ step the whole size (13/11, 14/12, 15/13); there is no size setting.
 |---|---|---|---|
 | background | `#FFFFFF` | `#1A1B1F` | pages: the thread, editors, settings |
 | foreground | `#1B1C1F` | `#E4E5E8` | text |
-| sidebar, chrome (title bar, status bar, tabs) | `#F6F6F7` | `#202126` | the light grey frame |
+| sidebar, chrome (title bar, tabs) | `#F6F6F7` | `#202126` | the light grey frame |
 | border | `#E2E3E7` | `#303238` | every hairline |
 | sidebar_accent | `#E6E7EB` | `#30333A` | a selected row's ground |
 | list_hover | `#EDEDF0` | `#2A2C31` | a hovered row |
@@ -47,7 +47,7 @@ Marks are Finder's tag colours (`bench_ui::mark_color`), drawn as a `tag_dot`.
 | `THREAD_META` | 13 | the work line, steps, block heads, cards' text in the thread |
 | `SIDEBAR_TEXT` | 13 | sidebar and tree rows, controls (segmented, form actions, completions, popovers) |
 | `SIDEBAR_HEAD_TEXT` | 11 semibold, muted | group heads (Host, a project, Agent, Project), popover section titles, log lines |
-| `BAR_TEXT` | 12 | the status bar, chips in bars, an IDE head |
+| `BAR_TEXT` | 12 | chips in bars, an IDE head, a file's caret in its tab bar |
 | `BAR_TITLE` | 13 semibold | the window's title, the Explorer's project pull-down |
 | mono | 12 | code (`CODE_LEAD` 1.618, Zed's), the terminal, diffs |
 
@@ -58,7 +58,7 @@ Leading: the thread's prose `LEAD` (1.5rem), shared with the composer.
 | Name | Value | What |
 |---|---|---|
 | `TITLE_BAR_H` | 40 | the title bar across the window |
-| `STATUS_H` | 29 | the status bar with its rule |
+| `SIDEBAR_FOOT_H` | 40 | the left dock's foot (agent, gear) with its rule |
 | `bar_h(cx)` | font × 2.5 | the Explorer's bar, the documents' tabs, IDE heads |
 | `FIELD_H` | 28 | a field; form actions match it |
 | `SEGMENT_H` / `MODE_SEGMENT_H` | 24 / 22 | a segmented control's segment / Chat · Code's |

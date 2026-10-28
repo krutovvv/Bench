@@ -9,21 +9,20 @@ Sizes are `bench_ui` names (`crates/ui/src/metrics.rs`, `design-system.md`).
 ┌──────────────────────────────── title bar 40, across the window ─────────────────────────┐
 │ ● ● ●  ◧ │ Thread title  /  second thread ×     38k/131k · storefront · main  [Chat|Code] │
 ├ sidebar 280 ─────────────┬───────────────────────────────────────────────────────────────┤
-│ [🔍 Search threads ⌘F ]  │         the thread, a centred column (≤ 860)                  │
-│ Host                   › │                           ┌ the person's bubble ┐             │
-│ Northwind blog ● ✈       │  8 actions · 3:17 · Done                                      │
+│ ✎ New thread        ⌘N   │         the thread, a centred column (≤ 860)                  │
+│ ⊞ New project            │                           ┌ the person's bubble ┐             │
+│ 🔍 Search           ⌘K   │  8 actions · 3:17 · Done                                      │
 │  Publish the release…    │  the answer …                                                 │
 │ Storefront               │                                                               │
 │ (Launch the spring …)    │  ┌ + Write to the agent · / for a tool          🎤  (↑) ┐     │
 │──────────────────────────│  └──────────────────────────────────────────────────────┘     │
-│ + New project            │                                                               │
-├──────────────────────────┴───────────────────────────────────────────────────────────────┤
-│ status bar 29: ● Agent · 1 working                    Ln, Col · Spaces · Language  ✦  ▭  │
-└──────────────────────────────────────────────────────────────────────────────────────────┘
+│ ● This Mac  1 working  ⚙ │                                                               │
+└──────────────────────────┴───────────────────────────────────────────────────────────────┘
 ```
 
 `src/workspace/layout.rs`: the title bar (`render_window_lead` + `render_header`) over
-`render_layout` (the docks around the center), the status bar under both. The menu bar's
+`render_layout` (the docks around the center); no status bar, as Claude's window; ⌘K's list
+over everything while open (`sidebar/search.rs`). The menu bar's
 actions are on the window's root (`app/menu.rs` `listen`).
 
 ## Title bar (`src/titlebar/mod.rs`)
@@ -32,13 +31,16 @@ actions are on the window's root (`app/menu.rs` `listen`).
 sidebar's fold (⌘\), a short rule (`BAR_SEPARATOR_H`), then the title at `BAR_TITLE` semibold.
 A second thread beside the open one adds its title after a faint "/", muted medium, and its ×
 (no head of its own over the dock). Right: the thread's meters and repo chip at `BAR_TEXT`, then
-`mode_switch` Chat | Code (⌘E) at the window's corner. Settings and the new project's page put
+the window's toggles (`tail.rs`: running terminals ⌨, the thread beside ✦ ⌘J in Code, the
+terminal ▭ ⌃`), then `mode_switch` Chat | Code (⌘E) at the window's corner. Settings and the new project's page put
 their title and a close × here.
 
 ## Sidebar (`src/sidebar/`)
 
-- **Search**: `bench_ui::search_band` — a filled field (`foreground` 6%, no rule, `rounded_md`),
-  set in by `SIDEBAR_ROW_INSET`. ⌘F focuses it.
+- **Actions** (as Claude's "New" and "Search"): `bench_ui::nav_row` rows — New thread (⌘N),
+  New project, Search (⌘K, also ⌘F) — an icon in the text's column, the shortcut faint on hover.
+  Search opens a list over the window (`search.rs`, `bench_ui::quick_frame`, as ⌘P's): recent
+  threads and the two actions; typed, threads and projects by name, then threads by message.
 - **Groups**: Host first (the threads of no project), then the projects, pinned first. A
   group's head is `SIDEBAR_HEAD_TEXT` semibold muted in its own case, then its tag dot and the
   Telegram glyph; `group_chevron` on hover; a click folds it. `GROUP_GAP` between groups.
@@ -47,16 +49,14 @@ their title and a close × here.
   hover `list_hover`; the text keeps its colour. After the title: the tag dot, a faint pin when
   pinned; on the right "needs you" in the accent while it waits, "paused" or the branch faint.
   A working thread's title shimmers. "⋯" on hover = right click (`item_menu`).
-- **Foot**: "New project" pinned under the list, `STATUS_H` tall with a hairline over it, a row
-  with its hover and selected ground.
+- **Foot** (the left dock's, under the threads or the Explorer; `agent.rs`), as Claude's account
+  row: `SIDEBAR_FOOT_H` with a hairline over it; the open thread's agent — where it runs ("This
+  Mac"), its dot, "N working" muted — whose popover is a Mac popover: sections edge to edge with
+  hairlines, 13pt lines with state dots, 11pt semibold section titles, the log at 11; the gear
+  (⌘,) at the right end.
 
-## Status bar (`src/statusbar/`)
-
-`STATUS_H` 29, `BAR_TEXT`, one muted tone. Left: the agent's dot and words ("Agent · 1
-working"); its popover (`agent.rs`) is a Mac popover: sections edge to edge with hairlines,
-13pt lines with state dots, 11pt semibold section titles, the log at 11. Right: in the IDE the
-cursor (`cursor.rs`: Ln, Col · indent · language), the thread-beside toggle ✦ (⌘J), the
-terminal ▭ (⌃`).
+There is no status bar. An open file's caret, indent and language sit at its tab bar's right
+end (`explorer/pane/cursor.rs`).
 
 ## The thread (chat look, `src/thread/look.rs` `Chat`)
 
@@ -79,7 +79,7 @@ terminal ▭ (⌃`).
 
 ## Composer (`src/thread/composer/input.rs`)
 
-Pinned under the list, in the thread's column, `COMPOSER_CARD_PB` over the status bar. One
+Pinned under the list, in the thread's column, `COMPOSER_CARD_PB` over the window's edge. One
 line of a field, as Claude's: the card (`COMPOSER_CARD_R`, a hairline, no shadow) holds
 `round_icon_button` + on the left, the text in the middle, the mic and Send on the right — all
 three `SEND_BUTTON` round, on the text's last line; the text grows upward. Files to send ride

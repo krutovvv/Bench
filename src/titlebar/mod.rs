@@ -1,7 +1,7 @@
 //! The bar over the center: the thread's title, its meters (`thread/meters.rs`) and its repo's
-//! branch, the documents' project
-//! (their tabs are the center's own bar, `explorer/view.rs`) with the thread-beside button, or a
-//! settings page's title and its close.
+//! branch, or the documents' project (their tabs are the center's own bar, `explorer/pane/view.rs`),
+//! then the window's toggles at its right end (`tail.rs`); or a settings page's title and its
+//! close.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -13,39 +13,9 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 use crate::workspace::Center;
 
-impl BenchApp {
-    /// The header's right end, the window's top-right corner: the Explorer's button — it opens
-    /// the project of the thread open now, and is pressed while that tree is shown (⌘E).
-    /// The thread-beside toggle lives by the terminal, in the status bar. Shown,
-    /// the thread's own head takes this corner with its + and ×.
-    fn render_header_tail(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let ide = self.left_dock.shows(crate::workspace::Panel::Explorer);
-        h_flex()
-            .flex_none()
-            .gap_1()
-            .items_center()
-            // The extreme corner, there whatever the center shows: the thread, or its project as
-            // an IDE shows it — one hop either way, and which one is on is plain to see.
-            .child({
-                let app = cx.entity().downgrade();
-                bench_ui::mode_switch(
-                    "mode",
-                    &[
-                        (bench_ui::icons::Ico::MessageSquare, "Chat", "The threads  ⌘E"),
-                        (bench_ui::icons::Ico::Code, "Code", "The project's files  ⌘E"),
-                    ],
-                    usize::from(ide),
-                    cx,
-                    std::rc::Rc::new(move |k, window, cx| {
-                        if (k == 1) != ide {
-                            let _ = app.update(cx, |this, cx| this.toggle_side(window, cx));
-                        }
-                    }),
-                )
-            })
-            .into_any_element()
-    }
+mod tail;
 
+impl BenchApp {
     /// "app · main": the thread works in a git repository (its folder's name and branch). A
     /// click opens what the repo is: uncommitted changes, the newest commits (a click copies
     /// the sha), its origin. Git itself stays the agent's: ask it to commit, or to undo.

@@ -1,4 +1,4 @@
-//! Tools mode (⌘3, the wrench in the status bar): the utilities of `devtools` in the window,
+//! Tools mode (⌘3): the utilities of `devtools` in the window,
 //! listed in the sidebar like servers, each with its input and output on the right. Every tool
 //! keeps its own input while another one is open; output follows the input as you type.
 

@@ -1,5 +1,5 @@
-//! The status bar's corner for the open file (Code mode): where the caret is, how the file is
-//! indented, its language — as an editor's status bar says them. A view of its own that watches
+//! The tab bar's right corner for the open file: where the caret is, how the file is indented,
+//! its language — as an editor's status bar says them. A view of its own that watches
 //! the file's editor, so a caret that moves redraws these words and not the window.
 
 use gpui_kit::component::ActiveTheme as _;
@@ -41,9 +41,10 @@ impl Render for CursorItem {
             crate::explorer::code::lang::indent_of(&text),
             crate::explorer::code::lang::language_name(crate::explorer::code::lang::language_for_text(path, &text)),
         ];
-        div().child(
+        div().h_full().child(
             h_flex()
                 .h_full()
+                .pr_1()
                 .items_center()
                 .text_size(px(bench_ui::BAR_TEXT))
                 .text_color(cx.theme().muted_foreground)

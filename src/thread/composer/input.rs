@@ -1,6 +1,6 @@
 //! The input: the thread's next message — the person's avatar and the text,
 //! at the messages' size, growing with what is typed. No buttons (⌘Enter sends, ⌘⇧D dictates,
-//! files are dropped); stopping the agent is the status bar's control.
+//! files are dropped); stopping the agent is Send's Stop, ⌘..
 
 use gpui_kit::component::input::Textarea;
 use gpui_kit::component::tooltip::Tooltip;
@@ -28,7 +28,7 @@ impl ThreadView {
         if !crate::thread::look::COMPOSER_IN_LIST {
             return Some(self.render_completions(matches, sel, &theme, cx));
         }
-        // Under the line, or above it when the window has no room below (the status bar is
+        // Under the line, or above it when the window has no room below (the window's edge is
         // there): the list's own height decides.
         let list_h = (matches.len() as f32).min(SLASH_ROWS) * SLASH_ROW + 10.;
         let below = f32::from(self.composer_y) + bench_ui::TURN_Y + 30.;
@@ -178,8 +178,8 @@ impl ThreadView {
 
     pub(crate) fn render_composer(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        // No buttons here: ⌘Enter sends, ⌘⇧D (or the status bar's mic) dictates, files are
-        // dropped or pasted. Stopping the agent is the status bar's control, by the paperclip.
+        // No buttons here: ⌘Enter sends, ⌘⇧D (or the composer's mic) dictates, files are
+        // dropped or pasted. Stopping the agent is Send's Stop, ⌘..
         let slash = self.render_slash(cx);
         let mut chips: Vec<AnyElement> = vec![];
         chips.extend(self.attachments.clone().iter().enumerate().map(|(k, p)| {

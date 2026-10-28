@@ -31,9 +31,16 @@ impl BenchApp {
                 search,
                 window,
                 |this, state, ev: &InputEvent, window, cx| {
-                    if matches!(ev, InputEvent::Change) {
-                        let q = state.read(cx).value().trim().to_string();
-                        this.search_threads(q, window, cx);
+                    match ev {
+                        InputEvent::Change => {
+                            let q = state.read(cx).value().trim().to_string();
+                            if let Some(sel) = this.sidebar.finding.as_mut() {
+                                *sel = 0;
+                            }
+                            this.search_threads(q, window, cx);
+                        }
+                        InputEvent::PressEnter { .. } => this.search_choose(window, cx),
+                        _ => {}
                     }
                 },
             ),

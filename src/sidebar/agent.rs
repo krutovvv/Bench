@@ -1,6 +1,7 @@
-//! The agent's item in the status bar: the open thread's agent — connected or not, how many
-//! threads it is working on — and on a click Reconnect and Restart, whether macOS lets Bench say
-//! it is done, and the last lines of its log (read as the panel opens).
+//! The left dock's foot, under the threads or the Explorer, as Claude's account row: the open thread's agent — where it runs, a dot
+//! for connected or not, how many threads it is working on — and on a click Reconnect and
+//! Restart, whether macOS lets Bench say it is done, and the last lines of its log (read as the
+//! panel opens); the gear (⌘,) at the other end.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -11,9 +12,9 @@ use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
-    /// The open thread's agent — always, ready or not — and, on click, what more there is to
-    /// say about it.
-    pub(super) fn render_backend(&mut self, cx: &mut Context<Self>) -> Option<AnyElement> {
+    /// The foot: the open thread's agent — always, ready or not — and, on click, what more there
+    /// is to say about it; the gear.
+    pub(crate) fn render_foot(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let at = self.thread_ref(cx);
@@ -27,28 +28,32 @@ impl BenchApp {
             .iter()
             .filter(|t| t.host == host && t.running)
             .count();
-        // A status bar's item, as Xcode's: muted words and a small dot that says the state —
-        // green up, grey connecting, red down; the words in the accent read as a link.
-        let (label, dot): (String, Hsla) = if connected && working > 0 {
-            (format!("Agent · {working} working"), theme.success)
+        // Where it runs (this Mac, or its project's server) and a small dot that says the state —
+        // green up, grey connecting, red down; then what it does, quieter.
+        let (state, dot): (String, Hsla) = if connected && working > 0 {
+            (format!("{working} working"), theme.success)
         } else if connected {
-            ("Agent".into(), theme.success)
+            (String::new(), theme.success)
         } else if error.is_some() {
-            ("Agent offline".into(), theme.danger)
+            ("offline".into(), theme.danger)
         } else {
-            ("Connecting…".into(), bench_ui::faint(&theme))
+            ("connecting…".into(), bench_ui::faint(&theme))
         };
-        let color = if error.is_some() && !connected { theme.danger } else { muted };
+        let state_color = if error.is_some() && !connected { theme.danger } else { muted };
         let log = self.agent_log.clone();
-        // Where it runs: this Mac, or its project's server.
         let where_ = self.target_of(&host).label();
+        let name = where_.clone();
         let view = cx.entity();
-        Some(
-            h_flex()
-                .h_full()
-                .items_center()
-                .pl_1()
-                .child(
+        h_flex()
+            .flex_none()
+            .h(px(bench_ui::SIDEBAR_FOOT_H))
+            .pl(px(bench_ui::SIDEBAR_ROW_INSET))
+            .pr(px(bench_ui::SIDEBAR_ROW_INSET))
+            .items_center()
+            .border_t_1()
+            .border_color(theme.border.opacity(0.6))
+            .child(
+                h_flex().flex_1().min_w_0().child(
                     gpui_kit::component::popover::Popover::new("backend-pop")
                         .anchor(gpui_kit::Anchor::BottomLeft)
                         // Its sections pad themselves, so their rules run edge to edge as a
@@ -68,10 +73,13 @@ impl BenchApp {
                                         h_flex()
                                             .gap_1p5()
                                             .items_center()
+                                            .text_size(px(bench_ui::SIDEBAR_TEXT))
                                             .child(bench_ui::dot(dot))
-                                            .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label)),
+                                            .child(div().text_color(theme.foreground).child(name))
+                                            .when(!state.is_empty(), |d| {
+                                                d.child(div().text_color(state_color).child(state))
+                                            }),
                                     )
-                                    .text_color(color)
                                     .on_click(move |_, _, cx| {
                                         v.update(cx, |this, cx| {
                                             this.notif(false, cx);
@@ -279,8 +287,14 @@ impl BenchApp {
                                         .child(where_.clone()),
                                 )
                         }),
-                )
-                .into_any_element(),
-        )
+                ),
+            )
+            .child(
+                bench_ui::icon_button("open-settings", Ico::Settings, "Settings  ⌘,", false, cx)
+                    .on_click(cx.listener(|this, _, window, cx| {
+                        this.on_open_settings(&crate::app::menu::OpenSettings, window, cx)
+                    })),
+            )
+            .into_any_element()
     }
 }

@@ -15,28 +15,25 @@ result to the pixel. The change cycle itself (build, screenshot, measure, ship) 
 ```
 x: 0                         280 (sidebar, resizable)                                   1240
 y ┌──────────────────────────────────────────────────────────────────────────────────────┐
-0 │ ● ● ●  ◧ │ TITLE (13 semibold) [/ second thread ×]   meters · repo chip [Chat|Code] │ 0–40
+0 │ ● ● ●  ◧ │ TITLE (13 semibold) [/ second thread ×]  meters · repo ⌨ ✦ ▭ [Chat|Code] │ 0–40
 40│━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│ rule
-  │ [🔍 Search threads ⌘F]   │ THE THREAD (gpui::list, the only scroll), centred ≤ 860:│
-  │ Host                   › │   bubbles, "N actions", answers, inserts where put,     │
-  │ Project ● ✈              │   cards under them; the overlay scrollbar               │
-  │  (thread row)            │ ┌ + text …                                  🎤 (↑) ┐    │
+  │ ✎ New thread       ⌘N    │ THE THREAD (gpui::list, the only scroll), centred ≤ 860:│
+  │ ⊞ New project            │   bubbles, "N actions", answers, inserts where put,     │
+  │ 🔍 Search          ⌘K    │   cards under them; the overlay scrollbar               │
+  │ Host / Project ● ✈ rows  │ ┌ + text …                                  🎤 (↑) ┐    │
   │──────────────────────────│ └ COMPOSER, pinned, COMPOSER_CARD_PB over the bar ─┘    │
-  │ + New project            │                                                         │
-772│━━━━━━━━━━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━│ rule
-  │ STATUS BAR: ● Agent · state            (IDE: Ln, Col · indent · language) ✦ ▭      │ STATUS_H 29
-  └────────────────────────────────────────────────────────────────────────────────────┘
+  │ ● This Mac 1 working   ⚙ │                                                         │ SIDEBAR_FOOT_H 40
+  └──────────────────────────┴─────────────────────────────────────────────────────────┘
 ```
 
 | Area | Height | Inside | Inset | Code |
 |---|---|---|---|---|
-| Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), the thread's meters and repo chip, Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header`, `render_header_tail` in `src/titlebar/mod.rs` |
-| Search | its field | a filled field, no rule | `SIDEBAR_ROW_INSET` | `bench_ui::search_band` (`crates/ui/src/bars.rs`) |
+| Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), the thread's meters and repo chip, Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header` in `src/titlebar/mod.rs`; the right end's toggles (running terminals, ✦ ⌘J in Code, ▭ ⌃`) `src/titlebar/tail.rs` |
+| Actions | three rows | New thread, New project, Search (⌘K opens a list over the window) | `nav_row`, text at `SIDEBAR_TEXT_X` | `render_actions` in `src/sidebar/mod.rs`; the list `src/sidebar/search.rs` |
 | Sidebar list | rest | Host's threads first, then each project (pinned first) with its threads | rows at `SIDEBAR_ROW_INSET`, text at `SIDEBAR_TEXT_X` | `src/sidebar/mod.rs`; order and acts `src/sidebar/items.rs` |
-| Sidebar foot | `STATUS_H` | New project | as a row | `render_new_project_row`, `src/sidebar/mod.rs` |
+| Left dock's foot | `SIDEBAR_FOOT_H` 40 incl. its rule | the open thread's agent (where, a dot, "N working") and its popover; the gear (⌘,) | `SIDEBAR_ROW_INSET` | `render_foot`, `src/sidebar/agent.rs`, under any left panel (`workspace/layout.rs`) |
 | The thread | rest | rows from `crates/thread`, centred in `THREAD_MAX_W`; inserts where the journal puts them | `CHAT_LEFT` (`CHAT_LEFT_NARROW` in a dock) | `src/thread/mod.rs`; inserts `src/inserts/mod.rs` |
 | Composer | its text | plus, text, mic, Send in one rounded field; chips over the text | the column's sides | `src/thread/composer/input.rs` |
-| Status bar | `STATUS_H` 29 incl. its rule | the agent's state; in the IDE the cursor; the thread-beside and terminal toggles | items `px_2` | `src/statusbar/mod.rs` |
 | Explorer bar (Code) | `bar_h` + its rule, level with the tabs | the project pull-down, Files \| Threads glyphs, Refresh, ⌘P | `SIDEBAR_ROW_INSET` | `explorer_picker`, `src/explorer/tree/view.rs` |
 
 Every rule that crosses the window is one pixel row. Settings pages are a centred column of
@@ -50,20 +47,22 @@ Every rule that crosses the window is one pixel row. Settings pages are a centre
 | A form a tool needs (a new server, a new host) | an agent-message card under the insert that asked for it | a dialog, a settings page |
 | A project's settings (name, where, model, Telegram) | its Settings page (`Center::Project`, `src/env/page.rs`) | a thread, a dialog |
 | What a project contains (files, soul, prompts, skills, MCP, schedule) | the Explorer (`src/explorer/`, `docs/explorer.md`) | a thread, a settings tab |
-| The sidebar's fold | the title bar, right after the traffic lights; New project: the sidebar's foot | the status bar |
+| The sidebar's fold | the title bar, right after the traffic lights; New project: a row over the sidebar's list | a bar under the window |
 | New window, Settings, and every other command | the menu bar (`app/menu.rs`), with its key | a button in a bar |
-| Attach, dictate, Send / Stop | the composer's field | the status bar |
+| Attach, dictate, Send / Stop | the composer's field | a bar |
 | The thread's facts (context, speed, repo) | the title bar, by the title | — |
-| The agent's state | status bar, left; its popover | — |
+| The agent's state | the left dock's foot; its popover | — |
+| The window's toggles (terminal, thread beside) | the title bar's right end, before Chat \| Code | a status bar (Bench has none) |
+| An open file's caret, indent, language | its tab bar's right end | — |
 | Rare actions on a thread or project | its row's hover "⋯" and right-click (one `item_menu`) | the header |
 | Quick actions on a row (a new thread "+") | on the row, shown on hover | always visible |
 | Actions on an answer (copy, read aloud) | at the end of its work line, on hover | a row of their own |
 | Results that come with an answer (files, processes, code) | a block under the answer: `block_frame`, `block_head` | a dialog |
-| Search over threads | the sidebar's search field | inside the list |
+| Search over threads and projects | ⌘K's list over the window (the sidebar's "Search" row) | a field in the sidebar |
 | A choice to make before starting | the empty state, one line | a separate screen |
 
 If the person names an area ("over the sidebar", "in the bottom corner"), that wins: do it,
-then make sure the area's other rules still hold (insets, Stop last on the status bar).
+then make sure the area's other rules still hold (insets, Chat | Code last in the title bar).
 
 ## Moving a control from one area to another
 

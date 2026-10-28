@@ -1,4 +1,4 @@
-//! The bottom dock's terminals (`Panel::Terminal`, ⌃`, the status bar's button): the same shells
+//! The bottom dock's terminals (`Panel::Terminal`, ⌃`, the title bar's button): the same shells
 //! as a `/terminal` insert (`servers.rs` `Tab`, `session.rs`), each on its project's machine and
 //! started in its folder. Tabs appear when there is more than one (⌘T adds one for the shown
 //! project); they live while Bench runs. The active one's selection, or its last lines, go to

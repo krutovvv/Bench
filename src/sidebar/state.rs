@@ -1,4 +1,5 @@
-//! What the threads panel keeps: its search (the field, the words, the agent's hits), the
+//! What the threads panel keeps: its search (the field, the words, the agent's hits, the panel's
+//! chosen row), the
 //! groups folded, the marks (pins and colours), the item being renamed, and the focus that lets
 //! ↑ ↓ ⌫ work on its rows.
 
@@ -19,6 +20,8 @@ pub struct SidebarState {
     pub query: String,
     pub hits: Option<Vec<(String, String)>>,
     pub seq: u64,
+    /// The search's panel over the window (⌘K) while open: the row chosen in it.
+    pub finding: Option<usize>,
     /// Groups folded or opened against their default (`p:<id>`, `open:loose`), kept on this Mac.
     pub collapsed: HashSet<String>,
     /// Pins and colours of threads and projects (this Mac).
@@ -32,10 +35,11 @@ pub struct SidebarState {
 impl SidebarState {
     pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         Self {
-            search: cx.new(|cx| InputState::new(window, cx).placeholder("Search threads  ⌘F")),
+            search: cx.new(|cx| InputState::new(window, cx).placeholder("Search threads and projects")),
             query: String::new(),
             hits: None,
             seq: 0,
+            finding: None,
             collapsed: std::fs::read(collapsed_path())
                 .ok()
                 .and_then(|b| serde_json::from_slice(&b).ok())

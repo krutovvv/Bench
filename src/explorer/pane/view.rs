@@ -99,11 +99,30 @@ impl BenchApp {
                     .into_any_element(),
             );
         }
+        // The open file's caret, indent and language at the bar's right end, where an editor's
+        // status bar would say them (Bench has none: the window's bars are its title bar's).
+        let file = self.explorer.active.clone().and_then(|key| match &key {
+            crate::explorer::DocKey::File(f) => self
+                .explorer
+                .docs
+                .get(&key)
+                .filter(|d| !d.binary)
+                .map(|d| (d.editor.clone(), f.path.clone())),
+            _ => None,
+        });
+        self.cursor_item.update(cx, |c, cx| c.show(file, cx));
         h_flex()
-            .id("doc-tabs")
             .size_full()
-            .overflow_x_scroll()
-            .children(tabs)
+            .child(
+                h_flex()
+                    .id("doc-tabs")
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .overflow_x_scroll()
+                    .children(tabs),
+            )
+            .child(div().flex_none().h_full().child(self.cursor_item.clone()))
             .into_any_element()
     }
 
@@ -155,16 +174,7 @@ impl BenchApp {
                 .flex()
                 .justify_center()
                 .child(
-                    v_flex()
-                        .id("quick")
-                        .w(px(bench_ui::QUICK_W))
-                        .max_h(px(bench_ui::QUICK_MAX_H))
-                        .rounded_md()
-                        .border_1()
-                        .border_color(theme.border)
-                        .bg(theme.popover)
-                        .shadow_lg()
-                        .overflow_hidden()
+                    bench_ui::quick_frame("quick", cx)
                         .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _, cx| {
                             match ev.keystroke.key.as_str() {
                                 "down" => this.quick_move(1, cx),

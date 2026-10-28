@@ -46,8 +46,8 @@ Popover::new("stats").anchor(gpui_kit::Anchor::BottomRight)
     .content(move |_, _, cx| v_flex().p_3().gap_1().child(…))
 ```
 
-`trigger` must be selectable (a `Button` is). Anchor `BottomRight` for things in the status bar.
-Bench: the context-usage, speed and agent readouts in `src/statusbar/mod.rs`.
+`trigger` must be selectable (a `Button` is). Anchor `BottomLeft` for things at the window's bottom (they open upward).
+Bench: the agent's readout in `src/sidebar/agent.rs`; the thread's meters in `src/thread/meters.rs`.
 
 ## Tooltip
 

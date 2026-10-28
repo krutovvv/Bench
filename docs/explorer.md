@@ -140,7 +140,7 @@ Phases, each a thing of its own:
    to the thread") puts them in the composer as a reference (`thread/attachments.rs`
    `Reference::Problems`), beside ⌘L's code.
 3. **A terminal in the bottom dock** (done): `Panel::Terminal` (`src/inserts/terminal/panel.rs`),
-   ⌃` or the status bar's button — the `/terminal` insert's shell (`servers.rs` `Tab`,
+   ⌃` or the title bar's button — the `/terminal` insert's shell (`servers.rs` `Tab`,
    `session.rs`) on the project's machine, started in its folder, one per project (the
    Explorer's while it is shown, else the thread's). "Send to the thread" puts its selection,
    or its last lines, in the composer (`Reference::Terminal`).

@@ -1,6 +1,6 @@
 //! Sending: the composer's message, a new chat made into a thread, a slash command, copy, an
 //! answer to what the run asks (the view's and the app's); the reasoning level and Stop (the
-//! app's: the status bar's controls act on the open thread). The queue is `queued.rs`, drafts
+//! app's: the window's controls act on the open thread). The queue is `queued.rs`, drafts
 //! `drafts.rs`.
 
 use std::sync::Arc;
@@ -64,7 +64,7 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// The status bar's Stop, ⌘.: the open thread's run.
+    /// Send's Stop, ⌘.: the open thread's run.
     pub fn stop(&mut self, cx: &mut Context<Self>) {
         let at = self.thread_ref(cx);
         if let Some(thread) = at.id.clone() {
