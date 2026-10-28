@@ -189,6 +189,8 @@ pub const SLASH_LIST_W: f32 = 560.;
 /// between it and the field it sits over, as wide as that field.
 pub const COMPLETION_ROW_H: f32 = 26.;
 pub const COMPLETION_GAP: f32 = 6.;
+/// A step's verb column in a work's list ("read", "web fetch"): the targets start in one line.
+pub const STEP_VERB_W: f32 = 88.;
 /// A path typed into the thread's head (a server's folder).
 pub const PATH_FIELD_W: f32 = 360.;
 

@@ -280,12 +280,14 @@ impl ThreadView {
         } else {
             vec![]
         };
+        // The steps as a Mac's grouped list (Xcode's build log, System Settings' lists): a soft
+        // rounded ground, no rule, rows that light up whole — not a rule down their left with
+        // lines hung on it.
         let list = open.then(|| {
             v_flex()
-                .pl_3()
-                .gap_1()
-                .border_l_1()
-                .border_color(theme.border)
+                .p_1()
+                .rounded_lg()
+                .bg(theme.foreground.opacity(0.03))
                 .children(items)
         });
         // The plan, the questions and the background processes this work's calls made, under
@@ -366,12 +368,9 @@ impl ThreadView {
                 .filter(|(_, v)| !v.trim().is_empty())
                 .collect(),
             ),
-            Step::Note(text) => (
-                Ico::ChevronRight,
-                theme.foreground.opacity(0.75),
-                clip(text, 400),
-                vec![],
-            ),
+            // What the agent said between its calls: its own words, in the text's colour.
+            Step::Note(text) => (Ico::MessageSquare, muted, clip(text, 400), vec![]),
+            // The model's reasoning: the quietest row, the whole of it when opened.
             Step::Thought(text) => (
                 Ico::Brain,
                 bench_ui::faint(&theme),
@@ -396,35 +395,66 @@ impl ThreadView {
         } else {
             vec![]
         };
+        let note = matches!(step, Step::Note(_));
+        let faint = bench_ui::faint(&theme);
         // A step is the thread's own line, as the work line over it: its size, not the answer's.
+        // A row of a list: one line, its glyph in a column of its own, the whole row lit on hover.
         v_flex()
             .text_size(px(bench_ui::THREAD_META))
             .child(
                 h_flex()
                     .id(SharedString::from(format!("step-{key}-{k}")))
+                    .min_h(px(bench_ui::LIST_ROW_H))
+                    .px_2()
                     .gap_2()
-                    .items_start()
+                    .items_center()
+                    .rounded_md()
                     .text_color(color)
                     .when(expandable, |d| {
-                        d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
+                        d.cursor_pointer().hover(|s| s.bg(theme.list_hover))
                     })
-                    .child(icon.icon().xsmall().mt(px(bench_ui::ICON_ON_SMALL_LINE)))
-                    // One line each, as a build log's: the tool in the step's grey, what it
-                    // acted on in the text's colour; the whole of it when the step is opened.
+                    .child(
+                        div()
+                            .flex_none()
+                            .text_color(if note { faint } else { color })
+                            .child(icon.icon().xsmall()),
+                    )
+                    // The tool in the step's grey, what it acted on in the text's colour; the
+                    // agent's own words in the text's colour.
                     .child(match label.split_once(": ") {
-                        Some((verb, rest)) if tool_ok => h_flex()
+                        Some((verb, rest)) if tool_ok => {
+                            // A file: its name, then where it is, quieter — the name is what
+                            // the eye looks for (Xcode's and the changed files' list).
+                            let (name, dir) = split_path(rest);
+                            h_flex()
+                                .flex_1()
+                                .min_w_0()
+                                .gap_1p5()
+                                .child(
+                                    div()
+                                        .flex_none()
+                                        .w(px(bench_ui::STEP_VERB_W))
+                                        .truncate()
+                                        .child(verb.to_string()),
+                                )
+                                .child(
+                                    div()
+                                        .flex_none()
+                                        .max_w_2_3()
+                                        .truncate()
+                                        .text_color(theme.foreground)
+                                        .child(name),
+                                )
+                                .when_some(dir, |d, dir| {
+                                    d.child(div().min_w_0().truncate().text_color(faint).child(dir))
+                                })
+                        }
+                        _ => div()
                             .flex_1()
                             .min_w_0()
-                            .gap_1()
-                            .child(div().flex_none().child(format!("{verb}")))
-                            .child(
-                                div()
-                                    .min_w_0()
-                                    .truncate()
-                                    .text_color(theme.foreground.opacity(0.85))
-                                    .child(rest.to_string()),
-                            ),
-                        _ => div().flex_1().min_w_0().truncate().child(label.clone()),
+                            .truncate()
+                            .when(note, |d| d.text_color(theme.foreground))
+                            .child(label.clone()),
                     })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.claim_click(cx);
@@ -437,9 +467,10 @@ impl ThreadView {
             .when(open && expandable, |d| {
                 d.children(bodies.into_iter().map(|(title, body)| {
                     v_flex()
-                        .ml_5()
-                        .mt_1()
-                        .mb_1()
+                        .ml_7()
+                        .mr_2()
+                        .mt_0p5()
+                        .mb_1p5()
                         .child(div().text_color(muted).child(title))
                         .child(
                             div()
@@ -471,6 +502,17 @@ fn step_icon(name: &str) -> Ico {
         "bash" | "ssh_run" | "process" => Ico::Terminal,
         _ if name.starts_with("mcp__browser") || n.starts_with("browser") => Ico::Globe,
         _ => Ico::Wrench,
+    }
+}
+
+/// A path as its file's name and the folder it is in; anything else (a command, a URL) whole.
+fn split_path(text: &str) -> (String, Option<String>) {
+    let is_path = (text.starts_with('/') || text.starts_with("~/"))
+        && !text.contains(char::is_whitespace)
+        && !text.ends_with('/');
+    match text.rsplit_once('/').filter(|_| is_path) {
+        Some((dir, name)) if !name.is_empty() => (name.to_string(), Some(dir.to_string())),
+        _ => (text.to_string(), None),
     }
 }
 
