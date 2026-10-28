@@ -20,6 +20,7 @@
 pub mod instructions;
 pub mod lsp;
 pub mod mcp;
+pub mod mcp_actions;
 pub mod mcp_status;
 pub mod name;
 pub mod page;

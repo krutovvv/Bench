@@ -4,7 +4,9 @@
 pub mod model;
 pub mod state;
 pub mod store;
-pub mod view;
+pub mod card;
+pub mod list;
+pub mod row;
 
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
