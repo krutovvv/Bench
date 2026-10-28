@@ -12,6 +12,7 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { randomUUID } from "node:crypto";
 import { projects } from "../builtin/projects.ts";
 import { shOut } from "../modules/files.ts";
+import { specsOf } from "../specs.ts";
 import { CHANGES_KIND } from "./journal.ts";
 import type { Live, Runtime } from "./runtime.ts";
 
@@ -37,6 +38,8 @@ export interface FileChange {
 	add: number;
 	del: number;
 	binary?: boolean;
+	/** A spec's title, when the file is one (`specs.ts`). */
+	spec?: string;
 }
 
 /** `git diff --numstat` read as the files of a turn, under the repository's root. */
@@ -94,6 +97,13 @@ export class Turns {
 		const out = await shOut(at.machine, at.dir, NUMSTAT, [base.root, base.tree, head.tree]).catch(() => "");
 		const files = parseNumstat(base.root, out);
 		if (!files.length) return;
+		// The specs the turn changed go first, named by their titles: a decision moved.
+		const { specs } = await specsOf(at.machine, base.root);
+		for (const f of files) {
+			const s = specs.find((s) => s.path === f.path);
+			if (s) f.spec = s.title;
+		}
+		files.sort((a, b) => Number(!a.spec) - Number(!b.spec));
 		await live.conversation.submit(
 			{ type: "write", entry: { kind: CHANGES_KIND, data: { root: base.root, base: base.tree, head: head.tree, files } }, requestId: randomUUID() } as any,
 			ctx,

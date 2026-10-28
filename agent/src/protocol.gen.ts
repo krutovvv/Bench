@@ -39,7 +39,11 @@ export type PlanStep = { id: string, content: string,
  */
 status: string, parent?: string, };
 
-export type FileChange = { path: string, add: number, del: number, binary?: boolean, };
+export type FileChange = { path: string, add: number, del: number, binary?: boolean, 
+/**
+ * The file is a spec (`agent/src/specs.ts`): its title.
+ */
+spec?: string, };
 
 export type Finding = { path: string, lines?: string, body: string, };
 

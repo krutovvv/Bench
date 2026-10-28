@@ -219,6 +219,7 @@ fn a_turns_changes_follow_its_answer() {
             add: 2,
             del: 1,
             binary: None,
+            spec: None,
         }],
     };
     let t = Thread::open(ThreadOpen {

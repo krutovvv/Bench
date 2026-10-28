@@ -175,6 +175,10 @@ pub struct FileChange {
     #[ts(optional)]
     #[serde(default)]
     pub binary: Option<bool>,
+    /// The file is a spec (`agent/src/specs.ts`): its title.
+    #[ts(optional)]
+    #[serde(default)]
+    pub spec: Option<String>,
 }
 
 /// A reviewer's finding: a file (absolute), its lines ("12-14"), what is wrong.

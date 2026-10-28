@@ -4,6 +4,7 @@
 // few short sections (src/prompt.ts). An agent can select other extensions next to it or instead
 // of it (its settings.json "extensions").
 
+import path from "node:path";
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool, hook, section, ToolTask } from "@earendil-works/pi-durable";
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
@@ -16,6 +17,8 @@ import { memoryTool } from "../builtin/memory.ts";
 import { skillManage, skillView } from "../builtin/skills.ts";
 import { delegate } from "../builtin/subagent.ts";
 import { resolveComment } from "../builtin/review.ts";
+import { specFor, specsOf } from "../specs.ts";
+import { machineOf } from "../repo.ts";
 import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { host } from "../host.ts";
@@ -67,6 +70,24 @@ export const images = await createNodePhotonImages();
 const Coding = createCodingTools({ images });
 const coding = (Coding.tools ?? []).map((t: any) => (t.name === "read" ? createAnchoredRead({ images }) : t.name === "edit" ? createAnchoredEdit() : t));
 
+/** The specs each conversation was told of: one line per spec per thread, not per file. */
+const toldSpecs = new Map<string, Set<string>>();
+
+/** "This file is under <spec>": once per thread for each spec, none outside the specs. */
+async function specNote(info: { cwd: string; project?: string }, conversation: string, p: string): Promise<string | undefined> {
+	if (!p) return undefined;
+	const machine = machineOf(info.project) ?? null;
+	const file = path.posix.resolve(info.cwd || "/", p);
+	const { root, specs } = await specsOf(machine, path.posix.dirname(file));
+	const spec = specFor(root, specs, file);
+	if (!spec) return undefined;
+	const told = toldSpecs.get(conversation) ?? new Set<string>();
+	if (told.has(spec.id)) return undefined;
+	told.add(spec.id);
+	toldSpecs.set(conversation, told);
+	return `[${path.posix.relative(root, file)} is under the spec ${path.posix.relative(root, spec.path)} ("${spec.title}"): read it before changing what the module does, and update it when a decision or contract there changes.]`;
+}
+
 export const assistant = defineExtension({
 	name: "assistant",
 	tools: [...coding, grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, resolveComment, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, sshRun, processTool],
@@ -105,14 +126,21 @@ export const assistant = defineExtension({
 			},
 			// The file's errors from the project's language servers, with the edit that made them
 			// (`lsp.ts`): the model sees them as an editor shows them, without asking.
+			// The module's spec, the first time the thread touches a file under it (`specs.ts`):
+			// the decisions and contracts the code does not show, found without being looked for.
 			afterTool: async (call: any, result: any, api: any) => {
-				if ((call.name !== "edit" && call.name !== "write") || result?.isError) return undefined;
+				if (!["read", "edit", "write"].includes(call.name) || result?.isError) return undefined;
 				const info = host().thread(api.conversationId);
 				if (!info) return undefined;
-				const at = await placeOf(info, String(call.arguments?.path ?? ""));
-				if (!at) return undefined;
-				const diag = await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text).catch(() => undefined);
-				return diag ? { ...result, output: [...(result.output ?? []), { type: "text", text: diag }] } : undefined;
+				const notes: string[] = [];
+				const spec = await specNote(info, String(api.conversationId), String(call.arguments?.path ?? "")).catch(() => undefined);
+				if (spec) notes.push(spec);
+				if (call.name !== "read") {
+					const at = await placeOf(info, String(call.arguments?.path ?? ""));
+					const diag = at ? await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text).catch(() => undefined) : undefined;
+					if (diag) notes.push(diag);
+				}
+				return notes.length ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
 			},
 		} as any),
 	],

@@ -171,6 +171,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
     let changes = journal.changes(
         "/Users/demo/code/storefront",
         &[
+            ("src/pages/SPEC.md", 3, 1),
             ("src/pages/landing.tsx", 2, 2),
             ("src/components/SignupForm.tsx", 0, 2),
             ("package-lock.json", 14, 9),

@@ -147,6 +147,9 @@ impl Journal {
                     add: *add,
                     del: *del,
                     binary: None,
+                    spec: p
+                        .ends_with("SPEC.md")
+                        .then(|| "src/pages — the storefront's pages".to_string()),
                 })
                 .collect(),
         });

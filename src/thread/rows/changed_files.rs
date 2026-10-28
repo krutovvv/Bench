@@ -25,6 +25,8 @@ pub(crate) struct Changed {
     pub del: usize,
     /// Made by a write the thread has no diff of.
     pub new: bool,
+    /// A spec's title, when the file is one: shown by it, first in the list.
+    pub spec: Option<String>,
     /// Its diff when the thread holds it already (the file tools' own); None: read from the
     /// turn's trees when first shown.
     pub diff: Option<String>,
@@ -57,6 +59,7 @@ impl ThreadView {
                     add,
                     del,
                     new: diffs.is_empty(),
+                    spec: None,
                     diff: (!diffs.is_empty()).then(|| diffs.join("\n")),
                 }
             })
@@ -83,6 +86,7 @@ impl ThreadView {
                 add: f.add as usize,
                 del: f.del as usize,
                 new: false,
+                spec: f.spec.clone(),
                 diff: None,
             })
             .collect();
@@ -140,15 +144,20 @@ impl ThreadView {
         {
             let shown = short(&f.path);
             let p = std::path::Path::new(&shown);
-            let name = p
+            let mut name = p
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_default();
-            let dir = p
+            let mut dir = p
                 .parent()
                 .map(|p| p.to_string_lossy().to_string())
                 .unwrap_or_default();
-            let (ico, color) = bench_ui::file_icon(&name, false, &theme);
+            let (mut ico, mut color) = bench_ui::file_icon(&name, false, &theme);
+            // A spec reads as the decision it holds: its title, the file quieter after it.
+            if let Some(title) = &f.spec {
+                (name, dir) = (title.clone(), shown.clone());
+                (ico, color) = (Ico::BookCheck, theme.primary);
+            }
             let slot = (key.to_string(), f.path.clone());
             let shows = self.thread.diffs_open.contains(&slot);
             let group: SharedString = format!("chg-{key}-{k}").into();
