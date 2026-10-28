@@ -141,12 +141,16 @@ pub const POPOVER_DROP: f32 = 2.;
 
 // ---- The sidebar ---------------------------------------------------------------------------
 
+/// The sidebar's type: a project's name and a thread's title share one size, a step under the
+/// messages', so the list reads as a list and not as a page; what they are tells them apart (the
+/// name is heavier, the title quieter), not how big they are.
+pub const SIDEBAR_TEXT: f32 = 13.;
 /// Air above a project's head (the first one sits closer), and under it.
 pub const GROUP_GAP: f32 = 13.;
 pub const GROUP_HEAD_PB: f32 = 6.;
 /// A thread's row: its marker stripe, and its padding in the ordinary and the compact list.
 pub const ROW_STRIPE: f32 = 2.;
-pub const THREAD_ROW_PY: f32 = 4.;
+pub const THREAD_ROW_PY: f32 = 5.;
 pub const THREAD_ROW_PY_COMPACT: f32 = 3.;
 /// A search hit's inset.
 pub const HIT_PL: f32 = 14.;

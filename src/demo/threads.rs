@@ -7,7 +7,7 @@ use protocol::ThreadItem;
 
 /// A thread about something (`tasks:today`, `ssh:local`…): one turn, done.
 fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Journal) {
-    app.threads.list.push(row(id, title, 2, false, "desktop"));
+    app.threads.list.push(row(id, title, false, "desktop"));
     let mut t = journal.thread();
     // A tool: an insert before the first message.
     if !subject.is_empty() {

@@ -3,17 +3,16 @@
 
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
 use gpui_kit::component::shimmer::ShimmerText;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::SESSION_TITLE;
 use super::menu::item_menu;
 use crate::app::BenchApp;
 use crate::sidebar::items::Item;
 use crate::workspace::Center;
+use bench_ui::SIDEBAR_TEXT;
 use bench_ui::icons::Ico;
-use bench_ui::plural;
 
 impl BenchApp {
     /// `guide`: under a group header, indented on the group's guide line (`Some(last row)`).
@@ -37,22 +36,22 @@ impl BenchApp {
         } else {
             s.paused
         };
-        let count = if s.running && paused {
-            "paused".to_string()
-        } else if s.running {
-            "working…".to_string()
-        } else {
-            plural(s.messages as usize, "message", "messages", "messages")
-        };
-        // A chat in a branch of its own says which.
+        // One line: the title, and on its right only what is not plain — a paused run, or the
+        // branch of a chat that works in a branch folder of its own. A working run says so by its
+        // title's shimmer; a count of messages told nothing worth the second line.
         let row_at = crate::thread::ThreadRef {
             host: s.host.clone(),
             id: Some(s.id.clone()),
             ..Default::default()
         };
-        let meta = match self.repo_of(&row_at).filter(|p| p.in_branch_folder()) {
-            Some(p) if !p.branch.is_empty() => format!("{} · {count}", p.branch),
-            _ => count,
+        let branch = self
+            .repo_of(&row_at)
+            .filter(|p| p.in_branch_folder() && !p.branch.is_empty())
+            .map(|p| p.branch.clone());
+        let meta: Option<String> = if s.running && paused {
+            Some("paused".into())
+        } else {
+            branch
         };
         let (open_id, del_id) = (s.id.clone(), s.id.clone());
         // Deleting asks once (⌫, or the menu): the row shows Delete · Cancel; ⌫ again deletes.
@@ -139,12 +138,16 @@ impl BenchApp {
                 None => h.bg(theme.sidebar_accent),
             })
             .child(
-                v_flex()
+                h_flex()
                     .flex_1()
                     .min_w_0()
+                    .gap_2()
+                    .items_center()
                     // A working session's title carries a moving highlight, to find it at a glance.
                     .child(
                         h_flex()
+                            .flex_1()
+                            .min_w_0()
                             .gap_1()
                             .items_center()
                             .when(pinned, |d| {
@@ -158,7 +161,7 @@ impl BenchApp {
                                     .relative()
                                     .flex_1()
                                     .min_w_0()
-                                    .text_size(px(SESSION_TITLE))
+                                    .text_size(px(SIDEBAR_TEXT))
                                     .child(
                                         div()
                                             .truncate()
@@ -178,7 +181,7 @@ impl BenchApp {
                                                 bench_ui::bare_field(&field)
                                                     // Input draws at 0.875 of its size: the title's.
                                                     .with_size(gpui_kit::component::Size::Size(px(
-                                                        SESSION_TITLE / 0.875,
+                                                        SIDEBAR_TEXT / 0.875,
                                                     )))
                                                     .px_0(),
                                             ),
@@ -186,7 +189,7 @@ impl BenchApp {
                                     .into_any_element(),
                                 None => div()
                                     .min_w_0()
-                                    .text_size(px(SESSION_TITLE))
+                                    .text_size(px(SIDEBAR_TEXT))
                                     .truncate()
                                     .map(|d| {
                                         if working {
@@ -199,8 +202,8 @@ impl BenchApp {
                             }),
                     )
                     // Compact: the title alone (a working session still shimmers).
-                    .when(!compact, |d| {
-                        d.child(div().text_xs().text_color(muted).child(meta))
+                    .when_some(meta.filter(|_| !compact), |d, meta| {
+                        d.child(div().flex_none().text_xs().text_color(muted).child(meta))
                     }),
             )
             .child(delete)

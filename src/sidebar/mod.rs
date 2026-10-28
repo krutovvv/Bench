@@ -23,9 +23,6 @@ use crate::sidebar::items::Item;
 use crate::workspace::Center;
 use bench_ui::icons::Ico;
 
-/// A session title: the sidebar's 14px.
-pub(crate) const SESSION_TITLE: f32 = 14.;
-
 impl BenchApp {
     /// The left dock's threads panel (`Panel::Threads`): the search, then the projects and their
     /// threads. The dock's strip over it is the dock's (`top.rs`).
@@ -120,15 +117,16 @@ impl BenchApp {
                 .pb_1()
                 .gap_1p5()
                 .items_center()
-                // Small caps, as every project's head (`project_row`): HOST is a group too.
-                .text_xs()
+                // As every project's head (`project_row`): Host is a group too.
+                .text_size(px(bench_ui::SIDEBAR_TEXT))
                 .child(bench_ui::head_icon_in(Ico::Server, host_color, cx))
                 .child(
                     div()
                         .min_w_0()
                         .truncate()
-                        .text_color(host_color.unwrap_or(muted))
-                        .child(crate::app::LOCAL_HOST.to_uppercase()),
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(host_color.unwrap_or(cx.theme().foreground))
+                        .child(crate::app::LOCAL_HOST),
                 )
                 .child(div().flex_1())
                 // "⋯" (on hover), as a right click: its environment, its color — the same menu as
@@ -244,7 +242,7 @@ impl BenchApp {
             })
             .when(selected, |d| d.bg(theme.sidebar_accent))
             .hover(|s| s.bg(theme.sidebar_accent))
-            .child(div().text_size(px(SESSION_TITLE)).truncate().child(title))
+            .child(div().text_size(px(bench_ui::SIDEBAR_TEXT)).truncate().child(title))
             .child(
                 div()
                     .text_xs()

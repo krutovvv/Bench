@@ -60,53 +60,46 @@ pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
         row(
             "d-landing",
             "Launch the spring landing page",
-            42,
             false,
             "desktop",
         ),
         row(
             "d-notes",
             "Summarize this week's meeting notes",
-            8,
             false,
             "desktop",
         ),
         row(
             "d-api",
             "Add rate limiting to the public API",
-            23,
             false,
             "desktop",
         ),
         row(
             "d-tests",
             "Fix the flaky checkout test",
-            15,
             false,
             "desktop",
         ),
         row(
             "d-audit-1",
             "Competitors: pricing pages",
-            31,
             true,
             "desktop",
         ),
         row(
             "d-audit-2",
             "Competitors: onboarding flows",
-            19,
             false,
             "desktop",
         ),
         row(
             "d-tg",
             "Invoice for March from the inbox",
-            6,
             false,
             "telegram",
         ),
-        row("d-cron", "Daily digest of new issues", 4, false, "cron"),
+        row("d-cron", "Daily digest of new issues", false, "cron"),
     ];
     // Where the demo's threads work: a folder, and the repo it is in.
     for (id, cwd, repo) in [

@@ -77,9 +77,9 @@ impl BenchApp {
                 .pb(px(bench_ui::GROUP_HEAD_PB))
                 .gap_1p5()
                 .items_center()
-                // Small caps, as the Explorer's headings (`tree_heading`): a group of threads
-                // reads as a section, and a color on it is a mark, not a bigger type.
-                .text_xs()
+                // The list's size, a heavier weight: a project is the name its threads hang
+                // under, read as a word and not as a label in capitals; a color marks it.
+                .text_size(px(bench_ui::SIDEBAR_TEXT))
                 .child(bench_ui::head_icon_in(icon, color, cx))
                 .child(match renaming {
                     Some(field) => div()
@@ -88,12 +88,13 @@ impl BenchApp {
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .child(Input::new(&field).xsmall())
                         .into_any_element(),
-                    // The name takes the heading's size and colour; only a chosen color marks it.
+                    // The name in the text's colour; only a chosen color marks it.
                     None => div()
                         .min_w_0()
                         .truncate()
-                        .text_color(color.unwrap_or(muted))
-                        .child(p.name.to_uppercase())
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .text_color(color.unwrap_or(theme.foreground))
+                        .child(p.name.clone())
                         .into_any_element(),
                 })
                 .child(div().flex_1())

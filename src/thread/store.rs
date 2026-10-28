@@ -40,7 +40,6 @@ impl ThreadStore {
 pub struct ThreadRow {
     pub id: protocol::ThreadId,
     pub title: String,
-    pub messages: u64,
     pub running: bool,
     /// The person paused its run: it stands still until resumed.
     pub paused: bool,
@@ -64,7 +63,6 @@ impl ThreadRow {
         Self {
             id: t.id,
             title: t.title,
-            messages: t.messages,
             running: t.running,
             paused: t.paused,
             source: t.source,

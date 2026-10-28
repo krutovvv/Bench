@@ -10,11 +10,10 @@ pub(super) fn demo_file(name: &str) -> String {
     format!("{}/assets/demo/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
-pub(super) fn row(id: &str, title: &str, messages: u64, running: bool, source: &str) -> ThreadRow {
+pub(super) fn row(id: &str, title: &str, running: bool, source: &str) -> ThreadRow {
     ThreadRow {
         id: id.into(),
         title: title.into(),
-        messages,
         running,
         source: source.into(),
         ..Default::default()
