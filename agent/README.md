@@ -12,12 +12,15 @@ and talks to it over a WebSocket and a REST API; over SSH it does the same on an
   `bash`) and its `tool_search` for deferred tools.
 - **Official and popular packages for the rest**: `@earendil-works/pi-mcp` (MCP servers),
   [grammY](https://grammy.dev) (Telegram), [croner](https://croner.56k.guru) (cron expressions).
-- **Its own code, about 5k lines**: the server and protocol (`src/server.ts`), the bridge from Pi's
-  events to Bench's (`src/runtime.ts`), settings and the session index (`src/config.ts`,
-  `src/store.ts`), the assistant extension (`src/extensions/assistant.ts`) with a short prompt
-  (`src/prompt.ts`) and a few tools of its own (`src/builtin/`), the inserts (`src/inserts.ts`), MCP sign-in
-  (`src/mcp-oauth.ts`), Telegram (`src/telegram.ts`, a bot per project, through a proxy where
-  `TELEGRAM_PROXY` or `HTTPS_PROXY` is set).
+- **Its own code, about 9k lines**: the server and its modules, each with its RPC and REST routes
+  (`src/server.ts`, `src/modules/`; the wire is written from `crates/protocol` into
+  `src/protocol.gen.ts`), the threads' core and the bridge from Pi's events to Bench's
+  (`src/runtime/`), settings and the session index (`src/config.ts`, `src/store.ts`), the
+  assistant extension (`src/extensions/assistant.ts`) with a short prompt (`src/prompt.ts`) and
+  tools of its own (`src/builtin/`), where tools work (`src/machine/`: a server over SSH, a
+  project kept in its folder), language servers (`src/lsp/`), MCP and its sign-in (`src/mcp/`),
+  Telegram (`src/telegram.ts`, a bot per project, through a proxy where `TELEGRAM_PROXY` or
+  `HTTPS_PROXY` is set).
 
 ## Extensions
 
@@ -44,16 +47,19 @@ The agent picks its extensions in `~/.bench/agents/default/settings.json`:
 
 | Tool | What it does |
 |---|---|
-| `read`, `write`, `edit`, `bash` | Pi's coding tools, in the session's folder |
+| `read`, `write`, `bash` | Pi's coding tools, on the project's machine, in its folder; `read` shows every line as `LINE:HASH\|text` |
+| `edit` | changes lines by those anchors (`src/builtin/hashline.ts`); with `oldText`/`newText` it is Pi's own edit |
+| `grep`, `glob`, `ls` | search the project's files, through the same machine |
+| `lsp`, `diagnostics` | definitions, references, outline, hover and problems from the project's language servers; edits come back with their diagnostics |
 | `clarify` | a question with choices (Bench's card, Telegram's buttons) |
 | `todo` | the plan Bench shows over the composer |
-| `memory` | notes kept across sessions (`memories/MEMORY.md`, `USER.md`), only when asked |
+| `memory` | notes kept across sessions: the project's `memories/MEMORY.md`, the shared `USER.md`; only when asked |
 | `skill_view`, `skill_manage` | the agent's skills (`skills/<…>/SKILL.md`), listed in the prompt |
 | `cron` | scheduled prompts: durable Pi tasks that sleep until their time; answers go to Telegram or the app |
 | `delegate` | subagents: child conversations owned by the call, run in parallel |
+| `process` | a command in the background, its output's tail kept, its exit the outcome |
 | `session_search` | the text of past sessions |
-| `tasks` | the person's tasks (in `bench.sqlite`): list, add, change, complete, sum the time spent |
-| `ssh_run` | a command on this Mac or a `~/.ssh/config` server; without a host, the thread's terminal insert |
+| `ssh_run` | a command on this Mac or a `~/.ssh/config` server; without a host, on the project's machine or the thread's terminal insert |
 | `tool_search` + `mcp__<server>__<tool>` | MCP servers; a server with many tools is deferred behind tool_search |
 
 Web search comes from the official MCP servers of Tavily or Brave, added to an agent's `mcp.json`.
@@ -61,30 +67,31 @@ Web search comes from the official MCP servers of Tavily or Brave, added to an a
 ## Inserts, in Pi's terms
 
 A thread is a Pi conversation; what the person puts into it with `/` is kept in it
-(`src/inserts.ts`): an entry `bench.insert {id, key}` in the transcript where it was put (a write,
-so the model doesn't see it and it is never queued), and its live state in the conversation's
-document `bench.inserts`, changed in commits. Bench calls `session.insert` and
-`session.insert.patch`; `session.resume` returns the inserts with their place. The `inserts`
+(`src/runtime/inserts.ts`): an entry `bench.insert {id, key}` in the transcript where it was put
+(a write, so the model doesn't see it and it is never queued), and its live state in the
+conversation's document `bench.inserts`, changed in commits. Bench calls `thread.insert` and
+`thread.insert.patch`; `thread.open` returns the inserts with their place. The `inserts`
 prompt section reads the document and says, one line per insert, what it is and which tool acts
 on it (`src/prompt.ts` `inserted()`); what each shows at that moment comes with the message as
 `<block-state>`, kept out of the history.
 
-A message sent while a run is live waits in Pi's inbox (`session.queue`); "send now" aborts it
-and steers. Pi 1.4 leaves an aborted item in the inbox, so `dropFromInbox` takes it out in a
-commit.
+A message sent while a run is live waits in Pi's inbox (`src/runtime/queue.ts`): it can be taken
+back, edited, or sent now, which aborts the run and steers.
 
 ## Projects and their environment
 
 A project is a row in `bench.sqlite` (name, an optional folder, an optional server, a Telegram
 bot). Its environment is laid out like Pi's agent directory, in `~/.bench/projects/<id>/`:
-`SYSTEM.md` (its soul), `mcp.json`, `skills/`, `prompts/`. Its threads share the machine's own
-agent, `~/.bench/agents/default/` (the "Host" project in Bench): model, memory, standing instructions.
-MCP servers that need OAuth sign in through `src/mcp-oauth.ts` (callback on `localhost:47823`,
-credentials in `~/.bench/mcp-oauth/`).
+`SYSTEM.md` (its soul), `mcp.json`, `lsp.json`, `skills/`, `prompts/`, `memories/MEMORY.md`. Its
+threads share the machine's own agent, `~/.bench/agents/default/` (the "Host" project in Bench):
+model, `USER.md`, standing instructions. A project's settings stay on this Mac even when its
+work is on a server; the file tools reach them there (`src/machine/settings.ts`). MCP servers that
+need OAuth sign in through `src/mcp/oauth.ts` (callback on `localhost:47823`, credentials in
+`~/.bench/mcp-oauth/`).
 
 ## Its home: `~/.bench`
 
-`bench.sqlite` (settings, keys, providers, projects, sessions, tasks, cron jobs),
+`bench.sqlite` (settings, keys, providers, projects, the thread index and its search, cron jobs),
 `pi.sqlite` (the conversations), `agents/default/` and `projects/<id>/` (laid out like Pi's agent
 directory, plus `memories/`), `app/` (the installed server), `server.json` (port, token),
 `server.log`, `backups/`.
