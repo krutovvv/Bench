@@ -2,7 +2,6 @@
 
 pub(crate) mod agent_form;
 pub(crate) mod appearance;
-mod controls;
 pub(crate) mod new_project;
 pub(crate) mod presets;
 pub(crate) mod providers;
@@ -51,19 +50,19 @@ impl BenchApp {
         match self.gear_tab {
             1 => {
                 page.extend(self.render_presets(cx));
-                return Self::providers_page(page);
+                return bench_ui::settings_page("settings", page);
             }
             2 => {
-                page.push(self.pv_heading("APPEARANCE", cx).into_any_element());
+                page.push(bench_ui::settings_heading("APPEARANCE", vec![], cx).into_any_element());
                 page.push(self.render_appearance(cx).into_any_element());
-                return Self::providers_page(page);
+                return bench_ui::settings_page("settings", page);
             }
             _ => {}
         }
 
         // ---- agents: each has its own models and voice (its own network: a model on its
         // own machine is localhost there) ----
-        page.push(self.pv_heading("AGENTS", cx).into_any_element());
+        page.push(bench_ui::settings_heading("AGENTS", vec![], cx).into_any_element());
         for host in self.agent_hosts() {
             let current = crate::client::launch::build();
             // A server's agent is linked once this Mac's lists it; until then (and in the demo,
@@ -84,29 +83,29 @@ impl BenchApp {
             // Restarts it from this Bench's sources; an interrupted run resumes (runs are durable).
             let update = older.then(|| {
                 let h = host.clone();
-                self.pv_button(
+                bench_ui::secondary_button(
                     SharedString::from(format!("gear-agent-up-{host}")),
                     "Update",
-                    false,
-                    cx,
-                    Box::new(move |this, w, cx| this.update_agent(h.clone(), w, cx)),
                 )
+                .small()
+                .on_click(cx.listener(move |this, _, w, cx| this.update_agent(h.clone(), w, cx)))
+                .into_any_element()
             });
             let remove = (!host.is_empty()).then(|| {
                 let (gone, label) = (
                     host.clone(),
                     if armed { "Remove from Bench" } else { "Remove" },
                 );
-                self.pv_button(
+                bench_ui::secondary_button(
                     SharedString::from(format!("gear-agent-rm-{host}")),
                     label,
-                    false,
-                    cx,
-                    Box::new(move |this, w, cx| this.remove_agent(gone.clone(), w, cx)),
                 )
+                .small()
+                .on_click(cx.listener(move |this, _, w, cx| this.remove_agent(gone.clone(), w, cx)))
+                .into_any_element()
             });
             page.push(
-                self.pv_row(
+                bench_ui::settings_field(
                     Self::agent_name(&host),
                     if armed {
                         "Bench forgets it; the agent on the server runs on, its Telegram and schedule too".to_string()
@@ -118,13 +117,10 @@ impl BenchApp {
                         .gap_2()
                         .children(update)
                         .children(remove)
-                        .child(self.pv_button(
-                            SharedString::from(format!("gear-agent-{host}")),
-                            if shown { "Shown below" } else { "Show" },
-                            shown,
-                            cx,
-                            Box::new(move |this, w, cx| this.show_gear_agent(pick.clone(), w, cx)),
-                        ))
+                        .child((if shown { bench_ui::primary_button } else { bench_ui::secondary_button })(SharedString::from(format!("gear-agent-{host}")), if shown { "Shown below" } else { "Show" })
+.small()
+.on_click(cx.listener(move |this, _, w, cx| this.show_gear_agent(pick.clone(), w, cx)))
+.into_any_element())
                         .into_any_element(),
                     cx,
                 )
@@ -147,18 +143,19 @@ impl BenchApp {
                     })
                     .into_any_element(),
             );
-            return Self::providers_page(page);
+            return bench_ui::settings_page("settings", page);
         }
 
         // ---- custom endpoints ----
         page.push(
-            self.pv_heading(
+            bench_ui::settings_heading(
                 // One model for every thread of this agent's projects: the main one and the
                 // fallback below.
                 format!(
                     "MODELS · {} · its projects",
                     Self::agent_name(&self.gear_agent)
                 ),
+                vec![],
                 cx,
             )
             .into_any_element(),
@@ -186,36 +183,37 @@ impl BenchApp {
                 None => "If the server asks for one".into(),
             };
             let armed = saved && self.providers.armed.as_deref() == Some(e.id.as_str());
-            let mut actions = vec![self.pv_button(
-                ("ep-delete", i),
-                if armed { "Confirm delete" } else { "Delete" },
-                false,
-                cx,
-                Box::new(move |this, w, cx| this.delete_endpoint(i, w, cx)),
-            )];
-            actions.push(self.pv_button(
-                ("ep-check", i),
-                "Check",
-                false,
-                cx,
-                Box::new(move |this, w, cx| this.check_endpoint(i, w, cx)),
-            ));
+            let mut actions = vec![
+                bench_ui::secondary_button(
+                    ("ep-delete", i),
+                    if armed { "Confirm delete" } else { "Delete" },
+                )
+                .small()
+                .on_click(cx.listener(move |this, _, w, cx| this.delete_endpoint(i, w, cx)))
+                .into_any_element(),
+            ];
+            actions.push(
+                bench_ui::secondary_button(("ep-check", i), "Check")
+                    .small()
+                    .on_click(cx.listener(move |this, _, w, cx| this.check_endpoint(i, w, cx)))
+                    .into_any_element(),
+            );
             if saved && !current {
-                actions.push(self.pv_button(
-                    ("ep-default", i),
-                    "Make main",
-                    false,
-                    cx,
-                    Box::new(move |this, w, cx| this.make_endpoint_default(i, w, cx)),
-                ));
+                actions.push(
+                    bench_ui::secondary_button(("ep-default", i), "Make main")
+                        .small()
+                        .on_click(
+                            cx.listener(move |this, _, w, cx| this.make_endpoint_default(i, w, cx)),
+                        )
+                        .into_any_element(),
+                );
             }
-            actions.push(self.pv_button(
-                ("ep-save", i),
-                "Save",
-                true,
-                cx,
-                Box::new(move |this, w, cx| this.save_endpoint(i, w, cx)),
-            ));
+            actions.push(
+                bench_ui::primary_button(("ep-save", i), "Save")
+                    .small()
+                    .on_click(cx.listener(move |this, _, w, cx| this.save_endpoint(i, w, cx)))
+                    .into_any_element(),
+            );
             page.push(
                 v_flex()
                     .pt_3()
@@ -239,27 +237,42 @@ impl BenchApp {
                                 )
                             }),
                     )
-                    .child(self.pv_row("Name", "How it is listed", self.pv_input(&name), cx))
-                    .child(self.pv_row(
+                    .child(bench_ui::settings_field(
+                        "Name",
+                        "How it is listed",
+                        gpui_kit::component::input::Input::new(&name).into_any_element(),
+                        cx,
+                    ))
+                    .child(bench_ui::settings_field(
                         "Address",
                         "OpenAI-compatible, ends in /v1",
-                        self.pv_input(&url),
+                        gpui_kit::component::input::Input::new(&url).into_any_element(),
                         cx,
                     ))
-                    .child(self.pv_row(
+                    .child(bench_ui::settings_field(
                         "Default model",
                         "The model it serves first",
-                        self.pv_input(&model),
+                        gpui_kit::component::input::Input::new(&model).into_any_element(),
                         cx,
                     ))
-                    .child(self.pv_row("Context length", "Tokens", self.pv_input(&context), cx))
-                    .child(self.pv_row(
+                    .child(bench_ui::settings_field(
+                        "Context length",
+                        "Tokens",
+                        gpui_kit::component::input::Input::new(&context).into_any_element(),
+                        cx,
+                    ))
+                    .child(bench_ui::settings_field(
                         "Parallel requests",
                         "How many its server answers at once; subagents keep to it",
-                        self.pv_input(&parallel),
+                        gpui_kit::component::input::Input::new(&parallel).into_any_element(),
                         cx,
                     ))
-                    .child(self.pv_row("API key", key_hint, self.pv_input(&key), cx))
+                    .child(bench_ui::settings_field(
+                        "API key",
+                        key_hint,
+                        gpui_kit::component::input::Input::new(&key).into_any_element(),
+                        cx,
+                    ))
                     .child(
                         h_flex()
                             .py_2()
@@ -292,7 +305,7 @@ impl BenchApp {
         );
 
         // ---- fallback ----
-        page.push(self.pv_heading("FALLBACK", cx).into_any_element());
+        page.push(bench_ui::settings_heading("FALLBACK", vec![], cx).into_any_element());
         let current = self.providers.fallback.clone();
         let label = current
             .as_ref()
@@ -340,7 +353,7 @@ impl BenchApp {
                 menu
             });
         page.push(
-            self.pv_row(
+            bench_ui::settings_field(
                 "Fallback model",
                 "Answers when the main model fails or goes silent",
                 h_flex().child(picker).into_any_element(),
@@ -361,74 +374,88 @@ impl BenchApp {
                 v.tts_voice.clone(),
             );
             page.push(
-                self.pv_heading("VOICE · OPENAI-COMPATIBLE SERVERS", cx)
+                bench_ui::settings_heading("VOICE · OPENAI-COMPATIBLE SERVERS", vec![], cx)
                     .into_any_element(),
             );
             page.push(
-                self.pv_row(
+                bench_ui::settings_field(
                     "Speech to text",
                     "Address of the server",
-                    self.pv_input(&v.0),
+                    gpui_kit::component::input::Input::new(&v.0).into_any_element(),
                     cx,
                 )
                 .into_any_element(),
             );
             page.push(
-                self.pv_row("Model", "", self.pv_input(&v.1), cx)
-                    .into_any_element(),
+                bench_ui::settings_field(
+                    "Model",
+                    "",
+                    gpui_kit::component::input::Input::new(&v.1).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
             );
             page.push(
-                self.pv_row(
+                bench_ui::settings_field(
                     "Language",
                     "e.g. en, ru; empty = auto",
-                    self.pv_input(&v.2),
+                    gpui_kit::component::input::Input::new(&v.2).into_any_element(),
                     cx,
                 )
                 .into_any_element(),
             );
             page.push(
-                self.pv_row(
+                bench_ui::settings_field(
                     "API key",
                     "If the server asks for one",
-                    self.pv_input(&v.3),
+                    gpui_kit::component::input::Input::new(&v.3).into_any_element(),
                     cx,
                 )
                 .into_any_element(),
             );
             page.push(
-                self.pv_row(
+                bench_ui::settings_field(
                     "Text to speech",
                     "Address of the server",
-                    self.pv_input(&v.4),
+                    gpui_kit::component::input::Input::new(&v.4).into_any_element(),
                     cx,
                 )
                 .into_any_element(),
             );
             page.push(
-                self.pv_row("Model", "", self.pv_input(&v.5), cx)
-                    .into_any_element(),
+                bench_ui::settings_field(
+                    "Model",
+                    "",
+                    gpui_kit::component::input::Input::new(&v.5).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
             );
             page.push(
-                self.pv_row("Voice", "", self.pv_input(&v.6), cx)
-                    .into_any_element(),
+                bench_ui::settings_field(
+                    "Voice",
+                    "",
+                    gpui_kit::component::input::Input::new(&v.6).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
             );
             page.push(
                 h_flex()
                     .py_2()
                     .child(div().flex_1())
-                    .child(self.pv_button(
-                        "voice-save",
-                        "Save",
-                        true,
-                        cx,
-                        Box::new(|this, w, cx| this.save_voice(w, cx)),
-                    ))
+                    .child(
+                        bench_ui::primary_button("voice-save", "Save")
+                            .small()
+                            .on_click(cx.listener(|this, _, w, cx| this.save_voice(w, cx)))
+                            .into_any_element(),
+                    )
                     .into_any_element(),
             );
         }
 
         // No list of keys here: each key is set on the card or MCP server that reads it.
-        Self::providers_page(page)
+        bench_ui::settings_page("settings", page)
     }
 }
 

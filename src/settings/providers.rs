@@ -433,9 +433,7 @@ impl BenchApp {
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn| {
-                rest::merge_config(conn, json!({"fallback_providers": list}))
-            },
+            move |conn| rest::merge_config(conn, json!({"fallback_providers": list})),
             |this, r, window, cx| match r {
                 Ok(()) => this.load_agent_settings(window, cx),
                 Err(e) => this.toast(
@@ -449,7 +447,9 @@ impl BenchApp {
     }
 
     pub fn save_voice(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(v) = &self.providers.voice else { return };
+        let Some(v) = &self.providers.voice else {
+            return;
+        };
         let mut stt = json!({
             "base_url": text(&v.stt_url, cx),
             "model": text(&v.stt_model, cx),

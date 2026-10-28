@@ -50,6 +50,18 @@ pub fn field_row(label: impl Into<SharedString>, field: impl IntoElement, cx: &A
         .child(div().flex_1().max_w(px(560.)).child(field))
 }
 
+/// A settings page: its rows and headings, scrolled, as far from the edges as the thread's avatar.
+pub fn settings_page(id: &'static str, rows: Vec<AnyElement>) -> AnyElement {
+    v_flex()
+        .id(id)
+        .size_full()
+        .overflow_y_scroll()
+        .px(px(crate::metrics::CHAT_LEFT))
+        .pb(px(crate::metrics::CHAT_LEFT))
+        .child(v_flex().flex_1().children(rows))
+        .into_any_element()
+}
+
 /// The left column of a settings page's field: its title and hint.
 pub const SETTING_LABEL_W: f32 = 220.;
 

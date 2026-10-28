@@ -4,6 +4,7 @@
 //! the agent there on connecting. Removing it only forgets it here: the agent on the server runs
 //! on, its Telegram bot and schedule with it.
 
+use gpui_kit::component::Sizable as _;
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, h_flex};
@@ -182,13 +183,12 @@ impl BenchApp {
             return vec![
                 h_flex()
                     .py_2()
-                    .child(self.pv_button(
-                        "gear-agent-add",
-                        "+ Agent on a server",
-                        false,
-                        cx,
-                        Box::new(|this, w, cx| this.open_agent_form(w, cx)),
-                    ))
+                    .child(
+                        bench_ui::secondary_button("gear-agent-add", "+ Agent on a server")
+                            .small()
+                            .on_click(cx.listener(|this, _, w, cx| this.open_agent_form(w, cx)))
+                            .into_any_element(),
+                    )
                     .into_any_element(),
             ];
         };
@@ -220,7 +220,7 @@ impl BenchApp {
             },
         );
         let mut out = vec![
-            self.pv_row(
+            bench_ui::settings_field(
                 "Server",
                 "A host from ~/.ssh/config, or a new one",
                 h_flex().flex_wrap().child(pick).into_any_element(),
@@ -236,16 +236,21 @@ impl BenchApp {
                 ("Key file", "Empty: ssh-agent", &key),
             ] {
                 out.push(
-                    self.pv_row(title, hint, self.pv_input(input), cx)
-                        .into_any_element(),
+                    bench_ui::settings_field(
+                        title,
+                        hint,
+                        gpui_kit::component::input::Input::new(input).into_any_element(),
+                        cx,
+                    )
+                    .into_any_element(),
                 );
             }
         }
         out.push(
-            self.pv_row(
+            bench_ui::settings_field(
                 "Name",
                 "Its project in the sidebar",
-                self.pv_input(&name),
+                gpui_kit::component::input::Input::new(&name).into_any_element(),
                 cx,
             )
             .into_any_element(),
@@ -263,23 +268,21 @@ impl BenchApp {
                 .pt_3()
                 .pb_2()
                 .gap_2()
-                .child(self.pv_button(
-                    "gear-agent-save",
-                    "Add agent",
-                    true,
-                    cx,
-                    Box::new(|this, w, cx| this.add_agent(w, cx)),
-                ))
-                .child(self.pv_button(
-                    "gear-agent-cancel",
-                    "Cancel",
-                    false,
-                    cx,
-                    Box::new(|this, _, cx| {
-                        this.agent_form = None;
-                        cx.notify();
-                    }),
-                ))
+                .child(
+                    bench_ui::primary_button("gear-agent-save", "Add agent")
+                        .small()
+                        .on_click(cx.listener(|this, _, w, cx| this.add_agent(w, cx)))
+                        .into_any_element(),
+                )
+                .child(
+                    bench_ui::secondary_button("gear-agent-cancel", "Cancel")
+                        .small()
+                        .on_click(cx.listener(|this, _, _, cx| {
+                            this.agent_form = None;
+                            cx.notify();
+                        }))
+                        .into_any_element(),
+                )
                 .into_any_element(),
         );
         out

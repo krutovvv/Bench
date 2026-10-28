@@ -3,6 +3,7 @@
 //! This Mac's agent keeps them; the gear's Presets tab edits them; a project on a server gets the
 //! finished spec from here.
 
+use gpui_kit::component::Sizable as _;
 use gpui_kit::component::input::EditorState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, h_flex};
@@ -186,7 +187,9 @@ impl BenchApp {
                     "offered in a project's Model section and the composer".into(),
                 )],
             };
-            out.push(self.pv_heading(title.to_uppercase(), cx).into_any_element());
+            out.push(
+                bench_ui::settings_heading(title.to_uppercase(), vec![], cx).into_any_element(),
+            );
             for (name, note) in lines {
                 out.push(
                     h_flex()
@@ -223,43 +226,57 @@ impl BenchApp {
                         h_flex()
                             .py_2()
                             .gap_2()
-                            .child(self.pv_button(
-                                SharedString::from(format!("preset-save-{kind}")),
-                                "Save",
-                                true,
-                                cx,
-                                Box::new(|this, w, cx| this.save_presets(false, w, cx)),
-                            ))
-                            .child(self.pv_button(
-                                SharedString::from(format!("preset-reset-{kind}")),
-                                "Built-in",
-                                false,
-                                cx,
-                                Box::new(|this, w, cx| this.save_presets(true, w, cx)),
-                            ))
-                            .child(self.pv_button(
-                                SharedString::from(format!("preset-cancel-{kind}")),
-                                "Cancel",
-                                false,
-                                cx,
-                                Box::new(|this, _, cx| {
+                            .child(
+                                bench_ui::primary_button(
+                                    SharedString::from(format!("preset-save-{kind}")),
+                                    "Save",
+                                )
+                                .small()
+                                .on_click(
+                                    cx.listener(|this, _, w, cx| this.save_presets(false, w, cx)),
+                                )
+                                .into_any_element(),
+                            )
+                            .child(
+                                bench_ui::secondary_button(
+                                    SharedString::from(format!("preset-reset-{kind}")),
+                                    "Built-in",
+                                )
+                                .small()
+                                .on_click(
+                                    cx.listener(|this, _, w, cx| this.save_presets(true, w, cx)),
+                                )
+                                .into_any_element(),
+                            )
+                            .child(
+                                bench_ui::secondary_button(
+                                    SharedString::from(format!("preset-cancel-{kind}")),
+                                    "Cancel",
+                                )
+                                .small()
+                                .on_click(cx.listener(|this, _, _, cx| {
                                     this.preset_editor = None;
                                     cx.notify();
-                                }),
-                            ))
+                                }))
+                                .into_any_element(),
+                            )
                             .into_any_element(),
                     );
                 }
                 None => out.push(
                     h_flex()
                         .py_2()
-                        .child(self.pv_button(
-                            SharedString::from(format!("preset-edit-{kind}")),
-                            "Edit",
-                            false,
-                            cx,
-                            Box::new(move |this, w, cx| this.edit_presets(kind, w, cx)),
-                        ))
+                        .child(
+                            bench_ui::secondary_button(
+                                SharedString::from(format!("preset-edit-{kind}")),
+                                "Edit",
+                            )
+                            .small()
+                            .on_click(
+                                cx.listener(move |this, _, w, cx| this.edit_presets(kind, w, cx)),
+                            )
+                            .into_any_element(),
+                        )
                         .into_any_element(),
                 ),
             }
