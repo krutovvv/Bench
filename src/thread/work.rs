@@ -27,7 +27,7 @@ impl ThreadView {
         holds: &[Hold],
         plan: Option<&(String, Vec<PlanStep>)>,
         asks: &[AskCard],
-        procs: bool,
+        processes: &[::thread::Process],
         // The answer this work leads to, when the run has ended: its read-aloud and copy
         // ride this line's far edge, the exact place Pause and Stop held while the run
         // lived — standing there from the start, shown on hover.
@@ -290,8 +290,8 @@ impl ThreadView {
                 .border_color(theme.border)
                 .children(items)
         });
-        // The plan and the questions this work wrote, under its steps; the live work also
-        // carries the background processes it started.
+        // The plan, the questions and the background processes this work's calls made, under
+        // its steps.
         // A call of this work waiting for the person's approval: its card joins the questions.
         // The request is live state (the call is the journal's): it is asked again after a restart.
         let approval = self.thread.approval.as_ref().filter(|a| {
@@ -317,9 +317,7 @@ impl ThreadView {
             }))
             .collect();
         let mut artifacts = self.render_work_artifacts(plan, &asks, cx);
-        if procs {
-            artifacts.extend(self.processes_frame(cx));
-        }
+        artifacts.extend(self.processes_frame(key, processes, cx));
         // Work that only asked or only planned has no "N actions" line to open: the cards are it.
         let no_steps = steps.is_empty() && !live;
         speaker_row(

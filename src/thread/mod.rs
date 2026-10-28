@@ -78,14 +78,16 @@ impl ThreadView {
             self.thread.tv.list.remeasure_items(end..end + 1);
             window.request_animation_frame();
         }
-        // A live run's clock moves once a second.
-        if self.thread.journal.running() && self.thread.tv.ticker.is_none() {
+        // A live run's clock moves once a second, and so does a running background process's,
+        // which outlives the run.
+        let ticking = |t: &::thread::Thread| t.running() || t.processes_running();
+        if ticking(&self.thread.journal) && self.thread.tv.ticker.is_none() {
             self.thread.tv.ticker = Some(cx.spawn(async move |this, cx| {
                 loop {
                     cx.background_executor().timer(Duration::from_secs(1)).await;
                     let Ok(running) = this.update(cx, |this, cx| {
                         cx.notify();
-                        this.thread.journal.running()
+                        ticking(&this.thread.journal)
                     }) else {
                         break;
                     };
@@ -459,6 +461,7 @@ impl ThreadView {
                 holds,
                 plan,
                 asks,
+                processes,
             } => self.render_work(
                 &key,
                 &steps,
@@ -468,7 +471,7 @@ impl ThreadView {
                 &holds,
                 plan.as_ref(),
                 &asks,
-                live && !self.thread.processes.is_empty(),
+                &processes,
                 // The answer that follows this work: its read-aloud and copy ride this
                 // line's far edge — the very place Pause and Stop held while the run lived.
                 match self.thread.tv.rows.get(k + 1) {

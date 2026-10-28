@@ -116,12 +116,7 @@ pub enum Cmd {
     Catalog {
         profile: String,
     },
-    /// The session's background processes (polled while it is open).
-    Processes {
-        profile: String,
-        session: String,
-    },
-    /// Stop one of them.
+    /// Stop a background process of the session.
     KillProcess {
         profile: String,
         session: String,
@@ -151,8 +146,6 @@ pub enum Cmd {
 
 pub enum Evt {
     Catalog(Vec<crate::app::model::SlashCommand>),
-    /// (runtime session, its background processes)
-    Processes(String, Vec<crate::app::model::BgProcess>),
     /// A slash command ran: either it printed something, or it wants a prompt sent.
     Dispatched {
         session: String,
@@ -226,8 +219,7 @@ impl Evt {
     /// its stored id — its history, its creation, its inserts).
     pub fn runtime(&self) -> Option<&str> {
         match self {
-            Evt::Processes(s, _)
-            | Evt::ClarifyDone(s)
+            Evt::ClarifyDone(s)
             | Evt::Speed(s, _)
             | Evt::ApprovalDone(s)
             | Evt::Effort(s, _)

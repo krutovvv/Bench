@@ -34,10 +34,9 @@ pub struct ActiveThread {
     pub queued: Option<(String, String)>,
     /// The "Changed files" list under the last turn is unfolded (folded by default).
     pub files_open: bool,
-    /// The open session's background processes (`thread/processes.rs`), the card's fold, and
+    /// The works whose background processes' card is unfolded (`thread/processes.rs`), and
     /// the process whose output is shown.
-    pub processes: Vec<crate::app::model::BgProcess>,
-    pub processes_open: bool,
+    pub processes_open: HashSet<String>,
     pub process_open: Option<String>,
     pub usage: Option<Usage>,
     /// The fallback model is answering the open thread: (its model, why the main one failed).
@@ -78,8 +77,7 @@ impl Default for ActiveThread {
             live: None,
             queued: None,
             files_open: false,
-            processes: Vec::new(),
-            processes_open: false,
+            processes_open: HashSet::new(),
             process_open: None,
             usage: None,
             fallback_on: None,
@@ -191,19 +189,6 @@ impl ActiveThread {
                 }
             }
             Evt::Usage(_, usage) => self.usage = Some(usage.clone()),
-            // Running ones first, then the newest.
-            Evt::Processes(_, list) => {
-                let mut list = list.clone();
-                list.sort_by(|a, b| {
-                    b.running.cmp(&a.running).then(
-                        b.started
-                            .unwrap_or(0.)
-                            .partial_cmp(&a.started.unwrap_or(0.))
-                            .unwrap_or(std::cmp::Ordering::Equal),
-                    )
-                });
-                self.processes = list;
-            }
             Evt::Complete { .. } => self.live = None,
             _ => {}
         }

@@ -16,7 +16,6 @@ mod threads;
 
 pub use env::{env, file_head, file_problems, file_text, ignored, listing};
 pub use inserts::terminal;
-pub use threads::processes;
 
 use inserts::other_modes;
 use journal::*;
@@ -176,7 +175,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 "/Users/demo/code/storefront/src/components/SignupForm.tsx",
                 "@@ -30,6 +30,4 @@\n-  <Field name=\"companySize\" />\n-  <Field name=\"phone\" />\n",
             ),
-            tool("bash", "npm run dev -- --port 5173"),
+            tool("process", "npm run dev -- --port 5173"),
             tool("web_fetch", "https://www.nngroup.com/articles/landing-page-guidelines/"),
             tool("web_fetch", "https://developer.mozilla.org/en-US/docs/Web/Performance"),
             tool("execute_code", "chart of weekly signups"),
@@ -186,6 +185,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         now - 312.0,
         252.0,
     );
+    journal.started(threads::processes(now));
     let landing = journal.thread();
     if std::env::var("BENCH_DEMO").as_deref() == Ok("top") {
         if let Some(::thread::Row::Work { key, .. }) = landing
@@ -287,7 +287,6 @@ fewer form fields. Then check what it did to signups and give me a short summary
         open_thread(app, cx, |t| {
             t.session = Some("d-landing".into());
             t.journal = journal.thread();
-            t.processes.clear();
         });
     }
     // `BENCH_DEMO_JUMP=1`: "Jump to latest" pressed two seconds after opening.
@@ -396,12 +395,6 @@ fewer form fields. Then check what it did to signups and give me a short summary
             t.journal = Default::default();
         });
     }
-    let procs = if open.is_some() {
-        Vec::new()
-    } else {
-        processes(now)
-    };
-    open_thread(app, cx, |t| t.processes = procs);
     open_thread(app, cx, |t| {
         t.usage = Some(Usage {
             model: "Qwen3.8-Next-Flash".into(),

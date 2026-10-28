@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use protocol::{Hold, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
+use protocol::{Hold, Process, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
 use serde_json::{Map, Value};
 
 use crate::rows::{Row, rows_of};
@@ -24,6 +24,8 @@ pub struct Thread {
     running: bool,
     /// The live run's holds (the person's pauses); the last one open while it stands held.
     holds: Vec<Hold>,
+    /// The background processes, as their last record said (`thread.process`).
+    processes: Vec<Process>,
     /// The answer being written: (reasoning, text).
     stream: (String, String),
     /// Words the model wrote while working, whose message went on to call a tool: narration,
@@ -47,6 +49,7 @@ impl Thread {
             inserts: o.inserts,
             running: o.running,
             holds: o.holds,
+            processes: o.processes,
             head: o.head,
             ..Default::default()
         };
@@ -61,6 +64,7 @@ impl Thread {
         self.inserts = o.inserts;
         self.running = o.running;
         self.holds = o.holds;
+        self.processes = o.processes;
         if !o.running {
             self.stream = Default::default();
         }
@@ -104,6 +108,10 @@ impl Thread {
                 }
             }
             ThreadEvent::Holds(h) => self.holds = h,
+            ThreadEvent::Process(p) => match self.processes.iter_mut().find(|x| x.id == p.id) {
+                Some(x) => *x = p,
+                None => self.processes.push(p),
+            },
         }
         self.version += 1;
     }
@@ -179,6 +187,7 @@ impl Thread {
             &self.sent,
             &self.queue,
             &self.sent_queue,
+            &self.processes,
         )
     }
 
@@ -191,6 +200,13 @@ impl Thread {
             .count()
             + self.sent.len()
             + self.queue.len()
+    }
+
+    /// Whether a background process of the thread still runs.
+    pub fn processes_running(&self) -> bool {
+        self.processes
+            .iter()
+            .any(|p| p.state == protocol::ProcessState::Running)
     }
 
     pub fn running(&self) -> bool {

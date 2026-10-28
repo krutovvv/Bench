@@ -3,7 +3,7 @@
 
 use crate::app::model::SessionRow;
 use ::thread::Thread;
-use protocol::{ThreadItem, ThreadOpen};
+use protocol::{Process, ThreadItem, ThreadOpen};
 use serde_json::{Value, json};
 
 pub(super) fn demo_file(name: &str) -> String {
@@ -65,6 +65,7 @@ pub(super) fn edit(path: &str, diff: &str) -> Call {
 pub(super) struct Journal {
     items: Vec<ThreadItem>,
     seq: u64,
+    processes: Vec<Process>,
 }
 
 impl Journal {
@@ -140,9 +141,23 @@ impl Journal {
         });
     }
 
+    /// Background processes, each at the next `process` call of the journal, in order.
+    pub(super) fn started(&mut self, processes: Vec<Process>) {
+        let calls = self.items.iter().filter_map(|it| match it {
+            ThreadItem::Tool { call_id, name, .. } if name == "process" => Some(call_id.clone()),
+            _ => None,
+        });
+        self.processes = processes
+            .into_iter()
+            .zip(calls)
+            .map(|(p, call_id)| Process { call_id, ..p })
+            .collect();
+    }
+
     pub(super) fn thread(self) -> Thread {
         Thread::open(ThreadOpen {
             items: self.items,
+            processes: self.processes,
             ..Default::default()
         })
     }

@@ -11,7 +11,7 @@ use crate::client::connection;
 use crate::client::rest;
 use crate::client::rpc::Cmd;
 
-use crate::app::{BenchApp, now_secs};
+use crate::app::BenchApp;
 use crate::workspace::Center;
 
 impl BenchApp {
@@ -99,16 +99,10 @@ impl BenchApp {
             self.thread_cache.remove(&id)
         };
         let project = self.project_of_session(&id);
-        let processes = if self.demo && id == "d-landing" {
-            crate::demo::processes(now_secs())
-        } else {
-            Vec::new()
-        };
         self.active_thread.update(cx, |v, cx| {
             v.thread.session = Some(id.clone());
             v.thread.journal = journal.unwrap_or_default();
             v.thread.thread_project = project;
-            v.thread.processes = processes;
             cx.notify();
         });
         if self.demo {

@@ -201,22 +201,6 @@ pub fn source_label(source: &str) -> String {
     }
 }
 
-/// A background process the agent started in a session (`process.list`).
-#[derive(Clone, Debug, PartialEq)]
-pub struct BgProcess {
-    pub id: String,
-    pub command: String,
-    pub running: bool,
-    pub exit_code: Option<i64>,
-    /// Unix seconds.
-    pub started: Option<f64>,
-    pub exited: Option<f64>,
-    /// Why it ended, when the agent says (e.g. killed, timeout).
-    pub reason: Option<String>,
-    /// The last part of its output.
-    pub tail: String,
-}
-
 /// A slash command from the gateway's catalog, a saved prompt, or a tool to attach to the
 /// thread (`/tasks today`).
 #[derive(Clone, Debug, Default)]

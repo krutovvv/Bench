@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use protocol::{Hold, PlanStep, QueuedItem, ThreadItem};
+use protocol::{Hold, PlanStep, Process, QueuedItem, ThreadItem};
 use serde_json::{Map, Value};
 
 use crate::state::Pressed;
@@ -33,6 +33,9 @@ pub enum Row {
         plan: Option<(String, Vec<PlanStep>)>,
         /// The agent's questions put in this work, settled or still waiting.
         asks: Vec<AskCard>,
+        /// The background processes its calls started, running or ended: they stay at their
+        /// call, whatever came after.
+        processes: Vec<Process>,
     },
     /// What the agent said: its answer.
     Answer {
@@ -125,7 +128,8 @@ impl Step {
 }
 
 /// Every row stands on a journal item; the plan and the questions are the agent's own calls
-/// (`todo`, `clarify`) inside the work that made them (docs/thread-objects.md).
+/// (`todo`, `clarify`) inside the work that made them, and so are the background processes,
+/// at the `process` call that started each (docs/thread-objects.md).
 pub(crate) fn rows_of(
     log: &[ThreadItem],
     inserts: &Map<String, Value>,
@@ -136,6 +140,7 @@ pub(crate) fn rows_of(
     sent: &[Pressed],
     queue: &[QueuedItem],
     sent_queue: &[Pressed],
+    processes: &[Process],
 ) -> Vec<Row> {
     // A question's answer is its call's result, which comes later in the journal.
     let asked: HashMap<&str, &str> = log
@@ -168,6 +173,7 @@ pub(crate) fn rows_of(
             holds: vec![],
             plan: None,
             asks: vec![],
+            processes: vec![],
         });
         if let Row::Work {
             steps, from, to, ..
@@ -193,6 +199,7 @@ pub(crate) fn rows_of(
             holds: vec![],
             plan: None,
             asks: vec![],
+            processes: vec![],
         });
         put(w);
     };
@@ -405,7 +412,29 @@ pub(crate) fn rows_of(
             holds: holds.to_vec(),
             plan: None,
             asks: vec![],
+            processes: vec![],
         });
+    }
+    if !processes.is_empty() {
+        for row in &mut rows {
+            if let Row::Work {
+                steps,
+                processes: mine,
+                ..
+            } = row
+            {
+                mine.extend(
+                    processes
+                        .iter()
+                        .filter(|p| {
+                            steps.iter().any(
+                                |s| matches!(s, Step::Tool { call_id, .. } if *call_id == p.call_id),
+                            )
+                        })
+                        .cloned(),
+                );
+            }
+        }
     }
     if running && !stream.1.is_empty() {
         rows.push(Row::Writing {

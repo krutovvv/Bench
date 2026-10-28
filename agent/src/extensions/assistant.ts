@@ -14,6 +14,7 @@ import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
 import { clarify, sessionSearch, todo } from "../builtin/ask.ts";
 import { CronTask, cronTool } from "../builtin/cron.ts";
+import { ProcessTask, processTool } from "../builtin/process.ts";
 import { memoryTool } from "../builtin/memory.ts";
 import { skillManage, skillView } from "../builtin/skills.ts";
 import { delegate } from "../builtin/subagent.ts";
@@ -87,8 +88,8 @@ const Coding = createCodingTools({ images });
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun],
-	tasks: [CronTask],
+	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, processTool],
+	tasks: [CronTask, ProcessTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),
 		section("environment", s(environment)),

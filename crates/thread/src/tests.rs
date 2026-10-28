@@ -1,4 +1,6 @@
-use protocol::{PlanStep, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen};
+use protocol::{
+    PlanStep, Process, ProcessState, QueuedItem, StreamKind, ThreadEvent, ThreadItem, ThreadOpen,
+};
 use serde_json::json;
 
 use crate::{Row, Step, Thread};
@@ -337,6 +339,66 @@ fn rule_1_the_question_lives_in_the_work_that_asked_it() {
         ..Default::default()
     });
     assert_eq!(kinds(&t3.rows()), ["user:go", "work:1·a1q1"]);
+}
+
+fn process(id: &str, call: &str, state: ProcessState) -> Process {
+    Process {
+        id: id.into(),
+        call_id: call.into(),
+        command: "npm run dev".into(),
+        state,
+        ..Default::default()
+    }
+}
+
+fn processes_of(row: &Row) -> Vec<(String, ProcessState)> {
+    match row {
+        Row::Work { processes, .. } => processes.iter().map(|p| (p.id.clone(), p.state)).collect(),
+        _ => vec![],
+    }
+}
+
+#[test]
+fn rule_1_a_process_lives_at_the_call_that_started_it() {
+    let mut t = Thread::open(ThreadOpen {
+        items: vec![
+            user(1, "serve it"),
+            tool(2, 0, "p1"),
+            text(3, 0, "Running."),
+            user(4, "now the docs"),
+            tool(5, 0, "x"),
+        ],
+        processes: vec![process("7", "p1", ProcessState::Running)],
+        running: true,
+        ..Default::default()
+    });
+    let rows = t.rows();
+    let keys: Vec<String> = rows.iter().map(|r| r.key().to_string()).collect();
+    assert_eq!(
+        processes_of(&rows[1]),
+        [("7".into(), ProcessState::Running)]
+    );
+    assert!(
+        processes_of(&rows[4]).is_empty(),
+        "later work does not take it"
+    );
+    assert!(t.processes_running());
+    // It ends: the card changes where it stands, and nothing moves.
+    t.apply(ThreadEvent::Process(process(
+        "7",
+        "p1",
+        ProcessState::Restarted,
+    )));
+    let rows = t.rows();
+    assert_eq!(
+        rows.iter().map(|r| r.key().to_string()).collect::<Vec<_>>(),
+        keys
+    );
+    assert_eq!(
+        processes_of(&rows[1]),
+        [("7".into(), ProcessState::Restarted)]
+    );
+    assert!(!t.processes_running());
 }
 
 #[test]

@@ -33,7 +33,6 @@ pub(super) enum Pending {
     Delete,
     Catalog,
     /// `process.list` for this runtime session.
-    Processes(String),
     Dispatch(String),
     Ignore,
 }
@@ -177,11 +176,6 @@ impl Rpc {
                 "commands.catalog",
                 json!({"profile": profile}),
                 Pending::Catalog,
-            )?,
-            Cmd::Processes { profile, session } => self.call(
-                "process.list",
-                json!({"session_id": session, "profile": profile}),
-                Pending::Processes(session),
             )?,
             Cmd::KillProcess {
                 profile,
@@ -333,7 +327,6 @@ pub(super) fn run(
                     Pending::Create => emit(Evt::CreateFailed(text)),
                     Pending::Resume(session, _) => emit(Evt::ResumeFailed(session, text)),
                     // A poll every few seconds: logged above, never a toast.
-                    Pending::Processes(_) => {}
                     // The thread itself could not be read: said where it would show.
                     Pending::Thread { session, .. } => emit(Evt::ResumeFailed(session, text)),
                     // A close of a session the gateway already dropped is not worth a toast.

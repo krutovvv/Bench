@@ -22,6 +22,8 @@ import { AGENT_HOME, agents, compactionAt, compactionPolicy, getSetting, readCon
 import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
+import { PROCESS_KIND, processOf } from "./builtin/process.ts";
+import type { Process } from "./protocol.gen.ts";
 import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, compactionsOf, FAIL_KIND, itemsOfAll, preview, queueOf, Requests, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
 import { ensureMcp } from "./mcp.ts";
@@ -745,6 +747,8 @@ export class Runtime {
 			adopt: (conversationId, sessionId) => void this.adopted.set(String(conversationId), sessionId),
 			// A subagent's call waits on its parent's hold too: the person holds the whole work.
 			hold: (sessionId, signal) => this.hold(sessionId, signal),
+			processes: (conversationId) => this.processes(conversationId),
+			stopProcess: (id) => this.stopProcess(id),
 			busyElsewhere: (sessionId) => [...this.live.values()].filter((l) => l.busy && l.row.id !== sessionId).length,
 			ask: async (sessionId, callId, question, choices, multiSelect, signal) => {
 				const live = await this.session(sessionId);
@@ -1035,6 +1039,7 @@ export class Runtime {
 				if (ch.append) this.emit(id, "thread.append", { items: ch.append });
 				if (ch.queue) this.emit(id, "thread.queue", { items: ch.queue });
 				if (ch.inserts) this.emit(id, "thread.inserts", { items: ch.inserts });
+				for (const p of ch.processes ?? []) this.emit(id, "thread.process", { process: p });
 			}
 		});
 	}
@@ -1044,7 +1049,7 @@ export class Runtime {
 	 * queue, the inserts' state, and whether a run is live. `head` is the last entry id: Bench asks
 	 * with `since: head` after a reconnect and gets only what it missed.
 	 */
-	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; holds: Hold[]; head: number }> {
+	async thread(id: string, since = 0): Promise<{ items: any[]; queue: any[]; inserts: Record<string, unknown>; running: boolean; holds: Hold[]; processes: Process[]; head: number }> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
 		const entries: any[] = [];
@@ -1079,8 +1084,29 @@ export class Runtime {
 			inserts: doc?.items ?? {},
 			running: live.busy,
 			holds: live.busy ? live.holds : [],
+			processes: await this.processes(live.conversation.id),
 			head,
 		};
+	}
+
+	/** A conversation's background processes, from Pi's task records (`builtin/process.ts`). */
+	async processes(conversationId: string | number): Promise<Process[]> {
+		const out: Process[] = [];
+		let cursor: any;
+		do {
+			const page = await this.storage.scanTasks({ conversationId: Number(conversationId), kind: PROCESS_KIND }, 200, cursor, ctx);
+			for (const rec of page.items) {
+				const p = processOf(rec);
+				if (p) out.push(p);
+			}
+			cursor = page.next;
+		} while (cursor);
+		return out;
+	}
+
+	/** Stop a background process: Pi aborts its task, and its `abort` commits how it ended. */
+	async stopProcess(id: string): Promise<void> {
+		await this.harness.abortTask(Number(id) as any, ctx);
 	}
 
 	pendingPrompts(id: string): any[] {

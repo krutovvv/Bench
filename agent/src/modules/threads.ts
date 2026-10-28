@@ -124,9 +124,12 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			rt.respond(session_id, prompt_id ?? request_id, String(choice ?? "deny"));
 			return { ok: true };
 		},
-		// Pi's bash has no background processes.
-		"process.list": () => ({ processes: [] }),
-		"process.kill": async () => ({ ok: true }),
+		// A background process ends by its own stop only (`builtin/process.ts`); Bench sees it
+		// end in the thread's `thread.process` events.
+		"process.kill": async ({ process_id }) => {
+			await rt.stopProcess(String(process_id));
+			return { ok: true };
+		},
 	},
 	routes: {
 		"GET /api/sessions": (req) => {

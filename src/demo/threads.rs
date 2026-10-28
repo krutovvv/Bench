@@ -3,7 +3,6 @@
 
 use super::journal::*;
 use crate::app::BenchApp;
-use crate::app::model::BgProcess;
 use protocol::ThreadItem;
 use serde_json::json;
 
@@ -203,15 +202,14 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
 }
 
 /// The landing page thread's dev server, still running.
-pub fn processes(now: f64) -> Vec<BgProcess> {
-    vec![BgProcess {
-        id: "p-1".into(),
+/// The dev server the landing thread's agent left running (`process start`).
+pub(super) fn processes(now: f64) -> Vec<::thread::Process> {
+    vec![::thread::Process {
+        id: "41".into(),
         command: "npm run dev -- --port 5173".into(),
-        running: true,
-        exit_code: None,
-        started: Some(now - 250.0),
-        exited: None,
-        reason: None,
+        state: ::thread::ProcessState::Running,
+        started: Some((now - 250.0) * 1000.),
         tail: "VITE v6.2  ready in 412 ms\n  ➜  Local:   http://localhost:5173/".into(),
+        ..Default::default()
     }]
 }

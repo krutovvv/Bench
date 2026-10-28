@@ -152,15 +152,6 @@ impl BenchApp {
                 }
             }
         });
-        // The open session's background processes, every 3 s (the gateway has no event for them).
-        let processes = cx.spawn(async move |this, cx| {
-            loop {
-                cx.background_executor().timer(Duration::from_secs(3)).await;
-                if this.update(cx, |this, cx| this.poll_processes(cx)).is_err() {
-                    break;
-                }
-            }
-        });
         // The gateway item in the status bar: its state and the last lines of its log, every 10 s
         // while connected. Both come from where this project's agent runs, so a project on a
         // server shows that server's gateway.
@@ -198,6 +189,6 @@ impl BenchApp {
                     .await;
             }
         });
-        vec![events, ticker, processes, backend]
+        vec![events, ticker, backend]
     }
 }

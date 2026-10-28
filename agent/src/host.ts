@@ -18,6 +18,8 @@ export interface SessionInfo {
 	inserts?: { id: string; key: string; state: Record<string, unknown> }[];
 }
 
+import type { Process } from "./protocol.gen.ts";
+
 export interface Host {
 	session(conversationId: string | number): SessionInfo | undefined;
 	/** Waits while the person holds the run at a step boundary; resolves at once when free.
@@ -33,6 +35,10 @@ export interface Host {
 	/** "once" | "session" | "always" | "deny". */
 	approve(sessionId: string, callId: string, command: string, description: string): Promise<string>;
 	emit(sessionId: string, type: string, payload: Record<string, unknown>): void;
+	/** The background processes of a conversation, oldest first (`builtin/process.ts`). */
+	processes(conversationId: string | number): Promise<Process[]>;
+	/** Stop a background process by its task id. */
+	stopProcess(id: string): Promise<void>;
 	search(query: string, limit: number, profile: string): { session_id: string; title: string; snippet: string; when: string }[];
 	/** Runs one prompt to its answer in a new session of this profile (cron jobs). */
 	run(profile: string, prompt: string, opts: { source: string; title?: string; cwd?: string }): Promise<{ sessionId: string; text: string }>;

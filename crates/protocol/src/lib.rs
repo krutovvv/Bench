@@ -239,9 +239,56 @@ pub struct ThreadOpen {
     /// stands held. Empty when no run lives.
     #[serde(default)]
     pub holds: Vec<Hold>,
+    /// The thread's background processes, each placed at the call that started it.
+    #[serde(default)]
+    pub processes: Vec<Process>,
     #[serde(default)]
     #[ts(type = "number")]
     pub head: u64,
+}
+
+/// A background process the agent started (`process start`): a Pi task of the conversation,
+/// read from its record. It stands in the work at the call `call_id`.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+pub struct Process {
+    /// The Pi task's id: what Stop names.
+    pub id: String,
+    pub call_id: String,
+    pub command: String,
+    pub state: ProcessState,
+    #[ts(optional, type = "number")]
+    #[serde(default)]
+    pub exit_code: Option<i64>,
+    /// ms, like an item's `at`.
+    #[ts(optional)]
+    #[serde(default)]
+    pub started: Option<f64>,
+    #[ts(optional)]
+    #[serde(default)]
+    pub ended: Option<f64>,
+    /// The last lines of its output.
+    #[serde(default)]
+    pub tail: String,
+    /// Why it could not run, when it failed.
+    #[ts(optional)]
+    #[serde(default)]
+    pub error: Option<String>,
+}
+
+/// Where a background process is.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "lowercase")]
+pub enum ProcessState {
+    #[default]
+    Running,
+    /// Its command ended by itself, with `exit_code`.
+    Exited,
+    /// The person or the agent stopped it.
+    Stopped,
+    /// The agent restarted while it ran: it ended with the agent and was not started again.
+    Restarted,
+    /// It could not run.
+    Failed,
 }
 
 /// A stretch of a run the person held (paused): `from` and `to` in ms like an item's `at`;
@@ -281,6 +328,8 @@ pub enum ThreadEvent {
     Run(bool),
     /// The person held the run or let it go on: the run's holds, whole.
     Holds(Vec<Hold>),
+    /// A background process started, wrote output or ended: its record, whole.
+    Process(Process),
 }
 
 impl ThreadEvent {
@@ -298,6 +347,9 @@ impl ThreadEvent {
             "thread.run" => ThreadEvent::Run(payload.get("running")?.as_bool()?),
             "thread.pause" => {
                 ThreadEvent::Holds(serde_json::from_value(payload.get("holds")?.clone()).ok()?)
+            }
+            "thread.process" => {
+                ThreadEvent::Process(serde_json::from_value(payload.get("process")?.clone()).ok()?)
             }
             _ => return None,
         })
@@ -368,6 +420,8 @@ pub fn typescript() -> String {
         QueuedItem::decl(),
         ThreadOpen::decl(),
         Hold::decl(),
+        Process::decl(),
+        ProcessState::decl(),
         StreamKind::decl(),
     ] {
         out.push_str("export ");

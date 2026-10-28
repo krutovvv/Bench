@@ -1,39 +1,18 @@
-//! The agent's background processes in the open session (`process.list`): polled every few
-//! seconds while a session is open, shown as a card inside the live work that started them,
-//! each one stoppable (`process.kill`) and with its latest output a click away.
+//! The agent's background processes (`process start`, Pi tasks of the conversation): a card in
+//! the work whose call started them, as their records come in `thread.process` events — running
+//! or ended, each one stoppable (`process.kill`) and with its latest output a click away.
 
 use gpui_kit::*;
 
 use super::ThreadView;
-use crate::app::BenchApp;
 use crate::client::rpc::Cmd;
 use crate::media::text::plain_text;
+use ::thread::{Process, ProcessState};
 use bench_ui::clock;
 use bench_ui::icons::Ico;
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
-
-impl BenchApp {
-    /// Ask the gateway again for the processes of the threads on screen (the poll).
-    pub(crate) fn poll_processes(&self, cx: &App) {
-        let Some(profile) = self.profile.clone() else {
-            return;
-        };
-        for view in self.thread_views() {
-            let at = view.read(cx).thread_ref();
-            if let Some(session) = at.runtime.clone() {
-                self.cmd_at(
-                    &at,
-                    Cmd::Processes {
-                        profile: profile.clone(),
-                        session,
-                    },
-                );
-            }
-        }
-    }
-}
 
 impl ThreadView {
     pub(crate) fn kill_process(&mut self, id: String, cx: &mut Context<Self>) {
@@ -46,7 +25,6 @@ impl ThreadView {
                 },
                 cx,
             );
-            self.cmd(Cmd::Processes { profile, session }, cx);
         }
         cx.notify();
     }
@@ -63,54 +41,63 @@ impl ThreadView {
 }
 
 impl ThreadView {
-    /// The background processes the agent started in this session, as a card of the work going
-    /// on: running or finished, each with Stop (while it runs) and its latest output a click
-    /// away. `None` when there are none, so the work row shows nothing.
-    pub(crate) fn processes_frame(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if self.thread.processes.is_empty() {
+    /// The background processes the calls of the work `work` started, as a card of that work:
+    /// running or ended, each with Stop (while it runs) and its latest output a click away.
+    /// `None` when there are none, so the work row shows nothing.
+    pub(crate) fn processes_frame(
+        &self,
+        work: &str,
+        processes: &[Process],
+        cx: &mut Context<Self>,
+    ) -> Option<AnyElement> {
+        if processes.is_empty() {
             return None;
         }
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        // Times are ms, like the journal's.
         let now = web_time::SystemTime::now()
             .duration_since(web_time::UNIX_EPOCH)
-            .map_or(0., |d| d.as_secs_f64());
-        let running = self.thread.processes.iter().filter(|p| p.running).count();
-        let done = self.thread.processes.len() - running;
-        let open = self.thread.processes_open;
+            .map_or(0., |d| d.as_secs_f64() * 1000.);
+        let running = processes
+            .iter()
+            .filter(|p| p.state == ProcessState::Running)
+            .count();
+        let done = processes.len() - running;
+        let open = self.thread.processes_open.contains(work);
         let mut bits = vec![];
         if running > 0 {
             bits.push(format!("{running} running"));
         }
         if done > 0 {
-            bits.push(format!("{done} finished"));
+            bits.push(format!("{done} ended"));
         }
-        let rows: Vec<AnyElement> = self
-            .thread
-            .processes
+        let rows: Vec<AnyElement> = processes
             .iter()
             .filter(|_| open)
             .enumerate()
             .map(|(k, p)| {
-                let failed = !p.running && p.exit_code.is_some_and(|c| c != 0);
+                let live = p.state == ProcessState::Running;
+                let failed = p.state == ProcessState::Failed
+                    || (p.state == ProcessState::Exited && p.exit_code.is_some_and(|c| c != 0));
                 let elapsed = p
                     .started
-                    .map(|t| (p.exited.unwrap_or(now) - t).max(0.) as u64)
+                    .map(|t| ((p.ended.unwrap_or(now) - t) / 1000.).max(0.) as u64)
                     .map(clock);
-                let state = if p.running {
+                let state = if live {
                     elapsed.unwrap_or_default()
                 } else {
-                    let code = p
-                        .exit_code
-                        .map_or("ended".to_string(), |c| format!("exit {c}"));
-                    // A reason that only says it ended adds nothing to "exit N".
-                    let reason = p.reason.as_deref().filter(|r| {
-                        !r.is_empty() && !matches!(*r, "exited" | "exit" | "completed")
-                    });
-                    match (reason, elapsed) {
-                        (Some(r), Some(e)) => format!("{code} · {r} · {e}"),
-                        (_, Some(e)) => format!("{code} · {e}"),
-                        _ => code,
+                    let how = match p.state {
+                        ProcessState::Exited => p
+                            .exit_code
+                            .map_or("ended".to_string(), |c| format!("exit {c}")),
+                        ProcessState::Stopped => "stopped".into(),
+                        ProcessState::Restarted => "stopped by restart".into(),
+                        _ => "could not start".into(),
+                    };
+                    match elapsed {
+                        Some(e) => format!("{how} · {e}"),
+                        None => how,
                     }
                 };
                 let shown = self.thread.process_open.as_deref() == Some(p.id.as_str());
@@ -125,7 +112,11 @@ impl ThreadView {
                 .to_string();
                 let full_cmd = p.command.clone();
                 let tail: String = {
-                    let lines: Vec<&str> = p.tail.trim_end().lines().collect();
+                    let out = match &p.error {
+                        Some(e) if p.tail.trim().is_empty() => e.as_str(),
+                        _ => p.tail.as_str(),
+                    };
+                    let lines: Vec<&str> = out.trim_end().lines().collect();
                     lines[lines.len().saturating_sub(60)..].join("\n")
                 };
                 v_flex()
@@ -141,7 +132,7 @@ impl ThreadView {
                             .text_base()
                             .cursor_pointer()
                             .hover(|s| s.bg(theme.list_hover))
-                            .child(if p.running {
+                            .child(if live {
                                 Ico::Loader.live(false)
                             } else if failed {
                                 Ico::CircleAlert
@@ -174,7 +165,7 @@ impl ThreadView {
                                     .text_color(if failed { theme.danger } else { muted })
                                     .child(state),
                             )
-                            .when(p.running, |d| {
+                            .when(live, |d| {
                                 d.child(
                                     div()
                                         .id(("proc-stop", k))
@@ -227,7 +218,8 @@ impl ThreadView {
                                         .child("No output yet")
                                         .into_any_element()
                                 } else {
-                                    plain_text(format!("proc-out-{k}"), &tail).into_any_element()
+                                    plain_text(format!("proc-out-{}", p.id), &tail)
+                                        .into_any_element()
                                 }),
                         )
                     })
@@ -243,12 +235,17 @@ impl ThreadView {
         )
         .when(running > 0, |d| d.child(Ico::Loader.live(false)))
         .when(!open, |d| d.child(div().flex_1()))
-        .on_click(cx.listener(|this, _, _, cx| {
-            // Folding is the thread's own click: it must not pull the focus to the composer.
-            this.claim_click(cx);
-            this.thread.processes_open = !this.thread.processes_open;
-            cx.notify();
-        }));
+        .on_click({
+            let work = work.to_string();
+            cx.listener(move |this, _, _, cx| {
+                // Folding is the thread's own click: it must not pull the focus to the composer.
+                this.claim_click(cx);
+                if !this.thread.processes_open.remove(&work) {
+                    this.thread.processes_open.insert(work.clone());
+                }
+                cx.notify();
+            })
+        });
         let frame = v_flex()
             .id("procs-block")
             .w_full()

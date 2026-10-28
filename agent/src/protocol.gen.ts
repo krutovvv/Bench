@@ -50,8 +50,32 @@ export type ThreadOpen = { items: Array<ThreadItem>, queue: Array<QueuedItem>, i
  * The live run's holds (the person's pauses), oldest first; the last one open while it
  * stands held. Empty when no run lives.
  */
-holds: Array<Hold>, head: number, };
+holds: Array<Hold>, 
+/**
+ * The thread's background processes, each placed at the call that started it.
+ */
+processes: Array<Process>, head: number, };
 
 export type Hold = { from: number, to?: number, };
+
+export type Process = { 
+/**
+ * The Pi task's id: what Stop names.
+ */
+id: string, call_id: string, command: string, state: ProcessState, exit_code?: number, 
+/**
+ * ms, like an item's `at`.
+ */
+started?: number, ended?: number, 
+/**
+ * The last lines of its output.
+ */
+tail: string, 
+/**
+ * Why it could not run, when it failed.
+ */
+error?: string, };
+
+export type ProcessState = "running" | "exited" | "stopped" | "restarted" | "failed";
 
 export type StreamKind = "text" | "thought" | "narration";

@@ -5,6 +5,7 @@
 // else. Queued messages come after the whole journal, in the inbox's order.
 
 import { InboxDoc } from "@earendil-works/pi-durable";
+import { processOf } from "./builtin/process.ts";
 import { Inserts } from "./inserts.ts";
 
 /** A tool call in one line: what it acts on (a command, a path, a query…). */
@@ -16,7 +17,7 @@ export function preview(name: string, args: any): string {
 }
 
 // The items and the queue are typed in crates/protocol: Bench reads them with the same types.
-import type { PlanStep, QueuedItem, ThreadItem } from "./protocol.gen.ts";
+import type { PlanStep, Process, QueuedItem, ThreadItem } from "./protocol.gen.ts";
 export type { QueuedItem, ThreadItem };
 
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
@@ -170,11 +171,14 @@ export interface ThreadChange {
 	append?: ThreadItem[];
 	queue?: QueuedItem[];
 	inserts?: Record<string, unknown>;
+	/** Background processes whose task records this commit changed, in id order. */
+	processes?: Process[];
 }
 
 /**
  * Read one commit publication: new entries become `append` (in id order), a new inbox revision
- * becomes `queue`, a new inserts document becomes `inserts`. Only conversations `watched`
+ * becomes `queue`, a new inserts document becomes `inserts`, a changed process task becomes
+ * one of `processes`. Only conversations `watched`
  * answers yes for are read.
  */
 export function changesOf(changes: readonly any[], watched: (conversation: string) => boolean, requests: (conversation: string) => Requests): ThreadChange[] {
@@ -196,6 +200,10 @@ export function changesOf(changes: readonly any[], watched: (conversation: strin
 			if (!watched(c)) continue;
 			if (ch.record?.kind === INBOX_KIND) at(c).queue = queueOf(ch.value, requests(c));
 			else if (ch.record?.kind === INSERTS_KIND) at(c).inserts = (ch.value as any).items ?? {};
+		} else if (ch.type === "task") {
+			const c = String(ch.value?.conversationId);
+			const p = watched(c) ? processOf(ch.value) : undefined;
+			if (p) (at(c).processes ??= []).push(p);
 		}
 	}
 	entries.sort((a, b) => Number(a.id) - Number(b.id));

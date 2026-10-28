@@ -81,7 +81,6 @@ pub(super) fn on_result(kind: Pending, r: &Value, emit: &impl Fn(Evt)) {
         Pending::Inserts(session) => emit(Evt::Inserts(session, inserts(&r["inserts"]))),
         Pending::Delete => emit(Evt::Deleted),
         Pending::Catalog => emit(Evt::Catalog(catalog(r))),
-        Pending::Processes(session) => emit(Evt::Processes(session, processes(r))),
         Pending::Dispatch(session) => {
             let s = |k: &str| {
                 r[k].as_str()
@@ -261,28 +260,4 @@ pub(super) fn log_error(method: &str, err: &str) {
         use std::io::Write as _;
         let _ = writeln!(f, "{} {method}: {err}", crate::app::now_secs() as u64);
     }
-}
-
-/// `process.list`'s rows (the process id rides in `session_id`).
-fn processes(r: &Value) -> Vec<crate::app::model::BgProcess> {
-    r["processes"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .map(|p| crate::app::model::BgProcess {
-            id: p["session_id"].as_str().unwrap_or_default().to_string(),
-            command: p["command"].as_str().unwrap_or_default().to_string(),
-            running: p["status"].as_str() != Some("exited"),
-            exit_code: p["exit_code"].as_i64(),
-            started: p["started_epoch"].as_f64(),
-            exited: p["exited_at"].as_f64(),
-            reason: p["completion_reason"].as_str().map(str::to_string),
-            tail: p["output_tail"]
-                .as_str()
-                .or(p["output_preview"].as_str())
-                .unwrap_or_default()
-                .to_string(),
-        })
-        .filter(|p| !p.id.is_empty())
-        .collect()
 }
