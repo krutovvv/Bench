@@ -78,7 +78,7 @@ impl BenchApp {
                 .ghost()
                 .small()
                 .text_color(theme.muted_foreground)
-                .icon(bench_ui::icons::Ico::GitBranch.icon().small())
+                .icon(bench_ui::icons::Ico::GitBranch.icon().xsmall())
                 // A Button's `.label()` takes the control's size: the bars' size is set here.
                 .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
                 .dropdown_menu(move |menu, _, _| {

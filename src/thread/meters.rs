@@ -60,7 +60,7 @@ impl ThreadView {
                     Button::new("context")
                         .ghost()
                         .small()
-                        .icon(Ico::MemoryStick.icon())
+                        .icon(Ico::MemoryStick.icon().xsmall())
                         .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
                         .text_color(color),
                 )
@@ -125,7 +125,7 @@ impl ThreadView {
                     Button::new("speed")
                         .ghost()
                         .small()
-                        .icon(Ico::Gauge.icon())
+                        .icon(Ico::Gauge.icon().xsmall())
                         .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
                         .text_color(muted),
                 )
@@ -146,7 +146,7 @@ impl ThreadView {
                 .items_center()
                 .text_color(theme.danger)
                 .text_size(px(bench_ui::BAR_TEXT))
-                .child(Ico::CircleAlert.icon().small())
+                .child(Ico::CircleAlert.icon().xsmall())
                 .child(format!("Main model down · on fallback {model}"))
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))
         });
