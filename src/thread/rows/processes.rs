@@ -4,7 +4,7 @@
 
 use gpui_kit::*;
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 use crate::media::text::plain_text;
 use ::thread::{Process, ProcessState};
 use bench_ui::clock;

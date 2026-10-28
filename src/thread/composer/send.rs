@@ -12,7 +12,7 @@ use gpui_kit::*;
 
 use protocol::ThreadId;
 
-use super::{ThreadRef, ThreadView};
+use crate::thread::{ThreadRef, ThreadView};
 use crate::app::model::{ProjectKey, Target};
 use crate::app::{BenchApp, Live};
 use crate::client::connection::Connection;
@@ -231,7 +231,7 @@ impl ThreadView {
         }
         let typed = self.composer.read(cx).value().trim().to_string();
         // The code sent from the Explorer goes under the words.
-        let typed = super::attachments::with_references(typed, &self.thread_references(cx));
+        let typed = crate::thread::composer::attachments::with_references(typed, &self.thread_references(cx));
         let files = self.attachments.clone();
         if typed.is_empty() && files.is_empty() {
             return;

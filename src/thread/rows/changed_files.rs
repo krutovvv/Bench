@@ -6,7 +6,7 @@ use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 use bench_ui::icons::Ico;
 use bench_ui::plural;
 
@@ -23,7 +23,7 @@ impl ThreadView {
         let count = files.len();
         let (all_add, all_del) = files
             .iter()
-            .flat_map(|(_, diffs)| diffs.iter().map(|d| crate::thread::diff::stats(d)))
+            .flat_map(|(_, diffs)| diffs.iter().map(|d| crate::thread::rows::diff::stats(d)))
             .fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
         let rows: Vec<AnyElement> = files
             .into_iter()
@@ -32,7 +32,7 @@ impl ThreadView {
             .map(|(k, (path, diffs))| {
                 let (add, del) = diffs
                     .iter()
-                    .map(|d| crate::thread::diff::stats(d))
+                    .map(|d| crate::thread::rows::diff::stats(d))
                     .fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
                 let p = std::path::Path::new(&path);
                 let name = p

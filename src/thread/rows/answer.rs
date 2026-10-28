@@ -3,7 +3,7 @@
 use gpui_kit::*;
 use protocol::{Ask, AskKind};
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 
 impl ThreadView {
     /// The question the run waits for now, if any.

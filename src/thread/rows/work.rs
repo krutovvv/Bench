@@ -7,8 +7,8 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::ThreadView;
-use super::tool_labels::{activity_word, pretty, tool_label};
+use crate::thread::ThreadView;
+use crate::thread::rows::tool_labels::{activity_word, pretty, tool_label};
 use crate::app::now_secs;
 use bench_ui::icons::Ico;
 use bench_ui::{clip, clock, plural};

@@ -10,7 +10,7 @@ use gpui_kit::*;
 
 use bench_ui::icons::Ico;
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 
 /// Rows the command list shows before it scrolls, and their height.
 const SLASH_ROWS: f32 = 8.;

@@ -11,7 +11,7 @@ use super::item::Item;
 use super::{DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::rest::lsp;
-use crate::thread::attachments::{ProblemsRef, Reference};
+use crate::thread::composer::attachments::{ProblemsRef, Reference};
 use bench_ui::icons::Ico;
 
 /// A problem as one line, for the agent: `path:line:col error: message (source)`.

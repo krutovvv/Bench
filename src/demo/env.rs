@@ -184,7 +184,7 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
             app.show_demo_thread("d-site", cx);
             app.right_dock.activate(crate::workspace::Panel::Thread);
             app.add_reference(
-                crate::thread::attachments::Reference::Code(crate::thread::attachments::CodeRef {
+                crate::thread::composer::attachments::Reference::Code(crate::thread::composer::attachments::CodeRef {
                     path: "/Users/demo/code/blog/content/posts/release-2-4.md".into(),
                     lines: Some((11, 15)),
                     text: Some("## What changed".into()),

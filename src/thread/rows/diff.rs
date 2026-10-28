@@ -22,6 +22,6 @@ mod tests {
     #[test]
     fn counts_lines() {
         let diff = "--- a/f\n+++ b/f\n@@ -1,4 +1,5 @@\n a\n-b\n+B\n c\n d\n+e\n";
-        assert_eq!(super::stats(diff), (2, 1));
+        assert_eq!(crate::thread::stats(diff), (2, 1));
     }
 }

@@ -10,7 +10,7 @@ use gpui_kit::*;
 
 use super::{DocKey, FileRef};
 use crate::app::BenchApp;
-use crate::thread::attachments::{CodeRef, Reference};
+use crate::thread::composer::attachments::{CodeRef, Reference};
 use crate::workspace::{Center, Panel};
 use bench_ui::icons::Ico;
 
@@ -112,7 +112,7 @@ impl BenchApp {
             let text = s.value().to_string();
             Reference::Code(CodeRef {
                 path: f.path.clone(),
-                lines: Some(crate::thread::attachments::lines_of(&text, range)),
+                lines: Some(crate::thread::composer::attachments::lines_of(&text, range)),
                 text: Some(s.selected_value().to_string()),
             })
         };

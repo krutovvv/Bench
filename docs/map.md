@@ -9,11 +9,12 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change a size, a gap, a font, a color, a button's look | `crates/ui/src/` (`metrics.rs`, `text.rs`, `button.rs`, `theme/`) — see it in `cargo run -p storybook` |
 | add or change a colour theme (the gear's Theme chips) | `crates/ui/src/theme/palettes.rs` (a `Palette` per half, the row in `SCHEMES`), the syntax JSON of each half in `assets/themes/` (written by `scripts/gen_themes.py`), the chips in `crates/ui/src/swatch.rs`, the tab in `src/settings/appearance.rs` |
 | add an icon | `assets/icons/<name>.svg`, a line in `crates/ui/src/icons.rs` |
-| change how a message, an answer or "N actions" looks | `src/thread/message.rs`, `src/thread/work.rs` |
+| change how a message, an answer or "N actions" looks | `src/thread/rows/message.rs`, `src/thread/rows/work.rs` (a call's line: `rows/tool_labels.rs`) |
 | change what the thread shows or in what order | `crates/thread/src/rows.rs` (the rules are tests in `tests.rs`) |
-| change a queued message's row or its buttons | `src/thread/queued.rs` (the row and its actions: `queued`, `queue_edit_*`) |
+| change a queued message's row or its buttons | `src/thread/rows/queued.rs` (the row and its actions: `queued`, `queue_edit_*`) |
 | change the ticks on the right of the thread | `src/thread/rail.rs` |
-| change the composer | `src/thread/composer.rs` (its pop-up `slash.rs`, files `attachments.rs`, drafts `drafts.rs`), sending in `src/thread/send.rs` (`send`) |
+| change the composer | `src/thread/composer/` (`input.rs` the field, its pop-up `slash.rs`, prompts `prompts.rs`, files and references `attachments.rs`, drafts `drafts.rs`, sending `send.rs`) |
+| change a kind of row in the thread (a question, the plan, processes, changed files, pages read) | `src/thread/rows/` (`asks.rs`, `answer.rs`, `processes.rs`, `changed_files.rs`, `extras.rs`) |
 | change the bottom dock's terminals (⌃`, ⌘T, the tabs) | `src/inserts/terminal/panel.rs` (the shell itself: `session.rs`, `view.rs`) |
 | change an insert (`/terminal`, `/tasks`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
 | add an insert | `.agents/skills/bench-kit/references/build-insert.md` |

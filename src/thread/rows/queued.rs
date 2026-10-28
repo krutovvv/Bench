@@ -6,7 +6,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 use bench_ui::icons::Ico;
 use gpui_kit::component::input::{InputEvent, TextareaState};
 

@@ -2,7 +2,7 @@
 
 use gpui_kit::*;
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 
 impl ThreadView {
     /// The composer's text is the thread's draft (called on every change). The drafts are the

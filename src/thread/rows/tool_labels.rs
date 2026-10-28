@@ -112,20 +112,20 @@ mod tests {
     #[test]
     fn pages_a_tool_touched() {
         let mut out = vec![];
-        super::tool_urls(
+        crate::thread::tool_urls(
             "web_fetch",
             &json!({"url": "https://www.example.com/a", "code": "https://x.dev"}),
             &mut out,
         );
-        super::tool_urls(
+        crate::thread::tool_urls(
             "bash",
             &json!({"command": "curl http://localhost:3000 https://docs.rs/gpui."}),
             &mut out,
         );
-        super::tool_urls("edit", &json!({"path": "https://nope.io"}), &mut out);
+        crate::thread::tool_urls("edit", &json!({"path": "https://nope.io"}), &mut out);
         assert_eq!(out, ["https://www.example.com/a", "https://docs.rs/gpui"]);
         assert_eq!(
-            super::host_of("https://www.example.com:8080/a"),
+            crate::thread::host_of("https://www.example.com:8080/a"),
             "example.com"
         );
     }
@@ -216,16 +216,16 @@ fn clip_line(s: &str) -> String {
 mod tool_label_tests {
     #[test]
     fn labels() {
-        assert_eq!(super::tool_label("bash", "ls"), "bash: ls");
-        assert_eq!(super::tool_label("session_search", ""), "session search");
+        assert_eq!(crate::thread::tool_label("bash", "ls"), "bash: ls");
+        assert_eq!(crate::thread::tool_label("session_search", ""), "session search");
         assert_eq!(
-            super::tool_label("bash", "python3 - <<'PY'\nimport re\np='src/app.rs'"),
+            crate::thread::tool_label("bash", "python3 - <<'PY'\nimport re\np='src/app.rs'"),
             "bash: python3 - <<'PY'",
             "a multiline command stays one line"
         );
-        assert_eq!(super::tool_label("bash", "\n\n   \n"), "bash");
+        assert_eq!(crate::thread::tool_label("bash", "\n\n   \n"), "bash");
         assert_eq!(
-            super::tool_label("mcp__reminders__list_items", "Today"),
+            crate::thread::tool_label("mcp__reminders__list_items", "Today"),
             "reminders · list items: Today"
         );
     }

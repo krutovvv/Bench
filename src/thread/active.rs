@@ -184,7 +184,7 @@ impl ActiveThread {
                         ThreadItem::Tool { name, preview, .. } => {
                             label(
                                 &mut self.live,
-                                &crate::thread::tool_labels::tool_label(name, preview),
+                                &crate::thread::rows::tool_labels::tool_label(name, preview),
                             );
                             self.speed.tool_call();
                         }

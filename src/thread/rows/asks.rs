@@ -12,7 +12,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use thread::{AskCard, PlanStep};
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 use bench_ui::icons::Ico;
 
 impl ThreadView {

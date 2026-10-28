@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use crate::app::model::ThreadRow;
-use crate::thread::attachments::Reference;
+use crate::thread::composer::attachments::Reference;
 
 pub struct ThreadStore {
     /// Every agent's threads, as each last listed them.
@@ -27,7 +27,7 @@ impl ThreadStore {
         Self {
             list: vec![],
             cache: HashMap::new(),
-            drafts: super::drafts::load_drafts(),
+            drafts: super::composer::drafts::load_drafts(),
             references: HashMap::new(),
             reopen,
             creating: false,

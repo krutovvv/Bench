@@ -11,7 +11,7 @@ use gpui_kit::component::v_flex;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
-use crate::thread::attachments::{Reference, TerminalRef};
+use crate::thread::composer::attachments::{Reference, TerminalRef};
 use crate::workspace::{DockPosition, Panel};
 use bench_ui::icons::Ico;
 

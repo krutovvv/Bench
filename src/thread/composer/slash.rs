@@ -5,7 +5,7 @@
 
 use gpui_kit::*;
 
-use super::{ThreadRef, ThreadView};
+use crate::thread::{ThreadRef, ThreadView};
 use crate::app::BenchApp;
 use crate::app::model::SlashCommand;
 

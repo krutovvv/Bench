@@ -6,40 +6,24 @@
 //! lets the last row reach the top, as in an editor. Only what is on screen is laid out.
 //!
 //! Files: `view.rs` (the view: its state, composer, events), `active.rs` (the thread's state, one
-//! struct, and `ThreadRef`), `list.rs` (the list's state and scroll), `message.rs` (the person's
-//! and the agent's rows), `work.rs` (the folded steps), `queued.rs` (a waiting message), `rail.rs` (the ticks on
-//! the right), `extras.rs` (approval, sources), `processes.rs`, `changed_files.rs`, `asks.rs` and
-//! `answer.rs` (the agent's question and plan), `composer.rs` (the input) with `slash.rs` (its
-//! pop-up), `prompts.rs`, `attachments.rs` and `drafts.rs`; `send.rs` (sending, the reasoning
-//! level), `open.rs` (opening, creating and deleting threads: the app's), `panel.rs` (the right
-//! dock's thread panel: its head over a view), `beside.rs` (a second thread beside the open one).
+//! struct, and `ThreadRef`), `list.rs` (the list's state and scroll), `rail.rs` (the ticks on the
+//! right), `meters.rs` and `speed.rs` (its context and speed, in the title bar); `rows/` what the
+//! list shows, `composer/` the next message; `open.rs` (opening, creating and deleting threads:
+//! the app's), `store.rs` (every agent's threads, drafts, the journals seen), `panel.rs` (the
+//! right dock's thread panel), `beside.rs` (a second thread beside the open one).
 
 pub(crate) mod store;
 mod active;
-mod answer;
-mod asks;
-pub(crate) mod attachments;
+pub(crate) mod composer;
+pub(crate) mod rows;
 mod beside;
-mod changed_files;
-mod composer;
-pub(crate) mod diff;
-pub(crate) mod drafts;
-mod extras;
 mod list;
-mod message;
 mod meters;
 mod open;
 mod panel;
-mod processes;
-mod prompts;
-mod queued;
 mod rail;
-pub(crate) mod send;
-mod slash;
-pub(crate) mod tool_labels;
 pub(crate) mod speed;
 mod view;
-pub(crate) mod work;
 
 pub use active::{ActiveThread, ThreadRef};
 pub use list::View;

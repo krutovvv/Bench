@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use gpui_kit::*;
 
-use super::ThreadView;
+use crate::thread::ThreadView;
 use crate::app::BenchApp;
 use crate::media::attach;
 
@@ -279,7 +279,7 @@ impl ThreadView {
 
 #[cfg(test)]
 mod tests {
-    use super::{CodeRef, ProblemsRef, Reference, TerminalRef, lines_of, with_references};
+    use crate::thread::{CodeRef, ProblemsRef, Reference, TerminalRef, lines_of, with_references};
 
     #[test]
     fn a_selection_names_its_lines() {
