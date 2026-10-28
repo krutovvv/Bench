@@ -112,7 +112,7 @@ pub fn tree_row(
                 .min_w_0()
                 .truncate()
                 .text_xs()
-                .text_color(theme.muted_foreground)
+                .text_color(crate::text::faint(&theme))
                 .children(note),
         )
         .when(!actions.is_empty(), |d| {

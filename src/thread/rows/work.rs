@@ -35,6 +35,7 @@ impl ThreadView {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        let faint = bench_ui::faint(&theme);
         let tools = steps.iter().filter(|s| s.is_tool()).count();
         let errors = steps
             .iter()
@@ -113,10 +114,12 @@ impl ThreadView {
             .text_color(muted)
             .cursor_pointer()
             .hover(|s| s.text_color(theme.foreground))
+            // The counts in the muted grey; what follows them (the time, the errors keep their
+            // own colour) one level fainter, as "Done" is.
             .children(parts.into_iter().enumerate().map(|(k, (t, c))| {
                 div()
                     .flex_none()
-                    .text_color(c)
+                    .text_color(if k > 0 && c == muted { faint } else { c })
                     .child(if k == 0 { t } else { format!("· {t}") })
             }))
             .map(|d| match doing {
@@ -137,7 +140,7 @@ impl ThreadView {
                     }))
                 }
                 // A piece of work without tool calls was the model thinking before it answered.
-                None => d.child(div().flex_none().child(
+                None => d.child(div().flex_none().text_color(faint).child(
                     match (has_parts, tools > 0 || errors > 0) {
                         (true, true) => "· Done",
                         (false, true) => "Done",

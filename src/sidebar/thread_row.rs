@@ -25,6 +25,7 @@ impl BenchApp {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let accent = theme.primary;
+        let faint = bench_ui::faint(&theme);
         let s = &self.threads.list[i];
         let selected =
             self.center == Center::Chat && self.thread(cx).id.as_ref() == Some(&s.id);
@@ -212,7 +213,7 @@ impl BenchApp {
                     .when(waiting, |d| d.child(bench_ui::dot(accent)))
                     // Compact: the title alone (a working session still shimmers).
                     .when_some(meta.filter(|_| !compact), |d, meta| {
-                        d.child(div().flex_none().text_xs().text_color(muted).child(meta))
+                        d.child(div().flex_none().text_xs().text_color(faint).child(meta))
                     }),
             )
             .child(delete)

@@ -22,6 +22,13 @@ pub fn small(cx: &App) -> Div {
     div().text_xs().text_color(cx.theme().muted_foreground)
 }
 
+/// The third level of grey, under the muted one: what is there for whoever looks for it — a
+/// tree row's note, a list row's state, the time and "Done" after a work line's counts. Not a
+/// colour of the theme: its muted text, fainter.
+pub fn faint(theme: &gpui_kit::component::Theme) -> Hsla {
+    theme.muted_foreground.opacity(0.68)
+}
+
 /// A title: a block's or a form's name. Semibold: the UI font has no medium face, and Medium
 /// draws as the regular text beside it.
 pub fn title(cx: &App) -> Div {
