@@ -170,6 +170,10 @@ fewer form fields. Then check what it did to signups and give me a short summary
             });
         }
     }
+    // `BENCH_DEMO_FILES=1`: the changed files' list unfolded.
+    if std::env::var("BENCH_DEMO_FILES").is_ok() {
+        open_thread(app, cx, |t| t.files_open = true);
+    }
     // `BENCH_DEMO_PROCS=1`: the background processes' card unfolded, its output shown.
     if std::env::var("BENCH_DEMO_PROCS").is_ok() {
         if let Some(::thread::Row::Work { key, .. }) = landing

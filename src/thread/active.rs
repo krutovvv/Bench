@@ -37,6 +37,8 @@ pub struct ActiveThread {
     pub queued: Option<(String, String)>,
     /// The "Changed files" list under the last turn is unfolded (folded by default).
     pub files_open: bool,
+    /// The changed files' list shows them all, past its first ten.
+    pub files_all: bool,
     /// The works whose background processes' card is unfolded (`thread/processes.rs`), and
     /// the process whose output is shown.
     pub processes_open: HashSet<String>,
@@ -77,6 +79,7 @@ impl Default for ActiveThread {
             live: None,
             queued: None,
             files_open: false,
+            files_all: false,
             processes_open: HashSet::new(),
             process_open: None,
             speed: Meter::fresh(),

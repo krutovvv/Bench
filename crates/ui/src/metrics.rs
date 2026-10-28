@@ -38,6 +38,8 @@ pub const RING_CLEAR: f32 = 4.;
 pub const BLOCK_HEAD_H: f32 = 32.;
 /// Small rows and chips in the thread: an attachment, a queued message, a plan's head.
 pub const CHIP_H: f32 = FIELD_H;
+/// A row of a list inside a block (the changed files): a Mac list's medium row.
+pub const LIST_ROW_H: f32 = 26.;
 /// The status bar with the rule over it.
 pub const STATUS_H: f32 = 29.;
 /// The thread's leading, in lines: messages and the composer share it.
