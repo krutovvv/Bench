@@ -116,15 +116,16 @@ impl BenchApp {
                 .items_center()
                 // As every project's head (`project_row`): Host is a group too.
                 .text_size(px(bench_ui::SIDEBAR_TEXT))
-                .child(bench_ui::head_icon_in(Ico::Server, host_color, cx))
+                .child(bench_ui::head_icon_in(Ico::Server, None, cx))
                 .child(
                     div()
                         .min_w_0()
                         .truncate()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(host_color.unwrap_or(cx.theme().foreground))
+                        .text_color(cx.theme().foreground)
                         .child(crate::app::LOCAL_HOST),
                 )
+                .children(host_color.map(bench_ui::tag_dot))
                 .child(div().flex_1())
                 // "⋯" (on hover), as a right click: its environment, its color — the same menu as
                 // a project's, without pin and remove (it is always first, and always there).
@@ -187,10 +188,9 @@ impl BenchApp {
         if !open {
             return out;
         }
-        let n = rows.len();
-        for (k, i) in rows.into_iter().enumerate() {
+        for i in rows {
             out.push(
-                self.render_thread_row(i, Some(k + 1 == n), cx)
+                self.render_thread_row(i, cx)
                     .into_any_element(),
             );
         }

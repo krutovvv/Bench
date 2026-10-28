@@ -9,24 +9,34 @@ use gpui_kit::*;
 use crate::icons::Ico;
 use crate::metrics::bar_h;
 
-/// The sidebar's search: a transparent band, the magnifier over the group icons.
+/// The sidebar's search: a field on the page's ground, set in as the rows are (a Mac's
+/// sidebar search), the magnifier first.
 pub fn search_band(input: &Entity<InputState>, cx: &App) -> Div {
     let theme = cx.theme();
     h_flex()
         .flex_none()
         .w_full()
-        .h(bar_h(cx))
-        .pl(px(3.5))
-        .pr_2()
-        .items_center()
+        .px(px(crate::metrics::SIDEBAR_ROW_INSET))
+        .pb_2()
         .child(
-            // The list's size: the field is the first line of the list under it.
-            Input::new(input).small().appearance(false).cleanable(true).prefix(
-                Ico::Search
-                    .icon()
-                    .small()
-                    .text_color(theme.muted_foreground),
-            ),
+            h_flex()
+                .w_full()
+                .h(px(crate::metrics::FIELD_H))
+                .pl_1()
+                .items_center()
+                .rounded_md()
+                .bg(theme.background)
+                .border_1()
+                .border_color(theme.border)
+                .child(
+                    // The list's size: the field is the first line of the list under it.
+                    Input::new(input).small().appearance(false).cleanable(true).prefix(
+                        Ico::Search
+                            .icon()
+                            .xsmall()
+                            .text_color(theme.muted_foreground),
+                    ),
+                ),
         )
 }
 

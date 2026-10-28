@@ -10,6 +10,15 @@ const MARKS: [u32; 7] = [0xFF5F57, 0xFF9F0A, 0xFFCC00, 0x34C759, 0x0A84FF, 0xBF5
 /// How many mark colours there are.
 pub const MARK_COUNT: usize = MARKS.len();
 
+/// A mark as Finder shows a tag: a small dot of its colour after the name.
+pub fn tag_dot(color: Hsla) -> Div {
+    div()
+        .flex_none()
+        .size(px(crate::metrics::TAG_DOT))
+        .rounded_full()
+        .bg(color)
+}
+
 /// The mark colour `index`, if there is one.
 pub fn mark_color(index: usize) -> Option<Hsla> {
     MARKS.get(index).map(|c| rgb(*c).into())

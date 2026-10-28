@@ -55,12 +55,13 @@ impl BenchApp {
         let (new_id, menu_id, set_id) = (p.id.clone(), p.id.clone(), p.id.clone());
         let mark = self.mark_of(&format!("p:{}", p.id));
         let pinned = mark.pinned;
-        // A chosen color is the project's icon and name, no background: it marks the group.
+        // A chosen color is a tag's dot after the name (as Finder's); the name stays the text's.
         let color: Option<Hsla> = mark
             .color
             .and_then(bench_ui::mark_color);
         let armed = self.armed.is(&format!("p:{}", p.id));
         let renaming = self.renaming_field(&Item::Project(p.id.clone()));
+        let tag = color.filter(|_| renaming.is_none());
         let mut out = vec![
             h_flex()
                 .id(("phead", g))
@@ -80,7 +81,7 @@ impl BenchApp {
                 // The list's size, a heavier weight: a project is the name its threads hang
                 // under, read as a word and not as a label in capitals; a color marks it.
                 .text_size(px(bench_ui::SIDEBAR_TEXT))
-                .child(bench_ui::head_icon_in(icon, color, cx))
+                .child(bench_ui::head_icon_in(icon, None, cx))
                 .child(match renaming {
                     Some(field) => div()
                         .flex_1()
@@ -93,10 +94,11 @@ impl BenchApp {
                         .min_w_0()
                         .truncate()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(color.unwrap_or(theme.foreground))
+                        .text_color(theme.foreground)
                         .child(p.name.clone())
                         .into_any_element(),
                 })
+                .children(tag.map(bench_ui::tag_dot))
                 // A bot of its own: its threads are written to from Telegram too.
                 .when(p.telegram, |d| {
                     d.child(
@@ -201,10 +203,9 @@ impl BenchApp {
                     .into_any_element(),
             );
         }
-        let n = rows.len();
-        for (k, i) in rows.into_iter().enumerate() {
+        for i in rows {
             out.push(
-                self.render_thread_row(i, Some(k + 1 == n), cx)
+                self.render_thread_row(i, cx)
                     .into_any_element(),
             );
         }

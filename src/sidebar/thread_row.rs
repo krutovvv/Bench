@@ -15,11 +15,9 @@ use bench_ui::SIDEBAR_TEXT;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
-    /// `guide`: under a group header, indented on the group's guide line (`Some(last row)`).
     pub(super) fn render_thread_row(
         &self,
         i: usize,
-        guide: Option<bool>,
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
@@ -96,10 +94,10 @@ impl BenchApp {
                 )
                 .into_any_element()
         };
-        // A chosen color marks the row with a quiet stripe (the open chat keeps the accent).
-        // A paused run stands still: no shimmer, as nothing moves.
+        // A chosen color is a small dot after the title, as a Finder tag: the row itself stays
+        // the list's. A paused run stands still: no shimmer, as nothing moves.
         let working = !paused && (s.running || (open && self.thread(cx).live.is_some()));
-        let stripe = self
+        let tag = self
             .mark_of(s.id.as_str())
             .color
             .and_then(bench_ui::mark_color);
@@ -111,41 +109,20 @@ impl BenchApp {
             .group(group)
             .relative()
             .gap_1()
-            // The title starts where the project's name does (the row's 2 px border is part
-            // of that inset), so a project and its threads read as one column.
-            .pl(px(bench_ui::PROJECT_NAME_X - bench_ui::ROW_STRIPE))
-            .when_some(guide, |d, last| d.child(bench_ui::nest_guide(cx, last)))
-            .pr_3()
+            // A rounded row set in from the sidebar's edges (the open one a soft pill, as a
+            // Mac's source list); its title starts where the project's name does, so a project
+            // and its threads read as one column.
+            .mx(px(bench_ui::SIDEBAR_ROW_INSET))
+            .rounded_md()
+            .pl(px(bench_ui::PROJECT_NAME_X - bench_ui::SIDEBAR_ROW_INSET))
+            .pr_2()
             // The compact list packs rows closer; the ordinary one keeps a breath around
             // each title.
             .map(|d| if compact { d.py(px(bench_ui::THREAD_ROW_PY_COMPACT)) } else { d.py(px(bench_ui::THREAD_ROW_PY)) })
             .cursor_pointer()
-            .border_l_2()
-            // A chosen color wins over the accent; it also tints the row lightly.
-            .border_color(stripe.unwrap_or(if selected {
-                theme.primary
-            } else {
-                theme.transparent
-            }))
-            .when_some(stripe, |d, c| {
-                d.bg(Hsla {
-                    a: if selected { 0.22 } else { 0.12 },
-                    ..c
-                })
-            })
-            // The open chat in the accent's own tint, not one more grey.
-            .when(selected && stripe.is_none(), |d| {
-                d.bg(theme.primary.opacity(0.12))
-                    .text_color(theme.foreground)
-            })
-            // Hover keeps a chosen color, half a step denser; plain rows get the usual grey.
-            .hover(move |h| match stripe {
-                Some(c) => h.bg(Hsla {
-                    a: if selected { 0.30 } else { 0.20 },
-                    ..c
-                }),
-                None => h.bg(theme.sidebar_accent),
-            })
+            // The open chat: the sidebar's selected ground; hovered: the list's.
+            .when(selected, |d| d.bg(theme.sidebar_accent).text_color(theme.foreground))
+            .when(!selected, |d| d.hover(|h| h.bg(theme.list_hover)))
             .child(
                 h_flex()
                     .flex_1()
@@ -208,7 +185,8 @@ impl BenchApp {
                                         }
                                     })
                                     .into_any_element(),
-                            }),
+                            })
+                            .when_some(tag, |d, c| d.child(bench_ui::tag_dot(c))),
                     )
                     // Waiting for an answer: the words where there is room, the dot in the
                     // compact list.

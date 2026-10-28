@@ -164,6 +164,11 @@ pub const GROUP_GAP: f32 = 13.;
 pub const GROUP_HEAD_PB: f32 = 6.;
 /// A thread's row: its marker stripe, and its padding in the ordinary and the compact list.
 pub const ROW_STRIPE: f32 = 2.;
+/// A sidebar row is set in from the sidebar's edges by this, so its rounded ground (the open
+/// thread's, a hover's) floats in the list.
+pub const SIDEBAR_ROW_INSET: f32 = 8.;
+/// A mark's dot beside a name (Finder's tag).
+pub const TAG_DOT: f32 = 8.;
 pub const THREAD_ROW_PY: f32 = 5.;
 pub const THREAD_ROW_PY_COMPACT: f32 = 3.;
 /// A search hit's inset.
