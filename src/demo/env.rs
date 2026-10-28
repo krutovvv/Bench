@@ -97,7 +97,7 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         .detach();
     }
     // `BENCH_DEMO=explorer`: its tree open on a post, the soul and a skill; a file open, and
-    // `BENCH_EXPLORER=comment` a review comment being written, `=settings` its settings, `=part` an MCP server, `=lsp` a language
+    // `BENCH_EXPLORER=comment` a review comment being written, `=specs` the specs and one read, `=settings` its settings, `=part` an MCP server, `=lsp` a language
     // server that failed, `=lsp-new` the "Add a server" card with its preset chips, `=thread` the
     // thread beside it
     // with lines sent to it. `BENCH_DEMO=env` is `explorer` with its settings open.
@@ -192,6 +192,14 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
                 cx,
             );
         }
+        // The specs: the group open, the posts' spec read in its tab, the thread beside.
+        "specs" => {
+            app.explorer.open.extend(["specs".to_string(), "spec:blog".to_string()]);
+            app.explorer.specs.insert(app.explorer.project.clone(), Some(specs()));
+            let s = specs().specs[1].clone();
+            let key = app.spec_key(&s);
+            app.open_doc(key, window, cx);
+        }
         // Review comments: one already in the composer, the next being written under the post.
         "comment" => {
             use crate::thread::composer::attachments::{CodeRef, CommentRef, Reference};
@@ -283,8 +291,39 @@ pub fn file_text(path: &str) -> String {
         "SYSTEM.md" => "# Northwind blog\n\nProduct news and guides for our customers, published on Ghost.\n\nWrite plainly, for people who use the product, not for engineers. Every post gets a cover and two tags; drafts first, publish only when asked.\n".into(),
         "release-2-4.md" => "---\ntitle: \"Northwind 2.4: search that understands you\"\ntags: [releases, search]\ncover: /images/2-4-cover.png\nstatus: draft\n---\n\nSearch now reads what you mean, not only what you type. Ask for\n\"invoices from last spring\" and it finds them, even when none of them says *spring*.\n\n## What changed\n\n- Results understand dates, people and places.\n- Typos no longer hide what you were after.\n- The search box remembers your last five questions.\n\n## Why it matters\n\nMost of you search the same few things every day. Now it takes one try.\n".into(),
         "SKILL.md" => "---\nname: release-notes\ndescription: Turn a changelog into a post: what changed for the reader, not the commit list.\n---\n\n1. Read the changelog since the last release.\n2. Keep what a customer notices; drop refactors.\n3. Write the post in `content/posts/`, a draft, with a cover and two tags.\n".into(),
+        "SPEC.md" => spec_text(path),
         _ => String::new(),
     }
+}
+
+/// The blog's specs, as the agent lists them (`explorer/specs/`).
+pub fn specs() -> crate::explorer::specs::Specs {
+    use crate::explorer::specs::{Spec, Specs};
+    let root = "/Users/demo/code/blog";
+    let spec = |id: &str, title: &str, parent: Option<&str>, refs: &[&str], dir: &str, draft: bool| Spec {
+        id: id.into(),
+        title: title.into(),
+        status: Some(if draft { "draft" } else { "active" }.into()),
+        parent: parent.map(Into::into),
+        references: refs.iter().map(|r| r.to_string()).collect(),
+        path: format!("{root}/{dir}SPEC.md"),
+    };
+    Specs {
+        root: root.into(),
+        specs: vec![
+            spec("blog", "Northwind blog — product news for customers", None, &[], "", false),
+            spec("posts", "content/posts — one release, one post", Some("blog"), &["theme"], "content/posts/", false),
+            spec("pages", "content/pages — the pages that stay", Some("blog"), &[], "content/pages/", true),
+            spec("theme", "theme — the Ghost theme and its covers", Some("blog"), &[], "theme/", false),
+        ],
+    }
+}
+
+fn spec_text(path: &str) -> String {
+    if path.ends_with("content/posts/SPEC.md") {
+        return "---\nid: posts\ntype: module-design\nstatus: active\ntitle: content/posts — one release, one post\nparent: blog\nreferences: [theme]\n---\n\n# One release, one post\n\nEvery release the customers notice gets one post, written for the people who use the product.\n\n## Boundary\n\n- A post says what changed **for the reader**: a refactor, a dependency bump or an internal rename is not news.\n- The changelog is the source; the post never promises what the changelog does not have.\n\n## Contracts\n\n- Front matter: `title`, two `tags`, a `cover` (1600×900, from `theme`), `status: draft` until the person says *publish*.\n- A post is a draft first, always. Publishing is the person's call.\n\n## Decisions\n\n- **Short over complete.** Three changes a reader feels beat ten they do not.\n- Titles say the benefit (*search that understands you*), not the version alone.\n".into();
+    }
+    "---\nid: blog\ntype: goal-and-requirements\ntitle: Northwind blog\n---\n\n# Northwind blog\n\nProduct news and guides for our customers.\n".into()
 }
 
 /// A file's text at the last commit (`explorer/git.rs`): the release post had another title, no

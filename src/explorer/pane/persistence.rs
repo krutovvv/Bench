@@ -37,6 +37,11 @@ enum Tab {
         machine: Option<String>,
         path: String,
     },
+    Spec {
+        project: String,
+        machine: Option<String>,
+        path: String,
+    },
     TurnDiff {
         project: String,
         machine: Option<String>,
@@ -65,6 +70,11 @@ impl Tab {
             },
             DocKey::Problems { project } => Tab::Problems { project },
             DocKey::Diff(f) => Tab::Diff {
+                project: f.project,
+                machine: f.machine,
+                path: f.path,
+            },
+            DocKey::Spec(f) => Tab::Spec {
                 project: f.project,
                 machine: f.machine,
                 path: f.path,
@@ -106,6 +116,15 @@ impl Tab {
                 machine,
                 path,
             } => DocKey::Diff(FileRef {
+                project,
+                machine,
+                path,
+            }),
+            Tab::Spec {
+                project,
+                machine,
+                path,
+            } => DocKey::Spec(FileRef {
                 project,
                 machine,
                 path,

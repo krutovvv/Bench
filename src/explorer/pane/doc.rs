@@ -88,6 +88,8 @@ pub enum DocKey {
     /// What one turn of a thread changed in a file: the repository's trees at its start and end
     /// (`code/turn_diff.rs`), read only.
     TurnDiff { file: FileRef, turn: Turn },
+    /// A spec read with the graph around it (`explorer/specs/doc.rs`).
+    Spec(FileRef),
 }
 
 /// A turn's trees in the repository it changed (`agent/src/runtime/turns.ts`).
@@ -102,7 +104,7 @@ impl DocKey {
     /// The project it belongs to.
     pub fn project(&self) -> &str {
         match self {
-            DocKey::File(f) | DocKey::Diff(f) | DocKey::TurnDiff { file: f, .. } => &f.project,
+            DocKey::File(f) | DocKey::Diff(f) | DocKey::Spec(f) | DocKey::TurnDiff { file: f, .. } => &f.project,
             DocKey::Settings { project }
             | DocKey::Part { project, .. }
             | DocKey::Problems { project } => project,

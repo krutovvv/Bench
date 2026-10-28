@@ -74,6 +74,19 @@ impl BenchApp {
                 out.extend(self.folder_rows(&root, 0, cx));
             }
         }
+        // The decisions the code stands on: its specs by parent (`specs/`), when it has any.
+        if self.explorer_root().is_some() {
+            self.ensure_specs(window, cx);
+            let project = self.explorer.project.clone();
+            if let Some(Some(specs)) = self.explorer.specs.get(&project).cloned() {
+                if !specs.specs.is_empty() {
+                    out.push(self.heading("specs", "Specs", vec![], cx));
+                    if self.explorer.is_open("specs") {
+                        out.extend(self.spec_rows(&specs, cx));
+                    }
+                }
+            }
+        }
         // The agent's: its texts (the soul, prompts, skills), then its tools — the parts whose
         // group is "Agent". (The fold keeps its old key, "instructions".)
         out.push(self.heading("instructions", "Agent", vec![], cx));

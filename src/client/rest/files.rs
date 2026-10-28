@@ -172,6 +172,11 @@ pub fn git_head(
     Ok(v["text"].as_str().map(str::to_string))
 }
 
+/// The specs of the repository around `path` (`/api/specs`, `agent/src/specs.ts`), as JSON.
+pub fn specs(conn: &Connection, machine: Option<&str>, path: &str) -> Result<Value> {
+    get(conn, &format!("/api/specs?path={}{}", enc(path), on(machine)))
+}
+
 /// A file as a git tree has it (a turn's start or end, `agent/src/runtime/turns.ts`): its text,
 /// or None when the tree has no such file.
 pub fn git_show(

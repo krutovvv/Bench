@@ -238,6 +238,10 @@ pub fn doc_tab(
 
 /// ⌘P's list over the middle: its width, and how tall it grows.
 pub const QUICK_W: f32 = 560.;
+/// A spec's tab: its text's column, as a document reads (Xcode's documentation viewer).
+pub const SPEC_COLUMN_W: f32 = 760.;
+/// The width of a spec's link labels ("Under", "Referred to by").
+pub const SPEC_LINK_LABEL_W: f32 = 110.;
 pub const QUICK_MAX_H: f32 = 420.;
 
 /// A dock's size (a side dock's width, the bottom dock's height): at first, and how far it can be

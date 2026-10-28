@@ -219,8 +219,10 @@ impl BenchApp {
 
     /// Every listed folder read again (the agent may have changed them).
     pub fn refresh_explorer(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        // Ignored paths follow .gitignore and the files themselves: asked for again.
+        // Ignored paths follow .gitignore and the files themselves: asked for again; so are the
+        // specs, which the agent may have written meanwhile.
         self.explorer.ignored.clear();
+        self.explorer.specs.remove(&self.explorer.project.clone());
         self.explorer.ignored_asked.clear();
         let project = self.explorer.project.clone();
         let root = self.explorer_root();

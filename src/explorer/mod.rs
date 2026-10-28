@@ -9,6 +9,7 @@
 //! explorer/tree/    the tree: drawn, its parts, its menus, new / rename / delete
 //! explorer/pane/    the middle: documents, tabs, a file's editor, kept between starts
 //! explorer/search/  ⌘P a file by name, ⌘⇧F a text in the folder
+//! explorer/specs/   the project's specs: their tree by parent, a spec as a tab with its links
 //! explorer/code/    language servers (problems, hover, definition), Problems, git, languages
 //! ```
 
@@ -16,6 +17,7 @@
 pub mod code;
 pub mod pane;
 pub mod search;
+pub mod specs;
 pub mod tree;
 
 use std::collections::{HashMap, HashSet};
@@ -95,6 +97,10 @@ pub struct Explorer {
     /// Each project's Problems as last read (None: being read): (path, its problems).
     pub problems: HashMap<String, Option<Vec<(String, Vec<lsp_types::Diagnostic>)>>>,
     pub find: Option<Find>,
+    /// Each project's specs as last read (None: being read), `specs/`; the specs' texts open
+    /// in tabs, by path (None: being read).
+    pub specs: HashMap<String, Option<specs::Specs>>,
+    pub spec_texts: HashMap<String, Option<String>>,
     /// The left dock lists the project's threads in place of its tree (Files | Threads at its
     /// top): one clicked is the thread beside the document.
     pub threads: bool,

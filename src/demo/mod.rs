@@ -15,7 +15,7 @@ mod journal;
 mod thread;
 mod threads;
 
-pub use env::{env, file_head, file_problems, file_text, ignored, listing};
+pub use env::{env, file_head, file_problems, file_text, ignored, listing, specs};
 pub use inserts::terminal;
 
 use inserts::other_modes;

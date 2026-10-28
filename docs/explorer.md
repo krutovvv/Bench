@@ -112,6 +112,11 @@ one click away) and grows by putting the same parts in more places, not by new c
   "Add to thread", sends the file. A message carries them under its words as fenced blocks with
   `path:lines` — what the agent reads, what the thread shows. The same chips will carry a
   language server's problems and a terminal's output.
+- **Specs.** The tree's "Specs" group (after the folder, before Agent) shows the project's specs by
+  `parent`, not by folder: the module's name, what it is quieter, a draft dimmed
+  (`src/explorer/specs/`, from `GET /api/specs`). One opens as a tab read as a document: the
+  Markdown without its frontmatter in a reading column, over it the specs it is under, over,
+  refers to and is referred to by, each a link; "Edit" opens the file.
 - **Review comments.** ⌘⇧L (Thread → Comment on Selection…, the file head's speech bubble) opens
   a band under the editor naming the selected lines; Enter puts the comment in the composer as a
   chip (`Reference::Comment`, `src/explorer/pane/comment.rs`), the caret back in the code for the

@@ -38,6 +38,7 @@ impl DocKey {
         match self.clone() {
             DocKey::File(f) => Box::new(crate::explorer::pane::file::FileItem(f)),
             DocKey::Diff(f) => Box::new(crate::explorer::code::git::DiffItem(f)),
+            DocKey::Spec(f) => Box::new(crate::explorer::specs::doc::SpecItem(f)),
             DocKey::TurnDiff { file, turn } => {
                 Box::new(crate::explorer::code::turn_diff::TurnDiffItem { file, turn })
             }
