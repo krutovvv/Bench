@@ -10,7 +10,6 @@ mod telegram;
 mod thread_row;
 mod top;
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -106,8 +105,7 @@ impl BenchApp {
         let host_color: Option<Hsla> = self
             .mark_of(&format!("p:{}", crate::app::model::ProjectKey::HOST))
             .color
-            .and_then(|c| crate::sidebar::marks::MARK_COLORS.get(c))
-            .map(|c| rgb(*c).into());
+            .and_then(bench_ui::mark_color);
         let key = "open:loose".to_string();
         let open = self.ssh.collapsed.contains(&key);
         let group: SharedString = "loose-head".into();
@@ -135,16 +133,9 @@ impl BenchApp {
                 // "⋯" (on hover), as a right click: its environment, its color — the same menu as
                 // a project's, without pin and remove (it is always first, and always there).
                 .child(
-                    div()
-                        .flex_none()
-                        .opacity(0.)
-                        .group_hover(group.clone(), |s| s.opacity(1.))
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    bench_ui::on_group_hover(group.clone())
                         .child(
-                            Button::new("general-more")
-                                .ghost()
-                                .xsmall()
-                                .icon(Ico::Ellipsis.icon())
+                            bench_ui::row_icon_button("general-more", Ico::Ellipsis)
                                 .dropdown_menu(item_menu(
                                     cx.entity(),
                                     Item::Project(crate::app::model::ProjectKey::HOST.into()),
@@ -155,16 +146,9 @@ impl BenchApp {
                 // The gear (on hover), as on a project's row: this Mac's environment, in the
                 // Explorer.
                 .child(
-                    div()
-                        .flex_none()
-                        .opacity(0.)
-                        .group_hover(group.clone(), |s| s.opacity(1.))
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    bench_ui::on_group_hover(group.clone())
                         .child(
-                            Button::new("general-set")
-                                .ghost()
-                                .xsmall()
-                                .icon(Ico::Settings.icon())
+                            bench_ui::row_icon_button("general-set", Ico::Settings)
                                 .tooltip("Settings")
                                 .on_click(cx.listener(|this, _, window, cx| {
                                     cx.stop_propagation();

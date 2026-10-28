@@ -113,3 +113,15 @@ fn line(w: f32, color: Hsla) -> AnyElement {
         .bg(color)
         .into_any_element()
 }
+
+/// The colours a thread or a project can be marked with: red, orange, yellow, green, blue,
+/// violet, pink. Saved by index: new ones go at the end, so a saved mark never changes colour.
+const MARKS: [u32; 7] = [0xD0605A, 0xD99A4E, 0xD6C24A, 0x6DB86A, 0x5C8FD8, 0x9A6AD6, 0xD46A9F];
+
+/// How many mark colours there are.
+pub const MARK_COUNT: usize = MARKS.len();
+
+/// The mark colour `index`, if there is one.
+pub fn mark_color(index: usize) -> Option<Hsla> {
+    MARKS.get(index).map(|c| rgb(*c).into())
+}

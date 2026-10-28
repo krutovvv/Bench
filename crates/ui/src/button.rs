@@ -182,3 +182,18 @@ pub fn confirm_buttons(
                 }),
         )
 }
+
+/// A row's or a head's small icon button (its menu "⋯", its settings): no ground until hovered.
+pub fn row_icon_button(id: impl Into<ElementId>, icon: Ico) -> Button {
+    Button::new(id).ghost().xsmall().icon(icon.icon())
+}
+
+/// What shows only while the row `group` is hovered (its "⋯", its "+"); a press on it is its own,
+/// not the row's.
+pub fn on_group_hover(group: impl Into<SharedString>) -> Div {
+    div()
+        .flex_none()
+        .opacity(0.)
+        .group_hover(group.into(), |s| s.opacity(1.))
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+}

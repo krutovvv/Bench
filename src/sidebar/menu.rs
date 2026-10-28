@@ -39,7 +39,7 @@ pub(super) fn color_row(
                 Some(c) => d.child(
                     div()
                         .size(px(12.))
-                        .bg(Hsla::from(rgb(crate::sidebar::marks::MARK_COLORS[c]))),
+                        .bg(bench_ui::mark_color(c).unwrap_or_default()),
                 ),
                 None => d
                     .text_color(theme.muted_foreground)
@@ -58,7 +58,7 @@ pub(super) fn color_row(
         .gap_2()
         .ml(px(-16.))
         .py_1()
-        .children((0..crate::sidebar::marks::MARK_COLORS.len()).map(|c| swatch(Some(c))))
+        .children((0..bench_ui::MARK_COUNT).map(|c| swatch(Some(c))))
         .child(swatch(None))
         .into_any_element()
 }

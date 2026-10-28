@@ -2,7 +2,6 @@
 //! gear (its environment in the Explorer) and "+" for a new thread in it; the fold is always
 //! shown), then its threads on the head's guide.
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
 use gpui_kit::component::tooltip::Tooltip;
@@ -59,8 +58,7 @@ impl BenchApp {
         // A chosen color is the project's icon and name, no background: it marks the group.
         let color: Option<Hsla> = mark
             .color
-            .and_then(|c| crate::sidebar::marks::MARK_COLORS.get(c))
-            .map(|c| rgb(*c).into());
+            .and_then(bench_ui::mark_color);
         let armed = self.armed.is(&format!("p:{}", p.id));
         let renaming = self.renaming_field(&Item::Project(p.id.clone()));
         let mut out = vec![
@@ -114,16 +112,9 @@ impl BenchApp {
                 })
                 // "⋯" (on hover): the same menu as a right click.
                 .child(
-                    div()
-                        .flex_none()
-                        .opacity(0.)
-                        .group_hover(group.clone(), |s| s.opacity(1.))
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    bench_ui::on_group_hover(group.clone())
                         .child(
-                            Button::new(("pmore", g))
-                                .ghost()
-                                .xsmall()
-                                .icon(Ico::Ellipsis.icon())
+                            bench_ui::row_icon_button(("pmore", g), Ico::Ellipsis)
                                 .dropdown_menu(item_menu(
                                     cx.entity(),
                                     Item::Project(menu_id.clone()),
@@ -135,16 +126,9 @@ impl BenchApp {
                 // in the menu — a door to Settings that only shows on a right click is a door
                 // nobody finds; the gear says settings, and what it opens says there is more.
                 .child(
-                    div()
-                        .flex_none()
-                        .opacity(0.)
-                        .group_hover(group.clone(), |s| s.opacity(1.))
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    bench_ui::on_group_hover(group.clone())
                         .child(
-                            Button::new(("pset", g))
-                                .ghost()
-                                .xsmall()
-                                .icon(Ico::Settings.icon())
+                            bench_ui::row_icon_button(("pset", g), Ico::Settings)
                                 .tooltip("Settings")
                                 .on_click(cx.listener(move |this, _, window, cx| {
                                     cx.stop_propagation();

@@ -1,7 +1,6 @@
 //! A thread's row in the sidebar: its title, its state (running, unread, waiting), its mark, and
 //! what it does on a click, a drag or a key.
 
-use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
 use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -80,10 +79,7 @@ impl BenchApp {
                 // Opening the menu must not also open the chat.
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .child(
-                    Button::new(("more", i))
-                        .ghost()
-                        .xsmall()
-                        .icon(Ico::Ellipsis.icon())
+                    bench_ui::row_icon_button(("more", i), Ico::Ellipsis)
                         .dropdown_menu(item_menu(
                             view.clone(),
                             Item::Thread(id.clone()),
@@ -98,8 +94,7 @@ impl BenchApp {
         let stripe = self
             .mark_of(s.id.as_str())
             .color
-            .and_then(|c| crate::sidebar::marks::MARK_COLORS.get(c))
-            .map(|c| -> Hsla { rgb(*c).into() });
+            .and_then(bench_ui::mark_color);
 
         let pinned = self.mark_of(s.id.as_str()).pinned;
         let menu_id = s.id.clone();
