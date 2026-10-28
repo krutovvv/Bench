@@ -56,6 +56,17 @@ pub const CHAT_RIGHT: f32 = CHAT_TEXT;
 /// The thread's column at its widest, its margins with it (a text of ~720 px): a wider pane
 /// centres it rather than lengthening its lines.
 pub const THREAD_MAX_W: f32 = 860.;
+/// The person's message as a bubble (the chat): its padding and corner.
+pub const BUBBLE_PX: f32 = 14.;
+pub const BUBBLE_PY: f32 = 8.;
+pub const BUBBLE_R: f32 = 16.;
+/// The pinned composer (the chat): its card's corner, its inset from the thread's sides, the
+/// air under it, its tools' line.
+pub const COMPOSER_CARD_R: f32 = 12.;
+pub const COMPOSER_CARD_PB: f32 = 12.;
+/// The chat composer's Send: a round button, and Stop's square mark inside it.
+pub const SEND_BUTTON: f32 = 28.;
+pub const STOP_MARK: f32 = 9.;
 /// Every thread row pads its top and bottom by this, so two rows are 2 × TURN_Y apart.
 pub const TURN_Y: f32 = 14.;
 
@@ -193,6 +204,8 @@ pub const ATTACHED_PB: f32 = 4.;
 /// The composer: its field's own padding (gpui-component's input), the tools' column on its
 /// right, the tools' line under it, the gap between its lines, the air under the field.
 pub const INPUT_PAD_X: f32 = 12.;
+/// An icon button's padding round its glyph (`icon_button`).
+pub const ICON_BUTTON_PAD: f32 = 4.;
 pub const INPUT_PAD_Y: f32 = 10.;
 pub const COMPOSER_TOOLS_W: f32 = 56.;
 pub const COMPOSER_TOOLS_H: f32 = 40.;

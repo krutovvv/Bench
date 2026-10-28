@@ -42,6 +42,7 @@ macro_rules! icons {
 
 icons! {
     ArrowDown => "arrow-down",
+    ArrowUp => "arrow-up",
     Activity => "activity",
     AppWindow => "app-window",
     Bell => "bell",

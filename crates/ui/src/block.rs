@@ -100,6 +100,17 @@ pub fn turn_row(agent: Option<bool>, body: impl IntoElement, cx: &App) -> Div {
         .child(div().flex_1().min_w_0().child(body))
 }
 
+/// A turn's row without an avatar's gutter (the chat): the body between the thread's margins.
+pub fn turn_row_plain(body: impl IntoElement, _cx: &App) -> Div {
+    h_flex()
+        .w_full()
+        .px(px(CHAT_LEFT))
+        .py(px(TURN_Y))
+        .items_start()
+        .text_base()
+        .child(div().flex_1().min_w_0().child(body))
+}
+
 /// What an empty area says: one muted line.
 pub fn empty_state(text: impl Into<SharedString>, cx: &App) -> Div {
     div()

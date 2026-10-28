@@ -18,6 +18,7 @@ pub(crate) mod composer;
 pub(crate) mod rows;
 mod beside;
 mod list;
+pub(crate) mod look;
 mod meters;
 mod open;
 mod panel;
@@ -140,9 +141,11 @@ impl ThreadView {
         .flex_1()
         .min_h_0();
         let composer = self.composer.clone();
-        div()
+        let area = div()
             .relative()
-            .size_full()
+            .w_full()
+            .flex_1()
+            .min_h_0()
             // A file dropped anywhere on the thread — in the middle, in a dock, beside another —
             // waits in the composer with the next message (`attachments.rs`).
             .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
@@ -210,7 +213,56 @@ impl ThreadView {
                                 .on_click(cx.listener(|this, _, _, cx| this.jump_to_latest(cx))),
                         ),
                 )
-            })
+            });
+        if look::COMPOSER_IN_LIST {
+            return area.into_any_element();
+        }
+        // The chat: the composer pinned under the list, in the thread's column, with the agent's
+        // wait said over it while the person is elsewhere in the thread.
+        let waiting = !self.thread.journal.asks().is_empty() && below;
+        let composer = self.render_composer(cx);
+        v_flex()
+            .size_full()
+            .child(area)
+            .child(
+                h_flex().w_full().flex_none().justify_center().child(
+                    v_flex()
+                        .w_full()
+                        .max_w(px(bench_ui::THREAD_MAX_W))
+                        .px(px(bench_ui::CHAT_LEFT))
+                        .pb(px(bench_ui::COMPOSER_CARD_PB))
+                        .gap_2()
+                        .when(waiting, |d| d.child(self.render_waiting_line(cx)))
+                        .child(composer),
+                ),
+            )
+            .into_any_element()
+    }
+
+    /// Over the pinned composer while the agent waits for an answer and the question is out of
+    /// sight: one line, a click brings the question into view.
+    fn render_waiting_line(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        h_flex()
+            .id("waiting")
+            .h(px(bench_ui::CHIP_H))
+            .px_3()
+            .gap_2()
+            .items_center()
+            .rounded(px(bench_ui::COMPOSER_CARD_R))
+            .bg(theme.warning.opacity(0.12))
+            .text_size(px(bench_ui::THREAD_META))
+            .text_color(theme.foreground)
+            .cursor_pointer()
+            .child(bench_ui::dot(theme.warning))
+            .child("The agent is waiting for your answer")
+            .child(div().flex_1())
+            .child(
+                div()
+                    .text_color(theme.muted_foreground)
+                    .child("Show"),
+            )
+            .on_click(cx.listener(|this, _, _, cx| this.jump_to_latest(cx)))
             .into_any_element()
     }
 
@@ -419,8 +471,8 @@ impl ThreadView {
                 rows.push(
                     h_flex()
                         .w_full()
-                        .pl(px(bench_ui::CHAT_TEXT))
-                        .pr(px(bench_ui::CHAT_RIGHT))
+                        .pl(px(look::text_x()))
+                        .pr(px(look::text_right()))
                         .py(px(bench_ui::TURN_Y))
                         .gap_3()
                         .items_center()
@@ -442,7 +494,7 @@ impl ThreadView {
                 rows.push(
                     h_flex()
                         .w_full()
-                        .pl(px(bench_ui::CHAT_TEXT))
+                        .pl(px(look::text_x()))
                         .py(px(bench_ui::TURN_Y))
                         .child(
                             gpui_kit::component::shimmer::ShimmerText::new("Loading…")
@@ -455,14 +507,31 @@ impl ThreadView {
                 rows.push(
                     h_flex()
                         .w_full()
-                        .pl(px(bench_ui::CHAT_TEXT))
-                        .pr(px(bench_ui::CHAT_RIGHT))
+                        .pl(px(look::text_x()))
+                        .pr(px(look::text_right()))
                         .py(px(bench_ui::TURN_Y))
                         .child(
                             div()
                                 .w(px(bench_ui::PATH_FIELD_W))
                                 .child(gpui_kit::component::input::Input::new(&field).small()),
                         )
+                        .into_any_element(),
+                );
+            } else if self.thread.id.is_none() && !look::COMPOSER_IN_LIST {
+                // A new chat: one quiet line of where it is, the composer under it waiting.
+                let project = self.thread.project.clone();
+                let name = self
+                    .app(cx)
+                    .map(|a| a.project_name(&project))
+                    .unwrap_or_default();
+                rows.push(
+                    div()
+                        .w_full()
+                        .pt(px(bench_ui::TURN_Y * 2.))
+                        .text_center()
+                        .text_size(px(bench_ui::THREAD_META))
+                        .text_color(bench_ui::faint(&theme))
+                        .child(format!("A new thread in {name}"))
                         .into_any_element(),
                 );
             }
@@ -481,9 +550,12 @@ impl ThreadView {
         cx.notify();
     }
 
-    /// After the last row: the composer. Everything the agent produced stands in the journal —
-    /// its plans, questions and background processes inside the work that wrote them.
+    /// The list's last item: the composer in the document; in the chat (where the composer is
+    /// pinned under the list) a row of air, so the last message does not touch the edge.
     fn render_tail(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        if !look::COMPOSER_IN_LIST {
+            return div().h(px(bench_ui::TURN_Y)).into_any_element();
+        }
         let composer = self.render_composer(cx);
         v_flex().w_full().child(composer).into_any_element()
     }

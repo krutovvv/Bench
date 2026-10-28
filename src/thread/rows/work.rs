@@ -319,7 +319,7 @@ impl ThreadView {
         artifacts.extend(self.processes_frame(key, processes, cx));
         // Work that only asked or only planned has no "N actions" line to open: the cards are it.
         let no_steps = steps.is_empty() && !live;
-        bench_ui::turn_row(
+        crate::thread::look::turn(
             Some(true),
             v_flex()
                 .gap_3()

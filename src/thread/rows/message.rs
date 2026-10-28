@@ -57,7 +57,30 @@ impl ThreadView {
                 )
             });
         let body = body.when_some(actions, |d, a| d.child(div().pt_2().child(a)));
-        bench_ui::turn_row(Some(false), body, cx).into_any_element()
+        // The chat: the person's words in a grey bubble on the right, as Messages has them
+        // (a queued one outlined, not filled: it has not gone yet).
+        if crate::thread::look::USER_BUBBLE {
+            let bubble = div()
+                .max_w(relative(0.8))
+                .px(px(bench_ui::BUBBLE_PX))
+                .py(px(bench_ui::BUBBLE_PY))
+                .rounded(px(bench_ui::BUBBLE_R))
+                .map(|d| {
+                    if muted {
+                        d.border_1().border_color(theme.border)
+                    } else {
+                        d.bg(theme.secondary)
+                    }
+                })
+                .child(body);
+            return crate::thread::look::turn(
+                Some(false),
+                h_flex().w_full().justify_end().child(bubble),
+                cx,
+            )
+            .into_any_element();
+        }
+        crate::thread::look::turn(Some(false), body, cx).into_any_element()
     }
 
     /// What the agent said. `k` is the row's place (the last answer gets Regenerate);
@@ -165,7 +188,7 @@ impl ThreadView {
                 }))
             })
             .child(
-                bench_ui::turn_row(if after_work { None } else { Some(true) }, body, cx)
+                crate::thread::look::turn(if after_work { None } else { Some(true) }, body, cx)
                     .when(after_work, |d| d.pt_0()),
             )
             // A pure chat answer carries its two where they are; an answer after work wears
@@ -195,7 +218,7 @@ impl ThreadView {
         let body = v_flex()
             .gap_3()
             .children(self.answer_body("writing", text, cx));
-        bench_ui::turn_row(if after_work { None } else { Some(true) }, body, cx)
+        crate::thread::look::turn(if after_work { None } else { Some(true) }, body, cx)
             .when(after_work, |d| d.pt_0())
             .into_any_element()
     }
@@ -203,7 +226,7 @@ impl ThreadView {
     /// Why a run stopped, kept in the journal.
     pub(crate) fn render_fail(&mut self, text: &str, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        bench_ui::turn_row(
+        crate::thread::look::turn(
             Some(true),
             div()
                 .text_color(theme.danger)

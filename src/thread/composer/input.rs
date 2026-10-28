@@ -72,7 +72,11 @@ impl ThreadView {
             div()
                 .absolute()
                 .top(px(top))
-                .left(px(bench_ui::CHAT_TEXT - 4.))
+                .left(px(if crate::thread::look::COMPOSER_IN_LIST {
+                    bench_ui::CHAT_TEXT - 4.
+                } else {
+                    bench_ui::INPUT_PAD_X - 4.
+                }))
                 .w(px(bench_ui::SLASH_LIST_W))
                 .child(
                     div()
@@ -164,15 +168,18 @@ impl ThreadView {
         let row_h = self
             .composer_h
             .max(2. * bench_ui::TURN_Y + bench_ui::AVATAR);
+        // The chat's composer is pinned under the list: its tools are a line of their own at
+        // the card's foot, always shown, with Send (or Stop while the agent works) at its end.
+        let in_list = crate::thread::look::COMPOSER_IN_LIST;
         let tools = h_flex()
-            .absolute()
-            .when(empty, |d| {
+            .when(in_list, |d| d.absolute())
+            .when(in_list && empty, |d| {
                 // The messages' right column, not the window's edge: the icons end where
                 // the thread's text ends (`right_0` measures from the row's border box,
                 // past its right padding).
                 d.top(px(bench_ui::TURN_Y)).right(px(bench_ui::CHAT_RIGHT))
             })
-            .when(!empty, |d| {
+            .when(in_list && !empty, |d| {
                 // Their line in the row's grown bottom band: bottom-anchored by their own
                 // height, at the text's left edge.
                 d.top(px(row_h - bench_ui::AVATAR - 2.))
@@ -182,7 +189,7 @@ impl ThreadView {
             .items_center()
             .gap_1()
             .when(
-                !(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
+                in_list && !(rec || trans) && std::env::var("BENCH_TOOLS_SHOWN").is_err(),
                 |d| d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.)),
             )
             .child(
@@ -240,6 +247,57 @@ impl ThreadView {
                     }))
                     .into_any_element()
             });
+        let tools = if in_list {
+            tools
+        } else {
+            let live = self.thread.live.is_some() || self.thread.journal.running();
+            let send = div()
+                .id("composer-send")
+                .flex_none()
+                .size(px(bench_ui::SEND_BUTTON))
+                .rounded_full()
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .map(|d| {
+                    if live {
+                        d.bg(theme.foreground).child(
+                            div()
+                                .size(px(bench_ui::STOP_MARK))
+                                .rounded(px(bench_ui::HAIRLINE * 2.))
+                                .bg(theme.background),
+                        )
+                    } else if empty {
+                        d.bg(theme.foreground.opacity(0.12))
+                            .text_color(theme.background)
+                            .child(Ico::ArrowUp.icon().xsmall())
+                    } else {
+                        d.bg(theme.primary)
+                            .text_color(theme.primary_foreground)
+                            .child(Ico::ArrowUp.icon().xsmall())
+                    }
+                })
+                .tooltip(move |window, cx| {
+                    Tooltip::new(if live { "Stop  ⌘." } else { "Send  ⌘⏎" }).build(window, cx)
+                })
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    if live {
+                        if let Some(thread) = this.thread.id.clone() {
+                            this.tell(protocol::StopThread { thread }, cx);
+                        }
+                    } else {
+                        this.send(window, cx);
+                    }
+                }));
+            // The icons' glyphs on the text's edge (their buttons' own padding pulled back),
+            // Send at the line's other end.
+            tools
+                .w_full()
+                .ml(px(-bench_ui::ICON_BUTTON_PAD))
+                .child(div().flex_1())
+                .child(send)
+        };
         v_flex()
             .id("composer")
             .relative()
@@ -296,21 +354,33 @@ impl ThreadView {
                     .group("composer-row")
                     .relative()
                     .w_full()
-                    .pl(px(bench_ui::CHAT_LEFT))
-                    .pr(px(bench_ui::CHAT_RIGHT))
-                    .py(px(bench_ui::TURN_Y))
-                    // The tools' line under the field, reserved while words are in it.
-                    .when(!self.composer.read(cx).value().trim().is_empty(), |d| {
-                        d.pb(px(bench_ui::COMPOSER_TOOLS_H))
+                    .when(in_list, |d| {
+                        d.pl(px(bench_ui::CHAT_LEFT))
+                            .pr(px(bench_ui::CHAT_RIGHT))
+                            .py(px(bench_ui::TURN_Y))
+                            // The tools' line under the field, reserved while words are in it.
+                            .when(!empty, |d| d.pb(px(bench_ui::COMPOSER_TOOLS_H)))
+                            .gap(px(bench_ui::CHAT_TEXT - bench_ui::CHAT_LEFT - bench_ui::AVATAR))
+                            .items_start()
                     })
-                    .gap(px(bench_ui::CHAT_TEXT
-                        - bench_ui::CHAT_LEFT
-                        - bench_ui::AVATAR))
-                    .items_start()
+                    // The chat: a card, its text on top and its tools' line at its foot.
+                    .when(!in_list, |d| {
+                        d.flex_col()
+                            .items_stretch()
+                            .gap_1()
+                            .px_3()
+                            .pt(px(bench_ui::INPUT_PAD_Y))
+                            .pb_1p5()
+                            .rounded(px(bench_ui::COMPOSER_CARD_R))
+                            .border_1()
+                            .border_color(theme.border)
+                            .bg(theme.background)
+                            .shadow_md()
+                    })
                     .text_base()
                     // The person's avatar even in a new chat: an empty sheet with no sign of whose
                     // turn it is was not clear (the user, after trying a bare caret).
-                    .child(bench_ui::avatar(false, &theme))
+                    .when(in_list, |d| d.child(bench_ui::avatar(false, &theme)))
                     .child(
                         v_flex()
                             .flex_1()
@@ -330,7 +400,7 @@ impl ThreadView {
                                     // the font's own 1.41 em, which set typed lines 3 px
                                     // tighter than the thread's. 1.5rem is the thread's leading
                                     // exactly, since the thread's prose is 1rem.
-                                    div().ml(px(-bench_ui::INPUT_PAD_X)).mr(px(bench_ui::COMPOSER_TOOLS_W)).my(px(-bench_ui::INPUT_PAD_Y)).child(
+                                    div().ml(px(-bench_ui::INPUT_PAD_X)).mr(px(if in_list { bench_ui::COMPOSER_TOOLS_W } else { 0. })).my(px(-bench_ui::INPUT_PAD_Y)).child(
                                         Textarea::new(&self.composer)
                                             .appearance(false)
                                             .large()

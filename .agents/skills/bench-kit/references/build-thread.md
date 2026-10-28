@@ -39,7 +39,10 @@ renderer in `src/thread/`.
 - **Rows keep their place while measured again.** Changed rows are `remeasure_items`d, only the
   count changes by `splice`, at the end (`thread::diff`). Splicing a range resets the list's
   offset inside it — that was the jitter.
-- **The room past the end** (an editor's scroll past its last line): exactly as tall as puts the
+- **The look** (`src/thread/look.rs`): `Chat` (the default — no avatars, the person's messages
+  as bubbles, the composer pinned under the list, no room past the end) or `Document` (avatars,
+  the composer as the list's last row, the room below). One line, `pub type Current`, picks it.
+- **The room past the end** (the document's) (an editor's scroll past its last line): exactly as tall as puts the
   composer, scrolled to the end, where it stands in a new thread (`room_past_end`). Recomputed
   each frame and remeasured when it changes.
 - **"Jump to latest" goes to the very end** by `scroll_to_end` with the room at zero for one

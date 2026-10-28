@@ -75,6 +75,10 @@ impl View {
     /// viewport and does not scroll at all. The tail's height is the last frame's; `window_h`
     /// stands in for the viewport before the list's first layout.
     pub(super) fn room_past_end(&self, window_h: Pixels) -> Pixels {
+        // The chat ends at its last message: no editor's room past the end.
+        if !super::look::COMPOSER_IN_LIST {
+            return px(0.);
+        }
         let viewport = match self.list.viewport_bounds().size.height {
             h if h > px(0.) => h,
             _ => window_h - px(bench_ui::STATUS_H + 36.),

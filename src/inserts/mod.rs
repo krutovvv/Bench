@@ -275,7 +275,7 @@ impl ThreadView {
                 }),
             )
             .child(content);
-        bench_ui::turn_row(Some(true), body, cx).into_any_element()
+        crate::thread::look::turn(Some(true), body, cx).into_any_element()
     }
 
     /// The block an insert sits in — its head (fold, title and its menu, controls, remove), its
@@ -423,7 +423,7 @@ impl ThreadView {
                 }),
             )
             .child(frame);
-        bench_ui::turn_row(Some(false), body, cx).into_any_element()
+        crate::thread::look::turn(Some(false), body, cx).into_any_element()
     }
 }
 
