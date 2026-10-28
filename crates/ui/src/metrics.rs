@@ -83,6 +83,8 @@ pub const BAR_TEXT: f32 = 12.;
 /// a block's head ("Background · 1 running") — a step under the messages, so the answer leads.
 pub const THREAD_META: f32 = 13.;
 pub const BAR_TITLE: f32 = 13.;
+/// The short rule between the sidebar's part of the top bar and the title.
+pub const BAR_SEPARATOR_H: f32 = 16.;
 
 /// The header's Chat | Code switch: the track's inset around its segments, and a segment's height.
 pub const MODE_SWITCH_PAD: f32 = 2.;

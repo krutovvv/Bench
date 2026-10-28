@@ -17,7 +17,8 @@ pub fn search_band(input: &Entity<InputState>, cx: &App) -> Div {
         .flex_none()
         .w_full()
         .px(px(crate::metrics::SIDEBAR_ROW_INSET))
-        .pb_2()
+        .pt_2()
+        .pb_1()
         .child(
             h_flex()
                 .w_full()
