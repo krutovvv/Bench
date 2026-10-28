@@ -155,8 +155,10 @@ impl Section for Schedule {
 }
 
 impl ExplorerParts for Schedule {
+    /// What the project does by itself sits with what it is set to: the tree's Project group
+    /// (the agent's own texts and tools are the groups above it).
     fn group(&self) -> &'static str {
-        "Schedule"
+        "Project"
     }
 
     fn block(&self, _general: bool) -> &'static str {

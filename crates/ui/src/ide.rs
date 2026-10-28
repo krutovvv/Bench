@@ -29,6 +29,7 @@ pub fn tree_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx
         .gap_1()
         .items_center()
         .text_xs()
+        .font_weight(FontWeight::SEMIBOLD)
         .text_color(theme.muted_foreground)
         .child(
             div()
@@ -68,7 +69,8 @@ pub fn tree_row(
         .py_1()
         .gap_1p5()
         .items_center()
-        .text_base()
+        // The left dock's one size, the sidebar's: the tree is a list too.
+        .text_size(px(crate::metrics::SIDEBAR_TEXT))
         .cursor_pointer()
         .when(chosen, |d| d.bg(theme.list_active))
         .when(!chosen, |d| d.hover(|s| s.bg(theme.list_hover)))

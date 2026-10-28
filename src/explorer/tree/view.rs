@@ -94,12 +94,21 @@ impl BenchApp {
                 out.extend(self.part_rows(e, g, alone, cx));
             }
         }
-        // Last, what the project is set to: its settings, a document like the rest.
+        // Last, what the project is set to: its settings, a document like the rest — in the
+        // Project group, after what a part put there (its schedule); a heading of its own when
+        // no part did.
         let settings = DocKey::Settings {
             project: self.explorer.project.clone(),
         };
         let theme = cx.theme().clone();
-        out.push(bench_ui::tree_heading("Project", vec![], cx).into_any_element());
+        let project_group = PARTS
+            .iter()
+            .any(|s| s.group() == "Project" && s.shown(self, e));
+        if !project_group {
+            out.push(bench_ui::tree_heading("Project", vec![], cx).into_any_element());
+        } else if !self.explorer.is_open("g:Project") {
+            return out;
+        }
         out.push(
             bench_ui::tree_row(
                 "ex-settings",
