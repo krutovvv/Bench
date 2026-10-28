@@ -62,12 +62,14 @@ pub const THREAD_MAX_W: f32 = 860.;
 pub const BUBBLE_PX: f32 = 14.;
 pub const BUBBLE_PY: f32 = 8.;
 pub const BUBBLE_R: f32 = 16.;
-/// The pinned composer (the chat): its card's corner, its inset from the thread's sides, the
-/// air under it, its tools' line.
-pub const COMPOSER_CARD_R: f32 = 18.;
+/// The pinned composer (the chat): one line of a field, as Claude's — the plus, the text, the
+/// mic and Send — its corner, the air under it in the window.
+pub const COMPOSER_CARD_R: f32 = 14.;
 pub const COMPOSER_CARD_PB: f32 = 12.;
-/// The air inside the card under its tools' line.
-pub const COMPOSER_CARD_PB_IN: f32 = 6.;
+/// The air inside the card around its line (the buttons'; the text is centred on their height).
+pub const COMPOSER_CARD_PY: f32 = 8.;
+/// Its sides: the plus and Send set in by this from the card's rule.
+pub const COMPOSER_CARD_PX: f32 = 8.;
 /// The chat composer's Send: a round button, and Stop's square mark inside it.
 pub const SEND_BUTTON: f32 = 26.;
 pub const STOP_MARK: f32 = 9.;

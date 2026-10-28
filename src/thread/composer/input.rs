@@ -256,11 +256,11 @@ impl ThreadView {
                 |d| d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.)),
             )
             .when(in_list, |d| d.children(attach.take()).children(mic.take()));
-        let tools = if in_list {
-            tools
-        } else {
-            let live = self.thread.live.is_some() || self.thread.journal.running();
-            let send = div()
+        // The chat's Send at the line's end: the accent with words to send, a quiet disc
+        // without, Stop (a square) while the agent works.
+        let live = self.thread.live.is_some() || self.thread.journal.running();
+        let send = (!in_list).then(|| {
+            div()
                 .id("composer-send")
                 .flex_none()
                 .size(px(bench_ui::SEND_BUTTON))
@@ -278,7 +278,6 @@ impl ThreadView {
                                 .bg(theme.background),
                         )
                     } else if empty {
-                        // Nothing to send: a quiet grey disc, its arrow in the muted text.
                         d.bg(theme.foreground.opacity(0.07))
                             .text_color(theme.muted_foreground)
                             .child(Ico::ArrowUp.icon().xsmall())
@@ -299,19 +298,38 @@ impl ThreadView {
                     } else {
                         this.send(window, cx);
                     }
-                }));
-            // The icons' glyphs on the text's edge (their buttons' own padding pulled back),
-            // Send at the line's other end.
-            // Plus on the text's edge (its button's padding pulled back); the mic and Send at
-            // the line's other end, as Messages and ChatGPT have them.
-            tools
-                .w_full()
-                .ml(px(-bench_ui::ICON_BUTTON_PAD))
-                .children(attach.take())
-                .child(div().flex_1())
-                .children(mic.take())
-                .child(send)
-        };
+                }))
+        });
+        // A Large textarea pads its text 12 left and 10 above and below (gpui-component's
+        // input_px/py): pulled back by exactly that, so its first line sits where a message's
+        // does. Large = the messages' size; it grows with the text (no scroll of its own: the
+        // thread scrolls). The leading is set on the field itself — the library's input pins a
+        // line height inside — and it must be given in REM: the widget builds its rows from an
+        // absolute leading and lets a relative one fall through to the font's own 1.41 em. 1.5rem
+        // is the thread's leading exactly, since the thread's prose is 1rem.
+        let field = div().w_full().relative().child(
+            div()
+                .ml(px(-bench_ui::INPUT_PAD_X))
+                .mr(px(if in_list { bench_ui::COMPOSER_TOOLS_W } else { 0. }))
+                .my(px(-bench_ui::INPUT_PAD_Y))
+                .child(
+                    Textarea::new(&self.composer)
+                        .appearance(false)
+                        .large()
+                        .line_height(rems(bench_ui::LEAD)),
+                ),
+        );
+        // Files waiting to go: under the text in the document (where they sit once sent), over
+        // it in the chat's field, as Claude's.
+        let chips = (!chips.is_empty()).then(|| {
+            h_flex()
+                .flex_wrap()
+                .gap_2()
+                .when(in_list, |d| {
+                    d.pr(px(bench_ui::COMPOSER_TOOLS_W)).pb(px(bench_ui::COMPOSER_PB))
+                })
+                .children(chips)
+        });
         v_flex()
             .id("composer")
             .relative()
@@ -362,83 +380,76 @@ impl ThreadView {
             // down. Enter is a new line, ⌘Enter sends; the buttons — an answer's own small ones —
             // show on hover (⌘⇧D dictates, files are dropped or pasted), a Stop that matters
             // always.
-            .child(
+            .child(if in_list {
                 h_flex()
                     .id("composer-row")
                     .group("composer-row")
                     .relative()
                     .w_full()
-                    .when(in_list, |d| {
-                        d.pl(px(bench_ui::CHAT_LEFT))
-                            .pr(px(bench_ui::CHAT_RIGHT))
-                            .py(px(bench_ui::TURN_Y))
-                            // The tools' line under the field, reserved while words are in it.
-                            .when(!empty, |d| d.pb(px(bench_ui::COMPOSER_TOOLS_H)))
-                            .gap(px(bench_ui::CHAT_TEXT - bench_ui::CHAT_LEFT - bench_ui::AVATAR))
-                            .items_start()
-                    })
-                    // The chat: a card, its text on top and its tools' line at its foot.
-                    .when(!in_list, |d| {
-                        d.flex_col()
-                            .items_stretch()
-                            .gap_1()
-                            .px_3()
-                            .pt(px(bench_ui::INPUT_PAD_Y))
-                            .pb(px(bench_ui::COMPOSER_CARD_PB_IN))
-                            .rounded(px(bench_ui::COMPOSER_CARD_R))
-                            .border_1()
-                            .border_color(theme.border)
-                            .bg(theme.background)
-                            // No shadow: a Mac's text field is a rule on the page, not a card
-                            // over it; a soft lift only while it has the focus would be the
-                            // focus ring's job.
-                    })
+                    .pl(px(bench_ui::CHAT_LEFT))
+                    .pr(px(bench_ui::CHAT_RIGHT))
+                    .py(px(bench_ui::TURN_Y))
+                    // The tools' line under the field, reserved while words are in it.
+                    .when(!empty, |d| d.pb(px(bench_ui::COMPOSER_TOOLS_H)))
+                    .gap(px(bench_ui::CHAT_TEXT - bench_ui::CHAT_LEFT - bench_ui::AVATAR))
+                    .items_start()
                     .text_base()
-                    // The person's avatar even in a new chat: an empty sheet with no sign of whose
-                    // turn it is was not clear (the user, after trying a bare caret).
-                    .when(in_list, |d| d.child(bench_ui::avatar(false, &theme)))
+                    // The person's avatar even in a new chat: an empty sheet with no sign of
+                    // whose turn it is was not clear (the user, after trying a bare caret).
+                    .child(bench_ui::avatar(false, &theme))
                     .child(
                         v_flex()
                             .flex_1()
                             .min_w_0()
                             .gap(px(bench_ui::COMPOSER_GAP))
-                            .child(
-                                div().w_full().relative().child(
-                                    // A Large textarea pads its text 12 left and 10 above
-                                    // and below (gpui-component's input_px/py): pulled back
-                                    // by exactly that, so its first line sits where a
-                                    // message's does. Large = the messages' size; it grows
-                                    // with the text (no scroll of its own: the thread
-                                    // scrolls). The leading is set on the field itself — the
-                                    // library's input pins a line height inside — and it must
-                                    // be given in REM: the widget builds its rows from an
-                                    // absolute leading and lets a relative one fall through to
-                                    // the font's own 1.41 em, which set typed lines 3 px
-                                    // tighter than the thread's. 1.5rem is the thread's leading
-                                    // exactly, since the thread's prose is 1rem.
-                                    div().ml(px(-bench_ui::INPUT_PAD_X)).mr(px(if in_list { bench_ui::COMPOSER_TOOLS_W } else { 0. })).my(px(-bench_ui::INPUT_PAD_Y)).child(
-                                        Textarea::new(&self.composer)
-                                            .appearance(false)
-                                            .large()
-                                            .line_height(rems(bench_ui::LEAD)),
-                                    ),
-                                ),
-                            )
-                            // Files waiting to go, under the text — where they sit once sent,
-                            // so the same message never flips while it is being written.
-                            .when(!chips.is_empty(), |d| {
-                                d.child(
-                                    h_flex()
-                                        .flex_wrap()
-                                        .gap_2()
-                                        .pr(px(bench_ui::COMPOSER_TOOLS_W))
-                                        .pb(px(bench_ui::COMPOSER_PB))
-                                        .children(chips),
-                                )
-                            }),
+                            .child(field)
+                            .children(chips),
                     )
-                    .child(tools),
-            )
+                    .child(tools)
+                    .into_any_element()
+            } else {
+                // The chat: one line of a field, as Claude's — the plus, the text, the mic and
+                // Send; the text grows up from the buttons, which stay on its last line. Files
+                // to send ride over the text. No shadow: a Mac's text field is a rule on the
+                // page, not a card over it.
+                v_flex()
+                    .id("composer-row")
+                    .group("composer-row")
+                    .w_full()
+                    .px(px(bench_ui::COMPOSER_CARD_PX))
+                    .py(px(bench_ui::COMPOSER_CARD_PY))
+                    .gap_2()
+                    .rounded(px(bench_ui::COMPOSER_CARD_R))
+                    .border_1()
+                    .border_color(theme.border)
+                    .bg(theme.background)
+                    .text_base()
+                    .children(chips.map(|c| div().px(px(bench_ui::ICON_BUTTON_PAD)).child(c)))
+                    .child(
+                        h_flex()
+                            .w_full()
+                            .items_end()
+                            .gap_1()
+                            // The small buttons centred on Send's height, the line they share.
+                            .children(attach.take().map(|b| {
+                                h_flex().flex_none().h(px(bench_ui::SEND_BUTTON)).child(b)
+                            }))
+                            // Its line centred on the buttons' height.
+                            .child(
+                                v_flex()
+                                    .flex_1()
+                                    .min_w_0()
+                                    .pl(px(bench_ui::ICON_BUTTON_PAD))
+                                    .py(px((bench_ui::SEND_BUTTON - bench_ui::LEAD * 14.) / 2.))
+                                    .child(field),
+                            )
+                            .children(mic.take().map(|b| {
+                                h_flex().flex_none().h(px(bench_ui::SEND_BUTTON)).child(b)
+                            }))
+                            .children(send),
+                    )
+                    .into_any_element()
+            })
             // Last and deferred: painted over the rows under it.
             .children(slash.map(|s| deferred(s).with_priority(1)))
             .into_any_element()
