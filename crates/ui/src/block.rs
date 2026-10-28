@@ -22,7 +22,7 @@ pub fn block_head(theme: &Theme, over_body: bool) -> Div {
         .text_color(theme.muted_foreground)
 }
 
-/// A block's frame: the page's ground, a thin border, the theme's corners; what is inside is cut
+/// A block's frame: the page's ground, a soft hairline, a card's corners; what is inside is cut
 /// to them. Every block of the thread is one (an insert, a card, the processes, the changed files).
 pub fn block_frame(cx: &App) -> Div {
     let theme = cx.theme();
@@ -31,8 +31,10 @@ pub fn block_frame(cx: &App) -> Div {
         .min_w_0()
         .bg(theme.background)
         .border_1()
-        .border_color(theme.border)
-        .rounded_md()
+        // A Mac's grouped box (System Settings', Xcode's inspectors): a softer hairline and the
+        // larger corner a card has, where a field keeps the small one.
+        .border_color(theme.border.opacity(0.7))
+        .rounded_lg()
         .overflow_hidden()
 }
 

@@ -26,9 +26,9 @@ pub fn search_band(input: &Entity<InputState>, cx: &App) -> Div {
                 .pl_1()
                 .items_center()
                 .rounded_md()
-                .bg(theme.background)
-                .border_1()
-                .border_color(theme.border)
+                // A Mac sidebar's search field (System Settings', Notes'): a soft grey fill and
+                // no rule, the ground the segmented tracks have.
+                .bg(theme.foreground.opacity(0.06))
                 .child(
                     // The list's size: the field is the first line of the list under it.
                     Input::new(input).small().appearance(false).cleanable(true).prefix(
