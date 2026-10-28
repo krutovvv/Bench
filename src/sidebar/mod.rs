@@ -232,7 +232,7 @@ impl BenchApp {
         let open_id = id.to_string();
         v_flex()
             .id(("hit", k))
-            .pl(px(14.))
+            .pl(px(bench_ui::HIT_PL))
             .pr_3()
             .py_2()
             .cursor_pointer()

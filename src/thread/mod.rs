@@ -38,6 +38,11 @@ use gpui_kit::*;
 
 use bench_ui::icons::Ico;
 
+/// A change of the room past the end smaller than this is rounding, not a new height.
+const ROOM_EPSILON: f32 = 0.5;
+/// A press and its release closer than this are a click, not a drag (no text is selected).
+const CLICK_SLOP: f32 = 4.;
+
 impl ThreadView {
     /// The rows of the thread into the list, if the thread changed since the last frame.
     fn sync_rows(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -60,7 +65,7 @@ impl ThreadView {
         if std::mem::take(&mut self.thread.tv.jump) {
             // `to_end`: this frame lays out without the room.
             window.request_animation_frame();
-        } else if (room - self.thread.tv.room).abs() > px(0.5) {
+        } else if (room - self.thread.tv.room).abs() > px(ROOM_EPSILON) {
             self.thread.tv.room = room;
             let end = self.thread.tv.tail() + 1;
             self.thread.tv.list.remeasure_items(end..end + 1);
@@ -163,8 +168,8 @@ impl ThreadView {
                         MouseButton::Left,
                         self.app_listener(move |app, ev: &MouseUpEvent, window, cx| {
                             let still = app.click_at.take().is_some_and(|p| {
-                                (p.x - ev.position.x).abs() < px(4.)
-                                    && (p.y - ev.position.y).abs() < px(4.)
+                                (p.x - ev.position.x).abs() < px(CLICK_SLOP)
+                                    && (p.y - ev.position.y).abs() < px(CLICK_SLOP)
                             });
                             if still && !app.click_claimed {
                                 composer.update(cx, |s, cx| s.focus(window, cx));
@@ -430,7 +435,7 @@ impl ThreadView {
                         .py(px(bench_ui::TURN_Y))
                         .child(
                             div()
-                                .w(px(360.))
+                                .w(px(bench_ui::PATH_FIELD_W))
                                 .child(gpui_kit::component::input::Input::new(&field).small()),
                         )
                         .into_any_element(),

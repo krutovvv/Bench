@@ -23,7 +23,7 @@ pub(super) fn color_row(
         let on = current == k;
         div()
             .id(SharedString::from(format!("swatch-{k:?}")))
-            .size(px(16.))
+            .size(px(bench_ui::SWATCH_CELL))
             .flex()
             .items_center()
             .justify_center()
@@ -38,7 +38,7 @@ pub(super) fn color_row(
             .map(|d| match k {
                 Some(c) => d.child(
                     div()
-                        .size(px(12.))
+                        .size(px(bench_ui::SWATCH))
                         .bg(bench_ui::mark_color(c).unwrap_or_default()),
                 ),
                 None => d

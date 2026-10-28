@@ -303,12 +303,12 @@ fn grid(session: Arc<Session>, focused: bool, theme: &Theme) -> impl IntoElement
                         color: r.fg,
                         background_color: None,
                         underline: r.underline.then(|| UnderlineStyle {
-                            thickness: px(1.),
+                            thickness: px(bench_ui::HAIRLINE),
                             color: Some(r.fg),
                             wavy: false,
                         }),
                         strikethrough: r.strike.then(|| StrikethroughStyle {
-                            thickness: px(1.),
+                            thickness: px(bench_ui::HAIRLINE),
                             color: Some(r.fg),
                         }),
                     };
@@ -326,12 +326,12 @@ fn grid(session: Arc<Session>, focused: bool, theme: &Theme) -> impl IntoElement
                 match shape {
                     CursorShape::Block => {} // drawn as an inverted cell above
                     CursorShape::Beam => {
-                        window.paint_quad(fill(Bounds::new(origin, size(px(2.), line_h)), color))
+                        window.paint_quad(fill(Bounds::new(origin, size(px(bench_ui::CARET_W), line_h)), color))
                     }
                     CursorShape::Underline => window.paint_quad(fill(
                         Bounds::new(
-                            point(origin.x, origin.y + line_h - px(2.)),
-                            size(cell_w, px(2.)),
+                            point(origin.x, origin.y + line_h - px(bench_ui::CARET_W)),
+                            size(cell_w, px(bench_ui::CARET_W)),
                         ),
                         color,
                     )),

@@ -105,12 +105,12 @@ impl BenchApp {
             .gap_1()
             // The title starts where the project's name does (the row's 2 px border is part
             // of that inset), so a project and its threads read as one column.
-            .pl(px(bench_ui::PROJECT_NAME_X) - px(2.))
+            .pl(px(bench_ui::PROJECT_NAME_X - bench_ui::ROW_STRIPE))
             .when_some(guide, |d, last| d.child(bench_ui::nest_guide(cx, last)))
             .pr_3()
             // The compact list packs rows closer; the ordinary one keeps a breath around
             // each title.
-            .map(|d| if compact { d.py(px(3.)) } else { d.py(px(4.)) })
+            .map(|d| if compact { d.py(px(bench_ui::THREAD_ROW_PY_COMPACT)) } else { d.py(px(bench_ui::THREAD_ROW_PY)) })
             .cursor_pointer()
             .border_l_2()
             // A chosen color wins over the accent; it also tints the row lightly.

@@ -174,7 +174,7 @@ impl BenchApp {
                 div()
                     .id(id)
                     .flex_none()
-                    .h(px(22.))
+                    .h(px(bench_ui::TASK_HEAD_H))
                     .px_2()
                     .flex()
                     .items_center()
@@ -219,7 +219,7 @@ impl BenchApp {
             h_flex()
                 .id("task-tags")
                 .flex_none()
-                .pl(px(24.))
+                .pl(px(bench_ui::TASK_INSET))
                 .pr_6()
                 .py_1p5()
                 .flex_wrap()
@@ -298,7 +298,7 @@ impl BenchApp {
             // A long list scrolls instead of squeezing its rows.
             .flex_none()
             // 22 + the 2px selection stripe = the 24 of the headers and the day numbers.
-            .pl(px(22.))
+            .pl(px(bench_ui::TASK_INSET - bench_ui::ROW_STRIPE))
             .pr_6()
             .py_1p5()
             .gap_2()
@@ -316,7 +316,7 @@ impl BenchApp {
                 // The checkbox: a click marks it done (or not), without opening the card.
                 div()
                     .id(("task-check", n))
-                    .size(px(14.))
+                    .size(px(bench_ui::CHECKBOX))
                     .flex_none()
                     .flex()
                     .items_center()
@@ -516,14 +516,14 @@ impl BenchApp {
                     })
                     .child(
                         div()
-                            .w(px(110.))
+                            .w(px(bench_ui::TASK_DAY_W))
                             .flex_none()
                             .child(Input::new(&self.inserts.tasks.day)),
                     )
                     .when(t.done(), |d| {
                         d.child(
                             div()
-                                .w(px(120.))
+                                .w(px(bench_ui::TASK_LIST_W))
                                 .flex_none()
                                 .child(Input::new(&self.inserts.tasks.completed)),
                         )
@@ -592,7 +592,7 @@ impl BenchApp {
                     })
                     .child(
                         div()
-                            .w(px(100.))
+                            .w(px(bench_ui::TASK_TIME_W))
                             .flex_none()
                             .child(Input::new(&self.inserts.tasks.tags)),
                     )
@@ -601,7 +601,7 @@ impl BenchApp {
                             .flex_none()
                             .gap_1()
                             .items_center()
-                            .child(div().w(px(64.)).child(Input::new(&self.inserts.tasks.spent)))
+                            .child(div().w(px(bench_ui::TASK_SPENT_W)).child(Input::new(&self.inserts.tasks.spent)))
                             .child(
                                 div()
                                     .id("task-timer")

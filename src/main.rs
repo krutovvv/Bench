@@ -99,13 +99,13 @@ pub fn open_main_window(cx: &mut App) {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
             None,
-            size(px(1240.), px(800.)),
+            size(px(bench_ui::WINDOW_W), px(bench_ui::WINDOW_H)),
             cx,
         ))),
         titlebar: Some(TitlebarOptions {
             title: Some("Bench".into()),
             appears_transparent: true,
-            traffic_light_position: Some(point(px(14.), px(14.))),
+            traffic_light_position: Some(point(px(bench_ui::TRAFFIC_LIGHTS_INSET), px(bench_ui::TRAFFIC_LIGHTS_INSET))),
         }),
         ..Default::default()
     };

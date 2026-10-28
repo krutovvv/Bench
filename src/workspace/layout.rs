@@ -25,9 +25,9 @@ fn quiet_divider(vertical: bool) -> gpui_kit::base::ResizeHandleRenderer {
         });
         Some(
             if vertical {
-                line.h(px(1.)).w_full()
+                line.h(px(bench_ui::HAIRLINE)).w_full()
             } else {
-                line.w(px(1.)).h_full()
+                line.w(px(bench_ui::HAIRLINE)).h_full()
             }
             .into_any_element(),
         )
@@ -167,7 +167,7 @@ impl Render for BenchApp {
                         .child(
                             div()
                                 .absolute()
-                                .top(bench_ui::bar_h(cx) + px(2.))
+                                .top(bench_ui::bar_h(cx) + px(bench_ui::POPOVER_DROP))
                                 .left(left)
                                 .child(self.render_project_dialog(cx)),
                         ),

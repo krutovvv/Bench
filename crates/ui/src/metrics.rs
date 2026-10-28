@@ -97,3 +97,97 @@ pub fn editor_line(cx: &App) -> f32 {
 pub fn editor_height(lines: usize, cx: &App) -> f32 {
     (lines.max(1) + 1) as f32 * editor_line(cx) + 16.
 }
+
+// ---- The window ---------------------------------------------------------------------------
+
+/// A new window's size, and how far macOS's three lights sit from its corner.
+pub const WINDOW_W: f32 = 1240.;
+pub const WINDOW_H: f32 = 800.;
+pub const TRAFFIC_LIGHTS_INSET: f32 = 14.;
+
+// ---- Lines and marks ----------------------------------------------------------------------
+
+/// A rule or a divider between two things.
+pub const HAIRLINE: f32 = 1.;
+/// A state's dot (an agent up or down, a terminal running, a bot connected).
+pub const DOT: f32 = 6.;
+/// A colour's sample in a menu, and the cell it sits in.
+pub const SWATCH: f32 = 12.;
+pub const SWATCH_CELL: f32 = 16.;
+/// An accent's sample in the gear, and the air around it inside its ring.
+pub const ACCENT_SWATCH: f32 = 18.;
+pub const ACCENT_SWATCH_PAD: f32 = 3.;
+/// A checkbox (a task, a question's choice).
+pub const CHECKBOX: f32 = 14.;
+/// An icon or a box beside a line of text, lowered onto the text's first line.
+pub const ICON_ON_LINE: f32 = 2.;
+pub const ICON_ON_SMALL_LINE: f32 = 3.;
+/// A caret's width.
+pub const CARET_W: f32 = 2.;
+
+// ---- Popovers and fields ------------------------------------------------------------------
+
+/// A panel hung under a chip: numbers (the context), a chart (the speed), lines that wrap
+/// (the agent's state).
+pub const POPOVER_S: f32 = 260.;
+pub const POPOVER_M: f32 = 300.;
+pub const POPOVER_L: f32 = 380.;
+/// The composer's "/" list.
+pub const SLASH_LIST_W: f32 = 560.;
+/// A path typed into the thread's head (a server's folder).
+pub const PATH_FIELD_W: f32 = 360.;
+/// A popover's distance under the bar it hangs from.
+pub const POPOVER_DROP: f32 = 2.;
+
+// ---- The sidebar ---------------------------------------------------------------------------
+
+/// Air above a project's head (the first one sits closer), and under it.
+pub const GROUP_GAP: f32 = 13.;
+pub const GROUP_HEAD_PB: f32 = 6.;
+/// A thread's row: its marker stripe, and its padding in the ordinary and the compact list.
+pub const ROW_STRIPE: f32 = 2.;
+pub const THREAD_ROW_PY: f32 = 4.;
+pub const THREAD_ROW_PY_COMPACT: f32 = 3.;
+/// A search hit's inset.
+pub const HIT_PL: f32 = 14.;
+
+// ---- The thread ----------------------------------------------------------------------------
+
+/// The files under a message: air above them (after its words) and under them.
+pub const ATTACHED_MT: f32 = 10.;
+pub const ATTACHED_PB: f32 = 4.;
+/// The composer: its field's own padding (gpui-component's input), the tools' column on its
+/// right, the tools' line under it, the gap between its lines, the air under the field.
+pub const INPUT_PAD_X: f32 = 12.;
+pub const INPUT_PAD_Y: f32 = 10.;
+pub const COMPOSER_TOOLS_W: f32 = 56.;
+pub const COMPOSER_TOOLS_H: f32 = 40.;
+pub const COMPOSER_GAP: f32 = 10.;
+pub const COMPOSER_PB: f32 = 6.;
+/// The rail of ticks on the thread's right: a tick, the rail, its inset from the edge.
+pub const RAIL_TICK_W: f32 = 10.;
+pub const RAIL_TICK_H: f32 = 2.;
+pub const RAIL_W: f32 = 14.;
+pub const RAIL_INSET: f32 = 4.;
+/// The speed panel's chart: a bar a second, its height, the gap between bars.
+pub const SPEED_BAR_W: f32 = 3.;
+pub const SPEED_CHART_H: f32 = 56.;
+pub const SPEED_BAR_GAP: f32 = 1.;
+
+// ---- Attachments and inserts --------------------------------------------------------------
+
+/// An attachment's chip: its widest, its icon's square, its remove badge and the badge's inset.
+pub const ATTACHMENT_MAX_W: f32 = 260.;
+pub const ATTACHMENT_ICON: f32 = 24.;
+pub const BADGE: f32 = 18.;
+pub const BADGE_INSET: f32 = 3.;
+/// A terminal's line when it is drawn as text (the demo's, the web build's).
+pub const TERMINAL_LINE_H: f32 = 20.;
+/// The task list: a list's head row, the inset of a tag row and of a task (with its 2 px
+/// stripe the same 24), the card's field widths.
+pub const TASK_HEAD_H: f32 = 22.;
+pub const TASK_INSET: f32 = 24.;
+pub const TASK_DAY_W: f32 = 110.;
+pub const TASK_LIST_W: f32 = 120.;
+pub const TASK_TIME_W: f32 = 100.;
+pub const TASK_SPENT_W: f32 = 64.;

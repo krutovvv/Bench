@@ -73,7 +73,7 @@ impl ThreadView {
                 .absolute()
                 .top(px(top))
                 .left(px(bench_ui::CHAT_TEXT - 4.))
-                .w(px(560.))
+                .w(px(bench_ui::SLASH_LIST_W))
                 .child(
                     div()
                         .bg(theme.popover)
@@ -215,10 +215,10 @@ impl ThreadView {
                             div()
                                 .absolute()
                                 .right(px(-2.))
-                                .bottom(px(1.))
-                                .w(px(2.))
+                                .bottom(px(bench_ui::HAIRLINE))
+                                .w(px(bench_ui::CARET_W))
                                 .h(px(2. + level * 9.))
-                                .rounded(px(1.))
+                                .rounded(px(bench_ui::HAIRLINE))
                                 .bg(theme.foreground),
                         ),
                     )
@@ -301,7 +301,7 @@ impl ThreadView {
                     .py(px(bench_ui::TURN_Y))
                     // The tools' line under the field, reserved while words are in it.
                     .when(!self.composer.read(cx).value().trim().is_empty(), |d| {
-                        d.pb(px(40.))
+                        d.pb(px(bench_ui::COMPOSER_TOOLS_H))
                     })
                     .gap(px(bench_ui::CHAT_TEXT
                         - bench_ui::CHAT_LEFT
@@ -315,7 +315,7 @@ impl ThreadView {
                         v_flex()
                             .flex_1()
                             .min_w_0()
-                            .gap(px(10.))
+                            .gap(px(bench_ui::COMPOSER_GAP))
                             .child(
                                 div().w_full().relative().child(
                                     // A Large textarea pads its text 12 left and 10 above
@@ -330,7 +330,7 @@ impl ThreadView {
                                     // the font's own 1.41 em, which set typed lines 3 px
                                     // tighter than the thread's. 1.5rem is the thread's leading
                                     // exactly, since the thread's prose is 1rem.
-                                    div().ml(px(-12.)).mr(px(56.)).my(px(-10.)).child(
+                                    div().ml(px(-bench_ui::INPUT_PAD_X)).mr(px(bench_ui::COMPOSER_TOOLS_W)).my(px(-bench_ui::INPUT_PAD_Y)).child(
                                         Textarea::new(&self.composer)
                                             .appearance(false)
                                             .large()
@@ -345,8 +345,8 @@ impl ThreadView {
                                     h_flex()
                                         .flex_wrap()
                                         .gap_2()
-                                        .pr(px(56.))
-                                        .pb(px(6.))
+                                        .pr(px(bench_ui::COMPOSER_TOOLS_W))
+                                        .pb(px(bench_ui::COMPOSER_PB))
                                         .children(chips),
                                 )
                             }),

@@ -5,6 +5,11 @@ use ::thread::Row;
 use gpui_kit::*;
 
 /// What the list shows and how it is scrolled. Owned by `BenchApp`.
+/// How far past the viewport the list lays out rows ahead (gpui's overdraw).
+const OVERDRAW: f32 = 800.;
+/// A pixel's rounding when telling whether the last row ends below the viewport.
+const EPSILON: f32 = 1.;
+
 pub struct View {
     pub list: ListState,
     /// The thread's rows, as last given to the list.
@@ -40,7 +45,7 @@ enum Reveal {
 impl Default for View {
     fn default() -> Self {
         Self {
-            list: ListState::new(3, ListAlignment::Top, px(800.)),
+            list: ListState::new(3, ListAlignment::Top, px(OVERDRAW)),
             rows: vec![],
             version: u64::MAX,
             owner: None,
@@ -91,7 +96,7 @@ impl View {
         let pushed = self
             .list
             .bounds_for_item(self.tail())
-            .is_none_or(|b| b.bottom() > self.list.viewport_bounds().bottom() + px(1.));
+            .is_none_or(|b| b.bottom() > self.list.viewport_bounds().bottom() + px(EPSILON));
         if pushed {
             self.to_end();
         }

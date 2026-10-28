@@ -160,7 +160,7 @@ impl ThreadView {
                 .icon()
                 .small()
                 .text_color(if settled { muted } else { accent })
-                .mt(px(2.)),
+                .mt(px(bench_ui::ICON_ON_LINE)),
             )
             .child(
                 div()
@@ -197,7 +197,7 @@ impl ThreadView {
                                         .icon()
                                         .xsmall()
                                         .text_color(theme.success)
-                                        .mt(px(4.)),
+                                        .mt(px(bench_ui::ICON_ON_LINE * 2.)),
                                 )
                                 .child(div().flex_1().min_w_0().child(a)),
                         )
@@ -262,9 +262,9 @@ impl ThreadView {
                                 .hover(|s| s.text_color(theme.foreground))
                                 .child(
                                     div()
-                                        .size(px(14.))
+                                        .size(px(bench_ui::CHECKBOX))
                                         .flex_none()
-                                        .mt(px(2.))
+                                        .mt(px(bench_ui::ICON_ON_LINE))
                                         .border_1()
                                         .rounded_md()
                                         .border_color(if on { theme.primary } else { theme.input })

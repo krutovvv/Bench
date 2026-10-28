@@ -71,7 +71,7 @@ impl BenchApp {
                             let theme = cx.theme().clone();
                             let muted = theme.muted_foreground;
                             let dot = |ok: bool, warn: bool| {
-                                div().size(px(6.)).bg(if ok {
+                                div().size(px(bench_ui::DOT)).bg(if ok {
                                     theme.primary
                                 } else if warn {
                                     theme.warning
@@ -84,7 +84,7 @@ impl BenchApp {
                                     .gap_2()
                                     .items_start()
                                     .text_sm()
-                                    .child(div().pt(px(5.)).child(dot(ok, warn)))
+                                    .child(div().pt(px(bench_ui::ICON_ON_SMALL_LINE + bench_ui::ICON_ON_LINE)).child(dot(ok, warn)))
                                     // A URL or a refusal is longer than the panel: it wraps
                                     // inside it, never over its edge.
                                     .child(div().flex_1().min_w_0().whitespace_normal().child(text))
@@ -117,7 +117,7 @@ impl BenchApp {
                                 lines.push(line(false, false, e.clone()));
                             }
                             v_flex()
-                                .w(px(380.))
+                                .w(px(bench_ui::POPOVER_L))
                                 // Whatever a line holds, the panel keeps it in: nothing paints
                                 // over its edge.
                                 .overflow_hidden()
@@ -139,7 +139,7 @@ impl BenchApp {
                                                     })
                                                 }),
                                         )
-                                        .child(div().w(px(1.)).h(px(18.)).bg(theme.border))
+                                        .child(div().w(px(bench_ui::HAIRLINE)).h(px(bench_ui::BADGE)).bg(theme.border))
                                         .child(
                                             icon(
                                                 "backend-restart",

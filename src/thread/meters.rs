@@ -67,7 +67,7 @@ impl ThreadView {
                 .content(move |_, _, cx| {
                     let theme = cx.theme();
                     v_flex()
-                        .w(px(260.))
+                        .w(px(bench_ui::POPOVER_S))
                         .py_1()
                         .children(stats.iter().map(|(k, v)| {
                             h_flex()
@@ -287,7 +287,7 @@ fn speed_panel(
             )
             .child(div().child(v))
     };
-    let mut panel = v_flex().w(px(300.)).py_2();
+    let mut panel = v_flex().w(px(bench_ui::POPOVER_M)).py_2();
     if samples.is_empty() {
         panel = panel.child(
             div()
@@ -305,17 +305,17 @@ fn speed_panel(
         // One 3px bar per second from the left: a short answer is a few bars, not one slab.
         let bars = shown.iter().map(|v| {
             div()
-                .w(px(3.))
+                .w(px(bench_ui::SPEED_BAR_W))
                 .flex_none()
-                .h(px((v / max * 56.).max(1.) as f32))
+                .h(px((v / max * f64::from(bench_ui::SPEED_CHART_H)).max(1.) as f32))
                 .bg(theme.primary.opacity(0.75))
         });
         panel = panel.child(
             h_flex()
                 .mx_3()
                 .mb_2()
-                .h(px(56.))
-                .gap(px(1.))
+                .h(px(bench_ui::SPEED_CHART_H))
+                .gap(px(bench_ui::SPEED_BAR_GAP))
                 .items_end()
                 .border_b_1()
                 .border_color(theme.border)

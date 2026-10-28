@@ -121,7 +121,7 @@ impl BenchApp {
                 .size_full()
                 .items_stretch()
                 .child(left)
-                .child(div().w(px(1.)).h_full().bg(theme.border))
+                .child(div().w(px(bench_ui::HAIRLINE)).h_full().bg(theme.border))
                 .child(right)
                 .into_any_element()
         };

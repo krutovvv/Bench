@@ -48,8 +48,8 @@ impl ThreadView {
                 .group(group.clone())
                 .child(
                     div()
-                        .h(px(2.))
-                        .w(px(10.))
+                        .h(px(bench_ui::RAIL_TICK_H))
+                        .w(px(bench_ui::RAIL_TICK_W))
                         .bg(if on {
                             theme.primary
                         } else {
@@ -72,8 +72,8 @@ impl ThreadView {
                 .absolute()
                 .top_0()
                 .bottom_0()
-                .right(px(4.))
-                .w(px(14.))
+                .right(px(bench_ui::RAIL_INSET))
+                .w(px(bench_ui::RAIL_W))
                 .justify_center()
                 .child(v_flex().children(ticks))
                 .into_any_element(),

@@ -51,8 +51,8 @@ impl ThreadView {
                     h_flex()
                         .flex_wrap()
                         .gap_2()
-                        .when(!text.is_empty(), |d| d.mt(px(10.)))
-                        .pb(px(4.))
+                        .when(!text.is_empty(), |d| d.mt(px(bench_ui::ATTACHED_MT)))
+                        .pb(px(bench_ui::ATTACHED_PB))
                         .children(attached),
                 )
             });

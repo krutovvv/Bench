@@ -401,7 +401,7 @@ impl ThreadView {
                     .when(expandable, |d| {
                         d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
                     })
-                    .child(icon.icon().xsmall().mt(px(3.)))
+                    .child(icon.icon().xsmall().mt(px(bench_ui::ICON_ON_SMALL_LINE)))
                     .child(div().flex_1().min_w_0().child(label))
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.claim_click(cx);

@@ -98,7 +98,7 @@ impl InsertKind for Terminal {
                     .text_sm()
                     .text_color(theme.muted_foreground)
                     .cursor_pointer()
-                    .child(div().size(px(6.)).rounded_full().bg(theme.primary))
+                    .child(div().size(px(bench_ui::DOT)).rounded_full().bg(theme.primary))
                     .child("Background")
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.click_claimed = true;
@@ -147,7 +147,7 @@ impl InsertKind for Terminal {
                     .children(
                         crate::demo::terminal(&alias)
                             .lines()
-                            .map(|l| div().h(px(20.)).child(l.to_string())),
+                            .map(|l| div().h(px(bench_ui::TERMINAL_LINE_H)).child(l.to_string())),
                     )
                     .into_any_element(),
             );

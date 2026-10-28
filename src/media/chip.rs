@@ -39,13 +39,13 @@ impl ThreadView {
                 }));
             if badge {
                 b.absolute()
-                    .top(px(3.))
-                    .right(px(3.))
-                    .size(px(18.))
+                    .top(px(bench_ui::BADGE_INSET))
+                    .right(px(bench_ui::BADGE_INSET))
+                    .size(px(bench_ui::BADGE))
                     .flex()
                     .items_center()
                     .justify_center()
-                    .rounded(px(4.))
+                    .rounded_md()
                     .bg(theme.background.opacity(0.92))
                     .border_1()
                     .border_color(theme.border)
@@ -88,7 +88,7 @@ impl ThreadView {
             };
             let pill = h_flex()
                 .id(id.clone())
-                .max_w(px(260.))
+                .max_w(px(bench_ui::ATTACHMENT_MAX_W))
                 .h(px(bench_ui::CHIP_H))
                 .pl_1()
                 .pr_2()
@@ -101,7 +101,7 @@ impl ThreadView {
                 .text_base()
                 .child(
                     div()
-                        .size(px(24.))
+                        .size(px(bench_ui::ATTACHMENT_ICON))
                         .flex_none()
                         .flex()
                         .items_center()

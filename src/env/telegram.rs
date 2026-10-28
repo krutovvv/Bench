@@ -275,7 +275,7 @@ impl SettingsForm for Telegram {
                     .items_center()
                     .child(
                         div()
-                            .size(px(7.))
+                            .size(px(bench_ui::DOT))
                             .flex_none()
                             .rounded_full()
                             .bg(dot),

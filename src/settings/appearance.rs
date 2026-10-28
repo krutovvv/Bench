@@ -114,7 +114,7 @@ impl BenchApp {
                         };
                         div()
                             .id(("accent", k))
-                            .p(px(3.))
+                            .p(px(bench_ui::ACCENT_SWATCH_PAD))
                             .border_1()
                             .rounded_md()
                             .border_color(if on {
@@ -123,7 +123,7 @@ impl BenchApp {
                                 theme.transparent
                             })
                             .cursor_pointer()
-                            .child(div().size(px(18.)).bg(color))
+                            .child(div().size(px(bench_ui::ACCENT_SWATCH)).bg(color))
                             .tooltip(move |window, cx| {
                                 gpui_kit::component::tooltip::Tooltip::new(*name).build(window, cx)
                             })
