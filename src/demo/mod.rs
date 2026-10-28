@@ -12,6 +12,7 @@ mod drop;
 mod env;
 mod inserts;
 mod journal;
+mod thread;
 mod threads;
 
 pub use env::{env, file_head, file_problems, file_text, ignored, listing};

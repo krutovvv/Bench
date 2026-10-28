@@ -102,7 +102,7 @@ impl View {
     /// thread just opened it stops a message or two down. Scrolled to its end, the list lays out
     /// from the last item up, measuring as it goes — so for that frame the room past the end is
     /// nothing, and it comes back below the viewport the frame after.
-    pub(super) fn to_end(&mut self) {
+    pub(crate) fn to_end(&mut self) {
         self.jump = true;
         self.room = px(0.);
         let end = self.tail() + 1;

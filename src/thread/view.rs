@@ -57,8 +57,8 @@ pub struct ThreadView {
     /// so hovering the text is remembered here while hovering the line stays a group.
     pub(super) reveal_tail: Option<String>,
     /// `BENCH_DEMO_DRAFT` was put into the composer; `BENCH_DEMO_SCROLL` was done.
-    pub(super) demo_draft_done: bool,
-    pub(super) demo_scrolled: bool,
+    pub(crate) demo_draft_done: bool,
+    pub(crate) demo_scrolled: bool,
     _subscriptions: Vec<Subscription>,
 }
 
