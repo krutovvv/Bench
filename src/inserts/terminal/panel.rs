@@ -284,7 +284,7 @@ impl BenchApp {
             m if m.is_empty() => "this Mac".to_string(),
             m => m,
         };
-        let note = format!("{machine} {}", at.folder.unwrap_or_default())
+        let note = format!("{machine} · {}", at.folder.unwrap_or_default())
             .trim()
             .to_string();
         let actions = vec![
@@ -352,19 +352,19 @@ impl BenchApp {
                 .px_2()
                 .gap_2()
                 .items_center()
+                // No fill: the bar is the editor's ground with a rule under it, as Xcode's
+                // debug area; the terminals a segmented control, as Chat | Code.
                 .border_b_1()
                 .border_color(theme.border)
-                .bg(theme.muted.opacity(0.35))
-                .text_sm()
-                .child(h_flex().flex_none().gap_1().items_center().children(tabs))
+                .text_size(px(bench_ui::BAR_TEXT))
+                .child(bench_ui::segment_track(&theme).children(tabs))
                 .child(plus)
                 .child(
                     div()
                         .flex_1()
                         .min_w_0()
                         .truncate()
-                        .text_xs()
-                        .text_color(theme.muted_foreground)
+                        .text_color(bench_ui::faint(&theme))
                         .child(note.clone()),
                 )
                 .children(actions)
@@ -373,8 +373,9 @@ impl BenchApp {
             let alias = machine.clone();
             div()
                 .size_full()
-                .p_2()
-                .bg(cx.theme().secondary)
+                .px_4()
+                .py_2()
+                .bg(cx.theme().background)
                 .font_family(bench_ui::theme::MONO)
                 .text_sm()
                 .whitespace_nowrap()

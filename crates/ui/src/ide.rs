@@ -262,28 +262,31 @@ pub fn term_tab(
     let theme = cx.theme().clone();
     let id: SharedString = id.into();
     let group: SharedString = format!("{id}-g").into();
+    // A segment of the bar's segmented control (as Chat | Code, Files | Threads): the shown one
+    // raised on the grey track (`segment_track`), the others its muted text.
+    let fg = theme.foreground;
     h_flex()
         .id(ElementId::Name(id))
         .group(group.clone())
         .flex_none()
-        .h(px(TERM_TAB_H))
-        .pl_2()
+        .h(px(crate::metrics::SEGMENT_H))
+        .pl_2p5()
         .pr_0p5()
-        .gap_1()
+        .gap_0p5()
         .items_center()
-        .rounded_md()
-        .text_sm()
+        .rounded_sm()
+        .text_size(px(crate::metrics::BAR_TEXT))
         .cursor_pointer()
         .when(open, |d| {
-            d.bg(theme.list_active).text_color(theme.foreground)
+            d.bg(theme.background).shadow_xs().text_color(theme.foreground)
         })
         .when(!open, |d| {
             d.text_color(if ended {
-                theme.muted_foreground
+                crate::faint(&theme)
             } else {
-                theme.foreground
+                theme.muted_foreground
             })
-            .hover(|s| s.bg(theme.list_hover))
+            .hover(move |s| s.text_color(fg))
         })
         .child(div().max_w(px(TAB_MAX_W)).truncate().child(name.into()))
         .child(
