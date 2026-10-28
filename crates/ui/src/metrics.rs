@@ -71,8 +71,11 @@ pub const BUBBLE_R: f32 = 16.;
 /// mic and Send — its corner, the air under it in the window.
 pub const COMPOSER_CARD_R: f32 = 14.;
 pub const COMPOSER_CARD_PB: f32 = 12.;
-/// The line under the composer (its project, repo, meters), as Claude's: a field's height.
-pub const COMPOSER_FOOT_H: f32 = FIELD_H;
+/// gpui-kit's `.small()` button: 24 pt high.
+pub const SMALL_BUTTON_H: f32 = 24.;
+/// The line under the composer (its project, repo, meters), as Claude's: its small buttons'
+/// height, so their hover is all the air between it and the field.
+pub const COMPOSER_FOOT_H: f32 = SMALL_BUTTON_H;
 /// The air inside the card around its line (the buttons'; the text is centred on their height).
 pub const COMPOSER_CARD_PY: f32 = 8.;
 /// Its sides: the plus and Send set in by this from the card's rule.

@@ -261,8 +261,9 @@ impl ThreadView {
                         .max_w(px(bench_ui::THREAD_MAX_W))
                         .px(px(side))
                         .pb(px(bench_ui::COMPOSER_CARD_PB))
-                        .gap_2()
-                        .when(waiting, |d| d.child(self.render_waiting_line(cx)))
+                        // The line under it close, as Claude's: its chips' hover is the air.
+                        .gap_1()
+                        .when(waiting, |d| d.child(div().pb_1().child(self.render_waiting_line(cx))))
                         .child(composer)
                         .child(foot),
                 ),
