@@ -354,10 +354,10 @@ impl ThreadView {
                 if *failed {
                     Ico::CircleAlert
                 } else {
-                    Ico::Terminal
+                    step_icon(name)
                 },
                 if *failed { theme.danger } else { muted },
-                clip(&tool_label(name, preview), 220),
+                clip(&tool_label(name, &home_short(preview)), 220),
                 [
                     ("Arguments", pretty(args)),
                     ("Output", output.clone().unwrap_or_default()),
@@ -374,12 +374,13 @@ impl ThreadView {
             ),
             Step::Thought(text) => (
                 Ico::Brain,
-                muted,
+                bench_ui::faint(&theme),
                 clip(text, 160),
                 vec![("Reasoning", text.clone())],
             ),
         };
         let expandable = !details.is_empty();
+        let tool_ok = matches!(step, Step::Tool { failed: false, .. });
         let step_key = (key.to_string(), k);
         let bodies: Vec<(&str, AnyElement)> = if open {
             details
@@ -408,7 +409,23 @@ impl ThreadView {
                         d.cursor_pointer().hover(|s| s.text_color(theme.foreground))
                     })
                     .child(icon.icon().xsmall().mt(px(bench_ui::ICON_ON_SMALL_LINE)))
-                    .child(div().flex_1().min_w_0().child(label))
+                    // One line each, as a build log's: the tool in the step's grey, what it
+                    // acted on in the text's colour; the whole of it when the step is opened.
+                    .child(match label.split_once(": ") {
+                        Some((verb, rest)) if tool_ok => h_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .gap_1()
+                            .child(div().flex_none().child(format!("{verb}")))
+                            .child(
+                                div()
+                                    .min_w_0()
+                                    .truncate()
+                                    .text_color(theme.foreground.opacity(0.85))
+                                    .child(rest.to_string()),
+                            ),
+                        _ => div().flex_1().min_w_0().truncate().child(label.clone()),
+                    })
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.claim_click(cx);
                         if !this.thread.open_steps.remove(&step_key) {
@@ -440,5 +457,27 @@ impl ThreadView {
                 }))
             })
             .into_any_element()
+    }
+}
+
+/// A step's icon by what its tool does: reading, writing, searching, a page, a command; the
+/// rest a wrench.
+fn step_icon(name: &str) -> Ico {
+    let n = name.rsplit("__").next().unwrap_or(name);
+    match n {
+        "read" | "ls" | "skill_view" => Ico::FileText,
+        "edit" | "write" | "multi_edit" | "skill_manage" => Ico::Pencil,
+        "grep" | "glob" | "lsp" | "session_search" | "tool_search" => Ico::Search,
+        "bash" | "ssh_run" | "process" => Ico::Terminal,
+        _ if name.starts_with("mcp__browser") || n.starts_with("browser") => Ico::Globe,
+        _ => Ico::Wrench,
+    }
+}
+
+/// A path under the person's home as `~/…`: the step names where, not whose.
+fn home_short(text: &str) -> String {
+    match std::env::var("HOME") {
+        Ok(home) if !home.is_empty() => text.replace(&format!("{home}/"), "~/"),
+        _ => text.to_string(),
     }
 }
