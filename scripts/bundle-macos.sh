@@ -43,9 +43,10 @@ mkdir -p "$(dirname "$APP")"
 NEW="$(dirname "$APP")/.$NAME.new.app"
 rm -rf "$NEW"
 mkdir -p "$NEW/Contents/MacOS" "$NEW/Contents/Resources"
-cp target/release/bench "$NEW/Contents/MacOS/bench"
+# Named as the app: macOS titles the menu bar by the process, so "bench" read lowercase there.
+cp target/release/bench "$NEW/Contents/MacOS/Bench"
 # Its own Mach-O UUID per app (from the linker's one and the bundle id), before signing.
-python3 -I - "$NEW/Contents/MacOS/bench" "$ID" <<'PY'
+python3 -I - "$NEW/Contents/MacOS/Bench" "$ID" <<'PY'
 import hashlib, struct, sys
 path, ident = sys.argv[1], sys.argv[2]
 b = bytearray(open(path, "rb").read())
@@ -91,7 +92,7 @@ cat > "$NEW/Contents/Info.plist" <<PLIST
   <key>CFBundleName</key><string>$NAME</string>
   <key>CFBundleDisplayName</key><string>$NAME</string>
   <key>CFBundleIdentifier</key><string>$ID</string>
-  <key>CFBundleExecutable</key><string>bench</string>
+  <key>CFBundleExecutable</key><string>Bench</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>1.$COUNT</string>
