@@ -210,7 +210,19 @@ impl BenchApp {
                                     .into_any_element(),
                             }),
                     )
-                    .when(waiting, |d| d.child(bench_ui::dot(accent)))
+                    // Waiting for an answer: the words where there is room, the dot in the
+                    // compact list.
+                    .when(waiting && !compact, |d| {
+                        d.child(
+                            div()
+                                .flex_none()
+                                .text_xs()
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .text_color(accent)
+                                .child("needs you"),
+                        )
+                    })
+                    .when(waiting && compact, |d| d.child(bench_ui::dot(accent)))
                     // Compact: the title alone (a working session still shimmers).
                     .when_some(meta.filter(|_| !compact), |d, meta| {
                         d.child(div().flex_none().text_xs().text_color(faint).child(meta))

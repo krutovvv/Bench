@@ -68,6 +68,8 @@ impl ThreadView {
             TextareaState::new(window, cx)
                 .auto_grow(1, 100_000)
                 .submit_on_enter(false)
+                // One quiet line on an empty row: what it is and its two keys.
+                .placeholder("Write to the agent · / puts a tool here · ⌘⏎ sends")
         });
         let clarify_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Your own answer — Enter to send"));
@@ -208,7 +210,7 @@ impl Render for ThreadView {
         // The thread's unsent text in the composer (`drafts.rs`).
         self.sync_draft(window, cx);
         // A new chat is a code editor's empty file: the caret alone (no avatars yet), focused.
-        // The composer never has a placeholder: it is the thread's next text, not a form field.
+        // The composer's placeholder is one line of where-and-how, gone at the first key.
         let fresh = self.thread.journal.is_empty() && self.thread.id.is_none();
         if fresh != self.composer_fresh {
             self.composer_fresh = fresh;

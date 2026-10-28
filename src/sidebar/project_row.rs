@@ -161,7 +161,7 @@ impl BenchApp {
                         .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
                         .child(Ico::Plus.icon().xsmall())
                         .tooltip(|window, cx| {
-                            Tooltip::new("New thread in this project").build(window, cx)
+                            Tooltip::new("New thread in this project  ⌘N").build(window, cx)
                         })
                         .on_click(cx.listener(move |this, _, _, cx| {
                             cx.stop_propagation();

@@ -168,7 +168,7 @@ impl BenchApp {
                                 .text_color(cx.theme().foreground)
                         })
                         .child(Ico::Plus.icon().xsmall())
-                        .tooltip(|window, cx| Tooltip::new("New thread").build(window, cx))
+                        .tooltip(|window, cx| Tooltip::new("New thread  ⌘N").build(window, cx))
                         .on_click(cx.listener(|this, _, _, cx| {
                             cx.stop_propagation();
                             this.new_thread_in(String::new(), cx)
