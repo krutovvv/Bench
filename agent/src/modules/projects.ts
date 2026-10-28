@@ -43,14 +43,22 @@ function mcpView(agent: string) {
 
 const id1 = (m: RegExpMatchArray) => decodeURIComponent(m[1]);
 
+/** The live view's gateway of an agent's browser MCP server (its `live` in mcp.json), if it has one:
+ *  Bench's /browser watches that browser, the one the agent drives. */
+const liveOf = (agent: string): string | null => {
+	const live = agentMcp(agent).browser?.live;
+	return typeof live === "string" && live ? live : null;
+};
+
 export default ({ rt, publish }: Ctx): Module => ({
 	routes: {
 		// `browser`: the project has the watchable server browser among its MCP servers (Bench
 		// offers /browser only there); `host_browser`: the machine's own agent has it;
 		// `host_telegram`: the agent's general bot (its Host's) is set.
 		"GET /api/projects": () => ({
-			projects: projects.list().map((p) => ({ ...p, browser: !p.host && "browser" in agentMcp(`project:${p.id}`) })),
+			projects: projects.list().map((p) => ({ ...p, browser: !p.host && "browser" in agentMcp(`project:${p.id}`), browser_live: p.host ? null : liveOf(`project:${p.id}`) })),
 			host_browser: "browser" in agentMcp("default"),
+			host_browser_live: liveOf("default"),
 			host_telegram: !!getSetting("telegram")?.token,
 		}),
 		"POST /api/projects": (req) => {

@@ -32,6 +32,7 @@ pub fn entry_of(agent: &str, p: &Value) -> Option<ProjectEntry> {
         folder: text("folder"),
         machine: text("machine"),
         browser: p["browser"].as_bool().unwrap_or(false),
+        browser_live: text("browser_live"),
         telegram: p["telegram"]["token"].as_str().is_some_and(|t| !t.is_empty()),
     })
 }
@@ -275,6 +276,8 @@ pub struct Places {
     pub server_projects: std::collections::HashMap<String, Vec<crate::app::model::ProjectEntry>>,
     /// This Mac's agent (its Host) has the watchable server browser.
     pub host_browser: bool,
+    /// Its browser's live view (the gateway /browser watches in Host's threads).
+    pub host_browser_live: Option<String>,
     /// The agents whose general bot (their Host's) is set: "" this Mac's, else a server's alias.
     pub host_bots: std::collections::HashSet<String>,
 }

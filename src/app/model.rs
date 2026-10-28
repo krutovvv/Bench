@@ -106,6 +106,8 @@ pub struct ProjectEntry {
     pub machine: Option<String>,
     /// Has the watchable server browser among its own MCP servers: /browser is offered there.
     pub browser: bool,
+    /// Its browser's live view (the MCP server's `live`): the gateway /browser watches.
+    pub browser_live: Option<String>,
     /// Has a Telegram bot of its own: its threads are also written to from Telegram.
     pub telegram: bool,
 }

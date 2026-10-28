@@ -35,17 +35,23 @@ pub struct Sites {
 }
 
 impl BenchApp {
-    /// The server's browser, connected on first use.
-    pub fn ensure_browser(&mut self, cx: &mut Context<Self>) -> Option<Arc<Browser>> {
+    /// The browser the thread's agent drives (its MCP server's live view), connected on first
+    /// use; a thread whose browser is another gateway's connects to that one instead.
+    pub fn ensure_browser(&mut self, at: &ThreadRef, cx: &mut Context<Self>) -> Option<Arc<Browser>> {
+        let live = self.browser_gateway(at);
         if let Some(b) = &self.inserts.sites.browser {
-            return Some(b.clone());
+            if live.as_deref().is_none_or(|l| l == b.url) {
+                return Some(b.clone());
+            }
+            self.inserts.sites.browser = None;
         }
         // The demo's steps are pictures; nothing connects.
         if self.demo {
             return None;
         }
         let (tx, rx) = async_channel::bounded::<()>(1);
-        match Browser::start(tx) {
+        self.inserts.sites_error = None;
+        match Browser::start(live.as_deref(), tx) {
             Ok(b) => {
                 cx.spawn(async move |this, cx| {
                     while rx.recv().await.is_ok() {
@@ -114,7 +120,7 @@ impl BenchApp {
     /// The thread's tab: a new one (at its last address, when it had one), which becomes the
     /// thread's.
     pub fn reopen_thread_tab(&mut self, at: &ThreadRef, cx: &mut Context<Self>) {
-        let (Some((id, _, url)), Some(b)) = (self.thread_browser(at), self.ensure_browser(cx))
+        let (Some((id, _, url)), Some(b)) = (self.thread_browser(at), self.ensure_browser(at, cx))
         else {
             return;
         };

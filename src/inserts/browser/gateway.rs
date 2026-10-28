@@ -1,6 +1,8 @@
 //! The server browser's tabs, live in threads, through its `/live` gateway (`live.mjs` of
-//! browser-server-mcp, a project of its own, on the browser's server): a WebSocket with the
-//! person's own key (`~/.bench/ui/browser.json`: { url, token }), a narrow set of operations —
+//! browser-server-mcp, a project of its own, or `live.py` beside Camoufox on dev): the one of the
+//! browser the thread's agent drives — its `browser` MCP server's `live` address — a WebSocket
+//! with the person's own key for it (`~/.bench/ui/browser.json`: `keys` by address; its `url` and
+//! `token` when the MCP server names no live view), a narrow set of operations —
 //! the tabs, watch one, wake a sleeping one, open, close, mouse, wheel, text, keys — and no raw
 //! DevTools protocol.
 //! The gateway sends at most two frames a second, only while someone watches, and keeps the
@@ -59,8 +61,10 @@ pub struct State {
     pub ready: bool,
 }
 
-/// Where the gateway is and this person's key.
-fn access() -> Result<(String, String)> {
+/// Where the gateway is and this person's key: `live` (the thread's browser MCP server's live
+/// view) with its key from browser.json's `keys` by address; without one, browser.json's own
+/// `url` and `token`.
+fn access(live: Option<&str>) -> Result<(String, String)> {
     let file = crate::client::connection::state_dir().join("browser.json");
     let v: Value = serde_json::from_slice(&std::fs::read(&file).map_err(|_| {
         anyhow!(
@@ -68,6 +72,18 @@ fn access() -> Result<(String, String)> {
             file.display()
         )
     })?)?;
+    if let Some(live) = live {
+        let token = v["keys"][live]
+            .as_str()
+            .or_else(|| (v["url"].as_str() == Some(live)).then(|| v["token"].as_str()).flatten())
+            .ok_or_else(|| {
+                anyhow!(
+                    "No key for the browser at {live}: put it in {} under \"keys\" by this address",
+                    file.display()
+                )
+            })?;
+        return Ok((live.to_string(), token.to_string()));
+    }
     let url = v["url"].as_str().unwrap_or_default().to_string();
     if url.is_empty() {
         return Err(anyhow!(
@@ -79,6 +95,8 @@ fn access() -> Result<(String, String)> {
 }
 
 pub struct Browser {
+    /// The gateway it talks to.
+    pub url: String,
     pub state: Arc<Mutex<State>>,
     out: mpsc::Sender<Value>,
     paused: std::sync::atomic::AtomicBool,
@@ -86,13 +104,14 @@ pub struct Browser {
 
 impl Browser {
     /// Connects to the gateway; `wake` gets a message for every change the view should show.
-    pub fn start(wake: async_channel::Sender<()>) -> Result<Arc<Self>> {
+    pub fn start(live: Option<&str>, wake: async_channel::Sender<()>) -> Result<Arc<Self>> {
         if cfg!(target_family = "wasm") {
             return Err(anyhow!("The server's browser is live in the desktop app"));
         }
-        let (url, token) = access()?;
+        let (url, token) = access(live)?;
         let (out, rx) = mpsc::channel::<Value>();
         let b = Arc::new(Self {
+            url: url.clone(),
             state: Arc::new(Mutex::new(State::default())),
             out,
             paused: std::sync::atomic::AtomicBool::new(false),

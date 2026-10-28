@@ -96,8 +96,8 @@ impl InsertKind for Browser {
                     .into_any_element(),
             );
         }
-        if !app.demo && app.inserts.sites.browser.is_none() {
-            app.ensure_browser(cx);
+        if !app.demo {
+            app.ensure_browser(at, cx);
         }
         if let Some((tab, _, _)) = tab_of(app, ins) {
             return Some(app.render_tab(at, tab, cx));
@@ -224,7 +224,7 @@ impl InsertKind for Browser {
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) {
-        app.ensure_browser(cx);
+        app.ensure_browser(at, cx);
         app.touch_browser(at);
     }
 }

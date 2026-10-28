@@ -261,6 +261,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         agent: String::new(),
         machine: None,
         browser: true,
+        browser_live: None,
         telegram: false,
     };
     // The production site: worked on over SSH, on web-1 (its terminal is that server's).

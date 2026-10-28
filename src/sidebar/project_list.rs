@@ -27,6 +27,8 @@ impl BenchApp {
                         .filter_map(|p| crate::app::places::entry_of("", p))
                         .collect();
                     this.places.host_browser = v["host_browser"].as_bool().unwrap_or(false);
+                    this.places.host_browser_live =
+                        v["host_browser_live"].as_str().map(str::to_string);
                     this.places.note_host_bot("", &v);
                     this.compose_projects();
                 }

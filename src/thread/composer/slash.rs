@@ -30,6 +30,15 @@ impl BenchApp {
         }
     }
 
+    /// The live view of the browser the thread's agent drives (its MCP server's `live`); None:
+    /// the gateway kept in browser.json.
+    pub fn browser_gateway(&self, at: &ThreadRef) -> Option<String> {
+        match self.places.projects.iter().find(|p| p.id == at.project) {
+            Some(p) => p.browser_live.clone(),
+            None => self.places.host_browser_live.clone(),
+        }
+    }
+
     /// The slash commands threads offer, as this Mac's agent lists them.
     pub(crate) fn load_commands(&mut self, cx: &mut Context<Self>) {
         self.request("", protocol::ListCommands {}, cx, |this, r, _, _| {
