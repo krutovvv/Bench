@@ -190,7 +190,7 @@ impl BenchApp {
         let n = rows.len();
         for (k, i) in rows.into_iter().enumerate() {
             out.push(
-                self.render_session_row(i, Some(k + 1 == n), cx)
+                self.render_thread_row(i, Some(k + 1 == n), cx)
                     .into_any_element(),
             );
         }

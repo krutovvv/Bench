@@ -17,7 +17,7 @@ use bench_ui::plural;
 
 impl BenchApp {
     /// `guide`: under a group header, indented on the group's guide line (`Some(last row)`).
-    pub(super) fn render_session_row(
+    pub(super) fn render_thread_row(
         &self,
         i: usize,
         guide: Option<bool>,
@@ -99,7 +99,7 @@ impl BenchApp {
         let pinned = self.mark_of(s.id.as_str()).pinned;
         let menu_id = s.id.clone();
         h_flex()
-            .id(("session", i))
+            .id(("thread", i))
             .group(group)
             .relative()
             .gap_1()

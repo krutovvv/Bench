@@ -73,7 +73,7 @@ impl BenchApp {
             .child(bench_ui::search_band(&self.sidebar.search, cx))
             .child(
                 v_flex()
-                    .id("sessions")
+                    .id("threads")
                     // After a click on a thread: ↑ ↓ open the next, ⌫ deletes (`sidebar_items.rs`).
                     .track_focus(&self.sidebar.focus)
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
@@ -195,7 +195,7 @@ impl BenchApp {
         let n = rows.len();
         for (k, i) in rows.into_iter().enumerate() {
             out.push(
-                self.render_session_row(i, Some(k + 1 == n), cx)
+                self.render_thread_row(i, Some(k + 1 == n), cx)
                     .into_any_element(),
             );
         }

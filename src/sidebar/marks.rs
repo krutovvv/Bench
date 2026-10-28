@@ -45,19 +45,19 @@ impl BenchApp {
         let _ = std::fs::write(path(), serde_json::to_vec(&all).unwrap_or_default());
     }
 
-    pub fn mark_of(&self, session: &str) -> Mark {
-        self.sidebar.marks.get(session).copied().unwrap_or_default()
+    pub fn mark_of(&self, key: &str) -> Mark {
+        self.sidebar.marks.get(key).copied().unwrap_or_default()
     }
 
-    pub fn toggle_pin(&mut self, session: String, cx: &mut Context<Self>) {
-        let m = self.sidebar.marks.entry(session).or_default();
+    pub fn toggle_pin(&mut self, key: String, cx: &mut Context<Self>) {
+        let m = self.sidebar.marks.entry(key).or_default();
         m.pinned = !m.pinned;
         self.store_marks();
         cx.notify();
     }
 
-    pub fn set_color(&mut self, session: String, color: Option<usize>, cx: &mut Context<Self>) {
-        self.sidebar.marks.entry(session).or_default().color = color;
+    pub fn set_color(&mut self, key: String, color: Option<usize>, cx: &mut Context<Self>) {
+        self.sidebar.marks.entry(key).or_default().color = color;
         self.store_marks();
         cx.notify();
     }

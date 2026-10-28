@@ -229,7 +229,7 @@ impl ThreadView {
             })
             .sum::<usize>();
         rows.push(("Tool calls".into(), tools.to_string()));
-        let files = self.session_files();
+        let files = self.changed_files();
         if !files.is_empty() {
             rows.push(("Files changed".into(), files.len().to_string()));
         }

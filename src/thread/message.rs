@@ -80,7 +80,7 @@ impl ThreadView {
                 .iter()
                 .all(|r| matches!(r, Row::Queued { .. } | Row::Insert { .. }));
         let sources = self.render_sources(k, cx);
-        let files = last.then(|| self.render_session_files(cx)).flatten();
+        let files = last.then(|| self.render_changed_files(cx)).flatten();
         let group: SharedString = format!("answer-{key}").into();
         let (playing, speaking) = self.app(cx).map_or((false, false), |a| {
             (

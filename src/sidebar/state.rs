@@ -32,7 +32,7 @@ pub struct SidebarState {
 impl SidebarState {
     pub fn new(window: &mut Window, cx: &mut Context<BenchApp>) -> Self {
         Self {
-            search: cx.new(|cx| InputState::new(window, cx).placeholder("Search sessions")),
+            search: cx.new(|cx| InputState::new(window, cx).placeholder("Search threads")),
             query: String::new(),
             hits: None,
             seq: 0,

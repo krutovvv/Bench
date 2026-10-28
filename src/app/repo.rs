@@ -74,7 +74,7 @@ impl BenchApp {
                 let Some(dir) = self
                     .active_thread
                     .read(cx)
-                    .session_files()
+                    .changed_files()
                     .first()
                     .and_then(|(p, _)| p.rsplit_once('/').map(|(d, _)| d.to_string()))
                 else {

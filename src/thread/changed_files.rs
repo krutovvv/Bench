@@ -12,8 +12,8 @@ use bench_ui::plural;
 
 impl ThreadView {
     /// After the last turn: every file this session edited, with +/- counts.
-    pub(crate) fn render_session_files(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        let files = self.session_files();
+    pub(crate) fn render_changed_files(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
+        let files = self.changed_files();
         if files.is_empty() || self.thread.journal.running() {
             return None;
         }
@@ -145,7 +145,7 @@ impl ThreadView {
 
 impl ThreadView {
     /// Every file the thread's work edited or wrote: (path, its diffs).
-    pub fn session_files(&self) -> Vec<(String, Vec<String>)> {
+    pub fn changed_files(&self) -> Vec<(String, Vec<String>)> {
         let mut out: Vec<(String, Vec<String>)> = vec![];
         for r in &self.thread.tv.rows {
             let Row::Work { steps, .. } = r else { continue };
