@@ -17,6 +17,7 @@ pub trait Look {
 }
 
 /// A classic chat, as Messages and every chat app: what a first-time reader expects.
+#[allow(dead_code)]
 pub struct Chat;
 impl Look for Chat {
     const AVATARS: bool = false;

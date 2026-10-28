@@ -141,11 +141,13 @@ impl ThreadView {
         .flex_1()
         .min_h_0();
         let composer = self.composer.clone();
+        // The thread's own area: the whole view in the document; over the pinned composer in
+        // the chat, taking what the composer leaves.
         let area = div()
             .relative()
             .w_full()
-            .flex_1()
-            .min_h_0()
+            .when(look::COMPOSER_IN_LIST, |d| d.size_full())
+            .when(!look::COMPOSER_IN_LIST, |d| d.flex_1().min_h_0())
             // A file dropped anywhere on the thread — in the middle, in a dock, beside another —
             // waits in the composer with the next message (`attachments.rs`).
             .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
