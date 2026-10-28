@@ -51,6 +51,11 @@ impl BenchApp {
                 .child(
                     gpui_kit::component::popover::Popover::new("backend-pop")
                         .anchor(gpui_kit::Anchor::BottomLeft)
+                        // Its sections pad themselves, so their rules run edge to edge as a
+                        // Mac popover's separators do (the panel's own padding inset them).
+                        .p_0()
+                        // `BENCH_DEMO_POP=agent`: open from the start, for its picture.
+                        .default_open(std::env::var("BENCH_DEMO_POP").as_deref() == Ok("agent"))
                         .trigger(
                             // Opening the panel asks macOS what it allows now (the choice may
                             // have changed in System Settings since the start).
@@ -90,9 +95,9 @@ impl BenchApp {
                             let line = |ok: bool, warn: bool, text: String| {
                                 h_flex()
                                     .gap_2()
-                                    .items_start()
-                                    .text_sm()
-                                    .child(div().pt(px(bench_ui::ICON_ON_SMALL_LINE + bench_ui::ICON_ON_LINE)).child(dot(ok, warn)))
+                                    .items_center()
+                                    .text_size(px(bench_ui::SIDEBAR_TEXT))
+                                    .child(dot(ok, warn))
                                     // A URL or a refusal is longer than the panel: it wraps
                                     // inside it, never over its edge.
                                     .child(div().flex_1().min_w_0().whitespace_normal().child(text))
@@ -216,7 +221,7 @@ impl BenchApp {
                                                 div()
                                                     .id("notif-settings")
                                                     .cursor_pointer()
-                                                    .text_sm()
+                                                    .text_size(px(bench_ui::SIDEBAR_TEXT))
                                                     .text_color(theme.danger)
                                                     .whitespace_normal()
                                                     .child(
@@ -249,14 +254,14 @@ impl BenchApp {
                                         .when(log.is_empty(), |d| {
                                             d.child(
                                                 div()
-                                                    .text_sm()
+                                                    .text_size(px(bench_ui::SIDEBAR_TEXT))
                                                     .text_color(muted)
                                                     .child("Nothing logged"),
                                             )
                                         })
                                         .children(log.iter().map(|l| {
                                             div()
-                                                .text_xs()
+                                                .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
                                                 .text_color(muted)
                                                 .whitespace_normal()
                                                 .child(l.clone())
@@ -265,10 +270,10 @@ impl BenchApp {
                                 .child(
                                     div()
                                         .px_3()
-                                        .py_1p5()
+                                        .py_2()
                                         .border_t_1()
-                                        .border_color(theme.border)
-                                        .text_sm()
+                                        .border_color(theme.border.opacity(0.6))
+                                        .text_size(px(bench_ui::SIDEBAR_TEXT))
                                         .text_color(muted)
                                         .whitespace_normal()
                                         .child(where_.clone()),
