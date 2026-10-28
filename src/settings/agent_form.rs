@@ -144,12 +144,10 @@ impl BenchApp {
     /// leave the sidebar. The agent there runs on.
     pub fn remove_agent(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
         let key = format!("agent:{host}");
-        if self.confirm_delete.as_deref() != Some(key.as_str()) {
-            self.confirm_delete = Some(key);
+        if !self.armed.confirm(key) {
             cx.notify();
             return;
         }
-        self.confirm_delete = None;
         let Some(conn) = self.local_conn() else {
             return;
         };

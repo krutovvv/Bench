@@ -108,8 +108,6 @@ pub struct Explorer {
     pub tabs: Vec<DocKey>,
     pub active: Option<DocKey>,
     pub naming: Option<Naming>,
-    /// A delete or a close asked once: the second click does it.
-    pub armed: Option<String>,
     pub quick: Option<Quick>,
     /// Each project's Problems as last read (None: being read): (path, its problems).
     pub problems: HashMap<String, Option<Vec<(String, Vec<lsp_types::Diagnostic>)>>>,

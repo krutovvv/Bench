@@ -72,7 +72,7 @@ impl BenchApp {
         ex.quick = None;
         ex.find = None;
         ex.naming = None;
-        ex.armed = None;
+        self.armed.clear();
         cx.notify();
     }
 
@@ -437,12 +437,10 @@ impl BenchApp {
     /// and what had it open closes.
     pub fn delete_entry(&mut self, f: FileRef, window: &mut Window, cx: &mut Context<Self>) {
         let armed = format!("del:{}", f.listing_key());
-        if self.explorer.armed.as_deref() != Some(&armed) {
-            self.explorer.armed = Some(armed);
+        if !self.armed.confirm(armed) {
             cx.notify();
             return;
         }
-        self.explorer.armed = None;
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };

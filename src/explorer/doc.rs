@@ -180,12 +180,10 @@ impl BenchApp {
         let item = key.item();
         let dirty = item.dirty(self, cx);
         let armed = format!("close:{key:?}");
-        if dirty && self.explorer.armed.as_deref() != Some(&armed) {
-            self.explorer.armed = Some(armed);
+        if dirty && !self.armed.confirm(armed) {
             cx.notify();
             return;
         }
-        self.explorer.armed = None;
         let Some(at) = self.explorer.tabs.iter().position(|t| *t == key) else {
             return;
         };

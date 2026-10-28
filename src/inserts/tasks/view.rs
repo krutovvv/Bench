@@ -424,7 +424,7 @@ impl BenchApp {
         let id = t.id.clone();
         let view = cx.entity();
         let (i1, i2, i3, i4, i5) = (id.clone(), id.clone(), id.clone(), id.clone(), id.clone());
-        let armed = self.tasks.delete_armed.as_deref() == Some(id.as_str());
+        let armed = self.armed.is(&format!("task:{id}"));
         let running = t.timer.is_some();
         let spent_now = t.spent_now();
         // In a thread: the thread's width, as tall as its content (the thread scrolls).

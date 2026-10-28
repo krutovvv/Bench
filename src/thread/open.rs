@@ -39,7 +39,7 @@ impl BenchApp {
             cx.notify();
             return;
         }
-        self.confirm_delete = None;
+        self.armed.clear();
         self.project_form = None;
         self.unbeside(&host, &id, cx);
         let prev = self.active_thread.update(cx, |v, _| {
@@ -176,13 +176,13 @@ impl BenchApp {
 
     /// Deleting a thread asks once: its row shows Delete · Cancel (⌫ again, or Delete, deletes).
     pub fn arm_delete(&mut self, id: String, cx: &mut Context<Self>) {
-        self.confirm_delete = Some(id);
+        self.armed.arm(crate::app::armed::thread_key(&id));
         cx.notify();
     }
 
     /// The thread goes (after `arm_delete`, or ⌘⌫), by the agent that keeps it.
     pub fn delete_thread(&mut self, host: String, id: ThreadId, cx: &mut Context<Self>) {
-        self.confirm_delete = None;
+        self.armed.clear();
         let at = self.thread_ref(cx);
         if at.host == host && at.id.as_ref() == Some(&id) {
             self.reset_chat(cx);
@@ -209,7 +209,7 @@ impl BenchApp {
     }
 
     pub fn cancel_delete(&mut self, cx: &mut Context<Self>) {
-        self.confirm_delete = None;
+        self.armed.clear();
         cx.notify();
     }
 

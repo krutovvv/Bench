@@ -142,7 +142,7 @@ impl SettingsForm for Danger {
 
     fn form(
         &self,
-        _app: &BenchApp,
+        app: &BenchApp,
         e: &ProjectEnv,
         cx: &mut Context<BenchApp>,
     ) -> Option<Vec<AnyElement>> {
@@ -154,6 +154,7 @@ impl SettingsForm for Danger {
                     .flex()
                     .justify_end()
                     .child(remove(
+                        app,
                         e,
                         "project",
                         String::new(),
@@ -188,7 +189,7 @@ impl SettingsForm for Danger {
             app.explorer.docs.remove(&key);
             app.close_doc(key, cx);
         }
-        app.confirm_delete = Some(format!("p:{id}"));
+        app.armed.arm(format!("p:{id}"));
         app.delete_project(id.to_string(), window, cx);
         app.center = crate::workspace::Center::Chat;
         app.new_thread(cx);

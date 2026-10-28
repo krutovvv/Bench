@@ -52,7 +52,7 @@ impl BenchApp {
             let item = key.item();
             let (name, icon) = item.tab(self, cx);
             let dirty = item.dirty(self, cx);
-            let armed = self.explorer.armed.as_deref() == Some(format!("close:{key:?}").as_str());
+            let armed = self.armed.is(&format!("close:{key:?}"));
             let (k1, k2) = (key.clone(), key.clone());
             let close = bench_ui::head_icon_button(
                 &format!("doc-tab-x-{n}"),

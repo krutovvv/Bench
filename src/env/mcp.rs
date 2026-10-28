@@ -321,7 +321,7 @@ impl ExplorerParts for Mcp {
         }
         actions.push(save(&e.id, "mcp", e.mcp.dirty, cx));
         actions.extend(revert(&e.id, "mcp", e.mcp.dirty, cx));
-        actions.push(remove(e, "mcp", name.to_string(), "Remove", cx));
+        actions.push(remove(app, e, "mcp", name.to_string(), "Remove", cx));
         Some(Card::new(
             format!("MCP server · {name}"),
             code(&e.mcp.json, cx),

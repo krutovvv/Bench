@@ -57,43 +57,18 @@ impl BenchApp {
         };
         let (open_id, del_id) = (s.id.clone(), s.id.clone());
         // Deleting asks once (⌫, or the menu): the row shows Delete · Cancel; ⌫ again deletes.
-        let armed = self.confirm_delete.as_deref() == Some(s.id.as_str());
+        let armed = self.armed.is(&crate::app::armed::thread_key(s.id.as_str()));
         let compact = self.appearance.compact_sidebar;
 
         let delete = if armed {
-            h_flex()
-                .gap_1()
-                .text_xs()
-                .child(
-                    div()
-                        .id(("del-yes", i))
-                        .px_1p5()
-                        .py_0p5()
-                        .rounded_md()
-                        .bg(theme.danger)
-                        .text_color(theme.danger_foreground)
-                        .cursor_pointer()
-                        .child("Delete")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.delete_listed(del_id.clone(), cx)
-                        })),
-                )
-                .child(
-                    div()
-                        .id(("del-no", i))
-                        .px_1()
-                        .py_0p5()
-                        .cursor_pointer()
-                        .text_color(muted)
-                        .hover(|s| s.text_color(theme.foreground))
-                        .child("Cancel")
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.cancel_delete(cx)
-                        })),
-                )
-                .into_any_element()
+            bench_ui::confirm_buttons(
+                format!("del-{i}"),
+                "Delete",
+                Box::new(cx.listener(move |this, _, _, cx| this.delete_listed(del_id.clone(), cx))),
+                Box::new(cx.listener(|this, _, _, cx| this.cancel_delete(cx))),
+                cx,
+            )
+            .into_any_element()
         } else {
             // "⋯" on hover: pin, color, rename, delete.
             let view = cx.entity();

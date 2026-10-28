@@ -243,6 +243,10 @@ fewer form fields. Then check what it did to signups and give me a short summary
             )
         })
         .collect();
+    // `BENCH_DEMO_ARM=<key>`: that delete waits for its second press (`thread:d-api`, `p:p-web`).
+    if let Ok(key) = std::env::var("BENCH_DEMO_ARM") {
+        app.armed.arm(key);
+    }
     // The demo's own folds, not the person's: every group open but the long Tools.
     app.ssh.collapsed = ["s:Tools".to_string()].into_iter().collect();
     // `BENCH_DEMO=tasks|tasks-open|server|browser|tool`: that thread open instead.

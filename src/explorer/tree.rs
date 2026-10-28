@@ -257,7 +257,7 @@ impl BenchApp {
         };
         // Its work is in its menu; only a delete asked for shows here, to be confirmed.
         let armed =
-            self.explorer.armed.as_deref() == Some(format!("del:{}", f.listing_key()).as_str());
+            self.armed.is(&format!("del:{}", f.listing_key()));
         let acts = if armed {
             vec![self.trash(f, cx)]
         } else {
@@ -297,7 +297,7 @@ impl BenchApp {
     fn trash(&self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let armed =
-            self.explorer.armed.as_deref() == Some(format!("del:{}", f.listing_key()).as_str());
+            self.armed.is(&format!("del:{}", f.listing_key()));
         let target = f.clone();
         div()
             .id(SharedString::from(format!("ex-rm-{}", f.listing_key())))

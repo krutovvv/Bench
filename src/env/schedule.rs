@@ -223,7 +223,7 @@ impl ExplorerParts for Schedule {
 
     fn card(
         &self,
-        _app: &BenchApp,
+        app: &BenchApp,
         e: &ProjectEnv,
         name: &str,
         cx: &mut Context<BenchApp>,
@@ -272,7 +272,7 @@ impl ExplorerParts for Schedule {
         actions.push(save(&e.id, "cron", e.cron.dirty, cx));
         actions.extend(revert(&e.id, "cron", e.cron.dirty, cx));
         if job.is_some() {
-            actions.push(remove(e, "cron", name.to_string(), "Remove", cx));
+            actions.push(remove(app, e, "cron", name.to_string(), "Remove", cx));
         }
         let last = job
             .as_ref()

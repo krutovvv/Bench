@@ -13,6 +13,7 @@ use gpui_kit::component::select::SelectState;
 use gpui_kit::*;
 
 pub(crate) mod agents;
+pub(crate) mod armed;
 mod backend;
 mod defaults;
 mod events;
@@ -108,7 +109,8 @@ pub struct BenchApp {
 
     /// Every agent's threads, as each last listed them (the sidebar).
     pub threads: Vec<ThreadRow>,
-    pub confirm_delete: Option<String>,
+    /// What waits for a second press (a delete, closing an unsaved tab): `armed.rs`.
+    pub armed: armed::Armed,
 
     /// Each thread opened in this run, as last shown: switching back shows it at once.
     pub thread_cache: HashMap<String, ::thread::Thread>,
@@ -302,7 +304,7 @@ impl BenchApp {
             click_claimed: false,
             click_at: None,
             threads: vec![],
-            confirm_delete: None,
+            armed: Default::default(),
             thread_cache: HashMap::new(),
             references: HashMap::new(),
             send_after_transcribe: false,

@@ -48,8 +48,6 @@ pub struct TasksMode {
     pub field_error: Option<String>,
     /// The card was edited: saved shortly after the typing stops.
     dirty: Option<Instant>,
-    /// Delete was pressed once for this task.
-    pub delete_armed: Option<String>,
     pub(crate) store: Option<TaskStore>,
     last_load: Option<Instant>,
     next_token: u64,
@@ -120,7 +118,6 @@ impl TasksMode {
             completed,
             field_error: None,
             dirty: None,
-            delete_armed: None,
             store: None,
             last_load: None,
             next_token: 1,
@@ -379,7 +376,7 @@ impl BenchApp {
         self.flush_task(cx);
         self.tasks.selected = Some(id);
         self.drop_blank_new();
-        self.tasks.delete_armed = None;
+        self.armed.clear();
         self.fill_task_card(window, cx);
         cx.notify();
     }
@@ -616,12 +613,10 @@ impl BenchApp {
 
     /// First press arms, the second removes the task from the store.
     pub fn delete_task(&mut self, id: String, cx: &mut Context<Self>) {
-        if self.tasks.delete_armed.as_deref() != Some(id.as_str()) {
-            self.tasks.delete_armed = Some(id);
+        if !self.armed.confirm(format!("task:{id}")) {
             cx.notify();
             return;
         }
-        self.tasks.delete_armed = None;
         self.tasks.items.retain(|t| t.id != id);
         if self.tasks.selected.as_deref() == Some(id.as_str()) {
             self.tasks.selected = None;

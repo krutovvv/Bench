@@ -58,7 +58,7 @@ impl BenchApp {
             {
                 let at = self.thread_ref(cx);
                 let id = at.id.clone().unwrap_or_default();
-                if self.confirm_delete.as_deref() == Some(id.as_str()) {
+                if self.armed.is(&crate::app::armed::thread_key(id.as_str())) {
                     self.delete_thread(at.host, id, cx);
                 } else {
                     self.arm_delete(id.to_string(), cx);
@@ -108,8 +108,8 @@ impl BenchApp {
         let ex = &mut self.explorer;
         if ex.quick.take().is_some()
             || ex.naming.take().is_some()
-            || ex.armed.take().is_some()
             || ex.find.take().is_some()
+            || self.armed.clear()
         {
             cx.notify();
             return true;

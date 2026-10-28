@@ -79,7 +79,7 @@ impl BenchApp {
             let shown = host == self.gear_agent;
             let pick = host.clone();
             // A server's agent can be forgotten here (asked once); this Mac's is always there.
-            let armed = self.confirm_delete.as_deref() == Some(format!("agent:{host}").as_str());
+            let armed = self.armed.is(&format!("agent:{host}"));
             // Restarts it from this Bench's sources; an interrupted run resumes (runs are durable).
             let update = older.then(|| {
                 let h = host.clone();
@@ -182,7 +182,7 @@ impl BenchApp {
                 Some(name) => format!("In .env as {name}"),
                 None => "If the server asks for one".into(),
             };
-            let armed = saved && self.providers.armed.as_deref() == Some(e.id.as_str());
+            let armed = saved && self.armed.is(&format!("endpoint:{}", e.id));
             let mut actions = vec![
                 bench_ui::secondary_button(
                     ("ep-delete", i),

@@ -270,13 +270,14 @@ pub fn revert(
 
 /// A Remove: the first click arms it ("Remove?"), the second does it.
 pub fn remove(
+    app: &BenchApp,
     e: &ProjectEnv,
     what: &'static str,
     target: String,
     label: &'static str,
     cx: &mut Context<BenchApp>,
 ) -> AnyElement {
-    let on = e.armed.as_deref() == Some(format!("{what}:{target}").as_str());
+    let on = app.armed.is(&format!("env:{}:{what}:{target}", e.id));
     let project = e.id.clone();
     card_act(
         format!("env-card-rm-{what}"),

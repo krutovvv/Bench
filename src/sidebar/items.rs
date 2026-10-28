@@ -196,7 +196,7 @@ impl BenchApp {
                 };
                 // The first ⌫ asks (the row shows Delete · Cancel), the second deletes: a stray
                 // key never takes a thread.
-                if self.confirm_delete.as_deref() != Some(order[k].as_str()) {
+                if !self.armed.is(&crate::app::armed::thread_key(order[k].as_str())) {
                     self.arm_delete(order[k].to_string(), cx);
                     return;
                 }

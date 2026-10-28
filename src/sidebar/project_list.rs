@@ -50,12 +50,10 @@ impl BenchApp {
     pub fn delete_project(&mut self, id: String, window: &mut Window, cx: &mut Context<Self>) {
         // The first time asks (its head shows Remove · Cancel): its environment goes with it.
         let key = format!("p:{id}");
-        if self.confirm_delete.as_deref() != Some(key.as_str()) {
-            self.confirm_delete = Some(key);
+        if !self.armed.confirm(key) {
             cx.notify();
             return;
         }
-        self.confirm_delete = None;
         // It goes from the agent that keeps it. An agent's Host is not removed (a server's agent
         // leaves Bench in the gear).
         let key = crate::app::model::ProjectKey::parse(&id);

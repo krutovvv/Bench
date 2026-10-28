@@ -137,3 +137,48 @@ pub fn arm_delete_button(id: impl Into<ElementId>, armed: bool, cx: &App) -> Sta
             }
         })
 }
+
+/// An armed delete asking in place: the danger action ("Delete", "Remove") filled red, then a
+/// quiet Cancel. Each click stops there: the row under it is not clicked too.
+pub fn confirm_buttons(
+    id: impl Into<SharedString>,
+    action: &'static str,
+    on_yes: crate::OnClick,
+    on_no: crate::OnClick,
+    cx: &App,
+) -> Div {
+    let theme = cx.theme().clone();
+    let id: SharedString = id.into();
+    h_flex()
+        .gap_1()
+        .text_xs()
+        .child(
+            div()
+                .id(SharedString::from(format!("{id}-yes")))
+                .px_1p5()
+                .py_0p5()
+                .rounded_md()
+                .cursor_pointer()
+                .bg(theme.danger)
+                .text_color(theme.danger_foreground)
+                .child(action)
+                .on_click(move |e, window, cx| {
+                    cx.stop_propagation();
+                    on_yes(e, window, cx)
+                }),
+        )
+        .child(
+            div()
+                .id(SharedString::from(format!("{id}-no")))
+                .px_1()
+                .py_0p5()
+                .cursor_pointer()
+                .text_color(theme.muted_foreground)
+                .hover(|s| s.text_color(theme.foreground))
+                .child("Cancel")
+                .on_click(move |e, window, cx| {
+                    cx.stop_propagation();
+                    on_no(e, window, cx)
+                }),
+        )
+}

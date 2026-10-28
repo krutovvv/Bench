@@ -56,8 +56,6 @@ pub struct ProjectEnv {
     /// name), the kind a `Section::key` (name "new" for a new one). One per project: its fields
     /// are its section's.
     pub card: Option<(&'static str, String)>,
-    /// A remove asked once ("mcp:<name>", "project:"): the second click does it.
-    pub armed: Option<String>,
     pub error: Option<String>,
 }
 
@@ -199,7 +197,6 @@ impl BenchApp {
             cron: schedule::ScheduleEnv::new(id, window, cx),
             new_name,
             card: None,
-            armed: None,
             error: None,
         }
     }
@@ -365,16 +362,13 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(e) = self.envs.get_mut(id) else {
+        if !self.envs.contains_key(id) {
             return;
-        };
-        let key = format!("{what}:{name}");
-        if e.armed.as_deref() != Some(&key) {
-            e.armed = Some(key);
+        }
+        if !self.armed.confirm(format!("env:{id}:{what}:{name}")) {
             cx.notify();
             return;
         }
-        e.armed = None;
         // The project itself is removed by its form; a part by a DELETE to the agent.
         if let Some(form) = FORMS.iter().find(|s| s.key() == what) {
             form.remove_here(self, id, window, cx);
@@ -433,7 +427,6 @@ impl BenchApp {
         for s in PARTS {
             s.close(e);
         }
-        e.armed = None;
         e.card = Some((kind, name.clone()));
         let sec = part(kind);
         if name == "new" {

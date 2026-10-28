@@ -225,7 +225,7 @@ impl ExplorerParts for Lsp {
         let actions = [save(&e.id, "lsp", e.lsp.dirty, cx)]
             .into_iter()
             .chain(revert(&e.id, "lsp", e.lsp.dirty, cx))
-            .chain([remove(e, "lsp", name.to_string(), "Remove", cx)])
+            .chain([remove(app, e, "lsp", name.to_string(), "Remove", cx)])
             .collect();
         Some(Card::new(
             format!("Language server · {name}"),

@@ -50,8 +50,6 @@ pub struct Providers {
     pub endpoints: Vec<EndpointForm>,
     pub voice: Option<Voice>,
     pub fallback: Option<(String, String)>,
-    /// A provider armed for deletion (its id; the second click deletes it).
-    pub armed: Option<String>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -393,12 +391,10 @@ impl BenchApp {
             cx.notify();
             return;
         }
-        if self.providers.armed.as_deref() != Some(&id) {
-            self.providers.armed = Some(id);
+        if !self.armed.confirm(format!("endpoint:{id}")) {
             cx.notify();
             return;
         }
-        self.providers.armed = None;
         self.rest_on(
             self.gear_agent.clone(),
             window,

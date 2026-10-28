@@ -61,7 +61,7 @@ impl BenchApp {
             .color
             .and_then(|c| crate::sidebar::marks::MARK_COLORS.get(c))
             .map(|c| rgb(*c).into());
-        let armed = self.confirm_delete.as_deref() == Some(format!("p:{}", p.id).as_str());
+        let armed = self.armed.is(&format!("p:{}", p.id));
         let renaming = self.renaming_field(&Item::Project(p.id.clone()));
         let mut out = vec![
             h_flex()
@@ -102,38 +102,15 @@ impl BenchApp {
                 // Removing asks first: its environment goes with it.
                 .when(armed, |d| {
                     let yes = p.id.clone();
-                    d.child(
-                        h_flex()
-                            .gap_1()
-                            .text_xs()
-                            .child(
-                                div()
-                                    .id(("premove-yes", g))
-                                    .px_1p5()
-                                    .py_0p5()
-                                    .rounded_md()
-                                    .bg(theme.danger)
-                                    .text_color(theme.danger_foreground)
-                                    .child("Remove")
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        cx.stop_propagation();
-                                        this.delete_project(yes.clone(), window, cx)
-                                    })),
-                            )
-                            .child(
-                                div()
-                                    .id(("premove-no", g))
-                                    .px_1()
-                                    .py_0p5()
-                                    .text_color(muted)
-                                    .hover(|s| s.text_color(theme.foreground))
-                                    .child("Cancel")
-                                    .on_click(cx.listener(|this, _, _, cx| {
-                                        cx.stop_propagation();
-                                        this.cancel_delete(cx)
-                                    })),
-                            ),
-                    )
+                    d.child(bench_ui::confirm_buttons(
+                        format!("premove-{g}"),
+                        "Remove",
+                        Box::new(cx.listener(move |this, _, window, cx| {
+                            this.delete_project(yes.clone(), window, cx)
+                        })),
+                        Box::new(cx.listener(|this, _, _, cx| this.cancel_delete(cx))),
+                        cx,
+                    ))
                 })
                 // "⋯" (on hover): the same menu as a right click.
                 .child(
