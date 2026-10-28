@@ -33,6 +33,7 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
             }
         },
         "compaction": 0.9,
+        "code_mode": true,
         "window": 131072,
         "telegram": {
             "username": "northwind_blog_bot",

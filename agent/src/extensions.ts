@@ -14,9 +14,13 @@
 //   });
 //
 // An agent chooses its extensions in settings.json ("extensions": ["assistant", "research"]).
+// "codemode" is Pi's code mode: one script calls many tools, and only what it prints reaches the
+// model. A project turns it on in its Settings (`codeMode`), so it joins that project's threads.
 
 import * as ai from "@earendil-works/pi-ai";
 import * as pi from "@earendil-works/pi-durable";
+import { CodemodeSandbox } from "@earendil-works/pi-codemode";
+import { createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchExtension } from "@earendil-works/pi-durable/tool-search";
 import * as piTools from "@earendil-works/pi-durable/tools";
 import fs from "node:fs";
@@ -28,7 +32,7 @@ import * as memory from "./builtin/memory.ts";
 import * as skills from "./builtin/skills.ts";
 import * as subagent from "./builtin/subagent.ts";
 import * as taskStore from "./builtin/tasks.ts";
-import { agentDir, agents } from "./config.ts";
+import { agentDir, agents, readAgent } from "./config.ts";
 import { assistant, images } from "./extensions/assistant.ts";
 import { host } from "./host.ts";
 import { mcpTools } from "./mcp.ts";
@@ -104,7 +108,9 @@ async function loadFile(agent: string, file: string): Promise<Loaded> {
 
 /** Loads the built-in and every agent's extensions into the registry; `onChange` after a reload. */
 export async function loadExtensions(registry: { install(e: pi.Extension): void }, onChange: () => void): Promise<void> {
-	const builtin: pi.Extension[] = [assistant as any, createToolSearchExtension() as any, ...agents().map(mcpExtension)];
+	// Code mode without `models.*`: the scripts are for the thread's own tools.
+	const codemode = createCodemodeExtension({ sandbox: new CodemodeSandbox({ memoryLimitBytes: 256 * 1024 * 1024 }), models: false });
+	const builtin: pi.Extension[] = [assistant as any, createToolSearchExtension() as any, codemode as any, ...agents().map(mcpExtension)];
 	for (const e of builtin) {
 		loaded.set(e.name, { name: e.name, source: "builtin", extension: e });
 		registry.install(e);
@@ -135,7 +141,7 @@ export async function loadExtensions(registry: { install(e: pi.Extension): void 
 
 /** An agent's extensions, as objects for `configure()`: its own by name, else the built-in one; always its MCP and tool search. */
 export function forAgent(names: string[] | undefined, agent: string): pi.Extension[] {
-	const wanted = [...new Set([...(names?.length ? names : ["assistant"]), "tool-search"])];
+	const wanted = [...new Set([...(names?.length ? names : ["assistant"]), "tool-search", ...(readAgent(agent).codeMode ? ["codemode"] : [])])];
 	const own = agent.startsWith("project:") ? "default" : agent;
 	const list = wanted.map((n) => loaded.get(`${own}:${n}`)?.extension ?? loaded.get(n)?.extension).filter(Boolean) as pi.Extension[];
 	// A project's threads: the general MCP servers and the project's own.

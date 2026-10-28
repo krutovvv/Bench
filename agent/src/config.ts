@@ -125,6 +125,11 @@ export interface AgentSettings {
 	extensions?: string[];
 	/** "off" | "manual": ask before dangerous commands. */
 	approvals?: string;
+	/**
+	 * Code mode: its threads also get Pi's `codemode` tool, a script that calls the other tools
+	 * (`extensions.ts`). A project's choice; its threads take it from their next turn.
+	 */
+	codeMode?: boolean;
 }
 
 /** A project's environment is an agent directory too ("project:<id>"), in projects/<id>/. */

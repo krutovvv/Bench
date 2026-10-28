@@ -1,5 +1,6 @@
-//! How the project's threads run: how hard it thinks, what it may run without asking, when its
-//! conversations are summarized (compaction, a share of the model's window): a group of General,
+//! How the project's threads run: how hard it thinks, what it may run without asking, whether it
+//! works in code mode (a script that calls many tools in one step), when its conversations are
+//! summarized (compaction, a share of the model's window): a group of General,
 //! chosen once, not per chat — its threads start on these; the model is one for every project
 //! (the gear). Read from and saved to the agent its threads run with (`env_agent`).
 
@@ -20,6 +21,8 @@ pub struct RunEnv {
     pub compaction: Option<f64>,
     /// The model's window, in tokens (what the share is of).
     pub window: u64,
+    /// Its threads get Pi's code mode (`codemode`) from their next turn.
+    pub code_mode: bool,
 }
 
 /// What a compaction share means for this window, said in a line.
@@ -64,6 +67,7 @@ impl Section for Run {
     fn apply(&self, e: &mut ProjectEnv, v: &serde_json::Value, _w: &mut Window, _cx: &mut App) {
         e.run.compaction = v["compaction"].as_f64();
         e.run.window = v["window"].as_u64().unwrap_or(0);
+        e.run.code_mode = v["code_mode"].as_bool().unwrap_or(false);
     }
 }
 
@@ -120,6 +124,13 @@ impl SettingsForm for Run {
             &e.run.approvals,
             cx,
         );
+        let code_mode = segmented(
+            "env-code-mode",
+            "code_mode",
+            vec!["Off".into(), "On".into()],
+            if e.run.code_mode { "On" } else { "Off" },
+            cx,
+        );
         // Pi's own first, then the presets' shares.
         let names = app.presets.compaction.clone();
         let shares: Vec<Option<f64>> = std::iter::once(None)
@@ -159,6 +170,13 @@ impl SettingsForm for Run {
             )
             .into_any_element(),
             settings_field(
+                "Code mode",
+                "A script calls many tools in one step: fewer steps for work in code",
+                code_mode,
+                cx,
+            )
+            .into_any_element(),
+            settings_field(
                 "Compaction",
                 "When its conversations are summarized, as a share of the model's window; later keeps more in front of the model",
                 compaction,
@@ -170,9 +188,10 @@ impl SettingsForm for Run {
 }
 
 impl BenchApp {
-    /// One of the two running choices — its reasoning level, its approvals — set for the
-    /// project. A click applies it at once (a choice has no draft); the project's next threads
-    /// start on it, a thread already begun keeps what it started with.
+    /// One of the running choices — its reasoning level, its approvals, code mode, compaction —
+    /// set for the project. A click applies it at once (a choice has no draft); the project's
+    /// next threads start on it, a thread already begun keeps what it started with (code mode
+    /// alone reaches its threads from their next turn).
     pub fn env_set_run(
         &mut self,
         id: &str,
@@ -192,6 +211,7 @@ impl BenchApp {
         let body = match what {
             "reasoning" => json!({"config": {"agent": {"reasoning_effort": value}}}),
             "compaction" => json!({"config": {"compaction": {"at": value.parse::<f64>().ok()}}}),
+            "code_mode" => json!({"config": {"code_mode": {"enabled": value == "On"}}}),
             _ => json!({"config": {"approvals": {"mode": value}}}),
         };
         let asked = id.clone();

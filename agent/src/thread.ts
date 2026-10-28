@@ -11,6 +11,11 @@ import { Inserts } from "./inserts.ts";
 /** A tool call in one line: what it acts on (a command, a path, a query…). */
 export function preview(name: string, args: any): string {
 	if (!args || typeof args !== "object") return "";
+	// A code-mode script: its first line that says something.
+	if (name === "codemode" && typeof args.code === "string") {
+		const line = args.code.split("\n").map((l: string) => l.trim()).find((l: string) => l && !l.startsWith("//")) ?? "";
+		return line.length > 160 ? line.slice(0, 157) + "..." : line;
+	}
 	const pick = args.command ?? args.path ?? args.query ?? args.url ?? args.urls?.[0] ?? args.name ?? args.goal ?? args.pattern ?? args.action;
 	const text = typeof pick === "string" ? pick : JSON.stringify(args);
 	return text.length > 160 ? text.slice(0, 157) + "..." : text;

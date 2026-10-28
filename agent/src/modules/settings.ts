@@ -27,6 +27,8 @@ function patchConfig(profile: string, patch: any): void {
 			// A share of the window (0.9), or null: Pi's own policy again.
 			const at = m.at === null || m.at === undefined ? undefined : Number(m.at);
 			writeAgent(profile, { ...readAgent(profile), compaction: at });
+		} else if (k === "code_mode" && m && typeof m === "object" && m.enabled !== undefined) {
+			writeAgent(profile, { ...readAgent(profile), codeMode: Boolean(m.enabled) || undefined });
 		} else if (k === "approvals" && m && typeof m === "object" && m.mode !== undefined) {
 			writeAgent(profile, { ...readAgent(profile), approvals: String(m.mode) });
 		} else setSetting(k, deepMerge(getSetting(k), v));

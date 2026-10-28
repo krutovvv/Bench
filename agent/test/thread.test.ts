@@ -38,6 +38,7 @@ test("an assistant entry: thought, text, tool calls, each with its own key, in t
 	);
 	assert.equal((items[2] as any).call_id, "c1");
 	assert.equal((items[2] as any).preview, "ls");
+	assert.equal((itemsOf(assistant(10, [{ type: "toolCall", id: "c3", name: "codemode", arguments: { code: "// find it\nconst r = await tools.grep({ pattern: 'hold' });" } }]))[0] as any).preview, "const r = await tools.grep({ pattern: 'hold' });", "a script shows its first line");
 });
 
 test("empty blocks give nothing; a model error is said", () => {

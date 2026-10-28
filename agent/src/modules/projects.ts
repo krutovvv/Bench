@@ -3,7 +3,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { agentDir, agentMcp, compactionAt, getSetting, resolveModel, setSetting, writeAgentMcp } from "../config.ts";
+import { agentDir, agentMcp, compactionAt, getSetting, readAgent, resolveModel, setSetting, writeAgentMcp } from "../config.ts";
 import { arm, jobs, newJob, type Job } from "../builtin/cron.ts";
 import { projects } from "../builtin/projects.ts";
 import { listSkills } from "../builtin/skills.ts";
@@ -89,6 +89,7 @@ export default ({ rt }: Ctx): Module => ({
 					// What its machine lacks for them is said before any is started (no Node there).
 					lsp: { servers: readLsp(agent), states: { ...lspStates(agent), ...(await lspNeeds(agent, projects.get(id)?.machine ?? undefined)) } },
 					compaction: compactionAt(agent) ?? null,
+					code_mode: Boolean(readAgent(agent).codeMode),
 					window: resolveModel().contextLength,
 					project: p,
 					dir,
