@@ -1,3 +1,12 @@
+---
+id: architecture
+type: architecture-design
+status: draft
+title: Bench's architecture — where it grows and how the structure is laid for it
+parent: bench
+references: [thread-objects, projects-and-agents]
+---
+
 # Архитектура Bench: куда он будет расти и как это заложить
 
 План переписывания треда — [thread-rewrite.md](thread-rewrite.md). Этот документ отвечает на

@@ -6,6 +6,11 @@ neighbours. Read the skill `.agents/skills/bench-kit/SKILL.md` before any UI or 
 or a new kind of thing, and before any refactor: structure fitting where Bench goes first, then a
 file tree readable without docs, then Rust and Zed words.
 
+**Specs.** The why of each module is its `SPEC.md`, beside it (the root `SPEC.md` is Bench's goal;
+a few `docs/*.md` carry spec frontmatter too), linked by `parent` into one tree. Read a module's
+`SPEC.md` before changing it; a change that moves its boundary or a decision updates it in the
+same commit, and `node scripts/specs-check.mjs` checks the links.
+
 ## What Bench is
 
 Bench is a native desktop **workbench for working with an AI agent**. It is an open,

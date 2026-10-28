@@ -1,3 +1,12 @@
+---
+id: thread-objects
+type: architecture-design
+status: draft
+title: What lives in a thread, and where it comes from
+parent: architecture
+references: [thread-core, agent-runtime, agent-tools]
+---
+
 # Что живёт в треде, и откуда оно берётся
 
 Тред показывает журнал Pi (`docs/thread-rewrite.md`). Кроме сообщений и работы агента в нём

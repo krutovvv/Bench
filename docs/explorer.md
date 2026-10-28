@@ -1,3 +1,13 @@
+---
+id: explorer
+type: submodule-design
+status: draft
+title: The window's three places, and the Explorer
+parent: app
+references: [workspace, env, thread-view]
+covers: [src/explorer/]
+---
+
 # The window's three places, and the Explorer
 
 Bench has two ways to look at a project: as **threads** (talking to the agent, the work it
