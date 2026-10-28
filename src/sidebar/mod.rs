@@ -222,7 +222,7 @@ impl BenchApp {
             .into_any_element()
     }
 
-    fn sidebar_note(&self, text: &'static str, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn sidebar_note(&self, text: &'static str, cx: &mut Context<Self>) -> AnyElement {
         div()
             .px_4()
             .py_2()

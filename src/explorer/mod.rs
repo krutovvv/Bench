@@ -93,4 +93,7 @@ pub struct Explorer {
     /// Each project's Problems as last read (None: being read): (path, its problems).
     pub problems: HashMap<String, Option<Vec<(String, Vec<lsp_types::Diagnostic>)>>>,
     pub find: Option<Find>,
+    /// The left dock lists the project's threads in place of its tree (Files | Threads at its
+    /// top): one clicked is the thread beside the document.
+    pub threads: bool,
 }

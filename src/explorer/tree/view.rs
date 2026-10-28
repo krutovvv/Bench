@@ -43,7 +43,11 @@ impl BenchApp {
             let id = self.explorer.project.clone();
             self.load_env(&id, window, cx);
         }
-        let mut out = vec![self.explorer_picker(cx)];
+        let mut out = vec![self.explorer_picker(cx), self.explorer_side_switch(cx)];
+        if self.explorer.threads {
+            out.extend(self.explorer_threads(cx));
+            return out;
+        }
         if self.explorer.find.is_some() {
             out.extend(self.find_rows(cx));
             return out;
@@ -189,6 +193,55 @@ impl BenchApp {
                     .on_click(cx.listener(|this, _, w, cx| this.open_quick(w, cx))),
             )
             .into_any_element()
+    }
+
+    /// Files | Threads under the picker, as Xcode's navigator switches what it lists: the tree, or
+    /// the project's threads to pick the one beside the document.
+    fn explorer_side_switch(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let on = self.explorer.threads;
+        let seg = |k: usize, label: &'static str, chosen: bool, cx: &mut Context<Self>| {
+            bench_ui::segment(div().id(("ex-side", k)), chosen, &theme)
+                .flex_1()
+                .justify_center()
+                .child(label)
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.explorer.threads = k == 1;
+                    cx.notify();
+                }))
+        };
+        div()
+            .flex_none()
+            .px(px(bench_ui::SIDEBAR_ROW_INSET))
+            .pb_2()
+            .child(
+                bench_ui::segment_track(&theme)
+                    .w_full()
+                    .child(seg(0, "Files", !on, cx))
+                    .child(seg(1, "Threads", on, cx)),
+            )
+            .into_any_element()
+    }
+
+    /// The Threads side: the shown project's threads as the sidebar draws them, pinned first.
+    fn explorer_threads(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let project = self.explorer.project.clone();
+        let (loose, groups) = self.sidebar_groups();
+        let rows = if crate::app::model::ProjectKey::parse(&project).is_host() {
+            loose
+        } else {
+            groups
+                .into_iter()
+                .find(|(p, _)| p.id == project)
+                .map(|(_, rows)| rows)
+                .unwrap_or_default()
+        };
+        if rows.is_empty() {
+            return vec![self.sidebar_note("No threads yet", cx)];
+        }
+        rows.into_iter()
+            .map(|i| self.render_thread_row(i, cx).into_any_element())
+            .collect()
     }
 
     /// A group's heading: a click folds it.

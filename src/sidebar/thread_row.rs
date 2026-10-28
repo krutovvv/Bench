@@ -15,7 +15,7 @@ use bench_ui::SIDEBAR_TEXT;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
-    pub(super) fn render_thread_row(
+    pub(crate) fn render_thread_row(
         &self,
         i: usize,
         cx: &mut Context<Self>,
@@ -24,8 +24,9 @@ impl BenchApp {
         let accent = theme.primary;
         let faint = bench_ui::faint(&theme);
         let s = &self.threads.list[i];
-        let selected =
-            self.center == Center::Chat && self.thread(cx).id.as_ref() == Some(&s.id);
+        // The open thread: the center's, or the one beside a document (the IDE's Threads list).
+        let selected = matches!(self.center, Center::Chat | Center::Doc)
+            && self.thread(cx).id.as_ref() == Some(&s.id);
         let group: SharedString = format!("srow{i}").into();
         // The open thread knows its hold first-hand; the others by the agent's list and the
         // holds their views heard.
@@ -204,7 +205,14 @@ impl BenchApp {
             .child(delete)
             // Opened, and the sidebar takes the keys: ↑ ↓ to the next, ⌫ deletes it.
             .on_click(cx.listener(move |this, _, window, cx| {
+                // In the IDE (its Threads list) the document stays and the thread opens beside it.
+                let beside = this.center == Center::Doc;
                 this.open_listed(open_id.clone(), cx);
+                if beside {
+                    this.center = Center::Doc;
+                    this.right_dock.activate(crate::workspace::Panel::Thread);
+                    return;
+                }
                 window.focus(&this.sidebar.focus, cx);
             }))
             .context_menu(item_menu(cx.entity(), Item::Thread(menu_id), pinned))

@@ -446,6 +446,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Ok("explorer") | Ok("env") => {
             app.left_dock.activate(crate::workspace::Panel::Explorer);
             app.explorer.project = "p-blog".into();
+            // `BENCH_DEMO_SIDE=threads`: the tree's place given to the project's threads.
+            app.explorer.threads = std::env::var("BENCH_DEMO_SIDE").as_deref() == Ok("threads");
         }
         _ => {}
     }
