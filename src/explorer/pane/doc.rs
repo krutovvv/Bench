@@ -150,6 +150,10 @@ impl BenchApp {
         if !key.item().open(self, window, cx) {
             return;
         }
+        // Another project's document (a thread's changed file, a link): the Explorer goes to it.
+        if !key.project().is_empty() && !self.explorer.owns(&key) {
+            self.show_explorer(key.project().to_string(), window, cx);
+        }
         if !self.explorer.tabs.contains(&key) {
             let at = self
                 .explorer
@@ -200,13 +204,13 @@ impl BenchApp {
         let Some(at) = self.explorer.tabs.iter().position(|t| *t == key) else {
             return;
         };
+        // The neighbour shown next is one of the open project's tabs.
+        let shown = self.explorer.project_tabs();
+        let near = shown.iter().position(|t| *t == key);
         self.explorer.tabs.remove(at);
         if self.explorer.active.as_ref() == Some(&key) {
-            let next = self
-                .explorer
-                .tabs
-                .get(at)
-                .or_else(|| self.explorer.tabs.get(at.wrapping_sub(1)))
+            let next = near
+                .and_then(|i| shown.get(i + 1).or_else(|| shown.get(i.wrapping_sub(1))))
                 .cloned();
             self.explorer.active = next.clone();
             if next.is_none() && self.center == Center::Doc {

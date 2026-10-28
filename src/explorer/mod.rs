@@ -107,3 +107,16 @@ pub struct Explorer {
     /// top): one clicked is the thread beside the document.
     pub threads: bool,
 }
+
+impl Explorer {
+    /// The open project's tabs, in order: a project shows its own documents only; another's
+    /// stay open for when it is back.
+    pub fn project_tabs(&self) -> Vec<DocKey> {
+        self.tabs.iter().filter(|k| self.owns(k)).cloned().collect()
+    }
+
+    /// The document belongs to the open project.
+    pub fn owns(&self, key: &DocKey) -> bool {
+        key.project() == self.project
+    }
+}

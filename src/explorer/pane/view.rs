@@ -14,7 +14,7 @@ use bench_ui::icons::Ico;
 impl BenchApp {
     /// The middle in `Center::Doc`: the active document.
     pub(crate) fn render_doc(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let body = match self.explorer.active.clone() {
+        let body = match self.explorer.active.clone().filter(|k| self.explorer.owns(k)) {
             Some(key) => key.item().render(self, window, cx),
             None => note("Open a file from the tree, or find one with ⌘P", cx),
         };
@@ -47,7 +47,7 @@ impl BenchApp {
     pub(crate) fn render_doc_tabs(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let mut tabs = vec![];
-        for (n, key) in self.explorer.tabs.clone().into_iter().enumerate() {
+        for (n, key) in self.explorer.project_tabs().into_iter().enumerate() {
             let open = self.explorer.active.as_ref() == Some(&key);
             let item = key.item();
             let (name, icon) = item.tab(self, cx);

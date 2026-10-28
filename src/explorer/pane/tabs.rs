@@ -67,12 +67,12 @@ impl BenchApp {
 
     /// The menu's closes. A tab with unsaved changes is kept (its own × asks).
     pub fn close_tabs(&mut self, which: CloseTabs, from: &DocKey, cx: &mut Context<Self>) {
-        let Some(at) = self.explorer.tabs.iter().position(|t| t == from) else {
+        // Of the open project's tabs: another's are not in sight to be closed.
+        let shown = self.explorer.project_tabs();
+        let Some(at) = shown.iter().position(|t| t == from) else {
             return;
         };
-        let doomed: Vec<DocKey> = self
-            .explorer
-            .tabs
+        let doomed: Vec<DocKey> = shown
             .iter()
             .enumerate()
             .filter(|(k, _)| match which {
