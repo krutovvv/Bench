@@ -198,6 +198,19 @@ fewer form fields. Then check what it did to signups and give me a short summary
             });
         }
     }
+    // `BENCH_DEMO_PROCS=1`: the background processes' card unfolded, its output shown.
+    if std::env::var("BENCH_DEMO_PROCS").is_ok() {
+        if let Some(::thread::Row::Work { key, .. }) = landing
+            .rows()
+            .into_iter()
+            .find(|r| matches!(r, ::thread::Row::Work { processes, .. } if !processes.is_empty()))
+        {
+            open_thread(app, cx, |t| {
+                t.processes_open.insert(key);
+                t.process_open = Some("41".into());
+            });
+        }
+    }
     app.demo_threads.insert("d-landing".into(), landing.clone());
     open_thread(app, cx, |t| {
         t.journal = landing;
