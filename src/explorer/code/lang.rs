@@ -135,7 +135,7 @@ pub fn language_name(id: &str) -> String {
 
 #[cfg(test)]
 mod language_tests {
-    use super::{language_for, language_for_text};
+    use super::{indent_of, language_for, language_for_text, language_name};
 
     #[test]
     fn by_name_and_shebang() {
