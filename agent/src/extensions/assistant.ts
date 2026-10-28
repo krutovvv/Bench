@@ -4,9 +4,6 @@
 // few short sections (src/prompt.ts). An agent can select other extensions next to it or instead
 // of it (its settings.json "extensions").
 
-import fs from "node:fs";
-import path from "node:path";
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool, hook, section, ToolTask } from "@earendil-works/pi-durable";
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
@@ -42,27 +39,8 @@ const DANGEROUS: [RegExp, string][] = [
 ];
 
 import { globTool, grepTool, lsTool } from "../builtin/search.ts";
-import { projects } from "../builtin/projects.ts";
+import { lspTool, placeOf } from "../builtin/navigate.ts";
 import { diagnosticsFor, knownDiagnostics } from "../lsp.ts";
-import { machineEnv } from "../ssh-env.ts";
-
-/** A file a tool named, where it is and what it holds now (on the project's machine, if any). */
-async function placeOf(info: { cwd: string; project?: string }, p: string): Promise<{ file: string; machine?: string; text: string } | undefined> {
-	if (!p) return undefined;
-	const machine = info.project ? (projects.get(info.project)?.machine ?? undefined) : undefined;
-	if (machine) {
-		const env = await machineEnv(machine, info.cwd);
-		const file = path.posix.resolve(env.cwd, p);
-		const r = await env.readTextFile(file, BACKGROUND_CONTEXT);
-		return r.ok ? { file, machine, text: r.value } : undefined;
-	}
-	const file = path.resolve(info.cwd, p);
-	try {
-		return { file, text: fs.readFileSync(file, "utf8") };
-	} catch {
-		return undefined;
-	}
-}
 
 /** What the project's language servers say: about one file, or everything they have seen. */
 const diagnosticsTool = defineTool({
@@ -88,7 +66,7 @@ const Coding = createCodingTools({ images });
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, processTool],
+	tools: [...(Coding.tools ?? []), grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, tasksTool, sshRun, processTool],
 	tasks: [CronTask, ProcessTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),

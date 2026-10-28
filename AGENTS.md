@@ -109,7 +109,7 @@ built this way: `docs/architecture.md`. In short:
 | `agent/src/runtime.ts`, `agent/src/thread.ts` | Pi conversations, the queue, inserts; the journal as the items Bench shows |
 | `agent/src/inserts.ts` | The insert entry and document |
 | `agent/src/prompt.ts`, `agent/src/extensions/assistant.ts` | The prompt sections and the default extension (tools, sections, hooks) |
-| `agent/src/builtin/` | The agent's own tools and stores: `tasks`, `ssh`, `process`, `cron`, `subagent`, `memory`, `skills`, `ask`, `projects`, `servers` (the servers' agents), `presets`, `search` (grep, glob, ls) |
+| `agent/src/builtin/` | The agent's own tools and stores: `tasks`, `ssh`, `process`, `cron`, `subagent`, `memory`, `skills`, `ask`, `projects`, `servers` (the servers' agents), `presets`, `search` (grep, glob, ls), `navigate` (`lsp`: definitions, references, outline, symbols, hover from the project's language servers) |
 | `agent/src/ssh-env.ts`, `confined-env.ts`, `lsp.ts` | A project's machine over SSH as Pi's `ExecutionEnv`; a project kept in its folder; its language servers (diagnostics after every edit) |
 | `agent/src/mcp.ts`, `mcp-oauth.ts`, `telegram.ts` | MCP servers (pi-mcp, OAuth), Telegram bots (grammY, a proxy where needed) |
 
@@ -136,6 +136,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Where tools work | Pi's `ExecutionEnv`, one per conversation (`runtime.ts` `envFor`): `NodeExecutionEnv` on the agent's machine, `SshExecutionEnv` (`ssh-env.ts`) on a project's machine over SSH, wrapped by `confined-env.ts` for a project kept in its folder. Pi's read/write/edit/bash and our grep/glob/ls work through it unchanged |
 | Compaction | Pi's compaction policy; a project's share of the window becomes a per-model override under its own provider (`project_<id>.<provider>`), through a getter Pi reads at every use (`compactionOverrides`) |
 | After an edit | a `ToolTask` `afterTool` hook adds the file's diagnostics from the project's language servers (`lsp.ts`) to edit and write results |
+| Code navigation | tool `lsp` (`builtin/navigate.ts`) asks the same language servers: a place is a file, a line and the word on it, never a column. The servers start at a thread's first tool call (`envFor` → `warmUp`); one still loading the project (rust-analyzer's `experimental/serverStatus`) is waited for 20 s, then said to be loading |
 | Schedule | a durable `defineTask` per job that sleeps until its next run (`builtin/cron.ts`) |
 | Background processes | `process` (`builtin/process.ts`): a background task of the conversation (`bench.process`, `background`, `abandonOnRestart`) that runs the command in its `ExecutionEnv`, its output's tail in the checkpoint, its exit the outcome; Bench reads the task records from Pi's commits (`thread.process`). A restart of the agent ends it for good ("stopped by restart") |
 | Subagents | `delegate`: child conversations owned by the tool's task (`builtin/subagent.ts`) |

@@ -11,8 +11,9 @@
 // Microsoft's vscode-jsonrpc, as VS Code speaks it.
 //
 // The Explorer's editor asks the same servers (`modules/lsp.ts`): a file's problems as it is
-// typed, the hover at a place, where a symbol is defined. One server per project and folder
-// serves the agent and the editor alike.
+// typed, the hover at a place, where a symbol is defined. So does the agent's `lsp` tool
+// (`builtin/navigate.ts`): definitions, references, a file's outline, symbols by name. One server
+// per project and folder serves the agent and the editor alike.
 
 import { execFile, spawn, type ChildProcess } from "node:child_process";
 import fs from "node:fs";
@@ -188,6 +189,11 @@ class LspClient {
 	private diags = new Map<string, Diagnostic[]>();
 	private waiters = new Map<string, () => void>();
 	failed: string | undefined;
+	/** When it was started: a young server may still be indexing the project. */
+	readonly born = Date.now();
+	/** Whether it is done loading the project, when it says so (rust-analyzer's
+	 * `experimental/serverStatus`); undefined for a server that never says. */
+	private quiescent: boolean | undefined;
 	/** What the agent asked of it since it started: files checked, how many it answered, the last. */
 	private asked = 0;
 	private answered = 0;
@@ -228,6 +234,7 @@ class LspClient {
 		};
 		proc.on("exit", (code, sig) => died(`exited (${sig ?? code})`));
 		const conn = (this.conn = createMessageConnection(new StreamMessageReader(proc.stdout!), new StreamMessageWriter(proc.stdin!)));
+		conn.onNotification("experimental/serverStatus", (p: any) => (this.quiescent = Boolean(p?.quiescent)));
 		conn.onNotification("textDocument/publishDiagnostics", (p: any) => {
 			this.diags.set(p.uri, p.diagnostics ?? []);
 			this.waiters.get(p.uri)?.();
@@ -248,12 +255,15 @@ class LspClient {
 			workspaceFolders: [{ uri: uriOf(root), name: path.basename(root) }],
 			initializationOptions: spec.initialization ?? {},
 			capabilities: {
-				workspace: { configuration: true, workspaceFolders: true },
+				experimental: { serverStatusNotification: true },
+				workspace: { configuration: true, workspaceFolders: true, symbol: {} },
 				textDocument: {
 					synchronization: { didSave: true },
 					publishDiagnostics: { relatedInformation: false },
 					hover: { contentFormat: ["markdown", "plaintext"] },
 					definition: { linkSupport: true },
+					references: {},
+					documentSymbol: { hierarchicalDocumentSymbolSupport: true },
 				},
 			},
 		});
@@ -285,6 +295,23 @@ class LspClient {
 		await Promise.race([this.ready, sleep(ms)]);
 		if (!(await this.sync(file, text))) return undefined;
 		const answer = this.conn!.sendRequest(method, { textDocument: { uri: uriOf(file) }, ...params }).catch(() => undefined);
+		return Promise.race([answer, sleep(ms).then(() => undefined)]);
+	}
+
+	/** Whether it is still loading the project: by its own word, or, for a server that never says,
+	 * in its first 15 s. */
+	indexing(): boolean {
+		if (this.failed) return false;
+		return this.quiescent === undefined ? Date.now() - this.born < 15_000 : !this.quiescent;
+	}
+
+	/** A request about no one file (`workspace/symbol`), at most `ms`; undefined: not up, or no answer.
+	 * `open` are files the server is shown first: some (tsserver) know a project only from open files. */
+	async request(method: string, params: object, ms: number, open: { file: string; text: string }[] = []): Promise<any> {
+		await Promise.race([this.ready, sleep(ms)]);
+		if (this.failed || !this.started || !this.conn) return undefined;
+		for (const f of open) if (!(await this.sync(f.file, f.text))) return undefined;
+		const answer = this.conn!.sendRequest(method, params).catch(() => undefined);
 		return Promise.race([answer, sleep(ms).then(() => undefined)]);
 	}
 
@@ -328,6 +355,23 @@ class LspClient {
 }
 
 const clients = new Map<string, LspClient>();
+
+/** The servers of `profile` still loading the project, with how long they have been at it (s): an
+ * empty answer from one of them is not yet the truth. */
+export function indexing(profile: string): { name: string; secs: number }[] {
+	const out: { name: string; secs: number }[] = [];
+	for (const [key, c] of clients) if (key.startsWith(`${profile}|`) && c.indexing()) out.push({ name: key.split("|").pop()!, secs: Math.round((Date.now() - c.born) / 1000) });
+	return out;
+}
+
+/** Start every server of the project now, so it has loaded the project by the time it is asked
+ * (rust-analyzer takes minutes on a large workspace). Started ones are left as they are. */
+export function warmUp(profile: string, root: string, machine: string | undefined): void {
+	for (const [name, spec] of Object.entries(readLsp(profile))) {
+		const ext = (spec.extensions ?? [])[0]?.replace(/^\./, "");
+		if (spec?.command && ext) clientsFor(profile, root, machine, `${root}/.${name}.${ext}`);
+	}
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const uriOf = (p: string) => `file://${p.split("/").map(encodeURIComponent).join("/")}`;
 
@@ -464,13 +508,91 @@ const pathOf = (uri: string) => decodeURIComponent(uri.replace(/^file:\/\//, "")
  * or LocationLink[] as the places themselves. */
 export async function definitionAt(profile: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 4000): Promise<Place[]> {
 	for (const [, c] of clientsFor(profile, root, machine, file)) {
-		const d = await c.ask("textDocument/definition", file, text, { position: at }, ms);
-		const list: any[] = !d ? [] : Array.isArray(d) ? d : [d];
-		const places = list
-			.map((l) => (l.targetUri ? { uri: l.targetUri, range: l.targetSelectionRange ?? l.targetRange } : l))
-			.filter((l) => typeof l?.uri === "string" && l.uri.startsWith("file://") && l.range)
-			.map((l) => ({ path: pathOf(l.uri), range: l.range }));
+		const places = placesOf(await c.ask("textDocument/definition", file, text, { position: at }, ms));
 		if (places.length) return places;
 	}
 	return [];
+}
+
+/** Places from LSP's Location, Location[] or LocationLink[], files only. */
+function placesOf(d: any): Place[] {
+	const list: any[] = !d ? [] : Array.isArray(d) ? d : [d];
+	return list
+		.map((l) => (l.targetUri ? { uri: l.targetUri, range: l.targetSelectionRange ?? l.targetRange } : l))
+		.filter((l) => typeof l?.uri === "string" && l.uri.startsWith("file://") && l.range)
+		.map((l) => ({ path: pathOf(l.uri), range: l.range }));
+}
+
+/** Every place the symbol at `at` is used, its definition among them, from the first server that knows. */
+export async function referencesAt(profile: string, root: string, machine: string | undefined, file: string, text: string, at: Spot, ms = 8000): Promise<Place[]> {
+	for (const [, c] of clientsFor(profile, root, machine, file)) {
+		const places = placesOf(await c.ask("textDocument/references", file, text, { position: at, context: { includeDeclaration: true } }, ms));
+		if (places.length) return places;
+	}
+	return [];
+}
+
+/** A symbol as a server names it: its name, its kind ("function", "struct"…), where, and inside what. */
+export interface Symbol {
+	name: string;
+	kind: string;
+	path: string;
+	line: number;
+	/** What it is in: "impl Thread", "class Runtime". */
+	container?: string;
+	/** Nesting in a file's outline, 0 at the top. */
+	depth?: number;
+}
+
+const KINDS = ["", "file", "module", "namespace", "package", "class", "method", "property", "field", "constructor", "enum", "interface", "function", "variable", "constant", "string", "number", "boolean", "array", "object", "key", "null", "enum member", "struct", "event", "operator", "type parameter"];
+
+/** A file's outline, in order: DocumentSymbol trees flattened with their depth, or SymbolInformation as given. */
+export async function outlineOf(profile: string, root: string, machine: string | undefined, file: string, text: string, ms = 8000): Promise<Symbol[]> {
+	for (const [, c] of clientsFor(profile, root, machine, file)) {
+		const d = await c.ask("textDocument/documentSymbol", file, text, {}, ms);
+		if (!Array.isArray(d) || !d.length) continue;
+		const out: Symbol[] = [];
+		// In line order (tsserver gives them by name), and not inside functions: their locals are
+		// not the file's shape.
+		const line = (s: any) => (s.selectionRange ?? s.range ?? s.location?.range)?.start?.line ?? 0;
+		const walk = (list: any[], depth: number, container?: string) => {
+			for (const s of [...list].sort((a, b) => line(a) - line(b))) {
+				const range = s.selectionRange ?? s.range ?? s.location?.range;
+				out.push({ name: String(s.name), kind: KINDS[s.kind] ?? "symbol", path: s.location?.uri ? pathOf(s.location.uri) : file, line: (range?.start?.line ?? 0) + 1, depth, ...(container ?? s.containerName ? { container: container ?? s.containerName } : {}) });
+				if (Array.isArray(s.children) && ![6, 9, 12].includes(s.kind)) walk(s.children, depth + 1, String(s.name));
+			}
+		};
+		walk(d, 0);
+		return out;
+	}
+	return [];
+}
+
+/**
+ * Symbols named like `query` in the whole project (`workspace/symbol`), from every server of the
+ * project; `open` gives each server a file of its kind first (`files` by extension), as tsserver
+ * needs one to know the project.
+ */
+export async function symbolsNamed(
+	profile: string,
+	root: string,
+	machine: string | undefined,
+	query: string,
+	open: (extensions: string[]) => Promise<{ file: string; text: string }[]>,
+	ms = 8000,
+): Promise<Symbol[]> {
+	const out: Symbol[] = [];
+	for (const [name, spec] of Object.entries(readLsp(profile))) {
+		const exts = (spec.extensions ?? []).map((e) => e.replace(/^\./, "").toLowerCase());
+		const files = await open(exts);
+		if (!files.length) continue;
+		const c = clientsFor(profile, root, machine, files[0].file).find(([n]) => n === name)?.[1];
+		const d = await c?.request("workspace/symbol", { query }, ms, files);
+		for (const s of Array.isArray(d) ? d : []) {
+			const uri = s.location?.uri;
+			if (typeof uri !== "string" || !uri.startsWith("file://")) continue;
+			out.push({ name: String(s.name), kind: KINDS[s.kind] ?? "symbol", path: pathOf(uri), line: (s.location.range?.start?.line ?? 0) + 1, ...(s.containerName ? { container: String(s.containerName) } : {}) });
+		}
+	}
+	return out;
 }

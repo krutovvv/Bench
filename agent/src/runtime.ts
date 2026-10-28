@@ -23,6 +23,7 @@ import { fallbackProvider } from "./fallback.ts";
 import { EMPTY_TOTALS, totalsOf, usagePayload } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
 import { PROCESS_KIND, processOf } from "./builtin/process.ts";
+import { warmUp } from "./lsp.ts";
 import type { Process } from "./protocol.gen.ts";
 import { BLOCK_CLOSE, BLOCK_OPEN, changesOf, compactionsOf, FAIL_KIND, itemsOfAll, preview, queueOf, Requests, stripBlock, textOf } from "./thread.ts";
 import { forAgent, installMcp, loadExtensions } from "./extensions.ts";
@@ -722,8 +723,12 @@ export class Runtime {
 
 	/** The execution environment of a conversation: this machine's, or its project's machine over SSH. */
 	private async envFor(conversationId: string, cwd: string | undefined): Promise<ExecutionEnv> {
-		const id = this.host().session(conversationId)?.project;
+		const info = this.host().session(conversationId);
+		const id = info?.project;
 		const p = id ? projects.get(id) : undefined;
+		// The thread is at work: its project's language servers start loading the project now, so
+		// they know it when the agent asks (`lsp` tool, diagnostics after an edit).
+		if (info) warmUp(info.profile, info.cwd, p?.machine ?? undefined);
 		const env: ExecutionEnv = p?.machine ? await machineEnv(p.machine, cwd || p.folder || "") : new NodeExecutionEnv({ cwd: cwd || process.env.HOME || "/" });
 		// Kept in its folder: its tools and commands stay there (`confined-env.ts`).
 		return p?.confined && p.folder ? confined(env, env.cwd, !p.machine) : env;
