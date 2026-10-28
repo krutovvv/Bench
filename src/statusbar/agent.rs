@@ -57,7 +57,7 @@ impl BenchApp {
                                     .ghost()
                                     .small()
                                     .icon(Ico::Activity.icon())
-                                    .child(div().text_xs().child(label))
+                                    .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
                                     .text_color(color)
                                     .on_click(move |_, _, cx| {
                                         v.update(cx, |this, cx| {

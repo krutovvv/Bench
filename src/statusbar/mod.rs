@@ -41,7 +41,7 @@ impl BenchApp {
                 .cursor_pointer()
                 // Muted from `item`; the accent while its panel is open, so set after it.
                 .when(active, |d| d.text_color(theme.primary))
-                .text_xs()
+                .text_size(px(bench_ui::BAR_TEXT))
                 .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
                 .child(icon.icon().small())
                 .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
@@ -50,7 +50,7 @@ impl BenchApp {
         // A label as wide as its text that opens a menu of choices.
         // `note`: a line above the choices saying what they apply to.
         // A Button's `.label()` takes its font from the control's size, so bar labels are passed
-        // as children with the bar's extra-small font.
+        // as children in the bars' size (BAR_TEXT).
         let picker = |id: &'static str,
                       icon: Ico,
                       label: String,
@@ -70,9 +70,9 @@ impl BenchApp {
             let icon_only = label.is_empty();
             let button = Button::new(id).ghost().small().icon(icon.icon());
             let button = if icon_only {
-                button.text_xs()
+                button.text_size(px(bench_ui::BAR_TEXT))
             } else {
-                button.child(div().text_xs().child(label))
+                button.child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
             };
             let wrap = if icon_only {
                 h_flex().h_full().items_center().px_1()
@@ -153,8 +153,8 @@ impl BenchApp {
             .bg(theme.status_bar)
             .border_t_1()
             .border_color(theme.border)
-            // The bar's font: a row's extra-small, like the header and the pane strips.
-            .text_xs()
+            // The bars' size (BAR_TEXT), like the header and the pane strips.
+            .text_size(px(bench_ui::BAR_TEXT))
             // Far left: the agent of the machine this project lives on — always there, healthy
             // or not; its state in detail, its log, Reconnect and Restart are inside.
             .children(self.render_backend(cx))

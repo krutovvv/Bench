@@ -80,7 +80,7 @@ impl BenchApp {
                 .text_color(theme.muted_foreground)
                 .icon(bench_ui::icons::Ico::GitBranch.icon().small())
                 // A Button's `.label()` takes the control's size: the bars' size is set here.
-                .child(div().text_xs().child(label))
+                .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
                 .dropdown_menu(move |menu, _, _| {
                     // One line each, clipped: a long subject or path must not grow the menu
                     // wider than the window (clicking still copies the whole thing).
@@ -142,9 +142,9 @@ impl BenchApp {
                     div()
                         .flex_1()
                         .min_w_0()
-                        // The bars' one size, the status bar's: title, chips and buttons alike.
-                        .text_xs()
-                        .font_weight(FontWeight::MEDIUM)
+                        // The header's title: the sidebar's size, semibold; its chips the bars' size.
+                        .text_size(px(bench_ui::BAR_TITLE))
+                        .font_weight(FontWeight::SEMIBOLD)
                         .truncate()
                         .child(name),
                 )
@@ -171,9 +171,9 @@ impl BenchApp {
                     div()
                         .flex_1()
                         .min_w_0()
-                        // The bars' one size, the status bar's: title, chips and buttons alike.
-                        .text_xs()
-                        .font_weight(FontWeight::MEDIUM)
+                        // The header's title: the sidebar's size, semibold; its chips the bars' size.
+                        .text_size(px(bench_ui::BAR_TITLE))
+                        .font_weight(FontWeight::SEMIBOLD)
                         .truncate()
                         .child(title),
                 )
@@ -188,8 +188,8 @@ impl BenchApp {
         bar.child(
             div()
                 .px_4()
-                .text_xs()
-                .font_weight(FontWeight::MEDIUM)
+                .text_size(px(bench_ui::BAR_TITLE))
+                .font_weight(FontWeight::SEMIBOLD)
                 .child(title),
         )
         .child(div().flex_1())

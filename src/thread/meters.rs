@@ -61,7 +61,7 @@ impl ThreadView {
                         .ghost()
                         .small()
                         .icon(Ico::MemoryStick.icon())
-                        .child(div().text_xs().child(label))
+                        .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
                         .text_color(color),
                 )
                 .content(move |_, _, cx| {
@@ -126,7 +126,7 @@ impl ThreadView {
                         .ghost()
                         .small()
                         .icon(Ico::Gauge.icon())
-                        .child(div().text_xs().child(label))
+                        .child(div().text_size(px(bench_ui::BAR_TEXT)).child(label))
                         .text_color(muted),
                 )
                 .content(move |_, _, cx| speed_panel(&samples, live, prefill, generation, cx))
@@ -145,7 +145,7 @@ impl ThreadView {
                 .gap_1()
                 .items_center()
                 .text_color(theme.danger)
-                .text_xs()
+                .text_size(px(bench_ui::BAR_TEXT))
                 .child(Ico::CircleAlert.icon().small())
                 .child(format!("Main model down · on fallback {model}"))
                 .tooltip(move |window, cx| Tooltip::new(tip.clone()).build(window, cx))

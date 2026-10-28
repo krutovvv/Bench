@@ -61,7 +61,7 @@ pub fn mode_switch(
                 .items_center()
                 .rounded_sm()
                 .border_1()
-                .text_xs()
+                .text_size(px(crate::metrics::BAR_TEXT))
                 .font_weight(FontWeight::MEDIUM)
                 .cursor_pointer()
                 .map(|d| {
@@ -159,7 +159,7 @@ pub fn pane_bar(
         .items_center()
         .border_b_1()
         .border_color(theme.border)
-        .text_xs()
+        .text_size(px(crate::metrics::BAR_TEXT))
         .child(div().flex_1().min_w_0().truncate().map(|d| match error {
             Some(e) => d.text_color(theme.danger).child(e),
             None => d.text_color(theme.muted_foreground).child(title),

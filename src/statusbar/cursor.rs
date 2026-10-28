@@ -45,7 +45,7 @@ impl Render for CursorItem {
             h_flex()
                 .h_full()
                 .items_center()
-                .text_xs()
+                .text_size(px(bench_ui::BAR_TEXT))
                 .text_color(cx.theme().muted_foreground)
                 .children(words.into_iter().map(|w| div().px_2().child(w))),
         )

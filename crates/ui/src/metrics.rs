@@ -75,6 +75,12 @@ pub const CHOICE_CARD_MIN_H: f32 = 128.;
 pub const RADIO: f32 = 14.;
 pub const RADIO_ON_RING: f32 = 4.;
 
+/// The bars' type (the header, the status bar, a pane's strip): one step under the sidebar's,
+/// and the header's own title at the sidebar's size, heavier — so the chrome is quieter than
+/// what it frames, not a different scale.
+pub const BAR_TEXT: f32 = 12.;
+pub const BAR_TITLE: f32 = 13.;
+
 /// The header's Chat | Code switch: the track's inset around its segments, and a segment's height.
 pub const MODE_SWITCH_PAD: f32 = 2.;
 pub const MODE_SEGMENT_H: f32 = 22.;
