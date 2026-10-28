@@ -122,7 +122,15 @@ export type Usage = { model: string, context_used: number, context_max: number, 
 /**
  * The agent's own average: output tokens over whole-call time (prefill included).
  */
-avg_tps?: number, };
+avg_tps?: number, 
+/**
+ * The evaluator's requests for this thread (Settings → Agents → Evaluator); none while it is off.
+ */
+judge_calls?: number, 
+/**
+ * How often its answer changed the course: a search reordered, a nudge, a turn sent back.
+ */
+judge_nudges?: number, };
 
 export type SpeedStat = { 
 /**

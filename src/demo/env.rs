@@ -362,3 +362,20 @@ pub fn file_problems(path: &str) -> Vec<lsp_types::Diagnostic> {
         _ => vec![],
     }
 }
+
+/// The gear's Agents tab for this Mac's agent: an endpoint, the fallback, voice and the evaluator
+/// (`BENCH_PANEL=providers`), as `load_providers` reads them from an agent.
+pub fn providers() -> (serde_json::Value, serde_json::Value, serde_json::Value) {
+    let endpoints = serde_json::json!([{
+        "id": "dev", "name": "dev", "base_url": "http://192.168.1.100:10137/v1",
+        "model": "Qwen3.8-Next-Flash", "context_length": 131072, "current": true
+    }]);
+    let yaml = serde_json::json!({
+        "model": {"provider": "dev", "default": "Qwen3.8-Next-Flash"},
+        "fallback_providers": [{"provider": "openrouter", "model": "qwen/qwen3.8-flash"}],
+        "stt": {"provider": "openai", "openai": {"base_url": "http://192.168.1.100:10240/v1", "model": "whisper-1", "language": "ru"}},
+        "tts": {"provider": "openai", "openai": {"base_url": "http://192.168.1.100:10240/v1", "model": "tts-1", "voice": "alloy"}},
+        "judge": {"enabled": true, "base_url": "http://192.168.1.100:10292", "model": "h2o-lightning-4b", "api_key": "sk-none"}
+    });
+    (endpoints, serde_json::json!({}), yaml)
+}

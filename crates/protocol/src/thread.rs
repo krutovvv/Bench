@@ -433,6 +433,14 @@ pub struct Usage {
     #[ts(optional)]
     #[serde(default)]
     pub avg_tps: Option<f64>,
+    /// The evaluator's requests for this thread (Settings → Agents → Evaluator); none while it is off.
+    #[ts(optional, type = "number")]
+    #[serde(default)]
+    pub judge_calls: Option<u64>,
+    /// How often its answer changed the course: a search reordered, a nudge, a turn sent back.
+    #[ts(optional, type = "number")]
+    #[serde(default)]
+    pub judge_nudges: Option<u64>,
 }
 
 /// How fast the model wrote in a thread: Bench measures it from the stream (only it sees when

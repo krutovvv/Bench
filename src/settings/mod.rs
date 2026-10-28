@@ -455,6 +455,73 @@ impl BenchApp {
             );
         }
 
+        // ---- the evaluator ----
+        if let Some(j) = &self.gear.providers.judge {
+            let (on, url, model, key) = (j.enabled, j.url.clone(), j.model.clone(), j.key.clone());
+            page.push(
+                bench_ui::settings_heading("Evaluator · System One API", vec![], cx)
+                    .into_any_element(),
+            );
+            page.push(
+                bench_ui::settings_field(
+                    "Use the evaluator",
+                    "Orders long searches, checks the course every 20 steps and whether a turn is done. Off: the classic way",
+                    div()
+                        .flex()
+                        .justify_end()
+                        .child(
+                            gpui_kit::component::switch::Switch::new("judge-on")
+                                .checked(on)
+                                .on_click(cx.listener(|this, on: &bool, w, cx| {
+                                    this.set_judge(*on, w, cx)
+                                })),
+                        )
+                        .into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+            page.push(
+                bench_ui::settings_field(
+                    "Server",
+                    "Its address; /v1/systemone is added",
+                    gpui_kit::component::input::Input::new(&url).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+            page.push(
+                bench_ui::settings_field(
+                    "Model",
+                    "",
+                    gpui_kit::component::input::Input::new(&model).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+            page.push(
+                bench_ui::settings_field(
+                    "API key",
+                    "If the server asks for one",
+                    gpui_kit::component::input::Input::new(&key).into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
+            page.push(
+                h_flex()
+                    .py_2()
+                    .child(div().flex_1())
+                    .child(
+                        bench_ui::primary_button("judge-save", "Save")
+                            .small()
+                            .on_click(cx.listener(|this, _, w, cx| this.save_judge(w, cx)))
+                            .into_any_element(),
+                    )
+                    .into_any_element(),
+            );
+        }
+
         // No list of keys here: each key is set on the card or MCP server that reads it.
         bench_ui::settings_page("settings", page)
     }

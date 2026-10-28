@@ -44,6 +44,10 @@ export interface Host {
 	run(agent: string, prompt: string, opts: { source: string; title?: string; cwd?: string }): Promise<{ threadId: string; text: string }>;
 	/** Sends text to a delivery target ("telegram:<chat>"). */
 	deliver(target: string, text: string): Promise<void>;
+	/** Stops the thread's run, as the person's Stop does (the step limit, `builtin/steps.ts`). */
+	stop(threadId: string): void;
+	/** The evaluator asked once (`call`) or changed the course (`nudge`): the thread's meters count it. */
+	count(conversationId: string | number, what: "call" | "nudge"): void;
 }
 
 let current: Host | undefined;

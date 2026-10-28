@@ -39,6 +39,8 @@ the list of servers' agents.
 - `runtime/` — the threads' core (`agent-runtime`).
 - `builtin/` — the agent's own tools and the stores behind them (`agent-tools`).
 - `machine/` — where the tools work (`agent-machine`).
+- `judge/` — the evaluator, a System One model asked at a turn's searches, on its way and at
+  its end; the step limit beside it (`agent-judge`).
 - `extensions.ts`, `extensions/assistant.ts` — Pi extensions: the default "assistant" (tools,
   prompt sections, hooks), the MCP servers' tools, and the person's own per agent, reloaded
   without a restart.

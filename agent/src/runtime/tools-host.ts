@@ -49,6 +49,17 @@ export function hostOf(rt: Runtime): Host {
 			if (!send) throw new Error(`no way to deliver to ${kind}`);
 			await send(to, text);
 		},
+		// Not awaited: the caller is a hook of the very run being stopped.
+		stop: (threadId) => void rt.interrupt(threadId).catch(() => undefined),
+		count: (conversationId, what) => {
+			const key = String(conversationId);
+			const parent = adopted.get(key);
+			const live = rt.byConversation.get(key) ?? (parent ? rt.live.get(parent) : undefined);
+			if (!live) return;
+			if (what === "call") live.usage.judge = (live.usage.judge ?? 0) + 1;
+			else live.usage.nudges = (live.usage.nudges ?? 0) + 1;
+			rt.stream.emitUsage(live);
+		},
 	};
 }
 

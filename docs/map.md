@@ -50,6 +50,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change where a project lives (agent, machine, folder) or how the sidebar's projects are put together | `src/app/places.rs` (`ProjectKey`, `Location` in `src/app/model.rs`); its rows in `src/env/place.rs` |
 | keep a project's agent in its folder | `agent/src/machine/confined.ts` |
 | change the presets (MCP, LSP, compaction, reasoning levels) | defaults in `agent/src/builtin/presets.ts`; Bench's side `src/settings/presets.rs`, the gear's tab in `src/settings/mod.rs` |
+| the evaluator (a System One model asked at searches, on the way, at a turn's end) or a project's step limit | `agent/src/judge/` (`client.ts`, `search.ts`, `drift.ts`, `done.ts`, `SPEC.md`), the turn they read `agent/src/builtin/turn.ts`, the limit `agent/src/builtin/steps.ts`; hooked in `agent/src/extensions/assistant.ts`; the gear's section `src/settings/providers.rs` (`Judge`), the limit's row `src/env/run.rs`, the counts in `src/thread/meters.rs` |
 | change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts`; grep, glob, ls: `agent/src/builtin/search.ts` |
 | change a project's language servers (diagnostics after every edit; the editor's problems, hover, definition via `agent/src/modules/lsp.ts`) | `agent/src/lsp/lsp.ts`, the presets in `agent/src/lsp/presets.ts`; the section `src/env/lsp.rs` |
 | change when a project's conversations are compacted | `compactionPolicy` in `agent/src/config.ts`; the row in `src/env/run.rs` |

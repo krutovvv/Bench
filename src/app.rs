@@ -201,6 +201,9 @@ impl BenchApp {
         // The browser build is always the demo: there is nothing to connect to there.
         if cfg!(target_family = "wasm") || std::env::var("BENCH_DEMO").is_ok() {
             crate::demo::load(&mut app, cx);
+            if app.center == crate::workspace::Center::Settings {
+                app.load_providers(window, cx);
+            }
         } else {
             app.connect_agent(String::new(), window, cx);
         }

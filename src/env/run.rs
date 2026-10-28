@@ -1,5 +1,6 @@
 //! How the project's threads run: how hard it thinks, what it may run without asking, whether it
-//! works in code mode (a script that calls many tools in one step), when its conversations are
+//! works in code mode (a script that calls many tools in one step), its step limit (the most
+//! tool calls in one turn, then an answer), when its conversations are
 //! summarized (compaction, a share of the model's window): a group of General,
 //! chosen once, not per chat — its threads start on these; the model is one for every project
 //! (the gear). Read from and saved to the agent its threads run with (`settings_of`).
@@ -23,7 +24,12 @@ pub struct RunEnv {
     pub window: u64,
     /// Its threads get Pi's code mode (`codemode`) from their next turn.
     pub code_mode: bool,
+    /// The most steps in one turn; None: no limit.
+    pub step_limit: Option<u64>,
 }
+
+/// The step limits offered; the first is none.
+const STEP_LIMITS: [&str; 5] = ["None", "50", "100", "200", "400"];
 
 /// What a compaction share means for this window, said in a line.
 /// `names`: the presets' (share, name), to name a share that has one.
@@ -68,6 +74,7 @@ impl Section for Run {
         e.run.compaction = v["compaction"].as_f64();
         e.run.window = v["window"].as_u64().unwrap_or(0);
         e.run.code_mode = v["code_mode"].as_bool().unwrap_or(false);
+        e.run.step_limit = v["step_limit"].as_u64();
     }
 }
 
@@ -143,6 +150,13 @@ impl SettingsForm for Run {
                 )
                 .into_any_element()
         };
+        // A limit not offered (set in settings.json) is shown as its number, chosen.
+        let mut limits: Vec<String> = STEP_LIMITS.iter().map(|s| s.to_string()).collect();
+        let current = e.run.step_limit.map(|n| n.to_string()).unwrap_or("None".into());
+        if !limits.contains(&current) {
+            limits.push(current.clone());
+        }
+        let step_limit = segmented("env-step-limit", "step_limit", limits, &current, cx);
         // Pi's own first, then the presets' shares.
         let names = app.gear.presets.compaction.clone();
         let shares: Vec<Option<f64>> = std::iter::once(None)
@@ -189,6 +203,13 @@ impl SettingsForm for Run {
             )
             .into_any_element(),
             settings_field(
+                "Step limit",
+                "The most steps in one turn; then it stops and answers with what is done",
+                step_limit,
+                cx,
+            )
+            .into_any_element(),
+            settings_field(
                 "Compaction",
                 "When its conversations are summarized, as a share of the model's window; later keeps more in front of the model",
                 compaction,
@@ -200,7 +221,8 @@ impl SettingsForm for Run {
 }
 
 impl BenchApp {
-    /// One of the running choices — its reasoning level, its approvals, code mode, compaction —
+    /// One of the running choices — its reasoning level, its approvals, code mode, the step
+    /// limit, compaction —
     /// set for the project. A click applies it at once (a choice has no draft); the project's
     /// next threads start on it, a thread already begun keeps what it started with (code mode
     /// alone reaches its threads from their next turn).
@@ -224,6 +246,7 @@ impl BenchApp {
             "reasoning" => json!({"config": {"agent": {"reasoning_effort": value}}}),
             "compaction" => json!({"config": {"compaction": {"at": value.parse::<f64>().ok()}}}),
             "code_mode" => json!({"config": {"code_mode": {"enabled": value == "On"}}}),
+            "step_limit" => json!({"config": {"step_limit": {"steps": value.parse::<u64>().ok()}}}),
             _ => json!({"config": {"approvals": {"mode": value}}}),
         };
         let asked = id.clone();

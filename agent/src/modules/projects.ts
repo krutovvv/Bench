@@ -105,6 +105,7 @@ export default ({ rt, publish }: Ctx): Module => ({
 					lsp: { servers: readLsp(agent), states: { ...lspStates(agent), ...(await lspNeeds(agent, projects.get(id)?.machine ?? undefined)) } },
 					compaction: compactionAt(agent) ?? null,
 					code_mode: Boolean(readAgent(agent).codeMode),
+					step_limit: readAgent(agent).stepLimit ?? null,
 					window: resolveModel().contextLength,
 					project: p,
 					dir,

@@ -15,7 +15,7 @@ mod journal;
 mod thread;
 mod threads;
 
-pub use env::{env, file_head, file_problems, file_text, ignored, listing, specs};
+pub use env::{env, providers, file_head, file_problems, file_text, ignored, listing, specs};
 pub use inserts::terminal;
 
 use inserts::other_modes;
@@ -502,6 +502,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
             calls: 14,
             input: 212_000,
             output: 9_800,
+            judge_calls: Some(23),
+            judge_nudges: Some(4),
             ..Default::default()
         }))
     });

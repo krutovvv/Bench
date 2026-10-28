@@ -27,6 +27,10 @@ function patchConfig(agent: string, patch: any): void {
 			writeAgent(agent, { ...readAgent(agent), compaction: at });
 		} else if (k === "code_mode" && m && typeof m === "object" && m.enabled !== undefined) {
 			writeAgent(agent, { ...readAgent(agent), codeMode: Boolean(m.enabled) || undefined });
+		} else if (k === "step_limit" && m && typeof m === "object") {
+			// The most steps in a turn, or null: no limit (`builtin/steps.ts`).
+			const n = Math.floor(Number(m.steps));
+			writeAgent(agent, { ...readAgent(agent), stepLimit: n > 0 ? n : undefined });
 		} else if (k === "approvals" && m && typeof m === "object" && m.mode !== undefined) {
 			writeAgent(agent, { ...readAgent(agent), approvals: String(m.mode) });
 		} else setSetting(k, deepMerge(getSetting(k), v));

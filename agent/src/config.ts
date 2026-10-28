@@ -139,6 +139,8 @@ export interface AgentSettings {
 	 * (`extensions.ts`). A project's choice; its threads take it from their next turn.
 	 */
 	codeMode?: boolean;
+	/** The most steps (tool calls) in one turn; past it the run ends with an answer (`builtin/steps.ts`). Unset: no limit. */
+	stepLimit?: number;
 }
 
 /** A project's environment is an agent directory too ("project:<id>"), in projects/<id>/. */

@@ -48,6 +48,11 @@ export const INSERTS_KIND = Inserts.definition.kind;
 export const BLOCK_OPEN = "<block-state>";
 export const BLOCK_CLOSE = "</block-state>";
 
+/** The evaluator's own message to the model, appended after an answer (`judge/done.ts`): not the
+ *  person's, so it neither starts a turn (`builtin/turn.ts`) nor shows in the thread. */
+export const EVAL_OPEN = "<evaluator>";
+export const EVAL_CLOSE = "</evaluator>";
+
 /** A user message without the block state Bench sent with it (that is for the model). */
 export function stripBlock(text: string): string {
 	const at = text.lastIndexOf(BLOCK_OPEN);
@@ -127,7 +132,7 @@ export function itemsOf(entry: any, requests?: Requests): ThreadItem[] {
 			const text = stripBlock(textOf(m.content));
 			// The submission that brought it, and Bench's id for it, when Pi's records say.
 			const from = requests?.ofEntry(seq);
-			if (text) out.push({ key: key(), seq, kind: "user", text, at, ...(from ? { sub: from.sub, ...(from.request ? { request: from.request } : {}) } : {}) });
+			if (text && !text.startsWith(EVAL_OPEN)) out.push({ key: key(), seq, kind: "user", text, at, ...(from ? { sub: from.sub, ...(from.request ? { request: from.request } : {}) } : {}) });
 		} else if (m.role === "assistant") {
 			for (const b of m.content ?? []) {
 				if (b.type === "thinking" && b.thinking?.trim()) out.push({ key: key(), seq, kind: "thought", text: b.thinking, at });

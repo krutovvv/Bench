@@ -247,6 +247,15 @@ impl ThreadView {
                 rows.push(("Cache hit".into(), format!("{c}%")));
             }
             rows.push(("Compactions".into(), u.compressions.to_string()));
+            // Only while the evaluator is on (Settings → Agents): how much it is used and how
+            // often its answer changed what the agent did.
+            if let Some(n) = u.judge_calls.filter(|n| *n > 0) {
+                rows.push(("Evaluator calls".into(), n.to_string()));
+                rows.push((
+                    "Evaluator changed course".into(),
+                    u.judge_nudges.unwrap_or(0).to_string(),
+                ));
+            }
         }
         let speed = &self.thread.speed;
         if let Some(p) = speed.prefill {

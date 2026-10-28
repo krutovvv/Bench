@@ -1,6 +1,7 @@
 //! Settings → Providers and Messages, for an agent (the gear's), through the agent's
 //! API: providers (OpenAI-compatible endpoints, OpenRouter among them), the fallback model,
-//! voice (speech to text, text to speech) and Telegram. A key is set
+//! voice (speech to text, text to speech), the evaluator (a System One model the agent asks at
+//! a turn's searches, on its way and at its end: `agent/src/judge/`) and Telegram. A key is set
 //! on the card that uses it, never in a list of names.
 
 use std::collections::HashMap;
@@ -44,11 +45,20 @@ pub struct Voice {
     pub tts_voice: Entity<InputState>,
 }
 
+/// The evaluator: on or off (saved at once, as a switch is), its server, model and key.
+pub struct Judge {
+    pub enabled: bool,
+    pub url: Entity<InputState>,
+    pub model: Entity<InputState>,
+    pub key: Entity<InputState>,
+}
+
 #[derive(Default)]
 pub struct Providers {
     pub loaded: bool,
     pub endpoints: Vec<EndpointForm>,
     pub voice: Option<Voice>,
+    pub judge: Option<Judge>,
     pub fallback: Option<(String, String)>,
     _subscriptions: Vec<Subscription>,
 }
@@ -107,6 +117,11 @@ impl BenchApp {
     }
 
     pub(crate) fn load_providers(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.demo {
+            let (endpoints, env, yaml) = crate::demo::providers();
+            self.fill_providers(endpoints, env, yaml, window, cx);
+            return;
+        }
         self.rest_on(
             self.gear.agent.clone(),
             window,
@@ -250,6 +265,22 @@ impl BenchApp {
                 "e.g. gpt-4o-mini-tts",
             ),
             tts_voice: field(window, cx, &y(&["tts", "openai", "voice"]), "e.g. alloy"),
+        });
+        self.gear.providers.judge = Some(Judge {
+            enabled: yaml["judge"]["enabled"].as_bool().unwrap_or(false),
+            url: field(
+                window,
+                cx,
+                &y(&["judge", "base_url"]),
+                "https://api.typesafe.ai or http://host:port",
+            ),
+            model: field(window, cx, &y(&["judge", "model"]), "jev-latest"),
+            key: field(
+                window,
+                cx,
+                &y(&["judge", "api_key"]),
+                "If the server asks for one",
+            ),
         });
 
         self.gear.providers.loaded = true;
@@ -469,6 +500,47 @@ impl BenchApp {
             |this, r, window, cx| match r {
                 Ok(()) => this.toast(NotificationType::Success, "Voice saved", window, cx),
                 Err(e) => this.toast(NotificationType::Error, format!("Voice: {e:#}"), window, cx),
+            },
+        );
+    }
+
+    /// The evaluator on or off, saved at once; its threads take it from their next step.
+    pub fn set_judge(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(j) = &mut self.gear.providers.judge else {
+            return;
+        };
+        j.enabled = on;
+        cx.notify();
+        self.save_judge_config(json!({"judge": {"enabled": on}}), window, cx);
+    }
+
+    pub fn save_judge(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(j) = &self.gear.providers.judge else {
+            return;
+        };
+        let config = json!({"judge": {
+            "enabled": j.enabled,
+            "base_url": text(&j.url, cx),
+            "model": text(&j.model, cx),
+            "api_key": text(&j.key, cx),
+        }});
+        self.save_judge_config(config, window, cx);
+    }
+
+    fn save_judge_config(&mut self, config: Value, window: &mut Window, cx: &mut Context<Self>) {
+        self.rest_on(
+            self.gear.agent.clone(),
+            window,
+            cx,
+            move |conn| rest::merge_config(conn, config),
+            |this, r, window, cx| match r {
+                Ok(()) => this.toast(NotificationType::Success, "Evaluator saved", window, cx),
+                Err(e) => this.toast(
+                    NotificationType::Error,
+                    format!("Evaluator: {e:#}"),
+                    window,
+                    cx,
+                ),
             },
         );
     }

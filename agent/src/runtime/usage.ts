@@ -15,6 +15,9 @@ export interface Totals {
 	started?: number;
 	/** How often Pi compacted the thread (its journal's summaries, `compactionsOf`). */
 	compactions?: number;
+	/** The evaluator's requests for this thread, and how often it changed the course (`judge/`). */
+	judge?: number;
+	nudges?: number;
 }
 
 export const EMPTY_TOTALS: Totals = { input: 0, output: 0, calls: 0 };
@@ -29,6 +32,10 @@ export function totalsOf(v: unknown): Totals {
 	const cached = (v as any).cached;
 	const tps = (v as any).tps;
 	const compactions = (v as any).compactions;
+	const count = (k: string) => {
+		const x = (v as any)[k];
+		return typeof x === "number" && isFinite(x) && x > 0 ? { [k]: x } : {};
+	};
 	return {
 		input: n("input"),
 		output: n("output"),
@@ -36,6 +43,8 @@ export function totalsOf(v: unknown): Totals {
 		...(typeof cached === "number" ? { cached } : {}),
 		...(typeof tps === "number" ? { tps } : {}),
 		...(typeof compactions === "number" && isFinite(compactions) && compactions >= 0 ? { compactions } : {}),
+		...count("judge"),
+		...count("nudges"),
 		...((v as any).started ? { started: (v as any).started } : {}),
 	};
 }
@@ -52,6 +61,7 @@ export function usagePayload(model: string, u: Totals, max: number): Usage {
 		output: u.output,
 		calls: u.calls,
 		avg_tps: u.tps ?? 0,
+		...(u.judge ? { judge_calls: u.judge, judge_nudges: u.nudges ?? 0 } : {}),
 	};
 }
 /** How fast the model wrote in this thread (crates/protocol `SpeedStat`). Bench measures it (only

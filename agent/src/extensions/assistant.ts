@@ -6,7 +6,7 @@
 
 import path from "node:path";
 import { Type } from "@earendil-works/pi-ai";
-import { defineExtension, defineTool, hook, section, ToolTask } from "@earendil-works/pi-durable";
+import { defineExtension, defineTool, GenerationTask, hook, section, ToolTask } from "@earendil-works/pi-durable";
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
@@ -21,6 +21,11 @@ import { specFor, specsOf } from "../specs.ts";
 import { machineOf } from "../repo.ts";
 import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
+import { stepGate, stepNote } from "../builtin/steps.ts";
+import { seeRequest, seeResult } from "../builtin/turn.ts";
+import { checkCourse } from "../judge/drift.ts";
+import { checkDone } from "../judge/done.ts";
+import { rankSearch } from "../judge/search.ts";
 import { host } from "../host.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../runtime/inserts.ts";
@@ -110,6 +115,21 @@ export const assistant = defineExtension({
 	],
 	hooks: [
 		compactWithoutReasoning,
+		// The turn as the step limit and the evaluator see it (`builtin/turn.ts`): every request
+		// notes the person's last message; past the step limit it carries the instruction to
+		// answer (`builtin/steps.ts`). The answer is the evaluator's to check once (`judge/done.ts`).
+		hook(GenerationTask, {
+			beforeRequest: (request: any, api: any) => {
+				const conversation = String(api.conversationId);
+				seeRequest(conversation, request.messages);
+				const note = stepNote(conversation);
+				return note ? { messages: [...request.messages, note] } : undefined;
+			},
+			onYield: async (answer: any, api: any, context: any) => {
+				const back = await checkDone(String(api.conversationId), answer, context?.abortSignal).catch(() => undefined);
+				return back ? { continue: back } : undefined;
+			},
+		} as any),
 		hook(ToolTask, {
 			beforeTool: async (call: any, api: any, context: any) => {
 				// The person's hold, felt before any next step — the current answer and the step
@@ -117,6 +137,11 @@ export const assistant = defineExtension({
 				// The conversation is the hook's `api`'s, not the call's (Pi's ToolCall has no id of it).
 				const info = host().thread(api.conversationId);
 				if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
+				// A step of the turn (a script's nested calls are its own): refused past the project's limit.
+				if (!call.parent) {
+					const refused = stepGate(String(api.conversationId));
+					if (refused) return { block: refused };
+				}
 				if (call.name !== "bash" || !info || approvalsMode(info.agent) !== "manual") return undefined;
 				const command = String(call.arguments?.command ?? call.args?.command ?? "");
 				const hit = DANGEROUS.find(([re]) => re.test(command));
@@ -129,13 +154,23 @@ export const assistant = defineExtension({
 			// The module's spec, the first time the thread touches a file under it (`specs.ts`):
 			// the decisions and contracts the code does not show, found without being looked for.
 			// The plan left unchanged for several steps (`planNudge`): the model is reminded to update it.
-			afterTool: async (call: any, result: any, api: any) => {
-				const nudge = planNudge(String(api.conversationId), call);
-				const withNotes = (notes: string[]) => (notes.length ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined);
-				if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(nudge ? [nudge] : []);
+			// With the evaluator on (`judge/`): a long search's matches come likeliest first, and
+			// every so many steps the course is checked, a note when it is off.
+			afterTool: async (call: any, result: any, api: any, context: any) => {
+				const conversation = String(api.conversationId);
+				const top = !call.parent;
+				if (top) seeResult(conversation, call, result);
+				const ranked = top ? await rankSearch(conversation, call, result, context?.abortSignal).catch(() => undefined) : undefined;
+				if (ranked) result = ranked;
+				const nudge = planNudge(conversation, call);
+				const course = top ? await checkCourse(conversation, context?.abortSignal).catch(() => undefined) : undefined;
+				const first = [nudge, course].filter((n): n is string => !!n);
+				const withNotes = (notes: string[]) =>
+					notes.length || ranked ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
+				if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(first);
 				const info = host().thread(api.conversationId);
-				if (!info) return withNotes(nudge ? [nudge] : []);
-				const notes: string[] = nudge ? [nudge] : [];
+				if (!info) return withNotes(first);
+				const notes: string[] = [...first];
 				const spec = await specNote(info, String(api.conversationId), String(call.arguments?.path ?? "")).catch(() => undefined);
 				if (spec) notes.push(spec);
 				if (call.name !== "read") {
