@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use protocol::{FileChange, Hold, Inserts, PlanStep, Process, QueuedItem, ThreadItem};
+use protocol::{FileChange, Finding, Hold, Inserts, PlanStep, Process, QueuedItem, ThreadItem};
 use serde_json::Value;
 
 use crate::state::Pressed;
@@ -58,6 +58,8 @@ pub enum Row {
         base: String,
         head: String,
         files: Vec<FileChange>,
+        /// Its review, once made (`ThreadItem::Review` of this key): findings, or why not.
+        review: Option<(Vec<Finding>, Option<String>)>,
     },
     /// The answer being written now (its text; the model's reasoning is not shown while it streams).
     Writing { text: String },
@@ -350,7 +352,21 @@ pub(crate) fn rows_of(
                     base: base.clone(),
                     head: head.clone(),
                     files: files.clone(),
+                    review: None,
                 });
+            }
+            // A review settles the changes it looked at, where they stand: no row of its own.
+            ThreadItem::Review {
+                of, findings, error, ..
+            } => {
+                for r in rows.iter_mut().rev() {
+                    if let Row::Changes { key, review, .. } = r {
+                        if key == of {
+                            *review = Some((findings.clone(), error.clone()));
+                            break;
+                        }
+                    }
+                }
             }
             // The plan is the work's first `todo` call; a later one in the same work ticks it.
             ThreadItem::Plan { key, id, todos, .. } => {

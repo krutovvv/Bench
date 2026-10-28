@@ -159,7 +159,11 @@ fn kinds(rows: &[Row]) -> Vec<String> {
             Row::Answer { text, .. } => format!("answer:{text}"),
             Row::Insert { id, .. } => format!("insert:{id}"),
             Row::Fail { text, .. } => format!("fail:{text}"),
-            Row::Changes { files, .. } => format!("changes:{}", files.len()),
+            Row::Changes { files, review, .. } => format!(
+                "changes:{}{}",
+                files.len(),
+                review.as_ref().map_or(String::new(), |(f, _)| format!("·r{}", f.len()))
+            ),
             Row::Writing { text, .. } => format!("writing:{text}"),
             Row::Queued { text, .. } => format!("queued:{text}"),
         })
@@ -225,12 +229,24 @@ fn a_turns_changes_follow_its_answer() {
             text(6, 0, "Done."),
             changes,
             user(8, "more"),
+            ThreadItem::Review {
+                key: "9".into(),
+                seq: 9,
+                of: "7".into(),
+                findings: vec![protocol::Finding {
+                    path: "/p/a.rs".into(),
+                    lines: Some("3".into()),
+                    body: "x".into(),
+                }],
+                error: None,
+            },
         ],
         ..Default::default()
     });
     assert_eq!(
         kinds(&t.rows()),
-        ["user:go", "work:1", "answer:Done.", "changes:1", "user:more"]
+        ["user:go", "work:1", "answer:Done.", "changes:1·r1", "user:more"],
+        "a review settles the changes it read, later in the journal or not"
     );
 }
 

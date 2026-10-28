@@ -31,7 +31,7 @@ ask_kind: string, question: string,
 /**
  * Extra text under the question: the command an approval wants to run.
  */
-detail?: string, choices: Array<string>, multi: boolean, } | { "kind": "changes", key: string, seq: number, root: string, base: string, head: string, files: Array<FileChange>, } | { "kind": "asked", key: string, seq: number, id: string, answer?: string, };
+detail?: string, choices: Array<string>, multi: boolean, } | { "kind": "changes", key: string, seq: number, root: string, base: string, head: string, files: Array<FileChange>, } | { "kind": "review", key: string, seq: number, of: string, findings: Array<Finding>, error?: string, } | { "kind": "asked", key: string, seq: number, id: string, answer?: string, };
 
 export type PlanStep = { id: string, content: string, 
 /**
@@ -40,6 +40,8 @@ export type PlanStep = { id: string, content: string,
 status: string, parent?: string, };
 
 export type FileChange = { path: string, add: number, del: number, binary?: boolean, };
+
+export type Finding = { path: string, lines?: string, body: string, };
 
 export type QueuedItem = { key: string, sub: string, mode: QueueMode, text: string, 
 /**
@@ -210,6 +212,8 @@ export type OpenThread = { thread: ThreadId, since: number, };
 
 export type RenameThread = { thread: ThreadId, title: string, };
 
+export type ReviewTurn = { thread: ThreadId, of: string, };
+
 export type DeleteThread = { thread: ThreadId, };
 
 export type ForkThread = { thread: ThreadId, at: number, };
@@ -246,4 +250,4 @@ export type ListCommands = Record<string, never>;
 
 export type StopProcess = { thread: ThreadId, process: string, };
 
-export type Methods = { "threads.list": [ListThreads, Array<ThreadSummary>], "thread.create": [CreateThread, Created], "thread.open": [OpenThread, ThreadOpen], "thread.rename": [RenameThread, Done], "thread.delete": [DeleteThread, Done], "thread.fork": [ForkThread, Created], "thread.send": [SendMessage, Done], "thread.stop": [StopThread, Done], "thread.pause": [PauseThread, Done], "thread.queue.withdraw": [WithdrawQueued, Done], "thread.queue.send": [SendQueuedNow, Done], "thread.queue.edit": [EditQueued, Done], "thread.insert": [PutInsert, Done], "thread.insert.patch": [PatchInsert, Done], "thread.answer": [AnswerAsk, Done], "thread.effort": [SetEffort, Done], "thread.speed": [SaveSpeed, Done], "thread.command": [RunCommand, CommandResult], "commands.list": [ListCommands, Array<Command>], "process.stop": [StopProcess, Done] };
+export type Methods = { "threads.list": [ListThreads, Array<ThreadSummary>], "thread.create": [CreateThread, Created], "thread.open": [OpenThread, ThreadOpen], "thread.rename": [RenameThread, Done], "thread.review": [ReviewTurn, Done], "thread.delete": [DeleteThread, Done], "thread.fork": [ForkThread, Created], "thread.send": [SendMessage, Done], "thread.stop": [StopThread, Done], "thread.pause": [PauseThread, Done], "thread.queue.withdraw": [WithdrawQueued, Done], "thread.queue.send": [SendQueuedNow, Done], "thread.queue.edit": [EditQueued, Done], "thread.insert": [PutInsert, Done], "thread.insert.patch": [PatchInsert, Done], "thread.answer": [AnswerAsk, Done], "thread.effort": [SetEffort, Done], "thread.speed": [SaveSpeed, Done], "thread.command": [RunCommand, CommandResult], "commands.list": [ListCommands, Array<Command>], "process.stop": [StopProcess, Done] };

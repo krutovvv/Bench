@@ -486,10 +486,12 @@ impl ThreadView {
                 base,
                 head,
                 files,
+                review,
             } => self.render_turn_changes(
                 &key,
                 crate::explorer::pane::doc::Turn { root, base, head },
                 &files,
+                review,
                 cx,
             ),
             Row::Insert { id, .. } => {

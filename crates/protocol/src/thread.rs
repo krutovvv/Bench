@@ -140,6 +140,18 @@ pub enum ThreadItem {
         head: String,
         files: Vec<FileChange>,
     },
+    /// A turn's review: findings on the changes of item `of` (`agent/src/runtime/review.ts`);
+    /// `error` when the review could not be made.
+    Review {
+        key: String,
+        #[ts(type = "number")]
+        seq: u64,
+        of: String,
+        findings: Vec<Finding>,
+        #[ts(optional)]
+        #[serde(default)]
+        error: Option<String>,
+    },
     /// A question's answer ("" is a decline): it settles the [`ThreadItem::Ask`] of the same id.
     Asked {
         key: String,
@@ -163,6 +175,16 @@ pub struct FileChange {
     #[ts(optional)]
     #[serde(default)]
     pub binary: Option<bool>,
+}
+
+/// A reviewer's finding: a file (absolute), its lines ("12-14"), what is wrong.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+pub struct Finding {
+    pub path: String,
+    #[ts(optional)]
+    #[serde(default)]
+    pub lines: Option<String>,
+    pub body: String,
 }
 
 /// One step of the agent's plan.
@@ -190,6 +212,7 @@ impl ThreadItem {
             | ThreadItem::Plan { key, .. }
             | ThreadItem::Ask { key, .. }
             | ThreadItem::Changes { key, .. }
+            | ThreadItem::Review { key, .. }
             | ThreadItem::Asked { key, .. } => key,
         }
     }
@@ -206,6 +229,7 @@ impl ThreadItem {
             | ThreadItem::Plan { seq, .. }
             | ThreadItem::Ask { seq, .. }
             | ThreadItem::Changes { seq, .. }
+            | ThreadItem::Review { seq, .. }
             | ThreadItem::Asked { seq, .. } => *seq,
         }
     }
@@ -223,6 +247,7 @@ impl ThreadItem {
             | ThreadItem::Plan { .. }
             | ThreadItem::Ask { .. }
             | ThreadItem::Changes { .. }
+            | ThreadItem::Review { .. }
             | ThreadItem::Asked { .. } => None,
         }
     }

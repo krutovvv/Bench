@@ -117,6 +117,9 @@ requests! {
         #[ts(type = "number")] #[serde(default)] since: u64,
     }
     RenameThread = "thread.rename" -> Done { thread: ThreadId, title: String }
+    /// Review the turn whose changes are the journal's item `of`: its findings come into the
+    /// journal (`ThreadItem::Review`) when the model has read it.
+    ReviewTurn = "thread.review" -> Done { thread: ThreadId, of: String }
     DeleteThread = "thread.delete" -> Done { thread: ThreadId }
     /// A new thread with this one's history through entry `at` (Pi's fork).
     ForkThread = "thread.fork" -> Created { thread: ThreadId, #[ts(type = "number")] at: u64 }

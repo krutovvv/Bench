@@ -168,7 +168,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         252.0,
     );
     // What the turn changed, git's view: the two edits and the lock file `npm install` rewrote.
-    journal.changes(
+    let changes = journal.changes(
         "/Users/demo/code/storefront",
         &[
             ("src/pages/landing.tsx", 2, 2),
@@ -176,6 +176,29 @@ fewer form fields. Then check what it did to signups and give me a short summary
             ("package-lock.json", 14, 9),
         ],
     );
+    // `BENCH_DEMO_REVIEW=1`: the turn reviewed, its two notes unfolded under the files.
+    if std::env::var("BENCH_DEMO_REVIEW").is_ok() {
+        journal.review(
+            &changes,
+            &[
+                (
+                    "/Users/demo/code/storefront/src/components/SignupForm.tsx",
+                    "28-31",
+                    "The phone field is gone from the form but `submit()` still sends `phone`: the API will get undefined. Drop it there too.",
+                ),
+                (
+                    "/Users/demo/code/storefront/package-lock.json",
+                    "",
+                    "The lock file changed though no dependency was asked for: `npm install` upgraded 4 packages. Revert it unless that was meant.",
+                ),
+            ],
+        );
+        let key = changes.clone();
+        open_thread(app, cx, move |t| {
+            t.files_open.insert(key.clone());
+            t.review_open.insert(key);
+        });
+    }
     journal.started(threads::processes(now));
     let landing = journal.thread();
     if std::env::var("BENCH_DEMO").as_deref() == Ok("top") {

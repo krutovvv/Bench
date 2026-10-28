@@ -3,7 +3,9 @@
 //! that is not a repository, under the last answer, every file the thread's work edited or wrote.
 //! Unfolded, a file per row; a click on a row shows its diff in place, under it — the thread is
 //! where the person works, so the change is read there. "Open in Code" on a row's hover opens
-//! the same diff as a tab.
+//! the same diff as a tab. A turn's block has "Review" at its head's far edge: a reviewer reads the
+//! turn (`agent/src/runtime/review.ts`) and its findings fold under the files, sent to the agent
+//! as review comments with one button.
 
 use ::thread::{Row, Step};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
@@ -27,6 +29,9 @@ pub(crate) struct Changed {
     /// turn's trees when first shown.
     pub diff: Option<String>,
 }
+
+/// A turn's review as the thread holds it: findings, or why there are none.
+pub(crate) type Review = (Vec<protocol::Finding>, Option<String>);
 
 /// The key the thread-wide block (no repository) keeps its folds under.
 const ALL: &str = "files";
@@ -68,6 +73,7 @@ impl ThreadView {
         key: &str,
         turn: Turn,
         files: &[protocol::FileChange],
+        review: Option<Review>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let files = files
@@ -80,7 +86,10 @@ impl ThreadView {
                 diff: None,
             })
             .collect();
-        let block = self.changes_block(key, files, Some(turn), cx);
+        if review.is_some() {
+            self.thread.reviewing.remove(key);
+        }
+        let block = self.changes_block(key, files, Some((turn, review)), cx);
         crate::thread::look::turn(Some(true), block, cx).into_any_element()
     }
 
@@ -90,10 +99,14 @@ impl ThreadView {
         &mut self,
         key: &str,
         files: Vec<Changed>,
-        turn: Option<Turn>,
+        turn: Option<(Turn, Option<Review>)>,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
+        let (turn, review) = match turn {
+            Some((t, r)) => (Some(t), Some(r)),
+            None => (None, None),
+        };
         let open = self.thread.files_open.contains(key);
         let all = self.thread.files_all.contains(key);
         let count = files.len();
@@ -227,8 +240,15 @@ impl ThreadView {
                     .into_any_element(),
             );
         }
+        let review_open = self.thread.review_open.contains(key);
+        if let Some(Some((found, _))) = &review {
+            if review_open && !found.is_empty() {
+                rows.push(self.render_findings(key, found, cx));
+            }
+        }
         // The rows' own air under the head, as a list in a Mac sidebar.
         let rows = (!rows.is_empty()).then(|| v_flex().py_1().children(rows));
+        let review_head = review.map(|r| self.render_review_head(key, r, review_open, cx));
         let k = key.to_string();
         bench_ui::block_frame(cx)
             // Folded by default: one line with the totals; a click lists the files.
@@ -248,6 +268,7 @@ impl ThreadView {
                 .when(all_del > 0, |d| {
                     d.child(div().font_family(bench_ui::theme::MONO).text_size(theme.mono_font_size).text_color(theme.danger).child(format!("−{all_del}")))
                 })
+                .children(review_head)
                 .on_click(cx.listener(move |this, _, _, cx| {
                     if !this.thread.files_open.remove(&k) {
                         this.thread.files_open.insert(k.clone());
@@ -256,6 +277,132 @@ impl ThreadView {
                 })),
             )
             .children(rows)
+            .into_any_element()
+    }
+
+    /// The head's far edge on a turn: "Review"; "Reviewing…" while the model reads; then
+    /// "Review · 2 notes" (a click folds them), "Reviewed · nothing found", or a failure to retry.
+    fn render_review_head(
+        &mut self,
+        key: &str,
+        review: Option<Review>,
+        open: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let faint = bench_ui::faint(&theme);
+        let reviewing = self.thread.reviewing.contains(key);
+        let (label, color, act): (String, Hsla, Option<bool>) = match (&review, reviewing) {
+            (_, true) => ("Reviewing…".into(), faint, None),
+            (None, _) => ("Review".into(), theme.muted_foreground, Some(true)),
+            (Some((_, Some(_))), _) => ("Review failed · Retry".into(), theme.danger, Some(true)),
+            (Some((f, None)), _) if f.is_empty() => ("Reviewed · nothing found".into(), faint, None),
+            (Some((f, None)), _) => (
+                format!("Review · {}", plural(f.len(), "note", "notes", "notes")),
+                if open { theme.foreground } else { theme.primary },
+                Some(false),
+            ),
+        };
+        let k = key.to_string();
+        h_flex()
+            .id(SharedString::from(format!("review-{key}")))
+            .ml_auto()
+            .flex_none()
+            .text_color(color)
+            .child(label)
+            .when_some(act, |d, start| {
+                d.cursor_pointer()
+                    .hover(|s| s.text_color(theme.foreground))
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.claim_click(cx);
+                        if start {
+                            this.start_review(&k, cx);
+                        } else if !this.thread.review_open.remove(&k) {
+                            this.thread.review_open.insert(k.clone());
+                            this.thread.files_open.insert(k.clone());
+                        }
+                        cx.notify();
+                    }))
+            })
+            .into_any_element()
+    }
+
+    /// Ask the agent to review the turn whose changes are `key`.
+    fn start_review(&mut self, key: &str, cx: &mut Context<Self>) {
+        let Some(thread) = self.thread.id.clone() else {
+            return;
+        };
+        self.thread.reviewing.insert(key.to_string());
+        self.thread.review_open.insert(key.to_string());
+        self.tell(protocol::ReviewTurn { thread, of: key.to_string() }, cx);
+    }
+
+    /// The findings under the files: a file and lines, what is wrong; then one button that puts
+    /// them all in the composer as review comments.
+    fn render_findings(
+        &mut self,
+        key: &str,
+        found: &[protocol::Finding],
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let faint = bench_ui::faint(&theme);
+        let rows = found.iter().enumerate().map(|(k, f)| {
+            let name = f.path.rsplit('/').next().unwrap_or(&f.path).to_string();
+            let at = match &f.lines {
+                Some(l) => format!("{name}:{}", l.replace('-', "–")),
+                None => name,
+            };
+            h_flex()
+                .id(SharedString::from(format!("finding-{key}-{k}")))
+                .px_3()
+                .py_1()
+                .gap_2()
+                .items_start()
+                .text_size(px(bench_ui::THREAD_META))
+                .child(
+                    div()
+                        .flex_none()
+                        .pt_0p5()
+                        .text_color(theme.warning)
+                        .child(Ico::CircleAlert.icon().xsmall()),
+                )
+                .child(
+                    v_flex()
+                        .flex_1()
+                        .min_w_0()
+                        .child(div().text_color(faint).child(at))
+                        .child(div().child(f.body.clone())),
+                )
+                .into_any_element()
+        });
+        let all = found.to_vec();
+        let send = bench_ui::form_action(
+            SharedString::from(format!("findings-send-{key}")),
+            "Send to the agent",
+            false,
+            cx,
+        )
+        .on_click(self.app_listener(move |app, _, window, cx| {
+            use crate::thread::composer::attachments::{CodeRef, CommentRef, Reference};
+            for f in &all {
+                let lines = f.lines.as_deref().and_then(|l| {
+                    let (a, b) = l.split_once('-').unwrap_or((l, l));
+                    Some((a.parse().ok()?, b.parse().ok()?))
+                });
+                let code = CodeRef { path: f.path.clone(), lines, text: None };
+                let id = CommentRef::new_id(&code, &f.body);
+                app.add_reference(Reference::Comment(CommentRef { id, code, note: f.body.clone() }), cx);
+            }
+            app.focus_composer(window, cx);
+        }));
+        v_flex()
+            .mt_1()
+            .pt_1()
+            .border_t_1()
+            .border_color(theme.border.opacity(0.6))
+            .children(rows)
+            .child(h_flex().px_3().py_1().justify_end().child(send))
             .into_any_element()
     }
 

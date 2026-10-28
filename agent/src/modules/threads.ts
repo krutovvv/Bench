@@ -40,6 +40,11 @@ export default ({ rt }: Ctx): Module => ({
 		// The thread as a journal (src/thread.ts) and its live run: items after `since`, the queue,
 		// the inserts, what it waits for, its numbers. Changes follow as `thread` events.
 		"thread.open": ({ thread, since }) => rt.journal.open(thread, since),
+		// A turn reviewed, asked on its changes: the findings come into the journal when ready.
+		"thread.review": ({ thread, of }) => {
+			void rt.reviews.review(thread, of).catch((err) => console.error("[review]", err));
+			return {};
+		},
 		"thread.rename": ({ thread, title }) => {
 			rt.titles.rename(thread, title);
 			return {};

@@ -63,3 +63,7 @@ deletes threads (`open.rs`).
   a quiet line and unfolds on a click: no panels, no badges that ask for attention.
 - A review comment is a reference too (`Reference::Comment`, ⌘⇧L in the Explorer): `Comment <id>
   on \`path:lines\`: <note>` with the lines fenced; the agent closes each with `resolve_comment`.
+- **A turn is reviewed when the person asks**, from "Review" at the far edge of its changes' head:
+  one call to the thread's model reads what was asked, the plan, the answer and the turn's diff
+  (`agent/src/runtime/review.ts`); its findings fold under the files and go to the agent only
+  through "Send to the agent", as review comments. Nothing reaches the agent unasked.

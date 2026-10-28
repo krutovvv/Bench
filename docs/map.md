@@ -15,6 +15,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | switch the thread's look (the chat: bubbles, a pinned composer; the document: avatars, the composer as the last row) | `src/thread/look.rs` (`pub type Current`) |
 | a review comment on code (⌘⇧L) | `src/explorer/pane/comment.rs` (the band), `Reference::Comment` in `src/thread/composer/attachments.rs`, `resolve_comment` in `agent/src/builtin/review.ts` |
 | change the composer | `src/thread/composer/` (`input.rs` the field, its pop-up `slash.rs`, prompts `prompts.rs`, files and references (code, review comments, problems, a terminal) `attachments.rs`, drafts `drafts.rs`, sending `send.rs`) |
+| a turn's review (findings on its changes, sent as comments) | `agent/src/runtime/review.ts` (`thread.review`), drawn in `src/thread/rows/changed_files.rs` |
 | what a turn changed (git trees at a run's start and end) | `agent/src/runtime/turns.ts`, drawn by `src/thread/rows/changed_files.rs`, a file's turn diff as a tab `src/explorer/code/turn_diff.rs` |
 | change a kind of row in the thread (a question, the plan, processes, changed files, pages read) | `src/thread/rows/` (`asks.rs`, `answer.rs`, `processes.rs`, `changed_files.rs`, `extras.rs`) |
 | change the bottom dock's terminals (⌃`, ⌘T, the tabs) | `src/inserts/terminal/panel.rs` (the shell itself: `session.rs`, `view.rs`) |

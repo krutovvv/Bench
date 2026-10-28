@@ -36,6 +36,9 @@ export const FAIL_KIND = "bench.fail";
 /** What a turn changed in its repository (`turns.ts`): display-only, as a fail note. */
 export const CHANGES_KIND = "bench.changes";
 
+/** A turn's review: findings on its changes (`review.ts`), display-only. */
+export const REVIEW_KIND = "bench.review";
+
 /** Pi's compaction summary: a new context, with the older entries left out of what the model reads. */
 export const COMPACTION_KIND = "pi.compaction";
 
@@ -108,6 +111,11 @@ export function itemsOf(entry: any, requests?: Requests): ThreadItem[] {
 	if (entry.kind === CHANGES_KIND) {
 		const d = entry.data ?? {};
 		out.push({ key: `${seq}`, seq, kind: "changes", root: String(d.root ?? ""), base: String(d.base ?? ""), head: String(d.head ?? ""), files: Array.isArray(d.files) ? d.files : [] });
+		return out;
+	}
+	if (entry.kind === REVIEW_KIND) {
+		const d = entry.data ?? {};
+		out.push({ key: `${seq}`, seq, kind: "review", of: String(d.of ?? ""), findings: Array.isArray(d.findings) ? d.findings : [], ...(d.error ? { error: String(d.error) } : {}) });
 		return out;
 	}
 	if (entry.kind === COMPACTION_KIND || entry.kind === "pi.system") return out;

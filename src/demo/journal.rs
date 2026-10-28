@@ -132,7 +132,7 @@ impl Journal {
     }
 
     /// What the last turn changed in its repository (`bench.changes`): (path, added, removed).
-    pub(super) fn changes(&mut self, root: &str, files: &[(&str, u64, u64)]) {
+    pub(super) fn changes(&mut self, root: &str, files: &[(&str, u64, u64)]) -> String {
         let seq = self.next();
         self.items.push(ThreadItem::Changes {
             key: format!("{seq}"),
@@ -149,6 +149,26 @@ impl Journal {
                     binary: None,
                 })
                 .collect(),
+        });
+        format!("{seq}")
+    }
+
+    /// A review of the changes `of`: (path, lines, what is wrong).
+    pub(super) fn review(&mut self, of: &str, findings: &[(&str, &str, &str)]) {
+        let seq = self.next();
+        self.items.push(ThreadItem::Review {
+            key: format!("{seq}"),
+            seq,
+            of: of.into(),
+            findings: findings
+                .iter()
+                .map(|(path, lines, body)| protocol::Finding {
+                    path: (*path).into(),
+                    lines: (!lines.is_empty()).then(|| (*lines).into()),
+                    body: (*body).into(),
+                })
+                .collect(),
+            error: None,
         });
     }
 

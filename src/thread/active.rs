@@ -43,6 +43,10 @@ pub struct ActiveThread {
     /// being read).
     pub diffs_open: HashSet<(String, String)>,
     pub diffs: HashMap<(String, String), Option<String>>,
+    /// Turns being reviewed (their changes' keys) until the findings come; those whose findings
+    /// are unfolded.
+    pub reviewing: HashSet<String>,
+    pub review_open: HashSet<String>,
     /// The works whose background processes' card is unfolded (`thread/processes.rs`), and
     /// the process whose output is shown.
     pub processes_open: HashSet<String>,
@@ -86,6 +90,8 @@ impl Default for ActiveThread {
             files_all: HashSet::new(),
             diffs_open: HashSet::new(),
             diffs: HashMap::new(),
+            reviewing: HashSet::new(),
+            review_open: HashSet::new(),
             processes_open: HashSet::new(),
             process_open: None,
             speed: Meter::fresh(),

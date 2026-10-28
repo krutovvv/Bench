@@ -36,6 +36,9 @@ Bench (`journal.ts`), the pause (`hold.ts`), the queue (`queue.ts`), questions a
   branch and stash untouched), the differing files a display-only `bench.changes` entry after the
   answer. It sees a formatter's or a script's changes as well as an edit's; outside a repository
   nothing is written and Bench falls back to the file tools' own diffs.
+- **A review is one completion, not an agent** (`review.ts`, `thread.review`): the turn's request,
+  plan, answer and git diff in, JSON findings out, a display-only `bench.review` entry that
+  settles the turn's changes. No tools: cheap enough for a local model, and it cannot touch files.
 
 - **A message's id is Pi's `requestId`**, given by Bench: the row shown on Enter is matched to
   its entry by it, never by its words. A message sent while a run is live waits in Pi's inbox as a
