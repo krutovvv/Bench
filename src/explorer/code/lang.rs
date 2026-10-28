@@ -100,6 +100,39 @@ pub fn language_for_text(path: &str, text: &str) -> &'static str {
     }
 }
 
+/// How a file is indented, as a status bar says it: "Tabs", or "Spaces: N" by the smallest step
+/// its first lines take (4 when nothing is indented yet).
+pub fn indent_of(text: &str) -> String {
+    let mut step = usize::MAX;
+    for line in text.lines().take(400) {
+        if line.starts_with('\t') {
+            return "Tabs".into();
+        }
+        let n = line.len() - line.trim_start_matches(' ').len();
+        if n > 0 && n < line.len() {
+            step = step.min(n);
+        }
+    }
+    format!("Spaces: {}", if step == usize::MAX { 4 } else { step })
+}
+
+/// A highlighter's name as a person reads it ("rust" → "Rust", "tsx" → "TSX").
+pub fn language_name(id: &str) -> String {
+    match id {
+        "text" => "Plain text".into(),
+        "tsx" | "css" | "html" | "sql" | "php" | "erb" | "ejs" | "json" | "yaml" | "toml" => id.to_uppercase(),
+        "javascript" => "JavaScript".into(),
+        "typescript" => "TypeScript".into(),
+        "csharp" => "C#".into(),
+        "cpp" => "C++".into(),
+        "graphql" => "GraphQL".into(),
+        _ => {
+            let mut c = id.chars();
+            c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod language_tests {
     use super::{language_for, language_for_text};
@@ -132,5 +165,15 @@ mod language_tests {
             "bash"
         );
         assert_eq!(language_for_text("/usr/local/bin/x", "hello"), "text");
+    }
+
+    #[test]
+    fn indent_is_read_from_the_text() {
+        assert_eq!(indent_of("fn a() {\n    b();\n        c();\n}"), "Spaces: 4");
+        assert_eq!(indent_of("a:\n  b: 1\n"), "Spaces: 2");
+        assert_eq!(indent_of("func a() {\n\tb()\n}"), "Tabs");
+        assert_eq!(indent_of("one line"), "Spaces: 4");
+        assert_eq!(language_name("rust"), "Rust");
+        assert_eq!(language_name("typescript"), "TypeScript");
     }
 }

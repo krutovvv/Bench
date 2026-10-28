@@ -58,6 +58,8 @@ pub struct BenchApp {
     pub gear: crate::settings::state::Gear,
     /// The new project's page (`settings/new_project.rs`).
     pub new_project: crate::settings::new_project::NewProject,
+    /// The status bar's corner for the open file: caret, indent, language (`statusbar/cursor.rs`).
+    pub cursor_item: Entity<crate::statusbar::cursor::CursorItem>,
     /// The docks' dividers (`workspace/layout.rs`).
     pub layout: crate::workspace::layout::LayoutState,
     /// The repo chip's git facts (`repo.rs`).
@@ -166,6 +168,7 @@ impl BenchApp {
             sidebar,
             gear: Default::default(),
             new_project,
+            cursor_item: cx.new(|_| crate::statusbar::cursor::CursorItem::default()),
             layout: crate::workspace::layout::LayoutState::new(cx),
             git: Default::default(),
             window: window.window_handle(),

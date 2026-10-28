@@ -4,6 +4,7 @@
 //! (`thread/meters.rs`).
 
 mod agent;
+pub(crate) mod cursor;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -158,6 +159,23 @@ impl BenchApp {
             // or not; its state in detail, its log, Reconnect and Restart are inside.
             .children(self.render_backend(cx))
             .child(div().flex_1())
+            // The open file's caret, indent and language, while a file fills the center.
+            .child({
+                let file = (self.center == Center::Doc)
+                    .then(|| self.explorer.active.clone())
+                    .flatten()
+                    .and_then(|key| match &key {
+                        crate::explorer::DocKey::File(f) => self
+                            .explorer
+                            .docs
+                            .get(&key)
+                            .filter(|d| !d.binary)
+                            .map(|d| (d.editor.clone(), f.path.clone())),
+                        _ => None,
+                    });
+                self.cursor_item.update(cx, |c, cx| c.show(file, cx));
+                self.cursor_item.clone()
+            })
             // Right: icons only — the terminals in the background (if any), attach, dictate,
             // settings, and Stop at the very edge.
             .when(!background_terms.is_empty(), |d| {
