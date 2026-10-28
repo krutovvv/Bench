@@ -86,7 +86,7 @@ fn log_error(text: &str) {
     eprintln!("{text}");
 }
 
-/// A Bench window: its own connection to the agent, profile and chat.
+/// A Bench window: its own connections to the agents, its own threads open.
 pub fn open_main_window(cx: &mut App) {
     let options = WindowOptions {
         window_bounds: Some(WindowBounds::Windowed(Bounds::centered(

@@ -381,11 +381,10 @@ impl BenchApp {
             return;
         };
         let path = format!("/api/cron/jobs/{}/{action}", enc(&job));
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "POST", &path, &profile, Value::Null),
+            move || rest::send_json(&conn, "POST", &path, Value::Null),
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     if action == "trigger" {

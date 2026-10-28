@@ -157,12 +157,11 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path) = (f.machine.clone(), f.path.clone());
         self.background(
             window,
             cx,
-            move || rest::list_dir(&conn, &profile, machine.as_deref(), &path),
+            move || rest::list_dir(&conn, machine.as_deref(), &path),
             move |this, r, window, cx| {
                 match r {
                     Ok(list) => {
@@ -194,12 +193,11 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path) = (f.machine.clone(), f.path.clone());
         self.background(
             window,
             cx,
-            move || rest::git_ignored(&conn, &profile, machine.as_deref(), &path),
+            move || rest::git_ignored(&conn, machine.as_deref(), &path),
             move |this, r, _, cx| {
                 // Read of a path that vanished mid-flight: no rows to dim anyway.
                 let Ok((root, list)) = r else { return };
@@ -328,7 +326,6 @@ impl BenchApp {
             .get(&project)
             .map(|e| e.dir.clone())
             .unwrap_or_default();
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         // What is called, and what opens after: the new file, or nothing.
         let (call, opens): (
             Box<dyn FnOnce() -> anyhow::Result<()> + Send>,
@@ -338,7 +335,7 @@ impl BenchApp {
                 let f = d.join(&name);
                 let (m, p) = (f.machine.clone(), f.path.clone());
                 (
-                    Box::new(move || rest::write_text(&conn, &profile, m.as_deref(), &p, "")),
+                    Box::new(move || rest::write_text(&conn, m.as_deref(), &p, "")),
                     Some(f),
                 )
             }
@@ -347,7 +344,7 @@ impl BenchApp {
                 let body = json!({"path": f.path, "machine": f.machine});
                 (
                     Box::new(move || {
-                        rest::send_json(&conn, "POST", "/api/fs/mkdir", &profile, body).map(|_| ())
+                        rest::send_json(&conn, "POST", "/api/fs/mkdir", body).map(|_| ())
                     }),
                     None,
                 )
@@ -357,7 +354,7 @@ impl BenchApp {
                 let body = json!({"from": f.path, "to": to.path, "machine": f.machine});
                 (
                     Box::new(move || {
-                        rest::send_json(&conn, "POST", "/api/fs/rename", &profile, body).map(|_| ())
+                        rest::send_json(&conn, "POST", "/api/fs/rename", body).map(|_| ())
                     }),
                     None,
                 )
@@ -367,7 +364,7 @@ impl BenchApp {
                     self.agent_file(format!("{dir}/prompts/{}.md", name.trim_end_matches(".md")));
                 let p = f.path.clone();
                 (
-                    Box::new(move || rest::write_text(&conn, &profile, None, &p, "")),
+                    Box::new(move || rest::write_text(&conn, None, &p, "")),
                     Some(f),
                 )
             }
@@ -378,7 +375,7 @@ impl BenchApp {
                 let f = self.agent_file(format!("{dir}/skills/{name}/SKILL.md"));
                 (
                     Box::new(move || {
-                        rest::send_json(&conn, "POST", &path, &profile, json!({"text": text}))
+                        rest::send_json(&conn, "POST", &path, json!({"text": text}))
                             .map(|_| ())
                     }),
                     Some(f),
@@ -449,12 +446,11 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let body = json!({"path": f.path, "machine": f.machine});
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "POST", "/api/fs/delete", &profile, body),
+            move || rest::send_json(&conn, "POST", "/api/fs/delete", body),
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     let gone: Vec<DocKey> = this

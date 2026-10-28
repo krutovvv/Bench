@@ -412,11 +412,10 @@ impl BenchApp {
         }
         cx.notify();
         let path = format!("/api/projects/{eid}/mcp/check");
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json_secs(&conn, "POST", &path, &profile, Value::Null, 90),
+            move || rest::send_json_secs(&conn, "POST", &path, Value::Null, 90),
             move |this, r, window, cx| {
                 let mut note = None;
                 if let Some(e) = this.envs.get_mut(&id) {
@@ -447,7 +446,7 @@ impl BenchApp {
     }
 
     /// Sign in to an MCP server (OAuth): its page opens in the browser; the agent connects it once
-    /// the browser comes back, and the block reads the environment again until it shows connected.
+    /// the browser comes back and says so (`Event::EnvChanged`, `app/events.rs`).
     pub fn env_authorize(
         &mut self,
         id: String,
@@ -459,11 +458,10 @@ impl BenchApp {
             return;
         };
         let path = format!("/api/projects/{eid}/mcp/{}/authorize", enc(&name));
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "POST", &path, &profile, Value::Null),
+            move || rest::send_json(&conn, "POST", &path, Value::Null),
             move |this, r, window, cx| match r {
                 Ok(v) => {
                     match v["url"].as_str().filter(|u| !u.is_empty()) {
@@ -478,30 +476,6 @@ impl BenchApp {
                         }
                         None => this.toast(NotificationType::Success, "Connected", window, cx),
                     }
-                    // Read again every 3 s for 3 minutes, until it no longer asks.
-                    cx.spawn_in(window, async move |this, cx| {
-                        for _ in 0..60 {
-                            cx.background_executor()
-                                .timer(std::time::Duration::from_secs(3))
-                                .await;
-                            let more = this
-                                .update_in(cx, |this, window, cx| {
-                                    let waiting = this
-                                        .envs
-                                        .get(&id)
-                                        .is_some_and(|e| e.mcp.auth.contains(&name));
-                                    if waiting {
-                                        this.load_env(&id, window, cx);
-                                    }
-                                    waiting
-                                })
-                                .unwrap_or(false);
-                            if !more {
-                                break;
-                            }
-                        }
-                    })
-                    .detach();
                 }
                 Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
             },

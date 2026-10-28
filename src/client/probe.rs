@@ -7,7 +7,7 @@
 use anyhow::{Result, bail};
 use protocol::{Event, ThreadEvent};
 
-use crate::app::model::{GENERAL_AGENT, Target};
+use crate::app::model::Target;
 use crate::client::rest;
 use crate::client::rpc::{Client, Incoming};
 
@@ -30,13 +30,13 @@ pub fn run(target: &str) -> Result<()> {
     println!("threads: {}", list.len());
     if let Ok(paths) = std::env::var("PROBE_GET") {
         for path in paths.split(',') {
-            let v = rest::get_raw(&conn, GENERAL_AGENT, path)?;
+            let v = rest::get(&conn, path)?;
             let s = serde_json::to_string_pretty(&v)?;
             println!("GET {path}:\n{}", s.chars().take(2500).collect::<String>());
         }
     }
     if let Ok(q) = std::env::var("PROBE_SEARCH") {
-        for (id, s) in rest::search_threads(&conn, GENERAL_AGENT, &q)? {
+        for (id, s) in rest::search_threads(&conn, &q)? {
             println!("  hit {id}: {}", s.chars().take(100).collect::<String>());
         }
     }

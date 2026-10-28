@@ -65,7 +65,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::get_json(&conn, "/api/agents"),
+            move || rest::get(&conn, "/api/agents"),
             |this, r, window, cx| {
                 let Ok(v) = r else {
                     return;
@@ -108,7 +108,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::get_json(&conn, "/api/projects"),
+            move || rest::get(&conn, "/api/projects"),
             move |this, r, _window, cx| {
                 let Ok(v) = r else {
                     return;
@@ -246,11 +246,10 @@ impl BenchApp {
             }
         }
         self.compose_projects();
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, method, &path, &profile, json!({"name": name})),
+            move || rest::send_json(&conn, method, &path, json!({"name": name})),
             |this, r, window, cx| {
                 if let Err(e) = r {
                     this.toast(NotificationType::Error, format!("{e:#}"), window, cx);

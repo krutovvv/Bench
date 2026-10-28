@@ -43,7 +43,7 @@ function mcpView(agent: string) {
 
 const id1 = (m: RegExpMatchArray) => decodeURIComponent(m[1]);
 
-export default ({ rt }: Ctx): Module => ({
+export default ({ rt, publish }: Ctx): Module => ({
 	routes: {
 		// `browser`: the project has the watchable server browser among its MCP servers (Bench
 		// offers /browser only there); `host_browser`: the machine's own agent has it.
@@ -251,8 +251,10 @@ export default ({ rt }: Ctx): Module => ({
 			"POST",
 			/^\/api\/projects\/([^/]+)\/mcp\/([^/]+)\/authorize$/,
 			async (_req, m) => {
-				// The page to open; the server connects again once the browser comes back.
-				return { url: await authorizeServer(envOf(id1(m)).agent, decodeURIComponent(m[2])) };
+				// The page to open; the server connects again once the browser comes back, and Bench
+				// is told the project's environment changed.
+				const project = id1(m);
+				return { url: await authorizeServer(envOf(project).agent, decodeURIComponent(m[2]), () => publish({ type: "env_changed", project })) };
 			},
 		],
 		[

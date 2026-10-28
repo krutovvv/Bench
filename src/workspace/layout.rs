@@ -83,7 +83,7 @@ impl Render for BenchApp {
                 .size_full()
                 .child(self.active_thread.clone())
                 .into_any_element(),
-            Center::Providers => self.render_providers(cx),
+            Center::Settings => self.render_settings(cx),
             Center::Doc => self.render_doc(window, cx),
         };
 

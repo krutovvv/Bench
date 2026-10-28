@@ -92,12 +92,12 @@ pub fn part(key: &str) -> Option<&'static dyn ExplorerParts> {
     PARTS.iter().copied().find(|s| s.key() == key)
 }
 
-/// The agent a project's threads run with: its own (`project:<id>`), or this machine's for the
-/// Host project. Its model, reasoning level and approvals live in that agent's folder, so a
-/// project thinks and asks as it was set to, not as the machine was.
-pub(crate) fn env_agent(id: &str) -> String {
+/// The agent settings a project's threads run with (`rest::with_settings`): its own
+/// (`project:<id>`), or the agent's general ones for the Host. Its reasoning level and approvals
+/// live there, so a project thinks and asks as it was set to, not as the machine was.
+pub(crate) fn settings_of(id: &str) -> String {
     if id == crate::app::model::ProjectKey::HOST {
-        "default".into()
+        crate::app::model::GENERAL_AGENT.into()
     } else {
         format!("project:{id}")
     }
@@ -219,12 +219,11 @@ impl BenchApp {
         let Some((conn, eid)) = self.env_target(id) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!("/api/projects/{eid}/env");
         let asked = id.to_string();
         // How it runs, read from the same agent its threads run with.
         let conn2 = conn.clone();
-        let agent = env_agent(&eid);
+        let agent = settings_of(&eid);
         let asked2 = asked.clone();
         self.background(
             window,
@@ -245,7 +244,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::get_raw(&conn, &profile, &path),
+            move || rest::get(&conn, &path),
             move |this, r, window, cx| {
                 // The name is the sidebar's: a server's Host is named in this Mac's list of agents,
                 // not by the server (`places.rs`).
@@ -295,12 +294,11 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(id) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let id = id.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, method, &path, &profile, body),
+            move || rest::send_json(&conn, method, &path, body),
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     // A new one is made: its form's tab gives way to it when it has a name of its
@@ -391,12 +389,11 @@ impl BenchApp {
         let Some(path) = p.remove_path(&eid, &name) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let id = id.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "DELETE", &path, &profile, Value::Null),
+            move || rest::send_json(&conn, "DELETE", &path, Value::Null),
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     // What was removed was open: its tab closes.

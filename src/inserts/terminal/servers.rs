@@ -1,7 +1,5 @@
 //! The servers of `~/.ssh/config` (a new project picks its machine from them) and the shells of
-//! the terminal inserts. The same file feeds the gateway list: the servers there that can run the
-//! agent (Node 22.18+) show up as gateways by themselves; Bench installs and starts the agent
-//! there on connect.
+//! the terminal inserts. A server's agent is added in the gear (`settings/agent_form.rs`).
 
 use std::sync::Arc;
 

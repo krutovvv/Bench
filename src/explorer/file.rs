@@ -101,12 +101,11 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path) = (f.machine.clone(), f.path.clone());
         self.background(
             window,
             cx,
-            move || rest::read_text(&conn, &profile, machine.as_deref(), &path),
+            move || rest::read_text(&conn, machine.as_deref(), &path),
             move |this, r, window, cx| {
                 let key = DocKey::File(f.clone());
                 let Some(d) = this.explorer.docs.get_mut(&key) else {
@@ -156,12 +155,11 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path, body) = (f.machine.clone(), f.path.clone(), text.clone());
         self.background(
             window,
             cx,
-            move || rest::write_text(&conn, &profile, machine.as_deref(), &path, &body),
+            move || rest::write_text(&conn, machine.as_deref(), &path, &body),
             move |this, r, window, cx| match r {
                 Ok(()) => {
                     if let Some(d) = this.explorer.docs.get_mut(&DocKey::File(f.clone())) {

@@ -20,6 +20,13 @@ impl BenchApp {
         match event {
             Event::ThreadsChanged => self.list_threads(host, cx),
             Event::TasksChanged => self.load_tasks(),
+            // A project's environment shown here is read again.
+            Event::EnvChanged { project } => {
+                let key = crate::app::model::ProjectKey::new(host, &project).to_string();
+                if self.envs.contains_key(&key) {
+                    self.load_env(&key, window, cx);
+                }
+            }
             Event::Thread { thread, event } => {
                 self.on_thread_event(host, &thread, event, window, cx)
             }

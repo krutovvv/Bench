@@ -3,7 +3,7 @@
 //! thread; `BENCH_DEMO=landing` the landing-page chat at the end of its answer, `BENCH_DEMO=top`
 //! at its beginning with the agent's steps unfolded.
 //!
-//! No gateway, nothing of the person's: invented chats in the sidebar and one
+//! No agent, nothing of the person's: invented chats in the sidebar and one
 //! open session that shows what the agent's client can do — steps and a subagent, an answer with
 //! a code block, a chart, a diagram, a formula, a video and a voice reply, its sources, the
 //! files it changed, a process still running. The media live in `assets/demo/`.
@@ -455,7 +455,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
             .ok()
             .and_then(|t| t.parse().ok())
             .unwrap_or(0);
-        app.center = crate::workspace::Center::Providers;
+        app.center = crate::workspace::Center::Settings;
     }
     cx.notify();
 }

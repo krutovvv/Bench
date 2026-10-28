@@ -23,13 +23,13 @@ pub enum Center {
     /// An open document of the Explorer, with the tabs of the others (`src/explorer/view.rs`).
     Doc,
     /// The gear: agents, presets, appearance.
-    Providers,
+    Settings,
 }
 
 impl Center {
     /// A page with its own title and a close in the header (not a thread, not a document).
     pub fn is_settings(self) -> bool {
-        matches!(self, Center::Providers)
+        matches!(self, Center::Settings)
     }
 }
 
@@ -82,7 +82,7 @@ impl BenchApp {
     /// Show `center` in the middle, reading what it needs.
     pub fn open_center(&mut self, center: Center, window: &mut Window, cx: &mut Context<Self>) {
         self.center = center;
-        if center == Center::Providers {
+        if center == Center::Settings {
             self.load_providers(window, cx);
         }
         cx.notify();

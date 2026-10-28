@@ -1,5 +1,5 @@
-//! Bottom bar across the window: where / which profile on the left; context, reasoning effort,
-//! model, gateway restart and settings on the right.
+//! The bar under everything: the agent's state on the left (its log, Reconnect, Restart); the open
+//! thread's context and speed; the fallback answering; terminals sent to the background.
 
 mod agent;
 mod context;
@@ -270,7 +270,7 @@ impl BenchApp {
             // The bar's font: a row's extra-small, like the header and the pane strips.
             .text_xs()
             // Nothing about where the agent runs or which one: a thread runs with its project.
-            // Far left: the gateway of the machine this project lives on — always there, healthy
+            // Far left: the agent of the machine this project lives on — always there, healthy
             // or not; its state in detail, its log, Reconnect and Restart are inside. Then the
             // model, how full its context is, how hard it thinks, what it may run.
             .children(self.render_backend(cx))

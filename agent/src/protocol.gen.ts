@@ -150,7 +150,7 @@ export type StreamKind = "text" | "thought" | "narration";
 
 export type ThreadEvent = { "kind": "append", "value": Array<ThreadItem> } | { "kind": "stream", "value": [StreamKind, string] } | { "kind": "queue", "value": Array<QueuedItem> } | { "kind": "inserts", "value": { [key in string]?: InsertState } } | { "kind": "run", "value": boolean } | { "kind": "holds", "value": Array<Hold> } | { "kind": "process", "value": Process } | { "kind": "asks", "value": Array<Ask> } | { "kind": "info", "value": ThreadInfo } | { "kind": "usage", "value": Usage };
 
-export type Event = { "type": "threads_changed" } | { "type": "thread", thread: ThreadId, event: ThreadEvent, } | { "type": "tasks_changed" };
+export type Event = { "type": "threads_changed" } | { "type": "thread", thread: ThreadId, event: ThreadEvent, } | { "type": "tasks_changed" } | { "type": "env_changed", project: string, };
 
 export type ThreadId = string;
 

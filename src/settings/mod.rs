@@ -16,7 +16,7 @@ use gpui_kit::*;
 use crate::app::BenchApp;
 
 impl BenchApp {
-    pub(crate) fn render_providers(&mut self, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn render_settings(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let mut page: Vec<AnyElement> = vec![];
@@ -134,7 +134,7 @@ impl BenchApp {
         page.extend(self.render_agent_form(cx));
 
         // The shown agent's settings, once read.
-        if !self.pv.loaded {
+        if !self.providers.loaded {
             page.push(
                 div()
                     .py_2p5()
@@ -163,8 +163,8 @@ impl BenchApp {
             )
             .into_any_element(),
         );
-        for i in 0..self.pv.endpoints.len() {
-            let e = &self.pv.endpoints[i];
+        for i in 0..self.providers.endpoints.len() {
+            let e = &self.providers.endpoints[i];
             let (name, url, model, context, parallel, key) = (
                 e.name.clone(),
                 e.url.clone(),
@@ -185,7 +185,7 @@ impl BenchApp {
                 Some(name) => format!("In .env as {name}"),
                 None => "If the server asks for one".into(),
             };
-            let armed = saved && self.pv.armed.as_deref() == Some(e.id.as_str());
+            let armed = saved && self.providers.armed.as_deref() == Some(e.id.as_str());
             let mut actions = vec![self.pv_button(
                 ("ep-delete", i),
                 if armed { "Confirm delete" } else { "Delete" },
@@ -293,7 +293,7 @@ impl BenchApp {
 
         // ---- fallback ----
         page.push(self.pv_heading("FALLBACK", cx).into_any_element());
-        let current = self.pv.fallback.clone();
+        let current = self.providers.fallback.clone();
         let label = current
             .as_ref()
             .map(|(p, m)| {
@@ -350,7 +350,7 @@ impl BenchApp {
         );
 
         // ---- voice ----
-        if let Some(v) = &self.pv.voice {
+        if let Some(v) = &self.providers.voice {
             let v = (
                 v.stt_url.clone(),
                 v.stt_model.clone(),

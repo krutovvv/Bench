@@ -174,7 +174,7 @@ impl BenchApp {
         .detach();
     }
 
-    /// Off-thread work that does not need the gateway connection (git over SSH, etc.).
+    /// Off-thread work that does not need the agent's connection (git over SSH, etc.).
     pub(crate) fn background<T: Send + 'static>(
         &mut self,
         window: &mut Window,

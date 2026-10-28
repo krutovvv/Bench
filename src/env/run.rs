@@ -2,13 +2,13 @@
 //! works in code mode (a script that calls many tools in one step), when its conversations are
 //! summarized (compaction, a share of the model's window): a group of General,
 //! chosen once, not per chat — its threads start on these; the model is one for every project
-//! (the gear). Read from and saved to the agent its threads run with (`env_agent`).
+//! (the gear). Read from and saved to the agent its threads run with (`settings_of`).
 
 use gpui_kit::*;
 use serde_json::json;
 
 use super::section::{Section, SettingsForm, choices};
-use super::{ProjectEnv, env_agent};
+use super::{ProjectEnv, settings_of};
 use crate::app::BenchApp;
 use crate::client::rest;
 use bench_ui::settings_field;
@@ -207,7 +207,7 @@ impl BenchApp {
         let Some((conn, eid)) = self.env_target(&id) else {
             return;
         };
-        let agent = env_agent(&eid);
+        let agent = settings_of(&eid);
         let body = match what {
             "reasoning" => json!({"config": {"agent": {"reasoning_effort": value}}}),
             "compaction" => json!({"config": {"compaction": {"at": value.parse::<f64>().ok()}}}),
@@ -218,7 +218,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "PUT", "/api/config", &agent, body),
+            move || rest::send_json(&conn, "PUT", &rest::with_settings("/api/config", &agent), body),
             move |this, r, window, cx| match r {
                 Ok(_) => this.load_env(&asked, window, cx),
                 Err(err) => {

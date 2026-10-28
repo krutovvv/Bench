@@ -36,7 +36,7 @@ pub struct Fetched {
 
 const MAX_DOWNLOAD: u64 = 512 << 20;
 
-/// The file itself, when the gateway runs on this Mac and it is there.
+/// The file itself, when the agent runs on this Mac and it is there.
 fn on_this_mac(target: &Target, path: &str) -> Option<PathBuf> {
     let p = match path.strip_prefix("~/") {
         Some(rest) => home().join(rest),
@@ -55,25 +55,24 @@ pub fn fetch_now(target: &Target, path: &str) -> Option<Fetched> {
     prepare(local, path).ok()
 }
 
-/// Bring a delivered file here (a local gateway's files are read in place) and prepare its
+/// Bring a delivered file here (a local agent's files are read in place) and prepare its
 /// preview. Blocking: call off the UI thread.
 /// `machine`: the file is on that machine, not the agent's own (a project worked over SSH).
 pub fn fetch(
     conn: &Connection,
     target: &Target,
     machine: Option<&str>,
-    profile: &str,
     path: &str,
 ) -> Result<Fetched> {
     let local = match on_this_mac(target, path) {
         Some(p) => p,
-        None => download(conn, target, machine, profile, path)?,
+        None => download(conn, target, machine, path)?,
     };
     prepare(local, path)
 }
 
 /// A local file prepared now (its video frame drawn), so the first paint already has it — for
-/// the demo, which has no gateway to fetch through.
+/// the demo, which has no agent to fetch through.
 pub fn warm(path: &str) {
     let _ = prepare(PathBuf::from(path), path);
 }
@@ -108,13 +107,12 @@ fn download(
     conn: &Connection,
     target: &Target,
     machine: Option<&str>,
-    profile: &str,
     path: &str,
 ) -> Result<PathBuf> {
-    let bytes = rest::download(conn, profile, machine, path, MAX_DOWNLOAD)?;
+    let bytes = rest::download(conn, machine, path, MAX_DOWNLOAD)?;
     let dir = state_dir()
         .join("media")
-        .join(hash_of(&[&target.label(), profile, path]));
+        .join(hash_of(&[&target.label(), path]));
     std::fs::create_dir_all(&dir)?;
     let file = dir.join(file_name(path));
     std::fs::write(&file, bytes)?;

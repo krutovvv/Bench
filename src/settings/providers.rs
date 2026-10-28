@@ -1,4 +1,4 @@
-//! Settings → Providers and Messages, for the current machine and profile, through the agent's
+//! Settings → Providers and Messages, for an agent (the gear's), through the agent's
 //! API: providers (OpenAI-compatible endpoints, OpenRouter among them), the fallback model,
 //! voice (speech to text, text to speech) and Telegram. A key is set
 //! on the card that uses it, never in a list of names.
@@ -103,7 +103,7 @@ impl BenchApp {
             return;
         }
         self.gear_agent = host;
-        self.pv = Default::default();
+        self.providers = Default::default();
         self.load_providers(window, cx);
         cx.notify();
     }
@@ -113,11 +113,11 @@ impl BenchApp {
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn, profile| {
-                let endpoints = rest::custom_endpoints(conn, profile)?;
-                let env = rest::env_vars(conn, profile)?;
+            move |conn| {
+                let endpoints = rest::custom_endpoints(conn)?;
+                let env = rest::env_vars(conn)?;
                 let yaml: Value =
-                    serde_yaml::from_str(&rest::config_raw(conn, profile)?).unwrap_or(Value::Null);
+                    serde_yaml::from_str(&rest::config_raw(conn)?).unwrap_or(Value::Null);
                 Ok((endpoints, env, yaml))
             },
             |this, r, window, cx| match r {
@@ -158,7 +158,7 @@ impl BenchApp {
                 )
             })
             .collect();
-        self.pv.endpoints = endpoints["endpoints"]
+        self.providers.endpoints = endpoints["endpoints"]
             .as_array()
             .into_iter()
             .flatten()
@@ -200,7 +200,7 @@ impl BenchApp {
             .collect();
 
         let f = &yaml["fallback_providers"][0];
-        self.pv.fallback = f["model"].as_str().map(|m| {
+        self.providers.fallback = f["model"].as_str().map(|m| {
             (
                 f["provider"].as_str().unwrap_or_default().to_string(),
                 m.to_string(),
@@ -214,7 +214,7 @@ impl BenchApp {
             }
             v.as_str().unwrap_or_default().to_string()
         };
-        self.pv.voice = Some(Voice {
+        self.providers.voice = Some(Voice {
             stt_url: field(
                 window,
                 cx,
@@ -254,20 +254,20 @@ impl BenchApp {
             tts_voice: field(window, cx, &y(&["tts", "openai", "voice"]), "e.g. alloy"),
         });
 
-        self.pv.loaded = true;
+        self.providers.loaded = true;
         cx.notify();
     }
 
     // ---- actions ----------------------------------------------------------------------
 
-    /// After a save that changes what the profile offers: reload both lists.
+    /// After a save that changes what the agent offers: reload both lists.
     fn providers_changed(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.load_providers(window, cx);
         self.load_agent_settings(window, cx);
     }
 
     pub fn add_endpoint(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.pv.endpoints.push(EndpointForm {
+        self.providers.endpoints.push(EndpointForm {
             id: String::new(),
             current: false,
             key_value: String::new(),
@@ -284,7 +284,7 @@ impl BenchApp {
     }
 
     fn endpoint_body(&self, i: usize, cx: &App) -> Value {
-        let e = &self.pv.endpoints[i];
+        let e = &self.providers.endpoints[i];
         let mut body = json!({
             "id": e.id,
             "name": text(&e.name, cx),
@@ -310,7 +310,7 @@ impl BenchApp {
         if body["name"].as_str().unwrap_or_default().is_empty()
             || body["base_url"].as_str().unwrap_or_default().is_empty()
         {
-            self.pv.endpoints[i].check = Some((false, "Enter a name and an address".into()));
+            self.providers.endpoints[i].check = Some((false, "Enter a name and an address".into()));
             cx.notify();
             return;
         }
@@ -318,7 +318,7 @@ impl BenchApp {
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn, profile| rest::save_endpoint(conn, profile, body),
+            move |conn| rest::save_endpoint(conn, body),
             |this, r, window, cx| match r {
                 Ok(_) => {
                     this.toast(NotificationType::Success, "Provider saved", window, cx);
@@ -336,15 +336,15 @@ impl BenchApp {
 
     pub fn check_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         let body = self.endpoint_body(i, cx);
-        self.pv.endpoints[i].check = Some((true, "Checking…".into()));
+        self.providers.endpoints[i].check = Some((true, "Checking…".into()));
         cx.notify();
         self.rest_on(
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn, profile| rest::validate_endpoint(conn, profile, body),
+            move |conn| rest::validate_endpoint(conn, body),
             move |this, r, _, cx| {
-                let Some(e) = this.pv.endpoints.get_mut(i) else {
+                let Some(e) = this.providers.endpoints.get_mut(i) else {
                     return;
                 };
                 e.check = Some(match r {
@@ -367,12 +367,12 @@ impl BenchApp {
     }
 
     pub fn make_endpoint_default(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let id = self.pv.endpoints[i].id.clone();
+        let id = self.providers.endpoints[i].id.clone();
         self.rest_on(
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn, profile| rest::activate_endpoint(conn, profile, &id),
+            move |conn| rest::activate_endpoint(conn, &id),
             |this, r, window, cx| match r {
                 Ok(()) => this.providers_changed(window, cx),
                 Err(e) => this.toast(
@@ -387,23 +387,23 @@ impl BenchApp {
 
     /// Delete a provider: a form not saved yet just goes; a saved one goes on the second click.
     pub fn delete_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let id = self.pv.endpoints[i].id.clone();
+        let id = self.providers.endpoints[i].id.clone();
         if id.is_empty() {
-            self.pv.endpoints.remove(i);
+            self.providers.endpoints.remove(i);
             cx.notify();
             return;
         }
-        if self.pv.armed.as_deref() != Some(&id) {
-            self.pv.armed = Some(id);
+        if self.providers.armed.as_deref() != Some(&id) {
+            self.providers.armed = Some(id);
             cx.notify();
             return;
         }
-        self.pv.armed = None;
+        self.providers.armed = None;
         self.rest_on(
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn, profile| rest::delete_endpoint(conn, profile, &id),
+            move |conn| rest::delete_endpoint(conn, &id),
             |this, r, window, cx| match r {
                 Ok(()) => this.providers_changed(window, cx),
                 Err(e) => this.toast(
@@ -427,14 +427,14 @@ impl BenchApp {
             Some((p, m)) => json!([{"provider": p, "model": m}]),
             None => json!([]),
         };
-        self.pv.fallback = pick;
+        self.providers.fallback = pick;
         cx.notify();
         self.rest_on(
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn, profile| {
-                rest::merge_config(conn, profile, json!({"fallback_providers": list}))
+            move |conn| {
+                rest::merge_config(conn, json!({"fallback_providers": list}))
             },
             |this, r, window, cx| match r {
                 Ok(()) => this.load_agent_settings(window, cx),
@@ -449,7 +449,7 @@ impl BenchApp {
     }
 
     pub fn save_voice(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(v) = &self.pv.voice else { return };
+        let Some(v) = &self.providers.voice else { return };
         let mut stt = json!({
             "base_url": text(&v.stt_url, cx),
             "model": text(&v.stt_model, cx),
@@ -469,7 +469,7 @@ impl BenchApp {
             self.gear_agent.clone(),
             window,
             cx,
-            move |conn, profile| rest::merge_config(conn, profile, config),
+            move |conn| rest::merge_config(conn, config),
             |this, r, window, cx| match r {
                 Ok(()) => this.toast(NotificationType::Success, "Voice saved", window, cx),
                 Err(e) => this.toast(NotificationType::Error, format!("Voice: {e:#}"), window, cx),

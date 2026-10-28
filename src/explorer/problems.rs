@@ -92,7 +92,6 @@ impl BenchApp {
         let Some((conn, id)) = self.env_target(&project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.explorer
             .problems
             .entry(project.clone())
@@ -100,7 +99,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || lsp::problems(&conn, &profile, &id),
+            move || lsp::problems(&conn, &id),
             move |this, r, window, cx| {
                 match r {
                     Ok(found) => {

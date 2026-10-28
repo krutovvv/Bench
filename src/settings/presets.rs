@@ -88,7 +88,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::get_json(&conn, "/api/presets"),
+            move || rest::get(&conn, "/api/presets"),
             |this, r, window, cx| {
                 if let Ok(v) = r {
                     this.set_presets(Presets::from(&v), window, cx);
@@ -131,7 +131,6 @@ impl BenchApp {
         };
         let kind = ed.kind;
         let text = ed.text.read(cx).value().to_string();
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
@@ -140,7 +139,6 @@ impl BenchApp {
                     &conn,
                     "PUT",
                     &format!("/api/presets/{kind}"),
-                    &profile,
                     json!({"text": text, "reset": reset}),
                 )
             },

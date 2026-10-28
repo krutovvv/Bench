@@ -213,7 +213,7 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// Debounced: only the last query typed within 300 ms goes to the gateway.
+    /// Debounced: only the last query typed within 300 ms goes to the agent.
     pub(crate) fn search_threads(
         &mut self,
         q: String,
@@ -242,7 +242,7 @@ impl BenchApp {
                 this.rest(
                     window,
                     cx,
-                    move |conn, profile| rest::search_threads(conn, profile, &q),
+                    move |conn| rest::search_threads(conn, &q),
                     move |this, r, _, cx| {
                         if this.search_seq == seq {
                             this.search_hits = Some(r.unwrap_or_default());

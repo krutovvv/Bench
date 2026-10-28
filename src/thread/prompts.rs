@@ -20,12 +20,11 @@ impl BenchApp {
         let Some((conn, eid)) = target else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!("/api/projects/{eid}/prompts");
         self.background(
             window,
             cx,
-            move || rest::get_raw(&conn, &profile, &path),
+            move || rest::get(&conn, &path),
             |this, r, _, cx| {
                 if let Ok(v) = r {
                     this.prompts = v["prompts"]

@@ -1,4 +1,5 @@
-//! Left column: where, which profile, navigation, sessions (grouped by source), status bar.
+//! The threads panel (the left dock's): the projects, each with its threads, the Host first; the
+//! search over them.
 
 pub(crate) mod items;
 pub(crate) mod marks;

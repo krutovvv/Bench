@@ -1,4 +1,4 @@
-//! Plain data shared by the gateway thread and the UI.
+//! Plain data shared by the agent's session and the UI.
 
 use serde_json::Value;
 
@@ -221,7 +221,7 @@ pub fn source_label(source: &str) -> String {
     }
 }
 
-/// A slash command from the gateway's catalog, a saved prompt, or a tool to attach to the
+/// A slash command from the agent's commands, a saved prompt, or a tool to attach to the
 /// thread (`/tasks today`).
 #[derive(Clone, Debug, Default)]
 pub struct SlashCommand {
@@ -300,7 +300,7 @@ impl Repo {
 }
 
 /// A saved text snippet (Settings → Prompts), inserted from the composer with `@`: a Markdown
-/// file `<profile home>/prompts/<title>.md` on the gateway's machine.
+/// file `<agent home>/prompts/<title>.md` on the agent's machine.
 #[derive(Clone, Debug, Default)]
 pub struct Prompt {
     pub title: String,

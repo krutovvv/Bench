@@ -2,7 +2,7 @@
 //! Everything that talks to a server — the terminal, the IDE's files, the ssh-mcp server the
 //! agent uses — goes through the same ControlMaster socket in `~/.ssh/cm/` (one login per
 //! server, kept 10 idle minutes), so only the first of them logs in. The user's ssh config is
-//! never changed; the gateway connection (`connection.rs`) keeps its own tunnel.
+//! never changed; the agent's connection (`connection.rs`) keeps its own tunnel.
 
 use std::io::{Read, Write};
 use std::path::PathBuf;

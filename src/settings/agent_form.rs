@@ -117,7 +117,6 @@ impl BenchApp {
         } else {
             typed_name
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
@@ -126,7 +125,6 @@ impl BenchApp {
                     &conn,
                     "POST",
                     "/api/agents",
-                    &profile,
                     json!({"name": name, "host": alias}),
                 )
             },
@@ -156,15 +154,14 @@ impl BenchApp {
         };
         if self.gear_agent == host {
             self.gear_agent.clear();
-            self.pv = Default::default();
+            self.providers = Default::default();
             self.load_providers(window, cx);
         }
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!("/api/agents/{host}");
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "DELETE", &path, &profile, json!(null)),
+            move || rest::send_json(&conn, "DELETE", &path, json!(null)),
             |this, r, window, cx| {
                 if let Err(e) = r {
                     this.toast(NotificationType::Error, format!("{e:#}"), window, cx);

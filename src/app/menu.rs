@@ -25,7 +25,7 @@ pub fn install(cx: &mut App) {
 }
 
 impl BenchApp {
-    /// Bench → New Window: another window on this one's agent and profile (`marks.rs`).
+    /// Bench → New Window: another window (`marks.rs`).
     pub fn on_new_window(&mut self, _: &NewWindow, _: &mut Window, cx: &mut Context<Self>) {
         self.open_window(None, cx);
     }
@@ -37,11 +37,11 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.center == Center::Providers {
+        if self.center == Center::Settings {
             self.center = Center::Chat;
             cx.notify();
         } else {
-            self.open_center(Center::Providers, window, cx);
+            self.open_center(Center::Settings, window, cx);
         }
     }
 }

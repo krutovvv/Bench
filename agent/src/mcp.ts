@@ -136,7 +136,7 @@ function httpTransport(agent: string, name: string, spec: any, provider = oauthP
 }
 
 /** Sign in to an agent's HTTP MCP server: the page to open in the browser ("" when no sign-in was needed). */
-export async function authorizeServer(agent: string, name: string): Promise<string> {
+export async function authorizeServer(agent: string, name: string, connected?: () => void): Promise<string> {
 	let spec = fill(agentMcp(agent)[name], profileEnv(agent));
 	if (!spec?.url) throw new Error(`no HTTP MCP server "${name}"`);
 	// Its own Authorization header the server refuses (an expired key): signing in replaces it with
@@ -166,7 +166,10 @@ export async function authorizeServer(agent: string, name: string): Promise<stri
 			await withTimeout(client.connect(httpTransport(agent, name, spec, provider)), 30000, "connect timed out");
 			await client.close().catch(() => {});
 		},
-		() => connectMcp(agent),
+		async () => {
+			await connectMcp(agent);
+			connected?.();
+		},
 	);
 }
 

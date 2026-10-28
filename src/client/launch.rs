@@ -2,7 +2,7 @@
 //! installs and starts it on this Mac and, over SSH, on another machine, then speaks its
 //! protocol (JSON-RPC over `/api/ws?token=`, REST under `/api/` with `X-Bench-Token`).
 //!
-//! * Its home is `~/.bench` on each machine: `bench.sqlite`, `pi.sqlite`, `profiles/`,
+//! * Its home is `~/.bench` on each machine: `bench.sqlite`, `pi.sqlite`, `agents/`, `projects/`,
 //!   `extensions/`, and `app/` — the installed server, copied from the sources this app carries
 //!   (`Contents/Resources/agent`, or this repo's `agent/` for a dev build); `npm ci` runs there
 //!   when `package-lock.json` changed. Node 22.18+ is needed.

@@ -12,10 +12,9 @@ Bench is a native desktop **workbench for working with an AI agent**. It is an o
 thread-centric app, written from scratch in Rust and GPUI
 (gpui-kit 0.8). It is a client of its own agent in `agent/`, a Node server on **Pi Durable**.
 
-Bench is not a kit for building other apps, and it has nothing to do with Hermes. Hermes was an
-earlier agent, now gone; a few wire names (the `X-Hermes-Session-Token` header, "profile" in the
-protocol) are kept only so older agents on servers keep answering. There are no profiles for the
-person: there are projects.
+Bench is not a kit for building other apps, and it has nothing to do with Hermes (an earlier
+agent, now gone, with nothing of it left on the wire). There are no profiles for the person: there
+are projects. A server's agent is always reinstalled to match this Bench (`launch.rs`).
 
 ## The concepts (keep them exact)
 

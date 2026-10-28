@@ -316,7 +316,7 @@ pub fn agent_log(target: &Target, lines: usize) -> Vec<String> {
         .collect()
 }
 
-/// Run `git -C dir args…` where the gateway lives (this Mac, or the SSH host); stdout trimmed.
+/// Run `git -C dir args…` where the agent lives (this Mac, or the SSH host); stdout trimmed.
 pub fn git(target: &Target, dir: &str, args: &[&str]) -> Result<String> {
     let out = match target {
         Target::Local => Command::new("git").arg("-C").arg(dir).args(args).output()?,

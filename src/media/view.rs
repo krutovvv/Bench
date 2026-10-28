@@ -121,12 +121,12 @@ impl BenchApp {
             return; // a fresh copy is already on its way
         }
         self.media.insert(key.clone(), Loaded::Pending);
-        let (target, profile) = (self.thread_target(at), crate::app::model::GENERAL_AGENT.to_string());
+        let target = self.thread_target(at);
         let machine = self.files_machine(at);
         cx.spawn(async move |this, cx| {
             let r = cx
                 .background_spawn(async move {
-                    media::fetch(&conn, &target, machine.as_deref(), &profile, &path)
+                    media::fetch(&conn, &target, machine.as_deref(), &path)
                 })
                 .await;
             let _ = this.update(cx, |this, cx| {

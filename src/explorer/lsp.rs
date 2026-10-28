@@ -26,7 +26,6 @@ const PATH: &AsciiSet = &CONTROLS.add(b' ').add(b'#').add(b'?').add(b'%');
 #[derive(Clone)]
 struct Servers {
     conn: Arc<Connection>,
-    profile: String,
     /// The project's id at its agent.
     project: String,
     file: FileRef,
@@ -57,7 +56,7 @@ impl HoverProvider for Servers {
             text.to_string(),
         );
         cx.background_spawn(async move {
-            let md = lsp::hover(&s.conn, &s.profile, &s.asked(&text), at)?;
+            let md = lsp::hover(&s.conn, &s.asked(&text), at)?;
             Ok((!md.is_empty()).then(|| lsp_types::Hover {
                 contents: lsp_types::HoverContents::Markup(lsp_types::MarkupContent {
                     kind: lsp_types::MarkupKind::Markdown,
@@ -83,7 +82,7 @@ impl DefinitionProvider for Servers {
             text.to_string(),
         );
         cx.background_spawn(async move {
-            let places = lsp::definition(&s.conn, &s.profile, &s.asked(&text), at)?;
+            let places = lsp::definition(&s.conn, &s.asked(&text), at)?;
             Ok(places
                 .into_iter()
                 .filter_map(|(path, range)| {
@@ -119,7 +118,6 @@ impl BenchApp {
         };
         let servers = Rc::new(Servers {
             conn,
-            profile: crate::app::model::GENERAL_AGENT.to_string(),
             project,
             file: f.clone(),
         });
@@ -174,7 +172,6 @@ impl BenchApp {
         let Some((conn, project)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path) = (f.machine.clone(), f.path.clone());
         let project_key = f.project.clone();
         let task = cx.spawn_in(window, async move |this, cx| {
@@ -189,7 +186,7 @@ impl BenchApp {
                         path: &path,
                         text: &sent,
                     };
-                    lsp::diagnostics(&conn, &profile, &a)
+                    lsp::diagnostics(&conn, &a)
                 })
                 .await;
             // No server for this kind of file, or the agent did not answer: nothing underlined.

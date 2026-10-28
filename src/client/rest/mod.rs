@@ -17,25 +17,24 @@ use serde_json::{Value, json};
 
 use crate::client::connection::Connection;
 
-/// A route of the agent, for the agent settings `agent` ("default": its general ones; a
-/// project's: `project:<id>`).
-fn url(conn: &Connection, path: &str, agent: &str) -> String {
-    let sep = if path.contains('?') { '&' } else { '?' };
-    if agent.is_empty() || agent == "default" {
-        format!("{}{path}", conn.base)
-    } else {
-        format!("{}{path}{sep}agent={agent}", conn.base)
+fn url(conn: &Connection, path: &str) -> String {
+    format!("{}{path}", conn.base)
+}
+
+/// A route about agent settings, for the settings `settings` names: "default" (or "") the agent's
+/// general ones, `project:<id>` a project's (`env::settings_of`).
+pub fn with_settings(path: &str, settings: &str) -> String {
+    if settings.is_empty() || settings == crate::app::model::GENERAL_AGENT {
+        return path.to_string();
     }
+    let sep = if path.contains('?') { '&' } else { '?' };
+    format!("{path}{sep}agent={settings}")
 }
 
-/// A GET answered with JSON, for what is no one agent's (the agent's status).
-pub fn get_json(conn: &Connection, path: &str) -> Result<Value> {
-    get(conn, path, "")
-}
-
-fn get(conn: &Connection, path: &str, agent: &str) -> Result<Value> {
+/// A GET answered with JSON.
+pub fn get(conn: &Connection, path: &str) -> Result<Value> {
     let (h, v) = conn.auth();
-    let resp = ureq::get(&url(conn, path, agent))
+    let resp = ureq::get(&url(conn, path))
         .set(h, &v)
         .timeout(Duration::from_secs(30))
         .call();
@@ -61,10 +60,9 @@ pub fn send_json(
     conn: &Connection,
     method: &str,
     path: &str,
-    agent: &str,
     body: Value,
 ) -> Result<Value> {
-    send(conn, method, path, agent, body, 30)
+    send(conn, method, path, body, 30)
 }
 
 /// A JSON request that waits `secs`. Asking the MCP servers to answer is the one job that can
@@ -74,23 +72,21 @@ pub fn send_json_secs(
     conn: &Connection,
     method: &str,
     path: &str,
-    agent: &str,
     body: Value,
     secs: u64,
 ) -> Result<Value> {
-    send(conn, method, path, agent, body, secs)
+    send(conn, method, path, body, secs)
 }
 
 fn send(
     conn: &Connection,
     method: &str,
     path: &str,
-    agent: &str,
     body: Value,
     timeout: u64,
 ) -> Result<Value> {
     let (h, v) = conn.auth();
-    let resp = ureq::request(method, &url(conn, path, agent))
+    let resp = ureq::request(method, &url(conn, path))
         .set(h, &v)
         .timeout(Duration::from_secs(timeout))
         .send_json(body);
@@ -108,11 +104,10 @@ fn send(
 }
 
 /// Full-text search over thread titles and message content: (thread id, snippet).
-pub fn search_threads(conn: &Connection, agent: &str, q: &str) -> Result<Vec<(String, String)>> {
+pub fn search_threads(conn: &Connection, q: &str) -> Result<Vec<(String, String)>> {
     let v = get(
         conn,
         &format!("/api/threads/search?q={}&limit=30", enc(q)),
-        agent,
     )?;
     Ok(v["results"]
         .as_array()
@@ -159,8 +154,8 @@ pub fn provider_group(provider: &str, yaml: &Value) -> String {
     }
 }
 
-pub fn agent_defaults(conn: &Connection, agent: &str) -> Result<AgentDefaults> {
-    let raw = get(conn, "/api/config/raw", agent)?;
+pub fn agent_defaults(conn: &Connection, settings: &str) -> Result<AgentDefaults> {
+    let raw = get(conn, &with_settings("/api/config/raw", settings))?;
     let yaml: Value =
         serde_yaml::from_str(raw["yaml"].as_str().unwrap_or_default()).unwrap_or(Value::Null);
     let effort = yaml["agent"]["reasoning_effort"]
@@ -243,19 +238,18 @@ fn data_url_bytes(url: &str) -> Result<Vec<u8>> {
 }
 
 /// Text -> audio bytes (mp3 or wav, as the agent's TTS provider returns).
-pub fn speak(conn: &Connection, agent: &str, text: &str) -> Result<Vec<u8>> {
+pub fn speak(conn: &Connection, text: &str) -> Result<Vec<u8>> {
     let v = send(
         conn,
         "POST",
         "/api/audio/speak",
-        agent,
         json!({"text": text}),
         180,
     )?;
     data_url_bytes(v["data_url"].as_str().unwrap_or_default())
 }
 
-pub fn transcribe(conn: &Connection, agent: &str, wav: &[u8]) -> Result<String> {
+pub fn transcribe(conn: &Connection, wav: &[u8]) -> Result<String> {
     let data_url = format!(
         "data:audio/wav;base64,{}",
         base64::engine::general_purpose::STANDARD.encode(wav)
@@ -264,7 +258,6 @@ pub fn transcribe(conn: &Connection, agent: &str, wav: &[u8]) -> Result<String> 
         conn,
         "POST",
         "/api/audio/transcribe",
-        agent,
         json!({"data_url": data_url, "mime_type": "audio/wav"}),
         180,
     )?;
@@ -276,13 +269,13 @@ pub fn transcribe(conn: &Connection, agent: &str, wav: &[u8]) -> Result<String> 
 }
 
 /// The agent's config.yaml as text.
-pub fn config_raw(conn: &Connection, agent: &str) -> Result<String> {
-    let raw = get(conn, "/api/config/raw", agent)?;
+pub fn config_raw(conn: &Connection) -> Result<String> {
+    let raw = get(conn, "/api/config/raw")?;
     Ok(raw["yaml"].as_str().unwrap_or_default().to_string())
 }
 
-pub fn default_cwd(conn: &Connection, agent: &str) -> Result<String> {
-    let v = get(conn, "/api/fs/default-cwd", agent)?;
+pub fn default_cwd(conn: &Connection) -> Result<String> {
+    let v = get(conn, "/api/fs/default-cwd")?;
     Ok(v["cwd"].as_str().unwrap_or_default().to_string())
 }
 
@@ -297,14 +290,9 @@ fn enc(s: &str) -> String {
         .collect()
 }
 
-/// Raw GET, for diagnostics (`--probe`).
-pub fn get_raw(conn: &Connection, agent: &str, path: &str) -> Result<Value> {
-    get(conn, path, agent)
-}
-
 /// Where attachments go on the agent's machine: `~/.bench/attachments` in its home.
 pub fn attachments_dir(conn: &Connection) -> Result<String> {
-    let v = get(conn, "/api/chat/workspaces", "")?;
+    let v = get(conn, "/api/chat/workspaces")?;
     let home = v["home"]
         .as_str()
         .ok_or_else(|| anyhow!("home folder unknown"))?;

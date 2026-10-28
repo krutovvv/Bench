@@ -19,7 +19,7 @@ impl BenchApp {
                     self.rest(
                         window,
                         cx,
-                        move |c, p| rest::transcribe(c, p, &wav),
+                        move |c| rest::transcribe(c, &wav),
                         |this, r, window, cx| {
                             this.transcribing = false;
                             let send = std::mem::take(&mut this.send_after_transcribe);
@@ -124,7 +124,7 @@ impl BenchApp {
         self.rest(
             window,
             cx,
-            move |c, p| rest::speak(c, p, &text),
+            move |c| rest::speak(c, &text),
             move |this, r, window, cx| {
                 this.speaking = None;
                 match r {

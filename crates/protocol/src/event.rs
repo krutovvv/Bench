@@ -1,5 +1,6 @@
 //! What the agent tells Bench without being asked: a thread changed, the list of threads
-//! changed, the tasks changed. Every event names what it is about.
+//! changed, the tasks changed, a project's environment changed. Every event names what it is
+//! about.
 
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -16,4 +17,7 @@ pub enum Event {
     Thread { thread: ThreadId, event: ThreadEvent },
     /// The person's tasks changed (the `tasks` tool, another client).
     TasksChanged,
+    /// A project's environment changed by itself (an MCP server connected after its sign-in in
+    /// the browser): `project` is its id at the agent, "general" for the agent's Host.
+    EnvChanged { project: String },
 }

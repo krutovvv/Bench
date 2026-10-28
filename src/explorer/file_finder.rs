@@ -52,7 +52,6 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&root.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let path = format!(
             "/api/fs/files?path={}{}",
             enc(&root.path),
@@ -64,7 +63,7 @@ impl BenchApp {
         self.background(
             window,
             cx,
-            move || rest::get_raw(&conn, &profile, &path),
+            move || rest::get(&conn, &path),
             move |this, r, window, cx| {
                 match r {
                     Ok(v) => {

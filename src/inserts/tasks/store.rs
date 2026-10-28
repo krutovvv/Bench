@@ -36,22 +36,21 @@ pub struct TaskStore {
 }
 
 impl TaskStore {
-    pub fn start(conn: Arc<Connection>, profile: String, evt: async_channel::Sender<Evt>) -> Self {
+    pub fn start(conn: Arc<Connection>, evt: async_channel::Sender<Evt>) -> Self {
         let (tx, rx) = mpsc::channel::<Cmd>();
         std::thread::spawn(move || {
             for cmd in rx {
                 let r = match cmd {
                     Cmd::Load { done_since } => {
-                        load(&conn, &profile, done_since).map(Evt::Loaded).map(Some)
+                        load(&conn, done_since).map(Evt::Loaded).map(Some)
                     }
                     Cmd::Save { task, token } => {
-                        save(&conn, &profile, &task).map(|id| Some(Evt::Created { token, id }))
+                        save(&conn, &task).map(|id| Some(Evt::Created { token, id }))
                     }
                     Cmd::Delete(id) => crate::client::rest::send_json(
                         &conn,
                         "DELETE",
                         &format!("/api/tasks/{id}"),
-                        &profile,
                         Value::Null,
                     )
                     .map(|_| None),
@@ -115,10 +114,9 @@ fn to_json(t: &Task) -> Value {
     })
 }
 
-fn load(conn: &Connection, profile: &str, done_since: NaiveDate) -> Result<Vec<Task>> {
-    let v = crate::client::rest::get_raw(
+fn load(conn: &Connection, done_since: NaiveDate) -> Result<Vec<Task>> {
+    let v = crate::client::rest::get(
         conn,
-        profile,
         &format!("/api/tasks?done_since={}", done_since.format("%Y-%m-%d")),
     )?;
     let mut out: Vec<Task> = v["tasks"]
@@ -131,15 +129,14 @@ fn load(conn: &Connection, profile: &str, done_since: NaiveDate) -> Result<Vec<T
     Ok(out)
 }
 
-fn save(conn: &Connection, profile: &str, t: &Task) -> Result<String> {
+fn save(conn: &Connection, t: &Task) -> Result<String> {
     let v = if t.id.is_empty() {
-        crate::client::rest::send_json(conn, "POST", "/api/tasks", profile, to_json(t))?
+        crate::client::rest::send_json(conn, "POST", "/api/tasks", to_json(t))?
     } else {
         crate::client::rest::send_json(
             conn,
             "PUT",
             &format!("/api/tasks/{}", t.id),
-            profile,
             to_json(t),
         )?
     };

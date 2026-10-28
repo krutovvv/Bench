@@ -238,7 +238,7 @@ impl BenchApp {
     /// An agent came up: what waited for it is asked now — its threads, the gear showing it, the
     /// servers this Mac knows and the tasks (this Mac's), a server's own projects.
     pub fn agent_up(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
-        if self.center == super::Center::Providers && self.gear_agent == host && !self.pv.loaded {
+        if self.center == super::Center::Settings && self.gear_agent == host && !self.providers.loaded {
             self.load_providers(window, cx);
         }
         if host.is_empty() {
@@ -270,7 +270,7 @@ impl BenchApp {
         cx.spawn(async move |this, cx| {
             let build = cx
                 .background_spawn(async move {
-                    crate::client::rest::get_json(&conn, "/api/status")
+                    crate::client::rest::get(&conn, "/api/status")
                         .ok()
                         .and_then(|v| v["build"].as_str().map(str::to_string))
                 })
@@ -285,26 +285,24 @@ impl BenchApp {
         .detach();
     }
 
-    /// Run `job` off the UI thread with this Mac's agent and its general settings ("default"),
-    /// then `done` on the UI thread.
+    /// Run `job` off the UI thread with this Mac's agent, then `done` on the UI thread.
     pub(crate) fn rest<T: Send + 'static>(
         &mut self,
         window: &mut Window,
         cx: &mut Context<Self>,
-        job: impl FnOnce(&Connection, &str) -> anyhow::Result<T> + Send + 'static,
+        job: impl FnOnce(&Connection) -> anyhow::Result<T> + Send + 'static,
         done: impl FnOnce(&mut Self, anyhow::Result<T>, &mut Window, &mut Context<Self>) + 'static,
     ) {
         self.rest_on(String::new(), window, cx, job, done);
     }
 
-    /// Run `job` off the UI thread with the agent under `host` and its general settings, then
-    /// `done` on the UI thread.
+    /// Run `job` off the UI thread with the agent under `host`, then `done` on the UI thread.
     pub(crate) fn rest_on<T: Send + 'static>(
         &mut self,
         host: String,
         window: &mut Window,
         cx: &mut Context<Self>,
-        job: impl FnOnce(&Connection, &str) -> anyhow::Result<T> + Send + 'static,
+        job: impl FnOnce(&Connection) -> anyhow::Result<T> + Send + 'static,
         done: impl FnOnce(&mut Self, anyhow::Result<T>, &mut Window, &mut Context<Self>) + 'static,
     ) {
         let Some(conn) = self.conn_of(&host) else {
@@ -312,7 +310,7 @@ impl BenchApp {
         };
         cx.spawn_in(window, async move |this, cx| {
             let result = cx
-                .background_spawn(async move { job(&conn, crate::app::model::GENERAL_AGENT) })
+                .background_spawn(async move { job(&conn) })
                 .await;
             let _ = this.update_in(cx, |this, window, cx| {
                 done(this, result, window, cx);

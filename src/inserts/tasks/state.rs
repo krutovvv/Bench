@@ -210,7 +210,7 @@ impl BenchApp {
             return;
         };
         let (tx, rx) = async_channel::unbounded();
-        self.tasks.store = Some(TaskStore::start(conn, crate::app::model::GENERAL_AGENT.to_string(), tx));
+        self.tasks.store = Some(TaskStore::start(conn, tx));
         cx.spawn(async move |this, cx| {
             while let Ok(evt) = rx.recv().await {
                 if this

@@ -14,11 +14,10 @@ impl BenchApp {
         let Some(conn) = self.local_conn() else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
-            move || rest::get_raw(&conn, &profile, "/api/projects"),
+            move || rest::get(&conn, "/api/projects"),
             |this, r, _window, cx| {
                 if let Ok(v) = r {
                     this.local_projects = v["projects"]
@@ -67,11 +66,10 @@ impl BenchApp {
             return;
         };
         let path = format!("/api/projects/{}", key.id);
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "DELETE", &path, &profile, serde_json::Value::Null),
+            move || rest::send_json(&conn, "DELETE", &path, serde_json::Value::Null),
             move |this, r, window, cx| match r {
                 Ok(_) => {
                     this.local_projects.retain(|p| p.id != id);

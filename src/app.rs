@@ -1,4 +1,4 @@
-//! Application state, gateway events and user actions. Rendering lives with each area of the window
+//! Application state, the agents' events and user actions. Rendering lives with each area of the window
 //! (`workspace/`, `titlebar/`, `sidebar/`, `thread/`, `settings/`, `statusbar/`).
 
 use std::collections::{HashMap, HashSet};
@@ -122,7 +122,7 @@ pub struct BenchApp {
     /// The agent's primary model and its fallbacks, as (model, provider).
     pub models: Vec<rest::ModelChoice>,
     /// Settings → Providers and Messages.
-    pub pv: crate::settings::providers::Providers,
+    pub providers: crate::settings::providers::Providers,
     /// The last lines of the open thread's agent's log, read as its status item opens.
     pub agent_log: Vec<String>,
     /// The slash commands threads offer.
@@ -136,7 +136,7 @@ pub struct BenchApp {
     pub demo: bool,
     /// The demo's threads by session id (opening one shows its turns; nothing is fetched).
     pub demo_threads: HashMap<String, ::thread::Thread>,
-    /// The gateway refused a restart over running work: the next press (within a minute)
+    /// The agent refused a restart over running work: the next press (within a minute)
     /// restarts anyway.
     pub restart_armed: Option<Instant>,
     /// The agent's `model.context_length` (0 when not set).
@@ -156,7 +156,7 @@ pub struct BenchApp {
     pub path_entry: bool,
     pub project_path: Entity<InputState>,
     pub appearance: bench_ui::theme::Appearance,
-    /// Sidebar search: the field, what was typed, and the gateway's hits (None while searching).
+    /// Sidebar search: the field, what was typed, and the agent's hits (None while searching).
     pub search: Entity<InputState>,
     pub search_query: String,
     pub search_hits: Option<Vec<(String, String)>>,
@@ -308,7 +308,7 @@ impl BenchApp {
             send_after_transcribe: false,
             default_effort: EFFORTS.len() - 1,
             models: vec![],
-            pv: Default::default(),
+            providers: Default::default(),
             agent_log: Vec::new(),
             catalog: vec![],
             approval_mode: None,

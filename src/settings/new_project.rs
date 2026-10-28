@@ -134,11 +134,10 @@ impl BenchApp {
             );
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
-            move || rest::send_json(&conn, "POST", "/api/projects", &profile, body),
+            move || rest::send_json(&conn, "POST", "/api/projects", body),
             move |this, r, window, cx| match r {
                 Ok(v) => {
                     this.project_form = None;

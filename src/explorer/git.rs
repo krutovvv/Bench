@@ -108,12 +108,11 @@ impl BenchApp {
         let Some((conn, _)) = self.env_target(&f.project) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         let (machine, path, f) = (f.machine.clone(), f.path.clone(), f.clone());
         self.background(
             window,
             cx,
-            move || rest::git_head(&conn, &profile, machine.as_deref(), &path),
+            move || rest::git_head(&conn, machine.as_deref(), &path),
             move |this, r, window, cx| {
                 // Not a repository, or the agent could not tell: nothing is marked.
                 if let Some(d) = this.explorer.docs.get_mut(&DocKey::File(f.clone())) {

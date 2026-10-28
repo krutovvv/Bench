@@ -15,7 +15,7 @@ impl BenchApp {
     /// Restart the agent on the machine we are connected to, then reconnect. Its runs are
     /// durable, so it never refuses (the `Busy` branch: a backend that refused while work ran,
     /// pressed again within a minute, restarted anyway).
-    /// The gateway panel's notification line: refresh what macOS allows, and with `test` also
+    /// The agent panel's notification line: refresh what macOS allows, and with `test` also
     /// send one — the way to see for oneself that Bench can say it is done from the background.
     pub fn notif(&mut self, test: bool, cx: &mut Context<Self>) {
         if test {

@@ -391,7 +391,6 @@ impl BenchApp {
         let Some((conn, eid)) = self.env_target(&id) else {
             return;
         };
-        let profile = crate::app::model::GENERAL_AGENT.to_string();
         self.background(
             window,
             cx,
@@ -400,7 +399,6 @@ impl BenchApp {
                     &conn,
                     "PUT",
                     &format!("/api/projects/{eid}/lsp/{}", enc(&key)),
-                    &profile,
                     json!({"spec": spec}),
                 )
             },

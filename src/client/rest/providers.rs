@@ -1,5 +1,5 @@
 //! The agent's model providers, keys and messaging: custom endpoints, environment keys, the
-//! config, the gateway's status.
+//! config, the agent's status.
 
 use super::{enc, get, send};
 use crate::client::connection::Connection;
@@ -10,41 +10,38 @@ use serde_json::{Value, json};
 
 /// The agent's custom (OpenAI-compatible) endpoints: `{endpoints: [{id, name, base_url,
 /// model, models, context_length, has_api_key, api_key_preview, is_current}], current}`.
-pub fn custom_endpoints(conn: &Connection, agent: &str) -> Result<Value> {
-    get(conn, "/api/providers/custom-endpoints", agent)
+pub fn custom_endpoints(conn: &Connection) -> Result<Value> {
+    get(conn, "/api/providers/custom-endpoints")
 }
 
 /// Create or update an endpoint. `api_key: None` keeps the saved key.
-pub fn save_endpoint(conn: &Connection, agent: &str, body: Value) -> Result<Value> {
+pub fn save_endpoint(conn: &Connection, body: Value) -> Result<Value> {
     send(
         conn,
         "POST",
         "/api/providers/custom-endpoints",
-        agent,
         body,
         30,
     )
 }
 
 /// The endpoint becomes the agent's main model provider.
-pub fn activate_endpoint(conn: &Connection, agent: &str, id: &str) -> Result<()> {
+pub fn activate_endpoint(conn: &Connection, id: &str) -> Result<()> {
     send(
         conn,
         "POST",
         &format!("/api/providers/custom-endpoints/{}/activate", enc(id)),
-        agent,
         json!({}),
         30,
     )?;
     Ok(())
 }
 
-pub fn delete_endpoint(conn: &Connection, agent: &str, id: &str) -> Result<()> {
+pub fn delete_endpoint(conn: &Connection, id: &str) -> Result<()> {
     send(
         conn,
         "DELETE",
         &format!("/api/providers/custom-endpoints/{}", enc(id)),
-        agent,
         json!({}),
         30,
     )?;
@@ -52,12 +49,11 @@ pub fn delete_endpoint(conn: &Connection, agent: &str, id: &str) -> Result<()> {
 }
 
 /// Probe an endpoint's `/models`: `{ok, message, models}`.
-pub fn validate_endpoint(conn: &Connection, agent: &str, body: Value) -> Result<Value> {
+pub fn validate_endpoint(conn: &Connection, body: Value) -> Result<Value> {
     send(
         conn,
         "POST",
         "/api/providers/custom-endpoints/validate",
-        agent,
         body,
         30,
     )
@@ -65,17 +61,16 @@ pub fn validate_endpoint(conn: &Connection, agent: &str, body: Value) -> Result<
 
 /// The agent's `.env` keys the agent knows or holds: name → `{is_set, redacted_value,
 /// description, category, channel_managed, custom}`.
-pub fn env_vars(conn: &Connection, agent: &str) -> Result<Value> {
-    get(conn, "/api/env", agent)
+pub fn env_vars(conn: &Connection) -> Result<Value> {
+    get(conn, "/api/env")
 }
 
 /// Merge keys into the agent's config (the agent deep-merges what is sent over it).
-pub fn merge_config(conn: &Connection, agent: &str, config: Value) -> Result<()> {
+pub fn merge_config(conn: &Connection, config: Value) -> Result<()> {
     send(
         conn,
         "PUT",
         "/api/config",
-        agent,
         json!({"config": config}),
         30,
     )?;

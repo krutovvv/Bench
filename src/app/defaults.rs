@@ -13,7 +13,7 @@ impl BenchApp {
         self.active_thread
             .update(cx, |v, _| v.thread.effort_pending = false);
         self.settings_ready = false;
-        self.rest(window, cx, rest::agent_defaults, |this, r, window, cx| {
+        self.rest(window, cx, |c| rest::agent_defaults(c, ""), |this, r, window, cx| {
             this.settings_ready = true;
             let Ok((effort, _model, models, approval, context)) = r else {
                 return;

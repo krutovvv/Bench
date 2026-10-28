@@ -1,8 +1,6 @@
-//! Files sent with a message. Images (png, jpeg, gif, webp) go to the model as real attachments
-//! (staged in the profile's image cache, which `prompt.submit` requires); every file is also
-//! named in the message as `[attached: <path>]`, a path on the gateway's machine the agent can
-//! read. A local file is used in place unless it lives in a temporary folder (a dragged
-//! screenshot) or its path has Unicode spaces (`plain`): then it is copied to the profile's
+//! Files sent with a message: each is named in it as `[attached: <path>]`, a path on the agent's
+//! machine the agent can read. A local file is used in place unless it lives in a temporary folder (a dragged
+//! screenshot) or its path has Unicode spaces (`plain`): then it is copied to the agent's
 //! `attachments/`; over SSH files are uploaded.
 
 use std::path::{Path, PathBuf};
@@ -25,30 +23,17 @@ pub const PREFIX: &str = "[attached: ";
 /// The paths named by `[attached: …]` lines, and the text without them.
 pub fn split(text: &str) -> (String, Vec<String>) {
     let mut paths = vec![];
-    let mut images = vec![];
     let mut rest = vec![];
     for line in text.lines() {
         let t = line.trim();
         if let Some(p) = t.strip_prefix(PREFIX).and_then(|p| p.strip_suffix(']')) {
             paths.push(p.to_string());
-        } else if let Some(p) = t
-            .strip_prefix(GATEWAY_IMAGE)
-            .and_then(|p| p.strip_suffix(']'))
-        {
-            images.push(p.to_string());
         } else {
             rest.push(line);
         }
     }
-    // Our own lines already name every file; the gateway's notes only stand in without them.
-    if paths.is_empty() {
-        paths = images;
-    }
     (rest.join("\n").trim().to_string(), paths)
 }
-
-/// The gateway's own note for an image attachment, stored in the message.
-const GATEWAY_IMAGE: &str = "[Image attached at: ";
 
 fn is_temporary(path: &Path) -> bool {
     let p = path.to_string_lossy();
@@ -98,7 +83,7 @@ pub fn prepare(
         let bytes = std::fs::read(file).with_context(|| format!("read {name}"))?;
         let path = if let Some(m) = machine {
             let dest = format!("/tmp/bench-attachments/{stamp}-{name}");
-            rest::upload_file_to(conn, crate::app::model::GENERAL_AGENT, Some(m), &dest, &bytes)?;
+            rest::upload_file_to(conn, Some(m), &dest, &bytes)?;
             dest
         } else if *target == Target::Local
             && !is_temporary(file)
@@ -115,7 +100,7 @@ pub fn prepare(
                     std::fs::create_dir_all(Path::new(&dest).parent().unwrap())?;
                     std::fs::write(&dest, &bytes)?;
                 }
-                Target::Ssh(_) => rest::upload_file(conn, crate::app::model::GENERAL_AGENT, &dest, &bytes)?,
+                Target::Ssh(_) => rest::upload_file(conn, &dest, &bytes)?,
             }
             dest
         };
