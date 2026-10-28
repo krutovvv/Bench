@@ -51,6 +51,7 @@ export const memoryTool = defineTool({
 	execute: async (args, api) => {
 		const { agent } = threadOf(api.conversationId);
 		const entries = readEntries(agent, args.target);
+		const before = entries.join(SEP).length;
 		const limit = LIMITS()[args.target];
 		const find = () => {
 			const hits = entries.map((e, i) => [e, i] as const).filter(([e]) => args.old_text && e.includes(args.old_text));
@@ -65,7 +66,9 @@ export const memoryTool = defineTool({
 			entries[find()] = args.content.trim();
 		} else entries.splice(find(), 1);
 		const used = entries.join(SEP).length;
-		if (used > limit) throw new Error(`over the ${limit}-character budget (${used}); replace or remove an old note first`);
+		// Notes already over the budget (a lower limit, notes imported) can still shrink step by step.
+		if (used > limit && used > before)
+			throw new Error(`over the ${limit}-character budget: the notes take ${before} now and would take ${used}; shorten or remove old notes first`);
 		write(agent, args.target, entries);
 		return text({ success: true, target: args.target, entries: entries.length, usage: `${used}/${limit}` });
 	},

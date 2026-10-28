@@ -1,10 +1,12 @@
 // The runtime as its tools' host (`host.ts`), and where its tools work: the environment of a
-// conversation, on this machine or its project's over SSH, kept in its folder when asked.
+// conversation, on this machine or its project's over SSH, kept in its folder when asked; its
+// project's settings always here.
 
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { projects } from "../builtin/projects.ts";
 import { confined } from "../machine/confined.ts";
+import { withSettings } from "../machine/settings.ts";
 import { host, type Host, type ThreadFacts } from "../host.ts";
 import { warmUp } from "../lsp/lsp.ts";
 import { runToCompletion } from "./run.ts";
@@ -51,7 +53,7 @@ export function hostOf(rt: Runtime): Host {
 }
 
 /** The execution environment of a conversation: this machine's, or its project's machine over SSH;
- * kept in its folder when the project says so. */
+ * kept in its folder when the project says so; its project's settings on this machine. */
 export async function envFor(conversationId: string, cwd: string | undefined): Promise<ExecutionEnv> {
 	const s = host().thread(conversationId);
 	const p = s?.project ? projects.get(s.project) : undefined;
@@ -60,5 +62,9 @@ export async function envFor(conversationId: string, cwd: string | undefined): P
 	if (s) warmUp(s.agent, s.cwd, p?.machine ?? undefined);
 	const env: ExecutionEnv = p?.machine ? await machineEnv(p.machine, cwd || p.folder || "") : new NodeExecutionEnv({ cwd: cwd || process.env.HOME || "/" });
 	// Kept in its folder: its tools and commands stay there (`machine/confined.ts`).
-	return p?.confined && p.folder ? confined(env, env.cwd, !p.machine) : env;
+	const kept = p?.confined && p.folder ? confined(env, env.cwd, !p.machine) : env;
+	// Its settings are on this machine, whatever its machine and folder (`machine/settings.ts`).
+	if (!p) return kept;
+	const dir = projects.env(p.id);
+	return withSettings(kept, new NodeExecutionEnv({ cwd: dir }), dir);
 }
