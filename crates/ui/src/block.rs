@@ -7,7 +7,7 @@ use gpui_kit::*;
 use crate::icons::Ico;
 use crate::metrics::{AVATAR, BLOCK_HEAD_H, CHAT_LEFT, CHAT_RIGHT, CHAT_TEXT, TURN_Y};
 
-/// A block's head: one height, a faint ground, small muted text. `over_body`: a rule under it.
+/// A block's head: one height, a faint ground, muted text a step under the messages'. `over_body`: a rule under it.
 pub fn block_head(theme: &Theme, over_body: bool) -> Div {
     h_flex()
         .flex_none()
@@ -17,7 +17,7 @@ pub fn block_head(theme: &Theme, over_body: bool) -> Div {
         .items_center()
         .bg(theme.muted.opacity(0.35))
         .when(over_body, |d| d.border_b_1().border_color(theme.border))
-        .text_base()
+        .text_size(px(crate::metrics::THREAD_META))
         .text_color(theme.muted_foreground)
 }
 

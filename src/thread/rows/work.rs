@@ -111,6 +111,7 @@ impl ThreadView {
             .gap_1p5()
             .items_center()
             .min_w_0()
+            .text_size(px(bench_ui::THREAD_META))
             .text_color(muted)
             .cursor_pointer()
             .hover(|s| s.text_color(theme.foreground))
@@ -134,7 +135,7 @@ impl ThreadView {
                         div().text_color(muted).child(label).into_any_element()
                     } else {
                         ShimmerText::new(label)
-                            .text_base()
+                            .text_size(px(bench_ui::THREAD_META))
                             .text_color(muted)
                             .into_any_element()
                     }))

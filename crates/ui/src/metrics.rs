@@ -79,6 +79,9 @@ pub const RADIO_ON_RING: f32 = 4.;
 /// and the header's own title at the sidebar's size, heavier — so the chrome is quieter than
 /// what it frames, not a different scale.
 pub const BAR_TEXT: f32 = 12.;
+/// The thread's own lines, not the conversation: the work line ("8 actions · 3:17 · Done") and
+/// a block's head ("Background · 1 running") — a step under the messages, so the answer leads.
+pub const THREAD_META: f32 = 13.;
 pub const BAR_TITLE: f32 = 13.;
 
 /// The header's Chat | Code switch: the track's inset around its segments, and a segment's height.
