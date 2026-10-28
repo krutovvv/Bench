@@ -250,7 +250,9 @@ class LspClient {
 		conn.onClose(() => died("the connection closed"));
 		conn.listen();
 		await conn.sendRequest("initialize", {
-			processId: process.pid,
+			// Servers exit when the process of this id is gone (vscode-languageserver checks every
+			// few seconds): over SSH our pid means nothing on that machine, so it is not given.
+			processId: machine ? null : process.pid,
 			rootUri: uriOf(root),
 			workspaceFolders: [{ uri: uriOf(root), name: path.basename(root) }],
 			initializationOptions: spec.initialization ?? {},
