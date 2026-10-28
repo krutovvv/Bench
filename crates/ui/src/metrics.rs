@@ -182,6 +182,10 @@ pub const POPOVER_M: f32 = 300.;
 pub const POPOVER_L: f32 = 380.;
 /// The composer's "/" list.
 pub const SLASH_LIST_W: f32 = 560.;
+/// The chat's "/" list, as a Mac's completion list (Xcode's, Spotlight's): its rows, and the air
+/// between it and the field it sits over, as wide as that field.
+pub const COMPLETION_ROW_H: f32 = 26.;
+pub const COMPLETION_GAP: f32 = 6.;
 /// A path typed into the thread's head (a server's folder).
 pub const PATH_FIELD_W: f32 = 360.;
 

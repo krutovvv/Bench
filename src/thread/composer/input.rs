@@ -25,6 +25,9 @@ impl ThreadView {
         }
         let theme = cx.theme().clone();
         let sel = self.slash_sel.min(matches.len() - 1);
+        if !crate::thread::look::COMPOSER_IN_LIST {
+            return Some(self.render_completions(matches, sel, &theme, cx));
+        }
         // Under the line, or above it when the window has no room below (the status bar is
         // there): the list's own height decides.
         let list_h = (matches.len() as f32).min(SLASH_ROWS) * SLASH_ROW + 10.;
@@ -96,6 +99,81 @@ impl ThreadView {
                 )
                 .into_any_element(),
         )
+    }
+
+    /// The chat's "/" list as a Mac's completion list: right over the field and as wide, one
+    /// selection — the accent with white text, as a menu's — that follows the pointer too, the
+    /// names at the sidebar's size, what each is quieter, its kind faint at the end.
+    fn render_completions(
+        &mut self,
+        matches: Vec<crate::thread::composer::slash::SlashCommand>,
+        sel: usize,
+        theme: &gpui_kit::component::Theme,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let rows = matches.into_iter().enumerate().map(|(i, c)| {
+            let on = i == sel;
+            let (fg, quiet, faint) = if on {
+                (
+                    theme.primary_foreground,
+                    theme.primary_foreground.opacity(0.85),
+                    theme.primary_foreground.opacity(0.7),
+                )
+            } else {
+                (theme.foreground, theme.muted_foreground, bench_ui::faint(theme))
+            };
+            h_flex()
+                .id(("slash", i))
+                .flex_none()
+                .h(px(bench_ui::COMPLETION_ROW_H))
+                .px_2()
+                .gap_2()
+                .items_center()
+                .rounded_md()
+                .text_size(px(bench_ui::SIDEBAR_TEXT))
+                .cursor_pointer()
+                .when(on, |d| d.bg(theme.primary))
+                .child(div().flex_none().text_color(fg).child(c.name))
+                .child(div().flex_1().min_w_0().truncate().text_color(quiet).child(c.desc))
+                .child(
+                    div()
+                        .flex_none()
+                        .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
+                        .text_color(faint)
+                        .child(c.category),
+                )
+                .on_mouse_move(cx.listener(move |this, _, _, cx| {
+                    if this.slash_sel != i {
+                        this.slash_sel = i;
+                        cx.notify();
+                    }
+                }))
+                .on_click(cx.listener(move |this, _, window, cx| this.pick_slash(i, window, cx)))
+        });
+        div()
+            .absolute()
+            .left_0()
+            .right_0()
+            .bottom_full()
+            .mb(px(bench_ui::COMPLETION_GAP))
+            .child(
+                div()
+                    .bg(theme.popover)
+                    .border_1()
+                    .border_color(theme.border.opacity(0.7))
+                    .rounded_lg()
+                    .shadow_lg()
+                    .p_1()
+                    .child(
+                        v_flex()
+                            .id("slash-list")
+                            .max_h(px(bench_ui::COMPLETION_ROW_H * SLASH_ROWS))
+                            .overflow_y_scroll()
+                            .track_scroll(&self.slash_scroll)
+                            .children(rows),
+                    ),
+            )
+            .into_any_element()
     }
 
     pub(crate) fn render_composer(&mut self, cx: &mut Context<Self>) -> AnyElement {
