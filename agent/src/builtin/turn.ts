@@ -4,7 +4,8 @@
 // line each. The step limit (`steps.ts`) and the evaluator (`judge/`) read it; nothing else does.
 // In memory only: after a restart a turn starts counting again, which errs on the side of working.
 
-import { EVAL_OPEN, stripBlock, textOf } from "../runtime/journal.ts";
+import { EVAL_OPEN, planOf, stripBlock, textOf } from "../runtime/journal.ts";
+import type { PlanStep } from "../protocol.gen.ts";
 
 /** How many steps a turn remembers, a line each. */
 const RECENT = 24;
@@ -12,8 +13,12 @@ const RECENT = 24;
 export interface Turn {
 	/** The person's request: their last message's text. */
 	request: string;
-	/** The plan's items as the last `todo` call wrote them ("[status] content"). */
-	plan: string[];
+	/** The plan as the last `todo` call wrote it, with the evaluator's marks since (`judge/plan.ts`). */
+	plan: PlanStep[];
+	/** The id of the `todo` call that wrote the plan: the plan's id in the thread. */
+	planId: string;
+	/** The steps at which the evaluator last read the plan. */
+	planAt: number;
 	/** Top-level tool calls in this turn. */
 	steps: number;
 	/** The last steps, a line each: the call and the start of its result. */
@@ -28,7 +33,7 @@ export interface Turn {
 
 const turns = new Map<string, Turn>();
 
-const fresh = (request: string, plan: string[] = []): Turn => ({ request, plan, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0 });
+const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0 });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {
@@ -46,7 +51,7 @@ export function seeRequest(conversation: string, messages: readonly any[]): void
 	if (!text || text.startsWith(EVAL_OPEN)) return;
 	const t = turns.get(conversation);
 	if (t?.request === text && t.steps === 0) return;
-	turns.set(conversation, fresh(text, t?.plan));
+	turns.set(conversation, fresh(text, t?.plan, t?.planId));
 }
 
 /** A top-level call is about to run. */
@@ -55,10 +60,12 @@ export function countStep(conversation: string): number {
 }
 
 /** A call finished: remember it in a line, and the plan when it was `todo`. */
-export function seeResult(conversation: string, call: { name: string; arguments?: any }, result: any): void {
+export function seeResult(conversation: string, call: { id?: string; name: string; arguments?: any }, result: any): void {
 	const t = turnOf(conversation);
-	if (call.name === "todo" && Array.isArray(call.arguments?.todos)) {
-		t.plan = call.arguments.todos.map((x: any) => `[${x?.status ?? "pending"}] ${x?.content ?? ""}`);
+	if (call.name === "todo" && !result?.isError) {
+		t.plan = planOf(call.arguments);
+		t.planId = String(call.id ?? "");
+		t.planAt = t.steps;
 	}
 	const args = JSON.stringify(call.arguments ?? {});
 	const out = resultText(result).replace(/\s+/g, " ").trim();
@@ -75,3 +82,6 @@ export function resultText(result: any): string {
 }
 
 export const cut = (s: string, n: number): string => (s.length > n ? `${s.slice(0, n)}…` : s);
+
+/** The plan in a line per item, as the evaluator reads it. */
+export const planLines = (plan: PlanStep[]): string[] => plan.map((p) => `[${p.status}] ${p.content}`);

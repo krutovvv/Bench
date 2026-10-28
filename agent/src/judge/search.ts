@@ -2,11 +2,11 @@
 // is ordered by how likely each line is the place this turn's request needs, before the model
 // reads it. The likeliest few come first with their probability, the rest follow in their own
 // order: nothing is dropped, so a wrong guess costs a line of reading, not a missed match.
-// Without the evaluator, or not sure enough, the result stays as the tool gave it.
+// Not sure enough, the result stays as the tool gave it.
 
-import { cut, resultText, turnOf } from "../builtin/turn.ts";
-import { ask, STATE_CAP } from "./client.ts";
-import { host } from "../host.ts";
+import { cut, resultText } from "../builtin/turn.ts";
+import { STATE_CAP } from "./client.ts";
+import type { Point, Seen } from "./point.ts";
 
 /** Fewer lines than this are read as they are. */
 const MIN_LINES = 12;
@@ -40,50 +40,54 @@ function listOf(call: { name: string; arguments?: any }, text: string): { items:
 	return items.length >= MIN_LINES ? { items, rest: lines.filter((l) => !isItem(l) && l.trim()) } : undefined;
 }
 
-/** The call's result with its list ordered by the evaluator (`afterTool`); undefined: unchanged. */
-export async function rankSearch(conversation: string, call: { name: string; arguments?: any }, result: any, signal?: AbortSignal): Promise<any> {
-	if (result?.isError) return undefined;
-	const list = listOf(call, resultText(result));
-	if (!list) return undefined;
-	// As many lines as fit the state's room, in their order.
-	const options: Record<string, string> = {};
-	let room = STATE_CAP - 4000;
-	for (const [i, line] of list.items.entries()) {
-		const shown = cut(line, LINE);
-		if ((room -= shown.length + 12) < 0 || i >= 250) break;
-		options[`${i + 1}`] = shown;
-	}
-	const t = turnOf(conversation);
-	const answers = await ask(
-		conversation,
-		"search",
-		{ request: cut(t.request, 3000), plan: t.plan, search: `${call.name} ${cut(JSON.stringify(call.arguments ?? {}), 300)}` },
-		{
-			place: {
-				type: "choice",
-				instructions:
-					"An agent working on the person's request ran this search. Which line of its results is the place the agent most likely needs to read or change next for that request?",
-				criteria: options,
+const listOfSeen = (seen: Seen) => (seen.call && !seen.result?.isError ? listOf(seen.call, resultText(seen.result)) : undefined);
+
+export const search: Point = {
+	name: "search",
+	moment: "result",
+	ask(seen) {
+		const list = listOfSeen(seen);
+		if (!list) return undefined;
+		// As many lines as fit the state's room, in their order.
+		const options: Record<string, string> = {};
+		let room = STATE_CAP - 8000;
+		for (const [i, line] of list.items.entries()) {
+			const shown = cut(line, LINE);
+			if ((room -= shown.length + 12) < 0 || i >= 250) break;
+			options[`${i + 1}`] = shown;
+		}
+		return {
+			state: { search: `${seen.call!.name} ${cut(JSON.stringify(seen.call!.arguments ?? {}), 300)}` },
+			questions: {
+				place: {
+					type: "choice",
+					instructions:
+						"An agent working on the person's request ran this search. Which line of its results is the place the agent most likely needs to read or change next for that request?",
+					criteria: options,
+				},
 			},
-		},
-		signal,
-	);
-	const probs = Object.entries(answers?.place?.probabilities ?? {})
-		.map(([k, p]) => [Number(k) - 1, p] as [number, number])
-		.filter(([i]) => i >= 0 && i < list.items.length)
-		.sort((a, b) => b[1] - a[1]);
-	if (!probs.length || probs[0][1] < SURE) return undefined;
-	const first = probs.filter(([, p]) => p >= FLOOR).slice(0, SHOW);
-	const chosen = new Set(first.map(([i]) => i));
-	const others = list.items.filter((_, i) => !chosen.has(i));
-	const text = [
-		`[Evaluator: the likeliest places for the request first]`,
-		...first.map(([i, p]) => `${list.items[i]}    (${Math.round(p * 100)}%)`),
-		``,
-		`The other ${others.length}, in their order:`,
-		...others,
-		...list.rest,
-	].join("\n");
-	host().count(conversation, "nudge");
-	return { ...result, output: [{ type: "text", text }, ...(result.output ?? []).filter((b: any) => b?.type !== "text")] };
-}
+		};
+	},
+	apply(seen, answers) {
+		const list = listOfSeen(seen);
+		if (!list) return undefined;
+		const probs = Object.entries(answers.place?.probabilities ?? {})
+			.map(([k, p]) => [Number(k) - 1, p] as [number, number])
+			.filter(([i]) => i >= 0 && i < list.items.length)
+			.sort((a, b) => b[1] - a[1]);
+		if (!probs.length || probs[0][1] < SURE) return undefined;
+		const first = probs.filter(([, p]) => p >= FLOOR).slice(0, SHOW);
+		const chosen = new Set(first.map(([i]) => i));
+		const others = list.items.filter((_, i) => !chosen.has(i));
+		const text = [
+			`[Evaluator: the likeliest places for the request first]`,
+			...first.map(([i, p]) => `${list.items[i]}    (${Math.round(p * 100)}%)`),
+			``,
+			`The other ${others.length}, in their order:`,
+			...others,
+			...list.rest,
+		].join("\n");
+		const r = seen.result;
+		return { result: { ...r, output: [{ type: "text", text }, ...(r.output ?? []).filter((b: any) => b?.type !== "text")] } };
+	},
+};

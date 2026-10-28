@@ -27,6 +27,14 @@ export interface Choice {
 	criteria: Record<string, string>;
 }
 
+/** A yes/no question: the answer is the probability of yes (`noul`). */
+export interface Noul {
+	type: "noul";
+	instructions: string;
+}
+
+export type Question = Choice | Noul;
+
 export interface ChoiceAnswer {
 	choice: string;
 	confidence: number;
@@ -50,6 +58,12 @@ export function judgeSettings(): JudgeSettings | undefined {
 	return s?.enabled && s.base_url?.trim() ? s : undefined;
 }
 
+/** On, set and not quiet after a failure: the points may ask; otherwise the classic way. */
+export function judgeActive(): boolean {
+	const s = judgeSettings();
+	return !!s && Date.now() >= (quietUntil.get(s.base_url!) ?? 0);
+}
+
 /** The endpoint for an address given with or without `/v1`. */
 export function endpointOf(base: string): string {
 	return `${base.trim().replace(/\/+$/, "").replace(/\/v1$/, "")}/v1/systemone`;
@@ -63,7 +77,7 @@ export async function ask(
 	conversation: string,
 	point: string,
 	state: unknown,
-	questions: Record<string, Choice>,
+	questions: Record<string, Question>,
 	signal?: AbortSignal,
 ): Promise<Record<string, ChoiceAnswer> | undefined> {
 	const s = judgeSettings();

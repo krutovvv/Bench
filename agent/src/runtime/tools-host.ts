@@ -2,6 +2,8 @@
 // conversation, on this machine or its project's over SSH, kept in its folder when asked; its
 // project's settings always here.
 
+import { randomUUID } from "node:crypto";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { projects } from "../builtin/projects.ts";
@@ -51,6 +53,10 @@ export function hostOf(rt: Runtime): Host {
 		},
 		// Not awaited: the caller is a hook of the very run being stopped.
 		stop: (threadId) => void rt.interrupt(threadId).catch(() => undefined),
+		write: (conversationId, entry) => {
+			const live = rt.byConversation.get(String(conversationId));
+			if (live) void live.conversation.submit({ type: "write", entry, requestId: randomUUID() } as any, BACKGROUND_CONTEXT).catch(() => undefined);
+		},
 		count: (conversationId, what) => {
 			const key = String(conversationId);
 			const parent = adopted.get(key);

@@ -46,6 +46,8 @@ export interface Host {
 	deliver(target: string, text: string): Promise<void>;
 	/** Stops the thread's run, as the person's Stop does (the step limit, `builtin/steps.ts`). */
 	stop(threadId: string): void;
+	/** A display-only entry in the conversation's thread (the model never reads it): the evaluator's marks. */
+	write(conversationId: string | number, entry: { kind: string; data: unknown }): void;
 	/** The evaluator asked once (`call`) or changed the course (`nudge`): the thread's meters count it. */
 	count(conversationId: string | number, what: "call" | "nudge"): void;
 }

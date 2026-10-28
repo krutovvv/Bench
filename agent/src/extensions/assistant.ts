@@ -23,9 +23,8 @@ import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../builtin/steps.ts";
 import { seeRequest, seeResult } from "../builtin/turn.ts";
-import { checkCourse } from "../judge/drift.ts";
-import { checkDone } from "../judge/done.ts";
-import { rankSearch } from "../judge/search.ts";
+import { judgeActive } from "../judge/client.ts";
+import { atAnswer, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../runtime/inserts.ts";
@@ -126,7 +125,7 @@ export const assistant = defineExtension({
 				return note ? { messages: [...request.messages, note] } : undefined;
 			},
 			onYield: async (answer: any, api: any, context: any) => {
-				const back = await checkDone(String(api.conversationId), answer, context?.abortSignal).catch(() => undefined);
+				const back = await atAnswer(String(api.conversationId), answer, context?.abortSignal).catch(() => undefined);
 				return back ? { continue: back } : undefined;
 			},
 		} as any),
@@ -154,17 +153,20 @@ export const assistant = defineExtension({
 			// The module's spec, the first time the thread touches a file under it (`specs.ts`):
 			// the decisions and contracts the code does not show, found without being looked for.
 			// The plan left unchanged for several steps (`planNudge`): the model is reminded to update it.
-			// With the evaluator on (`judge/`): a long search's matches come likeliest first, and
-			// every so many steps the course is checked, a note when it is off.
+			// With the evaluator on (`judge/`), its points instead: a long search's matches come
+			// likeliest first, the plan's items are marked, the course is checked.
 			afterTool: async (call: any, result: any, api: any, context: any) => {
 				const conversation = String(api.conversationId);
 				const top = !call.parent;
 				if (top) seeResult(conversation, call, result);
-				const ranked = top ? await rankSearch(conversation, call, result, context?.abortSignal).catch(() => undefined) : undefined;
-				if (ranked) result = ranked;
+				// Read before the evaluator is asked: when it fails now, this step still had the classic reminder's turn.
+				const evaluated = top && judgeActive();
+				const none: { result?: any; notes: string[] } = { notes: [] };
+				const judged = top ? await atResult(conversation, call, result, context?.abortSignal).catch(() => none) : none;
+				const ranked = !!judged.result;
+				if (judged.result) result = judged.result;
 				const nudge = planNudge(conversation, call);
-				const course = top ? await checkCourse(conversation, context?.abortSignal).catch(() => undefined) : undefined;
-				const first = [nudge, course].filter((n): n is string => !!n);
+				const first = [evaluated ? undefined : nudge, ...judged.notes].filter((n): n is string => !!n);
 				const withNotes = (notes: string[]) =>
 					notes.length || ranked ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
 				if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(first);

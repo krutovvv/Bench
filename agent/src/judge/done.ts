@@ -6,10 +6,9 @@
 // or a short one are left as they are.
 
 import { EVAL_CLOSE, EVAL_OPEN, textOf } from "../runtime/journal.ts";
-import { cut, turnOf } from "../builtin/turn.ts";
+import { cut } from "../builtin/turn.ts";
 import { limitReached } from "../builtin/steps.ts";
-import { ask } from "./client.ts";
-import { host } from "../host.ts";
+import { sure, type Point } from "./point.ts";
 
 /** A turn with fewer steps is a conversation, not work: no check. */
 const MIN_STEPS = 5;
@@ -22,36 +21,37 @@ const BACK: Record<string, string> = {
 	off_target: "Your work does something other than what the person asked. Re-read their request and do what it asks.",
 };
 
-/** The message that sends the agent back, or undefined to let the answer stand (`onYield`). */
-export async function checkDone(conversation: string, answer: any, signal?: AbortSignal): Promise<string | undefined> {
-	const t = turnOf(conversation);
-	if (!t.request || t.continued || t.steps < MIN_STEPS || limitReached(conversation)) return undefined;
-	const text = textOf(answer?.content ?? []).trim();
-	if (!text) return undefined;
-	const answers = await ask(
-		conversation,
-		"done",
-		{ request: cut(t.request, 4000), plan: t.plan, steps: t.steps, last_steps: t.recent.slice(-12), final_answer: cut(text, 4000) },
-		{
-			verdict: {
-				type: "choice",
-				instructions: "An agent worked on the person's request and wrote this final answer. Is the request done?",
-				// "done" and "question" first: the model leans to the first options, and letting the answer stand is the safe side.
-				criteria: {
-					done: "The request is done, and the steps support what the answer says.",
-					question: "The answer asks the person something, or reports a blocker only the person can resolve.",
-					unfinished: "Parts of the request or of the plan are left undone though the agent could do them.",
-					unchecked: "Code was changed but not built, tested or run after the last change.",
-					off_target: "The work does something other than what the person asked.",
+const answerText = (answer: any) => textOf(answer?.content ?? []).trim();
+
+export const done: Point = {
+	name: "done",
+	moment: "answer",
+	ask({ conversation, turn, answer }) {
+		if (!turn.request || turn.continued || turn.steps < MIN_STEPS || limitReached(conversation)) return undefined;
+		const text = answerText(answer);
+		if (!text) return undefined;
+		return {
+			state: { final_answer: cut(text, 4000) },
+			questions: {
+				verdict: {
+					type: "choice",
+					instructions: "An agent worked on the person's request and wrote this final answer. Is the request done?",
+					// "done" and "question" first: the model leans to the first options, and letting the answer stand is the safe side.
+					criteria: {
+						done: "The request is done, and the steps support what the answer says.",
+						question: "The answer asks the person something, or reports a blocker only the person can resolve.",
+						unfinished: "Parts of the request or of the plan are left undone though the agent could do them.",
+						unchecked: "Code was changed but not built, tested or run after the last change.",
+						off_target: "The work does something other than what the person asked.",
+					},
 				},
 			},
-		},
-		signal,
-	);
-	const a = answers?.verdict;
-	const p = a?.probabilities?.[a.choice] ?? 0;
-	if (!a || !BACK[a.choice] || p < SURE) return undefined;
-	t.continued = true;
-	host().count(conversation, "nudge");
-	return `${EVAL_OPEN}\n${BACK[a.choice]}\n${EVAL_CLOSE}`;
-}
+		};
+	},
+	apply({ turn }, answers) {
+		const v = sure(answers.verdict, SURE);
+		if (!v || !BACK[v]) return undefined;
+		turn.continued = true;
+		return { continue: `${EVAL_OPEN}\n${BACK[v]}\n${EVAL_CLOSE}` };
+	},
+};

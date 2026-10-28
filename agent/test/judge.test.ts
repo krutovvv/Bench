@@ -19,18 +19,25 @@ const { setSetting, writeAgent, readAgent } = await import("../src/config.ts");
 const { seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
 const { stepGate, stepNote } = await import("../src/builtin/steps.ts");
 const { endpointOf, checkJudge } = await import("../src/judge/client.ts");
-const { rankSearch } = await import("../src/judge/search.ts");
-const { checkCourse, DRIFT_EVERY } = await import("../src/judge/drift.ts");
-const { checkDone } = await import("../src/judge/done.ts");
-const { itemsOf } = await import("../src/runtime/journal.ts");
+const { atResult, atAnswer } = await import("../src/judge/index.ts");
+const { DRIFT_EVERY } = await import("../src/judge/drift.ts");
+const { PLAN_EVERY } = await import("../src/judge/plan.ts");
+const { itemsOf, PLAN_KIND } = await import("../src/runtime/journal.ts");
 
 const counted: string[] = [];
 const stopped: string[] = [];
+const written: any[] = [];
 setHost({
 	thread: () => ({ id: "t", agent: "project:p", cwd: home, source: "local", project: "p", inserts: [] }),
 	count: (_c: string, what: string) => void counted.push(what),
 	stop: (id: string) => void stopped.push(id),
+	write: (_c: string, entry: any) => void written.push(entry),
 } as any);
+
+// The old single-point helpers, through the dispatcher: what the model would read.
+const rankSearch = async (c: string, call: any, result: any) => (await atResult(c, call, result)).result;
+const checkCourse = async (c: string) => (await atResult(c, { name: "bash", arguments: { command: "true" } }, out("ok"))).notes[0];
+const checkDone = (c: string, answer: any) => atAnswer(c, answer);
 
 // The stub server answers each question with the probabilities the test sets.
 let reply: (body: any) => any = () => ({ answers: {} });
@@ -68,7 +75,7 @@ test("a turn starts at the person's message, not at the evaluator's; the plan ca
 	seeRequest("c1", [user("<evaluator>\nCheck it.\n</evaluator>")]);
 	assert.equal(turnOf("c1").steps, 3, "the evaluator's message is not a new turn");
 	seeRequest("c1", [user("Now add sounds")]);
-	assert.deepEqual([turnOf("c1").request, turnOf("c1").steps, turnOf("c1").plan], ["Now add sounds", 0, ["[in_progress] Write it"]]);
+	assert.deepEqual([turnOf("c1").request, turnOf("c1").steps, turnOf("c1").plan.map((p) => `[${p.status}] ${p.content}`)], ["Now add sounds", 0, ["[in_progress] Write it"]]);
 });
 
 test("past the project's step limit calls are refused with the reason, and the run stops if they go on", () => {
@@ -97,7 +104,7 @@ test("off, the evaluator is never asked and nothing changes", async () => {
 
 test("a long search comes likeliest first, every line kept", async () => {
 	setSetting("judge", { enabled: true, base_url: `${base}/v1/`, model: "local", api_key: "sk-none" });
-	reply = () => choice("place", { "7": 0.6, "12": 0.3, "1": 0.01 });
+	reply = () => choice("search.place", { "7": 0.6, "12": 0.3, "1": 0.01 });
 	const r = await rankSearch("c3", grep, out(lines + "\n… 4 more: narrow the path or the pattern."));
 	const text = r.output[0].text as string;
 	assert.match(text, /^\[Evaluator[^\n]*\]\nsrc\/game\.js:7:line 7 +\(60%\)\nsrc\/game\.js:12:line 12 +\(30%\)\n/);
@@ -105,13 +112,13 @@ test("a long search comes likeliest first, every line kept", async () => {
 	assert.match(text, /The other 18, in their order:\nsrc\/game\.js:1:line 1\n/);
 	assert.match(text, /4 more/);
 	const req = seen.at(-1);
-	assert.deepEqual([req.url, req.auth, req.body.model, Object.keys(req.body.questions.place.criteria).length], ["/v1/systemone", "Bearer sk-none", "local", 20]);
+	assert.deepEqual([req.url, req.auth, req.body.model, Object.keys(req.body.questions["search.place"].criteria).length], ["/v1/systemone", "Bearer sk-none", "local", 20]);
 	assert.equal(req.body.state.request, "Make the tap jump");
 });
 
 test("a short list, an unsure answer or a failing server leave the result as it is", async () => {
 	assert.equal(await rankSearch("c3", grep, out(lines.split("\n").slice(0, 5).join("\n"))), undefined);
-	reply = () => choice("place", { "1": 0.08, "2": 0.07 });
+	reply = () => choice("search.place", { "1": 0.08, "2": 0.07 });
 	assert.equal(await rankSearch("c3", grep, out(lines)), undefined);
 	reply = () => {
 		throw new Error("down");
@@ -141,7 +148,7 @@ const steps = (c: string, n: number) => {
 
 test("the course is checked every so many steps; only a sure 'off' is said", async () => {
 	seeRequest("c4", [user("Make the game")]);
-	reply = () => choice("course", { on_track: 0.1, drifting: 0.85, looping: 0.04, done: 0.01 });
+	reply = () => choice("course.course", { on_track: 0.1, drifting: 0.85, looping: 0.04, done: 0.01 });
 	steps("c4", DRIFT_EVERY - 1);
 	assert.equal(await checkCourse("c4"), undefined, "not yet");
 	steps("c4", 1);
@@ -149,7 +156,7 @@ test("the course is checked every so many steps; only a sure 'off' is said", asy
 	assert.equal(seen.at(-1).body.state.last_steps.length, DRIFT_EVERY);
 	assert.equal(await checkCourse("c4"), undefined, "once per stretch");
 	steps("c4", DRIFT_EVERY);
-	reply = () => choice("course", { on_track: 0.4, drifting: 0.6, looping: 0, done: 0 });
+	reply = () => choice("course.course", { on_track: 0.4, drifting: 0.6, looping: 0, done: 0 });
 	assert.equal(await checkCourse("c4"), undefined, "unsure: quiet");
 });
 
@@ -157,7 +164,7 @@ test("an unfinished answer after work is sent back once; a question, a short tur
 	const answer = { role: "assistant", content: [{ type: "text", text: "The game is ready." }] };
 	seeRequest("c5", [user("Make the game")]);
 	steps("c5", 2);
-	reply = () => choice("verdict", { done: 0.05, question: 0.01, unfinished: 0.9, unchecked: 0.02, off_target: 0.02 });
+	reply = () => choice("done.verdict", { done: 0.05, question: 0.01, unfinished: 0.9, unchecked: 0.02, off_target: 0.02 });
 	assert.equal(await checkDone("c5", answer), undefined, "a short turn");
 	steps("c5", 5);
 	const back = await checkDone("c5", answer);
@@ -165,12 +172,12 @@ test("an unfinished answer after work is sent back once; a question, a short tur
 	assert.equal(await checkDone("c5", answer), undefined, "only once a turn");
 	seeRequest("c6", [user("Fix the bug")]);
 	steps("c6", 6);
-	reply = () => choice("verdict", { done: 0.02, question: 0.9, unfinished: 0.04, unchecked: 0.02, off_target: 0.02 });
+	reply = () => choice("done.verdict", { done: 0.02, question: 0.9, unfinished: 0.04, unchecked: 0.02, off_target: 0.02 });
 	assert.equal(await checkDone("c6", answer), undefined, "a question to the person stands");
 	writeAgent("project:p", { ...readAgent("project:p"), stepLimit: 4 });
 	seeRequest("c7", [user("Fix the bug")]);
 	steps("c7", 6);
-	reply = () => choice("verdict", { done: 0.02, question: 0.01, unfinished: 0.95, unchecked: 0.01, off_target: 0.01 });
+	reply = () => choice("done.verdict", { done: 0.02, question: 0.01, unfinished: 0.95, unchecked: 0.01, off_target: 0.01 });
 	assert.equal(await checkDone("c7", answer), undefined, "stopped by the limit: the answer stands");
 	writeAgent("project:p", { ...readAgent("project:p"), stepLimit: undefined });
 	assert.ok(counted.includes("call") && counted.includes("nudge"), "the thread's meters count both");
@@ -188,4 +195,64 @@ test("the gear's Check asks one question with the fields as typed, the saved key
 	assert.deepEqual(await checkJudge({ base_url: base }), { ok: false, message: "It answered, but not as a System One server" });
 	assert.equal((await checkJudge({ base_url: "http://127.0.0.1:9" })).ok, false);
 	assert.equal((await checkJudge({})).ok, false);
+});
+
+const todo = (todos: { content: string; status: string }[]) => ({ id: "call-plan", name: "todo", arguments: { todos: todos.map((t, i) => ({ id: `${i + 1}`, ...t })) } });
+
+test("the evaluator marks the plan forward every few steps, in one request with the course; the thread gets an entry", async () => {
+	setSetting("judge", { enabled: true, base_url: base });
+	seeRequest("c8", [user("Make the game")]);
+	seeResult("c8", todo([{ content: "Write the game", status: "in_progress" }, { content: "Test it", status: "pending" }, { content: "Deliver", status: "pending" }]), out("ok"));
+	written.length = 0;
+	reply = (body) => ({
+		answers: {
+			...(body.questions["plan.item0"] ? { "plan.item0": choice("x", { completed: 0.92, in_progress: 0.07, pending: 0.01 }).answers.x } : {}),
+			...(body.questions["plan.item1"] ? { "plan.item1": choice("x", { pending: 0.6, in_progress: 0.3, completed: 0.1 }).answers.x } : {}),
+			...(body.questions["plan.item2"] ? { "plan.item2": choice("x", { pending: 0.9, in_progress: 0.05, completed: 0.05 }).answers.x } : {}),
+		},
+	});
+	for (let i = 0; i < PLAN_EVERY - 1; i++) {
+		stepGate("c8");
+		assert.deepEqual((await atResult("c8", { name: "bash", arguments: { command: "true" } }, out("ok"))).notes, []);
+	}
+	stepGate("c8");
+	const r = await atResult("c8", { name: "bash", arguments: { command: "true" } }, out("ok"));
+	const q = seen.at(-1).body.questions;
+	assert.deepEqual(Object.keys(q.plan ? {} : q).sort(), ["plan.item0", "plan.item1", "plan.item2"]);
+	assert.deepEqual(Object.keys(q["plan.item0"].criteria), ["in_progress", "pending", "completed"], "its status as it stands first");
+	assert.match(r.notes[0], /done: "Write the game"; now: "Test it"/);
+	assert.deepEqual(turnOf("c8").plan.map((p) => p.status), ["completed", "in_progress", "pending"]);
+	assert.equal(written.length, 1);
+	assert.equal(written[0].kind, PLAN_KIND);
+	const items = itemsOf({ id: 9, kind: PLAN_KIND, data: written[0].data });
+	assert.deepEqual([items[0].kind, (items[0] as any).id, (items[0] as any).todos.map((t: any) => t.status)], ["plan", "call-plan", ["completed", "in_progress", "pending"]]);
+});
+
+test("an item never moves back, an unsure answer leaves it, and the model's own todo starts the marks again", async () => {
+	reply = (body) => ({
+		answers: Object.fromEntries(Object.keys(body.questions).map((k) => [k, choice("x", { pending: 0.95, in_progress: 0.04, completed: 0.01 }).answers.x])),
+	});
+	written.length = 0;
+	for (let i = 0; i < PLAN_EVERY; i++) {
+		stepGate("c8");
+		await atResult("c8", { name: "bash", arguments: { command: "true" } }, out("ok"));
+	}
+	assert.deepEqual(turnOf("c8").plan.map((p) => p.status), ["completed", "in_progress", "pending"], "not back to pending");
+	assert.equal(written.length, 0);
+	seeResult("c8", todo([{ content: "Write the game", status: "completed" }, { content: "Add sounds", status: "in_progress" }]), out("ok"));
+	assert.equal(turnOf("c8").planAt, turnOf("c8").steps, "read again from the model's plan in a few steps");
+	assert.equal(turnOf("c8").plan[1].content, "Add sounds");
+});
+
+test("off, no point asks and the hooks change nothing", async () => {
+	setSetting("judge", { enabled: false, base_url: base });
+	const before = seen.length;
+	seeRequest("c9", [user("Make the game")]);
+	seeResult("c9", todo([{ content: "Write the game", status: "in_progress" }]), out("ok"));
+	for (let i = 0; i < DRIFT_EVERY + 1; i++) {
+		stepGate("c9");
+		assert.deepEqual(await atResult("c9", grep, out(lines)), { notes: [] });
+	}
+	assert.equal(await atAnswer("c9", { role: "assistant", content: [{ type: "text", text: "Done." }] }), undefined);
+	assert.equal(seen.length, before);
 });

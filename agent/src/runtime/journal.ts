@@ -39,6 +39,10 @@ export const CHANGES_KIND = "bench.changes";
 /** A turn's review: findings on its changes (`review.ts`), display-only. */
 export const REVIEW_KIND = "bench.review";
 
+/** The evaluator's marks on the plan (`judge/plan.ts`): a later snapshot of the same plan, for the
+ *  thread only — the model never reads it. */
+export const PLAN_KIND = "bench.plan";
+
 /** Pi's compaction summary: a new context, with the older entries left out of what the model reads. */
 export const COMPACTION_KIND = "pi.compaction";
 
@@ -96,7 +100,7 @@ export class Requests {
 }
 
 /** The steps a `todo` call wrote. */
-function planOf(args: any): PlanStep[] {
+export function planOf(args: any): PlanStep[] {
 	const todos = Array.isArray(args?.todos) ? args.todos : [];
 	return todos.map((t: any) => ({ id: String(t?.id ?? ""), content: String(t?.content ?? ""), status: String(t?.status ?? "pending"), ...(typeof t?.parent === "string" ? { parent: t.parent } : {}) }));
 }
@@ -121,6 +125,11 @@ export function itemsOf(entry: any, requests?: Requests): ThreadItem[] {
 	if (entry.kind === REVIEW_KIND) {
 		const d = entry.data ?? {};
 		out.push({ key: `${seq}`, seq, kind: "review", of: String(d.of ?? ""), findings: Array.isArray(d.findings) ? d.findings : [], ...(d.error ? { error: String(d.error) } : {}) });
+		return out;
+	}
+	if (entry.kind === PLAN_KIND) {
+		const d = entry.data ?? {};
+		out.push({ key: `${seq}`, seq, kind: "plan", id: String(d.id ?? ""), todos: planOf({ todos: d.todos }) });
 		return out;
 	}
 	if (entry.kind === COMPACTION_KIND || entry.kind === "pi.system") return out;
