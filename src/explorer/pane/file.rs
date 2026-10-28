@@ -8,9 +8,9 @@ use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::item::Item;
-use super::view::note;
-use super::{Doc, DocKey, FileRef};
+use crate::explorer::pane::item::Item;
+use crate::explorer::pane::view::note;
+use crate::explorer::{Doc, DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::rest;
 use bench_ui::icons::Ico;
@@ -53,7 +53,7 @@ impl Item for FileItem {
 
 impl BenchApp {
     /// A file's editor, made and read once.
-    pub(super) fn ensure_doc(&mut self, f: FileRef, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn ensure_doc(&mut self, f: FileRef, window: &mut Window, cx: &mut Context<Self>) {
         let key = DocKey::File(f.clone());
         if self.explorer.docs.contains_key(&key) {
             return;
@@ -86,7 +86,7 @@ impl BenchApp {
         if self.demo {
             if let Some(d) = self.explorer.docs.get_mut(&DocKey::File(f.clone())) {
                 let text = crate::demo::file_text(&f.path);
-                let language = crate::explorer::lang::language_for_text(&f.path, &text);
+                let language = crate::explorer::code::lang::language_for_text(&f.path, &text);
                 d.editor.update(cx, |s, cx| {
                     s.set_highlighter(language, cx);
                     s.set_value(text.clone(), window, cx)
@@ -115,7 +115,7 @@ impl BenchApp {
                     Ok(t) => {
                         d.binary = t.binary || t.truncated;
                         d.loading = true;
-                        let language = crate::explorer::lang::language_for_text(&f.path, &t.text);
+                        let language = crate::explorer::code::lang::language_for_text(&f.path, &t.text);
                         d.editor.update(cx, |s, cx| {
                             s.set_highlighter(language, cx);
                             s.set_value(t.text.clone(), window, cx)

@@ -5,7 +5,7 @@ use gpui_kit::component::input::{InputEvent, InputState};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
 
-use super::{DocKey, Quick};
+use crate::explorer::{DocKey, Quick};
 use crate::app::BenchApp;
 use crate::client::rest;
 use crate::env::enc;

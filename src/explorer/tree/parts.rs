@@ -5,16 +5,16 @@ use gpui_kit::component::menu::ContextMenuExt as _;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 
-use super::tree::quiet;
-use super::view::note;
-use super::{DocKey, FileRef, Named};
+use crate::explorer::tree::view::quiet;
+use crate::explorer::pane::view::note;
+use crate::explorer::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
 use crate::env::PARTS;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
     /// The soul, the prompts, the skills (each a folder of its own).
-    pub(super) fn instruction_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    pub(crate) fn instruction_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
         let Some(e) = self.envs.get(&self.explorer.project) else {
             return vec![quiet("Reading…", 0, cx)];
@@ -45,7 +45,7 @@ impl BenchApp {
         // Prompts: files of its own prompts folder.
         out.push(
             self.node_row("prompts", "Prompts", Ico::Folder, None, vec![], cx)
-                .context_menu(super::menus::new_menu(
+                .context_menu(crate::explorer::tree::menus::new_menu(
                     cx.entity(),
                     Named::Prompt,
                     "New prompt",
@@ -65,7 +65,7 @@ impl BenchApp {
         // Skills, by where each lives; each its folder.
         out.push(
             self.node_row("skills", "Skills", Ico::Folder, None, vec![], cx)
-                .context_menu(super::menus::new_menu(
+                .context_menu(crate::explorer::tree::menus::new_menu(
                     cx.entity(),
                     Named::Skill,
                     "New skill",
@@ -165,7 +165,7 @@ impl BenchApp {
     }
 
     /// A group's parts: each section of it a node (its heading actions on it), its items under it.
-    pub(super) fn part_rows(
+    pub(crate) fn part_rows(
         &self,
         e: &crate::env::ProjectEnv,
         group: &'static str,
@@ -250,7 +250,7 @@ impl PartItem {
     }
 }
 
-impl super::item::Item for PartItem {
+impl crate::explorer::pane::item::Item for PartItem {
     fn tab(&self, _app: &BenchApp, cx: &App) -> (String, (Ico, Hsla)) {
         (
             self.name.clone(),

@@ -7,8 +7,8 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 
-use super::item::Item;
-use super::{DocKey, FileRef};
+use crate::explorer::pane::item::Item;
+use crate::explorer::{DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::rest::lsp;
 use crate::thread::composer::attachments::{ProblemsRef, Reference};
@@ -77,7 +77,7 @@ impl BenchApp {
     }
 
     /// What the project's servers know now, read into its tab.
-    pub(super) fn read_problems(
+    pub(crate) fn read_problems(
         &mut self,
         project: String,
         window: &mut Window,
@@ -113,7 +113,7 @@ impl BenchApp {
     }
 
     /// A file was checked: its project's Problems, when open, are read again.
-    pub(super) fn problems_changed(
+    pub(crate) fn problems_changed(
         &mut self,
         project: &str,
         window: &mut Window,
@@ -196,7 +196,7 @@ impl BenchApp {
 
     /// The Problems tab: the head (how many; read again; to the thread), a file's row and its
     /// problems under it, each opening the file at its line.
-    pub(super) fn problems_pane(&mut self, project: &str, cx: &mut Context<Self>) -> AnyElement {
+    pub(crate) fn problems_pane(&mut self, project: &str, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let found = self.explorer.problems.get(project).cloned().flatten();
         let all: Vec<(String, Vec<lsp_types::Diagnostic>)> = found
@@ -296,8 +296,8 @@ impl BenchApp {
             }
         }
         let body = match found {
-            None => super::view::note("Reading…", cx),
-            Some(_) if rows.is_empty() => super::view::note(
+            None => crate::explorer::pane::view::note("Reading…", cx),
+            Some(_) if rows.is_empty() => crate::explorer::pane::view::note(
                 "No problems in the files the language servers have seen",
                 cx,
             ),

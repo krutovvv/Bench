@@ -211,7 +211,7 @@ impl BenchApp {
     }
 
     /// A file's editor goes when no tab holds it and nothing is unsaved.
-    pub(super) fn drop_unused(&mut self, key: &DocKey) {
+    pub(crate) fn drop_unused(&mut self, key: &DocKey) {
         // A file's diff tab reads its document: it stays while either is open.
         let held = match key {
             DocKey::File(f) => self.explorer.tabs.contains(&DocKey::Diff(f.clone())),

@@ -10,7 +10,7 @@ use std::collections::HashSet;
 
 use serde_json::json;
 
-use super::{DocKey, Entry, Explorer, FileRef, Named, Naming};
+use crate::explorer::{DocKey, Entry, Explorer, FileRef, Named, Naming};
 use crate::app::BenchApp;
 use crate::client::rest;
 use crate::workspace::Panel;
@@ -29,7 +29,7 @@ impl BenchApp {
                 .folds
                 .get(&project)
                 .cloned()
-                .unwrap_or_else(super::persistence::first_open);
+                .unwrap_or_else(crate::explorer::pane::persistence::first_open);
             ex.project = project.clone();
             ex.listings.clear();
             ex.find = None;

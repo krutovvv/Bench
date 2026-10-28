@@ -136,7 +136,7 @@ keys, copy / cut / paste, undo ⌘Z / redo ⌘⇧Z, several cursors (⌘⌥↑ /
 
 Builder: `EditorState::new(window, cx).line_number(true).soft_wrap(false)`; `.folding(true)`
 for fold arrows; `set_highlighter(lang, cx)` with `crate::lang::language_for(path)` /
-`language_for_text` (`src/explorer/lang.rs`; only grammars enabled in `Cargo.toml`); `set_value`,
+`language_for_text` (`src/explorer/code/lang.rs`; only grammars enabled in `Cargo.toml`); `set_value`,
 `value()`. In a thread an editor never scrolls inside: give it the height of its text,
 `bench_ui::editor_height(lines, cx)` (`crates/ui/src/metrics.rs`), and let the thread scroll.
 

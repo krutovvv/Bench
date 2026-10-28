@@ -6,7 +6,7 @@
 
 use gpui_kit::*;
 
-use super::DocKey;
+use crate::explorer::DocKey;
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
@@ -36,19 +36,19 @@ impl DocKey {
     /// The document this tab holds.
     pub fn item(&self) -> Box<dyn Item> {
         match self.clone() {
-            DocKey::File(f) => Box::new(super::file::FileItem(f)),
-            DocKey::Diff(f) => Box::new(super::git::DiffItem(f)),
+            DocKey::File(f) => Box::new(crate::explorer::pane::file::FileItem(f)),
+            DocKey::Diff(f) => Box::new(crate::explorer::code::git::DiffItem(f)),
             DocKey::Settings { project } => Box::new(crate::env::page::SettingsItem(project)),
             DocKey::Part {
                 project,
                 kind,
                 name,
-            } => Box::new(super::parts::PartItem {
+            } => Box::new(crate::explorer::tree::parts::PartItem {
                 project,
                 kind,
                 name,
             }),
-            DocKey::Problems { project } => Box::new(super::problems::ProblemsItem(project)),
+            DocKey::Problems { project } => Box::new(crate::explorer::code::problems::ProblemsItem(project)),
         }
     }
 }

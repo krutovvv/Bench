@@ -6,14 +6,14 @@
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::*;
 
-use super::{DocKey, FileRef, Named};
+use crate::explorer::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
 type Act = Box<dyn Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>)>;
 
 /// A menu item's click, run on the app.
-fn act(view: &Entity<BenchApp>, f: Act) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
+pub(crate) fn act(view: &Entity<BenchApp>, f: Act) -> impl Fn(&ClickEvent, &mut Window, &mut App) + 'static {
     let view = view.clone();
     move |_, window, cx| view.update(cx, |this, cx| f(this, window, cx))
 }

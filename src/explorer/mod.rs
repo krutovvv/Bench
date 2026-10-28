@@ -6,43 +6,24 @@
 //!
 //! ```text
 //! explorer/mod.rs   the state: the project shown, folds, listings, open documents, tabs
-//! explorer/doc.rs   the tabs' keys and opening, closing, saving any of them
-//! explorer/item.rs  a document as Zed's `Item`: each kind's tab, open, draw, save
-//! explorer/file.rs  a file: read into an editor, saved, reverted, drawn
-//! explorer/ops.rs   the tree's work: listing a folder, new / rename / delete, ⌘P, ⌘⇧F
-//! explorer/tabs.rs  the tabs' drag and menu; code sent to the thread (⌘L)
-//! explorer/lsp.rs   the project's language servers in the editor: problems, hover, definition
-//! explorer/problems.rs  the project's Problems as a tab; problems sent to the thread
-//! explorer/persistence.rs  the tabs and folds kept on this Mac between starts
-//! explorer/git.rs   lines changed since HEAD in the gutter, a file's diff as a tab
-//! explorer/menus.rs the tree's context menus (new, rename, delete, copy path, Finder)
-//! explorer/tree.rs  the sidebar's tree
-//! explorer/view.rs  the middle: the open document, the tabs, ⌘P's list
+//! explorer/tree/    the tree: drawn, its parts, its menus, new / rename / delete
+//! explorer/pane/    the middle: documents, tabs, a file's editor, kept between starts
+//! explorer/search/  ⌘P a file by name, ⌘⇧F a text in the folder
+//! explorer/code/    language servers (problems, hover, definition), Problems, git, languages
 //! ```
 
-pub mod doc;
-pub mod file;
-pub mod file_finder;
-pub mod git;
-pub mod item;
-pub mod lang;
-pub mod lsp;
-pub mod menus;
-pub mod ops;
-pub mod parts;
-pub mod persistence;
-pub mod problems;
-pub mod project_search;
-pub mod tabs;
+
+pub mod code;
+pub mod pane;
+pub mod search;
 pub mod tree;
-pub mod view;
 
 use std::collections::{HashMap, HashSet};
 
 use gpui_kit::component::input::InputState;
 use gpui_kit::*;
 
-pub use doc::{Doc, DocKey, FileRef};
+pub use pane::doc::{Doc, DocKey, FileRef};
 
 /// A folder's entry, as listed: its name, its full path, whether it is a folder.
 #[derive(Clone, Debug)]

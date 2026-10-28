@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 use gpui_kit::*;
 use serde::{Deserialize, Serialize};
 
-use super::{DocKey, FileRef};
+use crate::explorer::{DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::connection;
 
@@ -124,7 +124,7 @@ pub fn first_open() -> HashSet<String> {
 
 impl BenchApp {
     /// The first opening after a start: the kept tabs opened again, each project's folds back.
-    pub(super) fn restore_explorer(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn restore_explorer(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.explorer.restored {
             return;
         }
@@ -177,7 +177,7 @@ impl BenchApp {
     }
 
     /// Every open folder of the project's tree listed (they were open when it was left).
-    pub(super) fn list_open_folders(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn list_open_folders(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let project = self.explorer.project.clone();
         let folders: Vec<FileRef> = self
             .explorer
@@ -202,7 +202,7 @@ impl BenchApp {
 
 #[cfg(test)]
 mod tests {
-    use super::{DocKey, FileRef, Tab};
+    use crate::explorer::{DocKey, FileRef, Tab};
 
     #[test]
     fn a_tab_comes_back_as_it_was_kept() {

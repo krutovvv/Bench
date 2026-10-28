@@ -70,7 +70,7 @@ impl BenchApp {
                 this.close_doc(k1.clone(), cx)
             }));
             let (drag, onto) = (
-                super::tabs::DraggedTab {
+                crate::explorer::pane::tabs::DraggedTab {
                     key: key.clone(),
                     name: name.clone().into(),
                 },
@@ -87,15 +87,15 @@ impl BenchApp {
                     // Dragged onto another tab it takes that place; onto the thread, the file
                     // goes to it.
                     .on_drag(drag, |d, _, _, cx| cx.new(|_| d.clone()))
-                    .drag_over::<super::tabs::DraggedTab>(move |s, _, _, _| {
+                    .drag_over::<crate::explorer::pane::tabs::DraggedTab>(move |s, _, _, _| {
                         s.border_l_2().border_color(primary)
                     })
                     .on_drop(
-                        cx.listener(move |this, d: &super::tabs::DraggedTab, _, cx| {
+                        cx.listener(move |this, d: &crate::explorer::pane::tabs::DraggedTab, _, cx| {
                             this.move_tab(&d.key, &onto, cx)
                         }),
                     )
-                    .context_menu(super::tabs::tab_menu(cx.entity(), key.clone()))
+                    .context_menu(crate::explorer::pane::tabs::tab_menu(cx.entity(), key.clone()))
                     .into_any_element(),
             );
         }
@@ -191,7 +191,7 @@ impl BenchApp {
 }
 
 /// One muted line, padded.
-pub(super) fn note(text: &str, cx: &App) -> AnyElement {
+pub(crate) fn note(text: &str, cx: &App) -> AnyElement {
     div()
         .p_3()
         .text_color(cx.theme().muted_foreground)

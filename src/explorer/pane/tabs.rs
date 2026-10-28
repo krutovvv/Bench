@@ -8,7 +8,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
 
-use super::{DocKey, FileRef};
+use crate::explorer::{DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::thread::composer::attachments::{CodeRef, Reference};
 use crate::workspace::{Center, Panel};
@@ -139,7 +139,7 @@ impl BenchApp {
     }
 
     /// The thread in the right dock (unless it is the center already), its composer focused.
-    pub(super) fn show_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn show_thread_beside(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.center != Center::Chat {
             self.right_dock.activate(Panel::Thread);
         }

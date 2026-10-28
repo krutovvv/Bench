@@ -10,7 +10,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::{DocKey, FileRef, Named};
+use crate::explorer::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
 use crate::env::PARTS;
 use bench_ui::icons::Ico;
@@ -50,7 +50,7 @@ impl BenchApp {
         }
         if let Some(root) = self.explorer_root() {
             let name = root.name().to_string();
-            let menu = super::menus::root_menu(cx.entity(), root.clone());
+            let menu = crate::explorer::tree::menus::root_menu(cx.entity(), root.clone());
             out.push(
                 self.heading_el("files", &name, vec![], cx)
                     .context_menu(menu)
@@ -202,15 +202,15 @@ impl BenchApp {
     }
 
     /// A folder's entries under it, `depth` deep; its open folders' entries under them.
-    pub(super) fn folder_rows(
+    pub(crate) fn folder_rows(
         &self,
         dir: &FileRef,
         depth: usize,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
         let mut out = vec![];
-        out.extend(self.naming_row(&super::Named::File(dir.clone()), depth));
-        out.extend(self.naming_row(&super::Named::Folder(dir.clone()), depth));
+        out.extend(self.naming_row(&crate::explorer::Named::File(dir.clone()), depth));
+        out.extend(self.naming_row(&crate::explorer::Named::Folder(dir.clone()), depth));
         let Some(entries) = self.explorer.listings.get(&dir.listing_key()) else {
             out.push(quiet("Reading…", depth, cx));
             return out;
@@ -237,7 +237,7 @@ impl BenchApp {
 
     /// One file or folder of the tree; its menu (`menus.rs`); `editable`: it can be renamed and
     /// deleted.
-    pub(super) fn entry_row(
+    pub(crate) fn entry_row(
         &self,
         f: &FileRef,
         dir: bool,
@@ -284,7 +284,7 @@ impl BenchApp {
                 this.open_doc(DocKey::File(target.clone()), window, cx)
             }
         }))
-        .context_menu(super::menus::entry_menu(
+        .context_menu(crate::explorer::tree::menus::entry_menu(
             cx.entity(),
             f.clone(),
             dir,
@@ -323,7 +323,7 @@ impl BenchApp {
     }
 
     /// The field a name is typed in, where `what` puts it.
-    pub(super) fn naming_row(&self, what: &Named, depth: usize) -> Option<AnyElement> {
+    pub(crate) fn naming_row(&self, what: &Named, depth: usize) -> Option<AnyElement> {
         let n = self.explorer.naming.as_ref().filter(|n| n.what == *what)?;
         let indent = match what {
             Named::Rename(_) => depth,
@@ -342,7 +342,7 @@ impl BenchApp {
 }
 
 /// A small icon action on a row (shown on its hover) or a heading.
-pub(super) fn act(
+pub(crate) fn act(
     id: &str,
     ico: Ico,
     tip: &'static str,
@@ -358,7 +358,7 @@ pub(super) fn act(
 }
 
 /// A muted line of the tree, `depth` deep (an empty folder, a group of skills).
-pub(super) fn quiet(text: &str, depth: usize, cx: &App) -> AnyElement {
+pub(crate) fn quiet(text: &str, depth: usize, cx: &App) -> AnyElement {
     div()
         .flex_none()
         .pl(bench_ui::tree_pl(depth + 1))

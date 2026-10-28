@@ -3,8 +3,8 @@
 
 use gpui_kit::*;
 
-use super::tree::{act, quiet};
-use super::{DocKey, FileRef, Find};
+use crate::explorer::tree::view::{act, quiet};
+use crate::explorer::{DocKey, FileRef, Find};
 use crate::app::BenchApp;
 use crate::client::rest;
 use crate::env::enc;
@@ -18,7 +18,7 @@ use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 impl BenchApp {
     /// ⌘⇧F in place of the tree: the field, then the lines found by file; a line opens its file
     /// there.
-    pub(super) fn find_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    pub(crate) fn find_rows(&self, cx: &mut Context<Self>) -> Vec<AnyElement> {
         let theme = cx.theme().clone();
         let Some(f) = self.explorer.find.as_ref() else {
             return vec![];

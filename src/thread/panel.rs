@@ -89,11 +89,11 @@ impl BenchApp {
         .bg(theme.title_bar);
         v_flex()
             .size_full()
-            .drag_over::<crate::explorer::tabs::DraggedTab>(|s, _, _, cx| {
+            .drag_over::<crate::explorer::pane::tabs::DraggedTab>(|s, _, _, cx| {
                 s.bg(cx.theme().list_active)
             })
             .on_drop(
-                cx.listener(|this, d: &crate::explorer::tabs::DraggedTab, window, cx| {
+                cx.listener(|this, d: &crate::explorer::pane::tabs::DraggedTab, window, cx| {
                     if let crate::explorer::DocKey::File(f) = &d.key {
                         this.send_file_to_thread(f, window, cx)
                     }

@@ -10,9 +10,9 @@ use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 use similar::{DiffOp, TextDiff};
 
-use super::item::Item;
-use super::view::note;
-use super::{Doc, DocKey, FileRef};
+use crate::explorer::pane::item::Item;
+use crate::explorer::pane::view::note;
+use crate::explorer::{Doc, DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::rest;
 
@@ -97,7 +97,7 @@ impl Item for DiffItem {
 
 impl BenchApp {
     /// HEAD's text of an open file, read once it is open; then its changes are marked.
-    pub(super) fn read_head(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn read_head(&mut self, f: &FileRef, window: &mut Window, cx: &mut Context<Self>) {
         if self.demo {
             if let Some(d) = self.explorer.docs.get_mut(&DocKey::File(f.clone())) {
                 d.head = crate::demo::file_head(&f.path);
@@ -124,7 +124,7 @@ impl BenchApp {
     }
 
     /// The file's changed lines marked in its gutter, and its diff tab (when open) written anew.
-    pub(super) fn mark_changes(
+    pub(crate) fn mark_changes(
         &mut self,
         f: &FileRef,
         window: &mut Window,
@@ -219,7 +219,7 @@ impl BenchApp {
 
 #[cfg(test)]
 mod tests {
-    use super::{Hunk, hunks, unified};
+    use crate::explorer::{Hunk, hunks, unified};
 
     #[test]
     fn lines_since_head_are_added_changed_or_removed() {

@@ -11,7 +11,7 @@ use gpui_kit::component::input::{DefinitionProvider, HoverProvider, Rope, RopeEx
 use gpui_kit::*;
 use percent_encoding::{AsciiSet, CONTROLS, percent_decode_str, utf8_percent_encode};
 
-use super::{DocKey, FileRef};
+use crate::explorer::{DocKey, FileRef};
 use crate::app::BenchApp;
 use crate::client::connection::Connection;
 use crate::client::rest::lsp::{self, Asked};
@@ -109,7 +109,7 @@ fn path_of(uri: &lsp_types::Uri) -> String {
 impl BenchApp {
     /// Give a file's editor its project's servers: the hover, the definition (another file opens
     /// as a tab of the same project and machine). None in the demo: it has no agent.
-    pub(super) fn attach_servers(&mut self, f: &FileRef, cx: &mut Context<Self>) {
+    pub(crate) fn attach_servers(&mut self, f: &FileRef, cx: &mut Context<Self>) {
         let Some((conn, project)) = self.env_target(&f.project).filter(|_| !self.demo) else {
             return;
         };
@@ -147,7 +147,7 @@ impl BenchApp {
 
     /// Ask the project's servers about the file as it is now (after `after`: typing pauses), and
     /// underline what they find. A newer check replaces this one.
-    pub(super) fn check_doc(
+    pub(crate) fn check_doc(
         &mut self,
         f: &FileRef,
         after: Duration,
@@ -207,7 +207,7 @@ impl BenchApp {
     }
 
     /// Typing in a file: its check waits for a pause.
-    pub(super) fn check_doc_soon(
+    pub(crate) fn check_doc_soon(
         &mut self,
         f: &FileRef,
         window: &mut Window,

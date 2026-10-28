@@ -95,7 +95,7 @@ impl BenchApp {
 /// Save; its typed fields stay in the environment until saved or reverted.
 pub struct SettingsItem(pub String);
 
-impl crate::explorer::item::Item for SettingsItem {
+impl crate::explorer::pane::item::Item for SettingsItem {
     fn tab(&self, app: &BenchApp, cx: &App) -> (String, (Ico, Hsla)) {
         (
             format!("{} · Settings", app.project_name(&self.0)),
