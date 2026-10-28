@@ -389,6 +389,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         open_thread(app, cx, |t| {
             t.id = None;
             t.journal = Default::default();
+            t.repo = None;
         });
     }
     open_thread(app, cx, |t| {

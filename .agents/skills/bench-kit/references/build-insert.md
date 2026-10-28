@@ -64,14 +64,15 @@ one beside it), so the kind never asks "the open thread" — it reads `at` (`app
 - `opened` (put in, or brought back: start a terminal), `removed`.
 The frame is the same for every kind (`ThreadView::render_insert`, drawn by the thread it is in): the person's avatar, a light ground, a
 thin border, round corners, `block_head` on top (one height and look for every block's head).
-State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`, a field on
-`BenchApp` (`ssh`, `tools`, `tasks`, `sites` for the browser); a long body goes to `view.rs` beside it. Build it from `bench_ui`
+State the kind needs while it lives is a struct in `src/inserts/<kind>/state.rs`, a field of
+`InsertsState` (`src/inserts/state.rs`; `app.inserts.ssh`, `.tools`, `.tasks`, `.sites`); a long body goes to `view.rs` beside it. Build it from `bench_ui`
 elements (`crates/ui`, shown in the storybook). Its clicks set `this.click_claimed = true`. What
 it calls on the app while it draws must never read a `ThreadView` (`self.thread(cx)`,
 `active_thread.read`): the view drawing it is borrowed then — use `at`.
 
-**3. Its `/` word.** A line in `words()` (`src/inserts/mod.rs`); rows for `/word <query>` in
-`tool_slash` (`inserts/subjects.rs`) when picking straight away helps (`/tasks today`).
+**3. Its `/` word.** The trait's `word()` (the word, its aliases, what it is, the key it puts
+in); `choices()` for the rows of `/word <query>` when picking straight away helps (`/tasks
+today`). The "/" list reads them from `KINDS` (`inserts/slash.rs`).
 
 **4. The agent's side**, in `agent/`:
 - **A tool** for its work: `defineTool` in `agent/src/builtin/<kind>.ts`, in the assistant's
@@ -131,7 +132,7 @@ memory.
 - **Work that takes time**: `cx.spawn_in(window, async move |this, cx| { let r =
   cx.background_spawn(async move { … }).await; this.update_in(cx, |this, window, cx| …) })`.
 - **"!" from any thread**: `!command` types into the thread's terminal insert, or puts this Mac's
-  in (in the thread's folder): `run_bang`, `subjects.rs`.
+  in (in the thread's folder): `run_bang`, `inserts/slash.rs`.
 
 ## Checklist: every file a new kind touches
 
@@ -141,12 +142,12 @@ In order, `cargo build` after each line:
 2. `agent/src/builtin/<kind>.ts` — the agent's tool (or an MCP server in the project's
    `mcp.json`); the REST routes Bench reads the same data with in a module `agent/src/modules/<kind>.ts`,
    a line in the list in `agent/src/server.ts`.
-3. `src/inserts/<kind>/state.rs` — what it keeps while it lives and its actions; the field on
-   `BenchApp` (`src/app.rs`).
+3. `src/inserts/<kind>/state.rs` — what it keeps while it lives and its actions; its field in
+   `InsertsState` (`src/inserts/state.rs`).
 4. `src/inserts/<kind>/mod.rs` — its `InsertKind`; `pub mod <kind>;` and a line in `KINDS`
    (`src/inserts/mod.rs`). A long body in `view.rs`.
-5. `src/inserts/mod.rs` `words()` — its `/` word; `src/inserts/state.rs` `insert_spec` when a row
-   carries state; `src/inserts/subjects.rs` `tool_slash` for its rows.
+5. Its `word()` and `choices()` in the `InsertKind`; `src/inserts/state.rs` `insert_spec` when a
+   row carries state.
 6. `agent/src/prompt.ts` — its line in `inserted()`.
 7. Icons: SVGs in `assets/icons/`, lines in `crates/ui/src/icons.rs` (`design-icons.md`).
 8. `src/demo/mod.rs` — a demo thread with it (`Journal` builds made-up journal items).

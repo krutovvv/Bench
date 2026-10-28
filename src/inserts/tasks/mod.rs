@@ -32,6 +32,28 @@ impl InsertKind for Tasks {
         key == "tasks"
     }
 
+    fn word(&self) -> crate::inserts::Word {
+        crate::inserts::Word {
+            word: "tasks",
+            aliases: &[],
+            desc: "The task lists",
+            key: "tasks",
+        }
+    }
+
+    /// One row per list: the insert opens on it.
+    fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<crate::app::model::SlashCommand> {
+        LISTS
+            .iter()
+            .map(|l| crate::app::model::SlashCommand {
+                name: format!("/tasks {}", l.name()),
+                desc: "the task lists, on this one".into(),
+                category: "Tool".into(),
+                key: format!("tasks:{}", l.name().to_lowercase()),
+            })
+            .collect()
+    }
+
     fn shared(&self) -> Option<&'static str> {
         Some("tasks")
     }

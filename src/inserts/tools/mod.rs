@@ -11,7 +11,7 @@ use serde_json::json;
 
 use crate::app::BenchApp;
 use crate::app::model::Insert;
-use crate::inserts::subjects::tool_key;
+use crate::inserts::slash::tool_key;
 use crate::inserts::{InsertKind, Switch, clip};
 use crate::thread::ThreadRef;
 use devtools::{GROUPS, Tool};
@@ -33,6 +33,29 @@ fn tool_of(ins: &Insert) -> Tool {
 impl InsertKind for Tools {
     fn owns(&self, key: &str) -> bool {
         key == "tools"
+    }
+
+    fn word(&self) -> crate::inserts::Word {
+        crate::inserts::Word {
+            word: "tools",
+            aliases: &["tool"],
+            desc: "Everyday utilities: Base64, JSON, regex, cron…",
+            key: "tools",
+        }
+    }
+
+    /// One row per utility, under its group's name.
+    fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<crate::app::model::SlashCommand> {
+        GROUPS
+            .iter()
+            .flat_map(|g| g.tools.iter().map(move |t| (*t, g.name)))
+            .map(|(t, g)| crate::app::model::SlashCommand {
+                name: format!("/tools {}", t.name()),
+                desc: g.to_string(),
+                category: "Tool".into(),
+                key: format!("tools:{}", tool_key(t)),
+            })
+            .collect()
     }
 
     fn shared(&self) -> Option<&'static str> {

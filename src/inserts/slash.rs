@@ -1,11 +1,12 @@
-//! What a thread is opened with: the `/` list that puts inserts into it (`app::inserts`). The
-//! terminal, a tool or the tasks opened from the keyboard are a new thread with that insert in it.
+//! What "/" puts into a thread: the bare words and, after one, what its kind can show
+//! (`InsertKind::word`, `choices`); a new thread with an insert in it (the terminal, a tool, the
+//! tasks opened from the keyboard); "!command" typed into the thread's terminal.
 
 use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::thread::{ThreadRef, ThreadView};
-use devtools::{GROUPS, Tool};
+use devtools::Tool;
 
 impl BenchApp {
     /// A new thread with one insert in it (its session is made at once).
@@ -28,50 +29,7 @@ impl BenchApp {
             Some((w, q)) => (w, q.trim().to_lowercase()),
             None => return None,
         };
-        let row = |name: String, desc: String, key: String| crate::app::model::SlashCommand {
-            name,
-            desc,
-            category: "Tool".into(),
-            key,
-        };
-        let mut rows: Vec<crate::app::model::SlashCommand> = match word.to_lowercase().as_str() {
-            "terminal" => {
-                let host = self.thread_host(at);
-                let desc = if host.is_empty() {
-                    "this Mac's terminal".to_string()
-                } else {
-                    format!("the terminal on {host}, where this project runs")
-                };
-                vec![row("/terminal".into(), desc, "ssh:local".into())]
-            }
-            "browser" => vec![row(
-                "/browser".into(),
-                "the server's browser: its tab, live".into(),
-                "browser".into(),
-            )],
-            "tasks" => crate::inserts::tasks::model::LISTS
-                .iter()
-                .map(|l| {
-                    row(
-                        format!("/tasks {}", l.name()),
-                        "the task lists, on this one".into(),
-                        format!("tasks:{}", l.name().to_lowercase()),
-                    )
-                })
-                .collect(),
-            "tools" | "tool" => GROUPS
-                .iter()
-                .flat_map(|g| g.tools.iter().map(move |t| (*t, g.name)))
-                .map(|(t, g)| {
-                    row(
-                        format!("/tools {}", t.name()),
-                        g.to_string(),
-                        format!("tools:{}", tool_key(t)),
-                    )
-                })
-                .collect(),
-            _ => return None,
-        };
+        let mut rows = crate::inserts::kind_of_word(&word.to_lowercase())?.choices(self, at);
         if !q.is_empty() {
             rows.retain(|r| {
                 r.name.to_lowercase().contains(&q) || r.desc.to_lowercase().contains(&q)

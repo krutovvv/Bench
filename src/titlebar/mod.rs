@@ -158,7 +158,7 @@ impl BenchApp {
                 .map(|s| s.title.clone())
                 .filter(|t| !t.is_empty())
                 // A thread about a task list is named after it until it has a title of its own.
-                .unwrap_or_else(|| "New session".into())
+                .unwrap_or_else(|| "New thread".into())
                 .into();
             return bar
                 .pl_4()

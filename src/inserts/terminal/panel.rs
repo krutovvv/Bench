@@ -177,7 +177,7 @@ impl BenchApp {
             {
                 let cd = format!(
                     "cd {} && clear\r",
-                    crate::inserts::subjects::shell_quote(&dir)
+                    crate::inserts::slash::shell_quote(&dir)
                 );
                 self.inserts.ssh.tabs[t].session.write(cd.as_bytes());
             }

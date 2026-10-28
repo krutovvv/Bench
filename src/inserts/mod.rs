@@ -10,12 +10,14 @@
 //! in (title, its menu, controls, fold, remove), drawn by the `ThreadView` it is in. `state.rs` here keeps the thread's inserts in
 //! step with the agent (agent/src/inserts.ts).
 //!
-//! A new kind: a folder like `tools/`, a line in `KINDS`, its word in `words()`, and a line in
-//! the agent's `inserted()` prompt (agent/src/prompt.ts).
+//! A new kind: a folder like `tools/` whose unit struct implements `InsertKind` (its "/" word
+//! and what follows it are the trait's `word` and `choices`), a line in `KINDS`, its app-wide
+//! state as a field of `state::InsertsState`, and a line in the agent's `inserted()` prompt
+//! (agent/src/prompt.ts).
 
 pub mod browser;
 pub mod state;
-pub mod subjects;
+pub mod slash;
 pub mod tasks;
 pub mod terminal;
 pub mod tools;
@@ -39,6 +41,30 @@ pub struct Switch {
     pub to: protocol::InsertPatch,
 }
 
+/// A kind's "/" word: the word ("terminal", also its `aliases`), what it is, the key it puts in.
+pub struct Word {
+    pub word: &'static str,
+    pub aliases: &'static [&'static str],
+    pub desc: &'static str,
+    pub key: &'static str,
+}
+
+impl Word {
+    /// It as a row of the "/" list.
+    pub fn command(&self, category: &str) -> SlashCommand {
+        SlashCommand {
+            name: format!("/{}", self.word),
+            desc: self.desc.into(),
+            category: category.into(),
+            key: self.key.into(),
+        }
+    }
+
+    pub fn is(&self, word: &str) -> bool {
+        self.word == word || self.aliases.contains(&word)
+    }
+}
+
 /// A kind of insert. Its app-wide state (the terminals' shells, the browser, the task list, the
 /// tool) is `BenchApp`'s; the thread it sits in is `at` — any thread on screen, the open one or
 /// the one beside it — so every method is told which (`ThreadRef`). Its block is drawn inside that
@@ -46,6 +72,13 @@ pub struct Switch {
 pub trait InsertKind: Sync {
     /// Whether `key` is this kind's.
     fn owns(&self, key: &str) -> bool;
+    /// Its "/" word: the bare "/" list offers it, and it puts the insert in at once.
+    fn word(&self) -> Word;
+    /// "/word …": what it can show, each a key to put in (a list, a tool); the bare word alone
+    /// unless the kind has more.
+    fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<SlashCommand> {
+        vec![self.word().command("Tool")]
+    }
     /// Kinds whose live state is one for the whole app (the task list, the tool): their
     /// name. Of several such inserts one is live — the last clicked, else the newest in the
     /// thread; the others offer to show it there.
@@ -152,24 +185,12 @@ pub(crate) fn scroll_pane(
 /// The words of the bare "/" list: each puts its insert in at once (the insert itself offers
 /// what to show: a list, a tool).
 pub fn words() -> Vec<SlashCommand> {
-    [
-        ("/terminal", "This Mac's terminal", "ssh:local"),
-        ("/tasks", "The task lists", "tasks"),
-        (
-            "/tools",
-            "Everyday utilities: Base64, JSON, regex, cron…",
-            "tools",
-        ),
-        ("/browser", "The server's browser: its tab, live", "browser"),
-    ]
-    .into_iter()
-    .map(|(n, d, k)| SlashCommand {
-        name: n.into(),
-        desc: d.into(),
-        category: "Insert".into(),
-        key: k.into(),
-    })
-    .collect()
+    KINDS.iter().map(|k| k.word().command("Insert")).collect()
+}
+
+/// The kind whose "/" word this is.
+pub fn kind_of_word(word: &str) -> Option<&'static dyn InsertKind> {
+    KINDS.iter().copied().find(|k| k.word().is(word))
 }
 
 impl BenchApp {

@@ -37,6 +37,15 @@ impl InsertKind for Browser {
         key == "browser"
     }
 
+    fn word(&self) -> crate::inserts::Word {
+        crate::inserts::Word {
+            word: "browser",
+            aliases: &[],
+            desc: "The server's browser: its tab, live",
+            key: "browser",
+        }
+    }
+
     fn title(&self, app: &BenchApp, _at: &ThreadRef, ins: &Insert) -> String {
         match tab_of(app, ins) {
             Some((_, _, t)) if !t.trim().is_empty() => format!("Browser · {t}"),

@@ -34,6 +34,27 @@ impl InsertKind for Terminal {
         key == "ssh:local"
     }
 
+    fn word(&self) -> crate::inserts::Word {
+        crate::inserts::Word {
+            word: "terminal",
+            aliases: &[],
+            desc: "This Mac's terminal",
+            key: "ssh:local",
+        }
+    }
+
+    /// The terminal where the thread's project runs: this Mac's, or its server's.
+    fn choices(&self, app: &BenchApp, at: &ThreadRef) -> Vec<crate::app::model::SlashCommand> {
+        let host = app.thread_host(at);
+        let mut row = self.word().command("Tool");
+        row.desc = if host.is_empty() {
+            "this Mac's terminal".to_string()
+        } else {
+            format!("the terminal on {host}, where this project runs")
+        };
+        vec![row]
+    }
+
     fn title(&self, app: &BenchApp, at: &ThreadRef, ins: &Insert) -> String {
         let a = app.thread_machine(at);
         let name = if a.is_empty() {
