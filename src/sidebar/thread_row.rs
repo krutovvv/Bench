@@ -21,7 +21,6 @@ impl BenchApp {
         cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
         let accent = theme.primary;
         let faint = bench_ui::faint(&theme);
         let s = &self.threads.list[i];
@@ -136,9 +135,6 @@ impl BenchApp {
                             .min_w_0()
                             .gap_1()
                             .items_center()
-                            .when(pinned, |d| {
-                                d.child(Ico::Pin.icon().xsmall().text_color(muted))
-                            })
                             .child(match self.renaming_field(&Item::Thread(s.id.clone())) {
                                 // Renamed in place: the field where the title was.
                                 // Over the title, in its place and size: the title stays (unseen) and
@@ -186,7 +182,11 @@ impl BenchApp {
                                     })
                                     .into_any_element(),
                             })
-                            .when_some(tag, |d, c| d.child(bench_ui::tag_dot(c))),
+                            .when_some(tag, |d, c| d.child(bench_ui::tag_dot(c)))
+                            // Pinned: a small pin after the name, with the row's other marks.
+                            .when(pinned, |d| {
+                                d.child(Ico::Pin.icon().xsmall().text_color(faint))
+                            }),
                     )
                     // Waiting for an answer: the words where there is room, the dot in the
                     // compact list.

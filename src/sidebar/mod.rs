@@ -9,7 +9,6 @@ mod project_list;
 mod project_row;
 mod telegram;
 mod thread_row;
-mod top;
 
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
 use gpui_kit::component::tooltip::Tooltip;

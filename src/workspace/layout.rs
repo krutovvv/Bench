@@ -3,7 +3,7 @@
 //! key first.
 
 use gpui_kit::component::resizable::{h_resizable, resizable_panel, v_resizable};
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -88,47 +88,16 @@ impl Render for BenchApp {
             Center::Doc => self.render_doc(window, cx),
         };
 
-        // The sidebar folded away: its corner joins the header — room for the window's buttons
-        // and the toggle that brings it back.
-        let header = self.render_header(cx);
-        let header = if self.shown_panel(DockPosition::Left).is_none() {
-            let theme = cx.theme().clone();
-            h_flex()
-                .flex_none()
-                .child(
-                    h_flex()
-                        .h(bench_ui::header_h(cx))
-                        .flex_none()
-                        .pl(px(bench_ui::WINDOW_BUTTONS_W))
-                        .pr_1()
-                        .items_center()
-                        .bg(theme.title_bar)
-                        .border_b_1()
-                        .border_color(theme.border)
-                        .child(
-                            div()
-                                .id("sidebar-show")
-                                .p_1()
-                                .cursor_pointer()
-                                .text_color(theme.muted_foreground)
-                                .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-                                .child(bench_ui::icons::Ico::PanelLeft.icon().small())
-                                .tooltip(|window, cx| {
-                                    gpui_kit::component::tooltip::Tooltip::new("Show sidebar  ⌘\\")
-                                        .build(window, cx)
-                                })
-                                .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
-                        ),
-                )
-                .child(div().flex_1().min_w_0().child(header))
-                .into_any_element()
-        } else {
-            header
-        };
+        // The window's one top bar, edge to edge over the docks: room for the window's buttons,
+        // the sidebar's fold, a short rule, then the center's header (`titlebar/`).
+        let header = h_flex()
+            .flex_none()
+            .w_full()
+            .child(self.render_window_lead(cx))
+            .child(div().flex_1().min_w_0().child(self.render_header(cx)));
         let main = v_flex()
             .size_full()
             .min_w_0()
-            .child(header)
             .child(div().flex_1().min_h_0().child(body));
 
         let content = self.render_layout(main, window, cx);
@@ -145,6 +114,7 @@ impl Render for BenchApp {
                     cx.stop_propagation();
                 }
             }))
+            .child(header)
             .child(div().flex_1().min_h_0().child(content))
             .child(self.render_statusbar(window, cx));
         base
@@ -225,12 +195,11 @@ impl BenchApp {
             }
             None => main.into_any_element(),
         };
-        // The left dock: its strip beside the window's buttons (`sidebar/top.rs`), its panel.
+        // The left dock: its panel, under the window's top bar.
         let left = left.map(|panel| {
             v_flex()
                 .size_full()
                 .bg(theme.sidebar)
-                .child(self.render_sidebar_top(cx))
                 .child(
                     div()
                         .flex_1()

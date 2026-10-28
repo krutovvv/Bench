@@ -165,9 +165,10 @@ pub const SIDEBAR_TEXT: f32 = 13.;
 /// A group's header in the sidebar (a project, the Host): 11 pt semibold in the secondary
 /// colour, as Finder's, Mail's and Xcode's sidebar sections — a label over its rows, not a row.
 pub const SIDEBAR_HEAD_TEXT: f32 = 11.;
-/// Air above a project's head (the first one sits closer), and under it.
-pub const GROUP_GAP: f32 = 13.;
-pub const GROUP_HEAD_PB: f32 = 6.;
+/// Air above a project's head (the first one sits closer), and under it: a header is near its
+/// rows and far from the group above, so the groups read apart (Finder's sidebar sections).
+pub const GROUP_GAP: f32 = 20.;
+pub const GROUP_HEAD_PB: f32 = 3.;
 /// A thread's row: its marker stripe, and its padding in the ordinary and the compact list.
 pub const ROW_STRIPE: f32 = 2.;
 /// A sidebar row is set in from the sidebar's edges by this, so its rounded ground (the open

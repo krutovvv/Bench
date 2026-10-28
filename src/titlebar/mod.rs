@@ -118,6 +118,40 @@ impl BenchApp {
         )
     }
 
+    /// The top bar's lead, left of the center's header: room for the window's buttons, the
+    /// sidebar's fold (hide or show, ⌘\), a short rule; the title follows it, as a Mac's
+    /// unified title bar has it, whether the sidebar is shown or not.
+    pub(crate) fn render_window_lead(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let shown = self.shown_panel(crate::workspace::DockPosition::Left).is_some();
+        h_flex()
+            .flex_none()
+            .h(bench_ui::header_h(cx))
+            .pl(px(bench_ui::WINDOW_BUTTONS_W))
+            .gap_2()
+            .items_center()
+            .bg(theme.title_bar)
+            .border_b_1()
+            .border_color(theme.border)
+            .child(
+                bench_ui::icon_button(
+                    "sidebar-fold",
+                    bench_ui::icons::Ico::PanelLeft,
+                    if shown { "Hide sidebar  ⌘\\" } else { "Show sidebar  ⌘\\" },
+                    false,
+                    cx,
+                )
+                .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
+            )
+            .child(
+                div()
+                    .w(px(bench_ui::HAIRLINE))
+                    .h(px(bench_ui::BAR_SEPARATOR_H))
+                    .bg(theme.border),
+            )
+            .into_any_element()
+    }
+
     /// Header strip: the session title, or the settings tabs.
     pub(crate) fn render_header(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();

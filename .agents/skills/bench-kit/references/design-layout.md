@@ -23,7 +23,7 @@ Sizes are `bench_ui` names (`crates/ui/src/metrics.rs`); the numbers below are w
 bottom dock under it in a `v_resizable`; the status bar under both
 (`render_statusbar`). The column divider is `quiet_divider`: transparent at rest, an accent line
 on hover. A whole project opens in Zed from its menu. The title bar is transparent: the sidebar starts with a 35px strip beside the traffic
-lights (`render_sidebar_top`: Hide sidebar ⌘\; a new project is the list's last row); the header (36) tops the main
+lights (`render_window_lead`: the fold ⌘\ and a short rule, then the title; the bar spans the window); the header (36) tops the main
 column.
 
 ## Facing bars (the alignment the person notices)
