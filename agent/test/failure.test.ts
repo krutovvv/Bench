@@ -53,7 +53,7 @@ test("a stopped run says why, live and in the history", async () => {
 		const wait = new Map<number, (v: any) => void>();
 		const notes: any[] = [];
 		let finishTurn: (v: any) => void = () => {};
-		const done: Promise<any> = new Promise((res) => (finishTurn = res));
+		let done: Promise<any> = new Promise((res) => (finishTurn = res));
 		ws.on("message", (d) => {
 			const m = JSON.parse(String(d));
 			if (m.id && wait.has(m.id)) (wait.get(m.id) as any)(m);
@@ -84,6 +84,15 @@ test("a stopped run says why, live and in the history", async () => {
 		const fail = opened.items.filter((i: any) => i.kind === "fail").at(-1);
 		assert.ok(fail, "the dead turn left nothing behind in the journal");
 		assert.match(String(fail.text), /\S/);
+		// The next turn dies the same way: it says so again, on its own. A turn's failure is
+		// its own; it never sticks to the next one nor silences its own failure.
+		done = new Promise((res) => (finishTurn = res));
+		await call("prompt.submit", { session_id: id, text: "try again" });
+		const again = await Promise.race([done, new Promise((_, rej) => setTimeout(() => rej(new Error("no second turn")), 60000))]);
+		assert.equal(notes.length, 2, "the second failure was said too");
+		assert.equal((String(again.text).match(/The run stopped/g) ?? []).length, 1, "once, not carried over");
+		const twice = (await call("thread.open", { session_id: id })).items.filter((i: any) => i.kind === "fail");
+		assert.equal(twice.length, 2, "each dead turn left its own note");
 		ws.close();
 		child.kill();
 		dead.close();

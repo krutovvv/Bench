@@ -5,10 +5,10 @@ import fs from "node:fs";
 import path from "node:path";
 import YAML from "yaml";
 import pkg from "../../package.json" with { type: "json" };
-import { agentDir, agents, deepMerge, deleteProvider, getSetting, providers, readAgent, readConfig, readEnv, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent, writeAgentMcp } from "../config.ts";
-import { findSkill, listSkills as skillsOf } from "../builtin/skills.ts";
+import { agentDir, agents, deepMerge, deleteProvider, getSetting, providers, readAgent, readConfig, readEnv, resolveModel, saveProvider, setEnv as storeEnv, setSetting, writeAgent } from "../config.ts";
+import { listSkills as skillsOf } from "../builtin/skills.ts";
 import { HttpError, profileOf, type Ctx, type Module } from "../http.ts";
-import { connectMcp, mcpStatus } from "../mcp.ts";
+import { mcpStatus } from "../mcp.ts";
 
 /**
  * `PUT /api/config`: each top-level key merges into its setting. The reasoning level and the
@@ -79,25 +79,7 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			patchConfig(profileOf(req), req.body?.config ?? {});
 			return { ok: true };
 		},
-		"PUT /api/mcp/servers": (req) => {
-			writeAgentMcp(profileOf(req), req.body?.servers ?? {});
-			void connectMcp(profileOf(req)).then(() => rt.reloadMcp(profileOf(req)));
-			return { ok: true };
-		},
 		"GET /api/skills": (req) => listSkills(profileOf(req)),
-		"GET /api/skills/content": (req) => {
-			const k = findSkill(profileOf(req), req.query.get("name") ?? "");
-			const f = k && path.join(k.dir, "SKILL.md");
-			if (!f) throw new HttpError(404, "skill not found");
-			return { content: fs.readFileSync(f, "utf8"), path: f };
-		},
-		"PUT /api/skills/content": (req) => {
-			const k = findSkill(profileOf(req), req.body?.name ?? "");
-			const f = k ? path.join(k.dir, "SKILL.md") : path.join(agentDir(profileOf(req)), "skills", req.body?.name, "SKILL.md");
-			fs.mkdirSync(path.dirname(f), { recursive: true });
-			fs.writeFileSync(f, String(req.body?.content ?? ""));
-			return { ok: true, path: f };
-		},
 		"POST /api/providers/custom-endpoints": (req) => {
 			const b = req.body ?? {};
 			const id = String(b.id || b.name || "").trim();

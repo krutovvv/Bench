@@ -1,8 +1,6 @@
 // Slash commands typed in a thread: /model, /reasoning, /title, /stop, /retry, /compact, and a
 // skill by its name.
 
-import fs from "node:fs";
-import path from "node:path";
 import { BACKGROUND_CONTEXT as BACKGROUND } from "@earendil-works/chord/context";
 import { readAgent, resolveModel, writeAgent } from "../config.ts";
 import { machineOf, readSkill, skillFor } from "../repo.ts";
@@ -68,7 +66,6 @@ export default ({ rt, broadcast }: Ctx): Module => {
 			// The session's commands only: skills are found and loaded by the agent itself, not typed.
 			"commands.catalog": () => ({ categories: [{ name: "Session", pairs: COMMANDS.map((c) => [c[0], c[1]]) }], pairs: [] }),
 			"slash.exec": async (p) => slash(p),
-			"command.dispatch": async ({ session_id, profile, name, arg }) => slash({ session_id, profile, command: `/${String(name).replace(/^\//, "")} ${arg ?? ""}`.trim() }),
 		},
 	};
 };

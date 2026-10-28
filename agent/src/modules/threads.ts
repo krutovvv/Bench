@@ -1,7 +1,7 @@
 // Threads: create, open, send, the queue, stop, the answers to the agent's questions, delete.
 
 import { resolveModel } from "../config.ts";
-import { gitRoot, HttpError, type Ctx, type Module } from "../http.ts";
+import { gitRoot, type Ctx, type Module } from "../http.ts";
 import { projects } from "../builtin/projects.ts";
 import { speedOf, usagePayload } from "../usage.ts";
 
@@ -26,11 +26,6 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 		// The person renames a thread (its "⋯" → Rename).
 		"session.title": ({ session_id, title }) => {
 			rt.rename(String(session_id), String(title ?? ""));
-			broadcast(session_id, "sessions.changed", {});
-			return { ok: true };
-		},
-		"session.subject": async ({ session_id, subject }) => {
-			rt.setSubject(String(session_id), String(subject ?? ""));
 			broadcast(session_id, "sessions.changed", {});
 			return { ok: true };
 		},
@@ -86,7 +81,6 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			return { ok: true };
 		},
 		// The messages waiting while the agent works (Pi's inbox): take one back, send it now, fix its words.
-		"session.queue": async ({ session_id }) => ({ items: await rt.queue(String(session_id)) }),
 		"session.queue.withdraw": async ({ session_id, id }) => ({ result: await rt.withdraw(String(session_id), String(id)) }),
 		"session.queue.send": async ({ session_id, id }) => {
 			await rt.sendNow(String(session_id), String(id));
@@ -112,10 +106,6 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 			broadcast(row.id, "sessions.changed", {});
 			return { session_id: row.id };
 		},
-		"session.undo": async ({ session_id }) => {
-			await rt.undo(session_id);
-			return { ok: true };
-		},
 		"clarify.respond": ({ session_id, prompt_id, request_id, answer }) => {
 			rt.respond(session_id, prompt_id ?? request_id, String(answer ?? ""));
 			return { ok: true };
@@ -140,13 +130,6 @@ export default ({ rt, broadcast }: Ctx): Module => ({
 		"GET /api/sessions/search": (req) => ({ results: rt.store.search(req.query.get("q") ?? "", Number(req.query.get("limit") ?? 30)).map((r) => ({ session_id: r.session_id, snippet: r.snippet })) }),
 	},
 	dynamic: [
-		[
-			"GET",
-			/^\/api\/sessions\/([^/]+)\/mutation-snapshot$/,
-			() => {
-				throw new HttpError(404, "no mutation snapshots");
-			},
-		],
 		[
 			"DELETE",
 			/^\/api\/sessions\/([^/]+)$/,

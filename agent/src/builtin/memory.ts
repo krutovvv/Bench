@@ -12,7 +12,7 @@ import { sessionOf } from "../host.ts";
 const SEP = "\n§\n";
 
 export const LIMITS = () => {
-	const m = getSetting("memory", {}) ?? {};
+	const m = getSetting<{ memory_char_limit?: number; user_char_limit?: number }>("memory", {}) ?? {};
 	return { memory: Number(m.memory_char_limit ?? 2200), user: Number(m.user_char_limit ?? 1375) };
 };
 

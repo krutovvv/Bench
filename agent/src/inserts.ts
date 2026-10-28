@@ -14,9 +14,10 @@
 // Bench sends with each message.
 
 import { defineDoc, defineEntry } from "@earendil-works/pi-durable";
-import type { JsonObject, JsonValue } from "@earendil-works/chord";
+import type { JsonValue } from "@earendil-works/chord";
+import type { JsonObject } from "@earendil-works/pi-durable";
 
-export interface InsertState {
+export type InsertState = {
 	key: string;
 	state: JsonObject;
 	folded: boolean;
@@ -27,7 +28,7 @@ export interface InsertState {
 	 * entry. The document remembers the place; without it the entry's own place decides.
 	 */
 	after?: number;
-}
+};
 
 export const InsertEntry = defineEntry<{ id: string; key: string }>("bench.insert");
 

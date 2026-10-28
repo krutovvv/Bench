@@ -26,7 +26,7 @@ test("inserts sit after the messages they were put after", () => {
 		{ kind: "bench.insert", data: { id: "i3", key: "tools" } },
 		{ kind: "pi.user" },
 	];
-	const doc = {
+	const doc: { items: Record<string, import("../src/inserts.ts").InsertState> } = {
 		items: {
 			// i1 sits where its entry says; i2 was moved down the thread (a message that went
 			// after it); i3's "after" is nonsense, so its entry decides.

@@ -143,8 +143,7 @@ export function subject(s: SessionInfo): string | undefined {
 export function inserted(items: { key: string; state: Record<string, unknown> }[]): string | undefined {
 	if (!items.length) return undefined;
 	const lines = items.map(({ key, state }) => {
-		const [kind, ...rest] = key.split(":");
-		const value = rest.join(":");
+		const [kind] = key.split(":");
 		if (kind === "ssh") return "- This machine's terminal. Run commands on it with ssh_run (host \"local\").";
 		if (kind === "tasks")
 			return `- The person's tasks, the "${state.list ?? "today"}" list. One list for every project; a project is a tag (its name as a slug), and in a project's thread the tasks tool works on that tag unless told "all". Read and change them with the tasks tool — the only place they live; the list updates by itself, so don't repeat it back unless asked. Time spent: list status "completed" with done_since / done_until and a tag; the result sums it.`;

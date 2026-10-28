@@ -89,7 +89,7 @@ export const ProcessTask = defineTask<Input, Checkpoint, Result>({
 		const reason = task.abortReason === "restart" ? "restart" : "stopped";
 		await rt.commit(() => ({ status: "terminal", outcome: { status: "aborted", reason, result: { exit: null, tail } } }), context);
 	},
-} as any);
+});
 
 /** A process as Bench and the agent see it, from its Pi task record (`Process` in crates/protocol). */
 export function processOf(rec: any): import("../protocol.gen.ts").Process | undefined {

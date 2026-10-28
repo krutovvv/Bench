@@ -28,7 +28,7 @@ function envOf(id: string): { agent: string; dir: string; project: { id: string;
 /** Every skill a project's threads can use (its folder's read where it is: `repo.ts`). */
 function skillsOf(agent: string) {
 	const p = agent.startsWith("project:") ? projects.get(agent.slice(8)) : undefined;
-	return p?.machine ? skillsFor(agent, p.folder, p.machine).catch(() => listSkills(agent, p.folder, [])) : Promise.resolve(listSkills(agent));
+	return p?.machine ? skillsFor(agent, p.folder ?? undefined, p.machine).catch(() => listSkills(agent, p.folder ?? undefined, [])) : Promise.resolve(listSkills(agent));
 }
 
 /** The project's MCP servers as the block shows them. `checked`: something tried the server

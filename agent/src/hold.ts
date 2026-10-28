@@ -5,12 +5,10 @@
 // again: a held run stays held. The document is the truth; the waiters here only wake the gate.
 
 import { defineDoc } from "@earendil-works/pi-durable";
+// A stretch the person held the run, ms; `to` absent while it still holds (crates/protocol).
+import type { Hold } from "./protocol.gen.ts";
 
-/** A stretch the person held the run, ms; `to` absent while it still holds. */
-export interface Hold {
-	from: number;
-	to?: number;
-}
+export type { Hold };
 
 export const HoldDoc = defineDoc<{ holds: Hold[] }>({
 	kind: "bench.hold",

@@ -133,7 +133,7 @@ const LANGUAGE: Record<string, string> = {
 };
 
 interface Diagnostic {
-	range: { start: { line: number; character: number } };
+	range: { start: Spot; end: Spot };
 	severity?: number;
 	message: string;
 	source?: string;

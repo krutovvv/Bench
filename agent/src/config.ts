@@ -314,7 +314,7 @@ function choiceOf(providerId: string, model: string): ModelChoice {
 }
 
 export function reasoningEffort(profile: string): string {
-	return readAgent(profile).defaultThinkingLevel ?? getSetting("agent", {})?.reasoning_effort ?? "medium";
+	return readAgent(profile).defaultThinkingLevel ?? getSetting<{ reasoning_effort?: string }>("agent", {})?.reasoning_effort ?? "medium";
 }
 
 /** A profile's compaction share, if it set one that makes sense. */
@@ -339,7 +339,7 @@ export function compactionPolicy(at: number, window: number): { reserveTokens: n
 }
 
 export function approvalsMode(profile: string): string {
-	return readAgent(profile).approvals ?? getSetting("approvals", {})?.mode ?? "off";
+	return readAgent(profile).approvals ?? getSetting<{ mode?: string }>("approvals", {})?.mode ?? "off";
 }
 
 export function timezone(_profile?: string): string {

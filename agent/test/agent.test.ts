@@ -19,7 +19,7 @@ const { toHtml, split, extractMedia } = await import("../src/telegram.ts");
 const { notes, skills } = await import("../src/prompt.ts");
 
 setSetting("timezone", "Asia/Yekaterinburg");
-writeAgent("default", { provider: "dev", model: "m" });
+writeAgent("default", { defaultProvider: "dev", defaultModel: "m" });
 const session = { id: "s1", profile: "default", cwd: home, source: "local" };
 setHost({ session: () => session } as any);
 const run = async (tool: any, args: any) => {
@@ -184,7 +184,7 @@ const { totalsOf, usagePayload } = await import("../src/usage.ts");
 
 test("usage: a thread's counters are kept and come back on a fresh store", () => {
 	const st = new Store();
-	const row = st.create({ id: "u1", conversation: 1, profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
+	const row = st.create({ id: "u1", conversation: "1", profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
 	assert.deepEqual(row.usage, { input: 0, output: 0, calls: 0 });
 	st.update("u1", { usage: { input: 1200, output: 340, calls: 2, cached: 900, tps: 31.4 } });
 	// A new Store = the agent process restarted: the same numbers are still there.
@@ -221,7 +221,7 @@ test("a waiting message keeps its attachments and block state when its words are
 test("history keeps the fixed words of a message taken back from the queue", async () => {
 	const { Store } = await import("../src/store.ts");
 	const st = new Store();
-	st.create({ id: "q1", conversation: 3, profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
+	st.create({ id: "q1", conversation: "3", profile: "default", source: "local", cwd: home, model: "m", provider: "dev", effort: "" });
 	st.addMessage("q1", { role: "user", text: "send the log" });
 	st.addMessage("q1", { role: "assistant", text: "ok" });
 	st.addMessage("q1", { role: "user", text: "send the log" });

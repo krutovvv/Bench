@@ -35,7 +35,7 @@ async function post(url: string, init: RequestInit): Promise<Response> {
 export async function transcribe(profile: string, audio: Buffer, mime: string, filename = mime.includes("wav") ? "audio.wav" : "audio.ogg"): Promise<string> {
 	const { o, base, key } = endpoint(profile, "stt");
 	const form = new FormData();
-	form.append("file", new Blob([audio], { type: mime }), filename);
+	form.append("file", new Blob([new Uint8Array(audio)], { type: mime }), filename);
 	form.append("model", String(o.model ?? "whisper-1"));
 	if (o.language) form.append("language", String(o.language));
 	const r = await post(`${base}/audio/transcriptions`, { method: "POST", headers: key ? { Authorization: `Bearer ${key}` } : {}, body: form });

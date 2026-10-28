@@ -72,8 +72,8 @@ export const SPEED_SAMPLES = 180;
  *  dropped rather than trusted — a broken sample would bend the chart and the averages. */
 export function speedOf(v: unknown): SpeedStat {
 	const o = v && typeof v === "object" ? (v as any) : {};
-	const num = (x: unknown) => (typeof x === "number" && isFinite(x) && x > 0 ? x : null);
-	const samples = (Array.isArray(o.samples) ? o.samples : [])
+	const num = (x: unknown): number | null => (typeof x === "number" && isFinite(x) && x > 0 ? x : null);
+	const samples = ((Array.isArray(o.samples) ? o.samples : []) as unknown[])
 		.map(num)
 		.filter((x): x is number => x !== null)
 		.slice(-SPEED_SAMPLES);

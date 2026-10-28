@@ -2,13 +2,13 @@
 // (src/extensions.ts), this file gives them their model and turns Pi's events into the events
 // Bench reads (message.delta, tool.start, clarify.request, …). It is also the tools' host.
 
-import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
+import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { createModels, createProvider, type Model } from "@earendil-works/pi-ai";
 import { anthropicMessagesApi } from "@earendil-works/pi-ai/api/anthropic-messages.lazy";
 import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completions.lazy";
 import { InsertEntry, Inserts, insertsOf, patchInsert, type InsertView } from "./inserts.ts";
-import type { JsonObject } from "@earendil-works/chord";
-import { createRegistry, Harness, InboxDoc, watchEvents, type AgentEvent, type Conversation } from "@earendil-works/pi-durable";
+import type { JsonObject } from "@earendil-works/pi-durable";
+import { createRegistry, Harness, InboxDoc, watchEvents, type AgentEvent, type Conversation, type SubmissionId } from "@earendil-works/pi-durable";
 import type { ExecutionEnv } from "@earendil-works/pi-durable/env";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
 import { machineEnv } from "./ssh-env.ts";
@@ -20,7 +20,7 @@ import path from "node:path";
 import { arm, jobs, setScheduler } from "./builtin/cron.ts";
 import { AGENT_HOME, agents, compactionAt, compactionPolicy, getSetting, readConfig, readAgent, reasoningEffort, resolveFallback, resolveModel, setSetting, type ModelChoice } from "./config.ts";
 import { fallbackProvider } from "./fallback.ts";
-import { EMPTY_TOTALS, totalsOf, usagePayload } from "./usage.ts";
+import { totalsOf, usagePayload, type Totals } from "./usage.ts";
 import { moveToFront } from "./queue.ts";
 import { PROCESS_KIND, processOf } from "./builtin/process.ts";
 import { warmUp } from "./lsp.ts";
@@ -71,15 +71,6 @@ interface Live {
 	/** The thread's inserts as last read from Pi (the tools' view of them). */
 	inserts: InsertView[];
 }
-
-/** A message the person sent while the agent works, waiting in the conversation's inbox. */
-export interface QueuedMessage {
-	id: string;
-	/** "followUp": sent when the agent answers; "steer": joins the running work after its tools. */
-	mode: string;
-	text: string;
-}
-
 
 /** An old thread's subject as an insert: "tasks:today" → tasks {list}, "tool:<name>" → tools {tool}… */
 function legacyInsert(subject: string): { key: string; state: JsonObject } | undefined {
@@ -333,7 +324,7 @@ export class Runtime {
 			ctx,
 		);
 		const id = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_${randomBytes(4).toString("hex")}`;
-		const row = this.store.create({ id, conversation: conversation.id, profile, source, cwd: dir, model: choice.model, provider: choice.provider, effort: reasoningEffort(profile), ...extra });
+		const row = this.store.create({ id, conversation: String(conversation.id), profile, source, cwd: dir, model: choice.model, provider: choice.provider, effort: reasoningEffort(profile), ...extra });
 		return this.attach(row, conversation);
 	}
 
@@ -431,15 +422,9 @@ export class Runtime {
 		live.generation++;
 		// A fresh turn starts free: the holds belong to the turn they were made in.
 		await this.setHolds(live, (h) => h.splice(0).length > 0);
-		live.answer = "";
-		live.blocks.clear();
-		live.narrating = false;
 		live.abort = new AbortController();
-		live.usage.started = Date.now();
-		live.usage.output = 0;
-		this.emit(id, "message.start", {});
 		// The run is live from here: Pi's own run_start comes later and finds the thread busy.
-		this.emit(id, "thread.run", { running: true });
+		this.beginRun(live);
 		await live.conversation.submit({ type: "input", content, requestId: request }, ctx);
 		if (!row.title) void this.title(live, text);
 	}
@@ -508,35 +493,12 @@ export class Runtime {
 
 	// ---- the queue (Pi's inbox) ------------------------------------------------
 
-	/** The messages waiting in the thread's inbox, oldest first. */
-	async queue(id: string): Promise<QueuedMessage[]> {
-		const live = this.live.get(id) ?? (await this.session(id));
-		if (!live) return [];
-		const inbox = (await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx)) as any;
-		return ((inbox?.items ?? []) as any[])
-			.filter((i) => i.mode !== "write")
-			.map((i) => ({ id: String(i.id), mode: i.mode, text: stripBlock(textOf(i.content)) }));
-	}
-
 	/** Take a waiting message back out of the queue. */
 	async withdraw(id: string, submission: string): Promise<string> {
 		const live = await this.session(id);
 		if (!live) throw new Error(`session not found: ${id}`);
-		const result = await this.harness.abortSubmission(submission as any, ctx, live.conversation.id);
-		if (result === "aborted") await this.dropFromInbox(live, submission);
-		return result;
-	}
-
-	/**
-	 * An aborted submission's inbox item: Pi 1.4 marks the submission unanswered but leaves the item,
-	 * and the next boundary still places it. Taken out of the inbox document in a commit.
-	 */
-	private async dropFromInbox(live: Live, submission: string): Promise<void> {
-		await live.conversation.commit(async (tx) => {
-			const inbox = (await tx.doc(InboxDoc as any, live.conversation.id)) as any;
-			const at = inbox.items.findIndex((i: any) => String(i.id) === submission);
-			if (at >= 0) inbox.items.splice(at, 1);
-		}, ctx);
+		// Pi settles the submission and takes its item out of the inbox in one commit.
+		return await this.harness.abortSubmission(Number(submission) as SubmissionId, ctx, live.conversation.id);
 	}
 
 	/**
@@ -568,8 +530,7 @@ export class Runtime {
 		const inbox = (await this.harness.snapshot(InboxDoc as any, live.conversation.id, ctx)) as any;
 		const item = (inbox?.items ?? []).find((i: any) => String(i.id) === submission);
 		if (!item) return;
-		if ((await this.harness.abortSubmission(submission as any, ctx, live.conversation.id)) !== "aborted") return;
-		await this.dropFromInbox(live, submission);
+		if ((await this.harness.abortSubmission(Number(submission) as SubmissionId, ctx, live.conversation.id)) !== "aborted") return;
 		// Its turn shows when Pi places it (after the current tools, or when the run answers).
 		const sub = await live.conversation.submit({ type: "input", content: item.content, ...(live.busy ? { whenBusy: "steer" } : {}), requestId: randomUUID() } as any, ctx);
 		// A new submission lands at the END of the inbox, and a boundary places what stands first
@@ -595,7 +556,7 @@ export class Runtime {
 		const newId = `${new Date().toISOString().slice(0, 10).replace(/-/g, "")}_${randomBytes(4).toString("hex")}`;
 		const made = this.store.create({
 			id: newId,
-			conversation: fork.id,
+			conversation: String(fork.id),
 			profile: row.profile,
 			source: "local",
 			cwd: row.cwd,
@@ -625,7 +586,7 @@ export class Runtime {
 		const lastUser = [...msgs].reverse().find((m) => m.role === "user");
 		if (lastUser) this.store.truncateMessages(id, lastUser.timestamp);
 		await this.close(id);
-		this.store.update(id, { conversation: fork.id });
+		this.store.update(id, { conversation: String(fork.id) });
 	}
 
 	// ---- prompts (clarify, approval) --------------------------------------
@@ -811,8 +772,7 @@ export class Runtime {
 				if (!live.busy) {
 					live.busy = true;
 					live.generation++;
-					this.emit(id, "message.start", {});
-					this.emit(id, "thread.run", { running: true });
+					this.beginRun(live);
 				}
 				break;
 			case "message_start": {
@@ -960,6 +920,18 @@ export class Runtime {
 	/** The reason a run stopped, as one line. Said at once, kept in the history: without it a
 	 * failed turn looks like an answer that had nothing to say, and after a restart there is
 	 * nothing left to explain the emptiness. */
+	/** A run begins: what the last one wrote, why it failed and its clock are its own, not this one's. */
+	private beginRun(live: Live): void {
+		live.answer = "";
+		live.blocks.clear();
+		live.narrating = false;
+		live.fail = undefined;
+		live.usage.started = Date.now();
+		live.usage.output = 0;
+		this.emit(live.row.id, "message.start", {});
+		this.emit(live.row.id, "thread.run", { running: true });
+	}
+
 	private failTurn(live: Live, why: unknown): void {
 		const text = String(why ?? "")
 			.replace(/^error:?\s*/i, "")
@@ -1154,19 +1126,9 @@ const TITLE_PROMPT =
 	'Too vague: {"title": "Code changes"}\nToo long: {"title": "Investigate and fix the issue where the login button does not respond on mobile devices"}\n\n' +
 	'Reply with JSON only: {"title": "..."}';
 
-function mtime(file: string): number {
-	try {
-		return fs.statSync(file).mtimeMs;
-	} catch {
-		return 0;
-	}
-}
-
 export function defaultCwd(profile: string): string {
 	const cfg = readConfig(profile);
 	const cwd = cfg?.terminal?.cwd;
 	if (typeof cwd === "string" && cwd && cwd !== "." && fs.existsSync(cwd.replace(/^~/, process.env.HOME ?? ""))) return cwd.replace(/^~/, process.env.HOME ?? "");
 	return process.env.HOME ?? "/";
 }
-
-/** The one-line detail Bench shows on a tool step (its `context`). */

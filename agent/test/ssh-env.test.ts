@@ -73,7 +73,7 @@ test("the prompt says where a machine project's work is", async () => {
 });
 
 test("/api/fs with a machine: read, write, list, rename and remove there", async () => {
-	const files = (await import("../src/modules/files.ts")).default({} as any);
+	const files = (await import("../src/modules/files.ts")).default();
 	const r = files.routes!;
 	const machine = real ?? "fake";
 	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bench-fs-machine-"));
