@@ -19,6 +19,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change an insert (`/terminal`, `/tools`, `/browser`) | `src/inserts/<kind>/` — `mod.rs` the block, `state.rs` its data and actions, `view.rs` a long body |
 | add an insert | `.agents/skills/bench-kit/references/build-insert.md` |
 | change a project's Settings (name, where, model, Telegram) or its parts (MCP, language servers, schedule) | `src/env/<section>.rs` (`mcp.rs`, `schedule.rs`, `telegram.rs`…); the page `src/env/page.rs`; a new section: `src/env/mod.rs` header |
+| export a project's environment to a file or import one (backups, a move to another project) | `src/env/backup.rs` (the Settings rows, the save and open dialogs, the alert); the agent packs and unpacks it in `agent/src/modules/backup.ts` (test `agent/test/backup.test.ts`) |
 | change the Explorer (the tree and its menus, documents, tabs, ⌘P, ⌘⇧F) | `src/explorer/`: `mod.rs` its state; `tree/` the tree (`view.rs` drawn, `parts.rs` the project's parts, `menus.rs` its context menus, `ops.rs` listing, new/rename/delete); `pane/` the middle as Zed's pane (`doc.rs` the tabs' keys and open/close/save, `item.rs` a document as Zed's `Item` — a new kind of document is a `DocKey` variant and its `Item` —, `file.rs` a file in an editor, `tabs.rs`, `view.rs`, `persistence.rs` kept between starts); `search/` (`file_finder.rs` ⌘P, `project_search.rs` ⌘⇧F); `code/` (`lsp.rs` problems, hover and definition, `problems.rs` the Problems tab ⌘⇧M, `git.rs` changed lines and a file's diff, `lang.rs` a file's language); its pieces `crates/ui/src/ide.rs`; the agent's `/api/fs/*` in `agent/src/modules/files.ts`; why: `docs/explorer.md` |
 | change what the window's docks or center show, add a panel to a dock | `src/workspace/dock.rs` (`Dock`, `Panel`), `src/workspace/mod.rs` (`Center`, `render_panel`), the layout in `src/workspace/layout.rs` |
 | change the bar over the center (a thread's title, the documents' project, a settings page's title) | `src/titlebar/mod.rs`; the documents' tab bar `src/explorer/pane/view.rs` (`render_doc`), the tabs themselves `src/explorer/pane/tabs.rs` |
@@ -45,7 +46,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change an agent tool | `agent/src/builtin/<tool>.ts`, its prompt line in `agent/src/prompt.ts`; grep, glob, ls: `agent/src/builtin/search.ts` |
 | change a project's language servers (diagnostics after every edit; the editor's problems, hover, definition via `agent/src/modules/lsp.ts`) | `agent/src/lsp/lsp.ts`, the presets in `agent/src/lsp/presets.ts`; the section `src/env/lsp.rs` |
 | change when a project's conversations are compacted | `compactionPolicy` in `agent/src/config.ts`; the row in `src/env/run.rs` |
-| change the demo (screenshots) | `src/demo/` (`mod.rs` what each `BENCH_DEMO` opens, `threads.rs`, `env.rs` the blog project, `inserts.rs` the made-up servers, `journal.rs`) |
+| change the demo (screenshots) | `src/demo/` (`mod.rs` what each `BENCH_DEMO` opens, `BENCH_DEMO_PROJECT=1|env` the new project's page (with an environment chosen), `threads.rs`, `env.rs` the blog project, `inserts.rs` the made-up servers, `journal.rs`) |
 
 ## The tree
 
