@@ -106,11 +106,9 @@ pub fn nest_pl(cx: &App) -> Pixels {
     cx.theme().font_size * 2.375 - px(4.)
 }
 
-/// Where the sidebar's project header starts its name: a 16 px inset, a 16 px head icon and
-/// the small gap between — measured on screen, the name's ink begins at 36 px, not 38: the
-/// gap step is 4 px. The rows under it — sessions, the remote note — start their text on this
-/// line, so a project and its threads read as one column.
-pub const PROJECT_NAME_X: f32 = 36.;
+/// Where the sidebar's words start, headers and rows alike, as in a Mac's source list: a row's
+/// ground is set in by `SIDEBAR_ROW_INSET` (10, HIG), its text 10 further in.
+pub const SIDEBAR_TEXT_X: f32 = SIDEBAR_ROW_INSET + 10.;
 
 /// One line of the code editor (mono font × 1.5).
 pub fn editor_line(cx: &App) -> f32 {
@@ -164,6 +162,9 @@ pub const PATH_FIELD_W: f32 = 360.;
 /// messages', so the list reads as a list and not as a page; what they are tells them apart (the
 /// name is heavier, the title quieter), not how big they are.
 pub const SIDEBAR_TEXT: f32 = 13.;
+/// A group's header in the sidebar (a project, the Host): 11 pt semibold in the secondary
+/// colour, as Finder's, Mail's and Xcode's sidebar sections — a label over its rows, not a row.
+pub const SIDEBAR_HEAD_TEXT: f32 = 11.;
 /// Air above a project's head (the first one sits closer), and under it.
 pub const GROUP_GAP: f32 = 13.;
 pub const GROUP_HEAD_PB: f32 = 6.;
@@ -171,10 +172,10 @@ pub const GROUP_HEAD_PB: f32 = 6.;
 pub const ROW_STRIPE: f32 = 2.;
 /// A sidebar row is set in from the sidebar's edges by this, so its rounded ground (the open
 /// thread's, a hover's) floats in the list.
-pub const SIDEBAR_ROW_INSET: f32 = 8.;
+pub const SIDEBAR_ROW_INSET: f32 = 10.;
 /// A mark's dot beside a name (Finder's tag).
 pub const TAG_DOT: f32 = 8.;
-pub const THREAD_ROW_PY: f32 = 5.;
+pub const THREAD_ROW_PY: f32 = 4.;
 pub const THREAD_ROW_PY_COMPACT: f32 = 3.;
 /// A search hit's inset.
 pub const HIT_PL: f32 = 14.;

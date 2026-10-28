@@ -30,14 +30,6 @@ impl BenchApp {
         let collapsed = self.sidebar.collapsed.contains(&key);
         let group: SharedString = format!("phead{g}").into();
         let remote = !p.agent.is_empty();
-        let icon = match (remote, &p.folder) {
-            // A server's Host is the server; a project on it is a folder there, or none.
-            (true, _) if p.is_host() => Ico::Server,
-            (true, Some(_)) => Ico::Folder,
-            (_, Some(f)) if std::path::Path::new(f).join(".git").exists() => Ico::FolderGit,
-            (_, Some(_)) => Ico::Folder,
-            _ => Ico::Layers,
-        };
         // A remote project's agent: connecting, or why it is not there.
         let remote_note =
             Some(&p.agent)
@@ -67,7 +59,8 @@ impl BenchApp {
                 .id(("phead", g))
                 .group(group.clone())
                 .cursor_pointer()
-                .px_4()
+                .pl(px(bench_ui::SIDEBAR_TEXT_X))
+                .pr(px(bench_ui::SIDEBAR_ROW_INSET))
                 .pt(if g == 0 {
                     AbsoluteLength::from(rems(0.5))
                 } else {
@@ -78,10 +71,8 @@ impl BenchApp {
                 .pb(px(bench_ui::GROUP_HEAD_PB))
                 .gap_1p5()
                 .items_center()
-                // The list's size, a heavier weight: a project is the name its threads hang
-                // under, read as a word and not as a label in capitals; a color marks it.
-                .text_size(px(bench_ui::SIDEBAR_TEXT))
-                .child(bench_ui::head_icon_in(icon, None, cx))
+                // A section's header, as a Mac's sidebar has them: small, semibold, secondary.
+                .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
                 .child(match renaming {
                     Some(field) => div()
                         .flex_1()
@@ -89,12 +80,12 @@ impl BenchApp {
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .child(Input::new(&field).xsmall())
                         .into_any_element(),
-                    // The name in the text's colour; only a chosen color marks it.
+                    // The name in the secondary colour; a chosen color is its tag dot.
                     None => div()
                         .min_w_0()
                         .truncate()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(theme.foreground)
+                        .text_color(muted)
                         .child(p.name.clone())
                         .into_any_element(),
                 })
@@ -170,18 +161,8 @@ impl BenchApp {
                             this.new_thread_in(new_id.clone(), cx)
                         })),
                 )
-                // The fold, always the rightmost and always shown (open: down, folded: right).
-                .child(
-                    div().flex_none().p_0p5().text_color(muted).child(
-                        if collapsed {
-                            Ico::ChevronRight
-                        } else {
-                            Ico::ChevronDown
-                        }
-                        .icon()
-                        .xsmall(),
-                    ),
-                )
+                // The fold, rightmost: shown when folded, on hover when open (Finder's).
+                .child(bench_ui::group_chevron(collapsed, group.clone(), cx))
                 .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
                 .context_menu(item_menu(cx.entity(), Item::Project(menu_id), pinned))
                 .into_any_element(),
@@ -192,7 +173,7 @@ impl BenchApp {
         if let Some(note) = remote_note {
             out.push(
                 div()
-                    .pl(px(bench_ui::PROJECT_NAME_X))
+                    .pl(px(bench_ui::SIDEBAR_TEXT_X))
                     .pr_4()
                     .py_1()
                     // The note belongs to the head: the heading's own size.

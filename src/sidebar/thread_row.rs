@@ -111,10 +111,10 @@ impl BenchApp {
             .gap_1()
             // A rounded row set in from the sidebar's edges (the open one a soft pill, as a
             // Mac's source list); its title starts where the project's name does, so a project
-            // and its threads read as one column.
+            // and its threads read as one column (a Mac's sidebar: rows flush with their header).
             .mx(px(bench_ui::SIDEBAR_ROW_INSET))
             .rounded_md()
-            .pl(px(bench_ui::PROJECT_NAME_X - bench_ui::SIDEBAR_ROW_INSET))
+            .pl(px(bench_ui::SIDEBAR_TEXT_X - bench_ui::SIDEBAR_ROW_INSET))
             .pr_2()
             // The compact list packs rows closer; the ordinary one keeps a breath around
             // each title.

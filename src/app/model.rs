@@ -111,15 +111,6 @@ pub struct ProjectEntry {
 }
 
 impl ProjectEntry {
-    pub fn key(&self) -> ProjectKey {
-        ProjectKey::parse(&self.id)
-    }
-
-    /// An agent's own environment (the Host of this Mac or of a server).
-    pub fn is_host(&self) -> bool {
-        self.key().is_host()
-    }
-
     pub fn location(&self) -> Location {
         Location {
             agent: self.agent.clone(),

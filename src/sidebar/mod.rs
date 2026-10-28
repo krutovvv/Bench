@@ -109,20 +109,20 @@ impl BenchApp {
                 .id("loose-head")
                 .group(group.clone())
                 .cursor_pointer()
-                .px_4()
+                .pl(px(bench_ui::SIDEBAR_TEXT_X))
+                .pr(px(bench_ui::SIDEBAR_ROW_INSET))
                 .pt(rems(0.5))
                 .pb_1()
                 .gap_1p5()
                 .items_center()
                 // As every project's head (`project_row`): Host is a group too.
-                .text_size(px(bench_ui::SIDEBAR_TEXT))
-                .child(bench_ui::head_icon_in(Ico::Server, None, cx))
+                .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
                 .child(
                     div()
                         .min_w_0()
                         .truncate()
                         .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(cx.theme().foreground)
+                        .text_color(cx.theme().muted_foreground)
                         .child(crate::app::LOCAL_HOST),
                 )
                 .children(host_color.map(bench_ui::tag_dot))
@@ -197,13 +197,14 @@ impl BenchApp {
         out
     }
 
-    /// "New project" as a project's head looks: a folder with a "+", in the muted colour.
+    /// "New project": a row of the list's last group, muted, its "+" where a row's text starts.
     fn render_new_project_row(&self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let on = self.new_project.form.is_some();
         h_flex()
             .id("new-project")
-            .px_4()
+            .pl(px(bench_ui::SIDEBAR_TEXT_X))
+            .pr(px(bench_ui::SIDEBAR_ROW_INSET))
             .pt(px(bench_ui::GROUP_GAP))
             .pb(px(bench_ui::GROUP_HEAD_PB))
             .gap_1p5()
@@ -212,7 +213,7 @@ impl BenchApp {
             .text_size(px(bench_ui::SIDEBAR_TEXT))
             .text_color(if on { theme.foreground } else { theme.muted_foreground })
             .hover(|s| s.text_color(theme.foreground))
-            .child(bench_ui::head_icon_in(Ico::FolderPlus, None, cx))
+            .child(Ico::Plus.icon().xsmall())
             .child("New project")
             .on_click(cx.listener(|this, _, window, cx| this.new_project_form(window, cx)))
             .into_any_element()
