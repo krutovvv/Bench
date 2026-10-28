@@ -22,10 +22,11 @@ pub fn small(cx: &App) -> Div {
     div().text_xs().text_color(cx.theme().muted_foreground)
 }
 
-/// A title: a block's or a form's name.
+/// A title: a block's or a form's name. Semibold: the UI font has no medium face, and Medium
+/// draws as the regular text beside it.
 pub fn title(cx: &App) -> Div {
     div()
-        .font_weight(FontWeight::MEDIUM)
+        .font_weight(FontWeight::SEMIBOLD)
         .text_color(cx.theme().foreground)
 }
 

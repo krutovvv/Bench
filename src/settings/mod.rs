@@ -226,7 +226,7 @@ impl BenchApp {
                             .child(
                                 div()
                                     .text_base()
-                                    .font_weight(FontWeight::MEDIUM)
+                                    .font_weight(FontWeight::SEMIBOLD)
                                     .child(title),
                             )
                             .when(current, |d| {

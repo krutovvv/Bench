@@ -102,7 +102,7 @@ impl BenchApp {
                         .gap_1p5()
                         .items_center()
                         .text_sm()
-                        .font_weight(FontWeight::MEDIUM)
+                        .font_weight(FontWeight::SEMIBOLD)
                         .text_color(muted)
                         .when_some(icon, |d, i| d.child(i.icon().xsmall()))
                         .child(title)

@@ -23,7 +23,7 @@ pub fn inline_form<L: Into<SharedString>>(
         .child(
             div()
                 .pb_1()
-                .font_weight(FontWeight::MEDIUM)
+                .font_weight(FontWeight::SEMIBOLD)
                 .child(title.into()),
         )
         .children(

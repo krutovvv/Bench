@@ -190,7 +190,7 @@ impl BenchApp {
         let servers: Vec<String> = self.inserts.ssh.servers.iter().map(|s| s.alias.clone()).collect();
         let agents: Vec<String> = self.places.server_agents.iter().map(|a| a.host.clone()).collect();
         let label = |text: &'static str| {
-            div().text_sm().font_weight(FontWeight::MEDIUM).child(text).into_any_element()
+            div().text_sm().font_weight(FontWeight::SEMIBOLD).child(text).into_any_element()
         };
         let hint = |text: String| div().text_xs().text_color(muted).child(text).into_any_element();
 

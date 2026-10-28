@@ -82,7 +82,7 @@ impl ThreadView {
                                 .when(strike, |d| d.line_through().text_color(muted))
                                 .when(t.status == "in_progress", |d| {
                                     d.text_color(theme.foreground)
-                                        .font_weight(FontWeight::MEDIUM)
+                                        .font_weight(FontWeight::SEMIBOLD)
                                 })
                                 .child(t.content.clone()),
                         )
@@ -166,7 +166,7 @@ impl ThreadView {
                 div()
                     .flex_1()
                     .min_w_0()
-                    .font_weight(FontWeight::MEDIUM)
+                    .font_weight(FontWeight::SEMIBOLD)
                     .when(settled, |d| d.text_color(muted))
                     .child(card.question.clone()),
             )
