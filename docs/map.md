@@ -7,7 +7,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | You are asked to… | Open |
 |---|---|
 | change a size, a gap, a font, a color, a button's look | `crates/ui/src/` (`metrics.rs`, `text.rs`, `button.rs`, `theme/`) — see it in `cargo run -p storybook` |
-| add or change a colour theme (the gear's Theme chips) | `crates/ui/src/theme/palettes.rs` (a `Palette` per half, the row in `SCHEMES`), the syntax JSON of each half in `assets/themes/` (written by `scripts/gen_themes.py`), the chips in `crates/ui/src/swatch.rs`, the tab in `src/settings/appearance.rs` |
+| change Bench's colours (its light and dark half) | `crates/ui/src/theme/palettes.rs` (`BENCH_LIGHT`, `BENCH_DARK`), the syntax JSON of each half in `assets/themes/bench-*.json` (written by `scripts/gen_themes.py`); a mark's colours: `crates/ui/src/mark.rs` |
 | add an icon | `assets/icons/<name>.svg`, a line in `crates/ui/src/icons.rs` |
 | change how a message, an answer or "N actions" looks | `src/thread/rows/message.rs`, `src/thread/rows/work.rs` (a call's line: `rows/tool_labels.rs`) |
 | change what the thread shows or in what order | `crates/thread/src/rows.rs` (the rules are tests in `tests.rs`) |

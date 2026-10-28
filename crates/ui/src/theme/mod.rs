@@ -15,9 +15,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Mode {
-    #[default]
     Light,
     Dark,
+    /// macOS's own: Bench turns dark when the Mac does.
+    #[default]
     System,
 }
 
@@ -40,16 +41,9 @@ impl Size {
     }
 }
 
-/// Accent presets: (name, light-mode color, dark-mode color).
-pub const ACCENTS: &[(&str, u32, u32)] = &[
-    ("Blue", 0x4F6FD8, 0x74A5F2),
-    ("Violet", 0x7A5BD0, 0xA98BF0),
-    ("Green", 0x3F8A50, 0x86C08A),
-    ("Teal", 0x16848A, 0x5FC0C4),
-    ("Amber", 0xB7700F, 0xE2B05A),
-    ("Coral", 0xCF5A3C, 0xEE8C6C),
-    ("Rose", 0xC2457A, 0xEC86AE),
-];
+/// The accent: (name, light-mode color, dark-mode color). One, Bench's blue; the person
+/// chooses light or dark, not a hue.
+pub const ACCENTS: &[(&str, u32, u32)] = &[("Blue", 0x2F6BED, 0x5B9BFF)];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]

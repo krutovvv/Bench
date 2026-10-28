@@ -133,9 +133,6 @@ pub const DOT: f32 = 6.;
 /// A colour's sample in a menu, and the cell it sits in.
 pub const SWATCH: f32 = 12.;
 pub const SWATCH_CELL: f32 = 16.;
-/// An accent's sample in the gear, and the air around it inside its ring.
-pub const ACCENT_SWATCH: f32 = 18.;
-pub const ACCENT_SWATCH_PAD: f32 = 3.;
 /// A checkbox (a task, a question's choice).
 pub const CHECKBOX: f32 = 14.;
 /// An icon or a box beside a line of text, lowered onto the text's first line.

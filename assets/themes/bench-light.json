@@ -1,41 +1,41 @@
 {
-  "name": "One Dark Pro",
-  "appearance": "dark",
+  "name": "Bench Light",
+  "appearance": "light",
   "style": {
-    "editor.background": "#282C34",
-    "editor.foreground": "#ABB2BF",
-    "editor.active_line.background": "#2C313C",
-    "editor.line_number": "#4B5263",
-    "editor.active_line_number": "#ABB2BF",
-    "editor.invisible": "#5C6370",
-    "error": "#E06C75",
-    "warning": "#E5C07B",
-    "success": "#98C379",
-    "info": "#61AFEF",
-    "hint": "#5C6370",
+    "editor.background": "#FFFFFF",
+    "editor.foreground": "#1B1C1F",
+    "editor.active_line.background": "#F6F6F7",
+    "editor.line_number": "#989BA3",
+    "editor.active_line_number": "#1B1C1F",
+    "editor.invisible": "#DCDDE2",
+    "error": "#CF222E",
+    "warning": "#BF8700",
+    "success": "#1A7F37",
+    "info": "#0969DA",
+    "hint": "#6E7781",
     "syntax": {
       "attribute": {
-        "color": "#D19A66"
+        "color": "#0550AE"
       },
       "boolean": {
-        "color": "#D19A66"
+        "color": "#0550AE"
       },
       "comment": {
-        "color": "#5C6370",
+        "color": "#6E7781",
         "font_style": "italic"
       },
       "comment_doc": {
-        "color": "#7F848E",
+        "color": "#6E7781",
         "font_style": "italic"
       },
       "constant": {
-        "color": "#56B6C2"
+        "color": "#0550AE"
       },
       "constructor": {
-        "color": "#61AFEF"
+        "color": "#8250DF"
       },
       "embedded": {
-        "color": "#ABB2BF"
+        "color": "#1B1C1F"
       },
       "emphasis": {
         "font_style": "italic"
@@ -44,103 +44,103 @@
         "font_weight": 700
       },
       "enum": {
-        "color": "#E5C07B"
+        "color": "#953800"
       },
       "function": {
-        "color": "#61AFEF"
+        "color": "#8250DF"
       },
       "hint": {
-        "color": "#5C6370"
+        "color": "#6E7781"
       },
       "keyword": {
-        "color": "#C678DD"
+        "color": "#CF222E"
       },
       "label": {
-        "color": "#D19A66"
+        "color": "#0550AE"
       },
       "link_text": {
-        "color": "#61AFEF",
+        "color": "#8250DF",
         "font_style": "normal"
       },
       "link_uri": {
-        "color": "#56B6C2",
+        "color": "#0550AE",
         "font_style": "italic"
       },
       "number": {
-        "color": "#D19A66"
+        "color": "#0550AE"
       },
       "operator": {
-        "color": "#56B6C2"
+        "color": "#CF222E"
       },
       "property": {
-        "color": "#E06C75"
+        "color": "#0550AE"
       },
       "punctuation": {
-        "color": "#ABB2BF"
+        "color": "#1F2328"
       },
       "punctuation.bracket": {
-        "color": "#B2B9C6"
+        "color": "#656D76"
       },
       "punctuation.delimiter": {
-        "color": "#B2B9C6"
+        "color": "#656D76"
       },
       "punctuation.list_marker": {
-        "color": "#E06C75"
+        "color": "#CF222E"
       },
       "punctuation.special": {
-        "color": "#56B6C2"
+        "color": "#0A3069"
       },
       "string": {
-        "color": "#98C379"
+        "color": "#0A3069"
       },
       "string.escape": {
-        "color": "#56B6C2"
+        "color": "#0A3069"
       },
       "string.regex": {
-        "color": "#56B6C2"
+        "color": "#0A3069"
       },
       "string.special": {
-        "color": "#D19A66"
+        "color": "#0550AE"
       },
       "string.special.symbol": {
-        "color": "#D19A66"
+        "color": "#0550AE"
       },
       "tag": {
-        "color": "#E06C75"
+        "color": "#116329"
       },
       "tag.doctype": {
-        "color": "#C678DD"
+        "color": "#CF222E"
       },
       "text.literal": {
-        "color": "#98C379"
+        "color": "#0A3069"
       },
       "text.code.span": {
-        "color": "#98C379"
+        "color": "#0A3069"
       },
       "title": {
-        "color": "#E06C75",
+        "color": "#CF222E",
         "font_weight": 700
       },
       "type": {
-        "color": "#E5C07B"
+        "color": "#953800"
       },
       "variable": {
-        "color": "#E06C75"
+        "color": "#953800"
       },
       "variable.special": {
-        "color": "#D19A66"
+        "color": "#0550AE"
       },
       "primary": {
-        "color": "#ABB2BF"
+        "color": "#1B1C1F"
       },
       "predictive": {
-        "color": "#5C6370"
+        "color": "#6E7781"
       },
       "preproc": {
-        "color": "#C678DD"
+        "color": "#CF222E"
       },
       "variant": {
-        "color": "#E5C07B"
+        "color": "#0550AE"
       }
     }
   }

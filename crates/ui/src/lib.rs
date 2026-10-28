@@ -16,8 +16,8 @@ pub mod icons;
 pub mod ide;
 pub mod layout;
 pub mod list;
+pub mod mark;
 pub mod metrics;
-pub mod swatch;
 pub mod text;
 pub mod theme;
 
@@ -31,8 +31,8 @@ pub use icons::Ico;
 pub use ide::*;
 pub use layout::*;
 pub use list::*;
+pub use mark::*;
 pub use metrics::*;
-pub use swatch::*;
 pub use text::*;
 
 /// A click handler, as `cx.listener(...)` makes it.

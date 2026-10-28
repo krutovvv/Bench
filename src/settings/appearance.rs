@@ -20,7 +20,7 @@ pub fn save(a: &Appearance) {
 
 impl BenchApp {
     pub(crate) fn render_appearance(&mut self, cx: &mut Context<Self>) -> impl IntoElement {
-        use bench_ui::theme::{ACCENTS, Mode};
+        use bench_ui::theme::Mode;
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
         let a = self.appearance.clone();
@@ -98,72 +98,16 @@ impl BenchApp {
                 view.update(cx, |this, cx| this.set_appearance(next, window, cx));
             })
             .into_any_element();
-        let dark = theme.mode.is_dark();
-        let accents = h_flex()
-            .gap_1()
-            .children(
-                ACCENTS
-                    .iter()
-                    .enumerate()
-                    .map(|(k, (name, light, dark_c))| {
-                        let on = a.accent == k;
-                        let color: Hsla = rgb(if dark { *dark_c } else { *light }).into();
-                        let next = bench_ui::theme::Appearance {
-                            accent: k,
-                            ..a.clone()
-                        };
-                        div()
-                            .id(("accent", k))
-                            .p(px(bench_ui::ACCENT_SWATCH_PAD))
-                            .border_1()
-                            .rounded_md()
-                            .border_color(if on {
-                                theme.foreground
-                            } else {
-                                theme.transparent
-                            })
-                            .cursor_pointer()
-                            .child(div().size(px(bench_ui::ACCENT_SWATCH)).bg(color))
-                            .tooltip(move |window, cx| {
-                                gpui_kit::component::tooltip::Tooltip::new(*name).build(window, cx)
-                            })
-                            .on_click(cx.listener(move |this, _, window, cx| {
-                                this.set_appearance(next.clone(), window, cx)
-                            }))
-                    }),
-            )
-            .into_any_element();
-
-        // A colour theme paints the surfaces and the code; the accent below stays the person's.
-        let view = cx.entity();
-        let chips = bench_ui::theme_chips(
-            &a.scheme,
-            theme.mode.is_dark(),
-            cx,
-            std::rc::Rc::new(move |k, window, cx| {
-                let name = bench_ui::theme::palettes::SCHEMES[k].name;
-                view.update(cx, |this, cx| {
-                    let next = bench_ui::theme::Appearance {
-                        scheme: name.into(),
-                        ..this.appearance.clone()
-                    };
-                    this.set_appearance(next, window, cx);
-                });
-            }),
-        );
-
         // The page's own width: these rows are rows of the same list, and a narrower column for
         // them alone read as a mistake (their rules ended short of every other rule).
         v_flex().w_full().child(
             v_flex()
                 .w_full()
-                .child(row("Theme", a.scheme().halves, chips))
                 .child(row(
                     "Mode",
                     "Light, dark, or follow macOS.",
                     segmented("mode", modes, cx),
                 ))
-                .child(row("Accent", "Buttons, selection, links.", accents))
                 .child(row(
                     "Compact sidebar",
                     "Chats and servers as titles only, closer together.",
