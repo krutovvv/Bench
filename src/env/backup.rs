@@ -32,34 +32,26 @@ impl SettingsForm for Backup {
         cx: &mut Context<BenchApp>,
     ) -> Option<Vec<AnyElement>> {
         let (p1, p2) = (e.id.clone(), e.id.clone());
-        let button = |id: &'static str, label: &'static str, cx: &mut Context<BenchApp>| {
-            div()
-                .flex()
-                .justify_end()
-                .child(bench_ui::form_action(id, label, false, cx))
-        };
+        // A push button at the row's end, as the folder's "Choose…".
+        let button = |button: Stateful<Div>| div().flex().justify_end().child(button);
         Some(vec![
             settings_field(
                 "Export",
                 "Soul, prompts, skills, servers, schedule and bot, in one file",
-                button("env-export", "Export…", cx)
-                    .id("env-export-row")
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.env_export(p1.clone(), window, cx)
-                    }))
-                    .into_any_element(),
+                button(bench_ui::form_action("env-export", "Export…", false, cx).on_click(
+                    cx.listener(move |this, _, window, cx| this.env_export(p1.clone(), window, cx)),
+                ))
+                .into_any_element(),
                 cx,
             )
             .into_any_element(),
             settings_field(
                 "Import",
                 "From an exported file; the same names here are replaced",
-                button("env-import", "Import…", cx)
-                    .id("env-import-row")
-                    .on_click(cx.listener(move |this, _, window, cx| {
-                        this.env_import(p2.clone(), window, cx)
-                    }))
-                    .into_any_element(),
+                button(bench_ui::form_action("env-import", "Import…", false, cx).on_click(
+                    cx.listener(move |this, _, window, cx| this.env_import(p2.clone(), window, cx)),
+                ))
+                .into_any_element(),
                 cx,
             )
             .into_any_element(),
