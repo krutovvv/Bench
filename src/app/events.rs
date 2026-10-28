@@ -2,7 +2,6 @@
 //! the views showing it, and what a run's end means for the window (a notification, stale copies
 //! of files) —, an agent's list of threads changed.
 
-use gpui_kit::*;
 use protocol::{Event, ThreadEvent, ThreadId};
 
 use super::*;

@@ -5,7 +5,6 @@ use std::time::Duration;
 use web_time::Instant;
 
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::*;
 
 use crate::client::connection::{self};
 

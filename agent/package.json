@@ -1,6 +1,6 @@
 {
   "name": "bench-agent",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Bench's agent: a server on Pi Durable",
   "type": "module",
