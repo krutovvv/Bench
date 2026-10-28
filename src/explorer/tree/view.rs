@@ -43,7 +43,7 @@ impl BenchApp {
             let id = self.explorer.project.clone();
             self.load_env(&id, window, cx);
         }
-        let mut out = vec![self.explorer_picker(cx), self.explorer_side_switch(cx)];
+        let mut out = vec![self.explorer_picker(cx)];
         if self.explorer.threads {
             out.extend(self.explorer_threads(cx));
             return out;
@@ -184,6 +184,17 @@ impl BenchApp {
             .items_center()
             .child(div().min_w_0().child(picker))
             .child(div().flex_1())
+            // What the panel lists, as Xcode's navigator picks it: two small glyphs, the shown one
+            // in the accent — the files, or the project's threads to pick the one beside.
+            .child(self.explorer_side_button(false, cx))
+            .child(self.explorer_side_button(true, cx))
+            .child(
+                div()
+                    .w(px(bench_ui::HAIRLINE))
+                    .h(px(bench_ui::BADGE))
+                    .mx_0p5()
+                    .bg(cx.theme().border),
+            )
             .child(
                 bench_ui::icon_button("ex-refresh", Ico::RefreshCw, "Read it again", false, cx)
                     .on_click(cx.listener(|this, _, w, cx| this.refresh_explorer(w, cx))),
@@ -195,31 +206,18 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// Files | Threads under the picker, as Xcode's navigator switches what it lists: the tree, or
-    /// the project's threads to pick the one beside the document.
-    fn explorer_side_switch(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        let on = self.explorer.threads;
-        let seg = |k: usize, label: &'static str, chosen: bool, cx: &mut Context<Self>| {
-            bench_ui::segment(div().id(("ex-side", k)), chosen, &theme)
-                .flex_1()
-                .justify_center()
-                .child(label)
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.explorer.threads = k == 1;
-                    cx.notify();
-                }))
+    /// One of the panel's two lists, as a navigator's glyph: the folder or the threads.
+    fn explorer_side_button(&mut self, threads: bool, cx: &mut Context<Self>) -> AnyElement {
+        let (id, ico, tip) = if threads {
+            ("ex-side-threads", Ico::MessageSquare, "The project's threads")
+        } else {
+            ("ex-side-files", Ico::Folder, "The project's files")
         };
-        div()
-            .flex_none()
-            .px(px(bench_ui::SIDEBAR_ROW_INSET))
-            .pb_2()
-            .child(
-                bench_ui::segment_track(&theme)
-                    .w_full()
-                    .child(seg(0, "Files", !on, cx))
-                    .child(seg(1, "Threads", on, cx)),
-            )
+        bench_ui::icon_button(id, ico, tip, self.explorer.threads == threads, cx)
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.explorer.threads = threads;
+                cx.notify();
+            }))
             .into_any_element()
     }
 

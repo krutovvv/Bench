@@ -23,21 +23,12 @@ impl BenchApp {
         if ks.key == "escape" && !m.modified() {
             return self.escape(cx);
         }
-        // ⌃`: the terminal under the center, as in Zed and VS Code.
-        if ks.key == "`" && m.control && !m.platform && !m.alt && !m.shift {
-            self.toggle_terminal_panel(window, cx);
-            return true;
-        }
         if !m.platform || m.control || m.alt {
             return false;
         }
+        // The rest of the window's keys are the menu bar's (`menu.rs`): it shows them. These stay
+        // here, the window's only when they are not a field's.
         match (ks.key.as_str(), m.shift) {
-            ("n", false) => {
-                // The new thread appears where a thread lives: beside a document, in the
-                // dock; otherwise the center shows it (`new_thread_here`).
-                self.new_thread_here(cx);
-                self.focus_composer(window, cx);
-            }
             ("2", false) if crate::app::shortcuts::SSH => self.open_terminal_thread(window, cx),
             // ⌘T: another terminal below the center, when it shows.
             ("t", false) if self.bottom_dock.shows(Panel::Terminal) => {
@@ -47,43 +38,14 @@ impl BenchApp {
                 let tool = self.inserts.tools.tool;
                 self.open_tool_thread(tool, window, cx)
             }
-            ("\\", false) => self.toggle_sidebar(cx),
             // ⌘⌫ / ⌘⌦: delete the open thread — asked once, as ⌫ ⌫ in the sidebar
-            // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's.
+            // (`sidebar_items.rs`); a bare ⌫ elsewhere is the composer's, and ⌘⌫ in a field
+            // deletes to the line's start when no thread is open in the center.
             ("backspace" | "delete", false)
                 if self.center == Center::Chat && self.thread(cx).id.is_some() =>
             {
-                let at = self.thread_ref(cx);
-                let id = at.id.clone().unwrap_or_default();
-                if self.armed.is(&crate::app::armed::thread_key(id.as_str())) {
-                    self.delete_thread(at.host, id, cx);
-                } else {
-                    self.arm_delete(id.to_string(), cx);
-                }
+                self.delete_open_thread(cx)
             }
-            // Dictation without its button: start, and again to stop and transcribe.
-            ("d", true) => self.toggle_mic(window, cx),
-            ("f", false) => self.open_search(window, cx),
-            // The Explorer (`src/explorer/`): the sidebar's panel, a file by name, a text in the
-            // folder; a document saved, its tab closed.
-            ("e", false) => self.toggle_side(window, cx),
-            // The thread beside the code, and the code sent to it.
-            ("j", false) => self.toggle_thread_beside(window, cx),
-            ("l", false) if self.focused_doc().is_some() => {
-                self.send_selection_to_thread(window, cx)
-            }
-            ("p", false) => self.open_quick(window, cx),
-            ("f", true) => self.open_find(window, cx),
-            ("m", true) => self.open_problems(window, cx),
-            ("s", false) => return self.save_active_doc(window, cx),
-            ("w", false) if self.center == Center::Doc => {
-                if let Some(key) = self.explorer.active.clone() {
-                    self.close_doc(key, cx);
-                }
-            }
-            (".", false) if self.thread(cx).live.is_some() => self.stop(cx),
-            ("=" | "+", _) => self.step_size(1, window, cx),
-            ("-", false) => self.step_size(-1, window, cx),
             _ => return false,
         }
         true
@@ -139,7 +101,7 @@ impl BenchApp {
     }
 
     /// ⌘+ / ⌘−: the Appearance size, one step.
-    fn step_size(&mut self, step: i32, window: &mut Window, cx: &mut Context<Self>) {
+    pub(crate) fn step_size(&mut self, step: i32, window: &mut Window, cx: &mut Context<Self>) {
         let sizes = [Size::Small, Size::Normal, Size::Large];
         let at = sizes
             .iter()

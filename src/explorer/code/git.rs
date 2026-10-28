@@ -200,6 +200,7 @@ impl BenchApp {
             Some((true, _)) | None => note("Reading…", cx),
             Some((false, false)) => note("Not in a repository, or not committed yet", cx),
             Some((false, true)) => Editor::new(&editor)
+                .line_height(relative(bench_ui::CODE_LEAD))
                 .appearance(false)
                 .h_full()
                 .into_any_element(),

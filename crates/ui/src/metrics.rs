@@ -44,6 +44,9 @@ pub const LIST_ROW_H: f32 = 26.;
 pub const STATUS_H: f32 = 29.;
 /// The thread's leading, in lines: messages and the composer share it.
 pub const LEAD: f32 = 1.5;
+/// The code editor's leading, Zed's "comfortable" (1.618 × the font): the library's 1.5 set code
+/// lines a touch tighter than Zed and Xcode do.
+pub const CODE_LEAD: f32 = 1.618;
 /// A picture's square in the composer and in a sent message.
 pub const THUMB: f32 = 64.;
 /// A filled control outside a bar ("Add server"), in rems.

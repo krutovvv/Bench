@@ -276,6 +276,7 @@ impl BenchApp {
             note("Reading…", cx)
         } else {
             Editor::new(&editor)
+                .line_height(relative(bench_ui::CODE_LEAD))
                 .appearance(false)
                 .h_full()
                 .into_any_element()

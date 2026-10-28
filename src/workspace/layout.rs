@@ -101,13 +101,14 @@ impl Render for BenchApp {
             .child(div().flex_1().min_h_0().child(body));
 
         let content = self.render_layout(main, window, cx);
-        let base = v_flex()
-            .size_full()
-            .bg(theme.background)
-            .text_color(theme.foreground)
-            // The app menu's Settings… (⌘,) acts on this window (`app/menu.rs`).
-            .on_action(cx.listener(BenchApp::on_open_settings))
-            .on_action(cx.listener(BenchApp::on_new_window))
+        // The menu bar's items act on this window (`app/menu.rs`).
+        let base = crate::app::menu::listen(
+            v_flex()
+                .size_full()
+                .bg(theme.background)
+                .text_color(theme.foreground),
+            cx,
+        )
             // Shortcuts for the whole window (app/keys.rs) see every key first.
             .capture_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                 if this.global_key(&ev.keystroke, window, cx) {
