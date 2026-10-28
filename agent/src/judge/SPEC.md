@@ -38,8 +38,8 @@ the first), and below its threshold an answer changes nothing.
 ## Off, unset or failing
 
 Every point does nothing and the turn goes the classic way. A failure (refused, timed out after
-60 s — a local server loads its model on the first request — or an HTTP error) keeps that address
-quiet for a minute. Every request and its answer is a line in `~/.bench/judge.log`, to measure the
+150 s — a local server behind a GPU balancer starts and loads its model on the first request, 90 s
+measured — or an HTTP error) keeps that address quiet for a minute. Every request and its answer is a line in `~/.bench/judge.log`, to measure the
 evaluator by; the thread's meters count its requests and how often it changed the course
 (`Usage.judge_calls`, `judge_nudges`).
 

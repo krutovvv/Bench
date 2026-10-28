@@ -33,8 +33,9 @@ export interface ChoiceAnswer {
 	probabilities: Record<string, number>;
 }
 
-/** A local server loads its model on the first request: that one may take this long. */
-const TIMEOUT_MS = 60_000;
+/** A local server starts its container and loads its model on the first request (90 s measured
+ *  behind a GPU balancer that first stops speech to text): that one may take this long. */
+const TIMEOUT_MS = 150_000;
 /** After a failure the evaluator is left alone this long. */
 const QUIET_MS = 60_000;
 /** The most of a state sent, in characters (a local server's window is ~16K tokens). */
