@@ -170,7 +170,18 @@ impl Connection {
 /// Bench's own state (last place, drafts, marks, settings, SSH reattach files): `~/.bench/ui`,
 /// beside the agent's home.
 pub fn state_dir() -> PathBuf {
-    crate::client::launch::agent_home().join("ui")
+    STATE_DIR
+        .get()
+        .cloned()
+        .unwrap_or_else(|| crate::client::launch::agent_home().join("ui"))
+}
+
+static STATE_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+/// Keep this run's state somewhere else (the demo: a folder of its own, so nothing it does —
+/// folds, marks, tabs, the last thread — touches the person's).
+pub fn use_state_dir(dir: PathBuf) {
+    let _ = STATE_DIR.set(dir);
 }
 
 /// Bench kept its state in `~/Library/Application Support/bench` before (and, as hermes-gpui,

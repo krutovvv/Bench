@@ -29,7 +29,15 @@ use crate::client::connection;
 
 #[cfg(not(target_family = "wasm"))]
 fn main() {
-    connection::migrate_state();
+    // The demo keeps its state in a folder of its own: the person's stays as it was.
+    if std::env::var("BENCH_DEMO").is_ok() {
+        let look = settings::appearance::load();
+        connection::use_state_dir(std::env::temp_dir().join(format!("bench-demo-{}", std::process::id())));
+        // Its look is the person's (reading it changes nothing of theirs).
+        settings::appearance::save(&look);
+    } else {
+        connection::migrate_state();
+    }
     let args: Vec<String> = std::env::args().collect();
     if args.get(1).map(String::as_str) == Some("--probe") {
         if let Err(e) = client::probe::run(args.get(2).map(String::as_str).unwrap_or("local")) {

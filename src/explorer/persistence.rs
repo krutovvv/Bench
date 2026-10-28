@@ -129,9 +129,6 @@ impl BenchApp {
             return;
         }
         self.explorer.restored = true;
-        if self.demo {
-            return;
-        }
         let kept: Kept = std::fs::read(path())
             .ok()
             .and_then(|b| serde_json::from_slice(&b).ok())
@@ -153,9 +150,9 @@ impl BenchApp {
         }
     }
 
-    /// The tabs and folds written down (not before they were read back, not in the demo).
+    /// The tabs and folds written down (not before they were read back).
     pub(crate) fn keep_explorer(&mut self) {
-        if !self.explorer.restored || self.demo {
+        if !self.explorer.restored {
             return;
         }
         let ex = &mut self.explorer;

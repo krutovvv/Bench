@@ -264,9 +264,6 @@ impl BenchApp {
 
     /// Remember the open thread (called whenever it changes).
     pub(crate) fn save_place(&self, cx: &App) {
-        if self.demo {
-            return;
-        }
         let at = self.thread_ref(cx);
         let place = at.id.map(|id| (at.host, id));
         let _ = std::fs::create_dir_all(connection::state_dir());

@@ -57,11 +57,6 @@ impl BenchApp {
         if !self.sidebar.collapsed.remove(&key) {
             self.sidebar.collapsed.insert(key);
         }
-        // The demo folds and unfolds in memory: the person's own folds stay as they were.
-        if self.demo {
-            cx.notify();
-            return;
-        }
         let _ = std::fs::create_dir_all(connection::state_dir());
         let _ = std::fs::write(
             collapsed_path(),
