@@ -39,14 +39,21 @@ impl BenchApp {
             .track_scroll(&self.env_scroll)
             .px(inset)
             .pb(inset)
-            .children(error.map(|err| {
-                div()
-                    .pt(inset)
-                    .text_color(theme.danger)
-                    .child(err)
-                    .into_any_element()
-            }))
-            .children(self.render_env_form(&id, cx))
+            // The gear's column (`settings_page`): the form in the middle, its widest SETTINGS_W.
+            .items_center()
+            .child(
+                v_flex()
+                    .w_full()
+                    .max_w(px(bench_ui::SETTINGS_W))
+                    .children(error.map(|err| {
+                        div()
+                            .pt(inset)
+                            .text_color(theme.danger)
+                            .child(err)
+                            .into_any_element()
+                    }))
+                    .children(self.render_env_form(&id, cx)),
+            )
             .into_any_element()
     }
 

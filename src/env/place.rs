@@ -3,7 +3,6 @@
 //! another (this Mac's agent over SSH), and its folder — which can be changed, and the agent kept
 //! in it (`agent/src/machine/confined.ts`). Agent and machine are chosen when the project is made.
 
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::h_flex;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -186,7 +185,8 @@ impl SettingsForm for Place {
         );
         let view = cx.entity();
         let pid = e.id.clone();
-        let kept = Checkbox::new("env-folder-confined")
+        // On or off, as a Mac's settings have it: a switch.
+        let kept = gpui_kit::component::switch::Switch::new("env-folder-confined")
             .checked(e.place.confined)
             .on_click(move |on, _, cx| {
                 let on = *on;

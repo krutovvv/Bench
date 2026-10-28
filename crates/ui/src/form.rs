@@ -113,7 +113,16 @@ pub fn settings_page(id: &'static str, rows: Vec<AnyElement>) -> AnyElement {
         .overflow_y_scroll()
         .px(px(crate::metrics::CHAT_LEFT))
         .pb(px(crate::metrics::CHAT_LEFT))
-        .child(v_flex().flex_1().children(rows))
+        // A column in the middle, as a Mac's settings pane: rows read as one form, not as
+        // a label at one edge of the window and its control at the other.
+        .items_center()
+        .child(
+            v_flex()
+                .flex_1()
+                .w_full()
+                .max_w(px(crate::metrics::SETTINGS_W))
+                .children(rows),
+        )
         .into_any_element()
 }
 

@@ -92,6 +92,8 @@ pub const TITLE_BAR_H: f32 = 40.;
 
 /// A page laid out for reading (the new project's): its column's width.
 pub const PAGE_W: f32 = 680.;
+/// A settings page's column (the gear's, a project's Settings): its widest.
+pub const SETTINGS_W: f32 = 760.;
 /// A choice drawn as a card (the new project's "where"): its least height, so a row of them
 /// lines up whatever their text.
 pub const CHOICE_CARD_MIN_H: f32 = 128.;
