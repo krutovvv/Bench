@@ -97,6 +97,7 @@ icons! {
     FileDiff => "file-diff",
     MessagesSquare => "messages-square",
     Paperclip => "paperclip",
+    Send => "send",
     Pencil => "pencil",
     Pin => "pin",
     Pause => "pause",

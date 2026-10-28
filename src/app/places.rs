@@ -32,6 +32,7 @@ pub fn entry_of(agent: &str, p: &Value) -> Option<ProjectEntry> {
         folder: text("folder"),
         machine: text("machine"),
         browser: p["browser"].as_bool().unwrap_or(false),
+        telegram: p["telegram"]["token"].as_str().is_some_and(|t| !t.is_empty()),
     })
 }
 

@@ -200,6 +200,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         agent: String::new(),
         machine: None,
         browser: true,
+        telegram: false,
     };
     // The production site: worked on over SSH, on web-1 (its terminal is that server's).
     let web = crate::app::model::ProjectEntry {
@@ -207,13 +208,19 @@ fewer form fields. Then check what it did to signups and give me a short summary
         ..project("p-web", "Production site", Some("/var/www/storefront"))
     };
     app.places.projects = vec![
-        project("p-blog", "Northwind blog", Some("/Users/demo/code/blog")),
+        // The blog's bot takes its readers' questions in Telegram.
+        crate::app::model::ProjectEntry {
+            telegram: true,
+            ..project("p-blog", "Northwind blog", Some("/Users/demo/code/blog"))
+        },
         project("p-store", "Storefront", Some("/Users/demo/code/storefront")),
         web,
         project("p-audit", "Competitor audit", None),
         project("p-me", "Personal", None),
     ];
     for s in app.threads.list.iter_mut() {
+        // The rate limiting asks to run a command: its row has the dot.
+        s.waiting = s.id.as_str() == "d-api";
         s.project = match s.id.as_str() {
             "d-site" => "p-blog",
             "d-landing" | "d-api" | "d-tests" => "p-store",

@@ -83,7 +83,12 @@ export class Asks {
 
 	/** Wait for the answer to `ask`: Bench hears what waits (`asks`), the listeners the question. */
 	private wait(live: Live, ask: Ask, question: string, timeoutS: number): Promise<string> {
-		const told = () => this.rt.tell(live.row.id, { kind: "asks", value: this.of(live) });
+		// The thread's own view hears what waits; the list hears that the thread waits (the
+		// sidebar's dot, `ThreadSummary.waiting`).
+		const told = () => {
+			this.rt.tell(live.row.id, { kind: "asks", value: this.of(live) });
+			this.rt.listChanged();
+		};
 		return new Promise<string>((resolve) => {
 			const timer = setTimeout(() => done(""), timeoutS * 1000);
 			const done = (answer: string) => {

@@ -273,13 +273,7 @@ impl SettingsForm for Telegram {
                 h_flex()
                     .gap_2()
                     .items_center()
-                    .child(
-                        div()
-                            .size(px(bench_ui::DOT))
-                            .flex_none()
-                            .rounded_full()
-                            .bg(dot),
-                    )
+                    .child(bench_ui::dot(dot))
                     .child(div().flex_1().min_w_0().child(line))
                     .child(
                         bench_ui::form_action(

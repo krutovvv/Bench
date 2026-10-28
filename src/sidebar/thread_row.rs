@@ -24,6 +24,7 @@ impl BenchApp {
     ) -> impl IntoElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
+        let accent = theme.primary;
         let s = &self.threads.list[i];
         let selected =
             self.center == Center::Chat && self.thread(cx).id.as_ref() == Some(&s.id);
@@ -48,6 +49,13 @@ impl BenchApp {
             .repo_of(&row_at)
             .filter(|p| p.in_branch_folder() && !p.branch.is_empty())
             .map(|p| p.branch.clone());
+        // Its run waits for the person (a question, an approval): a dot in the accent, the one
+        // thing in the list that asks for a click. The open thread knows it first-hand.
+        let waiting = if open {
+            !self.thread(cx).journal.asks().is_empty()
+        } else {
+            s.waiting
+        };
         let meta: Option<String> = if s.running && paused {
             Some("paused".into())
         } else {
@@ -201,6 +209,7 @@ impl BenchApp {
                                     .into_any_element(),
                             }),
                     )
+                    .when(waiting, |d| d.child(bench_ui::dot(accent)))
                     // Compact: the title alone (a working session still shimmers).
                     .when_some(meta.filter(|_| !compact), |d, meta| {
                         d.child(div().flex_none().text_xs().text_color(muted).child(meta))

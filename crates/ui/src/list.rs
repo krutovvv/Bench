@@ -27,6 +27,11 @@ pub fn head_icon_in(icon: Ico, color: Option<Hsla>, cx: &App) -> impl IntoElemen
         )
 }
 
+/// A state's dot in `color` (an agent up, a terminal running, a thread waiting for an answer).
+pub fn dot(color: Hsla) -> Div {
+    div().flex_none().size(px(crate::metrics::DOT)).rounded_full().bg(color)
+}
+
 /// The room a head's "+" takes, kept when it has none, so every chevron sits at one x.
 pub fn head_plus_slot() -> Div {
     div()

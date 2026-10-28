@@ -97,6 +97,19 @@ impl BenchApp {
                         .child(p.name.clone())
                         .into_any_element(),
                 })
+                // A bot of its own: its threads are written to from Telegram too.
+                .when(p.telegram, |d| {
+                    d.child(
+                        div()
+                            .id(("ptg", g))
+                            .flex_none()
+                            .text_color(muted)
+                            .child(Ico::Send.icon().xsmall())
+                            .tooltip(|window, cx| {
+                                Tooltip::new("Its Telegram bot is on").build(window, cx)
+                            }),
+                    )
+                })
                 .child(div().flex_1())
                 // Removing asks first: its environment goes with it.
                 .when(armed, |d| {

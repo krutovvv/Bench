@@ -29,6 +29,9 @@ pub struct ThreadSummary {
     pub running: bool,
     /// The person paused its run.
     pub paused: bool,
+    /// Its run waits for the person: a question to answer or a command to approve.
+    #[serde(default)]
+    pub waiting: bool,
     /// Where it was started: "local" (Bench), "telegram", "cron".
     pub source: String,
     /// The project it belongs to; `None` for the agent's own (Host) threads.

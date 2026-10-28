@@ -98,7 +98,7 @@ impl InsertKind for Terminal {
                     .text_sm()
                     .text_color(theme.muted_foreground)
                     .cursor_pointer()
-                    .child(div().size(px(bench_ui::DOT)).rounded_full().bg(theme.primary))
+                    .child(bench_ui::dot(theme.primary))
                     .child("Background")
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.click_claimed = true;

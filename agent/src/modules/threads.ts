@@ -20,6 +20,7 @@ export default ({ rt }: Ctx): Module => ({
 						messages: s.message_count,
 						running: rt.isBusy(s.id),
 						paused: rt.holds.isPaused(s.id),
+						waiting: (rt.live.get(s.id)?.prompts.size ?? 0) > 0,
 						source: s.source,
 						updated: s.updated,
 						cwd: s.cwd,

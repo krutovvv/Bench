@@ -166,6 +166,10 @@ export type ThreadSummary = { id: ThreadId, title: string, messages: number, run
  */
 paused: boolean, 
 /**
+ * Its run waits for the person: a question to answer or a command to approve.
+ */
+waiting: boolean, 
+/**
  * Where it was started: "local" (Bench), "telegram", "cron".
  */
 source: string, 
