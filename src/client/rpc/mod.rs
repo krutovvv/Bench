@@ -66,6 +66,7 @@ impl Client {
     }
 
     /// The same, waited for on this thread (`bench --probe`, no UI).
+    #[cfg(not(target_family = "wasm"))]
     pub fn request_blocking<R: Request>(&self, request: &R) -> Result<R::Response> {
         let answer = self
             .send(request)?
