@@ -141,14 +141,14 @@ impl ThreadView {
                 protocol::QueuedItem {
                     key: "q-1".into(),
                     sub: "q-1".into(),
-                    mode: "steer".into(),
+                    mode: protocol::QueueMode::Steer,
                     text: "And the cover: the one from the spring shoot.".into(),
                     request: None,
                 },
                 protocol::QueuedItem {
                     key: "q-2".into(),
                     sub: "q-2".into(),
-                    mode: "follow-up".into(),
+                    mode: protocol::QueueMode::FollowUp,
                     text: "Skip the pricing table for now, it goes in the next release.".into(),
                     request: None,
                 },
@@ -498,7 +498,7 @@ impl ThreadView {
                 sub,
                 mode,
                 text,
-            } => self.render_queued(&key, &sub, &mode, &text, window, cx),
+            } => self.render_queued(&key, &sub, mode, &text, window, cx),
         }
     }
 

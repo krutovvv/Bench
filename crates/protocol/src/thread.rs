@@ -216,12 +216,23 @@ impl ThreadItem {
 pub struct QueuedItem {
     pub key: String,
     pub sub: String,
-    pub mode: String,
+    pub mode: QueueMode,
     pub text: String,
     /// Bench's id for the message, when Bench sent it.
     #[ts(optional)]
     #[serde(default)]
     pub request: Option<String>,
+}
+
+/// How a waiting message joins the run (Pi's inbox modes): after the current tools, or when the
+/// run has answered.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+pub enum QueueMode {
+    #[serde(rename = "steer")]
+    Steer,
+    #[default]
+    #[serde(rename = "followUp")]
+    FollowUp,
 }
 
 /// The answer to `thread.open {thread, since}`: the thread as it is now. What changes after it

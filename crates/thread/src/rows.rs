@@ -56,7 +56,7 @@ pub enum Row {
     Queued {
         key: String,
         sub: String,
-        mode: String,
+        mode: protocol::QueueMode,
         text: String,
     },
 }
@@ -442,7 +442,7 @@ pub(crate) fn rows_of(
     rows.extend(queue.iter().map(|q| Row::Queued {
         key: q.key.clone(),
         sub: q.sub.clone(),
-        mode: q.mode.clone(),
+        mode: q.mode,
         text: q.text.clone(),
     }));
     // Words on their way to the queue: the row of a waiting message, but with no controls —
@@ -450,7 +450,7 @@ pub(crate) fn rows_of(
     rows.extend(sent_queue.iter().map(|p| Row::Queued {
         key: format!("sent-queue-{}", p.request),
         sub: String::new(),
-        mode: String::new(),
+        mode: protocol::QueueMode::FollowUp,
         text: p.text.clone(),
     }));
     rows

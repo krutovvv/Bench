@@ -57,6 +57,7 @@ pub fn typescript() -> String {
         ThreadItem::decl(),
         PlanStep::decl(),
         QueuedItem::decl(),
+        QueueMode::decl(),
         ThreadOpen::decl(),
         InsertState::decl(),
         InsertPatch::decl(),

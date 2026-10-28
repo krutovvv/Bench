@@ -15,13 +15,13 @@ impl ThreadView {
         &mut self,
         key: &str,
         sub: &str,
-        mode: &str,
+        mode: protocol::QueueMode,
         text: &str,
         _window: &mut Window,
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
-        let steer = mode == "steer";
+        let steer = mode == protocol::QueueMode::Steer;
         // Words still on their way to the queue (no `sub` yet): the row shows, controls wait
         // for the id the agent will give them.
         let echo = sub.is_empty();

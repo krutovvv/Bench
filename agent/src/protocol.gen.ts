@@ -39,11 +39,13 @@ export type PlanStep = { id: string, content: string,
  */
 status: string, parent?: string, };
 
-export type QueuedItem = { key: string, sub: string, mode: string, text: string, 
+export type QueuedItem = { key: string, sub: string, mode: QueueMode, text: string, 
 /**
  * Bench's id for the message, when Bench sent it.
  */
 request?: string, };
+
+export type QueueMode = "steer" | "followUp";
 
 export type ThreadOpen = { items: Array<ThreadItem>, queue: Array<QueuedItem>, inserts: { [key in string]?: InsertState }, running: boolean, 
 /**

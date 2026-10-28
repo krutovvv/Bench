@@ -81,7 +81,7 @@ fn queued(sub: u64, t: &str) -> QueuedItem {
     QueuedItem {
         key: format!("q{sub}"),
         sub: sub.to_string(),
-        mode: "followUp".into(),
+        mode: protocol::QueueMode::FollowUp,
         text: t.into(),
         request: None,
     }
