@@ -1,6 +1,6 @@
 //! A project in the sidebar: its head (the name, its Telegram and schedule marks, "⋯" on hover —
-//! its Settings among its items —, "+" for a new thread in it always shown, as Claude's, then
-//! the fold), then
+//! its Settings among its items —, the fold, then "+" for a new thread in it, always shown and
+//! rightmost, as Claude's), then
 //! its threads on the head's guide. Its files and environment are the Code view's (the switch
 //! over the window).
 
@@ -198,6 +198,9 @@ impl BenchApp {
                     ),
                 ),
             )
+            // The fold, before "+": shown when folded, on hover when open (Finder's); "+" is the
+            // rightmost, so it stands at the same x on every head.
+            .child(bench_ui::group_chevron(collapsed, group.clone(), cx))
             .child(
                 bench_ui::head_plus_slot()
                     .id(("pnew", g))
@@ -216,9 +219,6 @@ impl BenchApp {
                         this.new_thread_in(new_in.clone(), cx)
                     })),
             )
-            // The fold, rightmost, after "+": shown when folded, on hover when open (Finder's); its
-            // room kept either way, so "+" stands at one x on every head.
-            .child(bench_ui::group_chevron(collapsed, group.clone(), cx))
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(fold_key.clone(), cx)))
             .context_menu(item_menu(cx.entity(), Item::Project(id), pinned))
             .into_any_element()
