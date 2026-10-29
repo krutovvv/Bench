@@ -28,6 +28,7 @@ takes them again).
 | A labelled field, a form, a setting | `field_row`, `inline_form`, `settings_row`, `settings_heading`, `settings_field` | `form.rs` |
 | A Mac segmented control | `segmented(id, labels, chosen, cx, on_pick)`; its parts `segment_track`, `segment` (Light · Dark · System, the terminals' tabs) | `form.rs` |
 | Chat \| Code | `mode_switch` | `bars.rs` |
+| Files \| Threads (a panel's width) | `mode_switch_full` | `bars.rs` |
 | A big choice (the new project's place) | `choice_card` | `form.rs` |
 | The sections of a settings panel | `settings_tabs(id, &[(Ico, "Label")], open, cx, on_pick)` — text tabs with icons, the open one underlined in the accent over a rule across the page | `form.rs` |
 | A block (insert, card, pane) | `block(title, actions, body, cx)`, `block_frame`, `block_head`, `block_body` | `block.rs` |

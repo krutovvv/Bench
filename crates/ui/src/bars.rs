@@ -52,12 +52,35 @@ pub fn mode_switch(
     cx: &App,
     on_pick: crate::OnPick,
 ) -> Div {
+    capsule_switch(id, modes, chosen, false, cx, on_pick)
+}
+
+/// A `mode_switch` as wide as its place, its segments sharing it (a panel's Files | Threads).
+pub fn mode_switch_full(
+    id: &'static str,
+    modes: &[(Ico, &'static str, &'static str)],
+    chosen: usize,
+    cx: &App,
+    on_pick: crate::OnPick,
+) -> Div {
+    capsule_switch(id, modes, chosen, true, cx, on_pick)
+}
+
+fn capsule_switch(
+    id: &'static str,
+    modes: &[(Ico, &'static str, &'static str)],
+    chosen: usize,
+    full: bool,
+    cx: &App,
+    on_pick: crate::OnPick,
+) -> Div {
     use crate::metrics::{MODE_SEGMENT_H, MODE_SWITCH_PAD};
     let theme = cx.theme().clone();
     h_flex()
         .flex_none()
         .p(px(MODE_SWITCH_PAD))
         .gap(px(MODE_SWITCH_PAD))
+        .when(full, |d| d.w_full())
         .rounded_full()
         // A grey track, no rule; the pressed segment a raised chip.
         .bg(theme.foreground.opacity(0.06))
@@ -69,6 +92,7 @@ pub fn mode_switch(
                 .h(px(MODE_SEGMENT_H))
                 // The round ends take room: a step more than a squared segment's sides.
                 .px_2p5()
+                .when(full, |d| d.flex_1().justify_center())
                 .gap_1()
                 .items_center()
                 .rounded_full()
