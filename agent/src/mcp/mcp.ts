@@ -45,7 +45,30 @@ interface Server {
 /** key: "<agent>/<server>" */
 const servers = new Map<string, Server>();
 
-export const mcpTools = (agent: string): ToolRegistration[] => [...servers.values()].filter((s) => s.agent === agent).flatMap((s) => s.tools);
+/** Each server's tools as last listed, key "<agent>/<server>": declared while it reconnects. */
+const known = new Map<string, ToolRegistration[]>();
+
+/**
+ * An agent's MCP tools. A server that is down or reconnecting keeps its tools declared as they were
+ * last listed, each answering that it is reconnecting: the tools sit at the head of every request,
+ * and a list that shrinks and grows back rewrites it, the model server's prefix cache with it (on a
+ * local model, a minute of prefill each time). A server taken out of mcp.json loses them.
+ */
+export const mcpTools = (agent: string): ToolRegistration[] =>
+	[...servers.entries()]
+		.filter(([, s]) => s.agent === agent)
+		.flatMap(([key, s]) => {
+			if (s.tools.length) {
+				known.set(key, s.tools);
+				return s.tools;
+			}
+			return (known.get(key) ?? []).map((t: any) => ({
+				...t,
+				execute: async () => {
+					throw new Error(`MCP server "${s.name}" is not connected now (${s.error ?? "reconnecting"}); try again in a moment, or go on without it`);
+				},
+			}));
+		});
 // `connected` is the client being alive after a try; `error` is why the try failed. A server with
 // no entry at all was never tried — nobody called it yet — which is NOT the same as working.
 export const mcpStatus = (agent?: string) =>

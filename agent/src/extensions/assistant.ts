@@ -28,6 +28,7 @@ import { judgeActive } from "../judge/client.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
 import { steer } from "../runtime/steer.ts";
+import { frozen } from "../builtin/frozen.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../runtime/inserts.ts";
 
@@ -36,6 +37,8 @@ const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined
 	const info = of(input);
 	return info ? render(info) : undefined;
 };
+/** A section held as it was until the next compaction (`builtin/frozen.ts`): a change would rewrite the prompt's head. */
+const held = (name: string, render: Parameters<typeof s>[0]) => (input: any) => frozen(String(input.conversationId), name, () => s(render)(input));
 
 /** Commands that ask first when approvals are on (the agent's settings.json "approvals": "manual"). */
 const DANGEROUS: [RegExp, string][] = [
@@ -99,8 +102,8 @@ export const assistant = defineExtension({
 	tools: [...coding, grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, resolveComment, memoryTool, skillView, skillManage, cronTool, sessionSearch, sshRun, processTool],
 	tasks: [CronTask, ProcessTask],
 	sections: [
-		section("soul", s(soul), { tag: false }),
-		section("environment", s(environment)),
+		section("soul", held("soul", soul), { tag: false }),
+		section("environment", held("environment", environment)),
 		// Read from the thread's own document: what the person inserted.
 		section(
 			"inserts",
@@ -110,9 +113,9 @@ export const assistant = defineExtension({
 			},
 			{ tag: false },
 		),
-		section("project", s(projectContext), { tag: false }),
-		section("skills", s(skills), { tag: false }),
-		section("notes", s(notes), { tag: false }),
+		section("project", held("project", projectContext), { tag: false }),
+		section("skills", held("skills", skills), { tag: false }),
+		section("notes", held("notes", notes), { tag: false }),
 	],
 	hooks: [
 		compactWithoutReasoning,

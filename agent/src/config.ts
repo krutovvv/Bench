@@ -343,15 +343,18 @@ export function compactionAt(agent: string): number | undefined {
 /**
  * Pi's compaction policy from one share of the model's window, so it holds when the model (and
  * its window) changes: the summary is made at `at` of the window (a background one starts 5% of the
- * window earlier), and 40% of what was there stays word for word — a code project's files are
- * still in front of the model after it.
+ * window earlier), and 20% of what was there stays word for word. After a summary the model server
+ * reads everything that follows the prompt's head again (a minute for 60K tokens on a local model),
+ * so what stays is kept small: the files in work and the person's words in force follow the summary
+ * instead (`judge/summary.ts`). At 40% the next compaction came after ~40K tokens of work; at 20%
+ * after ~65K.
  */
 export function compactionPolicy(at: number, window: number): { reserveTokens: number; backgroundTokens: number; keepRecentTokens: number } {
 	const threshold = Math.floor(window * at);
 	return {
 		reserveTokens: Math.max(4096, window - threshold),
 		backgroundTokens: Math.floor(window * 0.05),
-		keepRecentTokens: Math.floor(threshold * 0.4),
+		keepRecentTokens: Math.floor(threshold * 0.2),
 	};
 }
 

@@ -32,7 +32,8 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   (where the project has the server browser's MCP) and each utility's own (`/base64`, `/json-yaml`…;
   `/tools …` lists them all). Every `/` adds a new insert where the conversation is. An insert:
   - shows something live (a terminal, a utility, a browser tab);
-  - tells the agent what it shows with every message (`<block-state>`, kept out of the history);
+  - tells the agent what it shows with every message (`<block-state>`, kept out of the thread Bench
+    shows; the model's history keeps it, as taking it out would rewrite the prompt and its cache);
   - has an agent tool that acts on it;
   - is restored exactly on return.
 
@@ -131,7 +132,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Thread | a Pi conversation in `~/.bench/pi.sqlite`; every step durable, a turn survives a restart. Bench shows its journal: `thread.open` (items after a head, the queue, the inserts' state) and the `thread.*` events from Pi's commits (`agent/src/runtime/journal.ts`) |
 | Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `session.insert`, `session.insert.patch` |
 | What the agent knows of inserts | the `inserts` prompt section, read with `input.read.snapshot(Inserts, conversationId)`, one line per kind (`prompt.ts` `inserted()`), plus `<block-state>` with each message |
-| Prompt | Pi sections (soul, environment, inserts, project, skills, notes), resent only when changed |
+| Prompt | Pi sections (soul, environment, inserts, project, skills, notes); all but inserts held as first read until the next compaction (`builtin/frozen.ts`): a changed section rewrites the prompt's head and the model server's cache with it |
 | Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Bench's id for each message is Pi's `requestId`: the row shown on Enter is matched by it, never by its words |
 | Plan, questions | the agent's own `todo` and `clarify` calls in the journal, the answer the call's result (`docs/thread-objects.md`) |
 | Pause | the conversation document `bench.hold` (`hold.ts`) and a gate in `beforeTool`: a held run stays held across a restart |
@@ -142,7 +143,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | `/browser` | the Playwright MCP through `@earendil-works/pi-mcp` (`mcp__browser__*`), one tab per thread (state `{tab,url}`). The server browser is its own project, `~/Projects/browser-server-mcp` (github.com/krutovvv/browser-server-mcp) (an MCP server with a live view); Bench is one of its clients (`src/inserts/browser/gateway.rs`), watching the gateway the project's `browser` MCP server names as `live`, with the key `~/.bench/ui/browser.json` keeps for it under `keys` |
 | Model | one for every thread of every project, set in the gear: the general agent's `defaultProvider`/`defaultModel`; a project has no model of its own. The fallback (`fallback_providers[0]`) is a pi-ai provider of ours (`fallback.ts`): the main model's error or silence sends the same request to it (Pi retries only with the same model), and the thread's `info {fallback}` shows a red chip by its repo |
 | Where tools work | Pi's `ExecutionEnv`, one per conversation (`runtime/tools-host.ts` `envFor`): `NodeExecutionEnv` on the agent's machine, `SshExecutionEnv` (`machine/ssh.ts`) on a project's machine over SSH, wrapped by `machine/confined.ts` for a project kept in its folder. Pi's read/write/edit/bash and our grep/glob/ls work through it unchanged |
-| Compaction | Pi's compaction policy; a project's share of the window becomes a per-model override under its own provider (`project_<id>.<provider>`), through a getter Pi reads at every use (`compactionOverrides`) |
+| Compaction | Pi's compaction policy; a project's share of the window becomes a per-model override under its own provider (`project_<id>.<provider>`), through a getter Pi reads at every use (`compactionOverrides`); 20% of the context stays word for word, and after the summary the evaluator puts the person's words in force, the files in work and exact results (`judge/summary.ts`) |
 | After an edit | a `ToolTask` `afterTool` hook adds the file's diagnostics from the project's language servers (`lsp.ts`) to edit and write results |
 | Read and edit | Pi's `read` wrapped to show every line as `LINE:HASH|text`, and an `edit` of the same name that changes lines by those anchors (`builtin/hashline.ts`): no old text to reproduce, a stale anchor refused with the lines as they are now, the changed lines returned with new anchors. An edit with `oldText`/`newText` is Pi's own edit |
 | Code navigation | tool `lsp` (`builtin/navigate.ts`) asks the same language servers: a place is a file, a line and the word on it, never a column. The servers start at a thread's first tool call (`envFor` → `warmUp`); one still loading the project (rust-analyzer's `experimental/serverStatus`) is waited for 20 s, then said to be loading |

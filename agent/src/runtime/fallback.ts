@@ -12,8 +12,19 @@
 import { createAssistantMessageEventStream, createProvider, type AssistantMessageEvent, type Model, type Models, type Provider } from "@earendil-works/pi-ai";
 import { isContextOverflow } from "@earendil-works/pi-ai/utils/overflow";
 
-/** How long the main model may stay silent: before its first event, then between two events. */
-export const WATCH = { firstMs: 120_000, idleMs: 300_000 };
+/** How long the main model may stay silent: before its first event, then between two events;
+ *  before the first, also as long as reading the prompt takes (`prefillMs`). */
+export const WATCH: { firstMs: number; idleMs: number; prefill?: boolean } = { firstMs: 120_000, idleMs: 300_000, prefill: true };
+
+/** A local server reads a prompt it has no cache for at ~1 100 tokens a second (a token ~3
+ *  characters): a long one, after a compaction, takes 100 s before its first event. Silence that
+ *  short is reading, not failure — falling over then costs the fallback's answer and, back on the
+ *  main model, the whole prompt read again. */
+const PREFILL_CHARS_PER_MS = 2;
+export function prefillMs(context: any): number {
+	const chars = JSON.stringify(context?.messages ?? []).length + String(context?.systemPrompt ?? "").length + JSON.stringify(context?.tools ?? []).length;
+	return Math.ceil(chars / PREFILL_CHARS_PER_MS) + 30_000;
+}
 
 /** A provider whose model `main.id` answers with `main`, or with `fallback` when `main` fails. */
 export function fallbackProvider(id: string, models: Models, main: Model<any>, fallback: Model<any>, watch = WATCH, onFallback: (why: string) => void = () => {}): Provider {
@@ -23,7 +34,7 @@ export function fallbackProvider(id: string, models: Models, main: Model<any>, f
 		// Models put this provider's (empty) auth into the options; each model gets its own again.
 		const { apiKey: _k, headers: _h, ...rest } = options;
 		void (async () => {
-			const first = await attempt(models, main, context, rest, watch, out);
+			const first = await attempt(models, main, context, rest, { ...watch, firstMs: Math.max(watch.firstMs, watch.prefill ? prefillMs(context) : 0) }, out);
 			if (first === undefined) return;
 			console.error(`[model] ${main.provider}/${main.id} failed (${first}); answering with ${fallback.provider}/${fallback.id}`);
 			onFallback(first);

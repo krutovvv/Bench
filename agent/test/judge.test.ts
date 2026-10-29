@@ -681,3 +681,18 @@ test("a queued message that corrects the work under way is judged a correction; 
 	reply = () => choice("correction", { next: 0.8, corrects: 0.2 });
 	assert.equal(await correctsTheWork("m1", "and later, a weekly report"), false);
 });
+
+test("answers without reasoning are sent back as generated; a section is held until the next compaction", async () => {
+	const { emptyThinking } = await import("../src/runtime/thinking.ts");
+	const local = { api: "openai-completions", baseUrl: "http://gpu:10200/v1" };
+	const p = emptyThinking({ messages: [{ role: "user", content: "x" }, { role: "assistant", content: "a" }, { role: "assistant", content: "b", reasoning_content: "why" }] }, local);
+	assert.equal(p.messages[1].reasoning_content, "\n");
+	assert.equal(p.messages[2].reasoning_content, "why");
+	assert.equal(emptyThinking({ messages: [{ role: "assistant", content: "a" }] }, { api: "openai-completions", baseUrl: "https://openrouter.ai/api/v1" }), undefined);
+	const { frozen, thaw } = await import("../src/builtin/frozen.ts");
+	let n = 0;
+	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v1");
+	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v1", "held");
+	thaw("z1");
+	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v2", "read anew after a compaction");
+});

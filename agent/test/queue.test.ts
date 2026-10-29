@@ -130,7 +130,7 @@ test("send now: the message goes to the head of the queue, not its end", async (
 	const key = Object.keys(over)[0]!;
 	assert.match(key, /^default\.stub.*\/m$/);
 	assert.deepEqual(over[key], compactionPolicy(0.9, 131072));
-	assert.deepEqual(compactionPolicy(0.9, 100000), { reserveTokens: 10000, backgroundTokens: 5000, keepRecentTokens: 36000 });
+	assert.deepEqual(compactionPolicy(0.9, 100000), { reserveTokens: 10000, backgroundTokens: 5000, keepRecentTokens: 18000 });
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m" } as any);
 
 	// A stalled run never ends on its own: stop it, or closing waits for it forever.
