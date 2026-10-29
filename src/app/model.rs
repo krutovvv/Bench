@@ -11,7 +11,7 @@ pub enum Target {
 impl Target {
     pub fn label(&self) -> String {
         match self {
-            Target::Local => "This Mac".into(),
+            Target::Local => "This computer".into(),
             Target::Ssh(host) => format!("{host} (SSH)"),
         }
     }

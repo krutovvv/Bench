@@ -230,7 +230,7 @@ impl BenchApp {
     /// An agent as people call it: "This Mac", or its server's alias.
     pub fn agent_name(host: &str) -> String {
         if host.is_empty() {
-            "This Mac".into()
+            "This computer".into()
         } else {
             host.to_string()
         }

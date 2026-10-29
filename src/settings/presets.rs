@@ -163,7 +163,7 @@ impl BenchApp {
             .pt_4()
             .text_sm()
             .text_color(muted)
-            .child("What a project takes with one click (+ Add in its environment), and the choices of its Model section. Kept by This Mac's agent; a server's projects take them too. Keys can be written right into a preset.")
+            .child("What a project takes with one click (+ Add in its environment), and the choices of its Model section. Kept by this computer's agent; a server's projects take them too. Keys can be written right into a preset.")
             .into_any_element()];
         for (kind, title) in crate::settings::presets::KINDS {
             let lines: Vec<(String, String)> = match kind {

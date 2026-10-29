@@ -39,7 +39,7 @@ impl InsertKind for Terminal {
         crate::inserts::Word {
             word: "terminal",
             aliases: &[],
-            desc: "This Mac's terminal",
+            desc: "This computer's terminal",
             key: "ssh:local",
         }
     }
@@ -49,7 +49,7 @@ impl InsertKind for Terminal {
         let host = app.thread_host(at);
         let mut row = self.word().command("Tool");
         row.desc = if host.is_empty() {
-            "this Mac's terminal".to_string()
+            "this computer's terminal".to_string()
         } else {
             format!("the terminal on {host}, where this project runs")
         };
@@ -180,7 +180,7 @@ impl InsertKind for Terminal {
     fn context(&self, app: &BenchApp, at: &ThreadRef, ins: &Insert, _cx: &App) -> String {
         let alias = app.thread_machine(at);
         let name = if alias.is_empty() {
-            "this Mac".to_string()
+            "this computer".to_string()
         } else {
             alias
         };

@@ -80,7 +80,7 @@ impl BenchApp {
             let scopes: [(&str, &str); 3] = [
                 ("project", "This project"),
                 ("repo", "Its folder"),
-                ("general", if remote { "The server's" } else { "This Mac" }),
+                ("general", if remote { "The server's" } else { "This computer" }),
             ];
             for (scope, label) in scopes {
                 let skills: Vec<_> = e

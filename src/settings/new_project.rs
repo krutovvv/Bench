@@ -263,15 +263,15 @@ impl BenchApp {
         let cards = h_flex()
             .gap_2()
             .items_stretch()
-            .child(card(0, Ico::Laptop, "This Mac", "A folder here. This Mac's agent runs it.".into(), Place::ThisMac, false, cx))
+            .child(card(0, Ico::Laptop, "This computer", "A folder here. This computer's agent runs it.".into(), Place::ThisMac, false, cx))
             .child(card(
                 1,
                 Ico::Link,
-                "A server, from this Mac",
+                "A server, from this computer",
                 if servers.is_empty() {
                     "Needs a server in ~/.ssh/config.".into()
                 } else {
-                    "This Mac's agent works there over SSH; nothing is installed on it.".into()
+                    "This computer's agent works there over SSH; nothing is installed on it.".into()
                 },
                 Place::OverSsh,
                 servers.is_empty(),
@@ -284,7 +284,7 @@ impl BenchApp {
                 if agents.is_empty() {
                     "Needs a server's agent: Settings → Agents.".into()
                 } else {
-                    "Its agent lives there and works while this Mac sleeps.".into()
+                    "Its agent lives there and works while this computer sleeps.".into()
                 },
                 Place::ServerAgent,
                 agents.is_empty(),
@@ -362,11 +362,11 @@ impl BenchApp {
         let typed = server_folder.read(cx).value().trim().to_string();
         let summary = match place {
             Place::ThisMac => match &folder {
-                Some(f) => format!("This Mac's agent runs its threads, in {f}."),
-                None => "This Mac's agent runs its threads.".into(),
+                Some(f) => format!("This computer's agent runs its threads, in {f}."),
+                None => "This computer's agent runs its threads.".into(),
             },
             Place::OverSsh => format!(
-                "This Mac's agent runs its threads; files and commands are on {}{}, over SSH.",
+                "This computer's agent runs its threads; files and commands are on {}{}, over SSH.",
                 machine.clone().unwrap_or_default(),
                 if typed.is_empty() { String::new() } else { format!(" in {typed}") }
             ),
@@ -375,7 +375,7 @@ impl BenchApp {
                 agent,
                 if typed.is_empty() { String::new() } else { format!(" in {typed}") }
             ),
-            Place::NoFolder => "This Mac's agent runs its threads; files it makes go to its own space.".into(),
+            Place::NoFolder => "This computer's agent runs its threads; files it makes go to its own space.".into(),
         };
 
         let column = v_flex()
