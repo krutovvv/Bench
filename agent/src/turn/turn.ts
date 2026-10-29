@@ -5,7 +5,7 @@
 // In memory only (`kept.ts`): after a restart a turn starts counting again, which errs on the side
 // of working.
 
-import { EVAL_OPEN, planOf, stripBlock, textOf } from "../runtime/journal.ts";
+import { EVAL_OPEN, planOf, stripBlock, SUMMARY_PREFIX, textOf } from "../runtime/journal.ts";
 import type { PlanStep } from "../protocol.gen.ts";
 import { slot } from "./kept.ts";
 
@@ -81,9 +81,6 @@ export interface Call {
 	out: string;
 }
 
-
-/** How Pi's compaction summary begins (its `SUMMARY_PREFIX`), as the user message after a compaction. */
-const SUMMARY_PREFIX = "The conversation history before this point was compacted";
 
 const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
 

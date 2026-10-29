@@ -2,7 +2,10 @@
 // a server that thinks by default it only costs time. Pi Durable summarizes with the thread's own
 // model and reasoning level and has no setting for the summarizer's, so this uses its hook for
 // exactly that (`beforeCompact`: an extension supplies the summary): the same model, the same
-// format as Pi's own summarizer, reasoning off (`noThinking`). The summary is memoized, so a
+// format as Pi's own summarizer, reasoning off (`noThinking`). `SYSTEM`, `FORMAT` and `transcript`
+// mirror pi-durable 1.4.0's `SUMMARIZATION_SYSTEM_PROMPT`, `SUMMARIZATION_PROMPT` and
+// `serializeConversation` (`harness/compaction.js`; Pi does not export them), with one line of ours
+// (the summary in the conversation's language): read them again when Pi is updated. The summary is memoized, so a
 // restart places the one already made; any failure leaves the compaction to Pi, as before. With the
 // evaluator on, what the rest of the work needs as it is follows the summary (`judge/summary.ts`).
 

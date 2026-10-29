@@ -45,6 +45,10 @@ export const PLAN_KIND = "bench.plan";
 
 /** Pi's compaction summary: a new context, with the older entries left out of what the model reads. */
 export const COMPACTION_KIND = "pi.compaction";
+/** How the summary begins as the user message the model reads after a compaction: the start of Pi's
+ *  `SUMMARY_PREFIX` (pi-durable 1.4.0, `harness/compaction.js`, not exported). Neither the person's
+ *  words nor a new turn. */
+export const SUMMARY_PREFIX = "The conversation history before this point was compacted";
 
 export const INBOX_KIND = InboxDoc.definition.kind;
 export const INSERTS_KIND = Inserts.definition.kind;

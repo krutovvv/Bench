@@ -10,7 +10,7 @@
 
 import { cut } from "../turn/turn.ts";
 import { windowTokens } from "../turn/window.ts";
-import { EVAL_OPEN, stripBlock } from "../runtime/journal.ts";
+import { EVAL_OPEN, stripBlock, SUMMARY_PREFIX } from "../runtime/journal.ts";
 import { envFor } from "../runtime/tools-host.ts";
 import { host } from "../host.ts";
 import { ask, judgeActive } from "./client.ts";
@@ -37,7 +37,7 @@ export function personsWords(messages: readonly any[]): string[] {
 	return messages
 		.filter((m) => m?.role === "user")
 		.map((m) => stripBlock(textOf(m.content)).trim())
-		.filter((t) => t && !t.startsWith(EVAL_OPEN) && !t.startsWith("The conversation history before this point was compacted"));
+		.filter((t) => t && !t.startsWith(EVAL_OPEN) && !t.startsWith(SUMMARY_PREFIX));
 }
 
 /** The files the calls read, wrote or edited, the latest touched first. */
