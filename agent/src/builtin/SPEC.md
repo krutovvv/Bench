@@ -12,9 +12,9 @@ references: [thread-objects, projects-and-agents]
 
 The tools the default "assistant" extension gives a thread beside Pi's own read, write, edit and
 bash, and the small stores behind them: `ssh_run` (`ssh.ts`), background processes, cron,
-memory, skills, `clarify` and approvals (`ask.ts`), projects, the
+memory, skills, `clarify` (`ask.ts`), the approvals' patterns (`approvals.ts`), projects, the
 servers' agents, presets, grep/glob/ls (`search.ts`), code navigation (`navigate.ts`, the `lsp`
-tool), and line-anchored read and edit (`hashline.ts`). Each tool's line in the prompt is in
+tool; `diagnostics.ts`), and line-anchored read and edit (`hashline.ts`). Each tool's line in the prompt is in
 `agent/src/prompt.ts`.
 
 ## Boundary

@@ -1,5 +1,5 @@
 // What the agent keeps in memory about a conversation between its hooks: the turn (`turn.ts`), the
-// window's count (`window.ts`), the sections held (`frozen.ts`), the specs told (`extensions/assistant.ts`),
+// window's count (`window.ts`), the sections held (`frozen.ts`), the specs told (`extensions/spec-note.ts`),
 // when the evaluator last weighed a compaction (`judge/boundary.ts`). One map, by conversation: each
 // part is a slot of it, and `forget` drops them all when the Runtime closes or deletes the thread.
 // Nothing here is the thread's record (that is Pi's journal): after a restart each starts again.

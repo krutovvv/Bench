@@ -4,19 +4,16 @@
 // few short sections (src/prompt.ts). An agent can select other extensions next to it or instead
 // of it (its settings.json "extensions").
 
-import path from "node:path";
-import { Type } from "@earendil-works/pi-ai";
-import { defineExtension, defineTool, GenerationTask, hook, ProviderDoc, section, ToolTask } from "@earendil-works/pi-durable";
+import { defineExtension, GenerationTask, hook, ProviderDoc, section, ToolTask } from "@earendil-works/pi-durable";
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
-import { approvalsMode } from "../config.ts";
+import { approvalOf } from "../builtin/approvals.ts";
 import { clarify, sessionSearch, todo } from "../builtin/ask.ts";
 import { CronTask, cronTool } from "../builtin/cron.ts";
 import { ProcessTask, processTool } from "../builtin/process.ts";
 import { memoryTool } from "../builtin/memory.ts";
 import { skillManage, skillView } from "../builtin/skills.ts";
 import { resolveComment } from "../builtin/review.ts";
-import { specFor, specsOf } from "../specs.ts";
-import { machineOf } from "../repo.ts";
+import { specNote } from "./spec-note.ts";
 import { compactWithoutReasoning } from "../turn/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../turn/steps.ts";
@@ -29,9 +26,13 @@ import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
 import { steer } from "../runtime/steer.ts";
 import { frozen } from "../turn/frozen.ts";
-import { slot } from "../turn/kept.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../runtime/inserts.ts";
+import { globTool, grepTool, lsTool } from "../builtin/search.ts";
+import { codingTools } from "../builtin/hashline.ts";
+import { lspTool, placeOf } from "../builtin/navigate.ts";
+import { diagnosticsTool } from "../builtin/diagnostics.ts";
+import { diagnosticsFor } from "../lsp/lsp.ts";
 
 const of = (input: any) => host().thread(input.conversationId);
 const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined | Promise<string | undefined>) => (input: any) => {
@@ -41,60 +42,11 @@ const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined
 /** A section held as it was until the next compaction (`turn/frozen.ts`): a change would rewrite the prompt's head. */
 const held = (name: string, render: Parameters<typeof s>[0]) => (input: any) => frozen(String(input.conversationId), name, () => s(render)(input));
 
-/** Commands that ask first when approvals are on (the agent's settings.json "approvals": "manual"). */
-const DANGEROUS: [RegExp, string][] = [
-	[/\brm\s+(-[a-z]*r[a-z]*f|-[a-z]*f[a-z]*r)\b/i, "recursive delete"],
-	[/\bsudo\b/, "runs as root"],
-	[/\bgit\s+(push\s+.*--force|reset\s+--hard|clean\s+-[a-z]*f)/i, "rewrites or discards git work"],
-	[/\b(mkfs|dd\s+if=|diskutil\s+erase)/i, "writes a disk"],
-	[/\b(shutdown|reboot|launchctl\s+unload)\b/i, "stops the system or a service"],
-	[/curl[^|]*\|\s*(ba|z)?sh\b/i, "runs a downloaded script"],
-];
-
-import { globTool, grepTool, lsTool } from "../builtin/search.ts";
-import { codingTools } from "../builtin/hashline.ts";
-import { lspTool, placeOf } from "../builtin/navigate.ts";
-import { diagnosticsFor, knownDiagnostics } from "../lsp/lsp.ts";
-
-/** What the project's language servers say: about one file, or everything they have seen. */
-const diagnosticsTool = defineTool({
-	name: "diagnostics",
-	description:
-		"Errors and warnings from the project's language servers (its lsp.json): for one file, checked now, or for every file they have seen. After edit and write they come with the result by themselves.",
-	parameters: Type.Object({ path: Type.Optional(Type.String({ description: "A file; empty: every file seen" })) }),
-	async execute(args: any, api: any) {
-		const info = host().thread(api.conversationId);
-		if (!info) throw new Error("no session");
-		if (!args.path) return { output: [{ type: "text" as const, text: knownDiagnostics(info.agent) }] };
-		const at = await placeOf(info, String(args.path));
-		if (!at) throw new Error(`cannot read ${args.path}`);
-		const d = await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text);
-		return { output: [{ type: "text" as const, text: d ?? "No language server of this project knows this kind of file (its lsp.json)." }] };
-	},
-});
-
 // Pictures the read tool shrinks to the model's limits: a shot of a Retina window (2480×1600) is
 // over them, and without a processor Pi refuses the file instead of resizing it.
 export const images = await createNodePhotonImages();
 // Pi's coding tools, with read and edit by line anchors (`builtin/hashline.ts`).
 const coding = codingTools({ images });
-
-/** The specs each conversation was told of: one line per spec per thread, not per file. */
-const toldSpecs = slot(() => new Set<string>());
-
-/** "This file is under <spec>": once per thread for each spec, none outside the specs. */
-async function specNote(info: { cwd: string; project?: string }, conversation: string, p: string): Promise<string | undefined> {
-	if (!p) return undefined;
-	const machine = machineOf(info.project) ?? null;
-	const file = path.posix.resolve(info.cwd || "/", p);
-	const { root, specs } = await specsOf(machine, path.posix.dirname(file));
-	const spec = specFor(root, specs, file);
-	if (!spec) return undefined;
-	const told = toldSpecs.get(conversation);
-	if (told.has(spec.id)) return undefined;
-	told.add(spec.id);
-	return `[${path.posix.relative(root, file)} is under the spec ${path.posix.relative(root, spec.path)} ("${spec.title}"): read it before changing what the module does, and update it when a decision or contract there changes.]`;
-}
 
 export const assistant = defineExtension({
 	name: "assistant",
@@ -212,9 +164,7 @@ async function gate(call: any, api: any, context: any): Promise<{ block?: string
 		const refused = stepGate(String(api.conversationId));
 		if (refused) return { block: refused };
 	}
-	const shell = ["bash", "ssh_run"].includes(call.name) && !!info && approvalsMode(info.agent) === "manual";
-	const command = String(call.arguments?.command ?? "");
-	const hit = shell ? DANGEROUS.find(([re]) => re.test(command))?.[1] : undefined;
+	const { shell, command, hit } = approvalOf(info?.agent, call);
 	// The evaluator: a repeat of a failed or known call is refused (`judge/repeat.ts`); with
 	// approvals on, a command the patterns let through is judged too (`judge/risk.ts`). A script's
 	// nested calls (codemode) too: a script is no way around either.
