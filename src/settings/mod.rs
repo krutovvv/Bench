@@ -441,6 +441,28 @@ impl BenchApp {
                 )
                 .into_any_element(),
             );
+            // Bench's own choice, not the agent's: saved at once, as a switch is.
+            page.push(
+                bench_ui::settings_field(
+                    "Text while speaking",
+                    "Each pause in dictation sends what was said, so the words come in as you speak (this Mac's Bench)",
+                    div()
+                        .flex()
+                        .justify_end()
+                        .child(
+                            gpui_kit::component::switch::Switch::new("voice-live")
+                                .checked(self.media.live_pref)
+                                .on_click(cx.listener(|this, on: &bool, _, cx| {
+                                    this.media.live_pref = *on;
+                                    crate::media::state::DictationPrefs { live: *on }.save();
+                                    cx.notify();
+                                })),
+                        )
+                        .into_any_element(),
+                    cx,
+                )
+                .into_any_element(),
+            );
             page.push(
                 h_flex()
                     .py_2()

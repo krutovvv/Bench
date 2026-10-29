@@ -97,22 +97,51 @@ impl Recorder {
         if samples.len() < self.rate as usize / 4 {
             bail!("recording too short");
         }
-        let spec = hound::WavSpec {
-            channels: 1,
-            sample_rate: self.rate,
-            bits_per_sample: 16,
-            sample_format: hound::SampleFormat::Int,
-        };
-        let mut cursor = Cursor::new(Vec::new());
-        {
-            let mut w = hound::WavWriter::new(&mut cursor, spec)?;
-            for s in samples {
-                w.write_sample((s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)?;
-            }
-            w.finalize()?;
-        }
-        Ok(cursor.into_inner())
+        wav(&samples, self.rate)
     }
+
+    /// Where to cut the speech recorded since sample `from` (`pauses.rs`); None: not yet.
+    pub fn cut_after(&self, from: usize) -> Option<super::pauses::Cut> {
+        super::pauses::cut(&self.samples.lock().unwrap(), self.rate, from)
+    }
+
+    /// The recording's samples `from..to` as a WAV.
+    pub fn wav_between(&self, from: usize, to: usize) -> Result<Vec<u8>> {
+        let samples = self.samples.lock().unwrap();
+        wav(&samples[from.min(samples.len())..to.min(samples.len())], self.rate)
+    }
+
+    /// Stop and return what was recorded since sample `from` as a WAV; None: too little, or no
+    /// speech in it.
+    pub fn finish_from(self, from: usize) -> Result<Option<Vec<u8>>> {
+        drop(self.stream);
+        let samples = std::mem::take(&mut *self.samples.lock().unwrap());
+        let rest = &samples[from.min(samples.len())..];
+        let loud = rest.iter().any(|s| s.abs() > 0.02);
+        if rest.len() < self.rate as usize / 4 || !loud {
+            return Ok(None);
+        }
+        wav(rest, self.rate).map(Some)
+    }
+}
+
+/// Samples as a 16-bit mono WAV.
+fn wav(samples: &[f32], rate: u32) -> Result<Vec<u8>> {
+    let spec = hound::WavSpec {
+        channels: 1,
+        sample_rate: rate,
+        bits_per_sample: 16,
+        sample_format: hound::SampleFormat::Int,
+    };
+    let mut cursor = Cursor::new(Vec::new());
+    {
+        let mut w = hound::WavWriter::new(&mut cursor, spec)?;
+        for s in samples {
+            w.write_sample((s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16)?;
+        }
+        w.finalize()?;
+    }
+    Ok(cursor.into_inner())
 }
 
 /// Whether playback can decode these bytes (Opus, for one, it cannot).

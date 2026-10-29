@@ -80,6 +80,9 @@ impl BenchApp {
         if self.media.recorder.take().is_some() {
             self.media.wave_ticker = None;
             self.media.send_after_transcribe = false;
+            // Dictation by pauses is dropped whole: the pieces still out land nowhere.
+            self.media.live = None;
+            self.media.transcribing = false;
         } else if self.center.is_settings() {
             self.center = Center::Chat;
         } else {

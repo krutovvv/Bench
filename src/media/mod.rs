@@ -6,6 +6,7 @@
 pub(crate) mod state;
 pub(crate) mod attach;
 pub(crate) mod audio;
+pub(crate) mod pauses;
 pub(crate) mod chip;
 mod diagram;
 mod fetch;

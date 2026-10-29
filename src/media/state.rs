@@ -36,6 +36,46 @@ pub struct MediaState {
     pub wave_ticker: Option<Task<()>>,
     pub transcribing: bool,
     pub send_after_transcribe: bool,
+    /// The gear's "Text while speaking": each pause sends what was said (`voice.rs`). Bench's own
+    /// choice, kept in `dictation.json` in its state folder.
+    pub live_pref: bool,
+    /// A dictation sent by pauses, while it lasts.
+    pub live: Option<LiveDictation>,
+}
+
+/// Dictation sent piece by piece: where the next piece starts, and each piece's text in order (None:
+/// not back yet), shown in the composer as the pieces before it are in.
+#[derive(Default)]
+pub struct LiveDictation {
+    pub sent: usize,
+    pub next: u64,
+    pub texts: std::collections::BTreeMap<u64, Option<String>>,
+    pub shown: u64,
+    pub failed: bool,
+}
+
+/// Bench's dictation preference (`dictation.json`).
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+pub struct DictationPrefs {
+    #[serde(default)]
+    pub live: bool,
+}
+
+impl DictationPrefs {
+    pub fn load() -> Self {
+        std::fs::read(crate::client::connection::state_dir().join("dictation.json"))
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+            .unwrap_or_default()
+    }
+
+    pub fn save(&self) {
+        let dir = crate::client::connection::state_dir();
+        let _ = std::fs::create_dir_all(&dir);
+        if let Ok(b) = serde_json::to_vec_pretty(self) {
+            let _ = std::fs::write(dir.join("dictation.json"), b);
+        }
+    }
 }
 
 impl Default for MediaState {
@@ -56,6 +96,8 @@ impl Default for MediaState {
             wave_ticker: None,
             transcribing: false,
             send_after_transcribe: false,
+            live_pref: DictationPrefs::load().live,
+            live: None,
         }
     }
 }
