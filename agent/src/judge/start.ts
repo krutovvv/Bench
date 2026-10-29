@@ -9,7 +9,7 @@
 // or none, as when it drove Chrome through rea with the browser server at hand.
 
 import { skillsFor, machineOf } from "../repo.ts";
-import { mcpServerTools } from "../mcp/mcp.ts";
+import { mcpServerTools, reachOf, type ServerTools } from "../mcp/mcp.ts";
 import { projects } from "../builtin/projects.ts";
 import { cut } from "../builtin/turn.ts";
 import type { Point } from "./point.ts";
@@ -31,7 +31,7 @@ const MAX_PROJECTS = 40;
 const MAX_LOAD = 30;
 
 /** The skills and servers asked about this turn, by question name. */
-const offered = new Map<string, { skills: string[]; servers: string[]; tools: string[][]; loadable: string[][] }>();
+const offered = new Map<string, { skills: string[]; servers: ServerTools[] }>();
 
 export const start: Point = {
 	name: "start",
@@ -45,7 +45,7 @@ export const start: Point = {
 		// evaluator does not see.
 		const opening = turn.opening;
 		if (!skills.length && !servers.length && !opening) return undefined;
-		offered.set(conversation, { skills: skills.map((k) => k.name), servers: servers.map((s) => s.name), tools: servers.map((s) => s.tools), loadable: servers.map((s) => s.loadable) });
+		offered.set(conversation, { skills: skills.map((k) => k.name), servers });
 		const questions: Record<string, any> = {};
 		const all = projects.list();
 		const here = all.find((p) => p.id === thread.project);
@@ -72,7 +72,7 @@ export const start: Point = {
 		servers.forEach((s, i) => {
 			questions[`server${i}`] = {
 				type: "choice",
-				instructions: `Will the work on the person's request need the tools of the MCP server "${s.name}" (tools: ${cut(s.tools.map((t) => t.replace(/^mcp__[^_]+__/, "")).join(", "), 400)})?`,
+				instructions: `Will the work on the person's request need the tools of the MCP server "${s.name}" (tools: ${cut(s.tools.map((t) => t.slice(s.prefix.length)).join(", "), 400)})?`,
 				criteria: { not_needed: "The work does not need these tools.", needed: "The work needs these tools." },
 			};
 		});
@@ -98,15 +98,12 @@ export const start: Point = {
 				turn.named.add(`skill:${name}`);
 			}
 		}
-		const chosen = o.servers.map((s, i) => [s, i] as const).filter(([, i]) => (answers[`server${i}`]?.probabilities?.needed ?? 0) >= SURE_SERVER);
-		// A server behind code mode (Pi's default) is named for a script; a deferred one's tools are
-		// offered from the next step; a direct one is offered already.
+		// Named as the model reaches them (`reachOf`); a deferred server's tools are offered from the next step.
+		const chosen = o.servers.filter((_, i) => (answers[`server${i}`]?.probabilities?.needed ?? 0) >= SURE_SERVER);
 		if (chosen.length) {
-			const scripted = chosen.filter(([, i]) => o.loadable[i].length < o.tools[i].length);
-			const loaded = chosen.filter(([, i]) => o.loadable[i].length);
-			if (scripted.length) lines.push(`the tools it needs are likely those of ${scripted.map(([s]) => `"${s}" (tools.mcp__${s}__* in a codemode script)`).join(", ")}`);
-			if (loaded.length) lines.push(`the tools it needs are likely those of ${loaded.map(([s]) => `"${s}" (mcp__${s}__*)`).join(", ")}, offered from your next step`);
-			turn.load = loaded.flatMap(([, i]) => o.loadable[i]).slice(0, MAX_LOAD);
+			const load = chosen.flatMap((s) => s.loadable);
+			lines.push(`the tools it needs are likely those of ${chosen.map(reachOf).join(", ")}${load.length ? ", the deferred ones offered from your next step" : ""}`);
+			turn.load = load.slice(0, MAX_LOAD);
 		}
 		return lines.length ? { hint: `[Evaluator, for this request: ${lines.join("; ")}.]` } : undefined;
 	},

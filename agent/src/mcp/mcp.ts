@@ -79,12 +79,16 @@ export const mcpTools = (agent: string): ToolRegistration[] =>
 export const mcpStatus = (agent?: string) =>
 	[...servers.values()].filter((s) => !agent || s.agent === agent).map((s) => ({ agent: s.agent, name: s.name, tools: s.tools.length, error: s.error, connected: Boolean(s.client) && !s.error, needsAuth: !!s.needsAuth }));
 
-function exposureOf(spec: any, tool: string): string {
+/** The /browser insert's server: its tools are the insert's agent tool, offered to the model as the
+ *  terminal's ssh_run is (an insert has a tool that acts on it), unless its mcp.json says otherwise. */
+const INSERT_SERVER = "browser";
+
+function exposureOf(spec: any, server: string, tool: string): string {
 	const rules: Record<string, string> = spec.toolExposure ?? {};
 	if (rules[tool]) return rules[tool] === "codemode-deferred" ? "codemode" : rules[tool];
 	for (const [pattern, e] of Object.entries(rules))
 		if (pattern.includes("*") && new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`).test(tool)) return e;
-	return spec.exposure ?? "codemode";
+	return spec.exposure ?? (server === INSERT_SERVER ? "direct" : "codemode");
 }
 
 const home = (v: unknown) => (typeof v === "string" ? v.replace(/^~(?=\/|$)/, os.homedir()) : v);
@@ -113,15 +117,36 @@ export async function connectMcp(agent?: string, timeoutMs = 30000): Promise<voi
 }
 
 /** An agent's connected servers and their tools' names (the evaluator's view of what a turn can use). */
-/** An agent's connected servers: their tools, and those the model may be offered (the rest are
- *  for scripts, or direct already). */
-export function mcpServerTools(agent: string): { name: string; tools: string[]; loadable: string[] }[] {
+export interface ServerTools {
+	name: string;
+	/** Its tools' common start, `mcp__<server>__` as Pi names them. */
+	prefix: string;
+	/** Its tools' names here. */
+	tools: string[];
+	/** Those the model may be offered with tool_search (`deferred`). */
+	loadable: string[];
+	/** Some of them are the scripts' alone (`codemode`). */
+	scripted: boolean;
+}
+
+/** An agent's connected servers and how the model reaches their tools. */
+export function mcpServerTools(agent: string): ServerTools[] {
 	return [...servers.values()]
 		.filter((s) => s.agent === agent && s.client && !s.error)
 		.map((s) => {
 			const tools = s.tools.map((t: any) => String(t.name ?? t.definition?.name ?? ""));
-			return { name: s.name, tools, loadable: tools.filter((t) => s.exposures.get(t) === "deferred") };
+			return { name: s.name, prefix: `mcp__${sanitize(s.name)}__`, tools, loadable: tools.filter((t) => s.exposures.get(t) === "deferred"), scripted: tools.some((t) => s.exposures.get(t) === "codemode") };
 		});
+}
+
+/** How a line for the model names a server's tools: in a script, or as its own tools. */
+export function reachOf(s: ServerTools): string {
+	return s.scripted ? `"${s.name}" (tools.${s.prefix}* in a codemode script)` : `"${s.name}" (${s.prefix}*)`;
+}
+
+/** The agent has tools behind tool_search (a `deferred` server): only then is tool_search offered. */
+export function hasDeferred(agent: string): boolean {
+	return [...servers.values()].some((s) => s.agent === agent && [...s.exposures.values()].includes("deferred"));
 }
 
 /** A server that failed is tried again with a message this long after, no sooner. */
@@ -167,15 +192,19 @@ async function connectServer(agent: string, name: string, raw: any, env: Record<
 			? httpTransport(agent, name, spec)
 			: stdioTransport(agent, spec, env);
 		await withTimeout(client.connect(transport), timeoutMs, "connect timed out");
-		server.client = client;
 		const prefix = `mcp__${sanitize(name)}__`;
 		const own = { name, prefix, description: client.instructions?.trim().slice(0, 600) || client.serverInfo?.title || undefined };
 		const at = NAMESPACES.findIndex((n) => n.prefix === prefix);
 		if (at >= 0) NAMESPACES[at] = own;
 		else NAMESPACES.push(own);
-		const listed = await withTimeout(client.listTools(), timeoutMs, "tools/list timed out");
+		// Connected only once it listed its tools: one that times out here is tried again (`ensureMcp`).
+		const listed = await withTimeout(client.listTools(), timeoutMs, "tools/list timed out").catch(async (e) => {
+			await client.close().catch(() => {});
+			throw e;
+		});
+		server.client = client;
 		server.tools = listed
-			.map((t: any) => ({ t, exposure: exposureOf(spec, t.name).replace("codemode-deferred", "codemode") }))
+			.map((t: any) => ({ t, exposure: exposureOf(spec, name, t.name).replace("codemode-deferred", "codemode") }))
 			.filter(({ exposure }) => exposure !== "hidden")
 			.map((x) => (server.exposures.set(mcpName(name, x.t.name), x.exposure), x))
 			.map(({ t, exposure }) =>

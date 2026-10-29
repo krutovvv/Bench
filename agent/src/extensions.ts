@@ -21,7 +21,7 @@
 import * as ai from "@earendil-works/pi-ai";
 import * as pi from "@earendil-works/pi-durable";
 import { CodemodeSandbox } from "@earendil-works/pi-codemode";
-import { NAMESPACES } from "./mcp/mcp.ts";
+import { hasDeferred, NAMESPACES } from "./mcp/mcp.ts";
 import { createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchExtension } from "@earendil-works/pi-durable/tool-search";
 import * as piTools from "@earendil-works/pi-durable/tools";
@@ -140,9 +140,11 @@ export async function loadExtensions(registry: { install(e: pi.Extension): void 
 	}
 }
 
-/** An agent's extensions, as objects for `configure()`: its own by name, else the built-in one; always its MCP, tool search and code mode. */
+/** An agent's extensions, as objects for `configure()`: its own by name, else the built-in one; always its MCP and code mode, tool search where it has deferred tools. */
 export function forAgent(names: string[] | undefined, agent: string): pi.Extension[] {
-	const wanted = [...new Set([...(names?.length ? names : ["assistant"]), "tool-search", "codemode"])];
+	// tool_search where a server's tools wait behind it (`deferred`); Pi's own description sends
+	// the model to it for every MCP tool, which scripts reach instead under the default exposure.
+	const wanted = [...new Set([...(names?.length ? names : ["assistant"]), ...(hasDeferred(agent) ? ["tool-search"] : []), "codemode"])];
 	// Its own extensions by name, else the built-in ones; its own MCP servers. A project takes
 	// nothing of Host's: Host's extensions and servers are Host's threads' alone.
 	const list = wanted.map((n) => loaded.get(`${agent}:${n}`)?.extension ?? loaded.get(n)?.extension).filter(Boolean) as pi.Extension[];

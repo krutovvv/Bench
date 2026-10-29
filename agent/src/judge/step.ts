@@ -8,7 +8,7 @@
 // server's tools that fit the step are a line for this request: the tools stay offered as they
 // were, as a list that changes rewrites the prompt's head and the server's cache with it.
 
-import { mcpServerTools } from "../mcp/mcp.ts";
+import { mcpServerTools, reachOf, type ServerTools } from "../mcp/mcp.ts";
 import { cut } from "../builtin/turn.ts";
 import type { Point } from "./point.ts";
 
@@ -29,7 +29,7 @@ const SURE_SERVER = 0.85;
 const MAX_SERVERS = 12;
 
 /** The servers asked about this request, by conversation. */
-const asked = new Map<string, string[]>();
+const asked = new Map<string, ServerTools[]>();
 
 export const step: Point = {
 	name: "step",
@@ -49,15 +49,16 @@ export const step: Point = {
 					plain: "No: the next step is plain and follows from the last ones — read or list what was found, run what was just written, the next item of a list, a known edit.",
 				},
 			};
-		const used = new Set(turn.calls.map((c) => c.name.match(/^mcp__(.+?)__/)?.[1]).filter(Boolean));
+		// A server whose tools the turn has called already, directly or in a script's nested calls, is not asked about.
+		const used = (s: ServerTools) => turn.calls.some((c) => c.name.startsWith(s.prefix));
 		const servers = mcpServerTools(thread.agent)
 			.slice(0, MAX_SERVERS)
-			.filter((s) => !used.has(s.name) && !turn.named.has(`server:${s.name}`));
-		asked.set(conversation, servers.map((s) => s.name));
+			.filter((s) => !used(s) && !turn.named.has(`server:${s.name}`));
+		asked.set(conversation, servers);
 		servers.forEach((s, i) => {
 			questions[`server${i}`] = {
 				type: "choice",
-				instructions: `Does the agent's next step need the tools of the MCP server "${s.name}" (tools: ${cut(s.tools.map((t) => t.replace(/^mcp__[^_]+__/, "")).join(", "), 400)})?`,
+				instructions: `Does the agent's next step need the tools of the MCP server "${s.name}" (tools: ${cut(s.tools.map((t) => t.slice(s.prefix.length)).join(", "), 400)})?`,
 				criteria: { not_needed: "The next step does not need these tools.", needed: "The next step needs these tools." },
 			};
 		});
@@ -68,8 +69,8 @@ export const step: Point = {
 		asked.delete(conversation);
 		const plain = (answers.think?.probabilities?.plain ?? 0) >= SURE_PLAIN;
 		const fit = servers.filter((_, i) => (answers[`server${i}`]?.probabilities?.needed ?? 0) >= SURE_SERVER);
-		for (const s of fit) turn.named.add(`server:${s}`);
-		const hint = fit.length ? `[Evaluator, for this step: the tools of ${fit.map((s) => `"${s}" (mcp__${s}__*)`).join(", ")} fit it.]` : undefined;
+		for (const s of fit) turn.named.add(`server:${s.name}`);
+		const hint = fit.length ? `[Evaluator, for this step: the tools of ${fit.map(reachOf).join(", ")} fit it.]` : undefined;
 		return plain || hint ? { ...(plain ? { plain } : {}), ...(hint ? { hint } : {}) } : undefined;
 	},
 };
