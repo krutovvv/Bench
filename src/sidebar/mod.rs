@@ -13,15 +13,11 @@ mod project_row;
 mod telegram;
 mod thread_row;
 
-use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
-use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use self::menu::item_menu;
 use crate::app::BenchApp;
-use crate::sidebar::items::Item;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -38,7 +34,7 @@ impl BenchApp {
         // machine's own project, with the threads of no project, Telegram's and cron's; then
         // the projects, pinned ones first (`items.rs` — ↑ ↓ walk the same order).
         let (loose, groups) = self.sidebar_groups();
-        list.extend(self.render_loose(loose, cx));
+        list.extend(self.render_host(loose, cx));
         for (g, (p, rows)) in groups.into_iter().enumerate() {
             list.extend(self.render_project(g + 1, &p, rows, cx));
         }
@@ -75,113 +71,6 @@ impl BenchApp {
                     }),
             )
             .into_any_element()
-    }
-
-    /// Host: the machine's own agent and environment, for looking after the machine itself (what every project's threads get too) and
-    /// the threads of no project; first in the sidebar, folded until opened.
-    fn render_loose(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
-        let muted = cx.theme().muted_foreground;
-        let host_color: Option<Hsla> = self
-            .mark_of(&format!("p:{}", crate::app::model::ProjectKey::HOST))
-            .color
-            .and_then(bench_ui::mark_color);
-        let key = "open:loose".to_string();
-        let open = self.sidebar.collapsed.contains(&key);
-        let group: SharedString = "loose-head".into();
-        let mut out = vec![
-            h_flex()
-                .id("loose-head")
-                .group(group.clone())
-                .cursor_pointer()
-                .pl(px(bench_ui::SIDEBAR_TEXT_X))
-                .pr(px(bench_ui::SIDEBAR_ROW_INSET))
-                .pt(rems(0.5))
-                .pb_1()
-                .gap_1p5()
-                .items_center()
-                // As every project's head (`project_row`): Host is a group too.
-                .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
-                .child(
-                    div()
-                        .min_w_0()
-                        .truncate()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(cx.theme().muted_foreground)
-                        .child(crate::app::LOCAL_HOST),
-                )
-                .children(host_color.map(bench_ui::tag_dot))
-                .when(self.places.host_bots.contains(""), |d| {
-                    d.child(project_row::telegram_mark("host-tg", muted))
-                })
-                .child(div().flex_1())
-                // "⋯" (on hover), as a right click: its environment, its color — the same menu as
-                // a project's, without pin and remove (it is always first, and always there).
-                .child(
-                    bench_ui::on_group_hover(group.clone())
-                        .child(
-                            bench_ui::row_icon_button("general-more", Ico::Ellipsis)
-                                .dropdown_menu(item_menu(
-                                    cx.entity(),
-                                    Item::Project(crate::app::model::ProjectKey::HOST.into()),
-                                    false,
-                                )),
-                        ),
-                )
-                // The gear (on hover), as on a project's row: this Mac's environment, in the
-                // Explorer.
-                .child(
-                    bench_ui::on_group_hover(group.clone())
-                        .child(
-                            bench_ui::row_icon_button("general-set", Ico::Settings)
-                                .tooltip("Settings")
-                                .on_click(cx.listener(|this, _, window, cx| {
-                                    cx.stop_propagation();
-                                    this.open_project_settings(
-                                        crate::app::model::ProjectKey::HOST.into(),
-                                        window,
-                                        cx,
-                                    )
-                                })),
-                        ),
-                )
-                .child(
-                    bench_ui::head_plus_slot()
-                        .id("general-new")
-                        .cursor_pointer()
-                        .text_color(muted)
-                        .opacity(0.)
-                        .group_hover(group.clone(), |s| s.opacity(1.))
-                        .hover(|s| {
-                            s.bg(cx.theme().sidebar_accent)
-                                .text_color(cx.theme().foreground)
-                        })
-                        .child(Ico::Plus.icon().xsmall())
-                        .tooltip(|window, cx| Tooltip::new("New thread  ⌘N").build(window, cx))
-                        .on_click(cx.listener(|this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.new_thread_in(String::new(), cx)
-                        })),
-                )
-                .child(bench_ui::group_chevron(!open, group, cx))
-                // Folded by default: the key marks it open.
-                .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
-                .context_menu(item_menu(
-                    cx.entity(),
-                    Item::Project(crate::app::model::ProjectKey::HOST.into()),
-                    false,
-                ))
-                .into_any_element(),
-        ];
-        if !open {
-            return out;
-        }
-        for i in rows {
-            out.push(
-                self.render_thread_row(i, cx)
-                    .into_any_element(),
-            );
-        }
-        out
     }
 
     /// The rows over the list: a new thread (where a thread lives now), a new project, the search.

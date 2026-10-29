@@ -15,7 +15,40 @@ use crate::app::BenchApp;
 use crate::sidebar::items::Item;
 use bench_ui::icons::Ico;
 
+/// What a group's head shows: Host's and every project's alike, drawn by one function, so
+/// nothing is on one head and missing from another.
+pub(super) struct GroupHead {
+    /// Its place in the sidebar (0 is Host): the ids of its controls.
+    pub g: usize,
+    pub name: SharedString,
+    /// The project's id: its menu, its mark, its rename and remove.
+    pub id: String,
+    /// The project a "+" makes a new thread in ("" is Host's).
+    pub new_in: String,
+    pub telegram: bool,
+    /// The key `toggle_group` flips, and whether the group is folded now.
+    pub fold_key: String,
+    pub collapsed: bool,
+}
+
 impl BenchApp {
+    /// Host: the machine's own agent and environment, for looking after the machine itself and
+    /// the threads of no project; first in the sidebar, folded until opened (the key marks it
+    /// open). A group as every project's.
+    pub(super) fn render_host(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let fold_key = "open:loose".to_string();
+        let head = GroupHead {
+            g: 0,
+            name: crate::app::LOCAL_HOST.into(),
+            id: crate::app::model::ProjectKey::HOST.into(),
+            new_in: String::new(),
+            telegram: self.places.host_bots.contains(""),
+            collapsed: !self.sidebar.collapsed.contains(&fold_key),
+            fold_key,
+        };
+        self.render_group(head, None, rows, cx)
+    }
+
     /// A project: its head and its threads on the head's guide (the controls of the head are in
     /// `menu.rs`'s notes: hover "⋯", "+", and the fold always shown).
     pub(super) fn render_project(
@@ -25,128 +58,47 @@ impl BenchApp {
         rows: Vec<usize>,
         cx: &mut Context<Self>,
     ) -> Vec<AnyElement> {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let key = format!("p:{}", p.id);
-        let collapsed = self.sidebar.collapsed.contains(&key);
-        let group: SharedString = format!("phead{g}").into();
-        let remote = !p.agent.is_empty();
+        let fold_key = format!("p:{}", p.id);
         // A remote project's agent: connecting, or why it is not there.
-        let remote_note =
-            Some(&p.agent)
-                .filter(|_| remote)
-                .and_then(|h| match self.agents.get(h) {
-                    Some(r) if r.conn.is_some() => None,
-                    Some(r) => Some(
-                        r.error
-                            .clone()
-                            .map(|e| format!("{h}: {e}"))
-                            .unwrap_or_else(|| format!("Connecting to {h}…")),
-                    ),
-                    None => Some(format!("{h}: not connected")),
-                });
-        let (new_id, menu_id) = (p.id.clone(), p.id.clone());
-        let mark = self.mark_of(&format!("p:{}", p.id));
-        let pinned = mark.pinned;
-        // A chosen color is a tag's dot after the name (as Finder's); the name stays the text's.
-        let color: Option<Hsla> = mark
-            .color
-            .and_then(bench_ui::mark_color);
-        let armed = self.armed.is(&format!("p:{}", p.id));
-        let renaming = self.renaming_field(&Item::Project(p.id.clone()));
-        let tag = color.filter(|_| renaming.is_none());
-        let mut out = vec![
-            h_flex()
-                .id(("phead", g))
-                .group(group.clone())
-                .cursor_pointer()
-                .pl(px(bench_ui::SIDEBAR_TEXT_X))
-                .pr(px(bench_ui::SIDEBAR_ROW_INSET))
-                .pt(if g == 0 {
-                    AbsoluteLength::from(rems(0.5))
-                } else {
-                    AbsoluteLength::from(px(bench_ui::GROUP_GAP))
-                })
-                // One pixel more breath under a heading than a plain pb_1: projects are
-                // sections, and the eye wants the groups further apart than the threads inside.
-                .pb(px(bench_ui::GROUP_HEAD_PB))
-                .gap_1p5()
-                .items_center()
-                // A section's header, as a Mac's sidebar has them: small, semibold, secondary.
-                .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
-                .child(match renaming {
-                    Some(field) => div()
-                        .flex_1()
-                        .min_w_0()
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .child(Input::new(&field).xsmall())
-                        .into_any_element(),
-                    // The name in the secondary colour; a chosen color is its tag dot.
-                    None => div()
-                        .min_w_0()
-                        .truncate()
-                        .font_weight(FontWeight::SEMIBOLD)
-                        .text_color(muted)
-                        .child(p.name.clone())
-                        .into_any_element(),
-                })
-                .children(tag.map(bench_ui::tag_dot))
-                // A bot of its own: its threads are written to from Telegram too.
-                .when(p.telegram, |d| d.child(telegram_mark(("ptg", g), muted)))
-                .child(div().flex_1())
-                // Removing asks first: its environment goes with it.
-                .when(armed, |d| {
-                    let yes = p.id.clone();
-                    d.child(bench_ui::confirm_buttons(
-                        format!("premove-{g}"),
-                        "Remove",
-                        Box::new(cx.listener(move |this, _, window, cx| {
-                            this.delete_project(yes.clone(), window, cx)
-                        })),
-                        Box::new(cx.listener(|this, _, _, cx| this.cancel_delete(cx))),
-                        cx,
-                    ))
-                })
-                // "⋯" (on hover): the same menu as a right click.
-                .child(
-                    bench_ui::on_group_hover(group.clone())
-                        .child(
-                            bench_ui::row_icon_button(("pmore", g), Ico::Ellipsis)
-                                .dropdown_menu(item_menu(
-                                    cx.entity(),
-                                    Item::Project(menu_id.clone()),
-                                    pinned,
-                                )),
-                        ),
-                )
-                .child(
-                    bench_ui::head_plus_slot()
-                        .id(("pnew", g))
-                        .cursor_pointer()
-                        .text_color(muted)
-                        // On hover, as the pencil.
-                        .opacity(0.)
-                        .group_hover(group.clone(), |s| s.opacity(1.))
-                        .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
-                        .child(Ico::Plus.icon().xsmall())
-                        .tooltip(|window, cx| {
-                            Tooltip::new("New thread in this project  ⌘N").build(window, cx)
-                        })
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            cx.stop_propagation();
-                            this.new_thread_in(new_id.clone(), cx)
-                        })),
-                )
-                // The fold, rightmost: shown when folded, on hover when open (Finder's).
-                .child(bench_ui::group_chevron(collapsed, group.clone(), cx))
-                .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(key.clone(), cx)))
-                .context_menu(item_menu(cx.entity(), Item::Project(menu_id), pinned))
-                .into_any_element(),
-        ];
+        let note = Some(&p.agent)
+            .filter(|h| !h.is_empty())
+            .and_then(|h| match self.agents.get(h) {
+                Some(r) if r.conn.is_some() => None,
+                Some(r) => Some(
+                    r.error
+                        .clone()
+                        .map(|e| format!("{h}: {e}"))
+                        .unwrap_or_else(|| format!("Connecting to {h}…")),
+                ),
+                None => Some(format!("{h}: not connected")),
+            });
+        let head = GroupHead {
+            g,
+            name: p.name.clone().into(),
+            id: p.id.clone(),
+            new_in: p.id.clone(),
+            telegram: p.telegram,
+            collapsed: self.sidebar.collapsed.contains(&fold_key),
+            fold_key,
+        };
+        self.render_group(head, note, rows, cx)
+    }
+
+    /// A group: its head, then (unless folded) a note on its agent and its threads.
+    fn render_group(
+        &mut self,
+        head: GroupHead,
+        note: Option<String>,
+        rows: Vec<usize>,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
+        let muted = cx.theme().muted_foreground;
+        let collapsed = head.collapsed;
+        let mut out = vec![self.render_group_head(head, cx)];
         if collapsed {
             return out;
         }
-        if let Some(note) = remote_note {
+        if let Some(note) = note {
             out.push(
                 div()
                     .pl(px(bench_ui::SIDEBAR_TEXT_X))
@@ -161,12 +113,107 @@ impl BenchApp {
             );
         }
         for i in rows {
-            out.push(
-                self.render_thread_row(i, cx)
-                    .into_any_element(),
-            );
+            out.push(self.render_thread_row(i, cx).into_any_element());
         }
         out
+    }
+
+    /// A group's head: the name, its tag dot and Telegram mark, then on hover "⋯" (its menu,
+    /// Settings among its items) and "+", and the fold.
+    fn render_group_head(&mut self, head: GroupHead, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        let muted = theme.muted_foreground;
+        let GroupHead { g, name, id, new_in, telegram, fold_key, collapsed } = head;
+        let group: SharedString = format!("phead{g}").into();
+        let mark = self.mark_of(&format!("p:{id}"));
+        let pinned = mark.pinned;
+        // A chosen color is a tag's dot after the name (as Finder's); the name stays the text's.
+        let color: Option<Hsla> = mark.color.and_then(bench_ui::mark_color);
+        let armed = self.armed.is(&format!("p:{id}"));
+        let renaming = self.renaming_field(&Item::Project(id.clone()));
+        let tag = color.filter(|_| renaming.is_none());
+        h_flex()
+            .id(("phead", g))
+            .group(group.clone())
+            .cursor_pointer()
+            .pl(px(bench_ui::SIDEBAR_TEXT_X))
+            .pr(px(bench_ui::SIDEBAR_ROW_INSET))
+            .pt(if g == 0 {
+                AbsoluteLength::from(rems(0.5))
+            } else {
+                AbsoluteLength::from(px(bench_ui::GROUP_GAP))
+            })
+            // One pixel more breath under a heading than a plain pb_1: projects are
+            // sections, and the eye wants the groups further apart than the threads inside.
+            .pb(px(bench_ui::GROUP_HEAD_PB))
+            .gap_1p5()
+            .items_center()
+            // A section's header, as a Mac's sidebar has them: small, semibold, secondary.
+            .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
+            .child(match renaming {
+                Some(field) => div()
+                    .flex_1()
+                    .min_w_0()
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                    .child(Input::new(&field).xsmall())
+                    .into_any_element(),
+                // The name in the secondary colour; a chosen color is its tag dot.
+                None => div()
+                    .min_w_0()
+                    .truncate()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .text_color(muted)
+                    .child(name)
+                    .into_any_element(),
+            })
+            .children(tag.map(bench_ui::tag_dot))
+            // A bot of its own: its threads are written to from Telegram too.
+            .when(telegram, |d| d.child(telegram_mark(("ptg", g), muted)))
+            .child(div().flex_1())
+            // Removing asks first: its environment goes with it.
+            .when(armed, |d| {
+                let yes = id.clone();
+                d.child(bench_ui::confirm_buttons(
+                    format!("premove-{g}"),
+                    "Remove",
+                    Box::new(cx.listener(move |this, _, window, cx| {
+                        this.delete_project(yes.clone(), window, cx)
+                    })),
+                    Box::new(cx.listener(|this, _, _, cx| this.cancel_delete(cx))),
+                    cx,
+                ))
+            })
+            // "⋯" (on hover): the same menu as a right click.
+            .child(
+                bench_ui::on_group_hover(group.clone()).child(
+                    bench_ui::row_icon_button(("pmore", g), Ico::Ellipsis).dropdown_menu(
+                        item_menu(cx.entity(), Item::Project(id.clone()), pinned),
+                    ),
+                ),
+            )
+            .child(
+                bench_ui::head_plus_slot()
+                    .id(("pnew", g))
+                    .cursor_pointer()
+                    .text_color(muted)
+                    // On hover, as the pencil.
+                    .opacity(0.)
+                    .group_hover(group.clone(), |s| s.opacity(1.))
+                    .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
+                    .child(Ico::Plus.icon().xsmall())
+                    .tooltip(|window, cx| {
+                        Tooltip::new("New thread in this project  ⌘N").build(window, cx)
+                    })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        cx.stop_propagation();
+                        this.new_thread_in(new_in.clone(), cx)
+                    })),
+            )
+            // The fold, rightmost: shown when folded, on hover when open (Finder's).
+            .child(bench_ui::group_chevron(collapsed, group.clone(), cx))
+            .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(fold_key.clone(), cx)))
+            .context_menu(item_menu(cx.entity(), Item::Project(id), pinned))
+            .into_any_element()
     }
 }
 

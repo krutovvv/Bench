@@ -64,8 +64,7 @@ pub(super) fn color_row(
 }
 
 /// The menu of a sidebar item (its "⋯" and a right click), the same for a thread and a
-/// project: a project's own entry (the Explorer), then pin, color, rename, delete. Settings is
-/// not here: the gear on the project's row is its door, and a right click hides a door.
+/// project: a project's own entries (the Explorer, its Settings), then pin, color, rename, delete.
 pub(super) fn item_menu(
     view: Entity<BenchApp>,
     item: Item,
