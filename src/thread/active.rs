@@ -25,6 +25,9 @@ pub struct ActiveThread {
     /// settle. The person touching it (either way) takes it over; at the run's end it folds.
     pub(crate) auto_work: Option<String>,
     pub open_steps: HashSet<(String, usize)>,
+    /// The runs of an opened work unfolded to their steps (work key, the run's first step:
+    /// `::thread::steps::runs`).
+    pub open_runs: HashSet<(String, usize)>,
     pub open_source: Option<(String, String)>,
     /// The open thread's texts, parsed once (`ui::media::Texts`).
     pub texts: crate::media::text::Texts,
@@ -80,6 +83,7 @@ impl Default for ActiveThread {
             open_work: Default::default(),
             auto_work: None,
             open_steps: Default::default(),
+            open_runs: Default::default(),
             open_source: None,
             texts: Default::default(),
             history_error: None,

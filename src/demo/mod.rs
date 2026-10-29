@@ -211,7 +211,38 @@ fewer form fields. Then check what it did to signups and give me a short summary
         });
     }
     journal.started(threads::processes(now));
-    let landing = journal.thread();
+    // `BENCH_DEMO_JOURNAL=<file>`: a real thread in the landing's place, as `thread.open` gave
+    // it (saved from the agent) — the person's data drawn by this copy, nothing sent anywhere.
+    let landing = match std::env::var("BENCH_DEMO_JOURNAL")
+        .ok()
+        .and_then(|f| std::fs::read_to_string(f).ok())
+        .and_then(|t| serde_json::from_str::<protocol::ThreadOpen>(&t).ok())
+    {
+        Some(open) => ::thread::Thread::open(open),
+        None => journal.thread(),
+    };
+    // `BENCH_DEMO_WORK=<n>[:<i>…]`: the n-th piece of work opened, its i-th lines unfolded.
+    if let Ok(how) = std::env::var("BENCH_DEMO_WORK") {
+        let mut parts = how.split(':');
+        let n: usize = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1);
+        let unfold: Vec<usize> = parts.filter_map(|i| i.parse().ok()).collect();
+        if let Some(::thread::Row::Work { key, steps, .. }) = landing
+            .rows()
+            .into_iter()
+            .filter(|r| matches!(r, ::thread::Row::Work { .. }))
+            .nth(n.saturating_sub(1))
+        {
+            open_thread(app, cx, move |t| {
+                t.open_work.insert(key.clone());
+                let lines = ::thread::steps::runs(&steps);
+                for i in &unfold {
+                    if let Some(l) = lines.get(i.saturating_sub(1)) {
+                        t.open_runs.insert((key.clone(), l.first()));
+                    }
+                }
+            });
+        }
+    }
     if std::env::var("BENCH_DEMO").as_deref() == Ok("top") {
         if let Some(::thread::Row::Work { key, .. }) = landing
             .rows()

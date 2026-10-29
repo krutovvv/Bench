@@ -14,6 +14,7 @@
 pub mod diff;
 mod rows;
 mod state;
+pub mod steps;
 #[cfg(test)]
 mod tests;
 
