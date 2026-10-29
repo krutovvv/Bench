@@ -229,6 +229,9 @@ pub const STATUS_H: f32 = 29.;
 pub const SIDEBAR_FOOT_H: f32 = 40.;
 /// A mark's dot beside a name (Finder's tag).
 pub const TAG_DOT: f32 = 8.;
+/// A group head's marks (a Telegram bot, a schedule): a step under the head's controls (12), so
+/// they inform without asking to be clicked.
+pub const HEAD_MARK_ICON: f32 = 10.;
 pub const THREAD_ROW_PY: f32 = 4.;
 /// A fork's corner (`nest_corner`): its width, its height over the title's middle, its round.
 pub const NEST_CORNER_W: f32 = 7.;

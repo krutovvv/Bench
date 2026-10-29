@@ -1,5 +1,6 @@
-//! A project in the sidebar: its head (the name, its Telegram and schedule marks, and on hover "⋯" — its
-//! Settings among its items — and "+" for a new thread in it; the fold is always shown), then
+//! A project in the sidebar: its head (the name, its Telegram and schedule marks, "⋯" on hover —
+//! its Settings among its items —, "+" for a new thread in it always shown, as Claude's, then
+//! the fold), then
 //! its threads on the head's guide. Its files and environment are the Code view's (the switch
 //! over the window).
 
@@ -200,13 +201,13 @@ impl BenchApp {
             .child(
                 bench_ui::head_plus_slot()
                     .id(("pnew", g))
+                    .rounded_sm()
                     .cursor_pointer()
                     .text_color(muted)
-                    // On hover, as the pencil.
-                    .opacity(0.)
-                    .group_hover(group.clone(), |s| s.opacity(1.))
+                    // Always shown, as Claude's: every project says where its new thread goes
+                    // without a hover to find it.
                     .hover(|s| s.bg(theme.sidebar_accent).text_color(theme.foreground))
-                    .child(Ico::Plus.icon().xsmall())
+                    .child(Ico::Plus.icon().small())
                     .tooltip(|window, cx| {
                         Tooltip::new("New thread in this project  ⌘N").build(window, cx)
                     })
@@ -215,7 +216,8 @@ impl BenchApp {
                         this.new_thread_in(new_in.clone(), cx)
                     })),
             )
-            // The fold, rightmost: shown when folded, on hover when open (Finder's).
+            // The fold, rightmost, after "+": shown when folded, on hover when open (Finder's); its
+            // room kept either way, so "+" stands at one x on every head.
             .child(bench_ui::group_chevron(collapsed, group.clone(), cx))
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(fold_key.clone(), cx)))
             .context_menu(item_menu(cx.entity(), Item::Project(id), pinned))
@@ -229,8 +231,8 @@ pub(super) fn cron_mark(id: impl Into<ElementId>, muted: Hsla) -> impl IntoEleme
     div()
         .id(id)
         .flex_none()
-        .text_color(muted)
-        .child(Ico::Clock.icon().xsmall())
+        .text_color(muted.opacity(0.7))
+        .child(Ico::Clock.icon().with_size(px(bench_ui::HEAD_MARK_ICON)))
         .tooltip(|window, cx| Tooltip::new("It runs on a schedule").build(window, cx))
 }
 
@@ -240,7 +242,7 @@ pub(super) fn telegram_mark(id: impl Into<ElementId>, muted: Hsla) -> impl IntoE
     div()
         .id(id)
         .flex_none()
-        .text_color(muted)
-        .child(Ico::Send.icon().xsmall())
+        .text_color(muted.opacity(0.7))
+        .child(Ico::Send.icon().with_size(px(bench_ui::HEAD_MARK_ICON)))
         .tooltip(|window, cx| Tooltip::new("Its Telegram bot is on").build(window, cx))
 }
