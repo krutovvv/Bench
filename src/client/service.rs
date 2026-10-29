@@ -44,6 +44,7 @@ EOF
 	}
 	unload() { launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true; }
 	again() { launchctl kickstart -k "$DOMAIN/$LABEL"; }
+	service_pid() { launchctl print "$DOMAIN/$LABEL" 2>/dev/null | awk '/^\tpid = /{print $3}'; }
 	;;
 Linux)
 	export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
@@ -74,6 +75,7 @@ EOF
 	load() { systemctl --user daemon-reload && systemctl --user enable --quiet "$UNIT" && systemctl --user restart "$UNIT"; }
 	unload() { systemctl --user disable --now --quiet "$UNIT" 2>/dev/null || true; }
 	again() { systemctl --user restart "$UNIT"; }
+	service_pid() { systemctl --user show -p MainPID --value "$UNIT" 2>/dev/null; }
 	;;
 *)
 	echo "Bench's agent runs as a launchd or systemd service, and $(uname) has neither" >&2; exit 4
@@ -82,11 +84,11 @@ esac
 pid_of() { sed -n 's/.*"pid":\([0-9]*\).*/\1/p' "$H/server.json" 2>/dev/null; }
 build_of() { sed -n 's/.*"build":"\([^"]*\)".*/\1/p' "$H/server.json" 2>/dev/null; }
 alive() { [ -n "$1" ] && kill -0 "$1" 2>/dev/null; }
-# The agent `server.json` names, when it is not of this build: one the service did not start
-# (by hand, or by a Bench from before the service) holds the home, and the service's would wait.
+# The agent `server.json` names, when the service did not start it (by hand, or by a Bench from
+# before the service), whatever its build: it holds the home, and the service's would wait.
 stop_other() {
 	p="$(pid_of)"
-	if alive "$p" && [ "$(build_of)" != "@BUILD@" ]; then
+	if alive "$p" && [ "$p" != "$(service_pid)" ]; then
 		kill "$p"
 		for i in $(seq 1 20); do alive "$p" || break; sleep 0.5; done
 	fi
@@ -94,24 +96,20 @@ stop_other() {
 "#;
 
 /// Makes the service match this build and waits for its agent: `server.json` on stdout. The
-/// service is (re)loaded when its file changed, started when it is not running, and restarted
-/// when it runs other sources — its runs are durable, so one it was in resumes.
+/// service is reloaded when its file changed, an agent it did not start is stopped, and the
+/// service is started when it is not running or restarted when it runs other sources — its runs
+/// are durable, so one it was in resumes. Only the service's own agent is answered.
 const START: &str = r#"
 mkdir -p "$(dirname "$FILE")"
 unit > "$FILE.new"
-if ! cmp -s "$FILE.new" "$FILE"; then
-	unload
-	stop_other
-	mv "$FILE.new" "$FILE"
-	load
-else
-	rm -f "$FILE.new"
-	if ! loaded; then stop_other; load
-	elif [ "$(build_of)" != "@BUILD@" ]; then again; stop_other
-	fi
+if cmp -s "$FILE.new" "$FILE"; then rm -f "$FILE.new"; else unload; mv "$FILE.new" "$FILE"; fi
+stop_other
+if ! loaded; then load
+elif [ "$(build_of)" != "@BUILD@" ]; then again
 fi
 for i in $(seq 1 120); do
-	if alive "$(pid_of)" && [ "$(build_of)" = "@BUILD@" ]; then cat "$H/server.json"; exit 0; fi
+	p="$(pid_of)"
+	if alive "$p" && [ "$p" = "$(service_pid)" ] && [ "$(build_of)" = "@BUILD@" ]; then cat "$H/server.json"; exit 0; fi
 	sleep 0.5
 done
 echo "the agent did not start: $(tail -n 3 "$H/server.log" 2>/dev/null | tr '\n' ' ')" >&2

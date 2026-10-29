@@ -1,7 +1,7 @@
 //! Where the agent lives and how to reach it: `launch::ensure()` brings it up as its machine's
-//! service and names its port — on this Mac reached directly, on a server through `ssh -L`. Either way it is a session token, sent as `?token=` on the WebSocket and as
-//! the `X-Bench-Token` header on REST. Port and token of a host are remembered so the
-//! next launch reattaches.
+//! service and names its port — on this Mac reached directly, on a server through `ssh -L`.
+//! Either way it is a session token, sent as `?token=` on the WebSocket and as the
+//! `X-Bench-Token` header on REST.
 
 use std::io::Write;
 use std::net::{TcpListener, TcpStream};
@@ -12,7 +12,6 @@ use std::time::Duration;
 use web_time::Instant;
 
 use anyhow::{Context as _, Result, anyhow, bail};
-use serde_json::{Value, json};
 use tungstenite::WebSocket;
 use tungstenite::client::IntoClientRequest;
 
@@ -80,30 +79,10 @@ impl Connection {
             ),
             HostCheck::NoNode => bail!("{host}: Bench's agent needs Node.js 22.18 or newer there"),
         }
-        let state_path = state_dir().join(format!("ssh-{host}.json"));
-        let build = crate::client::launch::build();
-        // Reattach to the agent we reached last time, if it still answers and is of this app's
-        // build; one of another build is updated and restarted by `ensure`, as on this Mac.
-        if let Ok(saved) = std::fs::read(&state_path)
-            .map_err(anyhow::Error::from)
-            .and_then(|b| Ok(serde_json::from_slice::<Value>(&b)?))
-        {
-            if let (Some(port), Some(token)) = (saved["port"].as_u64(), saved["token"].as_str()) {
-                // The saved token must still open the WebSocket (a restarted agent rejects it).
-                if let Ok(conn) = Self::attach_ssh(host, port as u16, token) {
-                    let current = build.is_none() || saved["build"].as_str() == build.as_deref();
-                    if current && conn.websocket().is_ok() {
-                        return Ok(conn);
-                    }
-                }
-            }
-        }
+        // Always through `ensure`, as on this Mac: it is what keeps the server's agent its
+        // machine's service, of this app's build (a saved port reused without it once left an
+        // agent of the old kind running).
         let (port, token) = crate::client::launch::ensure(&Target::Ssh(host.to_string()))?;
-        std::fs::create_dir_all(state_dir())?;
-        write_private(
-            &state_path,
-            &json!({"port": port, "token": token, "build": build}).to_string(),
-        )?;
         Self::attach_ssh(host, port, &token)
     }
 
@@ -154,7 +133,7 @@ impl Connection {
     }
 }
 
-/// Bench's own state (last place, drafts, marks, settings, SSH reattach files): `~/.bench/ui`,
+/// Bench's own state (last place, drafts, marks, settings): `~/.bench/ui`,
 /// beside the agent's home.
 pub fn state_dir() -> PathBuf {
     STATE_DIR
@@ -206,20 +185,6 @@ pub fn migrate_state() {
     }
 }
 
-fn write_private(path: &PathBuf, text: &str) -> Result<()> {
-    let mut options = std::fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    // Readable by the owner only (where the system has Unix permissions).
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        options.mode(0o600);
-    }
-    let mut f = options.open(path)?;
-    f.write_all(text.as_bytes())?;
-    Ok(())
-}
-
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
 }
@@ -235,9 +200,6 @@ pub enum Restart {
 /// Restarts the agent (its unfinished runs continue after the start).
 pub fn restart_agent(target: &Target, _interrupt: bool) -> Result<Restart> {
     crate::client::launch::restart(target)?;
-    if let Target::Ssh(host) = target {
-        let _ = std::fs::remove_file(state_dir().join(format!("ssh-{host}.json")));
-    }
     Ok(Restart::Done)
 }
 
