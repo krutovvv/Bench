@@ -148,6 +148,7 @@ impl InsertKind for Terminal {
         if app.demo {
             return Some(
                 div()
+                    .px_3()
                     .font_family(bench_ui::theme::MONO)
                     .text_sm()
                     .whitespace_nowrap()
@@ -173,15 +174,18 @@ impl InsertKind for Terminal {
         tab.session
             .set_min_rows((((MAX_H - 16.) / line).floor() as usize).max(4));
         let h = terminal_height(&tab.session).min(MAX_H);
-        // The view's own 16 inset pulled back: its text starts where the head's does.
         Some(
             div()
                 .h(px(h))
-                .mx(px(-12.))
                 .overflow_hidden()
                 .child(app.render_terminal(ix, window, cx))
                 .into_any_element(),
         )
+    }
+
+    /// The view has its own inset: its text starts where the head's does.
+    fn inset(&self) -> crate::inserts::Inset {
+        crate::inserts::Inset::Rows
     }
 
     fn context(&self, app: &BenchApp, at: &ThreadRef, ins: &Insert, _cx: &App) -> String {

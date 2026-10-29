@@ -49,6 +49,17 @@ pub struct Word {
     pub key: &'static str,
 }
 
+/// How a kind's body sits in its block.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Inset {
+    /// The block's inset on every side: words, a list.
+    Padded,
+    /// Above and below only: its own text starts where the head's does (a terminal).
+    Rows,
+    /// None: it fills the block to its frame (the utilities' panes).
+    Flush,
+}
+
 /// A kind's chip on a new thread's welcome: its icon and name; `compose` writes its word and a
 /// space into the composer (to choose what follows it), else the chip puts the insert in.
 pub struct WelcomeChip {
@@ -127,6 +138,10 @@ pub trait InsertKind: Sync {
         _cx: &mut Context<BenchApp>,
     ) -> Vec<AnyElement> {
         vec![]
+    }
+    /// How its body sits in the block (the block's inset, or none where the body has its own).
+    fn inset(&self) -> Inset {
+        Inset::Padded
     }
     /// What it shows, under the head; None: the head alone.
     fn body(
@@ -342,6 +357,7 @@ impl ThreadView {
         } else {
             vec![]
         };
+        let inset = if live { kind.inset() } else { Inset::Padded };
         let body = if ins.folded {
             None
         } else if live {
@@ -449,7 +465,14 @@ impl ThreadView {
         let frame = bench_ui::block_frame(cx)
             .id(id)
             .child(head)
-            .children(body.map(|b| div().px_3().py_2().child(b)));
+            .children(body.map(|b| {
+                match inset {
+                    Inset::Padded => div().px_3().py_2(),
+                    Inset::Rows => div().py_2(),
+                    Inset::Flush => div(),
+                }
+                .child(b)
+            }));
         // Working in an insert keeps the focus there, and doesn't pull the thread to its end
         // when it grows.
         let body = div()

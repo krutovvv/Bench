@@ -171,11 +171,14 @@ impl InsertKind for Tools {
         Some(
             div()
                 .h(h)
-                .mx(px(-12.))
-                .my(px(-8.))
                 .child(app.render_tools_body(cx))
                 .into_any_element(),
         )
+    }
+
+    /// Its panes fill the block to the frame.
+    fn inset(&self) -> crate::inserts::Inset {
+        crate::inserts::Inset::Flush
     }
 
     fn context(&self, app: &BenchApp, _at: &ThreadRef, ins: &Insert, cx: &App) -> String {

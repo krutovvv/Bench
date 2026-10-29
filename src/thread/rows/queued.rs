@@ -112,10 +112,8 @@ impl ThreadView {
             .into_any_element();
         let editor = field.map(|st| {
             // The composer's field, at its size and leading: the row is as tall as the text.
-            div()
+            bench_ui::flush_field()
                 .id((id.clone(), 4))
-                .ml(px(-12.))
-                .my(px(-10.))
                 .cursor_text()
                 .on_mouse_down(
                     MouseButton::Left,

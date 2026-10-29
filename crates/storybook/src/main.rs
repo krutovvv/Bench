@@ -114,7 +114,12 @@ impl Render for Story {
             .child(field_row("Name", field(&self.name), cx))
             .child(field_row("Password", secret_field(&self.password), cx))
             .child(field_row("Search", search_field(&self.search, cx), cx))
-            .child(field_row("Empty", field(&self.empty), cx));
+            .child(field_row("Empty", field(&self.empty), cx))
+            .child(field_row(
+                "Flush",
+                div().px_3().py_2().child(flush_field().child(bare_field(&self.empty))),
+                cx,
+            ));
 
         let gaps = stack(Gap::S).children([Gap::Xs, Gap::S, Gap::M, Gap::L, Gap::Xl].map(|g| {
             row(g)

@@ -16,6 +16,14 @@ pub fn bare_field(state: &Entity<InputState>) -> Input {
     Input::new(state).appearance(false)
 }
 
+/// A slot for a bare field (`appearance(false)`) among words: its own padding pulled back, so
+/// its text starts where the words around it do.
+pub fn flush_field() -> Div {
+    div()
+        .ml(px(-crate::metrics::INPUT_PAD_X))
+        .my(px(-crate::metrics::INPUT_PAD_Y))
+}
+
 /// The state of a password field: masked from the start.
 pub fn secret_state(window: &mut Window, cx: &mut Context<InputState>) -> InputState {
     InputState::new(window, cx).masked(true)
