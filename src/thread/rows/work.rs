@@ -296,13 +296,7 @@ impl ThreadView {
         // The steps as a Mac's grouped list (Xcode's build log, System Settings' lists): a soft
         // rounded ground, no rule, rows that light up whole — not a rule down their left with
         // lines hung on it. Open with no steps yet (a run that has only begun): nothing.
-        let list = (!items.is_empty()).then(|| {
-            v_flex()
-                .overflow_hidden()
-                .rounded_lg()
-                .bg(theme.foreground.opacity(0.03))
-                .children(items)
-        });
+        let list = (!items.is_empty()).then(|| bench_ui::block_frame(cx).children(items));
         // The plan, the questions and the background processes this work's calls made, under
         // its steps.
         // A call of this work waiting for the person's approval: its card joins the questions.

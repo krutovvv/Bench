@@ -46,8 +46,9 @@ pub struct ThreadView {
     pub slash_sel: usize,
     pub slash_closed: bool,
     pub slash_scroll: ScrollHandle,
-    /// Each opened work's list and detail, scrolled inside it (`rows/steps.rs`), by its key.
-    pub(crate) work_scroll: std::collections::HashMap<String, (ScrollHandle, ScrollHandle)>,
+    /// What scrolls inside an opened work (its list when long, a call's command and output
+    /// fields: `rows/steps.rs`), by the element's id.
+    pub(crate) work_scroll: std::collections::HashMap<String, ScrollHandle>,
     /// Where the composer is in the window, and the window's height (last frame): the `/` list
     /// opens above the line when there is no room under it.
     pub composer_y: Pixels,

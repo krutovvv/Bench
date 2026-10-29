@@ -24,13 +24,12 @@ pub struct ActiveThread {
     /// The live work this view opened on its own, so the agent's words show where they will
     /// settle. The person touching it (either way) takes it over; at the run's end it folds.
     pub(crate) auto_work: Option<String>,
-    /// The call each opened work shows whole, by the work row's key (its index in the work's
-    /// steps); none chosen, the newest.
-    pub chosen_step: std::collections::HashMap<String, usize>,
-    /// Runs of an opened work's list folded or unfolded against how they start (work key, the
-    /// run's first step): the one holding the chosen call starts open, the others folded.
+    /// Steps of an opened work opened to their card (work key, step), any number at once.
+    pub open_steps: HashSet<(String, usize)>,
+    /// Runs of an opened work folded or unfolded against how they start (work key, the run's
+    /// first step): the last run starts open — what the agent does now — the others folded.
     pub flipped_runs: HashSet<(String, usize)>,
-    /// Chosen calls shown whole, past their first lines (work key, step).
+    /// Steps whose reasoning is shown whole, past its first lines (work key, step).
     pub step_whole: HashSet<(String, usize)>,
     pub open_source: Option<(String, String)>,
     /// The open thread's texts, parsed once (`ui::media::Texts`).
@@ -86,7 +85,7 @@ impl Default for ActiveThread {
             tv: Default::default(),
             open_work: Default::default(),
             auto_work: None,
-            chosen_step: Default::default(),
+            open_steps: Default::default(),
             step_whole: Default::default(),
             flipped_runs: Default::default(),
             open_source: None,

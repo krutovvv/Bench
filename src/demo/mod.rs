@@ -221,7 +221,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Some(open) => ::thread::Thread::open(open),
         None => journal.thread(),
     };
-    // `BENCH_DEMO_WORK=<n>[:<i>]`: the n-th piece of work opened, its i-th listed step chosen.
+    // `BENCH_DEMO_WORK=<n>[:<i>]`: the n-th piece of work opened, its i-th listed step's card open.
     if let Ok(how) = std::env::var("BENCH_DEMO_WORK") {
         let mut parts = how.split(':');
         let n: usize = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1);
@@ -230,13 +230,34 @@ fewer form fields. Then check what it did to signups and give me a short summary
             .rows()
             .into_iter()
             .filter(|r| matches!(r, ::thread::Row::Work { .. }))
+            // `BENCH_DEMO_WORK_CALLS=<c>`: the first work of c calls instead of the n-th.
+            .filter(|r| match std::env::var("BENCH_DEMO_WORK_CALLS").ok().and_then(|c| c.parse::<usize>().ok()) {
+                Some(c) => matches!(r, ::thread::Row::Work { steps, .. } if steps.iter().filter(|s| s.is_tool()).count() == c),
+                None => true,
+            })
             .nth(n.saturating_sub(1))
         {
+            // The opened work at the window's top, unless a scroll was asked for.
+            if std::env::var("BENCH_DEMO_SCROLL").is_err() {
+                if let Some(ix) = landing.rows().iter().position(|r| r.key() == key) {
+                    // SAFETY: the demo sets it once, before any other thread reads the env.
+                    unsafe { std::env::set_var("BENCH_DEMO_SCROLL", format!("{ix}:0")) };
+                }
+            }
             open_thread(app, cx, move |t| {
                 t.open_work.insert(key.clone());
                 let listed = ::thread::steps::listed(&steps);
                 if let Some(k) = unfold.first().and_then(|i| listed.get(i.saturating_sub(1))) {
-                    t.chosen_step.insert(key.clone(), *k);
+                    t.open_steps.insert((key.clone(), *k));
+                    let runs = ::thread::steps::runs(&steps);
+                    let last = runs.len().saturating_sub(1);
+                    for (i, line) in runs.iter().enumerate() {
+                        if let ::thread::steps::Line::Run { calls, .. } = line {
+                            if calls.contains(k) && i != last {
+                                t.flipped_runs.insert((key.clone(), calls[0]));
+                            }
+                        }
+                    }
                 }
             });
         }

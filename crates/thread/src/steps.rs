@@ -193,6 +193,21 @@ pub fn say_command(command: &str) -> Said {
         };
     };
     let cd = cd_dir(line);
+    // `echo $PATH | tr ':' '\n'`: showing a variable, whatever filters it.
+    if let Some(var) = line
+        .trim_start()
+        .strip_prefix("echo ")
+        .filter(|r| r.contains('|'))
+        .and_then(|r| r.split('|').next()?.split_once('$').map(|(_, v)| v))
+        .map(|r| r.trim_start_matches('{'))
+        .map(|r| r.split(|c: char| !(c.is_alphanumeric() || c == '_')).next().unwrap_or(""))
+        .filter(|v| !v.is_empty())
+    {
+        return Said {
+            action: format!("Show {var}"),
+            place: None,
+        };
+    }
     let Some((prog, from)) = command_from(command) else {
         return Said {
             action: match &cd {
@@ -259,6 +274,16 @@ pub fn say_command(command: &str) -> Said {
         "defaults" => format!("Read the setting {second}"),
         "sqlite3" => format!("Query {}", or(&name, "a database")),
         "jq" => "Read JSON".into(),
+        "date" => "Show the date".into(),
+        "whoami" | "id" => "Show the user".into(),
+        "pwd" => "Show the folder".into(),
+        "uname" | "sw_vers" => "Show the system".into(),
+        "which" | "type" | "whereis" => format!("Find the program {name}"),
+        "stat" | "file" | "xattr" | "mdls" => format!("Look at {}", or(&name, "a file")),
+        "plutil" => format!("Read {}", or(&name, "a property list")),
+        "codesign" | "spctl" => format!("Check the signature of {}", or(&name, "an app")),
+        "launchctl" => format!("Services: {}", plain.first().copied().unwrap_or("")),
+        "tr" | "sort" | "uniq" | "cut" | "xargs" => "Filter text".into(),
         "du" | "df" => "Check disk space".into(),
         "ps" | "pgrep" | "lsof" => "Look at running programs".into(),
         "kill" | "pkill" | "killall" => format!("Stop {}", or(&name, "a program")),
@@ -396,6 +421,11 @@ pub fn command_from(command: &str) -> Option<(String, &str)> {
             continue;
         }
         let w = word.trim_matches(|c| c == '"' || c == '\'' || c == '(' || c == ')');
+        // `DB=$(ls -t …)`: the command inside the substitution is what runs.
+        let w = match w.find("$(") {
+            Some(i) => w[i + 2..].trim_matches(|c| c == '"' || c == '\''),
+            None => w,
+        };
         if w.is_empty() || (w.contains('=') && !w.starts_with('=') && !w.starts_with('-')) {
             continue;
         }
@@ -422,7 +452,18 @@ fn words(line: &str) -> Vec<(usize, &str)> {
     let mut out = vec![];
     let mut start: Option<usize> = None;
     let mut quote: Option<char> = None;
+    let mut escaped = false;
     for (i, c) in line.char_indices() {
+        // `\ ` and the like belong to the word: `Group\ Containers` is one path.
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if c == '\\' && quote.is_none() {
+            escaped = true;
+            start.get_or_insert(i);
+            continue;
+        }
         match (quote, c) {
             (Some(q), c) if c == q => quote = None,
             (Some(_), _) => {}
@@ -541,7 +582,7 @@ fn base(path: &str) -> String {
         .rsplit('/')
         .next()
         .unwrap_or(path)
-        .to_string()
+        .replace("\\ ", " ")
 }
 
 /// A tool's own name: an MCP server's tool without the server (`mcp__ozon__ozon_search` is
@@ -599,6 +640,11 @@ mod tests {
             ("git -C /x log --oneline -5", "Git log", None),
             ("time cargo build 2>&1 | tail -3", "Cargo build", None),
             ("cd /tmp/thingsre/repos", "Go to repos", None),
+            ("DB=$(ls -t ~/Library/Group\\ Containers/X/Things.* 2>/dev/null | head -3); echo \"$DB\"", "List Things.*", Some("X")),
+            ("ls ~/Library/Group\\ Containers/ 2>&1 | grep -i things", "List Group Containers", Some("Library")),
+            ("echo \"PATH=$PATH\" | tr ':' '\\n'", "Show PATH", None),
+            ("echo $PATH | tr ':' '\\n' | grep -n bin", "Show PATH", None),
+            ("date '+%A %Y-%m-%d'", "Show the date", None),
             (
                 "defaults read /Applications/Things3.app/Contents/Info.plist CFBundleShortVersionString",
                 "Read the setting Info.plist",
