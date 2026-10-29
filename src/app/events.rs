@@ -18,11 +18,17 @@ impl BenchApp {
     ) {
         match event {
             Event::ThreadsChanged => self.list_threads(host, cx),
-            // A project's environment shown here is read again.
+            // A project's environment shown here is read again, and the agent's projects: their
+            // marks (a schedule, a bot) are part of it.
             Event::EnvChanged { project } => {
                 let key = crate::app::model::ProjectKey::new(host, &project).to_string();
                 if self.envs.contains_key(&key) {
                     self.load_env(&key, window, cx);
+                }
+                if host.is_empty() {
+                    self.load_projects(window, cx);
+                } else {
+                    self.load_server_projects(host.to_string(), window, cx);
                 }
             }
             Event::Thread { thread, event } => {

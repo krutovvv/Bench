@@ -1,4 +1,4 @@
-//! A project in the sidebar: its head (an icon for what it is, the name, and on hover "⋯" — its
+//! A project in the sidebar: its head (the name, its Telegram and schedule marks, and on hover "⋯" — its
 //! Settings among its items — and "+" for a new thread in it; the fold is always shown), then
 //! its threads on the head's guide. Its files and environment are the Code view's (the switch
 //! over the window).
@@ -26,6 +26,8 @@ pub(super) struct GroupHead {
     /// The project a "+" makes a new thread in ("" is Host's).
     pub new_in: String,
     pub telegram: bool,
+    /// Its schedule has a job that is on.
+    pub cron: bool,
     /// The key `toggle_group` flips, and whether the group is folded now.
     pub fold_key: String,
     pub collapsed: bool,
@@ -43,6 +45,7 @@ impl BenchApp {
             id: crate::app::model::ProjectKey::HOST.into(),
             new_in: String::new(),
             telegram: self.places.host_bots.contains(""),
+            cron: self.places.host_crons.contains(""),
             collapsed: !self.sidebar.collapsed.contains(&fold_key),
             fold_key,
         };
@@ -78,6 +81,7 @@ impl BenchApp {
             id: p.id.clone(),
             new_in: p.id.clone(),
             telegram: p.telegram,
+            cron: p.cron,
             collapsed: self.sidebar.collapsed.contains(&fold_key),
             fold_key,
         };
@@ -123,7 +127,7 @@ impl BenchApp {
     fn render_group_head(&mut self, head: GroupHead, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
-        let GroupHead { g, name, id, new_in, telegram, fold_key, collapsed } = head;
+        let GroupHead { g, name, id, new_in, telegram, cron, fold_key, collapsed } = head;
         let group: SharedString = format!("phead{g}").into();
         let mark = self.mark_of(&format!("p:{id}"));
         let pinned = mark.pinned;
@@ -169,6 +173,8 @@ impl BenchApp {
             .children(tag.map(bench_ui::tag_dot))
             // A bot of its own: its threads are written to from Telegram too.
             .when(telegram, |d| d.child(telegram_mark(("ptg", g), muted)))
+            // A schedule: threads start in it by themselves.
+            .when(cron, |d| d.child(cron_mark(("pcron", g), muted)))
             .child(div().flex_1())
             // Removing asks first: its environment goes with it.
             .when(armed, |d| {
@@ -215,6 +221,17 @@ impl BenchApp {
             .context_menu(item_menu(cx.entity(), Item::Project(id), pinned))
             .into_any_element()
     }
+}
+
+/// A group head's sign that its project's schedule has a job on: threads start in it by
+/// themselves. Beside the Telegram mark, the same quiet glyph.
+pub(super) fn cron_mark(id: impl Into<ElementId>, muted: Hsla) -> impl IntoElement {
+    div()
+        .id(id)
+        .flex_none()
+        .text_color(muted)
+        .child(Ico::Clock.icon().xsmall())
+        .tooltip(|window, cx| Tooltip::new("It runs on a schedule").build(window, cx))
 }
 
 /// A group head's sign that its project has a Telegram bot: its threads are written to from

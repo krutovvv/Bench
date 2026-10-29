@@ -110,6 +110,8 @@ pub struct ProjectEntry {
     pub browser_live: Option<String>,
     /// Has a Telegram bot of its own: its threads are also written to from Telegram.
     pub telegram: bool,
+    /// Its schedule has a job that is on: threads start in it by themselves.
+    pub cron: bool,
 }
 
 impl ProjectEntry {

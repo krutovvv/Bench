@@ -273,10 +273,13 @@ fewer form fields. Then check what it did to signups and give me a short summary
         browser: true,
         browser_live: None,
         telegram: false,
+        cron: false,
     };
-    // The production site: worked on over SSH, on web-1 (its terminal is that server's).
+    // The production site: worked on over SSH, on web-1 (its terminal is that server's); its
+    // certificates are checked on a schedule.
     let web = crate::app::model::ProjectEntry {
         machine: Some("web-1".into()),
+        cron: true,
         ..project("p-web", "Production site", Some("/var/www/storefront"))
     };
     app.places.projects = vec![
@@ -292,6 +295,8 @@ fewer form fields. Then check what it did to signups and give me a short summary
     ];
     // This Mac's agent has its general bot: the Host's head shows it.
     app.places.host_bots.insert(String::new());
+    // …and a schedule of its own (the daily digest).
+    app.places.host_crons.insert(String::new());
     for s in app.threads.list.iter_mut() {
         // The rate limiting asks to run a command: its row has the dot.
         s.waiting = s.id.as_str() == "d-api";

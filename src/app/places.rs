@@ -34,6 +34,7 @@ pub fn entry_of(agent: &str, p: &Value) -> Option<ProjectEntry> {
         browser: p["browser"].as_bool().unwrap_or(false),
         browser_live: text("browser_live"),
         telegram: p["telegram"]["token"].as_str().is_some_and(|t| !t.is_empty()),
+        cron: p["cron"].as_bool().unwrap_or(false),
     })
 }
 
@@ -48,6 +49,7 @@ impl BenchApp {
                 name: a.name.clone(),
                 agent: a.host.clone(),
                 telegram: self.places.host_bots.contains(&a.host),
+                cron: self.places.host_crons.contains(&a.host),
                 ..Default::default()
             });
             all.extend(
@@ -280,15 +282,19 @@ pub struct Places {
     pub host_browser_live: Option<String>,
     /// The agents whose general bot (their Host's) is set: "" this Mac's, else a server's alias.
     pub host_bots: std::collections::HashSet<String>,
+    /// The agents whose own schedule (their Host's) has a job that is on.
+    pub host_crons: std::collections::HashSet<String>,
 }
 
 impl Places {
-    /// What an agent's `/api/projects` says of its Host's bot.
+    /// What an agent's `/api/projects` says of its Host's bot and schedule.
     pub fn note_host_bot(&mut self, agent: &str, v: &Value) {
-        if v["host_telegram"].as_bool().unwrap_or(false) {
-            self.host_bots.insert(agent.to_string());
-        } else {
-            self.host_bots.remove(agent);
+        for (key, set) in [("host_telegram", &mut self.host_bots), ("host_cron", &mut self.host_crons)] {
+            if v[key].as_bool().unwrap_or(false) {
+                set.insert(agent.to_string());
+            } else {
+                set.remove(agent);
+            }
         }
     }
 }

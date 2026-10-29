@@ -51,16 +51,21 @@ const liveOf = (agent: string): string | null => {
 	return typeof live === "string" && live ? live : null;
 };
 
+/** An agent's schedule has a job that is on. */
+const scheduled = (agent: string): boolean => jobs.list(agent).some((j) => j.enabled);
+
 export default ({ rt, publish }: Ctx): Module => ({
 	routes: {
 		// `browser`: the project has the watchable server browser among its MCP servers (Bench
 		// offers /browser only there); `host_browser`: the machine's own agent has it;
-		// `host_telegram`: the agent's general bot (its Host's) is set.
+		// `host_telegram`: the agent's general bot (its Host's) is set; `cron`, `host_cron`: a job of
+		// its schedule is on (the sidebar marks the project).
 		"GET /api/projects": () => ({
-			projects: projects.list().map((p) => ({ ...p, browser: !p.host && "browser" in agentMcp(`project:${p.id}`), browser_live: p.host ? null : liveOf(`project:${p.id}`) })),
+			projects: projects.list().map((p) => ({ ...p, browser: !p.host && "browser" in agentMcp(`project:${p.id}`), browser_live: p.host ? null : liveOf(`project:${p.id}`), cron: scheduled(`project:${p.id}`) })),
 			host_browser: "browser" in agentMcp("default"),
 			host_browser_live: liveOf("default"),
 			host_telegram: !!getSetting("telegram")?.token,
+			host_cron: scheduled("default"),
 		}),
 		"POST /api/projects": (req) => {
 			if (!String(req.body?.name ?? "").trim()) throw new HttpError(400, "name is required");

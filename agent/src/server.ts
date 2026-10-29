@@ -23,6 +23,7 @@ import audio from "./modules/audio.ts";
 import backup from "./modules/backup.ts";
 import commands from "./modules/commands.ts";
 import cron from "./modules/cron.ts";
+import { onJobsChanged } from "./builtin/cron.ts";
 import files from "./modules/files.ts";
 import lsp from "./modules/lsp.ts";
 import projects from "./modules/projects.ts";
@@ -56,6 +57,8 @@ for (const name of migrateProfiles()) console.log(`[migrate] agent ${name} → a
 for (const row of migrateServerRows()) console.log(`[migrate] ${row} is a server's agent now, not a project row`);
 for (const id of migrateProjectModels()) console.log(`[migrate] project ${id} follows the general model now (its settings.json in backups/)`);
 const rt = new Runtime(publish);
+// A schedule changed: its project's environment did (the sidebar's mark follows).
+onJobsChanged((agent) => publish({ type: "env_changed", project: agent.startsWith("project:") ? agent.slice("project:".length) : "general" }));
 await rt.open();
 
 

@@ -43,6 +43,13 @@ function table() {
 
 const row = (r: any): Job => ({ ...r, enabled: Boolean(r.enabled) });
 
+/** Told the agent whose schedule gained, lost, switched on or off a job (server.ts says it to
+ *  Bench, whose sidebar marks a project with a schedule). A run's own bookkeeping is not news. */
+let changed: (agent: string) => void = () => {};
+export function onJobsChanged(fn: (agent: string) => void): void {
+	changed = fn;
+}
+
 export const jobs = {
 	list(agent?: string): Job[] {
 		table();
@@ -65,6 +72,7 @@ export const jobs = {
 	},
 	save(j: Job): void {
 		table();
+		const before = jobs.get(j.id);
 		db()
 			.prepare(
 				`INSERT INTO cron_jobs (id, agent, name, prompt, schedule, deliver, enabled, next_run, last_run, last_status, last_output, last_thread, task_id, created)
@@ -73,10 +81,13 @@ export const jobs = {
 				 last_status=excluded.last_status, last_output=excluded.last_output, last_thread=excluded.last_thread, task_id=excluded.task_id`,
 			)
 			.run(j.id, j.agent, j.name, j.prompt, j.schedule, j.deliver, j.enabled ? 1 : 0, j.next_run, j.last_run, j.last_status, j.last_output, j.last_thread, j.task_id ?? null, j.created);
+		if (!before || before.enabled !== j.enabled) changed(j.agent);
 	},
 	remove(id: string): void {
 		table();
+		const gone = jobs.get(id);
 		db().prepare("DELETE FROM cron_jobs WHERE id = ?").run(id);
+		if (gone) changed(gone.agent);
 	},
 };
 
