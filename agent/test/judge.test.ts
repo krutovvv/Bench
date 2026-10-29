@@ -717,3 +717,14 @@ test("each message is read for what it asks; an approval is answered in words, a
 	steps("i1", 3);
 	assert.match((await checkCourse("i1"))!, /did not ask for/, "words wanted: checked at 3 steps");
 });
+
+test("a turn starts at the person's message though a section's update follows it; a compaction's summary is no new turn", () => {
+	const said = { role: "assistant", content: [{ type: "text", text: "Done." }] };
+	seeRequest("t9", [user("first"), said, user("write the skill"), { role: "system", content: "", sections: { notes: "x" } }]);
+	assert.equal(turnOf("t9").request, "write the skill");
+	assert.equal(turnOf("t9").previous, "Done.");
+	turnOf("t9").steps = 7;
+	seeRequest("t9", [user("The conversation history before this point was compacted into the following summary:\n\n<summary>…</summary>")]);
+	assert.equal(turnOf("t9").request, "write the skill", "the turn goes on");
+	assert.equal(turnOf("t9").steps, 7);
+});

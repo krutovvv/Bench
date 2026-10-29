@@ -81,6 +81,9 @@ export interface Call {
 
 const turns = new Map<string, Turn>();
 
+/** How Pi's compaction summary begins (its `SUMMARY_PREFIX`), as the user message after a compaction. */
+const SUMMARY_PREFIX = "The conversation history before this point was compacted";
+
 const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
@@ -93,16 +96,21 @@ export function turnOf(conversation: string): Turn {
 /** Every request to the model: a person's message at its end begins a new turn (the plan carries
  *  over: it is the thread's, not the turn's). The evaluator's own message does not. */
 export function seeRequest(conversation: string, messages: readonly any[]): void {
-	const last = messages[messages.length - 1];
+	// Pi puts a changed section after the person's message as a system message (a note written, the
+	// sections read anew after a restart): the message is the last one before those.
+	let at = messages.length - 1;
+	while (at >= 0 && messages[at]?.role === "system") at--;
+	const last = messages[at];
 	if (last?.role !== "user") return;
 	const text = stripBlock(textOf(last.content)).trim();
-	if (!text || text.startsWith(EVAL_OPEN)) return;
+	// The evaluator's own message, and a compaction's summary (Pi's, as a user message), are no new turn.
+	if (!text || text.startsWith(EVAL_OPEN) || text.startsWith(SUMMARY_PREFIX)) return;
 	const t = turns.get(conversation);
 	if (t?.request === text && t.steps === 0) return;
 	const next = fresh(text, t?.plan, t?.planId);
 	next.opening = messages.filter((m) => m?.role === "user").length === 1;
 	// The agent's last words before this message: what the person answers to.
-	const before = [...messages.slice(0, -1)].reverse().find((m) => m?.role === "assistant" && (m.content ?? []).some((b: any) => b?.type === "text" && String(b.text ?? "").trim()));
+	const before = [...messages.slice(0, at)].reverse().find((m) => m?.role === "assistant" && (m.content ?? []).some((b: any) => b?.type === "text" && String(b.text ?? "").trim()));
 	next.previous = before ? cut((before.content ?? []).filter((b: any) => b?.type === "text").map((b: any) => String(b.text)).join("\n").trim(), 3000) : "";
 	turns.set(conversation, next);
 }
