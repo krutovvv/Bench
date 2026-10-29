@@ -360,19 +360,21 @@ impl ThreadView {
                     // language only colours it.
                     render_code(view, &format!("step-{key}-{k}"), n, title.to_string(), body, long && !opened, more, cx)
                 }
-                // Words (why, the evaluator's): their name above them, quiet, the text, a long
-                // one cut with "Show all".
+                // Words: the model's reasoning as it wrote it, with no label of ours; the
+                // evaluator's under its name. A long one cut with "Show all".
                 None => {
                     let text = self.thread.texts.plain(&id, &body, cx);
                     let toggle = (key.to_string(), k);
                     v_flex()
                         .gap_1()
-                        .child(
-                            div()
-                                .text_size(px(bench_ui::THREAD_DETAIL))
-                                .text_color(theme.muted_foreground)
-                                .child(title),
-                        )
+                        .when(title != "Why", |d| {
+                            d.child(
+                                div()
+                                    .text_size(px(bench_ui::THREAD_DETAIL))
+                                    .text_color(theme.muted_foreground)
+                                    .child(title),
+                            )
+                        })
                         .child(div().text_size(px(bench_ui::THREAD_META)).child(text))
                         .when(cut || whole, |d| {
                             d.child(
