@@ -34,6 +34,7 @@ impl BenchApp {
             ex.listings.clear();
             ex.find = None;
         }
+        self.thread_follows(&project, cx);
         // The IDE takes the window: the tree on the left, documents in the center (its last one
         // again, or a word on how to open one).
         self.left_dock.activate(Panel::Explorer);
@@ -59,6 +60,36 @@ impl BenchApp {
         self.list_open_folders(window, cx);
         self.keep_explorer();
         cx.notify();
+    }
+
+    /// The thread beside the documents is the shown project's, never another's: its latest
+    /// thread, or a new one in it (made with its first message). The Explorer's switch is the
+    /// one way to change project here.
+    fn thread_follows(&mut self, project: &str, cx: &mut Context<Self>) {
+        if self.thread_ref(cx).project_or_host() == project {
+            return;
+        }
+        let (loose, groups) = self.sidebar_groups();
+        let rows = if project == crate::app::model::ProjectKey::HOST {
+            loose
+        } else {
+            groups
+                .into_iter()
+                .find(|(p, _)| p.id == project)
+                .map(|(_, rows)| rows)
+                .unwrap_or_default()
+        };
+        // The list is newest first; the sidebar puts pinned ones over it.
+        match rows.into_iter().min().map(|i| self.threads.list[i].clone()) {
+            Some(t) => self.open_thread(t.host, t.id, cx),
+            None => {
+                self.reset_chat(cx);
+                let project = project.to_string();
+                self.active_thread
+                    .update(cx, |v, _| v.thread.project = project);
+                self.save_place(cx);
+            }
+        }
     }
 
     /// The IDE closed (its pressed button in the window's top-right corner, ⌘E): the threads
