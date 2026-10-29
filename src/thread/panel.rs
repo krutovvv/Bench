@@ -46,14 +46,14 @@ impl BenchApp {
         if self.center == Center::Chat {
             return div().size_full().child(view).into_any_element();
         }
-        // A document in the middle: a new thread is the compose button Mail and Notes have,
-        // its words in the tooltip. Closing is the status bar's sparkle pressed off (⌘J), not a
+        // A document in the middle: a new thread is "+", as on a project's head in the
+        // sidebar (a compose glyph alone reads as "edit"). Closing is the status bar's sparkle pressed off (⌘J), not a
         // cross of this panel's own.
         let head = bench_ui::ide_head(
             title,
             None,
             vec![
-                bench_ui::icon_button("thread-new", Ico::SquarePen, "New thread  ⌘N", false, cx)
+                bench_ui::icon_button("thread-new", Ico::Plus, "New thread  ⌘N", false, cx)
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.new_thread_here(cx);
                         this.focus_composer(window, cx);
