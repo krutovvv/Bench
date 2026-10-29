@@ -136,9 +136,9 @@ pub const MODE_SEGMENT_H: f32 = 22.;
 /// A segmented control's segment on a page (settings, forms): a Mac's regular size.
 pub const SEGMENT_H: f32 = 24.;
 
-/// Room left of the header for the window's buttons (macOS's three lights), when the sidebar
-/// that usually sits under them is folded away.
-pub const WINDOW_BUTTONS_W: f32 = 78.;
+/// Room left of the header for the window's buttons (macOS's three lights): the sidebar's fold
+/// after them stands clear of the green one, a step wider than the lights' own spacing.
+pub const WINDOW_BUTTONS_W: f32 = 84.;
 
 /// The sidebar's strip under the window buttons: its icons end at the sidebar's 16 px inset
 /// (an icon's 4 px box padding + this).

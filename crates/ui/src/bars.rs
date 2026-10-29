@@ -43,7 +43,8 @@ pub fn search_band(input: &Entity<InputState>, cx: &App) -> Div {
 
 /// Ways to look at one thing, one pressed in a track (the header's Chat | Code): an icon and a
 /// word each, `tip` on hover (its key). The pressed one stands on the background, the others are
-/// words in the muted colour.
+/// words in the muted colour. A capsule, track and segments, as the thread's "Jump to latest":
+/// round ends, not a page's squared segmented control.
 pub fn mode_switch(
     id: &'static str,
     modes: &[(Ico, &'static str, &'static str)],
@@ -57,8 +58,8 @@ pub fn mode_switch(
         .flex_none()
         .p(px(MODE_SWITCH_PAD))
         .gap(px(MODE_SWITCH_PAD))
-        .rounded_md()
-        // A Mac's segmented control: a grey track, no rule; the pressed segment a raised chip.
+        .rounded_full()
+        // A grey track, no rule; the pressed segment a raised chip.
         .bg(theme.foreground.opacity(0.06))
         .children(modes.iter().enumerate().map(|(k, &(icon, label, tip))| {
             let on = k == chosen;
@@ -66,10 +67,11 @@ pub fn mode_switch(
             h_flex()
                 .id((id, k))
                 .h(px(MODE_SEGMENT_H))
-                .px_2()
+                // The round ends take room: a step more than a squared segment's sides.
+                .px_2p5()
                 .gap_1()
                 .items_center()
-                .rounded_sm()
+                .rounded_full()
                 .text_size(px(crate::metrics::BAR_TEXT))
                 .font_weight(FontWeight::MEDIUM)
                 .cursor_pointer()

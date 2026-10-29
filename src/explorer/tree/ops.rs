@@ -93,12 +93,14 @@ impl BenchApp {
     }
 
     /// The IDE closed (its pressed button in the window's top-right corner, ⌘E): the threads
-    /// again, the thread that was open in the center, nothing beside it. Its documents stay for
-    /// the next time.
+    /// again, the thread that was open in the center, nothing beside it or under it (the
+    /// terminals are the Code view's: their shells live on for ⌃`). Its documents stay for the
+    /// next time.
     pub fn close_explorer(&mut self, cx: &mut Context<Self>) {
         self.left_dock.activate(Panel::Threads);
         self.center = crate::workspace::Center::Chat;
         self.right_dock.open = false;
+        self.bottom_dock.open = false;
         let ex = &mut self.explorer;
         ex.quick = None;
         ex.find = None;

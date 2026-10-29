@@ -24,7 +24,8 @@ impl BenchApp {
             .flex_none()
             .h(bench_ui::header_h(cx))
             .pl(px(bench_ui::WINDOW_BUTTONS_W))
-            .gap_2()
+            // The fold, back and forward one even row, as Finder's: each glyph its box, one step apart.
+            .gap_1()
             .items_center()
             .bg(theme.title_bar)
             .border_b_1()
@@ -40,30 +41,29 @@ impl BenchApp {
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
             )
             .child(
-                h_flex()
-                    .child(
-                        bench_ui::nav_button(
-                            "nav-back",
-                            bench_ui::icons::Ico::ChevronLeft,
-                            "Back  ⌘[",
-                            self.can_go_back(cx),
-                            cx,
-                        )
-                        .on_click(cx.listener(|this, _, window, cx| this.go_back(window, cx))),
-                    )
-                    .child(
-                        bench_ui::nav_button(
-                            "nav-forward",
-                            bench_ui::icons::Ico::ChevronRight,
-                            "Forward  ⌘]",
-                            self.can_go_forward(cx),
-                            cx,
-                        )
-                        .on_click(cx.listener(|this, _, window, cx| this.go_forward(window, cx))),
-                    ),
+                bench_ui::nav_button(
+                    "nav-back",
+                    bench_ui::icons::Ico::ChevronLeft,
+                    "Back  ⌘[",
+                    self.can_go_back(cx),
+                    cx,
+                )
+                .on_click(cx.listener(|this, _, window, cx| this.go_back(window, cx))),
             )
             .child(
+                bench_ui::nav_button(
+                    "nav-forward",
+                    bench_ui::icons::Ico::ChevronRight,
+                    "Forward  ⌘]",
+                    self.can_go_forward(cx),
+                    cx,
+                )
+                .on_click(cx.listener(|this, _, window, cx| this.go_forward(window, cx))),
+            )
+            .child(
+                // As far from the last glyph as the title is from it.
                 div()
+                    .ml_1()
                     .w(px(bench_ui::HAIRLINE))
                     .h(px(bench_ui::BAR_SEPARATOR_H))
                     .bg(theme.border),
