@@ -1,7 +1,8 @@
 //! The line under the composer, as Claude's under its field: on the left the project the thread
 //! is in (a new thread's to choose: "New thread" in the sidebar starts one in the open thread's
 //! project, and this says which) and the git repo it works in; on the right the thread's meters
-//! (context, speed, fallback, `meters.rs`) and the terminals sent to the background.
+//! (context, speed, fallback, `meters.rs`) and the terminals sent to the background. Beside the
+//! documents (the Code view) the project is the Explorer's: the meters lead, no project pick.
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -19,17 +20,27 @@ impl ThreadView {
             return div().into_any_element();
         };
         let meters = self.render_meters(app.defaults.context_length, cx);
-        let project = self.render_project_pick(cx);
         let repo = self.render_repo_chip(cx);
         let terminals = self.render_background_terminals(cx);
-        h_flex()
+        let foot = h_flex()
             .w_full()
             .min_w_0()
             .h(px(bench_ui::COMPOSER_FOOT_H))
             .gap_1()
             .items_center()
-            .text_size(px(bench_ui::BAR_TEXT))
-            .child(project)
+            .text_size(px(bench_ui::BAR_TEXT));
+        // Beside the documents the project is the Explorer's (its switch over the tree): no
+        // second switch here, and the meters take the left end it had.
+        if self.beside_doc(cx) {
+            return foot
+                .children(meters)
+                .children(repo)
+                .child(div().flex_1())
+                .children(terminals)
+                .into_any_element();
+        }
+        let project = self.render_project_pick(cx);
+        foot.child(project)
             .children(repo)
             .child(div().flex_1())
             .children(terminals)

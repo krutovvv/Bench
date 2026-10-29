@@ -68,3 +68,15 @@ pub fn text_right() -> f32 {
         bench_ui::CHAT_LEFT
     }
 }
+
+impl crate::thread::ThreadView {
+    /// The thread beside the documents (the Code view's right dock): narrow as a phone's, so
+    /// nothing takes its width that the chat can spare — the person's bubble goes edge to edge,
+    /// and the project is the Explorer's, not chosen under the composer.
+    pub(crate) fn beside_doc(&self, cx: &Context<Self>) -> bool {
+        let me = cx.entity_id();
+        self.app(cx).is_some_and(|app| {
+            app.center == crate::workspace::Center::Doc && app.active_thread.entity_id() == me
+        })
+    }
+}
