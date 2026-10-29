@@ -41,8 +41,11 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
 - **Card**: a form or an editor that appears in the thread as an agent-message block, under the
   insert that asked for it (a task). A project's parts that are not files (an MCP server, a cron
   job) open as documents in the Explorer instead.
-- **Agent**: a process of `agent/` that runs threads. This Mac's always; a server's when the
-  person adds it in the gear (Bench installs and starts it over SSH). The Mac's agent keeps the
+- **Agent**: a process of `agent/` that runs threads, its machine's service (launchd on a Mac,
+  systemd on Linux: it runs without Bench, comes back when it dies or the machine restarts, and
+  one per machine). This Mac's always; a server's when the person adds it in the gear (Bench
+  installs it, here or over SSH, the same way: `src/client/service.rs`). Closing Bench stops no
+  agent; Restart in the agent's popover restarts its service. The Mac's agent keeps the
   list of servers' agents. Each agent has its own models, voice and general Telegram bot.
 - **Project**: the sidebar's only unit. It belongs to one agent and says where its work is
   (`docs/remote-projects.md`):
@@ -96,7 +99,7 @@ built this way: `docs/architecture.md`. In short:
 | `src/main.rs`, `src/app.rs` | Start; `BenchApp`: the window's state and its construction. Only these two are loose in `src/`: every other file is in the folder named for where it is in the window or what it does |
 | `src/app/` | What belongs to the whole app: `model.rs` (the plain data every area uses: `ProjectKey`, `Location`, `ProjectEntry`, `Target`; what one area keeps lives in its folder), `events.rs` (the agents' `protocol::Event`s applied: to the views showing a thread, the sidebar's list), `keys.rs` (shortcuts), `menu.rs` (the macOS menu: Settings…, New Window), `armed.rs` (what waits for a second press: deletes, closing unsaved), `defaults.rs` (the agent's defaults), `subscriptions.rs` (what `new` listens to, its timers), `backend.rs` (the agent's restart, its log), `repo.rs` (a thread's git repo) |
 | `src/app/places.rs`, `src/app/agents.rs` | **Projects and agents**: where each project lives, the sidebar's projects from their sources; the links to this Mac's and servers' agents |
-| `src/client/` | Talking to the agent, as Zed's `client`: `rpc/` (`Client`: a `crates/protocol` request answered as a future of its own response type; `Incoming` what the agent says unasked), `rest/` (REST: files, providers; `with_settings` where a call is about agent settings), `connection.rs` (where it runs, the tunnel), `launch.rs` (installing and starting it locally or over SSH), `probe.rs` (`bench --probe`) |
+| `src/client/` | Talking to the agent, as Zed's `client`: `rpc/` (`Client`: a `crates/protocol` request answered as a future of its own response type; `Incoming` what the agent says unasked), `rest/` (REST: files, providers; `with_settings` where a call is about agent settings), `connection.rs` (where it runs, the tunnel), `launch.rs` (installing it and bringing it up, the same script here or over SSH), `service.rs` (the agent as its machine's service: launchd, systemd), `probe.rs` (`bench --probe`) |
 | `src/workspace/` | The window as Zed's workspace: `dock.rs` the docks as Zed's (`Dock`: a list of `Panel`s, one shown; `left_dock` threads or Explorer, `right_dock` a thread beside the center (the open one beside a document, a second one beside a thread: `src/thread/beside.rs`), `bottom_dock` the project's terminals, with tabs, `src/inserts/terminal/panel.rs`), `mod.rs` the `Center` (thread, document, settings) and `render_panel`; `layout.rs` draws them around the center |
 | `src/titlebar/` | The bar over the center: the thread's title, the documents' project, a settings page's title; at its right end only Chat \| Code (`tail.rs`). The thread's project, repo and meters are the line under its composer (`src/thread/composer/foot.rs`); the Code view has its own status bar under the documents (`src/explorer/statusbar.rs`: the caret, the thread beside ⌘J, the terminal ⌃`); the chat has none |
 | `src/sidebar/` | The threads panel, as Claude's sidebar: New thread, New project, Search over the list (`search.rs`: ⌘K, a list over the window), projects (`project_row.rs`, `project_list.rs`), threads (`thread_row.rs`), the menu, what is done to an item (`items.rs`: pin, color, rename, ⌫⌫, ↑↓; `marks.rs`); the left dock's foot under any panel: the agent and its popover, the gear (`agent.rs`) |

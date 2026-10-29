@@ -11,7 +11,8 @@ references: [agent, projects-and-agents]
 # The client
 
 Everything Bench needs to reach an agent, as Zed's `client` crate: where the agent runs and how
-to reach it (`connection.rs`), installing and starting it on this Mac or over SSH (`launch.rs`),
+to reach it (`connection.rs`), installing it and bringing it up as its machine's service, the same on this Mac and over SSH
+(`launch.rs`, `service.rs`),
 its typed JSON-RPC session (`rpc/`), its REST API (`rest/`), and `bench --probe`.
 
 ## Contracts
@@ -28,10 +29,22 @@ its typed JSON-RPC session (`rpc/`), its REST API (`rest/`), and `bench --probe`
 
 ## Decisions
 
+- **The agent is its machine's service, one mechanism everywhere**: launchd on macOS, systemd
+  (user, lingering) on Linux. Bench never starts it as its own child: closing Bench stops no agent
+  on any machine; the service starts it with the machine, again when it dies, and its restart (the
+  agent's Restart) ends the whole process tree. Bench runs one script per step — install, bring
+  up, restart — in a local shell or over SSH, so this Mac and a server never differ. (Before, this
+  Mac's agent was Bench's `nohup` child and a server's a `setsid` one: they outlived Bench as
+  orphans nobody watched, and a test copy's agent stayed behind.)
+- **One agent per home**, held by the agent itself (`agent.pid`, `agent/src/instance.ts`): a
+  second start exits saying which agent holds it — two on one `pi.sqlite` would resume the same
+  runs.
 - **The agent's home is `~/.bench` on each machine**; the installed server lives in its `app/`,
-  copied from the sources this Bench carries. A running agent is reused; one built from other
-  sources is restarted when idle — its conversations are durable, so nothing is lost. A server's
+  unpacked from the sources this Bench carries, their hash in `app/.build`. A running agent of
+  other sources is restarted at once — its conversations are durable, a run it was in resumes. An
   agent therefore always matches this Bench, and the wire needs no versioning.
+- A copy of the home (`BENCH_HOME`) gets no service: Bench only connects to the agent started on
+  it by hand, so trying Bench on other data leaves nothing running.
 - A server's agent is reached through an `ssh -L` tunnel; everything about connecting to the
   server is its block in `~/.ssh/config`, never duplicated in Bench.
 - Installation is recorded by a marker written only after a successful `npm ci`, never inferred

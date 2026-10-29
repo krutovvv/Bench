@@ -11,11 +11,14 @@ lists what is Pi's, what is a package and what is ours.
   token in a header (`Connection::rest_auth`, `connection.rs`; checked in `server.ts`). Bench's
   client code speaks it in `src/client/rpc/` / `src/client/rest/`. Its calls still name the agent dir
   `profile` (a wire name only: there are no profiles in the UI).
-- **Start**: `src/client/launch.rs`. On this Mac `ensure()` copies the sources the app carries
-  (`Contents/Resources/agent`, or the repo's `agent/` for a dev build) to `~/.bench/app`, runs
-  `npm ci` when `package-lock.json` changed, starts `node src/server.ts`, reads `~/.bench/server.json`.
-  Over SSH `ensure_remote(host)` ships the sources as a tar over ssh, installs, starts, and Bench
-  tunnels to the port (`connection.rs`). A server built from other sources is restarted when idle.
+- **Start**: `src/client/launch.rs` `ensure(target)`, the same for this Mac and a server: the
+  sources the app carries (`Contents/Resources/agent`, or the repo's `agent/` for a dev build) go
+  as a tar to `~/.bench/app` there (a local shell or SSH), `npm ci` when `package-lock.json`
+  changed, `.build` their hash; then `service.rs` makes the machine's service (launchd
+  `local.bench.agent`, systemd `bench-agent`) run them — restarted when it ran other sources —
+  and prints `~/.bench/server.json`. Bench tunnels to a server's port (`connection.rs`). The agent
+  takes `~/.bench/agent.pid` at start (`agent/src/instance.ts`): a second one on the home exits.
+  A copy of the home (`BENCH_HOME`) gets no service: start its agent by hand and stop it after.
 - **Home** `~/.bench` (`config.ts`):
   - `bench.sqlite` — settings (among them `agents`, the servers' agents, and `presets`), keys,
     providers, the session index, cron jobs, tasks, hosts, projects; `pi.sqlite` — Pi's durable store;

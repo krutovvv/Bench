@@ -8,7 +8,7 @@ method and route is the agent's module that declares it, `agent/src/modules/<are
 
 ## Authentication
 
-`client/connection.rs`: `launch::ensure()` (this Mac) or `launch::ensure_remote(host)` (over an
+`client/connection.rs`: `launch::ensure(target)` (this Mac directly, a server over an
 `ssh -L` tunnel) gives a port and a session token. The WebSocket opens
 `ws://127.0.0.1:<port>/api/ws?token=<token>`; every REST call sends the token header that
 `Connection::rest_auth` returns. There are no tickets or purposes in the auth. Which agent dir a
@@ -75,8 +75,9 @@ events only say what is answerable *now*.
 
 ## The agent's lifecycle
 
-Restart (status bar) restarts the agent (`connection::restart_gateway` → `launch::restart()`
-on this Mac, the server's pid from `~/.bench/server.json` over SSH). Its runs are durable: an
+Restart (the agent's popover) restarts the agent's service (`connection::restart_agent` →
+`launch::restart(target)`: `launchctl kickstart -k` or `systemctl --user restart`, ending its
+whole process tree), the same on this Mac and a server. Closing Bench stops no agent. Its runs are durable: an
 unfinished answer continues after the start, so nothing is refused (`Restart::Busy` stays for a
 backend that would refuse). Still, don't restart the user's agent yourself without a reason.
 
@@ -151,8 +152,8 @@ notification replaces the older one for the same thread.
 
 This Mac's agent always; a server's when the person adds it in the gear (Agents tab,
 `src/settings/agent_form.rs`). The list of servers' agents is kept by this Mac's agent
-(`agent/src/builtin/servers.ts`, setting `agents`, `/api/agents`); Bench installs and starts each
-over SSH (`launch::ensure_remote`, Node 22.18+ on the server) and links to it
+(`agent/src/builtin/servers.ts`, setting `agents`, `/api/agents`); Bench installs each over SSH
+as the server's service (`launch::ensure`, Node 22.18+ and systemd on the server) and links to it
 (`src/app/agents.rs`). A project = its agent + its machine (the agent's own, or a server this Mac's
 agent works on over SSH) + an optional folder; `src/app/places.rs` answers where
 (`build-projects.md`). The terminal on the project's machine comes into a thread as an insert

@@ -321,7 +321,7 @@ impl BenchApp {
 
     /// Restart the agent under `host` from the sources this Bench carries (the gear's Update, for
     /// one that runs an older build): its link is dropped, and reconnecting installs the new
-    /// sources (`launch::ensure_remote`). Its runs are durable: one it was in the middle of
+    /// sources (`launch::ensure`). Its runs are durable: one it was in the middle of
     /// resumes.
     pub fn update_agent(&mut self, host: String, window: &mut Window, cx: &mut Context<Self>) {
         if host.is_empty() {

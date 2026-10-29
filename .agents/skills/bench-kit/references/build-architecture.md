@@ -25,8 +25,9 @@ and projects on servers: `docs/remote-projects.md` (and `build-projects.md`). In
     `media/` an answer's media; `system/` ssh and notifications; `demo/` the made-up session;
   - `inserts/` — one folder per insert kind; `env/` — a project's environment, one file per section;
   - `client/` — the protocol to the agent: `rpc/` (WebSocket JSON-RPC) and `rest/` (REST);
-    `connection.rs` and `launch.rs` — where an agent runs, installing and starting it here or
-    over SSH (`ensure`, `ensure_remote`) and its tunnel.
+    `connection.rs`, `launch.rs` and `service.rs` — where an agent runs, installing it and
+    bringing it up as its machine's service, one script here or over SSH (`ensure(target)`), and
+    its tunnel.
 - **The agent** (`agent/src/`):
   - `server.ts` collects `modules/*.ts` (each declares its RPC methods and REST routes);
   - `runtime.ts` runs Pi conversations (`envFor`: each one's `ExecutionEnv`); `thread.ts` turns

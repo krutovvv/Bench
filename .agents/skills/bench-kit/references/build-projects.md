@@ -41,8 +41,8 @@ In Bench:
 - What a machine lacks for a project's language servers (Node, a program) is the server's
   "failed: …" state before any starts (`lsp.ts` `lspNeeds`), red in the Language servers section.
 - The prompt says where the work is (`prompt.ts` `soul`: the server, the folder, kept in it).
-- A server's agent is installed and updated by Bench (`client/launch.rs` `ensure_remote`; an older
-  idle one is replaced on connecting).
+- A server's agent is installed and updated by Bench (`client/launch.rs` `ensure`, as this Mac's: its
+  machine's service, restarted on connecting when it runs other sources).
 
 ## Growing it
 

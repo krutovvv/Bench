@@ -1,6 +1,5 @@
-//! Where the agent lives and how to reach it: on this Mac `pi_agent::ensure()` starts it and
-//! names its port; over SSH `pi_agent::ensure_remote()` does the same on the host, reached
-//! through `ssh -L`. Either way it is a session token, sent as `?token=` on the WebSocket and as
+//! Where the agent lives and how to reach it: `launch::ensure()` brings it up as its machine's
+//! service and names its port — on this Mac reached directly, on a server through `ssh -L`. Either way it is a session token, sent as `?token=` on the WebSocket and as
 //! the `X-Bench-Token` header on REST. Port and token of a host are remembered so the
 //! next launch reattaches.
 
@@ -48,7 +47,7 @@ impl Connection {
     }
 
     fn open_local() -> Result<Self> {
-        let (port, token) = crate::client::launch::ensure()?;
+        let (port, token) = crate::client::launch::ensure(&Target::Local)?;
         Ok(Self {
             base: format!("http://127.0.0.1:{port}"),
             token,
@@ -64,17 +63,6 @@ impl Connection {
         ws.get_ref()
             .set_read_timeout(Some(Duration::from_millis(30)))?;
         Ok(ws)
-    }
-
-    /// The agent is running a turn now (or cannot say).
-    fn busy(&self) -> bool {
-        ureq::get(&format!("{}/api/status", self.base))
-            .set("X-Bench-Token", &self.token)
-            .timeout(Duration::from_secs(5))
-            .call()
-            .ok()
-            .and_then(|r| r.into_json::<Value>().ok())
-            .is_none_or(|st| st["active"].as_u64().unwrap_or(0) > 0)
     }
 
     /// The header that lets a REST call in: the agent's session token.
@@ -94,9 +82,8 @@ impl Connection {
         }
         let state_path = state_dir().join(format!("ssh-{host}.json"));
         let build = crate::client::launch::build();
-        // Reattach to the agent we started last time, if it still answers and is of this app's
-        // build — or of an older one but busy (its run goes on; it is updated when idle, as the
-        // agent on this Mac is). An idle older one is updated and restarted by `ensure_remote`.
+        // Reattach to the agent we reached last time, if it still answers and is of this app's
+        // build; one of another build is updated and restarted by `ensure`, as on this Mac.
         if let Ok(saved) = std::fs::read(&state_path)
             .map_err(anyhow::Error::from)
             .and_then(|b| Ok(serde_json::from_slice::<Value>(&b)?))
@@ -105,13 +92,13 @@ impl Connection {
                 // The saved token must still open the WebSocket (a restarted agent rejects it).
                 if let Ok(conn) = Self::attach_ssh(host, port as u16, token) {
                     let current = build.is_none() || saved["build"].as_str() == build.as_deref();
-                    if conn.websocket().is_ok() && (current || conn.busy()) {
+                    if current && conn.websocket().is_ok() {
                         return Ok(conn);
                     }
                 }
             }
         }
-        let (port, token) = crate::client::launch::ensure_remote(host)?;
+        let (port, token) = crate::client::launch::ensure(&Target::Ssh(host.to_string()))?;
         std::fs::create_dir_all(state_dir())?;
         write_private(
             &state_path,
@@ -247,15 +234,9 @@ pub enum Restart {
 
 /// Restarts the agent (its unfinished runs continue after the start).
 pub fn restart_agent(target: &Target, _interrupt: bool) -> Result<Restart> {
-    match target {
-        Target::Local => crate::client::launch::restart()?,
-        Target::Ssh(host) => {
-            let _ = Command::new("ssh")
-                .args(["-o", "BatchMode=yes", host, "kill $(sed -n 's/.*\"pid\":\\([0-9]*\\).*/\\1/p' ~/.bench/server.json) 2>/dev/null; true"])
-                .stdin(Stdio::null())
-                .output();
-            let _ = std::fs::remove_file(state_dir().join(format!("ssh-{host}.json")));
-        }
+    crate::client::launch::restart(target)?;
+    if let Target::Ssh(host) = target {
+        let _ = std::fs::remove_file(state_dir().join(format!("ssh-{host}.json")));
     }
     Ok(Restart::Done)
 }
@@ -370,7 +351,7 @@ pub enum HostCheck {
 
 /// Checks a host over SSH; the result is also appended to `hosts.log` for diagnosis.
 pub fn host_check(host: &str) -> HostCheck {
-    let result = match crate::client::launch::remote_node(host) {
+    let result = match crate::client::launch::node_ready(&Target::Ssh(host.to_string())) {
         Ok(true) => HostCheck::Ready,
         Ok(false) => HostCheck::NoNode,
         Err(_) => HostCheck::Unreachable,

@@ -11,8 +11,9 @@ references: [projects-and-agents, thread-objects]
 # The agent
 
 The process that runs threads. Bench is its client and nothing else is: this Mac always has one,
-and a server has one when the person adds it in the gear (Bench installs and starts it over SSH,
-`client`). Each agent has its own models, voice and general Telegram bot; this Mac's also keeps
+and a server has one when the person adds it in the gear. On every machine it is the system's
+service (launchd, systemd), installed by Bench the same way here or over SSH (`client`); one per
+home (`instance.ts`: a second start exits). Each agent has its own models, voice and general Telegram bot; this Mac's also keeps
 the list of servers' agents.
 
 ## Boundary
