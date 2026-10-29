@@ -249,12 +249,19 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 let listed = ::thread::steps::listed(&steps);
                 if let Some(k) = unfold.first().and_then(|i| listed.get(i.saturating_sub(1))) {
                     t.open_steps.insert((key.clone(), *k));
-                    let runs = ::thread::steps::runs(&steps);
-                    let last = runs.len().saturating_sub(1);
-                    for (i, line) in runs.iter().enumerate() {
-                        if let ::thread::steps::Line::Run { calls, .. } = line {
-                            if calls.contains(k) && i != last {
-                                t.flipped_runs.insert((key.clone(), calls[0]));
+                    // Its milestone open, and the chip holding it.
+                    let ms = ::thread::steps::milestones(&steps);
+                    let last = ms.len().saturating_sub(1);
+                    for (i, m) in ms.iter().enumerate() {
+                        if !m.steps.contains(k) {
+                            continue;
+                        }
+                        if i != last {
+                            t.flipped_runs.insert((key.clone(), m.steps[0]));
+                        }
+                        for chip in ::thread::steps::chips(&steps, &m.steps) {
+                            if chip.calls.contains(k) {
+                                t.open_chips.insert((key.clone(), chip.calls[0]));
                             }
                         }
                     }

@@ -10,6 +10,10 @@
 //! 2. Reasoning goes with the call it led to (`reasoning_before`); the list is the calls and the
 //!    agent's words (`listed`).
 //! 3. The evaluator's words are the ones it put in a call's result (`evaluator_word`).
+//! 5. The work reads as sentences (`sentences`): neighbouring calls told together in order.
+//! 6. The agent's own words between calls head the sentences after them (`chapters`).
+//! 7. The work's strips are milestones (`milestones`): the agent's words, or a sentence where
+//!    it wrote none; inside, its calls as a chain of chips in order (`chips`).
 //! 4. The list folds into runs (`runs`): calls of one kind in a row are one line, told in words
 //!    (`title`: "Ran 4 commands"); a single call of another kind between two of them stays
 //!    inside; the agent's words are lines of their own.
@@ -133,28 +137,23 @@ pub fn say(step: &Step) -> Said {
             let f = file(arg("path"));
             said(format!("Edit {}", f.action), f.place)
         }
-        (Kind::Search, "session_search") => {
-            said(format!("Search past threads for {}", quote(arg("query"))), None)
-        }
-        (Kind::Search, "tool_search") => {
-            said(format!("Look for tools: {}", quote(arg("query"))), None)
-        }
-        (Kind::Search, "glob") => {
-            said(format!("Find files {}", quote(arg("pattern"))), place_of(arg("path")))
-        }
+        (Kind::Search, "session_search") => said(format!("Search past threads {}", for_(arg("query"))).trim().to_string(), None),
+        (Kind::Search, "tool_search") => said("Look for tools".into(), None),
+        (Kind::Search, "glob") => said("Find files".into(), place_of(arg("path"))),
         (Kind::Search, "lsp") => said(format!("Look up {}", arg("symbol").max(arg("action"))), None),
         (Kind::Search, _) => {
-            let q = arg("pattern").max(arg("query"));
-            let action = if q.is_empty() {
-                "Search".to_string()
-            } else {
-                format!("Search for {}", quote(q))
+            let q = quote(arg("pattern").max(arg("query")));
+            let at = place_of(arg("path"));
+            let action = match (q.is_empty(), &at) {
+                (false, _) => format!("Search for {q}"),
+                (true, Some(p)) => format!("Search {p}"),
+                (true, None) => "Search the files".to_string(),
             };
-            said(action, place_of(arg("path")))
+            said(action, None)
         }
         (Kind::Plan, _) => said("Update the plan".into(), None),
         (Kind::Web, t) if t.contains("search") => {
-            said(format!("Search the web for {}", quote(arg("query"))), None)
+            said(format!("Search the web {}", for_(arg("query"))).trim().to_string(), None)
         }
         (Kind::Web, _) => said("Read a web page".into(), url_host(args)),
         (Kind::Browser, t) => {
@@ -172,10 +171,10 @@ pub fn say(step: &Step) -> Said {
         }
         (_, "clarify") => said("Ask you".into(), None),
         (_, "memory") => said("Update memory".into(), None),
-        (_, t) => {
-            let server = name.strip_prefix("mcp__").and_then(|n| n.split("__").next());
-            said(t.replace('_', " "), server.map(str::to_string))
-        }
+        (_, t) => match name.strip_prefix("mcp__").and_then(|n| n.split("__").next()) {
+            Some(server) => said(format!("Ask {} to {}", capital(server), t.replace('_', " ")), None),
+            None => said(format!("Use {}", t.replace('_', " ")), None),
+        },
     }
 }
 
@@ -192,7 +191,10 @@ pub fn say_command(command: &str) -> Said {
             place: None,
         };
     };
-    let cd = cd_dir(line);
+    let cd = command
+        .lines()
+        .find_map(cd_dir)
+        .and_then(plain_place);
     // `echo $PATH | tr ':' '\n'`: showing a variable, whatever filters it.
     if let Some(var) = line
         .trim_start()
@@ -232,6 +234,8 @@ pub fn say_command(command: &str) -> Said {
         .or(plain.first())
         .map(|w| unquote(w))
         .unwrap_or_default();
+    // A variable (`$F`) names nothing a person can read.
+    let target = if target.starts_with('$') { String::new() } else { target };
     let name = base(&target);
     let place = cd.or_else(|| parent(&target));
     let script = from.contains("<<") || given.iter().any(|w| *w == "-c" || *w == "-e");
@@ -242,7 +246,11 @@ pub fn say_command(command: &str) -> Said {
             format!("Run {name}")
         }
     };
-    let second = plain.get(1).map(|w| base(&unquote(w))).unwrap_or_default();
+    let second = plain
+        .get(1)
+        .map(|w| base(&unquote(w)))
+        .filter(|w| !w.starts_with('$'))
+        .unwrap_or_default();
     let action = match prog.as_str() {
         "ls" | "tree" => format!("List {}", or(&name, "the folder")),
         "cat" | "head" | "tail" | "less" | "bat" | "nl" => format!("Show {}", or(&name, "a file")),
@@ -250,11 +258,19 @@ pub fn say_command(command: &str) -> Said {
             format!("Edit {}", or(&second, "a file"))
         }
         "sed" | "awk" => format!("Show part of {}", or(&second, "a file")),
-        "grep" | "rg" | "ag" => format!(
-            "Search for {}",
-            quote(&plain.first().map(|w| unquote(w)).unwrap_or_default())
+        "grep" | "rg" | "ag" => {
+            let q = quote(&plain.first().map(|w| unquote(w)).unwrap_or_default());
+            let what = plain.get(1).map(|w| base(&unquote(w))).unwrap_or_default();
+            match (q.is_empty(), what.is_empty()) {
+                (false, _) => format!("Search for {q}"),
+                (true, false) => format!("Search {what}"),
+                (true, true) => "Search the output".to_string(),
+            }
+        }
+        "find" | "fd" | "mdfind" => format!(
+            "Find files in {}",
+            or(&plain_place(name.clone()).unwrap_or_default(), "the folder")
         ),
-        "find" | "fd" | "mdfind" => format!("Find files in {}", or(&name, "the folder")),
         "mkdir" => format!("Create the folder {name}"),
         "mv" => format!("Move {}", or(&name, "files")),
         "cp" | "rsync" => format!("Copy {}", or(&name, "files")),
@@ -298,6 +314,325 @@ pub fn say_command(command: &str) -> Said {
         action: action.trim().to_string(),
         place,
     }
+}
+
+/// A sentence of the opened work: neighbouring calls told together in the order they ran
+/// ("Ran a Python script in .bench, looked for files in backups and searched two notes."), or
+/// the agent's own words between them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Sentence {
+    pub text: String,
+    /// The steps it tells, in order: what it unfolds to.
+    pub steps: Vec<usize>,
+    pub failed: usize,
+    pub judged: usize,
+    /// The agent's words, not calls.
+    pub words: bool,
+}
+
+/// The most clauses a sentence takes before the next one starts.
+const CLAUSES: usize = 4;
+
+/// The listed steps as sentences (rule 5): calls join the sentence before them until it has
+/// `CLAUSES` clauses; a failure is counted, not a break. Places stay with the steps. The
+/// same call again is counted ("searched SKILL.md twice"), the same verb on another thing joins
+/// the clause ("read a.md and b.md"). Nothing is reordered.
+pub fn sentences(steps: &[Step]) -> Vec<Sentence> {
+    struct Clause {
+        verb: String,
+        objects: Vec<String>,
+        count: usize,
+    }
+    struct Open {
+        clauses: Vec<Clause>,
+        steps: Vec<usize>,
+        failed: usize,
+        judged: usize,
+    }
+    fn close(open: &mut Option<Open>, out: &mut Vec<Sentence>) {
+        let Some(o) = open.take() else { return };
+        let mut said: Vec<String> = vec![];
+        for c in &o.clauses {
+            let mut t = c.verb.clone();
+            let objs = match c.objects.len() {
+                0 => String::new(),
+                1 => c.objects[0].clone(),
+                2 => format!("{} and {}", c.objects[0], c.objects[1]),
+                3 => format!("{}, {} and {}", c.objects[0], c.objects[1], c.objects[2]),
+                n => format!("{}, {} and {} more", c.objects[0], c.objects[1], n - 2),
+            };
+            if !objs.is_empty() {
+                t = format!("{t} {objs}");
+            }
+            match c.count {
+                1 => {}
+                2 => t.push_str(" twice"),
+                n => t.push_str(&format!(" {n} times")),
+            }
+            said.push(t);
+        }
+        let text = match said.len() {
+            0 => String::new(),
+            1 => said[0].clone(),
+            n => format!("{} and {}", said[..n - 1].join(", "), said[n - 1]),
+        };
+        out.push(Sentence {
+            text: format!("{}.", capital(&text)),
+            steps: o.steps,
+            failed: o.failed,
+            judged: o.judged,
+            words: false,
+        });
+    }
+    let mut out = vec![];
+    let mut open: Option<Open> = None;
+    for k in listed(steps) {
+        let step = &steps[k];
+        let Step::Tool { failed, output, .. } = step else {
+            close(&mut open, &mut out);
+            out.push(Sentence {
+                text: first_line(match step { Step::Note(t) | Step::Thought(t) => t, _ => "" }, 160),
+                steps: vec![k],
+                failed: 0,
+                judged: 0,
+                words: true,
+            });
+            continue;
+        };
+        let said = say(step);
+        let (verb, object) = past(&said.action);
+        if let Some(o) = &open {
+            let same = o.clauses.last().is_some_and(|c| c.verb == verb);
+            if !same && o.clauses.len() >= CLAUSES {
+                close(&mut open, &mut out);
+            }
+        }
+        let o = open.get_or_insert_with(|| Open { clauses: vec![], steps: vec![], failed: 0, judged: 0 });
+        o.steps.push(k);
+        o.failed += usize::from(*failed);
+        o.judged += usize::from(output.as_deref().and_then(evaluator_word).is_some());
+        match o.clauses.last_mut() {
+            Some(c) if c.verb == verb => {
+                if c.objects.last() == Some(&object) || object.is_empty() {
+                    c.count += 1;
+                } else if c.count == 1 {
+                    c.objects.push(object);
+                } else {
+                    o.clauses.push(Clause { verb, objects: vec![object], count: 1 });
+                }
+            }
+            _ => o.clauses.push(Clause {
+                verb,
+                objects: [object].into_iter().filter(|x| !x.is_empty()).collect(),
+                count: 1,
+            }),
+        }
+    }
+    close(&mut open, &mut out);
+    out
+}
+
+/// A chapter of the opened work: the agent's own words between its calls, standing over the
+/// sentences that follow until its next words — as the work line's narrative does while the
+/// work runs. Work before any words has no heading.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Chapter {
+    /// The words' step and their first line.
+    pub heading: Option<(usize, String)>,
+    pub sentences: Vec<Sentence>,
+}
+
+/// The opened work as chapters (rule 6).
+pub fn chapters(steps: &[Step]) -> Vec<Chapter> {
+    let mut out: Vec<Chapter> = vec![];
+    for s in sentences(steps) {
+        let note = s.words && matches!(steps[s.steps[0]], Step::Note(_));
+        if note {
+            let line = match &steps[s.steps[0]] {
+                Step::Note(t) => heading_of(t),
+                _ => String::new(),
+            };
+            out.push(Chapter {
+                heading: Some((s.steps[0], line)),
+                sentences: vec![],
+            });
+            continue;
+        }
+        match out.last_mut() {
+            Some(c) => c.sentences.push(s),
+            None => out.push(Chapter {
+                heading: None,
+                sentences: vec![s],
+            }),
+        }
+    }
+    out
+}
+
+/// A milestone of the opened work, one of its strips: the agent's own words and the calls
+/// after them until its next words; with no words, a sentence of the calls themselves.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Milestone {
+    pub heading: String,
+    /// The heading is the agent's words (its step first in `steps`), not a sentence of calls.
+    pub words: bool,
+    /// Its steps in order: the words' step, then the calls.
+    pub steps: Vec<usize>,
+}
+
+/// The opened work as milestones (rule 7).
+pub fn milestones(steps: &[Step]) -> Vec<Milestone> {
+    let mut out = vec![];
+    for c in chapters(steps) {
+        match c.heading {
+            Some((k, heading)) => out.push(Milestone {
+                heading,
+                words: true,
+                steps: std::iter::once(k)
+                    .chain(c.sentences.iter().flat_map(|s| s.steps.iter().copied()))
+                    .collect(),
+            }),
+            None => out.extend(c.sentences.into_iter().map(|s| Milestone {
+                heading: s.text,
+                words: s.words,
+                steps: s.steps,
+            })),
+        }
+    }
+    out
+}
+
+/// A chip of a milestone's chain: calls of one kind in a row, in the order they ran.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Chip {
+    pub kind: Kind,
+    pub calls: Vec<usize>,
+    pub label: String,
+    pub failed: usize,
+}
+
+/// A milestone's calls as a chain of chips (rule 7): each run of one kind in a row is a chip, said
+/// as the one call it holds ("Edit things-do") or as how many ("3 commands", "Edit things-do ×2"
+/// when they are on one thing).
+pub fn chips(steps: &[Step], of: &[usize]) -> Vec<Chip> {
+    let mut out: Vec<Chip> = vec![];
+    for &k in of {
+        let Step::Tool { name, failed, .. } = &steps[k] else {
+            continue;
+        };
+        let kind = Kind::of(name);
+        match out.last_mut() {
+            Some(c) if c.kind == kind => {
+                c.calls.push(k);
+                c.failed += usize::from(*failed);
+            }
+            _ => out.push(Chip {
+                kind,
+                calls: vec![k],
+                label: String::new(),
+                failed: usize::from(*failed),
+            }),
+        }
+    }
+    for c in &mut out {
+        let said: Vec<Said> = c.calls.iter().map(|k| say(&steps[*k])).collect();
+        let n = said.len();
+        c.label = if n == 1 || said.iter().all(|s| s.action == said[0].action) {
+            let one = first_line(&said[0].action, 40);
+            if n == 1 { one } else { format!("{one} ×{n}") }
+        } else {
+            match c.kind {
+                Kind::Command => format!("{n} commands"),
+                Kind::Read => format!("{n} reads"),
+                Kind::Edit => format!("{n} edits"),
+                Kind::Search => format!("{n} searches"),
+                Kind::Web => format!("{n} web searches"),
+                Kind::Browser => format!("{n} browser steps"),
+                Kind::Plan => format!("Plan ×{n}"),
+                Kind::Other => format!("{n} tools"),
+            }
+        };
+    }
+    out
+}
+
+/// The agent's words as a heading: their first line that says something, without Markdown.
+fn heading_of(text: &str) -> String {
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty() && !l.starts_with("```"))
+        .unwrap_or("");
+    first_line(line.trim_start_matches(['#', '-', '>', ' ']), 160)
+}
+
+/// An action ("Show package.json") told as done, its verb and its object apart: ("looked at",
+/// "package.json").
+fn past(action: &str) -> (String, String) {
+    const TWO: &[(&str, &str)] = &[
+        ("Show the date", "checked the date"),
+        ("Show the user", "checked the user"),
+        ("Show the folder", "checked the folder"),
+        ("Show the system", "checked the system"),
+        ("Show part of", "looked at part of"),
+        ("Find files in", "looked for files in"),
+        ("Find files", "looked for files"),
+        ("Find the program", "looked for the program"),
+        ("Look for tools", "looked for tools"),
+        ("Look at", "looked at"),
+        ("Look up", "looked up"),
+        ("Search the web", "searched the web"),
+        ("Search past threads", "searched past threads"),
+        ("Search for", "searched for"),
+        ("Read the setting", "read the setting"),
+        ("Read a web page", "read a page"),
+        ("Run a", "ran a"),
+        ("Run AppleScript", "ran AppleScript"),
+        ("Open the skill", "opened the skill"),
+        ("Update the plan", "updated the plan"),
+        ("Update the skill", "updated the skill"),
+        ("Update memory", "updated memory"),
+        ("Create the folder", "created the folder"),
+        ("Check the signature of", "checked the signature of"),
+        ("Go to", "went to"),
+        ("Ask you", "asked you"),
+        ("Ask", "asked"),
+        ("Use", "used"),
+        ("Start in background:", "started in the background:"),
+    ];
+    for (from, to) in TWO {
+        if let Some(rest) = action.strip_prefix(from) {
+            return (to.to_string(), rest.trim().to_string());
+        }
+    }
+    let (first, rest) = action.split_once(' ').unwrap_or((action, ""));
+    let verb = match first {
+        "Run" => "ran",
+        "Show" => "looked at",
+        "List" => "listed",
+        "Read" => "read",
+        "Edit" => "edited",
+        "Write" => "wrote",
+        "Search" => "searched",
+        "Find" => "found",
+        "Create" => "created",
+        "Move" => "moved",
+        "Copy" => "copied",
+        "Delete" => "deleted",
+        "Make" => "made",
+        "Count" => "counted lines in",
+        "Compare" => "compared",
+        "Fetch" => "fetched",
+        "Query" => "queried",
+        "Stop" => "stopped",
+        "Wait" => "waited",
+        "Filter" => "filtered",
+        "Check" => "checked",
+        "Git" => "ran git",
+        _ => return ("ran".into(), action.to_lowercase()),
+    };
+    let rest = if first == "Count" { rest.trim_start_matches("lines in ") } else { rest };
+    (verb.to_string(), rest.trim().to_string())
 }
 
 /// A line of the folded list: calls of one kind in a row, or one step on its own (the agent's
@@ -397,15 +732,27 @@ pub fn program(command: &str) -> Option<String> {
 /// The program (`program`) and the first line from it on: what the call runs, without the
 /// `cd …;` and the assignments before it.
 pub fn command_from(command: &str) -> Option<(String, &str)> {
+    // Assignments seen so far: `$TD` is the program `TD=…/things-do` names.
+    let mut vars: Vec<(String, String)> = vec![];
+    for line in command.lines() {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        if let Some(found) = program_in(line, &mut vars) {
+            return Some(found);
+        }
+    }
+    None
+}
+
+/// The program a line runs (`command_from`), learning its assignments on the way.
+fn program_in<'a>(line: &'a str, vars: &mut Vec<(String, String)>) -> Option<(String, &'a str)> {
     const PASS: &[&str] = &[
         "cd", "export", "set", "source", ".", "echo", "printf", "true", "unset", "if", "then",
-        "do", "for", "while", "!", "{", "(",
+        "do", "for", "while", "!", "{", "(", "fi", "done", "else",
     ];
     const WRAP: &[&str] = &["time", "sudo", "env", "nohup", "exec", "command", "xargs"];
-    let line = command.lines().find(|l| {
-        let t = l.trim();
-        !t.is_empty() && !t.starts_with('#')
-    })?;
     let mut skip_next = false;
     let mut segment_passed = false;
     for (start, word) in words(line) {
@@ -426,7 +773,13 @@ pub fn command_from(command: &str) -> Option<(String, &str)> {
             Some(i) => w[i + 2..].trim_matches(|c| c == '"' || c == '\''),
             None => w,
         };
-        if w.is_empty() || (w.contains('=') && !w.starts_with('=') && !w.starts_with('-')) {
+        if let Some((name, value)) = w.split_once('=').filter(|(n, _)| {
+            !n.is_empty() && n.chars().all(|c| c.is_alphanumeric() || c == '_')
+        }) {
+            vars.push((name.to_string(), value.trim_matches(['"', '\'']).to_string()));
+            continue;
+        }
+        if w.is_empty() || (w.contains('=') && !w.starts_with('-')) {
             continue;
         }
         if w == "timeout" {
@@ -440,7 +793,15 @@ pub fn command_from(command: &str) -> Option<(String, &str)> {
             segment_passed = true;
             continue;
         }
-        let name = base(w.trim_start_matches('$').trim_matches(['{', '}']));
+        let bare = w.trim_start_matches('$').trim_matches(['{', '}']);
+        let name = match w.starts_with('$') {
+            // A variable runs what it was set to; one set elsewhere names nothing.
+            true => match vars.iter().rev().find(|(n, _)| n == bare) {
+                Some((_, v)) => base(v),
+                None => continue,
+            },
+            false => base(bare),
+        };
         return (!name.is_empty()).then(|| (name, &line[start..]));
     }
     None
@@ -530,13 +891,26 @@ fn host(url: &str) -> Option<String> {
     Some(h.trim_start_matches("www.").to_string()).filter(|h| !h.is_empty())
 }
 
+/// Words for a person in quotes; a pattern (`^#\\|^###`, `(?i)foo|bar`) or anything else not
+/// meant to be read says nothing: the call's card has it whole.
 fn quote(text: &str) -> String {
+    let human = text.chars().any(char::is_alphabetic)
+        && !text.chars().any(|c| "^$\\|[]{}()*+?<>=~`".contains(c));
+    if !human {
+        return String::new();
+    }
     let t = first_line(text, 40);
     if t.is_empty() {
         String::new()
     } else {
         format!("“{t}”")
     }
+}
+
+/// "for “words”", or nothing when the words are not for a person (`quote`).
+fn for_(text: &str) -> String {
+    let q = quote(text);
+    if q.is_empty() { q } else { format!("for {q}") }
 }
 
 fn first_line(text: &str, n: usize) -> String {
@@ -564,17 +938,29 @@ fn capital(word: &str) -> String {
 }
 
 fn place_of(path: &str) -> Option<String> {
-    (!path.is_empty()).then(|| base(path))
+    plain_place(base(path))
+}
+
+/// A place said only when it is a plain name: not the home folder, not `.`, not a piece of a
+/// command (spaces, quotes, `$`).
+fn plain_place(p: String) -> Option<String> {
+    let home = std::env::var("HOME").ok().map(|h| base(&h));
+    let odd = p.is_empty()
+        || p == "."
+        || p == "~"
+        || home.as_deref() == Some(p.as_str())
+        || p.contains(|c: char| c.is_whitespace() || "\\\"'$`*?".contains(c));
+    (!odd).then_some(p)
 }
 
 /// The folder a path is in, by its name; inside an app bundle, the app.
 fn parent(path: &str) -> Option<String> {
     let p = path.trim_end_matches('/');
     if let Some(i) = p.find(".app/") {
-        return Some(base(&p[..i + 4]));
+        return plain_place(base(&p[..i + 4]));
     }
     let (dir, _) = p.rsplit_once('/')?;
-    Some(base(dir)).filter(|d| !d.is_empty() && d != "~")
+    plain_place(base(dir))
 }
 
 fn base(path: &str) -> String {
@@ -710,6 +1096,55 @@ mod tests {
             ]
         );
         assert_eq!(title(&steps, Kind::Command, &[1, 2, 3, 4]), "Ran 3 commands");
+    }
+
+    /// `BENCH_SENTENCES=<thread.open json>`: every piece of work of a real thread as sentences,
+    /// printed — to read them, not to check them.
+    #[test]
+    #[ignore]
+    fn print_sentences_of_a_real_thread() {
+        let file = std::env::var("BENCH_SENTENCES").expect("BENCH_SENTENCES");
+        let open: protocol::ThreadOpen =
+            serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+        let thread = crate::Thread::open(open);
+        for row in thread.rows() {
+            if let crate::Row::Work { steps, .. } = row {
+                let calls = steps.iter().filter(|s| s.is_tool()).count();
+                let ch = chapters(&steps);
+                let lines: usize = ch.iter().map(|c| c.sentences.len() + usize::from(c.heading.is_some())).sum();
+                println!("\n== {calls} calls -> {lines} lines");
+                for c in ch {
+                    if let Some((_, h)) = c.heading {
+                        println!("  ## {h}");
+                    }
+                    for x in c.sentences {
+                        let mark = if x.words { "     ~" } else { "      " };
+                        let fail = if x.failed > 0 { format!("  [{} failed]", x.failed) } else { String::new() };
+                        println!("{mark} {}{fail}", x.text);
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rule_7_milestones_by_the_agents_words_chips_in_order() {
+        let bash = |c: &str| call("bash", json!({ "command": c }));
+        let steps = vec![
+            bash("ls /a"),
+            bash("ls /b"),
+            Step::Note("Found the cause.".into()),
+            call("edit", json!({"path": "/x/things-do"})),
+            call("edit", json!({"path": "/x/things-do"})),
+            bash("cat /x/things-do"),
+            call("read", json!({"path": "/x/report"})),
+        ];
+        let m = milestones(&steps);
+        assert_eq!(m.len(), 2);
+        assert!(!m[0].words);
+        assert_eq!((m[1].heading.as_str(), m[1].words), ("Found the cause.", true));
+        let labels: Vec<String> = chips(&steps, &m[1].steps).into_iter().map(|c| c.label).collect();
+        assert_eq!(labels, vec!["Edit things-do ×2", "Show things-do", "Read report"]);
     }
 
     #[test]

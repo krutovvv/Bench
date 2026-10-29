@@ -1,12 +1,12 @@
-//! The opened work as a tree in one column, as the Explorer's: calls of one kind in a row folded
-//! into a run as a Finder folder is ("Ran 6 commands"), the last run open — what the agent does
-//! now — each call an action and where, quiet; a click opens a call's card in place under it:
-//! why the agent made it, what the evaluator said, what was sent, what came back. Nothing
-//! scrolls but a long command or output inside its own field. What a call is said as is
-//! `::thread::steps`.
+//! The opened work as strips of milestones: the agent's own words, or a sentence of its calls
+//! where it wrote none, in order, the last open — what the agent does now. Inside a milestone its
+//! calls as a chain of chips in the order they ran ("3 commands → Edit things-do ×2 → Read
+//! report"); a chip opens to its calls, a call to its card: why, what the evaluator said, what
+//! was sent, what came back. Nothing scrolls but a long command or output inside its own field.
+//! What a call is said as is `::thread::steps`.
 
 use ::thread::Step;
-use ::thread::steps::{self, Kind, Line};
+use ::thread::steps::{self, Chip, Kind, Milestone};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -18,6 +18,8 @@ use bench_ui::icons::Ico;
 
 /// How much of the reasoning a card shows before "Show all".
 const WHY_LINES: usize = 5;
+/// …and its characters, for reasoning written as one long paragraph.
+const WHY_CHARS: usize = 420;
 /// The lines a command or output field holds before it scrolls inside.
 const FIELD_LINES: usize = 10;
 
@@ -29,28 +31,188 @@ impl ThreadView {
         _live: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let lines = steps::runs(steps);
-        let last = lines.len().saturating_sub(1);
+        let milestones = steps::milestones(steps);
+        let last = milestones.len().saturating_sub(1);
         let mut rows: Vec<AnyElement> = vec![];
-        for (i, line) in lines.into_iter().enumerate() {
-            match line {
-                Line::Step(k) => self.push_step(key, k, steps, false, &mut rows, cx),
-                Line::Run { kind, calls } => {
-                    let flipped = self
-                        .thread
-                        .flipped_runs
-                        .contains(&(key.to_string(), calls[0]));
-                    let open = (i == last) != flipped;
-                    rows.push(self.render_run_row(key, steps, kind, &calls, open, cx));
-                    if open {
-                        for k in calls {
-                            self.push_step(key, k, steps, true, &mut rows, cx);
-                        }
+        for (i, m) in milestones.iter().enumerate() {
+            let flipped = self
+                .thread
+                .flipped_runs
+                .contains(&(key.to_string(), m.steps[0]));
+            let open = (i == last) != flipped;
+            let calls: Vec<usize> = m.steps.iter().copied().filter(|k| steps[*k].is_tool()).collect();
+            rows.push(self.render_milestone_row(key, steps, m, &calls, open, cx));
+            if !open || calls.is_empty() {
+                continue;
+            }
+            let chain = steps::chips(steps, &calls);
+            rows.push(self.render_chain(key, steps, &chain, cx));
+            for chip in &chain {
+                if self.thread.open_chips.contains(&(key.to_string(), chip.calls[0])) {
+                    for k in chip.calls.clone() {
+                        self.push_step(key, k, steps, true, &mut rows, cx);
                     }
                 }
             }
         }
-        v_flex().p_1p5().children(rows).into_any_element()
+        v_flex().p_1p5().gap_0p5().children(rows).into_any_element()
+    }
+
+    /// A milestone's strip: the disclosure, the agent's words (or the sentence of its calls), and
+    /// at the end how many actions, how many failed, whether the evaluator spoke.
+    fn render_milestone_row(
+        &mut self,
+        key: &str,
+        steps: &[Step],
+        m: &Milestone,
+        calls: &[usize],
+        open: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let faint = bench_ui::faint(&theme);
+        let failed = calls.iter().filter(|k| matches!(steps[**k], Step::Tool { failed: true, .. })).count();
+        let judged = calls.iter().any(|k| judged(&steps[*k]));
+        let flip = (key.to_string(), m.steps[0]);
+        h_flex()
+            .id(SharedString::from(format!("milestone-{key}-{}", m.steps[0])))
+            .min_h(px(bench_ui::LIST_ROW_H))
+            .px_2()
+            .gap_2()
+            .items_center()
+            .rounded_md()
+            .text_size(px(bench_ui::THREAD_META))
+            .when(!calls.is_empty(), |d| d.cursor_pointer().hover(|s| s.bg(theme.list_hover)))
+            .child(
+                div()
+                    .flex_none()
+                    .text_color(faint)
+                    .when(calls.is_empty(), |d| d.invisible())
+                    .child(if open { Ico::ChevronDown } else { Ico::ChevronRight }.icon().xsmall()),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .text_color(if m.words || !calls.is_empty() {
+                        theme.foreground
+                    } else {
+                        theme.muted_foreground
+                    })
+                    .child(m.heading.clone()),
+            )
+            .when(!calls.is_empty(), |d| {
+                d.child(
+                    div()
+                        .flex_none()
+                        .text_size(px(bench_ui::THREAD_DETAIL))
+                        .text_color(faint)
+                        .child(bench_ui::plural(calls.len(), "action", "actions", "actions")),
+                )
+            })
+            .when(failed > 0, |d| {
+                d.child(
+                    div()
+                        .flex_none()
+                        .text_size(px(bench_ui::THREAD_DETAIL))
+                        .text_color(theme.danger)
+                        .child(format!("{failed} failed")),
+                )
+            })
+            .when(judged, |d| {
+                d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
+            })
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.claim_click(cx);
+                if !this.thread.flipped_runs.remove(&flip) {
+                    this.thread.flipped_runs.insert(flip.clone());
+                }
+                cx.notify();
+            }))
+            .into_any_element()
+    }
+
+    /// A milestone's calls as a chain of chips, in the order they ran, wrapping as words do;
+    /// a chip opens to its calls under the chain.
+    fn render_chain(
+        &mut self,
+        key: &str,
+        steps: &[Step],
+        chain: &[Chip],
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let theme = cx.theme().clone();
+        let faint = bench_ui::faint(&theme);
+        let mut items: Vec<AnyElement> = vec![];
+        for (i, chip) in chain.iter().enumerate() {
+            if i > 0 {
+                items.push(
+                    div()
+                        .flex_none()
+                        .text_color(faint)
+                        .child(Ico::ChevronRight.icon().xsmall())
+                        .into_any_element(),
+                );
+            }
+            let open = self.thread.open_chips.contains(&(key.to_string(), chip.calls[0]));
+            let flip = (key.to_string(), chip.calls[0]);
+            let judged = chip.calls.iter().any(|k| judged(&steps[*k]));
+            items.push(
+                h_flex()
+                    .id(SharedString::from(format!("chip-{key}-{}", chip.calls[0])))
+                    .flex_none()
+                    .max_w_80()
+                    .gap_1p5()
+                    .px_2()
+                    .py_0p5()
+                    .items_center()
+                    .rounded_md()
+                    .border_1()
+                    .border_color(theme.border.opacity(0.7))
+                    .text_size(px(bench_ui::THREAD_DETAIL))
+                    .cursor_pointer()
+                    .map(|d| if open { d.bg(theme.accent) } else { d.bg(theme.background).hover(|s| s.bg(theme.list_hover)) })
+                    .child(
+                        div()
+                            .flex_none()
+                            .text_color(theme.muted_foreground)
+                            .child(kind_icon(chip.kind).icon().xsmall()),
+                    )
+                    .child(div().min_w_0().truncate().text_color(theme.foreground).child(chip.label.clone()))
+                    .when(chip.failed > 0, |d| {
+                        d.child(
+                            h_flex()
+                                .flex_none()
+                                .gap_0p5()
+                                .text_color(theme.danger)
+                                .child(Ico::CircleAlert.icon().xsmall())
+                                .when(chip.failed > 1, |d| d.child(chip.failed.to_string())),
+                        )
+                    })
+                    .when(judged, |d| {
+                        d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
+                    })
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.claim_click(cx);
+                        if !this.thread.open_chips.remove(&flip) {
+                            this.thread.open_chips.insert(flip.clone());
+                        }
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            );
+        }
+        h_flex()
+            .flex_wrap()
+            .gap_1()
+            .items_center()
+            .pl_6()
+            .pr_2()
+            .pt_0p5()
+            .pb_1p5()
+            .children(items)
+            .into_any_element()
     }
 
     /// A step's row, and its card under it when open; `inner` under a run.
@@ -78,71 +240,6 @@ impl ThreadView {
                     .into_any_element(),
             );
         }
-    }
-
-    /// A run, as a Finder folder: the disclosure, what was done ("Ran 6 commands"), how many
-    /// failed, whether the evaluator spoke to any.
-    fn render_run_row(
-        &mut self,
-        key: &str,
-        steps: &[Step],
-        kind: Kind,
-        calls: &[usize],
-        open: bool,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let theme = cx.theme().clone();
-        let faint = bench_ui::faint(&theme);
-        let failed = calls
-            .iter()
-            .filter(|k| matches!(steps[**k], Step::Tool { failed: true, .. }))
-            .count();
-        let judged = calls.iter().any(|k| judged(&steps[*k]));
-        let flip = (key.to_string(), calls[0]);
-        h_flex()
-            .id(SharedString::from(format!("steprun-{key}-{}", calls[0])))
-            .min_h(px(bench_ui::LIST_ROW_H))
-            .px_2()
-            .gap_2()
-            .items_center()
-            .rounded_md()
-            .text_size(px(bench_ui::THREAD_META))
-            .cursor_pointer()
-            .hover(|s| s.bg(theme.list_hover))
-            .child(
-                div()
-                    .flex_none()
-                    .text_color(faint)
-                    .child(if open { Ico::ChevronDown } else { Ico::ChevronRight }.icon().xsmall()),
-            )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .truncate()
-                    .text_color(theme.foreground)
-                    .child(steps::title(steps, kind, calls)),
-            )
-            .when(failed > 0, |d| {
-                d.child(
-                    div()
-                        .flex_none()
-                        .text_size(px(bench_ui::THREAD_DETAIL))
-                        .text_color(theme.danger)
-                        .child(format!("{failed} failed")),
-                )
-            })
-            .when(judged, |d| {
-                d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
-            })
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.claim_click(cx);
-                if !this.thread.flipped_runs.remove(&flip) {
-                    this.thread.flipped_runs.insert(flip.clone());
-                }
-                cx.notify();
-            }))
-            .into_any_element()
     }
 
     /// A step's row: its icon, the action, where, quieter; a failure in the danger's colour with
@@ -285,8 +382,12 @@ impl ThreadView {
         let mut cut = false;
         if !whole {
             for (_, body, code) in parts.iter_mut() {
-                if !*code && body.lines().count() > WHY_LINES {
-                    *body = body.lines().take(WHY_LINES).collect::<Vec<_>>().join("\n");
+                if !*code && (body.lines().count() > WHY_LINES || body.chars().count() > WHY_CHARS) {
+                    let head = body.lines().take(WHY_LINES).collect::<Vec<_>>().join("\n");
+                    *body = match head.char_indices().nth(WHY_CHARS) {
+                        Some((i, _)) => format!("{}…", head[..i].trim_end()),
+                        None => head,
+                    };
                     cut = true;
                 }
             }
@@ -373,6 +474,19 @@ impl ThreadView {
 /// Whether the evaluator put its word in this call's result.
 fn judged(step: &Step) -> bool {
     matches!(step, Step::Tool { output: Some(o), .. } if steps::evaluator_word(o).is_some())
+}
+
+/// A call's icon by its kind.
+fn kind_icon(kind: Kind) -> Ico {
+    match kind {
+        Kind::Command => Ico::Terminal,
+        Kind::Read => Ico::FileText,
+        Kind::Edit => Ico::Pencil,
+        Kind::Search => Ico::Search,
+        Kind::Web | Kind::Browser => Ico::Globe,
+        Kind::Plan => Ico::ListChecks,
+        Kind::Other => Ico::Wrench,
+    }
 }
 
 /// A step's icon by what its call does; the agent's words a bubble, reasoning a brain.
