@@ -22,8 +22,9 @@ import { machineOf } from "../repo.ts";
 import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../builtin/steps.ts";
-import { fitRequest, fitResultFor, seeUsage } from "../builtin/window.ts";
-import { seeAnswer, seeRequest, seeResult } from "../builtin/turn.ts";
+import { fitRequestFor, fitResultFor, seeUsage } from "../builtin/window.ts";
+import { toolsToLoad } from "../judge/start.ts";
+import { seeAnswer, seeRequest, seeResult, turnOf } from "../builtin/turn.ts";
 import { judgeActive } from "../judge/client.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
@@ -129,7 +130,7 @@ export const assistant = defineExtension({
 				const note = stepNote(conversation);
 				const extra = [...hints.map((h) => ({ role: "user", content: h, timestamp: Date.now() })), ...(note ? [note] : [])];
 				const messages = extra.length ? [...request.messages, ...extra] : request.messages;
-				const fitted = fitRequest(conversation, messages);
+				const fitted = await fitRequestFor(conversation, messages, context?.abortSignal);
 				return fitted || extra.length ? { messages: fitted ?? messages } : undefined;
 			},
 			afterResponse: (message: any, api: any) => {
@@ -153,11 +154,15 @@ export const assistant = defineExtension({
 					const refused = stepGate(String(api.conversationId));
 					if (refused) return { block: refused };
 				}
-				if (!["bash", "ssh_run"].includes(call.name) || !info || approvalsMode(info.agent) !== "manual") return undefined;
+				const shell = ["bash", "ssh_run"].includes(call.name) && !!info && approvalsMode(info.agent) === "manual";
 				const command = String(call.arguments?.command ?? call.args?.command ?? "");
-				// The patterns first; what they let through, the evaluator judges too (`judge/risk.ts`).
-				const why = DANGEROUS.find(([re]) => re.test(command))?.[1] ?? (call.parent ? undefined : await atCall(String(api.conversationId), call, context?.abortSignal).catch(() => undefined));
-				if (!why) return undefined;
+				const hit = shell ? DANGEROUS.find(([re]) => re.test(command))?.[1] : undefined;
+				// The evaluator: a repeat of a failed or known call is refused (`judge/repeat.ts`); with
+				// approvals on, a command the patterns let through is judged too (`judge/risk.ts`).
+				const judged = call.parent ? {} : await atCall(String(api.conversationId), call, shell && !hit, context?.abortSignal).catch(() => ({}) as { block?: string; approve?: string });
+				if (judged.block) return { block: judged.block };
+				const why = hit ?? judged.approve;
+				if (!why || !info) return undefined;
 				const choice = await host().approve(info.id, String(call.id), command, why);
 				return choice === "deny" ? { block: `The person declined this command (${why}). Do not retry it; ask or choose another way.` } : undefined;
 			},
@@ -171,7 +176,12 @@ export const assistant = defineExtension({
 			// Last, what the model reads is cut to its share of the window (`builtin/window.ts`).
 			afterTool: async (call: any, result: any, api: any, context: any) => {
 				const done = await notesAfter(call, result, api, context);
-				return (await fitResultFor(String(api.conversationId), done ?? result, context?.abortSignal)) ?? done;
+				const fitted = (await fitResultFor(String(api.conversationId), done ?? result, context?.abortSignal)) ?? done;
+				// The MCP tools the evaluator named at the turn's start are offered from the next step.
+				const load = call.parent ? [] : toolsToLoad(turnOf(String(api.conversationId)));
+				if (!load.length) return fitted;
+				const base = fitted ?? result;
+				return { ...base, control: { ...(base.control ?? {}), addTools: [...(base.control?.addTools ?? []), ...load] } };
 			},
 		} as any),
 	],

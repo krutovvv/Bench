@@ -12,6 +12,10 @@ const RECENT = 24;
 /** How many results, and of the agent's own words, a turn keeps at more length (`EVIDENCE`). */
 const KEPT = 8;
 const EVIDENCE = 600;
+/** What a turn found, for its answer's facts: this many results, this much of each (the evaluator's
+ *  server keeps the parts nearest each question when it is more than it reads). */
+const FOUND_KEPT = 40;
+const FOUND = 2000;
 
 export interface Turn {
 	/** The person's request: their last message's text. */
@@ -38,11 +42,17 @@ export interface Turn {
 	said: string[];
 	/** The evaluator looked at the turn's start (`judge/start.ts`). */
 	started: boolean;
+	/** Every result of the turn at more length still, for checking the answer's facts (`judge/claims.ts`). */
+	found: string[];
+	/** MCP tools to offer from the next step: the servers the evaluator named at the start. */
+	load: string[];
+	/** The last call the evaluator stopped as a repeat (`judge/repeat.ts`): the same again goes through. */
+	stopped: string;
 }
 
 const turns = new Map<string, Turn>();
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false });
+const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "" });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {
@@ -82,6 +92,10 @@ export function seeResult(conversation: string, call: { id?: string; name: strin
 	if (t.recent.length > RECENT) t.recent.splice(0, t.recent.length - RECENT);
 	t.evidence.push(`${call.name} ${cut(args, 120)} → ${cut(out, EVIDENCE)}`);
 	if (t.evidence.length > KEPT) t.evidence.splice(0, t.evidence.length - KEPT);
+	if (!result?.isError) {
+		t.found.push(`${call.name} ${cut(args, 160)} → ${cut(out, FOUND)}`);
+		if (t.found.length > FOUND_KEPT) t.found.splice(0, t.found.length - FOUND_KEPT);
+	}
 }
 
 /** The model's message (`afterResponse`): its words between steps, kept for the evaluator. */

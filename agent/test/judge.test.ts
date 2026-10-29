@@ -293,9 +293,10 @@ test("a failed step is judged; a sure word goes with the error", async () => {
 
 test("with approvals on, a command the evaluator judges hard to undo is asked; a harmless one is not", async () => {
 	reply = () => choice("risk.risk", { reads: 0.1, changes: 0.2, harm: 0.7 });
-	assert.match((await atCall("a1", { name: "bash", arguments: { command: "psql -c 'drop table users'" } }))!, /hard to undo/);
+	assert.match((await atCall("a1", { name: "bash", arguments: { command: "psql -c 'drop table users'" } }, true)).approve!, /hard to undo/);
+	assert.equal((await atCall("a1", { name: "bash", arguments: { command: "psql -c 'drop table users'" } }, false)).approve, undefined, "approvals off: not asked");
 	reply = () => choice("risk.risk", { reads: 0.9, changes: 0.05, harm: 0.05 });
-	assert.equal(await atCall("a1", { name: "bash", arguments: { command: "ls" } }), undefined);
+	assert.equal((await atCall("a1", { name: "bash", arguments: { command: "ls" } }, true)).approve, undefined);
 });
 
 test("the plan's check sees the agent's own words and longer results", async () => {
@@ -332,4 +333,72 @@ test("a long result keeps the parts the request needs, in order; without the eva
 	const plain = await fitResultFor("x1", out(page), undefined, 4000);
 	assert.match(plain.output[0].text, /characters cut out here/);
 	setSetting("judge", { enabled: true, base_url: base });
+});
+
+test("a call that repeats a failed one is refused once; a new step, or the same again, runs", async () => {
+	seeRequest("r1", [user("Find the price on DNS")]);
+	const probe = { name: "bash", arguments: { command: "node probe.mjs" } };
+	seeResult("r1", probe, { output: [{ type: "text", text: "died at frame 800" }], isError: true });
+	reply = (body) => {
+		assert.match(body.state.next_call, /probe\.mjs/);
+		return choice("repeat.repeat", { new: 0.05, same_failed: 0.9, same_result: 0.05 });
+	};
+	assert.match((await atCall("r1", probe, false)).block!, /repeats one that just failed/);
+	assert.equal((await atCall("r1", probe, false)).block, undefined, "the same again goes through");
+	const before = seen.length;
+	assert.equal((await atCall("r1", { name: "read", arguments: { path: "a" } }, false)).block, undefined, "another tool: not asked");
+	assert.equal(seen.length, before);
+});
+
+test("an answer whose numbers none of the results gives is sent back once", async () => {
+	seeRequest("c1", [user("Compare prices")]);
+	for (let i = 0; i < 3; i++) {
+		stepGate("c1");
+		seeResult("c1", { name: "mcp__ozon__ozon_search", arguments: { q: "arctic" } }, out("Arctic LF III 360 — 9 753 ₽"));
+	}
+	reply = (body) => {
+		assert.match(body.state.found[0], /9 753/);
+		return choice("claims.claims", { supported: 0.1, unsupported: 0.9 });
+	};
+	const back = await atAnswer("c1", { content: [{ type: "text", text: "On Ozon it is 8 990 ₽." }] });
+	assert.match(back!, /in none of the results/);
+	assert.equal(await atAnswer("c1", { content: [{ type: "text", text: "8 990 ₽" }] }), undefined, "once a turn");
+});
+
+test("a JSON list a tool returned comes ordered by use, every item kept", async () => {
+	seeRequest("l1", [user("Arctic Liquid Freezer III Pro 360 price")]);
+	const items = Array.from({ length: 12 }, (_, i) => ({ title: i === 9 ? "Arctic Liquid Freezer III Pro 360" : `Cooler ${i}`, price: 1000 + i }));
+	reply = (body) => {
+		const hit = Object.keys(body.state.list).find((k) => /Arctic/.test(body.state.list[k]))!;
+		return choice("listing.item", { [hit]: 0.8, i0: 0.01, i1: 0.01, none: 0.05 });
+	};
+	const r = await atResult("l1", { name: "mcp__ozon__ozon_search", arguments: {} }, out(JSON.stringify({ items, total: 12 })));
+	const text = r.result.output[0].text as string;
+	const json = JSON.parse(text.slice(text.indexOf("\n") + 1));
+	assert.equal(json.items[0].title, "Arctic Liquid Freezer III Pro 360");
+	assert.equal(json.items.length, 12);
+	assert.equal(json.total, 12);
+});
+
+test("the MCP tools named at the start are offered from the next step, once", async () => {
+	const { toolsToLoad } = await import("../src/judge/start.ts");
+	const t = turnOf("m1");
+	t.load = ["mcp__browser__browser_navigate"];
+	assert.deepEqual(toolsToLoad(t), ["mcp__browser__browser_navigate"]);
+	assert.deepEqual(toolsToLoad(t), []);
+});
+
+test("an overflowing request cuts what the next step needs least first", async () => {
+	const { fitRequestFor } = await import("../src/builtin/window.ts");
+	seeRequest("w1", [user("Find the DNS price")]);
+	const big = (t: string) => ({ role: "toolResult", toolCallId: "1", content: [{ type: "text", text: t + " " + "x".repeat(200_000) }] });
+	const msgs = [user("Find the DNS price"), big("OLD menu page"), big("DNS PRICE 10 499"), user("go on")];
+	reply = (body) => {
+		const k = Object.keys(body.state.earlier).find((b) => /PRICE/.test(body.state.earlier[b]))!;
+		return choice("keep", { [k]: 0.9, none: 0.05 });
+	};
+	const out2 = (await fitRequestFor("w1", msgs, undefined, 131072))!;
+	assert.match(out2[1].content[0].text, /cut here/, "the old page cut");
+	assert.match(out2[2].content[0].text, /^DNS PRICE/);
+	assert.ok(out2[2].content[0].text.length > 150_000, "the needed one kept whole");
 });

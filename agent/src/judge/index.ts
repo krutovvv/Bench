@@ -18,9 +18,12 @@ import { done } from "./done.ts";
 import { start } from "./start.ts";
 import { failure } from "./failure.ts";
 import { risk } from "./risk.ts";
+import { repeat } from "./repeat.ts";
+import { listing } from "./listing.ts";
+import { claims } from "./claims.ts";
 
 /** Every point, in the order their effects apply. A new idea: a file with a `Point`, a line here. */
-export const POINTS: Point[] = [start, risk, search, failure, plan, course, done];
+export const POINTS: Point[] = [start, repeat, risk, search, listing, failure, plan, course, claims, done];
 
 /** Ask the points of `moment` that have a question now; their effects, in `POINTS` order. */
 async function at(moment: Moment, seen: Seen, signal?: AbortSignal): Promise<Effect[]> {
@@ -65,10 +68,10 @@ export async function atRequest(conversation: string, signal?: AbortSignal): Pro
 	return effects.map((e) => e.hint).filter((h): h is string => !!h);
 }
 
-/** Before a command runs with approvals on (`beforeTool`): why to ask the person first, if so. */
-export async function atCall(conversation: string, call: Seen["call"], signal?: AbortSignal): Promise<string | undefined> {
-	const effects = await at("call", { conversation, turn: turnOf(conversation), call }, signal);
-	return effects.find((e) => e.approve)?.approve;
+/** Before a top-level call runs (`beforeTool`): refuse it (a repeat), or ask the person first (a risk, approvals on). */
+export async function atCall(conversation: string, call: Seen["call"], approvals: boolean, signal?: AbortSignal): Promise<{ block?: string; approve?: string }> {
+	const effects = await at("call", { conversation, turn: turnOf(conversation), call, approvals }, signal);
+	return { block: effects.find((e) => e.block)?.block, approve: effects.find((e) => e.approve)?.approve };
 }
 
 /** At the model's final answer (`onYield`): the message that sends it back, if any. */

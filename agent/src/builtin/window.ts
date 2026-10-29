@@ -15,6 +15,7 @@
 
 import { resolveModel } from "../config.ts";
 import { excerpt } from "../judge/excerpt.ts";
+import { neededness } from "../judge/keep.ts";
 
 /** Characters per token, on the safe side: Russian text runs near 3, code near 3.5. */
 export const CHARS_PER_TOKEN = 3;
@@ -97,21 +98,15 @@ export function seeUsage(conversation: string, usage: any): void {
  * the largest tool results and call arguments first, oldest first among equals, the last message
  * never. Undefined: they fit as they are.
  */
-export function fitRequest(conversation: string, messages: readonly any[], window = windowTokens()): any[] | undefined {
+export function fitRequest(conversation: string, messages: readonly any[], window = windowTokens(), weighed?: [number, number, number, number][]): any[] | undefined {
 	const room = Math.floor(window * (1 - ANSWER_SHARE)) - (overhead.get(conversation) ?? 0);
 	let used = tokensOf(messages.reduce((n, m) => n + charsOf(m), 0));
 	sent.set(conversation, used);
 	if (used <= room) return undefined;
-	// Every block worth cutting: [message, block, characters], the largest first, then the oldest.
-	const cuts: [number, number, number][] = [];
-	messages.forEach((m, i) => {
-		if (i === messages.length - 1 || !Array.isArray(m?.content)) return;
-		m.content.forEach((b: any, j: number) => {
-			const n = b?.type === "text" && m.role === "toolResult" ? String(b.text ?? "").length : b?.type === "toolCall" ? JSON.stringify(b.arguments ?? {}).length : 0;
-			if (n > WORTH) cuts.push([i, j, n]);
-		});
-	});
-	cuts.sort((a, b) => b[2] - a[2] || a[0] - b[0]);
+	// Every block worth cutting, the least needed first when the evaluator weighed them, else the
+	// largest first, then the oldest.
+	const cuts: [number, number, number, number][] = weighed ?? candidates(messages).map((c) => [...c, 0] as [number, number, number, number]);
+	cuts.sort((a, b) => a[3] - b[3] || b[2] - a[2] || a[0] - b[0]);
 	const out = messages.map((m) => (Array.isArray(m?.content) ? { ...m, content: [...m.content] } : m));
 	const why = "kept whole in the thread, cut here so the conversation fits the model's window";
 	for (const [i, j, n] of cuts) {
@@ -123,6 +118,36 @@ export function fitRequest(conversation: string, messages: readonly any[], windo
 	}
 	sent.set(conversation, used);
 	return out;
+}
+
+/**
+ * As `fitRequest`, but with the evaluator on, the blocks the next step needs least are cut first
+ * (`judge/keep.ts`); the largest first only among equals.
+ */
+export async function fitRequestFor(conversation: string, messages: readonly any[], signal?: AbortSignal, window = windowTokens()): Promise<any[] | undefined> {
+	const room = Math.floor(window * (1 - ANSWER_SHARE)) - (overhead.get(conversation) ?? 0);
+	const total = tokensOf(messages.reduce((n, m) => n + charsOf(m), 0));
+	if (total <= room) return fitRequest(conversation, messages, window);
+	const blocks = candidates(messages);
+	const texts = blocks.map(([i, j]) => {
+		const b = messages[i].content[j];
+		return b.type === "text" ? String(b.text) : JSON.stringify(b.arguments ?? {});
+	});
+	const need = await neededness(conversation, texts, signal).catch(() => undefined);
+	return fitRequest(conversation, messages, window, need ? blocks.map((b, k) => [...b, need[k]] as [number, number, number, number]) : undefined);
+}
+
+/** Every block worth cutting: [message, block, characters], the last message never. */
+function candidates(messages: readonly any[]): [number, number, number][] {
+	const cuts: [number, number, number][] = [];
+	messages.forEach((m, i) => {
+		if (i === messages.length - 1 || !Array.isArray(m?.content)) return;
+		m.content.forEach((b: any, j: number) => {
+			const n = b?.type === "text" && m.role === "toolResult" ? String(b.text ?? "").length : b?.type === "toolCall" ? JSON.stringify(b.arguments ?? {}).length : 0;
+			if (n > WORTH) cuts.push([i, j, n]);
+		});
+	});
+	return cuts;
 }
 
 /** A call's arguments with its long strings cut (a file written whole, a long script). */

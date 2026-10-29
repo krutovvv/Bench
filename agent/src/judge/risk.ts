@@ -13,9 +13,9 @@ const SURE = 0.5;
 export const risk: Point = {
 	name: "risk",
 	moment: "call",
-	ask({ call }) {
+	ask({ call, approvals }) {
 		const command = String(call?.arguments?.command ?? "");
-		if (!command) return undefined;
+		if (!approvals || !command) return undefined;
 		return {
 			state: { command: cut(command, 3000) },
 			questions: {

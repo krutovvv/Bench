@@ -28,6 +28,8 @@ export interface Seen {
 	answer?: any;
 	/** At `request`: what the thread is (its agent, folder, project), for what it can use. */
 	thread?: import("../host.ts").ThreadFacts;
+	/** At `call`: approvals are on and the patterns let this command through (`judge/risk.ts`). */
+	approvals?: boolean;
 }
 
 export interface Asked {
@@ -52,6 +54,8 @@ export interface Effect {
 	hint?: string;
 	/** Ask the person before the call runs, saying why (`call` only). */
 	approve?: string;
+	/** Refuse the call, saying why to the model (`call` only). */
+	block?: string;
 }
 
 export interface Point {

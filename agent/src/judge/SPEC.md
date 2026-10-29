@@ -58,6 +58,18 @@ each point's answers under its own names. The default extension's hooks call the
   and a choice over their names (and "none", last) keeps the parts that stand out; without an
   answer, the cut keeps head and tail as before.
 
+- **repeat** (`repeat.ts`, `call`, when the same tool was called in the last 3 steps): the call is
+  new, repeats a failed one, or repeats one whose result the agent has, nothing changed since; a
+  repeat (both kinds summed, 0.85) is refused once with the reason — the same call again runs.
+- **listing** (`listing.ts`, `result`): a JSON list of 8 items or more (a shop's or a web search's)
+  comes ordered by use for the request, the items that stand out first, every item kept.
+- **claims** (`claims.ts`, `answer`): an answer with numbers after 3 steps or more is checked
+  against all the turn found (`turn.found`, 40 results); unsupported (0.8) sends it back once.
+- **keep** (`keep.ts`, called by `builtin/window.ts`): when a request would overflow the window, the
+  earlier results the next step needs least are cut first.
+- **start** also offers the named servers' tools from the turn's next step (`control.addTools` on
+  its first result, as `tool_search` does).
+
 What the local server (h2o-lightning-4b behind its shim, `MAX_LEN` 16384) taught: what a question
 is about goes in the state, not in its instructions or options — a part's text in a yes/no's
 instructions read every part alike (0.20), in an option it was read from its start; in the state,
