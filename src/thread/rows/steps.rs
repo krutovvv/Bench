@@ -13,7 +13,7 @@ use gpui_kit::*;
 
 use crate::thread::ThreadView;
 use crate::media::text::{FOLD_AFTER_LINES, render_code};
-use crate::thread::rows::tool_labels::pretty;
+use ::thread::tool_labels::pretty;
 use bench_ui::icons::Ico;
 
 /// How much of the reasoning a card shows before "Show all".

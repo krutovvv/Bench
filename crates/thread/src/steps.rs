@@ -1024,10 +1024,11 @@ fn url_host(args: &serde_json::Value) -> Option<String> {
     host(&url)
 }
 
+/// A URL's host (`tool_labels::host_of`); None for what is not a URL.
 fn host(url: &str) -> Option<String> {
-    let rest = url.split("://").nth(1)?;
-    let h = rest.split(['/', '?', '#', ':']).next()?;
-    Some(h.trim_start_matches("www.").to_string()).filter(|h| !h.is_empty())
+    url.contains("://")
+        .then(|| crate::tool_labels::host_of(url))
+        .filter(|h| !h.is_empty())
 }
 
 /// Words for a person in quotes; a pattern (`^#\\|^###`, `(?i)foo|bar`) or anything else not

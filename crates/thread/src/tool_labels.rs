@@ -1,8 +1,8 @@
 //! What a tool call says in one line, as pure functions of its name and arguments: its label
 //! ("bash: ls", "reminders · list items"), the word for the run's status, the pages it touched,
-//! its arguments as readable text. Tested here; drawn by `work.rs`.
+//! its arguments as readable text; the one place a URL's host is read (`host_of`, `steps.rs`
+//! says a page by it too). Tested here; drawn by Bench's `thread/rows/`.
 
-use bench_ui::clip;
 use serde_json::Value;
 
 /// JSON as readable text, capped so a huge value cannot stall the UI.
@@ -81,6 +81,7 @@ fn urls_in(v: &Value, out: &mut Vec<String>) {
     }
 }
 
+/// A URL's host, as a person names the site: no scheme, user, port or `www.`, lowercase.
 pub fn host_of(url: &str) -> String {
     let rest = url.split("://").nth(1).unwrap_or(url);
     let host = rest.split(['/', '?', '#']).next().unwrap_or_default();
@@ -150,7 +151,7 @@ pub fn tool_label(name: &str, detail: &str) -> String {
 
 /// The one word for what a kind of tool is doing, for the live line: a person reads words
 /// faster than command lines, and the opened step list still holds the exact command.
-pub(crate) fn activity_word(name: &str, preview: &str) -> String {
+pub fn activity_word(name: &str, preview: &str) -> String {
     // A file's own name, not its path: the line is about the thing, not where it lives.
     let target = || {
         preview
@@ -195,6 +196,16 @@ pub(crate) fn activity_word(name: &str, preview: &str) -> String {
             format!("using {tool}…")
         }
         _ => format!("using {}…", name.replace('_', " ")),
+    }
+}
+
+/// One line, cut to `n` characters with "…".
+fn clip(s: &str, n: usize) -> String {
+    let one = s.split_whitespace().collect::<Vec<_>>().join(" ");
+    if one.chars().count() > n {
+        format!("{}…", one.chars().take(n).collect::<String>())
+    } else {
+        one
     }
 }
 

@@ -8,7 +8,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::thread::ThreadView;
-use crate::thread::rows::tool_labels::activity_word;
+use ::thread::tool_labels::activity_word;
 use crate::app::now_secs;
 use bench_ui::icons::Ico;
 use bench_ui::{clip, clock, plural};

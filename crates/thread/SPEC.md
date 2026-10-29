@@ -44,7 +44,8 @@ inside each its calls in order, each what it did — in the agent's own words wh
 line of what came back, the reasoning's first sentence a beat between them.
 A call is said by what it does and to what: a command by what its program does, read from its
 own syntax (escaped spaces, variables, substitutions); never a pattern or a flag. Nothing is
-written for it: old threads read the same as new ones.
+written for it: old threads read the same as new ones. `tool_labels.rs` says a call in one line
+(its label, the live word, the pages it touched); a URL's host is read there alone.
 
 `diff.rs` gives the changes between two row lists, so the view updates only what changed and
 keeps its scroll (`thread-view`).

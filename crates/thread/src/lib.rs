@@ -1,7 +1,8 @@
 //! A thread as Bench shows it, without GPUI.
 //!
 //! Gives: `Thread` (fed with `open` and `apply(ThreadEvent)`) and `Row`s, the thread's lines in
-//! order. Takes: the `protocol` types.
+//! order; `steps` (an opened piece of work) and `tool_labels` (a call in one line). Takes: the
+//! `protocol` types.
 //!
 //! The rules of order (each is a test in `tests.rs`):
 //! 1. The journal comes first, ordered by item key; then the answer being written; then the queue.
@@ -15,6 +16,7 @@ pub mod diff;
 mod rows;
 mod state;
 pub mod steps;
+pub mod tool_labels;
 #[cfg(test)]
 mod tests;
 
