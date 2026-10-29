@@ -50,6 +50,7 @@ impl BenchApp {
             .collect();
         // Pinned first in the Host's group too: a new thread lands under them, never above.
         loose.sort_by_key(|&i| !self.mark_of(self.threads.list[i].id.as_str()).pinned);
+        let loose = self.nest_forks(loose);
         let mut projects = self.places.projects.clone();
         projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
         let groups = projects
@@ -66,10 +67,44 @@ impl BenchApp {
                     })
                     .collect();
                 rows.sort_by_key(|&i| !self.mark_of(self.threads.list[i].id.as_str()).pinned);
-                (p, rows)
+                (p, self.nest_forks(rows))
             })
             .collect();
         (loose, groups)
+    }
+
+    /// The thread a row sits under: the one it was forked from, when that one is in the same
+    /// group (a parent deleted or elsewhere leaves the fork a row of its own).
+    pub(crate) fn fork_parent(&self, i: usize) -> Option<usize> {
+        let s = &self.threads.list[i];
+        let parent = s.parent.as_ref()?;
+        self.threads
+            .list
+            .iter()
+            .position(|t| &t.id == parent && t.host == s.host && t.project == s.project)
+    }
+
+    /// A group's rows with every fork right under the thread it came from, as Claude's sidebar
+    /// nests a session's children; the rest keep their order.
+    fn nest_forks(&self, rows: Vec<usize>) -> Vec<usize> {
+        let parent = |i: usize| self.fork_parent(i).filter(|p| rows.contains(p));
+        let mut out = Vec::with_capacity(rows.len());
+        fn place(i: usize, rows: &[usize], parent: &dyn Fn(usize) -> Option<usize>, out: &mut Vec<usize>) {
+            out.push(i);
+            for &c in rows.iter().filter(|&&c| parent(c) == Some(i)) {
+                place(c, rows, parent, out);
+            }
+        }
+        for &i in rows.iter().filter(|&&i| parent(i).is_none()) {
+            place(i, &rows, &parent, &mut out);
+        }
+        // A loop of parents (not made by forks, but kept safe): its rows at the end.
+        for &i in &rows {
+            if !out.contains(&i) {
+                out.push(i);
+            }
+        }
+        out
     }
 
     /// The threads on screen in the sidebar, top to bottom (folded groups hide theirs).

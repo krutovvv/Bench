@@ -25,6 +25,7 @@ export default ({ rt }: Ctx): Module => ({
 						updated: s.updated,
 						cwd: s.cwd,
 						...(s.project ? { project: s.project } : {}),
+						...(s.parent ? { parent: s.parent } : {}),
 						...(repo ? { repo } : {}),
 						...(s.display_name ? { with: s.display_name } : {}),
 					};

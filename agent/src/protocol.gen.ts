@@ -202,6 +202,10 @@ updated: number,
  */
 cwd: string, repo?: string, 
 /**
+ * The thread it was forked from: the sidebar shows it under that one.
+ */
+parent?: ThreadId, 
+/**
  * Who it is with, for a thread from Telegram (the person's name there).
  */
 with?: string, };

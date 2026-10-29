@@ -29,6 +29,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change the bar over the center (a thread's title, the documents' project, a settings page's title) | `src/titlebar/mod.rs`; the documents' tab bar `src/explorer/pane/view.rs` (`render_doc`), the tabs themselves `src/explorer/pane/tabs.rs` |
 | back and forward over the threads and documents shown (‹ › in the title bar, ⌘[ ⌘]) | `src/workspace/history.rs` (`NavHistory`, noted from the window's render); the buttons `src/titlebar/mod.rs` |
 | a new thread's welcome (Bench's mark, the first steps, "no model yet") | `src/thread/rows/welcome.rs`; its pieces `crates/ui/src/welcome.rs`; `BENCH_DEMO=new` [`BENCH_DEMO_NOMODEL=1`] |
+| a fork shown under the thread it came from (the sidebar's └) | the order `nest_forks` in `src/sidebar/items.rs`, the corner `bench_ui::nest_corner`; the parent is kept by the agent (`parent` in `agent/src/store.ts`, set by `Runtime.fork`) |
 | change what happens on an agent event | `src/app/events.rs` |
 | open, delete or search threads | `src/thread/open.rs` |
 | make anything wait for a second press (delete, remove, close unsaved) | `src/app/armed.rs` (`self.armed.confirm(key)`), the control `bench_ui::confirm_buttons` |

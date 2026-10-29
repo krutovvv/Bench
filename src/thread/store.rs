@@ -57,6 +57,8 @@ pub struct ThreadRow {
     pub repo: Option<String>,
     /// Who it is with (a Telegram thread's person).
     pub with: Option<String>,
+    /// The thread it was forked from: the sidebar shows it under that one.
+    pub parent: Option<protocol::ThreadId>,
 }
 
 impl ThreadRow {
@@ -74,6 +76,7 @@ impl ThreadRow {
             cwd: t.cwd,
             repo: t.repo,
             with: t.with,
+            parent: t.parent,
         }
     }
 }

@@ -23,6 +23,8 @@ export interface ThreadRow {
 	display_name?: string;
 	/** The project the thread belongs to (`projects.id`); "" = none. */
 	project?: string;
+	/** The thread it was forked from ("Fork from here"); "" = none. The sidebar shows it under it. */
+	parent?: string;
 	/** The thread's token counters as of its last finished turn; zeroes for a thread that has
 	 *  not run yet. Kept so Bench shows them again when the thread is reopened. */
 	usage: Totals;
@@ -64,9 +66,10 @@ export class Store {
 				SELECT session_id, -rowid, role, text, ts FROM messages WHERE role IN ('user', 'assistant');
 				DROP TABLE messages;`);
 		}
+		// parent: the thread a fork was made from (`Runtime.fork`).
 		// usage: the thread's token counters, settled at every turn end (src/usage.ts);
 		// speed: how fast the model wrote, measured by Bench and sent over at the turn's end.
-		for (const col of ["project", "usage", "speed"])
+		for (const col of ["project", "usage", "speed", "parent"])
 			try {
 				this.db.exec(`ALTER TABLE threads ADD COLUMN ${col} TEXT DEFAULT ''`);
 			} catch {}
@@ -98,8 +101,8 @@ export class Store {
 	): ThreadRow {
 		const now = Date.now() / 1000;
 		this.db
-			.prepare("INSERT INTO threads (id, conversation, agent, title, source, cwd, effort, created, updated, chat_id, display_name, project) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-			.run(s.id, String(s.conversation), s.agent, s.title ?? "", s.source, s.cwd, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.project ?? "");
+			.prepare("INSERT INTO threads (id, conversation, agent, title, source, cwd, effort, created, updated, chat_id, display_name, project, parent) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+			.run(s.id, String(s.conversation), s.agent, s.title ?? "", s.source, s.cwd, s.effort, now, now, s.chat_id ?? null, s.display_name ?? null, s.project ?? "", s.parent ?? "");
 		return this.get(s.id)!;
 	}
 

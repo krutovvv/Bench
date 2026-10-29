@@ -74,6 +74,12 @@ pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
             "desktop",
         ),
         row(
+            "d-landing-fork",
+            "Launch the spring landing page (fork)",
+            false,
+            "desktop",
+        ),
+        row(
             "d-notes",
             "Summarize this week's meeting notes",
             false,
@@ -111,6 +117,10 @@ pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
         ),
         row("d-cron", "Daily digest of new issues", false, "cron"),
     ];
+    // A fork of the landing thread: the sidebar shows it under that one.
+    if let Some(r) = app.threads.list.iter_mut().find(|r| r.id.as_str() == "d-landing-fork") {
+        r.parent = Some("d-landing".into());
+    }
     // Where the demo's threads work: a folder, and the repo it is in.
     for (id, cwd, repo) in [
         ("d-landing", "/Users/demo/code/storefront", Some("/Users/demo/code/storefront")),
@@ -287,7 +297,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         s.waiting = s.id.as_str() == "d-api";
         s.project = match s.id.as_str() {
             "d-site" => "p-blog",
-            "d-landing" | "d-api" | "d-tests" => "p-store",
+            "d-landing" | "d-landing-fork" | "d-api" | "d-tests" => "p-store",
             "d-web1" | "d-web1-tls" => "p-web",
             "d-audit-1" | "d-audit-2" => "p-audit",
             "d-tool" | "d-notes" => "p-me",

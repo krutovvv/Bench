@@ -362,6 +362,7 @@ export class Runtime {
 			cwd: row.cwd,
 			effort: row.effort,
 			title: row.title ? `${row.title} (fork)` : "",
+			parent: row.id,
 			...(row.project ? { project: row.project } : {}),
 		});
 		this.store.copyIndex(row.id, made.id, at);

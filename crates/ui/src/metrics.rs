@@ -230,6 +230,10 @@ pub const SIDEBAR_FOOT_H: f32 = 40.;
 /// A mark's dot beside a name (Finder's tag).
 pub const TAG_DOT: f32 = 8.;
 pub const THREAD_ROW_PY: f32 = 4.;
+/// A fork's corner (`nest_corner`): its width, its height over the title's middle, its round.
+pub const NEST_CORNER_W: f32 = 7.;
+pub const NEST_CORNER_H: f32 = 8.;
+pub const NEST_CORNER_R: f32 = 2.;
 /// A search hit's inset.
 pub const HIT_PL: f32 = 14.;
 

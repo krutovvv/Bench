@@ -1,4 +1,5 @@
-//! A thread's row in the sidebar: its title, its state (running, unread, waiting), its mark, and
+//! A thread's row in the sidebar: its title (a fork's under its parent's, with a corner), its
+//! state (running, unread, waiting), its mark, and
 //! what it does on a click, a drag or a key.
 
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
@@ -103,6 +104,8 @@ impl BenchApp {
 
         let pinned = self.mark_of(s.id.as_str()).pinned;
         let menu_id = s.id.clone();
+        // A fork sits under the thread it came from (`items.rs`), its corner before the title.
+        let nested = self.fork_parent(i).is_some();
         h_flex()
             .id(("thread", i))
             .group(group)
@@ -126,6 +129,7 @@ impl BenchApp {
                     .min_w_0()
                     .gap_2()
                     .items_center()
+                    .when(nested, |d| d.child(bench_ui::nest_corner(cx)))
                     // A working session's title carries a moving highlight, to find it at a glance.
                     .child(
                         h_flex()

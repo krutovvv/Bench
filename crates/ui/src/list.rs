@@ -61,6 +61,21 @@ pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl Int
         )
 }
 
+/// A fork's corner before its title in the sidebar (└, as Claude nests a session's children): a
+/// hairline down and across in the faint ink, where the parent's title starts.
+pub fn nest_corner(cx: &App) -> Div {
+    let theme = cx.theme();
+    div()
+        .flex_none()
+        .w(px(crate::metrics::NEST_CORNER_W))
+        .h(px(crate::metrics::NEST_CORNER_H))
+        .mb(px(crate::metrics::NEST_CORNER_H / 2.))
+        .border_l_1()
+        .border_b_1()
+        .rounded_bl(px(crate::metrics::NEST_CORNER_R))
+        .border_color(crate::text::faint(theme))
+}
+
 /// The 1 px guide under a group header's icon; in the group's `last` row it stops at the text.
 pub fn nest_guide(cx: &App, last: bool) -> impl IntoElement {
     div()

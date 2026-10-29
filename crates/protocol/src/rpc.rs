@@ -47,6 +47,10 @@ pub struct ThreadSummary {
     #[ts(optional)]
     #[serde(default)]
     pub repo: Option<String>,
+    /// The thread it was forked from: the sidebar shows it under that one.
+    #[ts(optional)]
+    #[serde(default)]
+    pub parent: Option<ThreadId>,
     /// Who it is with, for a thread from Telegram (the person's name there).
     #[ts(optional)]
     #[serde(default)]
