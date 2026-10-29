@@ -31,7 +31,7 @@ Bench (`journal.ts`), the pause (`hold.ts`), the queue (`queue.ts`), questions a
 
 ## Decisions
 
-- **What a turn changed is git's view, not the tools'** (`turns.ts`): the working tree written as a
+- **What a turn changed is git's view, not the tools'** (`changes.ts`): the working tree written as a
   tree when a run starts and when it ends, through a copy of the index (the person's index,
   branch and stash untouched), the differing files a display-only `bench.changes` entry after the
   answer. It sees a formatter's or a script's changes as well as an edit's; outside a repository

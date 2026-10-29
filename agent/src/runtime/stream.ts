@@ -170,7 +170,7 @@ export class Stream {
 		live.fail = undefined;
 		live.usage.started = Date.now();
 		live.usage.output = 0;
-		this.rt.turns.begin(live);
+		this.rt.changes.begin(live);
 		this.rt.report(live.row.id, { kind: "start" });
 		this.rt.tell(live.row.id, { kind: "run", value: true });
 		this.rt.listChanged();
@@ -200,7 +200,7 @@ export class Stream {
 		// Whatever the person held, the run is over: the hold lets go, nobody waits on it.
 		this.rt.holds.end(live);
 		// What the turn changed in its repository, into the journal under its answer.
-		void this.rt.turns.settle(live).catch((err) => console.error("[turn changes]", err));
+		void this.rt.changes.settle(live).catch((err) => console.error("[turn changes]", err));
 		this.rt.tell(live.row.id, { kind: "run", value: false });
 		// The turn's blended rate, as one number worth remembering.
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);

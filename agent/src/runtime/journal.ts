@@ -33,7 +33,7 @@ export type { QueuedItem, ThreadItem };
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
 export const FAIL_KIND = "bench.fail";
 
-/** What a turn changed in its repository (`turns.ts`): display-only, as a fail note. */
+/** What a turn changed in its repository (`changes.ts`): display-only, as a fail note. */
 export const CHANGES_KIND = "bench.changes";
 
 /** A turn's review: findings on its changes (`review.ts`), display-only. */

@@ -1,4 +1,4 @@
-// What a turn changed (runtime/turns.ts): the working tree as a git tree at the run's start and
+// What a turn changed (runtime/changes.ts): the working tree as a git tree at the run's start and
 // end, the files that differ written into the journal — whatever changed them, an edit or a
 // command — and the person's index left as it was.
 
@@ -11,7 +11,7 @@ import { after, test } from "node:test";
 
 const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-turns-"));
 process.env.BENCH_HOME = home;
-const { Turns, parseNumstat, CHANGES_KIND } = await import("../src/runtime/turns.ts");
+const { Changes, parseNumstat, CHANGES_KIND } = await import("../src/runtime/changes.ts");
 after(() => fs.rmSync(home, { recursive: true, force: true }));
 
 test("numstat reads as files under the root, a binary marked", () => {
@@ -35,13 +35,13 @@ test("a turn's changes go into the journal; the index is untouched; nothing chan
 
 	const written: any[] = [];
 	const live: any = { row: { id: "t1", cwd: repo, project: "" }, conversation: { submit: async (s: any) => void written.push(s) } };
-	const turns = new Turns();
+	const changes = new Changes();
 
-	turns.begin(live);
+	changes.begin(live);
 	await new Promise((r) => setTimeout(r, 300));
 	fs.writeFileSync(path.join(repo, "a.ts"), "one\nTWO\nthree\n");
 	fs.writeFileSync(path.join(repo, "made.ts"), "new\n");
-	await turns.settle(live);
+	await changes.settle(live);
 
 	assert.equal(written.length, 1);
 	assert.equal(written[0].entry.kind, CHANGES_KIND);
@@ -57,7 +57,7 @@ test("a turn's changes go into the journal; the index is untouched; nothing chan
 	);
 	assert.equal(git("diff", "--cached", "--name-only"), indexBefore, "the person's index is as it was");
 
-	turns.begin(live);
-	await turns.settle(live);
+	changes.begin(live);
+	await changes.settle(live);
 	assert.equal(written.length, 1, "a turn that changed nothing writes nothing");
 });

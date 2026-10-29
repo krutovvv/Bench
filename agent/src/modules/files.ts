@@ -176,7 +176,7 @@ export default (): Module => ({
 		},
 		// The Explorer's editor marks the lines changed since the last commit (`git show HEAD:`).
 		"GET /api/git/head": async (req) => ({ text: await textAtHead(req.query.get("machine"), required(req.query.get("path"), "path")) }),
-		// A file as a tree has it (a turn's start or end, `runtime/turns.ts`): its text, or null
+		// A file as a tree has it (a turn's start or end, `runtime/changes.ts`): its text, or null
 		// when the tree has no such file (made, or removed, in that turn).
 		"GET /api/git/show": async (req) => {
 			const root = required(req.query.get("root"), "root");

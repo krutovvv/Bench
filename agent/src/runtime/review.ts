@@ -1,7 +1,7 @@
 // A turn reviewed (`rt.reviews`), asked by the person on the turn's changes (Bench's "Review"
 // under "Changed files", `thread.review`). One call to the thread's model, thinking left as it is:
 // what the person asked, the plan the agent kept, what it said it did, and the turn's diff from
-// git (`turns.ts`); back come findings on lines of the files. They go into the journal as a
+// git (`changes.ts`); back come findings on lines of the files. They go into the journal as a
 // display-only entry (`bench.review`) that settles the turn's changes card; the person sends them
 // to the agent as review comments (`builtin/review.ts`) — nothing reaches the agent unasked.
 //

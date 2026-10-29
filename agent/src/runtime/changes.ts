@@ -1,4 +1,4 @@
-// What a turn changed (`rt.turns`): when a run starts, the working tree of the repository the thread
+// What a turn changed (`rt.changes`): when a run starts, the working tree of the repository the thread
 // works in is written as a git tree; when it ends, again, and the files that differ go into the
 // journal as a display-only entry (`bench.changes`, the model never sees it). It catches whatever
 // changed the files — an edit, a formatter, a script run with bash — and the two trees let Bench
@@ -55,7 +55,7 @@ export function parseNumstat(root: string, out: string): FileChange[] {
 		}));
 }
 
-export class Turns {
+export class Changes {
 	/** Each running thread's tree as its run began. */
 	private base = new Map<string, Promise<{ root: string; tree: string } | null>>();
 
