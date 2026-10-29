@@ -147,3 +147,24 @@ test("an MCP server behind code mode: a script reads its records whole and asks 
 	assert.equal(judged.length, 3);
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 });
+
+test("the scripts' servers are named from mcp.json; a server's namespace goes once its agent connects without it", async () => {
+	const { connectMcp, NAMESPACES, scriptedServers } = await import("../src/mcp/mcp.ts");
+	const server = { command: process.execPath, args: [mcp] };
+	writeAgentMcp("default", {
+		crm: server,
+		desk: { ...server, exposure: "direct" },
+		off: { ...server, enabled: false },
+		mixed: { ...server, exposure: "direct", toolExposure: { "tick*": "codemode" } },
+	});
+	assert.deepEqual(scriptedServers("default").sort(), ["crm", "mixed"], "codemode by default or by a tool's rule; not one turned off");
+	await connectMcp("default");
+	const prefixes = () => NAMESPACES.map((n) => n.prefix).sort();
+	assert.deepEqual(prefixes(), ["mcp__crm__", "mcp__desk__", "mcp__mixed__"]);
+	assert.equal(NAMESPACES.find((n) => n.prefix === "mcp__crm__")!.description, "The support desk's tickets.");
+	writeAgentMcp("default", { desk: { ...server, exposure: "direct" } });
+	await connectMcp("default");
+	assert.deepEqual(prefixes(), ["mcp__desk__"], "the removed servers' namespaces are gone");
+	await closeMcp();
+	assert.deepEqual(NAMESPACES, []);
+});

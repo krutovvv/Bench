@@ -6,7 +6,8 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, agentMcp, isProject, timezone } from "./config.ts";
+import { agentDir, isProject, timezone } from "./config.ts";
+import { scriptedServers } from "./mcp/mcp.ts";
 import { evaluatorFor } from "./judge/client.ts";
 import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
@@ -68,9 +69,7 @@ export function environment(s: ThreadFacts): string {
  *  much data go through one script, many small judgments through the classifier, not the model. */
 function scripts(s: ThreadFacts): string {
 	// The servers behind code mode by name: their tools are not listed, only found in a script.
-	const scripted = Object.entries(agentMcp(s.agent))
-		.filter(([, spec]: [string, any]) => (spec?.exposure ?? "codemode").startsWith("codemode"))
-		.map(([name]) => name);
+	const scripted = scriptedServers(s.agent);
 	const servers = scripted.length ? ` This project's MCP servers ${scripted.join(", ")} are reached that way: find their tools with searchTools() and describeNamespace() in a script.` : "";
 	const line = `Many calls or much data (an MCP server's records, many files or pages): one codemode script calls the tools, filters and counts, and prints only what matters.${servers}`;
 	if (!evaluatorFor(s.agent)) return line;
