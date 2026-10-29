@@ -57,11 +57,49 @@ pub fn tree_row(
     actions: Vec<AnyElement>,
     cx: &App,
 ) -> Stateful<Div> {
+    row(id, depth, chevron, icon, name, note, dim, chosen, actions, None, cx)
+}
+
+/// A row whose click opens it as a document while its chevron folds and unfolds what is under
+/// it (`on_fold`), as Xcode's navigator: a document that has children (a spec and its modules).
+/// `dim` as `tree_row`'s.
+#[allow(clippy::too_many_arguments)]
+pub fn tree_doc_row(
+    id: impl Into<SharedString>,
+    depth: usize,
+    open: bool,
+    icon: (Ico, Hsla),
+    name: impl Into<SharedString>,
+    note: Option<SharedString>,
+    dim: bool,
+    chosen: bool,
+    on_fold: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static,
+    cx: &App,
+) -> Stateful<Div> {
+    row(id, depth, Some(open), icon, name, note, dim, chosen, vec![], Some(Box::new(on_fold)), cx)
+}
+
+type OnFold = Box<dyn Fn(&ClickEvent, &mut Window, &mut App)>;
+
+#[allow(clippy::too_many_arguments)]
+fn row(
+    id: impl Into<SharedString>,
+    depth: usize,
+    chevron: Option<bool>,
+    icon: (Ico, Hsla),
+    name: impl Into<SharedString>,
+    note: Option<SharedString>,
+    dim: bool,
+    chosen: bool,
+    actions: Vec<AnyElement>,
+    on_fold: Option<OnFold>,
+    cx: &App,
+) -> Stateful<Div> {
     let theme = cx.theme().clone();
     let id: SharedString = id.into();
     let group: SharedString = format!("{id}-g").into();
     h_flex()
-        .id(ElementId::Name(id))
+        .id(ElementId::Name(id.clone()))
         .group(group.clone())
         .flex_none()
         .pl(tree_pl(depth))
@@ -76,9 +114,17 @@ pub fn tree_row(
         .when(!chosen, |d| d.hover(|s| s.bg(theme.list_hover)))
         .child(
             div()
+                .id(SharedString::from(format!("{id}-fold")))
                 .w(px(12.))
                 .flex_none()
                 .text_color(theme.muted_foreground)
+                // The chevron's own click: the fold, not the row's.
+                .when_some(on_fold, |d, f| {
+                    d.on_click(move |ev, window, cx| {
+                        cx.stop_propagation();
+                        f(ev, window, cx)
+                    })
+                })
                 .when_some(chevron, |d, open| {
                     d.child(
                         if open {

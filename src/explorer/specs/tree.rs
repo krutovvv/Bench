@@ -38,11 +38,12 @@ impl BenchApp {
             Some((n, w)) => (n.to_string(), Some(SharedString::from(w.to_string()))),
             None => (s.title.clone(), None),
         };
-        out.push(
+        let fold = node.clone();
+        let row = if kids.is_empty() {
             bench_ui::tree_row(
                 format!("ex-spec-{id}"),
                 depth,
-                (!kids.is_empty()).then_some(open),
+                None,
                 (Ico::BookCheck, theme.primary),
                 name,
                 what,
@@ -51,7 +52,23 @@ impl BenchApp {
                 vec![],
                 cx,
             )
-            .on_click(cx.listener(move |this, _, window, cx| {
+        } else {
+            // The chevron folds and unfolds; the row opens the spec (and unfolds it).
+            bench_ui::tree_doc_row(
+                format!("ex-spec-{id}"),
+                depth,
+                open,
+                (Ico::BookCheck, theme.primary),
+                name,
+                what,
+                draft,
+                chosen,
+                cx.listener(move |this, _, _, cx| this.toggle_node(&fold, cx)),
+                cx,
+            )
+        };
+        out.push(
+            row.on_click(cx.listener(move |this, _, window, cx| {
                 if !this.explorer.is_open(&node) {
                     this.toggle_node(&node, cx);
                 }
