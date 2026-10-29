@@ -43,15 +43,32 @@ pub struct MediaState {
     pub live: Option<LiveDictation>,
 }
 
-/// Dictation sent piece by piece: where the next piece starts, and each piece's text in order (None:
-/// not back yet), shown in the composer as the pieces before it are in.
-#[derive(Default)]
+/// Dictation recognized while it goes: at each pause, the whole speech so far, one run at a time; its
+/// text replaces the last after what the composer held before. Stopping is the last pause.
 pub struct LiveDictation {
-    pub sent: usize,
-    pub next: u64,
-    pub texts: std::collections::BTreeMap<u64, Option<String>>,
+    /// The composer's text when dictation began: the draft goes after it.
+    pub base: String,
+    /// Where to look for the next pause from, in samples.
+    pub looked: usize,
+    /// The speech the last run had, in samples.
+    pub ran: usize,
+    /// A run is out; the last result shown, and the number the next run gets.
+    pub running: bool,
     pub shown: u64,
+    pub next: u64,
+    /// Seconds of work per second of speech, as the last run measured it.
+    pub speed: f32,
+    /// The recording stopped: the dictation ends with the run out, or `last` after it.
+    pub finishing: bool,
+    /// The whole recording, for a run once the one out is back (speech came after it).
+    pub last: Option<Vec<u8>>,
     pub failed: bool,
+}
+
+impl LiveDictation {
+    pub fn new(base: String) -> Self {
+        Self { base, looked: 0, ran: 0, running: false, shown: 0, next: 0, speed: 0.3, finishing: false, last: None, failed: false }
+    }
 }
 
 /// Bench's dictation preference (`dictation.json`).

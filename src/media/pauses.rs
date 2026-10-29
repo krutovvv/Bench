@@ -1,5 +1,5 @@
-//! Where dictation is cut while the person speaks (`voice.rs`, the gear's "Text while speaking"):
-//! at a pause after some speech, so each piece is recognized while the next is said. Loudness is
+//! When dictation is recognized while the person speaks (`voice.rs`, the gear's "Text while
+//! speaking"): at a pause after some speech, the whole speech so far, when it is worth the run. Loudness is
 //! measured in 25 ms slices against the recording's own quiet (its tenth percentile), so a noisy
 //! room and a quiet one both find their pauses. Pure: the tests below drive it with made-up sound.
 
@@ -78,6 +78,17 @@ pub fn cut(samples: &[f32], rate: u32, from: usize) -> Option<Cut> {
     None
 }
 
+/// The least new speech worth a run, in seconds.
+const MIN_NEW: f32 = 0.8;
+
+/// At a pause, whether to recognize the whole speech again: worth it when the speech added since
+/// the last run is at least what the run will take (`speed`: seconds of work per second of speech,
+/// as measured on the last run). Short dictation updates at nearly every pause; long dictation,
+/// whose every run costs more, less often — the processor never falls behind the person.
+pub fn worth_a_run(new_secs: f32, total_secs: f32, speed: f32) -> bool {
+    new_secs >= MIN_NEW && new_secs >= speed * total_secs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -132,6 +143,15 @@ mod tests {
             Some(Cut::Speech(at)) => assert!(at > first + RATE as usize * 2),
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn a_run_is_worth_it_when_the_new_speech_outweighs_its_cost() {
+        // 0.24 s of work per second of speech, as the 0.6B on dev.
+        assert!(worth_a_run(3., 8., 0.24), "short dictation: at nearly every pause");
+        assert!(!worth_a_run(0.5, 2., 0.24), "too little new");
+        assert!(!worth_a_run(5., 60., 0.24), "a minute in: 14 s of work for 5 s new");
+        assert!(worth_a_run(15., 60., 0.24));
     }
 
     #[test]

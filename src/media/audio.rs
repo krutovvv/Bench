@@ -100,6 +100,15 @@ impl Recorder {
         wav(&samples, self.rate)
     }
 
+    /// How many samples are recorded, and at what rate.
+    pub fn len(&self) -> usize {
+        self.samples.lock().unwrap().len()
+    }
+
+    pub fn rate(&self) -> u32 {
+        self.rate
+    }
+
     /// Where to cut the speech recorded since sample `from` (`pauses.rs`); None: not yet.
     pub fn cut_after(&self, from: usize) -> Option<super::pauses::Cut> {
         super::pauses::cut(&self.samples.lock().unwrap(), self.rate, from)
@@ -111,18 +120,6 @@ impl Recorder {
         wav(&samples[from.min(samples.len())..to.min(samples.len())], self.rate)
     }
 
-    /// Stop and return what was recorded since sample `from` as a WAV; None: too little, or no
-    /// speech in it.
-    pub fn finish_from(self, from: usize) -> Result<Option<Vec<u8>>> {
-        drop(self.stream);
-        let samples = std::mem::take(&mut *self.samples.lock().unwrap());
-        let rest = &samples[from.min(samples.len())..];
-        let loud = rest.iter().any(|s| s.abs() > 0.02);
-        if rest.len() < self.rate as usize / 4 || !loud {
-            return Ok(None);
-        }
-        wav(rest, self.rate).map(Some)
-    }
 }
 
 /// Samples as a 16-bit mono WAV.

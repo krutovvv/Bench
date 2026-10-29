@@ -1,5 +1,5 @@
-//! Dictation and reading an answer aloud. Dictation goes whole when it stops, or, with "Text
-//! while speaking" on, piece by piece at its pauses (`pauses.rs`) while the person goes on.
+//! Dictation and reading an answer aloud. Dictation goes whole when it stops; with "Text while
+//! speaking" on, the whole speech so far is also recognized at pauses while the person goes on.
 
 use std::time::Duration;
 
@@ -8,28 +8,25 @@ use gpui_kit::*;
 
 use crate::client::rest;
 use crate::media::audio::{Playback, Recorder};
-use crate::media::pauses::Cut;
+use crate::media::pauses::{Cut, worth_a_run};
 use crate::media::state::LiveDictation;
 
 /// Ticks of the waveform's repaint (33 ms) between two looks for a pause.
 const PAUSE_LOOK: u32 = 6;
+/// Speech after the last run, in seconds, that stopping still sends.
+const LAST_WORDS: f32 = 0.3;
 
 use crate::app::BenchApp;
 
 impl BenchApp {
     /// The microphone on, or off and what it heard into the composer. With "Text while speaking"
-    /// on (the gear's Voice), each pause sends what was said while the next is spoken, and the
-    /// words come in as they are recognized; off, the whole recording goes when it stops.
+    /// on (the gear's Voice), the whole speech so far is recognized again at each pause — one run at
+    /// a time, when the new speech is worth the run (`pauses.rs`) — and its text replaces the last;
+    /// stopping is the last pause: the whole speech once more, only when some came after the last run.
     pub fn toggle_mic(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(rec) = self.media.recorder.take() {
-            if let Some(live) = self.media.live.as_ref() {
-                let from = live.sent;
-                match rec.finish_from(from) {
-                    Ok(Some(wav)) => self.send_piece(wav, window, cx),
-                    Ok(None) => {}
-                    Err(e) => self.toast(NotificationType::Warning, format!("Recording: {e:#}"), window, cx),
-                }
-                self.show_pieces(window, cx);
+            if self.media.live.is_some() {
+                self.stop_live(rec, window, cx);
                 cx.notify();
                 return;
             }
@@ -63,6 +60,7 @@ impl BenchApp {
                 }
                 Err(e) => {
                     self.media.send_after_transcribe = false;
+                    self.media.live = None;
                     self.toast(
                         NotificationType::Warning,
                         format!("Recording: {e:#}"),
@@ -75,7 +73,8 @@ impl BenchApp {
             match Recorder::start() {
                 Ok(r) => {
                     self.media.recorder = Some(r);
-                    self.media.live = self.media.live_pref.then(LiveDictation::default);
+                    let base = self.active_thread.read(cx).composer.read(cx).value().to_string();
+                    self.media.live = self.media.live_pref.then(|| LiveDictation::new(base));
                     let mut tick = 0u32;
                     self.media.wave_ticker = Some(cx.spawn_in(window, async move |this, cx| {
                         loop {
@@ -87,7 +86,7 @@ impl BenchApp {
                                 cx.notify();
                                 // A look for a pause every ~0.2 s.
                                 if tick % PAUSE_LOOK == 0 && this.media.live.is_some() {
-                                    this.cut_piece(window, cx);
+                                    this.at_pause(window, cx);
                                 }
                                 this.media.recorder.is_some()
                             });
@@ -108,89 +107,126 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// While recording: at a pause after speech, the piece since the last goes to be recognized.
-    fn cut_piece(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    /// While recording: at a pause after speech, the whole speech so far is recognized again — when
+    /// no run is out and the new speech is worth the run's cost.
+    fn at_pause(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let (Some(rec), Some(live)) = (self.media.recorder.as_ref(), self.media.live.as_ref()) else {
             return;
         };
-        let from = live.sent;
-        match rec.cut_after(from) {
+        // One run at a time: a pause meanwhile waits, and the next run takes the speech as it is then.
+        if live.running {
+            return;
+        }
+        let (looked, ran, speed) = (live.looked, live.ran, live.speed);
+        match rec.cut_after(looked) {
             Some(Cut::Speech(at)) => {
-                let wav = rec.wav_between(from, at);
+                let (len, rate) = (rec.len(), rec.rate() as f32);
+                let worth = worth_a_run((len - ran) as f32 / rate, len as f32 / rate, speed);
+                let wav = worth.then(|| rec.wav_between(0, len));
                 if let Some(live) = self.media.live.as_mut() {
-                    live.sent = at;
+                    live.looked = at;
+                    if worth {
+                        live.ran = len;
+                    }
                 }
-                if let Ok(wav) = wav {
-                    self.send_piece(wav, window, cx);
+                if let Some(Ok(wav)) = wav {
+                    self.run_live(wav, false, window, cx);
                 }
             }
             Some(Cut::Silence(at)) => {
                 if let Some(live) = self.media.live.as_mut() {
-                    live.sent = at;
+                    live.looked = at;
                 }
             }
             None => {}
         }
     }
 
-    /// One piece to be recognized; its text joins the composer in the order the pieces were said.
-    fn send_piece(&mut self, wav: Vec<u8>, window: &mut Window, cx: &mut Context<Self>) {
+    /// The recording stopped: one more run of the whole speech when some came after the last run
+    /// (now, or once the run out is back); else the dictation ends with what is shown.
+    fn stop_live(&mut self, rec: Recorder, window: &mut Window, cx: &mut Context<Self>) {
+        let (len, rate) = (rec.len(), rec.rate() as f32);
+        let Some(live) = self.media.live.as_mut() else {
+            return;
+        };
+        let more = (len.saturating_sub(live.ran)) as f32 / rate >= LAST_WORDS;
+        live.finishing = true;
+        let wav = if more { rec.finish().ok() } else { None };
+        match (wav, live.running) {
+            (Some(wav), false) => self.run_live(wav, true, window, cx),
+            (Some(wav), true) => live.last = Some(wav),
+            (None, true) => {}
+            (None, false) => self.end_live(window, cx),
+        }
+    }
+
+    /// The dictation is over: its text stays, and is sent when Send was pressed meanwhile.
+    fn end_live(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.media.live = None;
+        self.media.transcribing = false;
+        if std::mem::take(&mut self.media.send_after_transcribe) {
+            self.send_dictated(window, cx);
+        }
+        cx.notify();
+    }
+
+    /// One run of the whole speech so far (`last`: at the recording's end). Its text replaces the
+    /// last shown unless a later run's is already there; after the recording stopped, the run out
+    /// is followed by the whole recording's when speech came after it, else the dictation ends.
+    fn run_live(&mut self, wav: Vec<u8>, last: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(live) = self.media.live.as_mut() else {
             return;
         };
         let seq = live.next;
         live.next += 1;
-        live.texts.insert(seq, None);
+        live.running = true;
+        // Seconds of speech in it: a 16-bit mono WAV, its header 44 bytes.
+        let secs = wav_secs(&wav);
+        let started = std::time::Instant::now();
         self.media.transcribing = true;
         self.rest(
             window,
             cx,
             move |c| rest::transcribe(c, &wav),
             move |this, r, window, cx| {
+                let took = started.elapsed().as_secs_f32();
+                let Some(live) = this.media.live.as_mut() else {
+                    return;
+                };
+                live.running = false;
+                if secs > 1. {
+                    live.speed = took / secs;
+                }
                 let text = match r {
-                    Ok(t) => t,
+                    Ok(t) => Some(t),
                     Err(e) => {
-                        // One toast for a dictation, however many pieces fail.
-                        if this.media.live.as_ref().is_some_and(|l| !l.failed) {
-                            if let Some(l) = this.media.live.as_mut() {
-                                l.failed = true;
-                            }
+                        if !live.failed {
+                            live.failed = true;
                             this.transcription_failed(e, window, cx);
                         }
-                        String::new()
+                        None
                     }
                 };
-                if let Some(live) = this.media.live.as_mut() {
-                    live.texts.insert(seq, Some(text));
+                let live = this.media.live.as_mut().expect("checked above");
+                let newest = seq + 1 >= live.shown;
+                if let Some(text) = text.filter(|_| newest) {
+                    live.shown = seq + 1;
+                    let base = live.base.clone();
+                    let joined = if base.trim().is_empty() { text } else if text.trim().is_empty() { base } else { format!("{} {text}", base.trim_end()) };
+                    let composer = this.active_thread.read(cx).composer.clone();
+                    composer.update(cx, |s, cx| s.set_value(joined, window, cx));
                 }
-                this.show_pieces(window, cx);
+                let live = this.media.live.as_mut().expect("checked above");
+                if last || (live.finishing && live.last.is_none()) {
+                    this.end_live(window, cx);
+                } else if let Some(wav) = live.last.take() {
+                    this.run_live(wav, true, window, cx);
+                } else {
+                    this.media.transcribing = false;
+                }
+                cx.notify();
             },
         );
-    }
-
-    /// The pieces back so far, in order, into the composer; once the recording stopped and every
-    /// piece is in, the dictation ends (and is sent when Send was pressed meanwhile).
-    fn show_pieces(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let mut ready = vec![];
-        if let Some(live) = self.media.live.as_mut() {
-            while let Some(Some(text)) = live.texts.get(&live.shown) {
-                ready.push(text.clone());
-                live.shown += 1;
-            }
-        }
-        for text in ready.into_iter().filter(|t| !t.trim().is_empty()) {
-            self.put_dictated(text, window, cx);
-        }
-        let done = self.media.recorder.is_none() && self.media.live.as_ref().is_some_and(|l| l.shown == l.next);
-        self.media.transcribing = !done && self.media.live.as_ref().is_some_and(|l| l.shown < l.next);
-        if done {
-            self.media.live = None;
-            self.media.transcribing = false;
-            if std::mem::take(&mut self.media.send_after_transcribe) {
-                self.send_dictated(window, cx);
-            }
-        }
-        cx.notify();
     }
 
     /// Dictated words at the end of the open thread's composer, after a space.
@@ -260,4 +296,10 @@ impl BenchApp {
         );
         cx.notify();
     }
+}
+
+/// Seconds of speech in a 16-bit mono WAV (its header is 44 bytes, its rate at bytes 24..28).
+fn wav_secs(wav: &[u8]) -> f32 {
+    let rate = wav.get(24..28).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])).unwrap_or(48_000).max(1);
+    (wav.len().saturating_sub(44) / 2) as f32 / rate as f32
 }
