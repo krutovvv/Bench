@@ -79,18 +79,16 @@ function earlierOf(next: { name: string; arguments?: any }, calls: Call[]): { ca
 
 const shown = (c: { name: string; args?: any; arguments?: any }) => `${c.name} ${cut(JSON.stringify(c.args ?? c.arguments ?? {}), SHOWN)}`;
 
-/** What the evaluator stopped, by conversation: the kind of likeness it was asked about. */
-const asked = new Map<string, "same" | "near">();
-
-export const repeat: Point = {
+/** The kind of likeness it was asked about: the same call, or a near copy. */
+export const repeat: Point<"same" | "near"> = {
 	name: "repeat",
 	moment: "call",
-	ask({ conversation, call, turn }) {
+	ask({ call, turn }) {
 		if (!call || call.name === "todo" || turn.stopped === keyOf(call)) return undefined;
 		const e = earlierOf(call, turn.calls);
 		if (!e) return undefined;
-		asked.set(conversation, e.kind);
 		return {
+			context: e.kind,
 			state: {
 				next_call: shown(call),
 				earlier_call: `${shown(e.call)}${e.call.failed ? " → FAILED: " : " → "}${e.call.out}`,
@@ -110,9 +108,7 @@ export const repeat: Point = {
 			},
 		};
 	},
-	apply({ conversation, call, turn }, answers) {
-		const kind = asked.get(conversation);
-		asked.delete(conversation);
+	apply({ call, turn }, answers, kind) {
 		// Both kinds are a repeat: their sum is how sure it is one (0.79 + 0.17 for the same probe
 		// run again on the local server), the likelier of the two says which.
 		const p = answers.repeat?.probabilities ?? {};

@@ -33,11 +33,15 @@ export interface Seen {
 	approvals?: boolean;
 }
 
-export interface Asked {
+export interface Asked<C = undefined> {
 	/** Its questions, by names of its own (the dispatcher keeps them apart from other points'). */
 	questions: Record<string, Question>;
 	/** What it adds to the turn's common state (`baseState`). */
 	state?: Record<string, unknown>;
+	/** What `apply` needs of this asking (the options it named, what it compared): handed back with
+	 *  the answers, so two calls of one conversation asked at once (Pi runs tools in parallel) never
+	 *  read each other's. */
+	context?: C;
 }
 
 export interface Effect {
@@ -61,13 +65,14 @@ export interface Effect {
 	block?: string;
 }
 
-export interface Point {
+export interface Point<C = any> {
 	name: string;
 	moment: Moment;
 	/** The questions to ask now, or undefined: nothing to ask at this moment. */
-	ask(seen: Seen): Asked | undefined | Promise<Asked | undefined>;
-	/** What the answers change; undefined: nothing (unsure, or the answer agrees with things as they are). */
-	apply(seen: Seen, answers: Record<string, ChoiceAnswer>): Effect | undefined;
+	ask(seen: Seen): Asked<C> | undefined | Promise<Asked<C> | undefined>;
+	/** What the answers change, with the `context` its `ask` gave; undefined: nothing (unsure, or the
+	 *  answer agrees with things as they are). */
+	apply(seen: Seen, answers: Record<string, ChoiceAnswer>, context: C): Effect | undefined;
 }
 
 /** What every request carries about the turn: the person's request, the plan, the last steps. */

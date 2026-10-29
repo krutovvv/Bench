@@ -46,10 +46,10 @@ async function at(moment: Moment, seen: Seen, signal?: AbortSignal): Promise<Eff
 	const answers = await ask(seen.conversation, asking.map(([p]) => p.name).join("+"), state, questions, signal);
 	if (!answers) return [];
 	const effects: Effect[] = [];
-	for (const [p] of asking) {
+	for (const [p, a] of asking) {
 		const own: Record<string, ChoiceAnswer> = {};
 		for (const [k, v] of Object.entries(answers)) if (k.startsWith(`${p.name}.`)) own[k.slice(p.name.length + 1)] = v;
-		const e = p.apply(seen, own);
+		const e = p.apply(seen, own, a.context);
 		if (!e) continue;
 		if (e.result) seen.result = e.result;
 		if (e.plan) seen.turn.plan = e.plan;

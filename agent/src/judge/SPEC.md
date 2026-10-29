@@ -37,7 +37,10 @@ answers change — a result reordered, a note to the model, the turn sent back, 
 thread, the plan's marks. `index.ts` keeps them in `POINTS` and asks every point of a moment that
 has a question now in one request: one state (the turn's request, plan and last steps, kept by
 `turn/turn.ts`, plus what each point adds), every question evaluated against it in parallel,
-each point's answers under its own names. The default extension's hooks call the moments
+each point's answers under its own names. What a point's `apply` needs of its asking (the skills
+or servers it offered, the likeness it compared) comes back with the answers as the asking's
+`context`, never through a map by conversation: Pi runs a step's tools in parallel, and two calls of
+one thread are asked about at once. The default extension's hooks call the moments
 (`extensions/assistant.ts`): `result` in `afterTool`, `answer` in `onYield`.
 
 - **search** (`search.ts`, `result`: grep, glob, a grep or find through bash): a list of twelve

@@ -387,6 +387,19 @@ test("a call that repeats a failed one is refused once; a new step, or the same 
 	assert.equal(seen.length, before);
 });
 
+test("two calls asked about at once each get their own answer's reading (tools run in parallel)", async () => {
+	seeRequest("r3", [user("Find the price on DNS")]);
+	const probe = { name: "bash", arguments: { command: "node probe.mjs" } };
+	const long = (n: number) => ({ name: "ssh_run", arguments: { command: `cd /srv/app && for f in logs/*.log; do grep -c 'price' "$f"; done | sort | uniq -c | head -${n}` } });
+	seeResult("r3", probe, { output: [{ type: "text", text: "died" }], isError: true });
+	seeResult("r3", long(20), { output: [{ type: "text", text: "died" }], isError: true });
+	reply = () => choice("repeat.repeat", { new: 0.08, same_failed: 0.9, same_result: 0.02 });
+	// The same probe (sure at 0.85) and a near copy of the long one (sure only at 0.95), asked together.
+	const [same, near] = await Promise.all([atCall("r3", probe, false), atCall("r3", long(30), false)]);
+	assert.match(same.block!, /repeats one that just failed/, "the same call, read as the same");
+	assert.equal(near.block, undefined, "the near copy, read as a near copy");
+});
+
 test("repeat asks only about the same call, whole: other scripts, offsets and refused calls are not repeats", async () => {
 	seeRequest("r2", [user("Restore the skills from the backup")]);
 	const script = (body: string) => ({ name: "bash", arguments: { command: `cd /tmp && python3 - <<'EOF'\nimport json, glob, hashlib, os\n${body}\nEOF` } });
