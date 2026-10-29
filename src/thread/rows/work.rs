@@ -1,15 +1,14 @@
 //! The agent's work between two messages: one line "N actions · time · Done", the steps under
 //! it when opened. What one call says in a line is `tool_labels.rs`.
 
-use ::thread::steps::{self, Filter};
 use ::thread::{AskCard, Hold, PlanStep, Step, worked_ms};
 use gpui_kit::component::shimmer::ShimmerText;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::thread::ThreadView;
-use crate::thread::rows::tool_labels::{activity_word, pretty, tool_label};
+use crate::thread::rows::tool_labels::activity_word;
 use crate::app::now_secs;
 use bench_ui::icons::Ico;
 use bench_ui::{clip, clock, plural};
@@ -288,32 +287,9 @@ impl ThreadView {
                 }
                 cx.notify();
             }));
-        // Opened: the work in order as runs — calls of one kind in a row on one line with what
-        // they acted on — and the agent's words between them; a run unfolds to its calls, each
-        // opening to its request and answer (`::thread::steps::runs`).
+        // Opened: the calls in order beside the chosen one, whole (`rows/steps.rs`).
         let items: Vec<AnyElement> = if open && !steps.is_empty() {
-            let mut out = vec![];
-            for line in steps::runs(steps) {
-                match line {
-                    steps::Line::Step(k) => out.push(self.render_step(key, k, &steps[k], "", cx)),
-                    steps::Line::Run { kind, calls } => {
-                        let unfolded = self.thread.open_runs.contains(&(key.to_string(), calls[0]));
-                        out.push(self.render_run(key, steps, kind, &calls, unfolded, cx));
-                        if unfolded {
-                            for k in calls {
-                                let why = steps::reasoning_before(steps, k).join("\n\n");
-                                out.push(
-                                    div()
-                                        .pl_5()
-                                        .child(self.render_step(key, k, &steps[k], &why, cx))
-                                        .into_any_element(),
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            out
+            vec![self.render_steps(key, steps, live, cx)]
         } else {
             vec![]
         };
@@ -322,7 +298,7 @@ impl ThreadView {
         // lines hung on it. Open with no steps yet (a run that has only begun): nothing.
         let list = (!items.is_empty()).then(|| {
             v_flex()
-                .p_1()
+                .overflow_hidden()
                 .rounded_lg()
                 .bg(theme.foreground.opacity(0.03))
                 .children(items)
@@ -369,327 +345,9 @@ impl ThreadView {
         )
         .into_any_element()
     }
-
-    /// A run of the opened work: its kind, how many calls, what they acted on (the most first),
-    /// how many failed, how many the evaluator spoke to. A click unfolds its calls under it.
-    fn render_run(
-        &mut self,
-        key: &str,
-        steps: &[Step],
-        kind: Filter,
-        calls: &[usize],
-        unfolded: bool,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let faint = bench_ui::faint(&theme);
-        let errors = calls.iter().filter(|k| Filter::Errors.matches(&steps[**k])).count();
-        let judged = calls.iter().filter(|k| Filter::Evaluator.matches(&steps[**k])).count();
-        let parts = steps::parts(steps, kind, calls)
-            .into_iter()
-            .map(|(name, n)| if n > 1 { format!("{name} {n}") } else { name })
-            .collect::<Vec<_>>()
-            .join(" · ");
-        let fold = (key.to_string(), calls[0]);
-        h_flex()
-            .id(SharedString::from(format!("run-{key}-{}", calls[0])))
-            .min_h(px(bench_ui::LIST_ROW_H))
-            .px_2()
-            .gap_2()
-            .items_center()
-            .rounded_md()
-            .text_size(px(bench_ui::THREAD_META))
-            .cursor_pointer()
-            .hover(|s| s.bg(theme.list_hover))
-            .child(div().flex_none().text_color(muted).child(group_icon(kind).icon().xsmall()))
-            .child(
-                h_flex()
-                    .flex_none()
-                    .w(px(bench_ui::STEP_VERB_W))
-                    .gap_1p5()
-                    .child(div().text_color(theme.foreground).child(kind.label()))
-                    .child(div().text_color(muted).child(calls.len().to_string())),
-            )
-            .child(div().flex_1().min_w_0().truncate().text_color(faint).child(parts))
-            // How many of its calls the evaluator spoke to: as quiet as the parts.
-            .when(judged > 0, |d| {
-                d.child(
-                    h_flex()
-                        .flex_none()
-                        .gap_1()
-                        .text_color(faint)
-                        .child(Ico::Scale.icon().xsmall())
-                        .child(judged.to_string()),
-                )
-            })
-            .when(errors > 0, |d| {
-                d.child(
-                    div()
-                        .flex_none()
-                        .text_color(theme.danger)
-                        .child(plural(errors, "error", "errors", "errors")),
-                )
-            })
-            .child(
-                div()
-                    .flex_none()
-                    .text_color(faint)
-                    .child(if unfolded { Ico::ChevronDown } else { Ico::ChevronRight }.icon().xsmall()),
-            )
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.claim_click(cx);
-                if !this.thread.open_runs.remove(&fold) {
-                    this.thread.open_runs.insert(fold.clone());
-                }
-                cx.notify();
-            }))
-            .into_any_element()
-    }
-
-    /// One step; a click unfolds its details (the reasoning that led to a call, its arguments,
-    /// its output). What the evaluator said in its result shows under it.
-    fn render_step(
-        &mut self,
-        key: &str,
-        k: usize,
-        step: &Step,
-        why: &str,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let theme = cx.theme().clone();
-        let muted = theme.muted_foreground;
-        let open = self.thread.open_steps.contains(&(key.to_string(), k));
-        let (icon, color, label, details): (Ico, Hsla, String, Vec<(&str, String)>) = match step {
-            Step::Tool {
-                name,
-                preview,
-                args,
-                output,
-                failed,
-                ..
-            } => (
-                if *failed {
-                    Ico::CircleAlert
-                } else {
-                    step_icon(name)
-                },
-                if *failed { theme.danger } else { muted },
-                clip(&call_label(name, args, &home_short(preview)), 220),
-                [
-                    (
-                        "Evaluator",
-                        output
-                            .as_deref()
-                            .and_then(steps::evaluator_word)
-                            .unwrap_or_default()
-                            .to_string(),
-                    ),
-                    ("Reasoning", why.to_string()),
-                    ("Arguments", pretty(args)),
-                    ("Output", output.clone().unwrap_or_default()),
-                ]
-                .into_iter()
-                .filter(|(_, v)| !v.trim().is_empty())
-                .collect(),
-            ),
-            // What the agent said between its calls: its own words, in the text's colour.
-            Step::Note(text) => (Ico::MessageSquare, muted, clip(text, 400), vec![]),
-            // The model's reasoning: the quietest row, the whole of it when opened.
-            Step::Thought(text) => (
-                Ico::Brain,
-                bench_ui::faint(&theme),
-                clip(text, 160),
-                vec![("Reasoning", text.clone())],
-            ),
-        };
-        let expandable = !details.is_empty();
-        // The evaluator spoke to this call: a quiet mark at the row's end, its words the first
-        // of the opened details.
-        let judged = Filter::Evaluator.matches(step);
-        let tool_ok = matches!(step, Step::Tool { failed: false, .. });
-        let step_key = (key.to_string(), k);
-        let bodies: Vec<(&str, AnyElement)> = if open {
-            details
-                .into_iter()
-                .map(|(title, body)| {
-                    let text =
-                        self.thread
-                            .texts
-                            .plain(&format!("step-{key}-{k}-{title}"), &body, cx);
-                    (title, text.into_any_element())
-                })
-                .collect()
-        } else {
-            vec![]
-        };
-        let note = matches!(step, Step::Note(_));
-        let faint = bench_ui::faint(&theme);
-        // A step is the thread's own line, as the work line over it: its size, not the answer's.
-        // A row of a list: one line, its glyph in a column of its own, the whole row lit on hover.
-        v_flex()
-            .text_size(px(bench_ui::THREAD_META))
-            .child(
-                h_flex()
-                    .id(SharedString::from(format!("step-{key}-{k}")))
-                    .min_h(px(bench_ui::LIST_ROW_H))
-                    .px_2()
-                    .gap_2()
-                    .items_center()
-                    .rounded_md()
-                    .text_color(color)
-                    .when(expandable, |d| {
-                        d.cursor_pointer().hover(|s| s.bg(theme.list_hover))
-                    })
-                    .child(
-                        div()
-                            .flex_none()
-                            .text_color(if note { faint } else { color })
-                            .child(icon.icon().xsmall()),
-                    )
-                    // The tool in the step's grey, what it acted on in the text's colour; the
-                    // agent's own words in the text's colour.
-                    .child(match label.split_once(": ") {
-                        Some((verb, rest)) if tool_ok => {
-                            // A file: its name, then where it is, quieter — the name is what
-                            // the eye looks for (Xcode's and the changed files' list).
-                            let (name, dir) = split_path(rest);
-                            h_flex()
-                                .flex_1()
-                                .min_w_0()
-                                .gap_1p5()
-                                .child(
-                                    div()
-                                        .flex_none()
-                                        .w(px(bench_ui::STEP_VERB_W))
-                                        .truncate()
-                                        .child(verb.to_string()),
-                                )
-                                .child(
-                                    div()
-                                        .flex_none()
-                                        .max_w_2_3()
-                                        .truncate()
-                                        .text_color(theme.foreground)
-                                        .child(name),
-                                )
-                                .when_some(dir, |d, dir| {
-                                    d.child(div().min_w_0().truncate().text_color(faint).child(dir))
-                                })
-                        }
-                        _ => div()
-                            .flex_1()
-                            .min_w_0()
-                            .truncate()
-                            .when(note, |d| d.text_color(theme.foreground))
-                            .child(label.clone()),
-                    })
-                    .when(judged, |d| {
-                        d.child(
-                            div()
-                                .flex_none()
-                                .text_color(faint)
-                                .child(Ico::Scale.icon().xsmall()),
-                        )
-                    })
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.claim_click(cx);
-                        if !this.thread.open_steps.remove(&step_key) {
-                            this.thread.open_steps.insert(step_key.clone());
-                        }
-                        cx.notify();
-                    })),
-            )
-            .when(open && expandable, |d| {
-                d.children(bodies.into_iter().map(|(title, body)| {
-                    v_flex()
-                        .ml_7()
-                        .mr_2()
-                        .mt_0p5()
-                        .mb_1p5()
-                        .child(div().text_color(muted).child(title))
-                        .child(
-                            div()
-                                .mt_0p5()
-                                .p_2()
-                                .bg(theme.secondary)
-                                .border_1()
-                                .rounded_md()
-                                .border_color(theme.border)
-                                .font_family(bench_ui::theme::MONO)
-                                .text_size(theme.mono_font_size)
-                                .text_color(theme.foreground)
-                                .child(body),
-                        )
-                }))
-            })
-            .into_any_element()
-    }
 }
 
-/// A call's line: a command by its program and its first line (past a `cd …`), an MCP tool by
-/// its own name; any other as `tool_label` says it.
-fn call_label(name: &str, args: &serde_json::Value, preview: &str) -> String {
-    match Filter::of_tool(name) {
-        Filter::Commands => {
-            let command = args.get("command").and_then(|c| c.as_str()).unwrap_or(preview);
-            match steps::command_from(command) {
-                // The program in the verb's column, what it was given beside it.
-                Some((p, from)) => {
-                    let given = from.split_once(char::is_whitespace).map_or("", |(_, r)| r);
-                    format!("{p}: {}", home_short(given.trim()))
-                }
-                None => tool_label(name, preview),
-            }
-        }
-        _ if name.starts_with("mcp__") => {
-            format!("{}: {preview}", name.rsplit("__").next().unwrap_or(name))
-        }
-        _ => tool_label(name, preview),
-    }
-}
 
-/// A line's icon by its kind.
-fn group_icon(f: Filter) -> Ico {
-    match f {
-        Filter::Evaluator => Ico::Scale,
-        Filter::Errors => Ico::CircleAlert,
-        Filter::Commands => Ico::Terminal,
-        Filter::Reads => Ico::FileText,
-        Filter::Edits => Ico::Pencil,
-        Filter::Searches => Ico::Search,
-        Filter::Browser => Ico::Globe,
-        Filter::Tools => Ico::Wrench,
-    }
-}
 
-/// A step's icon by the kind of its call (`::thread::steps::Filter`).
-fn step_icon(name: &str) -> Ico {
-    match Filter::of_tool(name) {
-        Filter::Reads => Ico::FileText,
-        Filter::Edits => Ico::Pencil,
-        Filter::Searches => Ico::Search,
-        Filter::Commands => Ico::Terminal,
-        Filter::Browser => Ico::Globe,
-        _ => Ico::Wrench,
-    }
-}
 
-/// A path as its file's name and the folder it is in; anything else (a command, a URL) whole.
-fn split_path(text: &str) -> (String, Option<String>) {
-    let is_path = (text.starts_with('/') || text.starts_with("~/"))
-        && !text.contains(char::is_whitespace)
-        && !text.ends_with('/');
-    match text.rsplit_once('/').filter(|_| is_path) {
-        Some((dir, name)) if !name.is_empty() => (name.to_string(), Some(dir.to_string())),
-        _ => (text.to_string(), None),
-    }
-}
 
-/// A path under the person's home as `~/…`: the step names where, not whose.
-fn home_short(text: &str) -> String {
-    match std::env::var("HOME") {
-        Ok(home) if !home.is_empty() => text.replace(&format!("{home}/"), "~/"),
-        _ => text.to_string(),
-    }
-}

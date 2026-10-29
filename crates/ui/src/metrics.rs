@@ -127,6 +127,16 @@ pub const BAR_TEXT: f32 = 12.;
 /// The thread's own lines, not the conversation: the work line ("8 actions · 3:17 · Done") and
 /// a block's head ("Background · 1 running") — a step under the messages, so the answer leads.
 pub const THREAD_META: f32 = 13.;
+/// The second line of a thread's row (a run's calls under its title): a step quieter than meta.
+pub const THREAD_DETAIL: f32 = 12.;
+/// The opened work's list of calls, beside the chosen call's detail: wide enough for an action
+/// and its place ("Show package.json  supathings-mcp"), as Mail's message list.
+pub const STEPS_LIST_W: f32 = 320.;
+/// The opened work's height at most, however many steps: the list and the detail scroll inside
+/// it, as Mail's panes do in its window.
+pub const STEPS_MAX_H: f32 = 520.;
+/// …and at least, so a short list still leaves the chosen call's detail room to read.
+pub const STEPS_MIN_H: f32 = 240.;
 pub const BAR_TITLE: f32 = 13.;
 /// The short rule between the sidebar's part of the top bar and the title.
 pub const BAR_SEPARATOR_H: f32 = 16.;

@@ -46,6 +46,8 @@ pub struct ThreadView {
     pub slash_sel: usize,
     pub slash_closed: bool,
     pub slash_scroll: ScrollHandle,
+    /// Each opened work's list and detail, scrolled inside it (`rows/steps.rs`), by its key.
+    pub(crate) work_scroll: std::collections::HashMap<String, (ScrollHandle, ScrollHandle)>,
     /// Where the composer is in the window, and the window's height (last frame): the `/` list
     /// opens above the line when there is no room under it.
     pub composer_y: Pixels,
@@ -127,6 +129,7 @@ impl ThreadView {
             slash_sel: 0,
             slash_closed: false,
             slash_scroll: ScrollHandle::new(),
+            work_scroll: Default::default(),
             composer_y: px(0.),
             composer_h: 0.,
             narrow: false,

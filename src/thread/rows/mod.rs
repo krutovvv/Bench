@@ -12,6 +12,7 @@ mod extras;
 pub(crate) mod message;
 mod processes;
 mod queued;
+mod steps;
 pub(crate) mod tool_labels;
 mod welcome;
 pub(crate) mod work;

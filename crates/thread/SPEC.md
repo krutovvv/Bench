@@ -36,11 +36,11 @@ the agent never writes a second record "for Bench" — is `thread-objects`. In s
   it nor its neighbours.
 - An insert sits where its entry is; a removed one is not shown.
 
-`steps.rs` lays an opened piece of work out as the person reads it, from the journal alone: in
-order, calls of one kind in a row as one line with what they acted on (a command by its program,
-read from its own syntax; a read or an edit by its file), the agent's words between them as lines
-of their own, reasoning inside the call it led to, the evaluator's words found in a call's result.
-Nothing is written for it: old threads read the same as new ones.
+`steps.rs` says an opened piece of work's calls for a person, from the journal alone: each call
+as an action and where (a command by what its program does, read from its own syntax; a file
+tool by its file and folder; a search by its words), the reasoning that led to it, the
+evaluator's words found in its result, and the list folded into runs of one kind in a row
+without losing their order. Nothing is written for it: old threads read the same as new ones.
 
 `diff.rs` gives the changes between two row lists, so the view updates only what changed and
 keeps its scroll (`thread-view`).

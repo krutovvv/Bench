@@ -221,7 +221,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         Some(open) => ::thread::Thread::open(open),
         None => journal.thread(),
     };
-    // `BENCH_DEMO_WORK=<n>[:<i>…]`: the n-th piece of work opened, its i-th lines unfolded.
+    // `BENCH_DEMO_WORK=<n>[:<i>]`: the n-th piece of work opened, its i-th listed step chosen.
     if let Ok(how) = std::env::var("BENCH_DEMO_WORK") {
         let mut parts = how.split(':');
         let n: usize = parts.next().and_then(|n| n.parse().ok()).unwrap_or(1);
@@ -234,11 +234,9 @@ fewer form fields. Then check what it did to signups and give me a short summary
         {
             open_thread(app, cx, move |t| {
                 t.open_work.insert(key.clone());
-                let lines = ::thread::steps::runs(&steps);
-                for i in &unfold {
-                    if let Some(l) = lines.get(i.saturating_sub(1)) {
-                        t.open_runs.insert((key.clone(), l.first()));
-                    }
+                let listed = ::thread::steps::listed(&steps);
+                if let Some(k) = unfold.first().and_then(|i| listed.get(i.saturating_sub(1))) {
+                    t.chosen_step.insert(key.clone(), *k);
                 }
             });
         }
