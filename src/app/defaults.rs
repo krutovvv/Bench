@@ -15,9 +15,10 @@ impl BenchApp {
         self.defaults.ready = false;
         self.rest(window, cx, |c| rest::agent_defaults(c, ""), |this, r, window, cx| {
             this.defaults.ready = true;
-            let Ok((effort, _model, models, approval, context)) = r else {
+            let Ok((effort, model, models, approval, context)) = r else {
                 return;
             };
+            this.defaults.model = model;
             this.defaults.approval_mode = Some(approval);
             this.defaults.context_length = context;
             this.defaults.models = models;
@@ -51,6 +52,9 @@ pub struct AgentDefaults {
     pub effort: usize,
     /// The reasoning levels offered (the presets'; `EFFORTS` until they are read).
     pub efforts: Vec<String>,
+    /// The main model; None: none is set, and a new thread says nothing can answer yet
+    /// (`thread/rows/welcome.rs`).
+    pub model: Option<String>,
     /// The primary model and its fallbacks, as (model, provider).
     pub models: Vec<crate::client::rest::ModelChoice>,
     /// `approvals.mode`, once read.
@@ -70,6 +74,7 @@ impl Default for AgentDefaults {
             ready: false,
             effort: EFFORTS.len() - 1,
             efforts: EFFORTS.iter().map(|e| e.to_string()).collect(),
+            model: None,
             models: vec![],
             approval_mode: None,
             context_length: 0,

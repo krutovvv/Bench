@@ -511,7 +511,7 @@ impl ThreadView {
     }
 
     /// Before the first row: why the thread is empty, or the new chat's folder being typed.
-    fn render_head(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+    fn render_head(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let mut rows: Vec<AnyElement> = vec![];
         let empty = self.thread.tv.rows.is_empty();
@@ -574,22 +574,8 @@ impl ThreadView {
                         .into_any_element(),
                 );
             } else if self.thread.id.is_none() && !look::COMPOSER_IN_LIST {
-                // A new chat: one quiet line of where it is, the composer under it waiting.
-                let project = self.thread.project.clone();
-                let name = self
-                    .app(cx)
-                    .map(|a| a.project_name(&project))
-                    .unwrap_or_default();
-                rows.push(
-                    div()
-                        .w_full()
-                        .pt(px(bench_ui::TURN_Y * 2.))
-                        .text_center()
-                        .text_size(px(bench_ui::THREAD_META))
-                        .text_color(bench_ui::faint(&theme))
-                        .child(format!("A new thread in {name}"))
-                        .into_any_element(),
-                );
+                // A new chat: Bench's welcome and the first steps (`rows/welcome.rs`).
+                rows.push(self.render_welcome(window, cx));
             }
         }
         v_flex().w_full().children(rows).into_any_element()

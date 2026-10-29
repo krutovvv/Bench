@@ -1,7 +1,7 @@
 //! Bench's elements. The only crate that touches `gpui-kit` styling and pixel values.
 //!
 //! Gives: `theme` (palette, fonts, accent), `icons` (`Ico`), `metrics` (every size and `Gap`),
-//! `text`, `button`, `field`, `block`, `layout` (`row`, `stack`), `form`, `list`, `bars`, `fmt`.
+//! `text`, `button`, `field`, `block`, `layout` (`row`, `stack`), `form`, `list`, `bars`, `fmt`, `welcome`.
 //! Takes: nothing from Bench. Every element is stateless: data and handlers in, an element out.
 //!
 //! The storybook (`cargo run -p storybook`) shows each of them in every state.
@@ -20,6 +20,7 @@ pub mod mark;
 pub mod metrics;
 pub mod text;
 pub mod theme;
+pub mod welcome;
 
 pub use bars::*;
 pub use block::*;
@@ -34,6 +35,7 @@ pub use list::*;
 pub use mark::*;
 pub use metrics::*;
 pub use text::*;
+pub use welcome::*;
 
 /// A click handler, as `cx.listener(...)` makes it.
 pub type OnClick =

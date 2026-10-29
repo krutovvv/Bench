@@ -100,6 +100,14 @@ pub fn header_h(_cx: &App) -> Pixels {
 /// | Code) — taller than the status bar under the window (28), as a toolbar is over a status line.
 pub const TITLE_BAR_H: f32 = 40.;
 
+/// A new thread's welcome (`welcome.rs`): Bench's mark, its title (a Mac's large title, as an
+/// empty window of Notes or Xcode's welcome names itself), the gap over its suggestions.
+pub const WELCOME_MARK: f32 = 40.;
+pub const WELCOME_TITLE: f32 = 22.;
+pub const WELCOME_GAP: f32 = 20.;
+/// Its message when nothing can answer yet (no model): a readable column, not the thread's.
+pub const WELCOME_NOTE_W: f32 = 440.;
+
 /// A page laid out for reading (the new project's): its column's width.
 pub const PAGE_W: f32 = 680.;
 /// A settings page's column (the gear's, a project's Settings): its widest.

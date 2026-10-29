@@ -566,6 +566,9 @@ fewer form fields. Then check what it did to signups and give me a short summary
         }
         _ => {}
     }
+    // The demo's agent has a model; `BENCH_DEMO_NOMODEL=1`: none set, as a fresh install.
+    app.defaults.ready = true;
+    app.defaults.model = (std::env::var("BENCH_DEMO_NOMODEL").is_err()).then(|| "qwen3-coder".into());
     if std::env::var("BENCH_PANEL").as_deref() == Ok("providers") {
         app.gear.tab = std::env::var("BENCH_GEAR_TAB")
             .ok()
