@@ -44,6 +44,26 @@ impl InsertKind for Tools {
         }
     }
 
+    /// "tools:<tool>" (or "tool:<tool>"): the utility chosen.
+    fn spec(&self, slash_key: &str) -> Option<(String, serde_json::Map<String, serde_json::Value>)> {
+        match slash_key.split_once(':') {
+            Some(("tools" | "tool", v)) if !v.is_empty() => {
+                let mut state = serde_json::Map::new();
+                state.insert("tool".into(), json!(v));
+                Some(("tools".into(), state))
+            }
+            _ => self.owns(slash_key).then(|| (slash_key.to_string(), Default::default())),
+        }
+    }
+
+    fn welcome(&self) -> Option<crate::inserts::WelcomeChip> {
+        Some(crate::inserts::WelcomeChip {
+            icon: bench_ui::icons::Ico::Wrench,
+            label: "Utilities",
+            compose: true,
+        })
+    }
+
     /// One row per utility, under its group's name.
     fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<crate::thread::composer::slash::SlashCommand> {
         GROUPS

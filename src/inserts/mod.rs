@@ -49,6 +49,14 @@ pub struct Word {
     pub key: &'static str,
 }
 
+/// A kind's chip on a new thread's welcome: its icon and name; `compose` writes its word and a
+/// space into the composer (to choose what follows it), else the chip puts the insert in.
+pub struct WelcomeChip {
+    pub icon: Ico,
+    pub label: &'static str,
+    pub compose: bool,
+}
+
 impl Word {
     /// It as a row of the "/" list.
     pub fn command(&self, category: &str) -> SlashCommand {
@@ -78,6 +86,20 @@ pub trait InsertKind: Sync {
     /// unless the kind has more.
     fn choices(&self, _app: &BenchApp, _at: &ThreadRef) -> Vec<SlashCommand> {
         vec![self.word().command("Tool")]
+    }
+    /// Whether the thread `at` offers it at all (the "/" list, the welcome's chips).
+    fn offered(&self, _app: &BenchApp, _at: &ThreadRef) -> bool {
+        true
+    }
+    /// What a "/" row's key ("ssh:local", "tools:json") puts in: the insert's key and its first
+    /// state; None when the key is not this kind's.
+    fn spec(&self, slash_key: &str) -> Option<(String, serde_json::Map<String, serde_json::Value>)> {
+        self.owns(slash_key)
+            .then(|| (slash_key.to_string(), Default::default()))
+    }
+    /// Its chip on a new thread's welcome; None: it has none.
+    fn welcome(&self) -> Option<WelcomeChip> {
+        None
     }
     /// Its rows of the bare "/" list: its word, or — a kind of many things (the utilities) —
     /// one word for each, so a tool is one pick away and not two.
@@ -158,6 +180,16 @@ static KINDS: &[&dyn InsertKind] = &[
 
 pub fn kind_of(key: &str) -> Option<&'static dyn InsertKind> {
     KINDS.iter().copied().find(|k| k.owns(key))
+}
+
+/// Every kind, in the "/" list's order.
+pub fn kinds() -> &'static [&'static dyn InsertKind] {
+    KINDS
+}
+
+/// The kind a "/" row's key puts in (`InsertKind::spec`).
+pub fn kind_of_slash(slash_key: &str) -> Option<&'static dyn InsertKind> {
+    KINDS.iter().copied().find(|k| k.spec(slash_key).is_some())
 }
 
 /// A pane that scrolls inside the thread: the wheel over it moves the pane, and the thread only

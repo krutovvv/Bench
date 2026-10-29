@@ -4,11 +4,9 @@
 //! answer yet, and the gear (Settings → Agents) is where a model is added.
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::thread::ThreadView;
-use bench_ui::Ico;
 
 /// How far down the thread's area the welcome starts, as a share of the window's height: over
 /// the middle, as an empty window's message sits on a Mac.
@@ -24,7 +22,6 @@ impl ThreadView {
         let name = app.project_name(&self.thread.project);
         // Read once the agent has said: before that, a warning would only flash.
         let no_model = app.defaults.ready && app.defaults.model.is_none();
-        let browser = app.browser_offered(&at);
 
         let head = v_flex()
             .items_center()
@@ -66,48 +63,32 @@ impl ThreadView {
                 )
                 .into_any_element()
         } else {
-            let chips = h_flex()
-                .flex_wrap()
-                .justify_center()
-                .gap_2()
-                .child(
+            // Each kind the thread offers, with its chip (`InsertKind::welcome`).
+            let kinds: Vec<_> = crate::inserts::kinds()
+                .iter()
+                .filter(|k| k.offered(app, &at))
+                .filter_map(|k| Some((k.word(), k.welcome()?)))
+                .collect();
+            let chips = h_flex().flex_wrap().justify_center().gap_2().children(kinds.into_iter().map(
+                |(word, chip)| {
+                    let slash = format!("/{}", word.word);
+                    let (key, typed) = (word.key.to_string(), format!("{slash} "));
                     bench_ui::suggestion_chip(
-                        "welcome-terminal",
-                        Ico::Terminal,
-                        "Terminal",
-                        Some("/terminal".into()),
+                        SharedString::from(format!("welcome-{}", word.word)),
+                        chip.icon,
+                        chip.label,
+                        Some(slash.into()),
                         cx,
                     )
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.put_insert("ssh:local".into(), window, cx)
-                    })),
-                )
-                .when(browser, |d| {
-                    d.child(
-                        bench_ui::suggestion_chip(
-                            "welcome-browser",
-                            Ico::Globe,
-                            "Browser",
-                            Some("/browser".into()),
-                            cx,
-                        )
-                        .on_click(cx.listener(|this, _, window, cx| {
-                            this.put_insert("browser".into(), window, cx)
-                        })),
-                    )
-                })
-                .child(
-                    bench_ui::suggestion_chip(
-                        "welcome-tools",
-                        Ico::Wrench,
-                        "Utilities",
-                        Some("/tools".into()),
-                        cx,
-                    )
-                    .on_click(cx.listener(|this, _, window, cx| {
-                        this.compose("/tools ".into(), window, cx)
-                    })),
-                );
+                    .on_click(cx.listener(move |this, _, window, cx| {
+                        if chip.compose {
+                            this.compose(typed.clone(), window, cx)
+                        } else {
+                            this.put_insert(key.clone(), window, cx)
+                        }
+                    }))
+                },
+            ));
             v_flex()
                 .items_center()
                 .gap_3()

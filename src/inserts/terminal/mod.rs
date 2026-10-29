@@ -34,6 +34,14 @@ impl InsertKind for Terminal {
         key == "ssh:local"
     }
 
+    fn welcome(&self) -> Option<crate::inserts::WelcomeChip> {
+        Some(crate::inserts::WelcomeChip {
+            icon: Ico::Terminal,
+            label: "Terminal",
+            compose: false,
+        })
+    }
+
     fn word(&self) -> crate::inserts::Word {
         crate::inserts::Word {
             word: "terminal",

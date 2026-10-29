@@ -46,6 +46,24 @@ impl InsertKind for Browser {
         }
     }
 
+    fn offered(&self, app: &BenchApp, at: &ThreadRef) -> bool {
+        app.browser_offered(at)
+    }
+
+    /// "browser", or "browser:<anything>": a tab of the server's browser.
+    fn spec(&self, slash_key: &str) -> Option<(String, serde_json::Map<String, serde_json::Value>)> {
+        (slash_key == "browser" || slash_key.starts_with("browser:"))
+            .then(|| ("browser".to_string(), Default::default()))
+    }
+
+    fn welcome(&self) -> Option<crate::inserts::WelcomeChip> {
+        Some(crate::inserts::WelcomeChip {
+            icon: bench_ui::icons::Ico::Globe,
+            label: "Browser",
+            compose: false,
+        })
+    }
+
     fn title(&self, app: &BenchApp, _at: &ThreadRef, ins: &Insert) -> String {
         match tab_of(app, ins) {
             Some((_, _, t)) if !t.trim().is_empty() => format!("Browser · {t}"),

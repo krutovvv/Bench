@@ -7,7 +7,7 @@
 
 use gpui_kit::*;
 use protocol::InsertPatch;
-use serde_json::{Map, Value, json};
+use serde_json::{Map, Value};
 
 use crate::app::BenchApp;
 use crate::inserts::kind_of;
@@ -84,20 +84,13 @@ impl BenchApp {
         self.inserts.by_thread.get(&at.key()).cloned().unwrap_or_default()
     }
 
-    /// What a "/" row puts in: "tools:<tool>"; the rest as they are
-    /// ("ssh:local", "browser"…).
+    /// What a "/" row puts in: its kind's key and first state (`InsertKind::spec`); a key no
+    /// kind knows as it is.
     pub fn insert_spec(slash_key: &str) -> (String, Map<String, Value>) {
-        let mut state = Map::new();
-        let (kind, value) = slash_key.split_once(':').unwrap_or((slash_key, ""));
-        let key = match (kind, value) {
-            ("tools" | "tool", v) if !v.is_empty() => {
-                state.insert("tool".into(), json!(v));
-                "tools"
-            }
-            ("browser", _) => "browser",
-            _ => return (slash_key.to_string(), state),
-        };
-        (key.to_string(), state)
+        crate::inserts::kinds()
+            .iter()
+            .find_map(|k| k.spec(slash_key))
+            .unwrap_or_else(|| (slash_key.to_string(), Map::new()))
     }
 
     /// Put an insert into a thread (its view: the open thread's, or the one beside), after its
@@ -268,13 +261,6 @@ impl BenchApp {
             .filter(|s| !s.trim().is_empty())
             .collect::<Vec<_>>()
             .join("\n\n")
-    }
-
-    /// Whether a thread shows the browser (unfolded): its frames flow only then.
-    pub fn thread_has_browser(&self, at: &ThreadRef) -> bool {
-        self.inserts_of(at)
-            .iter()
-            .any(|i| i.key == "browser" && !i.folded)
     }
 }
 

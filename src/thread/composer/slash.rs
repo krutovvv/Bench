@@ -5,7 +5,7 @@
 
 use gpui_kit::*;
 
-use crate::thread::{ThreadRef, ThreadView};
+use crate::thread::ThreadView;
 use crate::app::BenchApp;
 
 /// `@word` at the end of the composer text: (byte offset of the `@`, the word).
@@ -18,27 +18,6 @@ fn prompt_token(text: &str) -> Option<(usize, String)> {
 }
 
 impl BenchApp {
-    /// /browser shows the server browser's tab: offered where the thread's environment has that
-    /// browser's MCP server (a project's own, or Host's), not where another browser works.
-    pub fn browser_offered(&self, at: &ThreadRef) -> bool {
-        if self.demo {
-            return true;
-        }
-        match self.places.projects.iter().find(|p| p.id == at.project) {
-            Some(p) => p.browser,
-            None => self.places.host_browser,
-        }
-    }
-
-    /// The live view of the browser the thread's agent drives (its MCP server's `live`); None:
-    /// the gateway kept in browser.json.
-    pub fn browser_gateway(&self, at: &ThreadRef) -> Option<String> {
-        match self.places.projects.iter().find(|p| p.id == at.project) {
-            Some(p) => p.browser_live.clone(),
-            None => self.places.host_browser_live.clone(),
-        }
-    }
-
     /// The slash commands threads offer, as this Mac's agent lists them.
     pub(crate) fn load_commands(&mut self, cx: &mut Context<Self>) {
         self.request("", protocol::ListCommands {}, cx, |this, r, _, _| {
@@ -110,11 +89,9 @@ impl ThreadView {
         let mut first: Vec<SlashCommand> = vec![];
         let mut rest: Vec<SlashCommand> = vec![];
         // Tools only: the session's commands (/new, /model…) are the window's buttons here.
-        let browser = app.browser_offered(&at);
-        for c in BenchApp::tool_words()
-            .iter()
-            .filter(|c| browser || c.name != "/browser")
-        {
+        for c in BenchApp::tool_words().iter().filter(|c| {
+            crate::inserts::kind_of_slash(&c.key).is_none_or(|k| k.offered(app, &at))
+        }) {
             let name = c.name.to_lowercase();
             if name.starts_with(&q) {
                 first.push(c.clone());

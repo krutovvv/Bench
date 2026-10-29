@@ -39,6 +39,35 @@ pub struct BrowserState {
 }
 
 impl BenchApp {
+    /// /browser shows the server browser's tab: offered where the thread's environment has that
+    /// browser's MCP server (a project's own, or Host's), not where another browser works.
+    pub fn browser_offered(&self, at: &ThreadRef) -> bool {
+        if self.demo {
+            return true;
+        }
+        match self.places.projects.iter().find(|p| p.id == at.project) {
+            Some(p) => p.browser,
+            None => self.places.host_browser,
+        }
+    }
+
+    /// The live view of the browser the thread's agent drives (its MCP server's `live`); None:
+    /// the gateway kept in browser.json.
+    pub fn browser_gateway(&self, at: &ThreadRef) -> Option<String> {
+        match self.places.projects.iter().find(|p| p.id == at.project) {
+            Some(p) => p.browser_live.clone(),
+            None => self.places.host_browser_live.clone(),
+        }
+    }
+
+    /// Whether a thread shows the browser (unfolded): its frames flow only then.
+    pub fn thread_has_browser(&self, at: &ThreadRef) -> bool {
+        use crate::inserts::InsertKind as _;
+        self.inserts_of(at)
+            .iter()
+            .any(|i| super::Browser.owns(&i.key) && !i.folded)
+    }
+
     /// The browser the thread's agent drives (its MCP server's live view), connected on first
     /// use; a thread whose browser is another gateway's connects to that one instead.
     pub fn ensure_browser(&mut self, at: &ThreadRef, cx: &mut Context<Self>) -> Option<Arc<Browser>> {
