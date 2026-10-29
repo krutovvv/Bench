@@ -25,12 +25,15 @@ impl BenchApp {
         // Its bar stands over the tree, level with the documents' tabs beside it (their height,
         // the rule under them); the tree scrolls under it.
         let bar = self.explorer_picker(cx);
-        // Under it, as the sidebar's search band under its head: Files | Threads.
+        // Under it Files | Threads, a bar level with the document's head beside it (its height,
+        // its softer rule): two bars on the left meet two on the right.
         let band = h_flex()
             .flex_none()
+            .h(px(bench_ui::BLOCK_HEAD_H))
             .px(px(bench_ui::SIDEBAR_ROW_INSET))
-            .pt_2()
-            .pb_1()
+            .items_center()
+            .border_b_1()
+            .border_color(cx.theme().border.opacity(0.6))
             .child(self.explorer_side_switch(cx));
         let rows = self.render_explorer(window, cx);
         v_flex()
