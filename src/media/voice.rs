@@ -8,8 +8,8 @@ use gpui_kit::*;
 
 use crate::client::rest;
 use crate::media::audio::{Playback, Recorder};
-use crate::media::pauses::{Cut, worth_a_run};
-use crate::media::state::LiveDictation;
+use crate::media::pauses::{Cut, predict, worth_a_run};
+use crate::media::state::{KEPT_RUNS, LiveDictation};
 
 /// Ticks of the waveform's repaint (33 ms) between two looks for a pause.
 const PAUSE_LOOK: u32 = 6;
@@ -115,11 +115,11 @@ impl BenchApp {
         if live.running {
             return;
         }
-        let (looked, ran, speed) = (live.looked, live.ran, live.speed);
+        let (looked, ran) = (live.looked, live.ran);
         match rec.cut_after(looked) {
             Some(Cut::Speech(at)) => {
                 let (len, rate) = (rec.len(), rec.rate() as f32);
-                let worth = worth_a_run((len - ran) as f32 / rate, len as f32 / rate, speed);
+                let worth = worth_a_run((len - ran) as f32 / rate, predict(&self.media.runs, len as f32 / rate));
                 let wav = worth.then(|| rec.wav_between(0, len));
                 if let Some(live) = self.media.live.as_mut() {
                     live.looked = at;
@@ -193,8 +193,15 @@ impl BenchApp {
                 };
                 live.running = false;
                 if secs > 1. {
-                    live.speed = took / secs;
+                    this.media.runs.push((secs, took));
+                    let n = this.media.runs.len();
+                    if n > KEPT_RUNS {
+                        this.media.runs.drain(..n - KEPT_RUNS);
+                    }
                 }
+                let Some(live) = this.media.live.as_mut() else {
+                    return;
+                };
                 let text = match r {
                     Ok(t) => Some(t),
                     Err(e) => {

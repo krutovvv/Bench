@@ -41,7 +41,14 @@ pub struct MediaState {
     pub live_pref: bool,
     /// A dictation sent by pauses, while it lasts.
     pub live: Option<LiveDictation>,
+    /// The runs recognized so far, (seconds of speech, seconds they took), the latest last: what
+    /// the next run's time is predicted from (`pauses::predict`). Kept across dictations — the
+    /// machine is the same — the last `KEPT_RUNS`.
+    pub runs: Vec<(f32, f32)>,
 }
+
+/// How many measured runs predict the next.
+pub const KEPT_RUNS: usize = 12;
 
 /// Dictation recognized while it goes: at each pause, the whole speech so far, one run at a time; its
 /// text replaces the last after what the composer held before. Stopping is the last pause.
@@ -57,8 +64,7 @@ pub struct LiveDictation {
     pub running: bool,
     pub shown: u64,
     pub next: u64,
-    /// Seconds of work per second of speech, as the last run measured it.
-    pub speed: f32,
+
     /// The recording stopped: the dictation ends with the run out, or `last` after it.
     pub finishing: bool,
     /// The whole recording, for a run once the one out is back (speech came after it).
@@ -68,7 +74,7 @@ pub struct LiveDictation {
 
 impl LiveDictation {
     pub fn new() -> Self {
-        Self { base: None, looked: 0, ran: 0, running: false, shown: 0, next: 0, speed: 0.3, finishing: false, last: None, failed: false }
+        Self { base: None, looked: 0, ran: 0, running: false, shown: 0, next: 0, finishing: false, last: None, failed: false }
     }
 }
 
@@ -116,6 +122,7 @@ impl Default for MediaState {
             send_after_transcribe: false,
             live_pref: DictationPrefs::load().live,
             live: None,
+            runs: vec![],
         }
     }
 }

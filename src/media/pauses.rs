@@ -94,12 +94,37 @@ pub fn cut(samples: &[f32], rate: u32, from: usize) -> Option<Cut> {
 /// The least new speech worth a run, in seconds.
 const MIN_NEW: f32 = 0.8;
 
+/// Seconds of work per second of speech before anything is measured.
+const FIRST_GUESS: f32 = 0.3;
+
+/// How long a run of `total` seconds of speech will take, from the runs measured so far
+/// ((seconds of speech, seconds it took), the latest last): a straight line through them by least
+/// squares — on one machine the time grows about linearly with the speech, with a fixed part (the
+/// request, the audio's decoding) — once they span enough length to draw one; from one run, its
+/// rate; from none, a guess. Never less than the latest rate says for the fixed part's sake.
+pub fn predict(runs: &[(f32, f32)], total: f32) -> f32 {
+    let rate = |(s, t): (f32, f32)| t / s.max(0.1);
+    let Some(last) = runs.last().copied() else {
+        return FIRST_GUESS * total;
+    };
+    let n = runs.len() as f32;
+    let (mx, my) = (runs.iter().map(|r| r.0).sum::<f32>() / n, runs.iter().map(|r| r.1).sum::<f32>() / n);
+    let sxx: f32 = runs.iter().map(|r| (r.0 - mx).powi(2)).sum();
+    // Lengths too alike (or one run) draw no line: the rate.
+    if runs.len() < 2 || sxx < 4. {
+        return rate(last) * total;
+    }
+    let slope = runs.iter().map(|r| (r.0 - mx) * (r.1 - my)).sum::<f32>() / sxx;
+    let line = my + slope.max(0.) * (total - mx);
+    line.max(0.)
+}
+
 /// At a pause, whether to recognize the whole speech again: worth it when the speech added since
-/// the last run is at least what the run will take (`speed`: seconds of work per second of speech,
-/// as measured on the last run). Short dictation updates at nearly every pause; long dictation,
-/// whose every run costs more, less often — the processor never falls behind the person.
-pub fn worth_a_run(new_secs: f32, total_secs: f32, speed: f32) -> bool {
-    new_secs >= MIN_NEW && new_secs >= speed * total_secs
+/// the last run is at least what the run will take (`predict`). Short dictation updates at nearly
+/// every pause; long dictation, whose every run costs more, less often — the processor never falls
+/// behind the person, and a long dictation is not sent again at every breath.
+pub fn worth_a_run(new_secs: f32, predicted: f32) -> bool {
+    new_secs >= MIN_NEW && new_secs >= predicted
 }
 
 #[cfg(test)]
@@ -160,11 +185,24 @@ mod tests {
 
     #[test]
     fn a_run_is_worth_it_when_the_new_speech_outweighs_its_cost() {
-        // 0.24 s of work per second of speech, as the 0.6B on dev.
-        assert!(worth_a_run(3., 8., 0.24), "short dictation: at nearly every pause");
-        assert!(!worth_a_run(0.5, 2., 0.24), "too little new");
-        assert!(!worth_a_run(5., 60., 0.24), "a minute in: 14 s of work for 5 s new");
-        assert!(worth_a_run(15., 60., 0.24));
+        assert!(worth_a_run(3., 1.9), "short dictation: at nearly every pause");
+        assert!(!worth_a_run(0.5, 0.4), "too little new");
+        assert!(!worth_a_run(5., 14.), "a minute in: 14 s of work for 5 s new");
+        assert!(worth_a_run(15., 14.));
+    }
+
+    #[test]
+    fn a_run_is_predicted_from_the_runs_measured() {
+        // Nothing yet: a guess; one run: its rate.
+        assert!((predict(&[], 10.) - 3.).abs() < 0.01);
+        assert!((predict(&[(5., 1.)], 20.) - 4.).abs() < 0.01);
+        // Several, as on dev (0.6B): about 0.2 s per second plus a fixed part — the line, not
+        // the last rate, which a short run's fixed part inflates.
+        let runs = [(5.5, 1.0), (11.5, 2.3), (16.9, 3.9), (22.1, 5.0)];
+        let p = predict(&runs, 60.);
+        assert!((13.0..15.5).contains(&p), "60 s predicted at {p}");
+        // Lengths too alike draw no line: the latest rate.
+        assert!((predict(&[(10., 2.), (10.5, 2.4)], 20.) - 20. * 2.4 / 10.5).abs() < 0.01);
     }
 
     #[test]
