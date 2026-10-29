@@ -1,8 +1,9 @@
 // bench-agent's server: Bench's protocol (crates/protocol) — JSON-RPC 2.0 over a WebSocket at
 // /api/ws?token= (requests, and `event` notifications), REST under /api/ with the token in
 // X-Bench-Token. A server's agent is always the build of the Bench that installed it, so the
-// wire never speaks to an older one. Started by Bench (or `node src/server.ts`); writes its port
-// and token to ~/.bench/server.json.
+// wire never speaks to an older one. Run as the machine's service, which Bench installs
+// (src/client/service.rs), or by hand (`node src/server.ts`); one per home (`instance.ts`).
+// Writes its port and token to ~/.bench/server.json.
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { onMachine } from "./modules/files.ts";
@@ -31,7 +32,11 @@ import settings from "./modules/settings.ts";
 import specs from "./modules/specs.ts";
 import threads from "./modules/threads.ts";
 import { Runtime } from "./runtime/runtime.ts";
+import { BUILD, capLog, holdHome } from "./instance.ts";
 import { syncTelegram } from "./telegram.ts";
+
+holdHome(AGENT_HOME);
+capLog(AGENT_HOME);
 
 const STATE = path.join(AGENT_HOME, "server.json");
 const args = process.argv.slice(2);
@@ -143,7 +148,7 @@ server.on("upgrade", (req, socket, head) => {
 server.listen(argPort || prior.port || 0, "127.0.0.1", () => {
 	const port = (server.address() as any).port;
 	fs.mkdirSync(AGENT_HOME, { recursive: true });
-	fs.writeFileSync(STATE, JSON.stringify({ port, token, pid: process.pid, version: pkg.version, build: process.env.BENCH_AGENT_BUILD ?? null }), { mode: 0o600 });
+	fs.writeFileSync(STATE, JSON.stringify({ port, token, pid: process.pid, version: pkg.version, build: BUILD }), { mode: 0o600 });
 	console.log(`BENCH_AGENT_READY port=${port}`);
 });
 server.on("error", (e: any) => {

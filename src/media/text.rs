@@ -187,7 +187,8 @@ pub(crate) fn plain_text(id: impl Into<SharedString>, text: &str) -> TextView {
 }
 
 /// Markdown as answers show it: with formulas. Code blocks keep the monospace font (trees and
-/// columns stay aligned) at the chat text's size, not the theme's larger code size.
+/// columns stay aligned) at the theme's code size and leading, as the editor shows code (Menlo
+/// 12): `rems(1.0)` was the window's 16 px, larger than the chat's own text.
 pub(crate) fn markdown(id: impl Into<SharedString>, text: String, cx: &App) -> TextView {
     answer_style(TextView::markdown(ElementId::Name(id.into()), text), cx)
 }
@@ -209,8 +210,8 @@ fn answer_style(view: TextView, cx: &App) -> TextView {
             .inline_code(code)
             .code_block(
                 StyleRefinement::default()
-                    .text_size(rems(1.0))
-                    .line_height(relative(bench_ui::LEAD)),
+                    .text_size(cx.theme().mono_font_size)
+                    .line_height(relative(bench_ui::CODE_LEAD)),
             ),
     )
 }
@@ -242,8 +243,8 @@ pub(super) fn render_code(
                 .inline_code(code_span(&theme))
                 .code_block(
                     StyleRefinement::default()
-                        .text_size(rems(1.0))
-                        .line_height(relative(bench_ui::LEAD))
+                        .text_size(theme.mono_font_size)
+                        .line_height(relative(bench_ui::CODE_LEAD))
                         .border_0()
                         // No fill, like the audio, video and changed-files cards: the frame alone.
                         .bg(gpui_kit::transparent_black()),

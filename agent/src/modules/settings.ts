@@ -8,6 +8,7 @@ import { listSkills as skillsOf } from "../builtin/skills.ts";
 import { HttpError, agentOf, type Ctx, type Module } from "../http.ts";
 import { mcpStatus } from "../mcp/mcp.ts";
 import { checkJudge } from "../judge/client.ts";
+import { BUILD } from "../instance.ts";
 
 /**
  * `PUT /api/config`: each top-level key merges into its setting. The reasoning level and the
@@ -56,7 +57,7 @@ export default ({ rt }: Ctx): Module => ({
 		"GET /api/status": () => ({
 			version: `bench-agent ${pkg.version}`,
 			// The sources it runs (Bench installs its own on a server when they differ).
-			build: process.env.BENCH_AGENT_BUILD ?? null,
+			build: BUILD,
 			// Threads with a run going: a restart waits for none of them, but Bench says so.
 			active: [...rt.live.values()].filter((l) => l.busy).length,
 			mcp: mcpStatus(),
