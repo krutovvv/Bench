@@ -83,8 +83,9 @@ impl BenchApp {
             // Air under them before the first group, as Claude's before its sections.
             .pb_3()
             .gap_px()
+            // "+", as each project's head has it: the same action, the same glyph (Claude's "New").
             .child(
-                bench_ui::nav_row("nav-new-thread", Ico::SquarePen, "New thread", "⌘N", false, cx)
+                bench_ui::nav_row("nav-new-thread", Ico::Plus, "New thread", "⌘N", false, cx)
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.new_thread_here(cx);
                         this.focus_composer(window, cx);
