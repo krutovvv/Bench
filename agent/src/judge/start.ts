@@ -37,7 +37,7 @@ export const start: Point = {
 				// "none" first: the model leans to the first option, and naming no skill is the safe side.
 				criteria: { none: "None of these fits the request.", ...Object.fromEntries(skills.map((k, i) => [`s${i}`, `${k.name}: ${cut(k.description.replace(/\s+/g, " "), 200)}`])) },
 			};
-		// A choice of two per server: a yes/no (noul) reads every server alike on the local server.
+		// A choice of two per server: what it is about stays in the question, short.
 		servers.forEach((s, i) => {
 			questions[`server${i}`] = {
 				type: "choice",

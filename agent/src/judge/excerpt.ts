@@ -1,8 +1,8 @@
 // The evaluator at a long result: one larger than its share of the model's window
 // (`builtin/window.ts`) is cut into parts, and the evaluator is asked which of them holds what the
 // request needs — the parts in the state, a choice over their names (and "none") per request, the
-// parts its probabilities set apart kept (a yes/no per part read every part alike, 0.20, on the
-// local server; a part's text as an option was read from its start only); the model
+// parts its probabilities set apart kept (a part's text in a question's instructions or options
+// was misread; in the state it is read whole); the model
 // gets the needed parts in their order, the rest said in a line with their
 // size. Without it, the middle of such a result was cut — and a page's price was as likely there
 // as anywhere. Parts go in as many requests as the evaluator's window takes (a local server's is
@@ -13,8 +13,9 @@ import { ask, judgeActive } from "./client.ts";
 import { baseState } from "./point.ts";
 import { host } from "../host.ts";
 
-/** A part's length, and how much of parts one request carries: at 18 000 the local server missed
- *  a part near the end of its state (read as cut short); at 9 000 it found it. */
+/** A part's length, and how much of parts one request carries: past the local server's context
+ *  (`MAX_LEN` 16384) its shim shortens the state per question, and at 18 000 a part near the end
+ *  was lost; at 9 000 it is read whole. */
 const PART = 1500;
 const PER_REQUEST = 9_000;
 const MAX_REQUESTS = 16;

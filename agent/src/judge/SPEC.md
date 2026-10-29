@@ -58,10 +58,13 @@ each point's answers under its own names. The default extension's hooks call the
   and a choice over their names (and "none", last) keeps the parts that stand out; without an
   answer, the cut keeps head and tail as before.
 
-What the local server taught: a yes/no (`noul`) read every option alike (0.20), so every question
-is a choice; an option's text is read from its start only, so long texts go in the state and the
-options are short names; "none" first takes nearly all the probability, so where finding matters
-it comes last.
+What the local server (h2o-lightning-4b behind its shim, `MAX_LEN` 16384) taught: what a question
+is about goes in the state, not in its instructions or options — a part's text in a yes/no's
+instructions read every part alike (0.20), in an option it was read from its start; in the state,
+yes/no and choice both find it (0.94). A record longer than the server's context is shortened per
+question by the shim (BM25, the parts nearest the question kept), so a request carries at most
+about 9 000 characters of parts. "none" first takes nearly all the probability, so where finding
+matters it comes last.
 
 The safe side wins every tie: the option that changes nothing is listed first (the model leans to
 the first), and below its threshold an answer changes nothing.
