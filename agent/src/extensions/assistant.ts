@@ -167,6 +167,11 @@ export const assistant = defineExtension({
 			// likeliest first, the plan's items are marked, the course is checked.
 			// Last, what the model reads is cut to its share of the window (`builtin/window.ts`).
 			afterTool: async (call: any, result: any, api: any, context: any) => {
+				if (ownCall(call)) {
+					// A script's question to the evaluator counts with the points' (the thread's meters).
+					if (String(call.name).endsWith(".classify") && evaluatorModel(call) && !result?.isError) host().count(String(api.conversationId), "call");
+					return undefined;
+				}
 				const done = await notesAfter(call, result, api, context);
 				const fitted = (await fitResultFor(String(api.conversationId), done ?? result, context?.abortSignal)) ?? done;
 				// The MCP tools the evaluator named at the turn's start are offered from the next step.
@@ -185,6 +190,12 @@ function ownCall(call: any): boolean {
 	return String(call.name).startsWith("pi.codemode.");
 }
 
+/** A script's model call on the evaluator (`bench/evaluator`), not another provider's model. */
+function evaluatorModel(call: any): boolean {
+	const model = call.arguments?.model ?? call.args?.model;
+	return (typeof model === "string" ? model.split("/")[0] : model?.provider) === EVALUATOR;
+}
+
 /** Before a call: the person's hold, the step limit, the evaluator's repeat and risk, approvals. */
 async function gate(call: any, api: any, context: any): Promise<{ block?: string } | undefined> {
 	// The person's hold, felt before any next step — the current answer and the step
@@ -194,9 +205,7 @@ async function gate(call: any, api: any, context: any): Promise<{ block?: string
 	if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
 	// A script asking the evaluator: only where the project uses it (its Settings, the gear's servers).
 	if (ownCall(call)) {
-		const model = call.arguments?.model ?? call.args?.model;
-		const evaluator = (typeof model === "string" ? model.split("/")[0] : model?.provider) === EVALUATOR;
-		return evaluator && !judgeFor(String(api.conversationId))
+		return evaluatorModel(call) && !judgeFor(String(api.conversationId))
 			? { block: "The evaluator is off in this project (its Settings → Model → Evaluator) or has no server in the gear: decide these in the script's code, or by reading them yourself." }
 			: undefined;
 	}

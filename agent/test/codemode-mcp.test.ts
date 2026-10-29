@@ -136,6 +136,8 @@ test("an MCP server behind code mode: a script reads its records whole and asks 
 	assert.ok(!offered[0].some((n) => n.startsWith("mcp__crm__")), "the server's tools are the scripts', not offered to the model");
 	assert.match(results.at(-1)!, /the site is down \| checkout is down for everyone/);
 	assert.equal(judged.length, 3, "one question a ticket, answered by the fallback");
+	const live = [...(rt as any).byConversation.values()][0];
+	assert.ok((live.usage.judge ?? 0) >= 3, "the script's questions count in the thread's Evaluator calls");
 
 	// The project's evaluator off: the script's question is refused, with the reason.
 	writeAgent("default", { ...readAgent("default"), evaluator: undefined });
