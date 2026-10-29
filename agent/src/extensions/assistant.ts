@@ -24,7 +24,7 @@ import { stepGate, stepNote } from "../turn/steps.ts";
 import { fitRequestFor, fitResultFor, seeUsage } from "../turn/window.ts";
 import { toolsToLoad } from "../judge/start.ts";
 import { markNotRun, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../turn/turn.ts";
-import { judgeActive, judgeFor } from "../judge/client.ts";
+import { evaluatorFor, judgeActive } from "../judge/client.ts";
 import { PROVIDER as EVALUATOR } from "../judge/models.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
@@ -205,7 +205,7 @@ async function gate(call: any, api: any, context: any): Promise<{ block?: string
 	if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
 	// A script asking the evaluator: only where the project uses it (its Settings, the gear's servers).
 	if (ownCall(call)) {
-		return evaluatorModel(call) && !judgeFor(String(api.conversationId))
+		return evaluatorModel(call) && !(info && evaluatorFor(info.agent))
 			? { block: "The evaluator is off in this project (its Settings → Model → Evaluator) or has no server in the gear: decide these in the script's code, or by reading them yourself." }
 			: undefined;
 	}

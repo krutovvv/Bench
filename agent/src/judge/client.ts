@@ -61,22 +61,18 @@ export function fitState(state: unknown, cap = STATE_CAP): unknown {
 	return s;
 }
 
-/** The project (or Host) turned the evaluator on in its Settings: off unless it did. */
-export function evaluatorOn(agent: string): boolean {
-	return readAgent(agent).evaluator?.enabled === true;
+/** The one place that says whether a project's (or Host's) threads use the evaluator: the gear has
+ *  a server, and the project's switch is on (its Settings → Model → Evaluator). The prompt's line on
+ *  it, the thread's meters and code mode's `models.classify()` ask it; the points ask `judgeActive`. */
+export function evaluatorFor(agent: string): boolean {
+	return evaluatorReady() && readAgent(agent).evaluator?.enabled === true;
 }
 
-/** The one place that says whether a conversation uses the evaluator: the gear has a server, and
- *  its project's switch is on. Code mode's `models.classify()` asks it too (`extensions/assistant.ts`). */
-export function judgeFor(conversation: string): boolean {
-	if (!evaluatorReady()) return false;
-	const agent = host().thread(conversation)?.agent;
-	return !!agent && evaluatorOn(agent);
-}
-
-/** On for this conversation and some server not quiet after a failure: the points may ask. */
+/** The conversation's project uses the evaluator, and some server is not quiet after a failure: the
+ *  points, the excerpt and the window's cut may ask now. */
 export function judgeActive(conversation: string): boolean {
-	return judgeFor(conversation) && answering();
+	const agent = host().thread(conversation)?.agent;
+	return !!agent && evaluatorFor(agent) && answering();
 }
 
 /** Our questions as pi-ai's: a yes/no is its `bool` (sent as `noul` again). */

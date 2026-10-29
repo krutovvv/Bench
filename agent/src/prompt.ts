@@ -8,8 +8,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { agentDir, agentMcp, isProject, timezone } from "./config.ts";
-import { evaluatorOn } from "./judge/client.ts";
-import { evaluatorReady } from "./judge/models.ts";
+import { evaluatorFor } from "./judge/client.ts";
 import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
 import { machineOf, repoOf, skillsFor } from "./repo.ts";
@@ -75,7 +74,7 @@ function scripts(s: ThreadFacts): string {
 		.map(([name]) => name);
 	const servers = scripted.length ? ` This project's MCP servers ${scripted.join(", ")} are reached that way: find their tools with searchTools() and describeNamespace() in a script.` : "";
 	const line = `Many calls or much data (an MCP server's records, many files or pages): one codemode script calls the tools, filters and counts, and prints only what matters.${servers}`;
-	if (!evaluatorReady() || !evaluatorOn(s.agent)) return line;
+	if (!evaluatorFor(s.agent)) return line;
 	return `${line} Many small judgments in it (is this urgent, which kind, does it match the request): ask the evaluator in the script, models.classify(await models.getModelOfType("classifier", "bench", "evaluator"), { state, questions }) — it answers in well under a second at no cost — and print only what it decided.`;
 }
 

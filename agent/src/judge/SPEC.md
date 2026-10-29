@@ -23,9 +23,11 @@ servers, as many as the person keeps, one the main and one its fallback; the pai
 model: the main server, or the fallback when it fails (a failed server is quiet a minute). There is
 no switch there: no server, no evaluator. A project's switch (Settings → Model → Evaluator, its
 `evaluator` in settings.json, Host's too) is its use — **on in a new project**, off where its
-utilities need the shared GPU (the balancer stops one to start the other). `judgeFor(conversation)`
-is the one place that answers whether a thread uses it; every point, the excerpt, the window's cut
-and a script's `models.classify()` (refused with the reason in `beforeTool`) ask it. Off, everything
+utilities need the shared GPU (the balancer stops one to start the other). `evaluatorFor(agent)`
+is the one place that answers whether a project's threads use it: the prompt's line on it, the
+thread's meters and a script's `models.classify()` (refused with the reason in `beforeTool`) ask it;
+every point, the excerpt and the window's cut ask `judgeActive(conversation)` — that, and a server
+not quiet after a failure. Off, everything
 goes the classic way. A script's calls of the classifier are not steps the points weigh or results
 they read.
 
