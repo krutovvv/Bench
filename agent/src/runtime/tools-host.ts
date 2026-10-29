@@ -51,6 +51,10 @@ export function hostOf(rt: Runtime): Host {
 			const live = rt.byConversation.get(String(conversationId));
 			if (live) void live.conversation.submit({ type: "write", entry, requestId: randomUUID() } as any, BACKGROUND_CONTEXT).catch(() => undefined);
 		},
+		compact: (conversationId, instructions) => {
+			const live = rt.byConversation.get(String(conversationId));
+			if (live) void live.conversation.compact(instructions, BACKGROUND_CONTEXT).catch(() => undefined);
+		},
 		count: (conversationId, what) => {
 			const key = String(conversationId);
 			const live = rt.byConversation.get(key);

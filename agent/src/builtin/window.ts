@@ -85,6 +85,11 @@ function charsOf(m: any): number {
 	}, 0);
 }
 
+/** How many tokens the conversation's last request held, as estimated and corrected by the provider's count. */
+export function usedTokens(conversation: string): number {
+	return (sent.get(conversation) ?? 0) + (overhead.get(conversation) ?? 0);
+}
+
 /** The provider's count after an answer (`afterResponse`): what the estimate missed. */
 export function seeUsage(conversation: string, usage: any): void {
 	const counted = Number(usage?.input ?? 0) + Number(usage?.cacheRead ?? 0) + Number(usage?.cacheWrite ?? 0);

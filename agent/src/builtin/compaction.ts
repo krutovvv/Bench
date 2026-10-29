@@ -4,11 +4,11 @@
 // exactly that (`beforeCompact`: an extension supplies the summary): the same model, the same
 // format as Pi's own summarizer, reasoning off (`noThinking`). The summary is memoized, so a
 // restart places the one already made; any failure leaves the compaction to Pi, as before. With the
-// evaluator on, the results the work still needs word for word follow the summary (`judge/keep.ts`).
+// evaluator on, what the rest of the work needs as it is follows the summary (`judge/summary.ts`).
 
 import { CompactionTask, DEFAULT_COMPACTION_POLICY, AgentDoc, hook } from "@earendil-works/pi-durable";
 import { noThinking } from "../runtime/thinking.ts";
-import { keptThrough } from "../judge/keep.ts";
+import { afterSummary } from "../judge/summary.ts";
 
 const SYSTEM = `You are a context summarization assistant. Your task is to read a conversation between a user and an AI assistant, then produce a structured summary following the exact format specified.
 
@@ -73,21 +73,6 @@ export function transcript(messages: readonly any[]): string {
 	return parts.join("\n\n");
 }
 
-/** Each tool result with the call that made it, a block each, in order. */
-export function results(messages: readonly any[]): string[] {
-	const calls = new Map<string, string>();
-	const out: string[] = [];
-	for (const m of messages) {
-		if (m.role === "assistant")
-			for (const c of m.content ?? []) if (c.type === "toolCall") calls.set(String(c.id), `${c.name} ${JSON.stringify(c.arguments ?? {}).slice(0, 200)}`);
-		if (m.role === "toolResult" && !m.isError) {
-			const t = text(m.content);
-			if (t) out.push(`[${calls.get(String(m.toolCallId)) ?? m.toolName ?? "result"}] →\n${t}`);
-		}
-	}
-	return out;
-}
-
 export const compactWithoutReasoning = hook(CompactionTask, {
 	beforeCompact: async (compaction: any, api: any, context: any) => {
 		const done = await api.memo("bench.summary", context);
@@ -104,9 +89,10 @@ export const compactWithoutReasoning = hook(CompactionTask, {
 			);
 			const summary = (res?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
 			if (res?.stopReason !== "stop" || !summary) return undefined;
-			// What a summary would lose that the work still needs (exact text, ids, paths) is kept as
-			// it was, chosen by the evaluator (`judge/keep.ts`); nothing without it.
-			const kept = await keptThrough(String(api.conversationId), results(compaction.messages), context?.abortSignal);
+			// What a summary would lose that the work still needs — the person's words in force, the
+			// files in work, exact results — follows it as it is, chosen by the evaluator
+			// (`judge/summary.ts`); nothing without it.
+			const kept = await afterSummary(String(api.conversationId), compaction.messages, context?.abortSignal).catch(() => "");
 			return { summary: await api.memo("bench.summary", summary + kept, context) };
 		} catch {
 			return undefined;

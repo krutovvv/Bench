@@ -21,9 +21,14 @@ import { risk } from "./risk.ts";
 import { repeat } from "./repeat.ts";
 import { listing } from "./listing.ts";
 import { claims } from "./claims.ts";
+import { step } from "./step.ts";
+import { quiet } from "./quiet.ts";
+import { watch } from "./watch.ts";
+import { skill } from "./skill.ts";
+import { boundary } from "./boundary.ts";
 
 /** Every point, in the order their effects apply. A new idea: a file with a `Point`, a line here. */
-export const POINTS: Point[] = [start, repeat, risk, search, listing, failure, plan, course, claims, done];
+export const POINTS: Point[] = [start, step, repeat, risk, search, listing, failure, quiet, watch, plan, course, skill, boundary, claims, done];
 
 /** Ask the points of `moment` that have a question now; their effects, in `POINTS` order. */
 async function at(moment: Moment, seen: Seen, signal?: AbortSignal): Promise<Effect[]> {
@@ -62,10 +67,10 @@ export async function atResult(conversation: string, call: Seen["call"], result:
 	return { ...(changed ? { result: seen.result } : {}), notes: effects.map((e) => e.note).filter((n): n is string => !!n) };
 }
 
-/** Before a request to the model (`beforeRequest`): lines for it with this request only. */
-export async function atRequest(conversation: string, signal?: AbortSignal): Promise<string[]> {
+/** Before a request to the model (`beforeRequest`): lines for it with this request only, and whether it may go without reasoning. */
+export async function atRequest(conversation: string, signal?: AbortSignal): Promise<{ hints: string[]; plain: boolean }> {
 	const effects = await at("request", { conversation, turn: turnOf(conversation), thread: host().thread(conversation) }, signal);
-	return effects.map((e) => e.hint).filter((h): h is string => !!h);
+	return { hints: effects.map((e) => e.hint).filter((h): h is string => !!h), plain: effects.some((e) => e.plain) };
 }
 
 /** Before a top-level call runs (`beforeTool`): refuse it (a repeat), or ask the person first (a risk, approvals on). */

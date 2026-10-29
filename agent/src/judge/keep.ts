@@ -41,23 +41,23 @@ export async function neededness(conversation: string, blocks: string[], signal?
 	return out;
 }
 
-/** At compaction: how many of the latest results are weighed, the least one must have, how much is kept. */
+/** At compaction: how many of the latest results are weighed, the least one must have, how much is kept
+ *  when the caller gives no room (`summary.ts` gives what its other parts left). */
 const WEIGHED = 48;
 const KEEP_AT = 0.3;
 const KEEP_CHARS = 8000;
-const KEEP_ONE = 3000;
+const KEEP_ONE = 6000;
 
 /**
  * The results a summary would lose that the work still needs, word for word, as a section to add to
  * it; "" when none, or no evaluator. `blocks` are the results in order, each a call and its text.
  */
-export async function keptThrough(conversation: string, blocks: string[], signal?: AbortSignal): Promise<string> {
+export async function keptThrough(conversation: string, blocks: string[], signal?: AbortSignal, room = KEEP_CHARS): Promise<string> {
 	const from = Math.max(0, blocks.length - WEIGHED);
 	const weighed = blocks.slice(from);
 	const p = await neededness(conversation, weighed, signal, AFTER_SUMMARY).catch(() => undefined);
 	if (!p) return "";
 	const chosen: number[] = [];
-	let room = KEEP_CHARS;
 	for (const i of p.map((_, i) => i).filter((i) => p[i] >= KEEP_AT).sort((a, b) => p[b] - p[a])) {
 		const size = Math.min(weighed[i].length, KEEP_ONE);
 		if (size > room) continue;

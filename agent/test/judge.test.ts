@@ -18,22 +18,25 @@ const { setHost } = await import("../src/host.ts");
 const { setSetting, writeAgent, readAgent } = await import("../src/config.ts");
 const { markNotRun, seeNestedResult, seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
 const { keptThrough } = await import("../src/judge/keep.ts");
-const { results } = await import("../src/builtin/compaction.ts");
+const { resultsOf: results, personsWords, touchedFiles, afterSummary } = await import("../src/judge/summary.ts");
 const { stepGate, stepNote } = await import("../src/builtin/steps.ts");
 const { endpointOf, checkJudge, fitState } = await import("../src/judge/client.ts");
 const { atResult, atAnswer } = await import("../src/judge/index.ts");
 const { DRIFT_EVERY } = await import("../src/judge/drift.ts");
 const { PLAN_EVERY } = await import("../src/judge/plan.ts");
+const { SKILL_EVERY } = await import("../src/judge/skill.ts");
 const { itemsOf, PLAN_KIND } = await import("../src/runtime/journal.ts");
 
 const counted: string[] = [];
 const stopped: string[] = [];
 const written: any[] = [];
+const compacted: [string, string][] = [];
 setHost({
 	thread: () => ({ id: "t", agent: "project:p", cwd: home, source: "local", project: "p", inserts: [] }),
 	count: (_c: string, what: string) => void counted.push(what),
 	stop: (id: string) => void stopped.push(id),
 	write: (_c: string, entry: any) => void written.push(entry),
+	compact: (c: string, why: string) => void compacted.push([c, why]),
 } as any);
 
 // The project's switch on (off by default); each test turns the gear's connection on or off.
@@ -223,8 +226,8 @@ test("the evaluator marks the plan forward every few steps, in one request with 
 	stepGate("c8");
 	const r = await atResult("c8", { name: "bash", arguments: { command: "true" } }, out("ok"));
 	const q = seen.at(-1).body.questions;
-	// The course is checked at the same step (both every 5): one request, each point its own questions.
-	assert.deepEqual(Object.keys(q).sort(), ["course.course", "plan.item0", "plan.item1", "plan.item2"]);
+	// The course is checked at the same step (both every 5), and the command's output: one request, each point its own questions.
+	assert.deepEqual(Object.keys(q).sort(), ["course.course", "plan.item0", "plan.item1", "plan.item2", "quiet.quiet"]);
 	assert.deepEqual(Object.keys(q["plan.item0"].criteria), ["in_progress", "pending", "completed"], "its status as it stands first");
 	assert.match(r.notes[0], /done: "Write the game"; now: "Test it"/);
 	assert.deepEqual(turnOf("c8").plan.map((p) => p.status), ["completed", "in_progress", "pending"]);
@@ -295,10 +298,10 @@ test("at a turn's start the fitting skill is named for the first request, once",
 		assert.equal(opts[0], "none", "naming none first");
 		return choice("start.skill", { none: 0.1, [opts[1]]: 0.85 });
 	};
-	const hints = await atRequest("s1");
+	const { hints } = await atRequest("s1");
 	assert.equal(hints.length, 1);
 	assert.match(hints[0], /the skill "price-check" fits it: load it with skill_view/);
-	assert.deepEqual(await atRequest("s1"), [], "once a turn");
+	assert.deepEqual((await atRequest("s1")).hints, [], "once a turn");
 });
 
 test("a failed step is judged; a sure word goes with the error", async () => {
@@ -486,7 +489,7 @@ test("the thread's opening message, leaving open where the work belongs, is aske
 		assert.deepEqual(Object.keys(body.questions["start.clear"].criteria), ["clear", "ask_first"], "starting first");
 		return { answers: { ...choice("start.clear", { clear: 0.15, ask_first: 0.85 }).answers, ...choice("start.skill", { none: 0.9 }).answers } };
 	};
-	const hints = await atRequest("o1");
+	const { hints } = await atRequest("o1");
 	assert.match(hints[0], /ask them with clarify/);
 	// A later message leans on what was said before: not asked.
 	seeRequest("o1", [user("restore the skills from the Hermes backup"), { role: "assistant", content: [] }, user("yes, go on")]);
@@ -540,4 +543,141 @@ test("at compaction, the results the work needs word for word follow the summary
 	setSetting("judge", { enabled: false, base_url: base });
 	assert.equal(await keptThrough("k1", blocks), "", "no evaluator: nothing added");
 	setSetting("judge", { enabled: true, base_url: base });
+});
+
+test("a plain step goes without reasoning; a server's tools that fit it are a line for that step", async () => {
+	const { steer, steered } = await import("../src/runtime/steer.ts");
+	seeRequest("p1", [user("Run the tests and fix what fails")]);
+	stepGate("p1");
+	seeResult("p1", { name: "write", arguments: { path: "t.mjs", content: "x" } }, out("ok"));
+	reply = (body) => {
+		assert.ok(body.questions["step.think"]);
+		return choice("step.think", { think: 0.05, plain: 0.95 });
+	};
+	assert.equal((await atRequest("p1")).plain, true);
+	// After a failure the model reasons: not asked.
+	seeResult("p1", { name: "bash", arguments: { command: "node t.mjs" } }, { output: [{ type: "text", text: "boom" }], isError: true });
+	reply = (body) => {
+		assert.equal(body.questions["step.think"], undefined);
+		return { answers: {} };
+	};
+	assert.equal((await atRequest("p1")).plain, false);
+	// The word reaches the request once: reasoning left out, the template's switch put in.
+	let seenOptions: any;
+	const api = steered({ streamSimple: (_m: any, _c: any, o: any) => (seenOptions = o) });
+	steer("sess", { plain: true });
+	api.streamSimple({}, {}, { sessionId: "sess", reasoning: "low" });
+	assert.equal(seenOptions.reasoning, undefined);
+	const payload = await seenOptions.onPayload({ messages: [] }, { api: "openai-completions", baseUrl: "http://gpu:8000/v1" });
+	assert.equal(payload.chat_template_kwargs.enable_thinking, false);
+	api.streamSimple({}, {}, { sessionId: "sess", reasoning: "low" });
+	assert.equal(seenOptions.reasoning, "low", "once");
+});
+
+test("a command's output that shows a failure is said, though the call did not fail", async () => {
+	seeRequest("q1", [user("Build it")]);
+	reply = (body) => {
+		assert.match(body.state.output, /No such file/);
+		return choice("quiet.quiet", { worked: 0.1, failed: 0.9 });
+	};
+	const r = await atResult("q1", { name: "bash", arguments: { command: "ls /nope; true" } }, out("ls: /nope: No such file or directory"));
+	assert.ok(r.notes.some((n) => /shows a failure/.test(n)));
+});
+
+test("a running process's log is read for what it shows", async () => {
+	seeRequest("w1", [user("Start the dev server")]);
+	reply = (body) => {
+		assert.match(body.state.process_log, /ready on :3000/);
+		return choice("watch.watch", { working: 0.05, finished: 0.9, failed: 0.03, stuck: 0.02 });
+	};
+	const r = await atResult("w1", { name: "process", arguments: { action: "log", id: "7" } }, out('{"id":"7","state":"running"}\nready on :3000'));
+	assert.ok(r.notes.some((n) => /work is done/.test(n)));
+	const before = seen.length;
+	await atResult("w1", { name: "process", arguments: { action: "log", id: "7" } }, out('{"id":"7","state":"exited"}\nbye'));
+	assert.ok(!seen.slice(before).some((s) => s.body.questions["watch.watch"]), "a finished one is not asked about");
+});
+
+test("mid-turn, a skill that fits what the agent does now is named once", async () => {
+	seeRequest("k2", [user("Fix the bug, then publish")]);
+	reply = (body) => {
+		const q = body.questions["skill.skill"];
+		if (!q) return { answers: {} };
+		const s = Object.keys(q.criteria).find((k) => /price-check/.test(q.criteria[k]))!;
+		return choice("skill.skill", { none: 0.05, [s]: 0.9 });
+	};
+	let notes: string[] = [];
+	for (let i = 0; i < SKILL_EVERY; i++) {
+		stepGate("k2");
+		notes = (await atResult("k2", { name: "read", arguments: { path: `f${i}` } }, out("x"))).notes;
+	}
+	assert.ok(notes.some((n) => /the skill "price-check" fits what you are doing now/.test(n)));
+	for (let i = 0; i < SKILL_EVERY; i++) {
+		stepGate("k2");
+		notes = (await atResult("k2", { name: "read", arguments: { path: `g${i}` } }, out("x"))).notes;
+	}
+	assert.ok(!notes.some((n) => /price-check/.test(n)), "once a turn");
+});
+
+test("well on its way to Pi's threshold, a part of the work that just ended is compacted now, once", async () => {
+	const { thresholds } = await import("../src/judge/boundary.ts");
+	const { fitRequest, tokensOf } = await import("../src/builtin/window.ts");
+	seeRequest("b1", [user("Do the three parts")]);
+	const { at } = thresholds("project:p");
+	const fill = (share: number) => {
+		const chars = Math.floor(share * at * (4 * 1000)) / tokensOf(4000);
+		fitRequest("b1", [{ role: "user", content: [{ type: "text", text: "x".repeat(Math.floor(chars)) }] }], 10_000_000);
+	};
+	reply = (body) => (body.questions["boundary.boundary"] ? choice("boundary.boundary", { mid_work: 0.1, ended: 0.9 }) : { answers: {} });
+	fill(0.3);
+	stepGate("b1");
+	await atResult("b1", { name: "read", arguments: { path: "a" } }, out("x"));
+	assert.equal(compacted.length, 0, "far from the threshold: not asked");
+	fill(0.65);
+	stepGate("b1");
+	await atResult("b1", { name: "read", arguments: { path: "b" } }, out("x"));
+	assert.deepEqual(compacted.map(([c]) => c), ["b1"]);
+	for (let i = 0; i < 4; i++) {
+		stepGate("b1");
+		await atResult("b1", { name: "read", arguments: { path: `c${i}` } }, out("x"));
+	}
+	assert.equal(compacted.length, 1, "once, until a compaction brings it down");
+});
+
+test("after a summary: the person's words in force, the files in work as they are now", async () => {
+	seeRequest("s9", [user("Restore the skills into Assistant TG")]);
+	const file = path.join(home, "SKILL.md");
+	fs.writeFileSync(file, "# Things skill\nnow edited");
+	const messages = [
+		user("restore the skills"),
+		user("not in this project, in Assistant TG; leave the memory alone"),
+		user("<evaluator>\ncheck it\n</evaluator>"),
+		{ role: "assistant", content: [{ type: "toolCall", id: "r", name: "read", arguments: { path: file } }] },
+		{ role: "toolResult", toolCallId: "r", content: [{ type: "text", text: "1:aa|# Things skill" }] },
+		{ role: "assistant", content: [{ type: "toolCall", id: "o", name: "read", arguments: { path: "/elsewhere/old.md" } }] },
+	];
+	assert.deepEqual(personsWords(messages), ["restore the skills", "not in this project, in Assistant TG; leave the memory alone"]);
+	assert.deepEqual(touchedFiles(messages), ["/elsewhere/old.md", file]);
+	reply = (body) => {
+		if (body.questions.keep) return choice("keep", { none: 0.9 });
+		const a = (k: string, p: Record<string, number>) => choice(k, p).answers[k];
+		return { answers: { w0: a("w0", { past: 0.9, in_force: 0.1 }), w1: a("w1", { past: 0.1, in_force: 0.9 }), f0: a("f0", { done_with: 0.9, in_work: 0.1 }), f1: a("f1", { done_with: 0.1, in_work: 0.9 }) } };
+	};
+	const after = await afterSummary("s9", messages);
+	assert.match(after, /## The person's words still in force\n> not in this project, in Assistant TG/);
+	assert.doesNotMatch(after, /> restore the skills/);
+	assert.match(after, /## Files in work, as they are now[\s\S]*now edited/);
+	assert.doesNotMatch(after, /old\.md/);
+});
+
+test("a queued message that corrects the work under way is judged a correction; a next task is not", async () => {
+	const { correctsTheWork } = await import("../src/judge/correction.ts");
+	setSetting("judge", { enabled: true, base_url: base });
+	seeRequest("m1", [user("Restore the skills")]);
+	reply = (body) => {
+		assert.match(body.state.new_message, /Assistant TG/);
+		return choice("correction", { next: 0.1, corrects: 0.9 });
+	};
+	assert.equal(await correctsTheWork("m1", "not here — in Assistant TG"), true);
+	reply = () => choice("correction", { next: 0.8, corrects: 0.2 });
+	assert.equal(await correctsTheWork("m1", "and later, a weekly report"), false);
 });

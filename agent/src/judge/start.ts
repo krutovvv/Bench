@@ -93,7 +93,10 @@ export const start: Point = {
 		const p = skill?.probabilities?.[skill.choice] ?? 0;
 		if (skill && skill.choice !== "none" && p >= SURE_SKILL) {
 			const name = o.skills[Number(skill.choice.slice(1))];
-			if (name) lines.push(`the skill "${name}" fits it: load it with skill_view first and follow it`);
+			if (name) {
+				lines.push(`the skill "${name}" fits it: load it with skill_view first and follow it`);
+				turn.named.add(`skill:${name}`);
+			}
 		}
 		const chosen = o.servers.map((s, i) => [s, i] as const).filter(([, i]) => (answers[`server${i}`]?.probabilities?.needed ?? 0) >= SURE_SERVER);
 		if (chosen.length) {

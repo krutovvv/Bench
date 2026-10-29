@@ -64,6 +64,26 @@ each point's answers under its own names. The default extension's hooks call the
   the person can say — which project the work belongs to, which program, what result; sure (0.75),
   the line says to ask with `clarify` before any other step. Sixty steps went to the wrong project
   before the person said "not here, in Assistant TG".
+- **step** (`step.ts`, `request`, every request of a turn but its first): does the step about to be
+  taken need reasoning — sure it is plain (0.85; never right after a failure), the request goes
+  without it (`runtime/steer.ts`: a word for the request's provider session, taken where the
+  model's API is registered; reasoning off changes only the template's end, never the prompt's
+  head); and do an MCP server's tools, untouched this turn, fit the step (0.85) — a line for that
+  step, once a server: the tools offered stay as they were, a changing list would rewrite the
+  prompt's head and the server's cache with it.
+- **quiet** (`quiet.ts`, `result`, bash, ssh_run, grep, glob that did not fail): does the output show
+  a failure all the same — an error printed, a traceback, nothing found where something was
+  meant to be (0.8): said with it, before the next step leans on it.
+- **watch** (`watch.ts`, `result`, `process log` of one still running): working, finished, failed
+  or stuck (0.8), said with the log — "still working" sends the agent to other work instead of
+  polling again at once.
+- **skill** (`skill.ts`, `result`, every 10 steps): the skill that fits what the agent does now,
+  not yet named or loaded this turn (0.8), a note once.
+- **boundary** (`boundary.ts`, `result`, every 3 steps from 0.6 of Pi's threshold to where its
+  background compaction starts): has a part of the work just ended (0.8) — then the conversation
+  is compacted now (`Host.compact`, Pi's `conversation.compact`, in the background), once until a
+  compaction brings the context under half the threshold: a summary at a boundary loses less
+  than one mid-edit.
 - **risk** (`risk.ts`, `call`, approvals "manual" only): a command the patterns let through is
   judged — reads, changes the project, or harm hard to undo; harm (0.5) asks the person, as a
   pattern's hit does. It only adds questions.
@@ -97,7 +117,16 @@ each point's answers under its own names. The default extension's hooks call the
   earlier results the next step needs least are cut first. At compaction (`builtin/compaction.ts`,
   `keptThrough`) the latest 48 results are weighed for what the rest of the work needs word for
   word — exact text, ids, paths a summary loses — and those (0.3, at most 8 000 characters) follow
-  the summary under "Kept word for word".
+  the summary under "Kept word for word". What follows a summary (`summary.ts`, `afterSummary`,
+  12% of the window): the person's words still in force (their latest 20 messages, each judged
+  past or in force, 0.6) word for word; the files the summed-up part read or changed that the
+  work is still on (0.7), as they are now on the thread's machine; then the results, in the room
+  left. In a thread compacted 25 times, 38% of the files touched in the 20 steps after a
+  compaction had been touched in the 80 before it: read again because the summary lost them.
+- **correction** (`correction.ts`, called by `Runtime.submit`): a message the person queues while
+  the run works is asked about — a next task, or a correction of the work under way; a sure
+  correction (0.8) joins the run after its current tools (Pi's steer), as "send now" would,
+  instead of waiting while the run finishes the wrong way.
 - **start** also offers the named servers' tools from the turn's next step (`control.addTools` on
   its first result, as `tool_search` does).
 
@@ -121,11 +150,12 @@ model now spends a step or a long context on:
 - **before a request** (`beforeRequest`): whether the request is a question to answer at once or
   work to plan.
 - **after a result**: what of a long file, page or command output matters for the request (the
-  model reads the likeliest parts first, as with a search); a failed command — retry, fix, or ask;
-  deep research's sources and passages scored before the model reads them.
-- **before a call** (`beforeTool`): how dangerous a command is, for approvals (instead of the
-  regular expressions); whether a call repeats one that just failed.
-- **memory**: whether an exchange is worth remembering.
+  model reads the likeliest parts first, as with a search); deep research's sources and passages
+  scored before the model reads them.
+
+Left out on purpose: **memory** (whether an exchange is worth remembering) — the agent writes
+memory only when the person asks (`builtin/memory.ts`), and remembering by itself would not make
+a turn shorter.
 
 ## Off, unset or failing
 

@@ -52,6 +52,8 @@ export interface Effect {
 	plan?: PlanStep[];
 	/** A line for the model with this request only (`request` only). */
 	hint?: string;
+	/** No reasoning for this request: the step is plain (`request` only, `runtime/steer.ts`). */
+	plain?: boolean;
 	/** Ask the person before the call runs, saying why (`call` only). */
 	approve?: string;
 	/** Refuse the call, saying why to the model (`call` only). */

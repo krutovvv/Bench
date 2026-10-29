@@ -37,6 +37,7 @@ import { Stream } from "./stream.ts";
 import { BLOCK_CLOSE, BLOCK_OPEN, Journal } from "./journal.ts";
 import { Titles } from "./title.ts";
 import { totalsOf, type Totals } from "./usage.ts";
+import { correctsTheWork } from "../judge/correction.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
@@ -317,6 +318,8 @@ export class Runtime {
 		const said = context.trim() ? `${text}\n\n${BLOCK_OPEN}\n${context.trim()}\n${BLOCK_CLOSE}` : text;
 		const content: any = images.length ? [{ type: "text", text: said }, ...images] : said;
 		if (live.busy) {
+			// A message queued that corrects the work under way joins it now (`judge/correction.ts`).
+			if (mode === "queue" && (await correctsTheWork(String(live.conversation.id), text).catch(() => false))) mode = "steer";
 			// Queued: Pi keeps it in the inbox until the run answers. Steered: placed after the
 			// current tool round. `request` is Bench's id for the message (docs/thread-objects.md):
 			// Pi keeps it with the submission, so its row in the queue and its entry are known as

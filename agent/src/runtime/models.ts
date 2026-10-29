@@ -9,6 +9,7 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { projects } from "../builtin/projects.ts";
 import { agents, compactionAt, compactionPolicy, resolveFallback, resolveModel, type ModelChoice } from "../config.ts";
 import { fallbackProvider } from "./fallback.ts";
+import { steered } from "./steer.ts";
 import type { ThreadInfo } from "../protocol.gen.ts";
 import type { ThreadRow } from "../store.ts";
 
@@ -103,7 +104,8 @@ export class Models {
 					baseUrl: choice.baseUrl,
 					auth: { apiKey: { name: choice.provider, resolve: async () => ({ auth: apiKey ? { apiKey } : {} }) } },
 					models: [model],
-					api: anthropic ? anthropicMessagesApi() : openAICompletionsApi(),
+					// A step's own word (no reasoning for a plain one) is taken here: `steer.ts`.
+					api: steered(anthropic ? anthropicMessagesApi() : openAICompletionsApi()),
 				} as any),
 			);
 		}

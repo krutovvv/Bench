@@ -44,6 +44,8 @@ export interface Host {
 	stop(threadId: string): void;
 	/** A display-only entry in the conversation's thread (the model never reads it): the evaluator's marks. */
 	write(conversationId: string | number, entry: { kind: string; data: unknown }): void;
+	/** Compacts the conversation now, in the background, as Pi's own threshold would later (`judge/boundary.ts`). */
+	compact(conversationId: string | number, instructions: string): void;
 	/** The evaluator asked once (`call`) or changed the course (`nudge`): the thread's meters count it. */
 	count(conversationId: string | number, what: "call" | "nudge"): void;
 }

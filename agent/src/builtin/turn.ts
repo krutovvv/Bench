@@ -56,6 +56,10 @@ export interface Turn {
 	opening: boolean;
 	/** The course the evaluator leaned to, unsure, at its last check (`judge/drift.ts`): "" on track. */
 	leaning: string;
+	/** What the evaluator already said this turn, once each: skills and servers named (`judge/skill.ts`, `judge/step.ts`). */
+	named: Set<string>;
+	/** The steps at which the evaluator last looked for a skill mid-turn (`judge/skill.ts`). */
+	skillAt: number;
 }
 
 /** A step as `judge/repeat.ts` compares it: its arguments whole, not a line's start. */
@@ -69,7 +73,7 @@ export interface Call {
 
 const turns = new Map<string, Turn>();
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "" });
+const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0 });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {

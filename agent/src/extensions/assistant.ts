@@ -6,7 +6,7 @@
 
 import path from "node:path";
 import { Type } from "@earendil-works/pi-ai";
-import { defineExtension, defineTool, GenerationTask, hook, section, ToolTask } from "@earendil-works/pi-durable";
+import { defineExtension, defineTool, GenerationTask, hook, ProviderDoc, section, ToolTask } from "@earendil-works/pi-durable";
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
@@ -27,6 +27,7 @@ import { markNotRun, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf }
 import { judgeActive } from "../judge/client.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
+import { steer } from "../runtime/steer.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../runtime/inserts.ts";
 
@@ -125,7 +126,12 @@ export const assistant = defineExtension({
 			beforeRequest: async (request: any, api: any, context: any) => {
 				const conversation = String(api.conversationId);
 				seeRequest(conversation, request.messages);
-				const hints = await atRequest(conversation, context?.abortSignal).catch(() => [] as string[]);
+				const { hints, plain } = await atRequest(conversation, context?.abortSignal).catch(() => ({ hints: [] as string[], plain: false }));
+				// A plain step goes without reasoning: a word for its provider session (`runtime/steer.ts`).
+				if (plain) {
+					const session = ((await api.snapshot(ProviderDoc, api.conversationId, context).catch(() => undefined)) as any)?.sessionId;
+					if (session) steer(session, { plain: true });
+				}
 				const note = stepNote(conversation);
 				const extra = [...hints.map((h) => ({ role: "user", content: h, timestamp: Date.now() })), ...(note ? [note] : [])];
 				const messages = extra.length ? [...request.messages, ...extra] : request.messages;
