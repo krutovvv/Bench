@@ -61,7 +61,7 @@ impl ThreadView {
         // (a queued one outlined, not filled: it has not gone yet).
         if crate::thread::look::USER_BUBBLE {
             let bubble = div()
-                .max_w(relative(if self.beside_doc(cx) { 1. } else { 0.8 }))
+                .max_w(relative(self.layout(cx).bubble_max()))
                 .px(px(bench_ui::BUBBLE_PX))
                 .py(px(bench_ui::BUBBLE_PY))
                 .rounded(px(bench_ui::BUBBLE_R))

@@ -69,14 +69,40 @@ pub fn text_right() -> f32 {
     }
 }
 
+/// How much room the thread has where it stands, and all that follows from it: a row asks its
+/// layout, never where the thread is. A new compact detail is one more answer here.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Layout {
+    /// The window's center: a chat column with room around it.
+    Wide,
+    /// Beside the documents (the Code view's right dock): narrow as a phone's, and its project
+    /// is the Explorer's.
+    Compact,
+}
+
+impl Layout {
+    /// The widest the person's bubble gets, as a share of the row: edge to edge when narrow.
+    pub fn bubble_max(self) -> f32 {
+        match self {
+            Layout::Wide => 0.8,
+            Layout::Compact => 1.,
+        }
+    }
+
+    /// The composer's foot offers to change the project; else it only names it (in the Code view
+    /// the Explorer's switch is the one).
+    pub fn picks_project(self) -> bool {
+        self == Layout::Wide
+    }
+}
+
 impl crate::thread::ThreadView {
-    /// The thread beside the documents (the Code view's right dock): narrow as a phone's, so
-    /// nothing takes its width that the chat can spare — the person's bubble goes edge to edge,
-    /// and the project is the Explorer's, not chosen under the composer.
-    pub(crate) fn beside_doc(&self, cx: &Context<Self>) -> bool {
+    /// The layout this thread is drawn in: compact while it is the one beside the documents.
+    pub(crate) fn layout(&self, cx: &Context<Self>) -> Layout {
         let me = cx.entity_id();
-        self.app(cx).is_some_and(|app| {
+        let beside_doc = self.app(cx).is_some_and(|app| {
             app.center == crate::workspace::Center::Doc && app.active_thread.entity_id() == me
-        })
+        });
+        if beside_doc { Layout::Compact } else { Layout::Wide }
     }
 }

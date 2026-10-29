@@ -1,8 +1,8 @@
 //! The line under the composer, as Claude's under its field: on the left the project the thread
 //! is in (a new thread's to choose: "New thread" in the sidebar starts one in the open thread's
 //! project, and this says which) and the git repo it works in; on the right the thread's meters
-//! (context, speed, fallback, `meters.rs`) and the terminals sent to the background. Beside the
-//! documents (the Code view) the project is the Explorer's: the meters lead, no project pick.
+//! (context, speed, fallback, `meters.rs`) and the terminals sent to the background. What shows
+//! and where is the thread's `Layout`'s (`look.rs`).
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -19,28 +19,19 @@ impl ThreadView {
         let Some(app) = self.app(cx) else {
             return div().into_any_element();
         };
+        let layout = self.layout(cx);
         let meters = self.render_meters(app.defaults.context_length, cx);
+        let project = self.render_project_pick(layout.picks_project(), cx);
         let repo = self.render_repo_chip(cx);
         let terminals = self.render_background_terminals(cx);
-        let foot = h_flex()
+        h_flex()
             .w_full()
             .min_w_0()
             .h(px(bench_ui::COMPOSER_FOOT_H))
             .gap_1()
             .items_center()
-            .text_size(px(bench_ui::BAR_TEXT));
-        // Beside the documents the project is the Explorer's (its switch over the tree): no
-        // second switch here, and the meters take the left end it had.
-        if self.beside_doc(cx) {
-            return foot
-                .children(meters)
-                .children(repo)
-                .child(div().flex_1())
-                .children(terminals)
-                .into_any_element();
-        }
-        let project = self.render_project_pick(cx);
-        foot.child(project)
+            .text_size(px(bench_ui::BAR_TEXT))
+            .child(project)
             .children(repo)
             .child(div().flex_1())
             .children(terminals)
@@ -49,8 +40,9 @@ impl ThreadView {
     }
 
     /// The thread's project. A new thread (nothing sent yet) moves to the one chosen; a thread
-    /// with messages stays where it is, and a choice starts a new thread there.
-    fn render_project_pick(&self, cx: &mut Context<Self>) -> AnyElement {
+    /// with messages stays where it is, and a choice starts a new thread there. `picks`: false,
+    /// only its name (the Explorer's switch chooses it).
+    fn render_project_pick(&self, picks: bool, cx: &mut Context<Self>) -> AnyElement {
         let app = self.app(cx).expect("checked by the caller");
         // A thread with messages is where the agent's list puts it; a new one, where it was made.
         let current = match &self.thread.id {
@@ -62,6 +54,16 @@ impl ThreadView {
         } else {
             app.project_name(&current)
         };
+        if !picks {
+            return h_flex()
+                .px_2()
+                .gap_1()
+                .items_center()
+                .text_color(cx.theme().muted_foreground)
+                .child(Ico::Folder.icon().xsmall())
+                .child(name)
+                .into_any_element();
+        }
         let mut choices: Vec<(String, String)> =
             vec![(ProjectKey::HOST.to_string(), crate::app::LOCAL_HOST.to_string())];
         choices.extend(app.places.projects.iter().map(|p| (p.id.clone(), p.name.clone())));
