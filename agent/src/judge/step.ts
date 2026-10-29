@@ -13,13 +13,14 @@ import { cut } from "../builtin/turn.ts";
 import type { Point } from "./point.ts";
 
 /**
- * Whether a plain step goes without reasoning. Off while the dev server's chat template writes its
- * reasoning line ("Reasoning effort is set to low…") at the system prompt's start only when
- * reasoning is on: a step without it rewrites the prompt's head, and the server reads the whole
- * prompt again — twice, as the next step turns it back on (measured: 0 tokens from the cache). On
- * once the template keeps that line whether reasoning is on or not.
+ * Whether a plain step goes without reasoning. It needs the model server's chat template to keep
+ * its reasoning line ("Reasoning effort is set to low…") at the system prompt's start whether
+ * reasoning is on or not; the dev server's stock template dropped it when off, so each switch
+ * rewrote the prompt's head (0 tokens from the cache). Its template was changed to keep it
+ * (chat_template.jinja, the stock one beside it as .orig): measured since, a switch either way
+ * keeps the cache (7 168 of 7 303, 7 424 of 7 656). A server with a stock template wants this off.
  */
-export const PLAIN_STEPS = false;
+export const PLAIN_STEPS = true;
 /** How sure the evaluator must be that a step is plain: a step thought through too little costs more than its reasoning. */
 const SURE_PLAIN = 0.85;
 /** How sure that a server's tools fit the step now. */
