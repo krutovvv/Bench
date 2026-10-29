@@ -275,8 +275,8 @@ impl BenchApp {
 
 /// `user@hostname:port` of an ~/.ssh/config alias.
 fn address_of(app: &BenchApp, alias: &str) -> String {
-    app.inserts.ssh
-        .servers
+    app.places
+        .ssh_servers
         .iter()
         .find(|s| s.alias == alias)
         .map(|s| {

@@ -279,22 +279,21 @@ impl BenchApp {
 }
 
 /// What the window keeps of the inserts: each thread's list as its journal has them, the live one
-/// of the kinds that are live once, and each kind's own state (the terminals and servers, the
-/// utilities, the server browser's sites).
+/// of the kinds that are live once, and each kind's own state (the terminals' shells, the
+/// utilities, the server browser's tabs).
 pub struct InsertsState {
     /// By `ThreadRef::key` ("draft" for a new chat).
     pub by_thread: std::collections::HashMap<String, Vec<Insert>>,
     /// Of the kinds whose state is app-wide (tools), the live insert per kind.
     pub live: std::collections::HashMap<String, String>,
-    /// /terminal: the servers of ~/.ssh/config and the shells.
-    pub ssh: crate::inserts::terminal::servers::Ssh,
+    /// /terminal: the inserts' shells.
+    pub terminal: crate::inserts::terminal::state::Terminals,
     /// The bottom dock's terminals (`terminal/panel.rs`).
     pub dock_terms: crate::inserts::terminal::panel::DockTerms,
     /// /tools: the utilities of `devtools`.
     pub tools: crate::inserts::tools::state::Tools,
     /// /browser: each thread's tab on the server's browser, live or as its last frame.
-    pub sites: crate::inserts::browser::state::Sites,
-    pub sites_error: Option<String>,
+    pub browser: crate::inserts::browser::state::BrowserState,
 }
 
 impl InsertsState {
@@ -302,11 +301,10 @@ impl InsertsState {
         Self {
             by_thread: Default::default(),
             live: Default::default(),
-            ssh: crate::inserts::terminal::servers::Ssh::new(),
+            terminal: Default::default(),
             dock_terms: Default::default(),
             tools: crate::inserts::tools::state::Tools::new(window, cx),
-            sites: Default::default(),
-            sites_error: None,
+            browser: Default::default(),
         }
     }
 }

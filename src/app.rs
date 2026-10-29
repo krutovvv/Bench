@@ -129,7 +129,10 @@ impl BenchApp {
 
         let mut app = Self {
             defaults: Default::default(),
-            places: Default::default(),
+            places: places::Places {
+                ssh_servers: crate::system::sshconfig::load(),
+                ..Default::default()
+            },
             threads: crate::thread::store::ThreadStore::new(reopen),
             inserts: crate::inserts::state::InsertsState::new(window, cx),
             media: Default::default(),

@@ -28,8 +28,8 @@ pub struct AgentForm {
 impl BenchApp {
     /// The hosts of ~/.ssh/config that have no agent here yet.
     pub fn hosts_without_agent(&self) -> Vec<String> {
-        self.inserts.ssh
-            .servers
+        self.places
+            .ssh_servers
             .iter()
             .map(|s| s.alias.clone())
             .filter(|a| !self.has_agent_on(a))

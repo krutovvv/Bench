@@ -39,6 +39,16 @@ pub fn entry_of(agent: &str, p: &Value) -> Option<ProjectEntry> {
 }
 
 impl BenchApp {
+    /// Re-read `~/.ssh/config` (edited elsewhere too).
+    pub fn reload_servers(&mut self, cx: &mut Context<Self>) {
+        // The demo shows made-up servers, never the person's ~/.ssh/config.
+        if self.demo {
+            return;
+        }
+        self.places.ssh_servers = crate::system::sshconfig::load();
+        cx.notify();
+    }
+
     /// The sidebar's projects from their sources: this Mac's, then each server's Host followed by
     /// the server's own projects.
     pub fn compose_projects(&mut self) {
@@ -284,6 +294,9 @@ pub struct Places {
     pub host_bots: std::collections::HashSet<String>,
     /// The agents whose own schedule (their Host's) has a job that is on.
     pub host_crons: std::collections::HashSet<String>,
+    /// The servers of `~/.ssh/config`: a new project's machine, a server's agent, are picked
+    /// from them.
+    pub ssh_servers: Vec<crate::system::sshconfig::Server>,
 }
 
 impl Places {

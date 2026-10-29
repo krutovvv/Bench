@@ -187,7 +187,7 @@ impl ThreadView {
     /// into its thread, and Stop all ends them.
     fn render_background_terminals(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
         let app = self.app(cx)?;
-        let ids: Vec<_> = app.inserts.ssh.tabs.iter().filter(|t| t.background).map(|t| t.id).collect();
+        let ids: Vec<_> = app.inserts.terminal.tabs.iter().filter(|t| t.background).map(|t| t.id).collect();
         if ids.is_empty() {
             return None;
         }
@@ -207,7 +207,7 @@ impl ThreadView {
                         menu = menu.item(PopupMenuItem::new(format!("Terminal {}", k + 1)).on_click(
                             move |_, _, cx| {
                                 let _ = app.update(cx, |this, cx| {
-                                    if let Some(t) = this.inserts.ssh.tabs.iter_mut().find(|t| t.id == id) {
+                                    if let Some(t) = this.inserts.terminal.tabs.iter_mut().find(|t| t.id == id) {
                                         t.background = false;
                                         t.collapsed = false;
                                     }
@@ -219,10 +219,10 @@ impl ThreadView {
                     let app = handle.clone();
                     menu.separator().item(PopupMenuItem::new("Stop all").on_click(move |_, _, cx| {
                         let _ = app.update(cx, |this, cx| {
-                            for t in this.inserts.ssh.tabs.iter().filter(|t| t.background) {
+                            for t in this.inserts.terminal.tabs.iter().filter(|t| t.background) {
                                 t.session.kill();
                             }
-                            this.inserts.ssh.tabs.retain(|t| !t.background);
+                            this.inserts.terminal.tabs.retain(|t| !t.background);
                             cx.notify();
                         });
                     }))

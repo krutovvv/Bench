@@ -115,7 +115,7 @@ is published.\n\nThe page is right here — click and type in it if something ne
             48.0,
         ),
     );
-    app.inserts.sites.demo_frame =
+    app.inserts.browser.demo_frame =
         crate::inserts::browser::gateway::image_of(include_bytes!("../../assets/demo/site.jpg"));
     thread(
         app,

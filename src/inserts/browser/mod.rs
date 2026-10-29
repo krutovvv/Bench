@@ -1,7 +1,7 @@
 //! `/browser`: the thread's own tab in the server's browser, live, instead of a screenshot: the
 //! person watches the agent work, clicks and types in it, then says "continue". Every thread has
 //! its tab (one site here, another in another thread); its state: {tab, url}. The tab the agent
-//! works in while it answers here becomes the thread's (`app::sites`); a tab that went away is
+//! works in while it answers here becomes the thread's (`state.rs`); a tab that went away is
 //! opened again at its address, or the agent opens a new one.
 
 pub mod gateway;
@@ -26,7 +26,7 @@ fn tab_of(app: &BenchApp, ins: &Insert) -> Option<(String, String, String)> {
     if app.demo {
         return (!tab.is_empty()).then(|| (tab, ins.get("url"), "New post".into()));
     }
-    let b = app.inserts.sites.browser.as_ref()?;
+    let b = app.inserts.browser.conn.as_ref()?;
     let st = b.state.lock().unwrap();
     let page = st.pages.iter().find(|p| p.id == tab)?;
     Some((tab, page.url.clone(), page.title.clone()))
@@ -87,7 +87,7 @@ impl InsertKind for Browser {
         cx: &mut Context<BenchApp>,
     ) -> Option<AnyElement> {
         let muted = cx.theme().muted_foreground;
-        if let Some(e) = &app.inserts.sites_error {
+        if let Some(e) = &app.inserts.browser.error {
             return Some(
                 div()
                     .text_base()
@@ -103,8 +103,8 @@ impl InsertKind for Browser {
             return Some(app.render_tab(at, tab, cx));
         }
         let ready = app
-            .inserts.sites
-            .browser
+            .inserts.browser
+            .conn
             .as_ref()
             .is_some_and(|b| b.state.lock().unwrap().ready);
         if !ready && !app.demo {
@@ -118,14 +118,14 @@ impl InsertKind for Browser {
         let url = ins.get("url");
         // The gateway refused (all tabs busy, a page it does not open…): say so, and offer again.
         let refused = app
-            .inserts.sites
-            .browser
+            .inserts.browser
+            .conn
             .as_ref()
             .and_then(|b| b.state.lock().unwrap().error.clone());
         if let Some(e) = refused
-            .filter(|_| app.inserts.sites.reopening.as_deref() == Some(ins.id.as_str()) || url.is_empty())
+            .filter(|_| app.inserts.browser.reopening.as_deref() == Some(ins.id.as_str()) || url.is_empty())
         {
-            app.inserts.sites.reopening = None;
+            app.inserts.browser.reopening = None;
             return Some(
                 h_flex()
                     .gap_2()
@@ -153,7 +153,7 @@ impl InsertKind for Browser {
                     .into_any_element(),
             );
         }
-        if app.inserts.sites.reopening.as_deref() == Some(ins.id.as_str()) {
+        if app.inserts.browser.reopening.as_deref() == Some(ins.id.as_str()) {
             return Some(
                 ShimmerText::new("Opening the page again…")
                     .text_base()

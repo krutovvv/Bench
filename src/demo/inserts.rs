@@ -18,7 +18,7 @@ fn server(alias: &str, hostname: &str, folder: &str) -> crate::system::sshconfig
 
 /// Made-up ~/.ssh/config servers, so the demo never shows the person's own.
 pub(super) fn other_modes(app: &mut BenchApp) {
-    app.inserts.ssh.servers = vec![
+    app.places.ssh_servers = vec![
         server("web-1", "203.0.113.10", "Production"),
         server("web-2", "203.0.113.11", "Production"),
         server("db-main", "203.0.113.20", "Production"),

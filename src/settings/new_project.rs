@@ -245,7 +245,7 @@ impl BenchApp {
             },
             |(_, v)| format!("{}.", crate::env::backup::contents(v)),
         );
-        let servers: Vec<String> = self.inserts.ssh.servers.iter().map(|s| s.alias.clone()).collect();
+        let servers: Vec<String> = self.places.ssh_servers.iter().map(|s| s.alias.clone()).collect();
         let agents: Vec<String> = self.places.server_agents.iter().map(|a| a.host.clone()).collect();
         let label = |text: &'static str| {
             div().text_sm().font_weight(FontWeight::SEMIBOLD).child(text).into_any_element()
@@ -476,7 +476,7 @@ impl BenchApp {
     }
 
     fn pick_project_place(&mut self, place: Place, cx: &mut Context<Self>) {
-        let first_server = self.inserts.ssh.servers.iter().next().map(|s| s.alias.clone());
+        let first_server = self.places.ssh_servers.iter().next().map(|s| s.alias.clone());
         let first_agent = self.places.server_agents.first().map(|a| a.host.clone());
         if let Some(f) = self.new_project.form.as_mut() {
             f.place = place;

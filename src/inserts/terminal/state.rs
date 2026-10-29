@@ -1,5 +1,5 @@
-//! The servers of `~/.ssh/config` (a new project picks its machine from them) and the shells of
-//! the terminal inserts. A server's agent is added in the gear (`settings/agent_form.rs`).
+//! The terminal inserts' shells (and the bottom dock's, `panel.rs`): each an ssh connection or a
+//! local shell, opened, sent to the background, ⌘-clicked.
 
 use std::sync::Arc;
 
@@ -9,7 +9,6 @@ use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::inserts::terminal::session::Session;
-use crate::system::sshconfig::{self, Server};
 
 /// An open terminal: one ssh connection.
 pub struct Tab {
@@ -19,32 +18,22 @@ pub struct Tab {
     pub focus: FocusHandle,
     /// Its block in the thread shows only its head.
     pub collapsed: bool,
-    /// Sent to the background: it keeps running, its block is a head with a badge, the status
-    /// bar lists it.
+    /// Sent to the background: it keeps running, its block is a head with a badge.
     pub background: bool,
     /// The insert it belongs to (each terminal insert has a shell of its own); "" none.
     pub insert: String,
     _wake: Task<()>,
 }
 
-pub struct Ssh {
-    pub servers: Vec<Server>,
+#[derive(Default)]
+pub struct Terminals {
     pub tabs: Vec<Tab>,
     next_tab: usize,
     /// Fractional wheel lines not yet scrolled.
     pub scroll_acc: f32,
 }
 
-impl Ssh {
-    pub fn new() -> Self {
-        Self {
-            servers: sshconfig::load(),
-            tabs: vec![],
-            next_tab: 0,
-            scroll_acc: 0.,
-        }
-    }
-
+impl Terminals {
     /// The shell of a terminal insert.
     pub fn tab_of_insert(&self, insert: &str) -> Option<usize> {
         self.tabs.iter().position(|t| t.insert == insert)
@@ -55,19 +44,9 @@ impl BenchApp {
     /// Terminals answer color queries (vim's background check) in the current theme.
     pub fn repaint_terminals(&mut self, cx: &mut Context<Self>) {
         let palette = crate::inserts::terminal::view::palette(cx.theme());
-        for t in &self.inserts.ssh.tabs {
+        for t in &self.inserts.terminal.tabs {
             t.session.set_palette(palette);
         }
-    }
-
-    /// Re-read `~/.ssh/config` (edited elsewhere too).
-    pub fn reload_servers(&mut self, cx: &mut Context<Self>) {
-        // The demo shows made-up servers, never the person's ~/.ssh/config.
-        if self.demo {
-            return;
-        }
-        self.inserts.ssh.servers = sshconfig::load();
-        cx.notify();
     }
 
     /// A new terminal tab (ssh to `alias`, or a local shell for `term::LOCAL`); its index.
@@ -92,9 +71,9 @@ impl BenchApp {
                         }
                     }
                 });
-                self.inserts.ssh.next_tab += 1;
-                self.inserts.ssh.tabs.push(Tab {
-                    id: self.inserts.ssh.next_tab,
+                self.inserts.terminal.next_tab += 1;
+                self.inserts.terminal.tabs.push(Tab {
+                    id: self.inserts.terminal.next_tab,
                     alias: alias.to_string(),
                     session,
                     focus: cx.focus_handle(),
@@ -103,7 +82,7 @@ impl BenchApp {
                     insert: String::new(),
                     _wake: wake,
                 });
-                Some(self.inserts.ssh.tabs.len() - 1)
+                Some(self.inserts.terminal.tabs.len() - 1)
             }
             Err(e) => {
                 self.toast(

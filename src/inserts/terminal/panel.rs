@@ -1,5 +1,5 @@
 //! The bottom dock's terminals (`Panel::Terminal`, ⌃`, the Code status bar's button): the same shells
-//! as a `/terminal` insert (`servers.rs` `Tab`, `session.rs`), each on its project's machine and
+//! as a `/terminal` insert (`state.rs` `Tab`, `session.rs`), each on its project's machine and
 //! started in its folder. Tabs appear when there is more than one (⌘T adds one for the shown
 //! project); they live while Bench runs. The active one's selection, or its last lines, go to
 //! the thread as a reference (`thread/attachments.rs` `TerminalRef`).
@@ -96,7 +96,7 @@ impl BenchApp {
                 self.inserts.dock_terms.add(&project);
             }
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.inserts.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.terminal.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -109,7 +109,7 @@ impl BenchApp {
         self.bottom_dock.activate(Panel::Terminal);
         if !self.demo {
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.inserts.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.terminal.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -123,7 +123,7 @@ impl BenchApp {
         self.inserts.dock_terms.active = i;
         if !self.demo {
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.inserts.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.terminal.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -134,15 +134,15 @@ impl BenchApp {
         let Some(t) = self.inserts.dock_terms.remove(i) else {
             return;
         };
-        if let Some(ix) = self.inserts.ssh.tab_of_insert(&t.key) {
-            self.inserts.ssh.tabs[ix].session.kill();
-            self.inserts.ssh.tabs.remove(ix);
+        if let Some(ix) = self.inserts.terminal.tab_of_insert(&t.key) {
+            self.inserts.terminal.tabs[ix].session.kill();
+            self.inserts.terminal.tabs.remove(ix);
         }
         if self.inserts.dock_terms.is_empty() {
             self.bottom_dock.open = false;
         } else if self.bottom_dock.shows(Panel::Terminal) {
             if let Some(t) = self.dock_active_shell(window, cx) {
-                self.inserts.ssh.tabs[t].focus.focus(window, cx);
+                self.inserts.terminal.tabs[t].focus.focus(window, cx);
             }
         }
         cx.notify();
@@ -161,8 +161,8 @@ impl BenchApp {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Option<usize> {
-        let fresh = self.inserts.ssh.tab_of_insert(&term.key).is_none_or(|t| {
-            self.inserts.ssh.tabs[t]
+        let fresh = self.inserts.terminal.tab_of_insert(&term.key).is_none_or(|t| {
+            self.inserts.terminal.tabs[t]
                 .session
                 .exited
                 .load(std::sync::atomic::Ordering::SeqCst)
@@ -179,7 +179,7 @@ impl BenchApp {
                     "cd {} && clear\r",
                     crate::inserts::slash::shell_quote(&dir)
                 );
-                self.inserts.ssh.tabs[t].session.write(cd.as_bytes());
+                self.inserts.terminal.tabs[t].session.write(cd.as_bytes());
             }
         }
         Some(t)
@@ -197,10 +197,10 @@ impl BenchApp {
         let text = if self.demo {
             crate::demo::terminal(&machine)
         } else {
-            let Some(t) = self.inserts.ssh.tab_of_insert(&term.key) else {
+            let Some(t) = self.inserts.terminal.tab_of_insert(&term.key) else {
                 return;
             };
-            let s = &self.inserts.ssh.tabs[t].session;
+            let s = &self.inserts.terminal.tabs[t].session;
             s.selection_text()
                 .filter(|t| !t.trim().is_empty())
                 .unwrap_or_else(|| s.screen_text(SENT_LINES))
@@ -233,8 +233,8 @@ impl BenchApp {
             .iter()
             .filter(|o| o.project == t.project)
             .count();
-        let name = match self.inserts.ssh.tab_of_insert(&t.key) {
-            Some(ix) => self.inserts.ssh.tabs[ix]
+        let name = match self.inserts.terminal.tab_of_insert(&t.key) {
+            Some(ix) => self.inserts.terminal.tabs[ix]
                 .session
                 .title()
                 .map(|s| s.trim().to_string())
@@ -242,8 +242,8 @@ impl BenchApp {
                 .unwrap_or_else(|| self.project_name(&t.project)),
             None => self.project_name(&t.project),
         };
-        let ended = self.inserts.ssh.tab_of_insert(&t.key).is_some_and(|ix| {
-            self.inserts.ssh.tabs[ix]
+        let ended = self.inserts.terminal.tab_of_insert(&t.key).is_some_and(|ix| {
+            self.inserts.terminal.tabs[ix]
                 .session
                 .exited
                 .load(std::sync::atomic::Ordering::SeqCst)
