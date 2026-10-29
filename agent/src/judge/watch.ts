@@ -3,7 +3,7 @@
 // failed, stuck — a sure answer is said with it: go on with the result, fix it, stop it, or leave
 // it be and do other work instead of polling again at once.
 
-import { cut, resultText } from "../builtin/turn.ts";
+import { cut, resultText } from "../turn/turn.ts";
 import { sure, type Point } from "./point.ts";
 
 /** How sure the evaluator must be to speak. */

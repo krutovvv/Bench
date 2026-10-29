@@ -9,7 +9,7 @@
 // were, as a list that changes rewrites the prompt's head and the server's cache with it.
 
 import { mcpServerTools, reachOf, type ServerTools } from "../mcp/mcp.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /**

@@ -4,7 +4,7 @@
 // accounts). Harm, when it is fairly sure, asks the person first, as a pattern's hit does. It only
 // adds questions: a pattern's hit is asked whatever the evaluator says.
 
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import { sure, type Point } from "./point.ts";
 
 /** How sure of harm the evaluator must be to ask the person (asking costs little). */

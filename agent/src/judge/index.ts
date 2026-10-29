@@ -8,7 +8,7 @@
 // classic way (`judgeActive`).
 
 import { host } from "../host.ts";
-import { turnOf } from "../builtin/turn.ts";
+import { turnOf } from "../turn/turn.ts";
 import { ask, judgeActive, type ChoiceAnswer, type Question } from "./client.ts";
 import { baseState, type Asked, type Effect, type Moment, type Point, type Seen } from "./point.ts";
 import { search } from "./search.ts";

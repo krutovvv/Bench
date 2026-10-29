@@ -11,7 +11,7 @@
 // and the turn keeps it: every later question of the evaluator sees it (`baseState`), and the
 // course is checked sooner when the message wanted words, not work (`drift.ts`).
 
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /** How sure the evaluator must be of the kind. */

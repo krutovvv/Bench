@@ -4,7 +4,7 @@
 // order: nothing is dropped, so a wrong guess costs a line of reading, not a missed match.
 // Not sure enough, the result stays as the tool gave it.
 
-import { cut, resultText } from "../builtin/turn.ts";
+import { cut, resultText } from "../turn/turn.ts";
 import { STATE_CAP } from "./client.ts";
 import type { Point, Seen } from "./point.ts";
 

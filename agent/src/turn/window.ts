@@ -16,6 +16,7 @@
 import { resolveModel } from "../config.ts";
 import { excerpt } from "../judge/excerpt.ts";
 import { neededness } from "../judge/keep.ts";
+import { slot } from "./kept.ts";
 
 /** Characters per token, on the safe side: Russian text runs near 3, code near 3.5. */
 export const CHARS_PER_TOKEN = 3;
@@ -69,10 +70,8 @@ export async function fitResultFor(conversation: string, result: any, signal?: A
 	return fitResult(result, window);
 }
 
-/** What the provider counted beyond the estimate of what was sent, per conversation. */
-const overhead = new Map<string, number>();
-/** The estimate of the last request's messages, per conversation. */
-const sent = new Map<string, number>();
+/** Per conversation: the estimate of the last request's messages, and what the provider counted beyond it. */
+const counts = slot<{ sent?: number; overhead: number }>(() => ({ overhead: 0 }));
 
 /** The characters of a message's blocks that a request can carry. */
 function charsOf(m: any): number {
@@ -87,15 +86,15 @@ function charsOf(m: any): number {
 
 /** How many tokens the conversation's last request held, as estimated and corrected by the provider's count. */
 export function usedTokens(conversation: string): number {
-	return (sent.get(conversation) ?? 0) + (overhead.get(conversation) ?? 0);
+	return (counts.get(conversation).sent ?? 0) + counts.get(conversation).overhead;
 }
 
 /** The provider's count after an answer (`afterResponse`): what the estimate missed. */
 export function seeUsage(conversation: string, usage: any): void {
 	const counted = Number(usage?.input ?? 0) + Number(usage?.cacheRead ?? 0) + Number(usage?.cacheWrite ?? 0);
-	const estimate = sent.get(conversation);
-	if (!counted || estimate === undefined) return;
-	overhead.set(conversation, Math.max(0, counted - estimate));
+	const c = counts.get(conversation);
+	if (!counted || c.sent === undefined) return;
+	c.overhead = Math.max(0, counted - c.sent);
 }
 
 /**
@@ -104,9 +103,9 @@ export function seeUsage(conversation: string, usage: any): void {
  * never. Undefined: they fit as they are.
  */
 export function fitRequest(conversation: string, messages: readonly any[], window = windowTokens(), weighed?: [number, number, number, number][]): any[] | undefined {
-	const room = Math.floor(window * (1 - ANSWER_SHARE)) - (overhead.get(conversation) ?? 0);
+	const room = Math.floor(window * (1 - ANSWER_SHARE)) - counts.get(conversation).overhead;
 	let used = tokensOf(messages.reduce((n, m) => n + charsOf(m), 0));
-	sent.set(conversation, used);
+	counts.get(conversation).sent = used;
 	if (used <= room) return undefined;
 	// Every block worth cutting, the least needed first when the evaluator weighed them, else the
 	// largest first, then the oldest.
@@ -121,7 +120,7 @@ export function fitRequest(conversation: string, messages: readonly any[], windo
 		else out[i].content[j] = { ...b, arguments: shrinkArgs(b.arguments) };
 		used -= tokensOf(n - SHRUNK);
 	}
-	sent.set(conversation, used);
+	counts.get(conversation).sent = used;
 	return out;
 }
 
@@ -130,7 +129,7 @@ export function fitRequest(conversation: string, messages: readonly any[], windo
  * (`judge/keep.ts`); the largest first only among equals.
  */
 export async function fitRequestFor(conversation: string, messages: readonly any[], signal?: AbortSignal, window = windowTokens()): Promise<any[] | undefined> {
-	const room = Math.floor(window * (1 - ANSWER_SHARE)) - (overhead.get(conversation) ?? 0);
+	const room = Math.floor(window * (1 - ANSWER_SHARE)) - counts.get(conversation).overhead;
 	const total = tokensOf(messages.reduce((n, m) => n + charsOf(m), 0));
 	if (total <= room) return fitRequest(conversation, messages, window);
 	const blocks = candidates(messages);

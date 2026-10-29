@@ -1,4 +1,4 @@
-// The evaluator at compaction (`builtin/compaction.ts`): what a summary of a few thousand
+// The evaluator at compaction (`turn/compaction.ts`): what a summary of a few thousand
 // characters loses that the rest of the work needs, put after it as it is.
 //
 // In a thread compacted 25 times, 38% of the files the agent touched in the 20 steps after a
@@ -8,14 +8,14 @@
 // window: the person's words still in force, word for word; the files in work, as they are now on
 // disk; the results the work needs exactly (`keep.ts`).
 
-import { cut } from "../builtin/turn.ts";
-import { windowTokens } from "../builtin/window.ts";
+import { cut } from "../turn/turn.ts";
+import { windowTokens } from "../turn/window.ts";
 import { EVAL_OPEN, stripBlock } from "../runtime/journal.ts";
 import { envFor } from "../runtime/tools-host.ts";
 import { host } from "../host.ts";
 import { ask, judgeActive } from "./client.ts";
 import { baseState } from "./point.ts";
-import { turnOf } from "../builtin/turn.ts";
+import { turnOf } from "../turn/turn.ts";
 import { keptThrough } from "./keep.ts";
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 

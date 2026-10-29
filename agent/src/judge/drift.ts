@@ -7,7 +7,7 @@
 // told to stop and answer. When the message wanted words, not work (`intent.ts`), the course is
 // checked every 3 steps. The model decides what to do.
 
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 
 import { sure, type Point } from "./point.ts";
 

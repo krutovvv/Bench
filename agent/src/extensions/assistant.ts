@@ -18,18 +18,19 @@ import { skillManage, skillView } from "../builtin/skills.ts";
 import { resolveComment } from "../builtin/review.ts";
 import { specFor, specsOf } from "../specs.ts";
 import { machineOf } from "../repo.ts";
-import { compactWithoutReasoning } from "../builtin/compaction.ts";
+import { compactWithoutReasoning } from "../turn/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
-import { stepGate, stepNote } from "../builtin/steps.ts";
-import { fitRequestFor, fitResultFor, seeUsage } from "../builtin/window.ts";
+import { stepGate, stepNote } from "../turn/steps.ts";
+import { fitRequestFor, fitResultFor, seeUsage } from "../turn/window.ts";
 import { toolsToLoad } from "../judge/start.ts";
-import { markNotRun, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../builtin/turn.ts";
+import { markNotRun, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../turn/turn.ts";
 import { judgeActive, judgeFor } from "../judge/client.ts";
 import { PROVIDER as EVALUATOR } from "../judge/models.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
 import { steer } from "../runtime/steer.ts";
-import { frozen } from "../builtin/frozen.ts";
+import { frozen } from "../turn/frozen.ts";
+import { slot } from "../turn/kept.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../runtime/inserts.ts";
 
@@ -38,7 +39,7 @@ const s = (render: (x: NonNullable<ReturnType<typeof of>>) => string | undefined
 	const info = of(input);
 	return info ? render(info) : undefined;
 };
-/** A section held as it was until the next compaction (`builtin/frozen.ts`): a change would rewrite the prompt's head. */
+/** A section held as it was until the next compaction (`turn/frozen.ts`): a change would rewrite the prompt's head. */
 const held = (name: string, render: Parameters<typeof s>[0]) => (input: any) => frozen(String(input.conversationId), name, () => s(render)(input));
 
 /** Commands that ask first when approvals are on (the agent's settings.json "approvals": "manual"). */
@@ -81,7 +82,7 @@ const Coding = createCodingTools({ images });
 const coding = (Coding.tools ?? []).map((t: any) => (t.name === "read" ? createAnchoredRead({ images }) : t.name === "edit" ? createAnchoredEdit() : t));
 
 /** The specs each conversation was told of: one line per spec per thread, not per file. */
-const toldSpecs = new Map<string, Set<string>>();
+const toldSpecs = slot(() => new Set<string>());
 
 /** "This file is under <spec>": once per thread for each spec, none outside the specs. */
 async function specNote(info: { cwd: string; project?: string }, conversation: string, p: string): Promise<string | undefined> {
@@ -91,10 +92,9 @@ async function specNote(info: { cwd: string; project?: string }, conversation: s
 	const { root, specs } = await specsOf(machine, path.posix.dirname(file));
 	const spec = specFor(root, specs, file);
 	if (!spec) return undefined;
-	const told = toldSpecs.get(conversation) ?? new Set<string>();
+	const told = toldSpecs.get(conversation);
 	if (told.has(spec.id)) return undefined;
 	told.add(spec.id);
-	toldSpecs.set(conversation, told);
 	return `[${path.posix.relative(root, file)} is under the spec ${path.posix.relative(root, spec.path)} ("${spec.title}"): read it before changing what the module does, and update it when a decision or contract there changes.]`;
 }
 
@@ -120,9 +120,9 @@ export const assistant = defineExtension({
 	],
 	hooks: [
 		compactWithoutReasoning,
-		// The turn as the step limit and the evaluator see it (`builtin/turn.ts`): every request
+		// The turn as the step limit and the evaluator see it (`turn/turn.ts`): every request
 		// notes the person's last message; past the step limit it carries the instruction to
-		// answer (`builtin/steps.ts`). Every request fits the model's window (`builtin/window.ts`),
+		// answer (`turn/steps.ts`). Every request fits the model's window (`turn/window.ts`),
 		// the provider's count after it correcting the estimate. The answer is the evaluator's to
 		// check once (`judge/done.ts`).
 		hook(GenerationTask, {
@@ -165,7 +165,7 @@ export const assistant = defineExtension({
 			// The plan left unchanged for several steps (`planNudge`): the model is reminded to update it.
 			// With the evaluator on (`judge/`), its points instead: a long search's matches come
 			// likeliest first, the plan's items are marked, the course is checked.
-			// Last, what the model reads is cut to its share of the window (`builtin/window.ts`).
+			// Last, what the model reads is cut to its share of the window (`turn/window.ts`).
 			afterTool: async (call: any, result: any, api: any, context: any) => {
 				if (ownCall(call)) {
 					// A script's question to the evaluator counts with the points' (the thread's meters).

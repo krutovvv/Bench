@@ -4,10 +4,10 @@
 // Asked whether the message corrects the current work or is a next task, a sure "corrects" joins
 // the run after its current tools instead (Pi's steer), as the person's "send now" would.
 
-import { turnOf } from "../builtin/turn.ts";
+import { turnOf } from "../turn/turn.ts";
 import { ask, judgeActive } from "./client.ts";
 import { baseState, sure } from "./point.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 
 /** How sure the evaluator must be: a wrong steer breaks into work the person meant to let finish. */
 const SURE = 0.8;

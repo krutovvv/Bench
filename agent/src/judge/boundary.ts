@@ -6,8 +6,9 @@
 // summary at the next boundary and the work goes on meanwhile. Pi's own threshold stays the floor.
 
 import { compactionAt } from "../config.ts";
-import { usedTokens, windowTokens } from "../builtin/window.ts";
+import { usedTokens, windowTokens } from "../turn/window.ts";
 import { host } from "../host.ts";
+import { slot } from "../turn/kept.ts";
 import { sure, type Point } from "./point.ts";
 
 /** From this share of Pi's threshold the evaluator is asked. */
@@ -23,8 +24,7 @@ const RESERVE = 16_384;
 const BACKGROUND = 32_768;
 
 /** Per conversation: compacted at this band already (until it falls under `REARM`), and the step last asked at. */
-const fired = new Set<string>();
-const askedAt = new Map<string, number>();
+const band = slot(() => ({ fired: false, askedAt: -EVERY }));
 
 /** Where Pi compacts: its threshold, and where its background compaction starts. */
 export function thresholds(agent: string, window = windowTokens()): { at: number; background: number } {
@@ -41,11 +41,12 @@ export const boundary: Point = {
 		if (!agent || !turn.request) return undefined;
 		const used = usedTokens(conversation);
 		const { at, background } = thresholds(agent);
-		if (used < at * REARM) fired.delete(conversation);
+		const b = band.get(conversation);
+		if (used < at * REARM) b.fired = false;
 		// Past where Pi's background compaction starts, Pi has it in hand.
-		if (fired.has(conversation) || used < at * FROM || used >= background) return undefined;
-		if (turn.steps - (askedAt.get(conversation) ?? -EVERY) < EVERY) return undefined;
-		askedAt.set(conversation, turn.steps);
+		if (b.fired || used < at * FROM || used >= background) return undefined;
+		if (turn.steps - b.askedAt < EVERY) return undefined;
+		b.askedAt = turn.steps;
 		return {
 			questions: {
 				boundary: {
@@ -62,7 +63,7 @@ export const boundary: Point = {
 	},
 	apply({ conversation }, answers) {
 		if (sure(answers.boundary, SURE) !== "ended") return undefined;
-		fired.add(conversation);
+		band.get(conversation).fired = true;
 		host().compact(conversation, "A part of the work has just ended: sum up its outcome, and keep what the next part needs.");
 		return {};
 	},

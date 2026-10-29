@@ -11,7 +11,7 @@
 import { skillsFor, machineOf } from "../repo.ts";
 import { mcpServerTools, reachOf, type ServerTools } from "../mcp/mcp.ts";
 import { projects } from "../builtin/projects.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /** How sure the evaluator must be to name a skill, or a server: the skills that fitted came at

@@ -4,6 +4,7 @@
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
 import { host, threadOf } from "../host.ts";
+import { slot } from "../turn/kept.ts";
 
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
 
@@ -60,7 +61,7 @@ export const PLAN_STALE_STEPS = 5;
 
 /** Each conversation's plan as its last `todo` left it: the step it shows as current, and the
  * steps taken since. Kept in memory: after a restart the next `todo` starts it again. */
-const plans = new Map<string, { current: string; since: number }>();
+const plans = slot<{ current: string; since: number } | undefined>(() => undefined);
 
 /**
  * What the model is told after a tool call about its plan, if anything. Models (Qwen above all)
@@ -72,8 +73,7 @@ export function planNudge(conversation: string, call: { name: string; arguments?
 		const todos: { content?: string; status?: string }[] = Array.isArray(call.arguments?.todos) ? call.arguments.todos : [];
 		const open = todos.filter((t) => t.status === "in_progress" || t.status === "pending");
 		const current = open.find((t) => t.status === "in_progress") ?? open[0];
-		if (current) plans.set(conversation, { current: String(current.content ?? ""), since: 0 });
-		else plans.delete(conversation);
+		plans.set(conversation, current ? { current: String(current.content ?? ""), since: 0 } : undefined);
 		return undefined;
 	}
 	const plan = plans.get(conversation);

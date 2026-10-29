@@ -2,10 +2,12 @@
 // person's request (the last message they wrote), the plan the agent keeps (`todo`), the turn's
 // steps (top-level tool calls, a script's nested calls not counted) and the last few of them in a
 // line each. The step limit (`steps.ts`) and the evaluator (`judge/`) read it; nothing else does.
-// In memory only: after a restart a turn starts counting again, which errs on the side of working.
+// In memory only (`kept.ts`): after a restart a turn starts counting again, which errs on the side
+// of working.
 
 import { EVAL_OPEN, planOf, stripBlock, textOf } from "../runtime/journal.ts";
 import type { PlanStep } from "../protocol.gen.ts";
+import { slot } from "./kept.ts";
 
 /** How many steps a turn remembers, a line each. */
 const RECENT = 24;
@@ -79,18 +81,17 @@ export interface Call {
 	out: string;
 }
 
-const turns = new Map<string, Turn>();
 
 /** How Pi's compaction summary begins (its `SUMMARY_PREFIX`), as the user message after a compaction. */
 const SUMMARY_PREFIX = "The conversation history before this point was compacted";
 
 const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
 
+const turns = slot<Turn>(() => fresh(""));
+
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {
-	let t = turns.get(conversation);
-	if (!t) turns.set(conversation, (t = fresh("")));
-	return t;
+	return turns.get(conversation);
 }
 
 /** Every request to the model: a person's message at its end begins a new turn (the plan carries
@@ -106,8 +107,8 @@ export function seeRequest(conversation: string, messages: readonly any[]): void
 	// The evaluator's own message, and a compaction's summary (Pi's, as a user message), are no new turn.
 	if (!text || text.startsWith(EVAL_OPEN) || text.startsWith(SUMMARY_PREFIX)) return;
 	const t = turns.get(conversation);
-	if (t?.request === text && t.steps === 0) return;
-	const next = fresh(text, t?.plan, t?.planId);
+	if (t.request === text && t.steps === 0) return;
+	const next = fresh(text, t.plan, t.planId);
 	next.opening = messages.filter((m) => m?.role === "user").length === 1;
 	// The agent's last words before this message: what the person answers to.
 	const before = [...messages.slice(0, at)].reverse().find((m) => m?.role === "assistant" && (m.content ?? []).some((b: any) => b?.type === "text" && String(b.text ?? "").trim()));

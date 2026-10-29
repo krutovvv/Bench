@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CHARS_PER_TOKEN, cutMiddle, fitRequest, fitResult, seeUsage } from "../src/builtin/window.ts";
+import { CHARS_PER_TOKEN, cutMiddle, fitRequest, fitResult, seeUsage } from "../src/turn/window.ts";
 
 const W = 131072;
 const text = (t: string) => ({ output: [{ type: "text", text: t }] });

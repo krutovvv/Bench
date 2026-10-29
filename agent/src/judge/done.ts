@@ -6,8 +6,8 @@
 // or a short one are left as they are.
 
 import { EVAL_CLOSE, EVAL_OPEN, textOf } from "../runtime/journal.ts";
-import { cut } from "../builtin/turn.ts";
-import { limitReached } from "../builtin/steps.ts";
+import { cut } from "../turn/turn.ts";
+import { limitReached } from "../turn/steps.ts";
 import { sure, type Point } from "./point.ts";
 
 /** A turn with fewer steps is a conversation, not work: no check. */

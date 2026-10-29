@@ -1,5 +1,5 @@
 // The evaluator at a long result: one larger than its share of the model's window
-// (`builtin/window.ts`) is cut into parts, and the evaluator is asked which of them holds what the
+// (`turn/window.ts`) is cut into parts, and the evaluator is asked which of them holds what the
 // request needs — the parts in the state, a choice over their names (and "none") per request, the
 // parts its probabilities set apart kept (a part's text in a question's instructions or options
 // was misread; in the state it is read whole); the model
@@ -8,7 +8,7 @@
 // as anywhere. Parts go in as many requests as the evaluator's window takes (a local server's is
 // about 16K tokens), up to `MAX_REQUESTS`; beyond that the rest is left to the cut.
 
-import { turnOf } from "../builtin/turn.ts";
+import { turnOf } from "../turn/turn.ts";
 import { ask, judgeActive } from "./client.ts";
 import { baseState } from "./point.ts";
 import { host } from "../host.ts";

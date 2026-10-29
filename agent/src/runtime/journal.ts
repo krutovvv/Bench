@@ -53,7 +53,7 @@ export const BLOCK_OPEN = "<block-state>";
 export const BLOCK_CLOSE = "</block-state>";
 
 /** The evaluator's own message to the model, appended after an answer (`judge/done.ts`): not the
- *  person's, so it neither starts a turn (`builtin/turn.ts`) nor shows in the thread. */
+ *  person's, so it neither starts a turn (`turn/turn.ts`) nor shows in the thread. */
 export const EVAL_OPEN = "<evaluator>";
 export const EVAL_CLOSE = "</evaluator>";
 

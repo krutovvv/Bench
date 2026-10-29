@@ -4,7 +4,7 @@
 // or mark them unverified. Deep research's guard against a price written from memory.
 
 import { EVAL_CLOSE, EVAL_OPEN, textOf } from "../runtime/journal.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import { sure, type Point } from "./point.ts";
 
 /** How sure the evaluator must be to send the answer back. */

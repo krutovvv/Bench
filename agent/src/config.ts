@@ -134,7 +134,7 @@ export interface AgentSettings {
 	approvals?: string;
 	/** Commands the person approved "always": never asked again in these settings' threads. */
 	allowed?: string[];
-	/** The most steps (tool calls) in one turn; past it the run ends with an answer (`builtin/steps.ts`). Unset: no limit. */
+	/** The most steps (tool calls) in one turn; past it the run ends with an answer (`turn/steps.ts`). Unset: no limit. */
 	stepLimit?: number;
 	/**
 	 * The project's use of the evaluator (`judge/`), where the gear has a server. On in a new

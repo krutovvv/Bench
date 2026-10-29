@@ -14,7 +14,7 @@ import { FAIL_KIND } from "./journal.ts";
 import { usagePayload } from "./usage.ts";
 import { evaluatorOn } from "../judge/client.ts";
 import { evaluatorReady } from "../judge/models.ts";
-import { thaw } from "../builtin/frozen.ts";
+import { thaw } from "../turn/frozen.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
@@ -91,7 +91,7 @@ export class Stream {
 			// moves without waiting for the thread to be read again. A failed compaction is not one.
 			case "compaction_end":
 				if (!e.error) {
-					// The prompt's sections are read anew after it (`builtin/frozen.ts`).
+					// The prompt's sections are read anew after it (`turn/frozen.ts`).
 					thaw(String(live.conversation.id));
 					live.usage.compactions = (live.usage.compactions ?? 0) + 1;
 					this.emitUsage(live);

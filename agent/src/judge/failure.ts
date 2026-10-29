@@ -3,7 +3,7 @@
 // give — and, when sure, said to the model with the error. Loops start here: the same failing
 // command again, a blocked site tried a fifth way.
 
-import { cut, resultText } from "../builtin/turn.ts";
+import { cut, resultText } from "../turn/turn.ts";
 import { sure, type Point } from "./point.ts";
 
 /** How sure the evaluator must be to speak. */

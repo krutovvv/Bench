@@ -5,7 +5,7 @@
 // one state (`index.ts`); a new idea is a new file with a `Point` and a line in `POINTS`.
 
 import type { PlanStep } from "../protocol.gen.ts";
-import { cut, planLines, type Turn } from "../builtin/turn.ts";
+import { cut, planLines, type Turn } from "../turn/turn.ts";
 import type { ChoiceAnswer, Question } from "./client.ts";
 import { INTENT_SCOPE } from "./intent.ts";
 

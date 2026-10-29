@@ -38,6 +38,7 @@ import { BLOCK_CLOSE, BLOCK_OPEN, Journal } from "./journal.ts";
 import { Titles } from "./title.ts";
 import { totalsOf, type Totals } from "./usage.ts";
 import { correctsTheWork } from "../judge/correction.ts";
+import { forget } from "../turn/kept.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
@@ -271,6 +272,8 @@ export class Runtime {
 		if (!live) return;
 		this.live.delete(id);
 		this.byConversation.delete(String(live.conversation.id));
+		// What the hooks kept in memory about its conversation goes with it (`turn/kept.ts`).
+		forget(String(live.conversation.id));
 		await live.stop?.();
 	}
 

@@ -7,7 +7,7 @@
 // reminder does this job (`builtin/ask.ts` `planNudge`).
 
 import type { PlanStep } from "../protocol.gen.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import { PLAN_KIND } from "../runtime/journal.ts";
 import { sure, type Point } from "./point.ts";
 

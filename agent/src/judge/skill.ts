@@ -6,7 +6,7 @@
 
 import { skillsFor, machineOf } from "../repo.ts";
 import { host } from "../host.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /** Steps between two looks. */

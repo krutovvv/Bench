@@ -9,7 +9,7 @@
 // 200 characters). What the evaluator judges is what the code cannot: whether anything changed
 // since, and whether a near copy is the same probe or a fix of it.
 
-import { cut, type Call } from "../builtin/turn.ts";
+import { cut, type Call } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /** How sure the evaluator must be to stop the same call: a wrong stop costs a step, so it must be very. */

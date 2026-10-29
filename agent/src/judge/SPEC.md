@@ -36,7 +36,7 @@ at, whether it asks now and what (typed questions, and what it adds to the state
 answers change — a result reordered, a note to the model, the turn sent back, an entry for the
 thread, the plan's marks. `index.ts` keeps them in `POINTS` and asks every point of a moment that
 has a question now in one request: one state (the turn's request, plan and last steps, kept by
-`builtin/turn.ts`, plus what each point adds), every question evaluated against it in parallel,
+`turn/turn.ts`, plus what each point adds), every question evaluated against it in parallel,
 each point's answers under its own names. The default extension's hooks call the moments
 (`extensions/assistant.ts`): `result` in `afterTool`, `answer` in `onYield`.
 
@@ -106,7 +106,7 @@ each point's answers under its own names. The default extension's hooks call the
 - **failure** (`failure.ts`, `result`, a failed call): retry once, fix the call, another way, or
   ask the person (0.6), said with the error. "Another way" still lets the agent find out why (a
   path not where it thought is looked for, not given up).
-- **excerpt** (`excerpt.ts`, called by `builtin/window.ts`): a result past its share of the window
+- **excerpt** (`excerpt.ts`, called by `turn/window.ts`): a result past its share of the window
   is cut into parts of 1 500 characters, the parts put in the state (9 000 characters a request),
   and a choice over their names (and "none", last) keeps the parts that stand out; without an
   answer, the cut keeps head and tail as before.
@@ -129,8 +129,8 @@ each point's answers under its own names. The default extension's hooks call the
   comes ordered by use for the request, the items that stand out first, every item kept.
 - **claims** (`claims.ts`, `answer`): an answer with numbers after 3 steps or more is checked
   against all the turn found (`turn.found`, 40 results); unsupported (0.8) sends it back once.
-- **keep** (`keep.ts`, called by `builtin/window.ts`): when a request would overflow the window, the
-  earlier results the next step needs least are cut first. At compaction (`builtin/compaction.ts`,
+- **keep** (`keep.ts`, called by `turn/window.ts`): when a request would overflow the window, the
+  earlier results the next step needs least are cut first. At compaction (`turn/compaction.ts`,
   `keptThrough`) the latest 48 results are weighed for what the rest of the work needs word for
   word — exact text, ids, paths a summary loses — and those (0.3, at most 8 000 characters) follow
   the summary under "Kept word for word". What follows a summary (`summary.ts`, `afterSummary`,
@@ -179,7 +179,7 @@ measured — or an HTTP error) keeps that address quiet for a minute. Every requ
 evaluator by; the thread's meters count its requests and how often it changed the course
 (`Usage.judge_calls`, `judge_nudges`).
 
-## The step limit (`builtin/steps.ts`)
+## The step limit (`turn/steps.ts`)
 
 Not the evaluator's, but on the same turn: a project's most steps in one turn (Settings → Model →
 Step limit, none by default). Past it every call is refused with the reason and every request to
