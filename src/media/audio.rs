@@ -114,6 +114,11 @@ impl Recorder {
         super::pauses::cut(&self.samples.lock().unwrap(), self.rate, from)
     }
 
+    /// Whether there was speech since sample `from` (`pauses.rs`).
+    pub fn spoke_since(&self, from: usize) -> bool {
+        super::pauses::spoke_since(&self.samples.lock().unwrap(), self.rate, from)
+    }
+
     /// The recording's samples `from..to` as a WAV.
     pub fn wav_between(&self, from: usize, to: usize) -> Result<Vec<u8>> {
         let samples = self.samples.lock().unwrap();

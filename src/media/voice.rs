@@ -13,8 +13,7 @@ use crate::media::state::LiveDictation;
 
 /// Ticks of the waveform's repaint (33 ms) between two looks for a pause.
 const PAUSE_LOOK: u32 = 6;
-/// Speech after the last run, in seconds, that stopping still sends.
-const LAST_WORDS: f32 = 0.3;
+
 
 use crate::app::BenchApp;
 
@@ -144,11 +143,11 @@ impl BenchApp {
     /// The recording stopped: one more run of the whole speech when some came after the last run
     /// (now, or once the run out is back); else the dictation ends with what is shown.
     fn stop_live(&mut self, rec: Recorder, window: &mut Window, cx: &mut Context<Self>) {
-        let (len, rate) = (rec.len(), rec.rate() as f32);
         let Some(live) = self.media.live.as_mut() else {
             return;
         };
-        let more = (len.saturating_sub(live.ran)) as f32 / rate >= LAST_WORDS;
+        // Words after the last run, not just time: silence since is not worth a run.
+        let more = rec.spoke_since(live.ran);
         live.finishing = true;
         let wav = if more { rec.finish().ok() } else { None };
         match (wav, live.running) {

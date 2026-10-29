@@ -33,20 +33,33 @@ fn slices(samples: &[f32], win: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Where to cut what was recorded since `from` (`samples` is the whole recording); None: not yet.
-pub fn cut(samples: &[f32], rate: u32, from: usize) -> Option<Cut> {
+/// The 25 ms slices' loudness, how long a slice is, and the levels of silence and of speech in
+/// this recording.
+fn measure(samples: &[f32], rate: u32) -> (Vec<f32>, usize, f32, f32) {
     let win = ((rate as f32 * SLICE) as usize).max(1);
     let all = slices(samples, win);
-    if all.is_empty() || from >= samples.len() {
-        return None;
-    }
     // The recording's quiet: its tenth percentile (no more than a quiet room's, for a recording
     // that has been speech all along); silence is a little above it, speech above that.
     let mut sorted = all.clone();
     sorted.sort_by(|a, b| a.total_cmp(b));
-    let floor = sorted[sorted.len() / 10].min(QUIET_ROOM);
+    let floor = sorted.get(sorted.len() / 10).copied().unwrap_or(0.).min(QUIET_ROOM);
     let silent = (floor * 3.).max(0.003);
-    let loud = silent * 2.;
+    (all, win, silent, silent * 2.)
+}
+
+/// Whether there was speech since sample `from` (stopping sends the speech again only then).
+pub fn spoke_since(samples: &[f32], rate: u32, from: usize) -> bool {
+    let (all, win, _, loud) = measure(samples, rate);
+    let speech = all.iter().skip(from / win).filter(|l| **l > loud).count();
+    speech as f32 * SLICE >= MIN_SPEECH
+}
+
+/// Where to cut what was recorded since `from` (`samples` is the whole recording); None: not yet.
+pub fn cut(samples: &[f32], rate: u32, from: usize) -> Option<Cut> {
+    let (all, win, silent, loud) = measure(samples, rate);
+    if all.is_empty() || from >= samples.len() {
+        return None;
+    }
     let first = from / win;
     let now = &all[first.min(all.len())..];
     let n = |secs: f32| (secs / SLICE) as usize;
@@ -152,6 +165,15 @@ mod tests {
         assert!(!worth_a_run(0.5, 2., 0.24), "too little new");
         assert!(!worth_a_run(5., 60., 0.24), "a minute in: 14 s of work for 5 s new");
         assert!(worth_a_run(15., 60., 0.24));
+    }
+
+    #[test]
+    fn stopping_after_silence_is_not_new_speech() {
+        let s = join(&[sound(3., 0.3), sound(0.7, 0.), sound(4., 0.)]);
+        let after_run = (3.7 * RATE as f32) as usize;
+        assert!(!spoke_since(&s, RATE, after_run), "only silence after the last run");
+        let s = join(&[sound(3., 0.3), sound(0.7, 0.), sound(1.5, 0.3)]);
+        assert!(spoke_since(&s, RATE, after_run), "words after it");
     }
 
     #[test]
