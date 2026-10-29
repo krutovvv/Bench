@@ -52,7 +52,7 @@ impl ThreadView {
             .map(|(path, diffs)| {
                 let (add, del) = diffs
                     .iter()
-                    .map(|d| crate::thread::rows::diff::stats(d))
+                    .map(|d| crate::thread::rows::diff_stats::stats(d))
                     .fold((0, 0), |a, b| (a.0 + b.0, a.1 + b.1));
                 Changed {
                     path,

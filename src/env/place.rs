@@ -11,7 +11,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Request, Section, SettingsForm, form_actions, text};
+use super::section::{SaveCall, Section, SettingsForm, form_actions, text};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use crate::app::model::ProjectKey;
@@ -74,7 +74,7 @@ impl Section for Place {
         eid: &str,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
+    ) -> Option<SaveCall> {
         let e = app.envs.get(id)?;
         let folder = e.place.folder.read(cx).value().trim().to_string();
         if ProjectKey::parse(id).is_host() {

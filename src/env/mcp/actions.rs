@@ -9,7 +9,7 @@ use crate::app::BenchApp;
 use crate::client::rest;
 use crate::env::enc;
 use crate::env::mcp::apply_mcp;
-use crate::env::mcp_status::mcp_tally;
+use super::status::mcp_tally;
 
 impl BenchApp {
     /// A server's row in the project `id`: its config opens to edit (again: closes).

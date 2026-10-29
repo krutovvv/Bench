@@ -15,11 +15,11 @@ use crate::app::BenchApp;
 use bench_ui::icons::Ico;
 
 /// A save's REST call: method, path, JSON body.
-pub type Request = (&'static str, String, Value);
+pub type SaveCall = (&'static str, String, Value);
 
 /// A part of a section shown in the Explorer's tree: its name (what `card` is called with), what
 /// the row says, a muted note after it, its icon.
-pub struct Item {
+pub struct PartRow {
     pub name: String,
     pub label: String,
     pub note: String,
@@ -65,7 +65,7 @@ pub trait Section: Sync {
         _eid: &str,
         _window: &mut Window,
         _cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
+    ) -> Option<SaveCall> {
         None
     }
     /// After a save went through: its dirty flag goes, a new one's form closes.
@@ -138,7 +138,7 @@ pub trait ExplorerParts: Section {
         None
     }
     /// Its parts.
-    fn items(&self, _app: &BenchApp, _e: &ProjectEnv, _cx: &mut Context<BenchApp>) -> Vec<Item> {
+    fn items(&self, _app: &BenchApp, _e: &ProjectEnv, _cx: &mut Context<BenchApp>) -> Vec<PartRow> {
         vec![]
     }
     /// What the part `name` opens in the middle: its fields, its actions (None: nothing to show).

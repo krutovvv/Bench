@@ -8,7 +8,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, ExplorerParts, Item, Request, Section, card_act, code, head_act, pad, remove, revert,
+    Card, ExplorerParts, PartRow, SaveCall, Section, card_act, code, head_act, pad, remove, revert,
     save, when,
 };
 use super::{ProjectEnv, editor, enc, on_change};
@@ -105,7 +105,7 @@ impl Section for Schedule {
         eid: &str,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
+    ) -> Option<SaveCall> {
         let e = app.envs.get(id)?;
         let job = e.cron.open.clone()?;
         let fields = json!({
@@ -184,7 +184,7 @@ impl ExplorerParts for Schedule {
     }
 
     /// What runs on its own, each run a thread of the project.
-    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<Item> {
+    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<PartRow> {
         let theme = cx.theme().clone();
         e.cron
             .jobs
@@ -204,7 +204,7 @@ impl ExplorerParts for Schedule {
                     note.push_str(&format!(" · last: {st}"));
                 }
                 let failed = j.last_status.as_deref().is_some_and(|s| s != "ok");
-                Item {
+                PartRow {
                     name: j.id.clone(),
                     label: j.name.clone(),
                     note,

@@ -5,12 +5,13 @@
 //! changes all of it too, from any thread, with its tools. Each section is a file here:
 //!
 //! ```text
-//! env/section.rs      `Section`, `SettingsForm`, `ExplorerParts`, `Item`, and the pieces sections
+//! env/section.rs      `Section`, `SettingsForm`, `ExplorerParts`, `PartRow`, and the pieces sections
 //!                     are made of
 //! env/page.rs         the Settings page: the `FORMS`
 //! env/instructions.rs the prompts and skills the environment lists (their texts are files)
 //! env/backup.rs      the environment exported to a file and imported from one
 //! env/<section>.rs    a section: its state (a part of `ProjectEnv`), form or items, card, save
+//! env/mcp/            the MCP servers' section, with what is done to them and what is said of them
 //! settings/new_project.rs the new project's page (the sidebar's "+")
 //! ```
 //!
@@ -22,8 +23,6 @@ pub mod backup;
 pub mod instructions;
 pub mod lsp;
 pub mod mcp;
-pub mod mcp_actions;
-pub mod mcp_status;
 pub mod name;
 pub mod page;
 pub mod place;

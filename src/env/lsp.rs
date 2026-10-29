@@ -1,7 +1,7 @@
 //! The project's language servers (its lsp.json, as Crush's lsp section): after every edit the
 //! agent gets the file's errors from them (`agent/src/lsp/lsp.ts`). A row per server with a sign of
 //! how it is doing — running, not started yet (it starts with the first file it knows), failed
-//! and why; its card is its own entry of lsp.json as JSON, as an MCP server's (`mcp.rs`). "+ Add"
+//! and why; its card is its own entry of lsp.json as JSON, as an MCP server's (`mcp/`). "+ Add"
 //! offers the usual ones (each installs itself on first use, on the machine where the project's
 //! files are), or one written by hand.
 
@@ -13,7 +13,7 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, ExplorerParts, Item, Request, Section, add, code, new_card, remove, revert, save,
+    Card, ExplorerParts, PartRow, SaveCall, Section, add, code, new_card, remove, revert, save,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
@@ -127,7 +127,7 @@ impl Section for Lsp {
         eid: &str,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
+    ) -> Option<SaveCall> {
         let e = app.envs.get(id)?;
         let mut name = e.lsp.open.clone()?;
         if name == "new" {
@@ -188,7 +188,7 @@ impl ExplorerParts for Lsp {
     }
 
     /// A row per server with its sign; each opens its own entry.
-    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<Item> {
+    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<PartRow> {
         let theme = cx.theme().clone();
         e.lsp
             .servers
@@ -200,7 +200,7 @@ impl ExplorerParts for Lsp {
                     LspTone::Starting => (bench_ui::icons::Ico::Loader, theme.muted_foreground),
                     LspTone::Idle => (bench_ui::icons::Ico::CircleEmpty, theme.muted_foreground),
                 };
-                Item {
+                PartRow {
                     name: s.name.clone(),
                     label: s.name.clone(),
                     note: lsp_note(s),

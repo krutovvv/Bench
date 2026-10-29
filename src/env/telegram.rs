@@ -6,7 +6,7 @@ use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
 use serde_json::{Value, json};
 
-use super::section::{Request, Section, SettingsForm, form_actions};
+use super::section::{SaveCall, Section, SettingsForm, form_actions};
 use super::{ProjectEnv, on_change};
 use crate::app::BenchApp;
 use bench_ui::settings_field;
@@ -142,7 +142,7 @@ impl Section for Telegram {
         eid: &str,
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
+    ) -> Option<SaveCall> {
         let e = app.envs.get(id)?;
         let token = e.telegram.token.read(cx).value().trim().to_string();
         let users: Vec<String> = e

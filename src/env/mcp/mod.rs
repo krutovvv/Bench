@@ -1,5 +1,9 @@
 //! The project's MCP servers (`mcp.json`): a row each with a sign of what the agent knows of it,
-//! Check and "+ Add" in the block's head; a card is the server's entry as JSON.
+//! Check and "+ Add" in the block's head; a card is the server's entry as JSON. What is done to
+//! them: `actions.rs`; what the block says of them: `status.rs`.
+
+pub mod actions;
+pub mod status;
 
 use gpui_kit::component::input::EditorState;
 use gpui_kit::component::notification::NotificationType;
@@ -9,12 +13,12 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use super::section::{
-    Card, ExplorerParts, Item, Request, Section, add, card_act, code, head_act, new_card, remove,
+    Card, ExplorerParts, PartRow, SaveCall, Section, add, card_act, code, head_act, new_card, remove,
     revert, save,
 };
 use super::{ProjectEnv, editor, enc, on_change};
 use crate::app::BenchApp;
-use crate::env::mcp_status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
+use status::{McpSet, McpTone, mcp_note, mcp_tally, mcp_tone};
 
 /// One MCP server of the project. `checked` is the field that matters most: the agent only knows
 /// a server once something has asked for its tools, so without it "no answer yet" and "answers
@@ -111,7 +115,7 @@ impl Section for Mcp {
         eid: &str,
         window: &mut Window,
         cx: &mut Context<BenchApp>,
-    ) -> Option<Request> {
+    ) -> Option<SaveCall> {
         let e = app.envs.get(id)?;
         let mut name = e.mcp.open.clone()?;
         if name == "new" {
@@ -225,7 +229,7 @@ impl ExplorerParts for Mcp {
     /// Each server carries a sign of what the agent knows of it. A server says nothing until
     /// something asks it for its tools, so "not tried yet" is its own state and says so out
     /// loud — it is not a working server.
-    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<Item> {
+    fn items(&self, _app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> Vec<PartRow> {
         let theme = cx.theme().clone();
         e.mcp
             .servers
@@ -240,7 +244,7 @@ impl ExplorerParts for Mcp {
                         (bench_ui::icons::Ico::CircleEmpty, theme.muted_foreground)
                     }
                 };
-                Item {
+                PartRow {
                     name: m.name.clone(),
                     label: m.name.clone(),
                     note: mcp_note(m),

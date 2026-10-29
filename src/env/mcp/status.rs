@@ -2,7 +2,7 @@
 //! and the line about the set. Pure, and tested below, because the whole point is that a server
 //! nobody has asked yet must never be drawn as one that works.
 //!
-//! A file of its own rather than functions in `env/mcp.rs`: the `#[test]` expansion on top of deep
+//! A file of its own rather than functions in `env/mcp/mod.rs`: the `#[test]` expansion on top of deep
 //! GPUI builder chains can pass the compiler's recursion limit. Here the logic sits with its own
 //! tests.
 
