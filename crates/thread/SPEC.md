@@ -39,7 +39,9 @@ the agent never writes a second record "for Bench" — is `thread-objects`. In s
 `steps.rs` lays an opened piece of work out for a person, from the journal alone: as
 milestones in order — the agent's own words between its calls, or, where it wrote none, a
 sentence of the calls themselves ("Read things-report, edited it twice and ran things-do") — and
-inside each its calls as a chain of chips in the order they ran, each run of one kind a chip.
+inside each its calls in order, each what it did — in the agent's own words where it wrote some
+(the label it echoed, what its AppleScript asks, the file its script works on) — beside the first
+line of what came back, the reasoning's first sentence a beat between them.
 A call is said by what it does and to what: a command by what its program does, read from its
 own syntax (escaped spaces, variables, substitutions); never a pattern or a flag. Nothing is
 written for it: old threads read the same as new ones.

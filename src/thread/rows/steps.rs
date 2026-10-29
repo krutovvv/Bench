@@ -1,19 +1,18 @@
 //! The opened work as strips of milestones: the agent's own words, or a sentence of its calls
 //! where it wrote none, in order, the last open — what the agent does now. Inside a milestone its
-//! calls as a chain of chips in the order they ran ("3 commands → Edit things-do ×2 → Read
-//! report"); a chip opens to its calls, a call to its card: why, what the evaluator said, what
-//! was sent, what came back. Nothing scrolls but a long command or output inside its own field.
+//! calls in order, each on a row: what it did, in the agent's own words where it wrote some, and
+//! what came back, beside it; the reasoning's first sentence a quiet beat between them. A row
+//! opens to its card: why, what the evaluator said, what was sent, what came back. Nothing scrolls but a long command or output inside its own field.
 //! What a call is said as is `::thread::steps`.
 
 use ::thread::Step;
-use ::thread::steps::{self, Chip, Kind, Milestone};
+use ::thread::steps::{self, Kind, Milestone};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::thread::ThreadView;
 use crate::thread::rows::tool_labels::pretty;
-use bench_ui::clip;
 use bench_ui::icons::Ico;
 
 /// How much of the reasoning a card shows before "Show all".
@@ -34,7 +33,11 @@ impl ThreadView {
         let milestones = steps::milestones(steps);
         let last = milestones.len().saturating_sub(1);
         let mut rows: Vec<AnyElement> = vec![];
+        // Where each milestone's steps start: past the one before, so the reasoning that led to
+        // its first call is its own.
+        let mut from = 0usize;
         for (i, m) in milestones.iter().enumerate() {
+            let to = m.steps.iter().copied().max().unwrap_or(from);
             let flipped = self
                 .thread
                 .flipped_runs
@@ -42,20 +45,43 @@ impl ThreadView {
             let open = (i == last) != flipped;
             let calls: Vec<usize> = m.steps.iter().copied().filter(|k| steps[*k].is_tool()).collect();
             rows.push(self.render_milestone_row(key, steps, m, &calls, open, cx));
-            if !open || calls.is_empty() {
-                continue;
-            }
-            let chain = steps::chips(steps, &calls);
-            rows.push(self.render_chain(key, steps, &chain, cx));
-            for chip in &chain {
-                if self.thread.open_chips.contains(&(key.to_string(), chip.calls[0])) {
-                    for k in chip.calls.clone() {
-                        self.push_step(key, k, steps, true, &mut rows, cx);
+            if open && !calls.is_empty() {
+                let mut beat_shown = false;
+                for k in from..=to.min(steps.len().saturating_sub(1)) {
+                    match &steps[k] {
+                        // A run of thoughts is one beat: the first sentence of the first.
+                        Step::Thought(t) if !beat_shown => {
+                            beat_shown = true;
+                            if let Some(b) = steps::beat(t) {
+                                rows.push(self.render_beat(b, cx));
+                            }
+                        }
+                        Step::Tool { .. } => {
+                            beat_shown = false;
+                            self.push_step(key, k, steps, true, &mut rows, cx);
+                        }
+                        _ => {}
                     }
                 }
             }
+            from = to + 1;
         }
         v_flex().p_1p5().gap_0p5().children(rows).into_any_element()
+    }
+
+    /// The reasoning between calls, as a beat: its first sentence, quiet, under the calls' text.
+    fn render_beat(&mut self, beat: String, cx: &mut Context<Self>) -> AnyElement {
+        let theme = cx.theme().clone();
+        div()
+            .pl(px(bench_ui::STEP_BEAT_INSET))
+            .pr_2()
+            .py_0p5()
+            .truncate()
+            .italic()
+            .text_size(px(bench_ui::THREAD_DETAIL))
+            .text_color(bench_ui::faint(&theme))
+            .child(beat)
+            .into_any_element()
     }
 
     /// A milestone's strip: the disclosure, the agent's words (or the sentence of its calls), and
@@ -133,88 +159,6 @@ impl ThreadView {
             .into_any_element()
     }
 
-    /// A milestone's calls as a chain of chips, in the order they ran, wrapping as words do;
-    /// a chip opens to its calls under the chain.
-    fn render_chain(
-        &mut self,
-        key: &str,
-        steps: &[Step],
-        chain: &[Chip],
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        let theme = cx.theme().clone();
-        let faint = bench_ui::faint(&theme);
-        let mut items: Vec<AnyElement> = vec![];
-        for (i, chip) in chain.iter().enumerate() {
-            if i > 0 {
-                items.push(
-                    div()
-                        .flex_none()
-                        .text_color(faint)
-                        .child(Ico::ChevronRight.icon().xsmall())
-                        .into_any_element(),
-                );
-            }
-            let open = self.thread.open_chips.contains(&(key.to_string(), chip.calls[0]));
-            let flip = (key.to_string(), chip.calls[0]);
-            let judged = chip.calls.iter().any(|k| judged(&steps[*k]));
-            items.push(
-                h_flex()
-                    .id(SharedString::from(format!("chip-{key}-{}", chip.calls[0])))
-                    .flex_none()
-                    .max_w_80()
-                    .gap_1p5()
-                    .px_2()
-                    .py_0p5()
-                    .items_center()
-                    .rounded_md()
-                    .border_1()
-                    .border_color(theme.border.opacity(0.7))
-                    .text_size(px(bench_ui::THREAD_DETAIL))
-                    .cursor_pointer()
-                    .map(|d| if open { d.bg(theme.accent) } else { d.bg(theme.background).hover(|s| s.bg(theme.list_hover)) })
-                    .child(
-                        div()
-                            .flex_none()
-                            .text_color(theme.muted_foreground)
-                            .child(kind_icon(chip.kind).icon().xsmall()),
-                    )
-                    .child(div().min_w_0().truncate().text_color(theme.foreground).child(chip.label.clone()))
-                    .when(chip.failed > 0, |d| {
-                        d.child(
-                            h_flex()
-                                .flex_none()
-                                .gap_0p5()
-                                .text_color(theme.danger)
-                                .child(Ico::CircleAlert.icon().xsmall())
-                                .when(chip.failed > 1, |d| d.child(chip.failed.to_string())),
-                        )
-                    })
-                    .when(judged, |d| {
-                        d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
-                    })
-                    .on_click(cx.listener(move |this, _, _, cx| {
-                        this.claim_click(cx);
-                        if !this.thread.open_chips.remove(&flip) {
-                            this.thread.open_chips.insert(flip.clone());
-                        }
-                        cx.notify();
-                    }))
-                    .into_any_element(),
-            );
-        }
-        h_flex()
-            .flex_wrap()
-            .gap_1()
-            .items_center()
-            .pl_6()
-            .pr_2()
-            .pt_0p5()
-            .pb_1p5()
-            .children(items)
-            .into_any_element()
-    }
-
     /// A step's row, and its card under it when open; `inner` under a run.
     fn push_step(
         &mut self,
@@ -242,9 +186,9 @@ impl ThreadView {
         }
     }
 
-    /// A step's row: its icon, the action, where, quieter; a failure in the danger's colour with
-    /// the first line of what went wrong at the end; the evaluator's word a quiet mark. A click
-    /// opens or closes its card; nothing else moves.
+    /// A step's row: its icon; what it did — the action and, quieter, the agent's own words for
+    /// it — on the left; what came back on the right, a failure in the danger's colour; the
+    /// evaluator's word a quiet mark. A click opens or closes its card; nothing else moves.
     fn render_step_row(
         &mut self,
         key: &str,
@@ -258,25 +202,8 @@ impl ThreadView {
         let faint = bench_ui::faint(&theme);
         let said = steps::say(step);
         let failed = matches!(step, Step::Tool { failed: true, .. });
-        let why_failed = match step {
-            Step::Tool {
-                failed: true,
-                output: Some(o),
-                ..
-            } => o
-                .lines()
-                .map(str::trim)
-                .find(|l| !l.is_empty() && !l.contains("[Evaluator"))
-                .map(|l| clip(l, 80)),
-            _ => None,
-        };
-        let (text, quiet) = if failed {
-            (theme.danger, theme.danger.opacity(0.75))
-        } else if matches!(step, Step::Thought(_) | Step::Note(_)) {
-            (theme.muted_foreground, faint)
-        } else {
-            (theme.foreground, faint)
-        };
+        let what = steps::detail(step).or(said.place.clone());
+        let result = steps::result_line(step);
         let toggle = (key.to_string(), k);
         h_flex()
             .id(SharedString::from(format!("steprow-{key}-{k}")))
@@ -294,39 +221,36 @@ impl ThreadView {
             .child(
                 div()
                     .flex_none()
-                    .text_color(if failed { quiet } else { theme.muted_foreground })
+                    .text_color(if failed { theme.danger } else { theme.muted_foreground })
                     .child(if failed { Ico::CircleAlert } else { step_icon(step) }.icon().xsmall()),
             )
             .child(
                 h_flex()
-                    .flex_1()
+                    .w_3_5()
+                    .flex_none()
                     .min_w_0()
-                    .gap_2()
+                    .gap_1p5()
                     .items_baseline()
-                    .child(div().min_w_0().truncate().text_color(text).child(said.action))
-                    .when_some(said.place, |d, p| {
+                    .child(div().flex_none().text_color(theme.foreground).child(said.action))
+                    .when_some(what, |d, w| {
                         d.child(
                             div()
-                                .flex_none()
-                                .max_w_1_3()
+                                .min_w_0()
                                 .truncate()
-                                .text_size(px(bench_ui::THREAD_DETAIL))
-                                .text_color(quiet)
-                                .child(p),
+                                .text_color(theme.muted_foreground)
+                                .child(w),
                         )
                     }),
             )
-            .when_some(why_failed, |d, w| {
-                d.child(
-                    div()
-                        .flex_shrink_0()
-                        .max_w_2_5()
-                        .truncate()
-                        .text_size(px(bench_ui::THREAD_DETAIL))
-                        .text_color(quiet)
-                        .child(w),
-                )
-            })
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .truncate()
+                    .text_size(px(bench_ui::THREAD_DETAIL))
+                    .text_color(if failed { theme.danger } else { faint })
+                    .children(result.map(|r| if failed { r } else { format!("→ {r}") })),
+            )
             .when(judged(step), |d| {
                 d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
             })
@@ -474,19 +398,6 @@ impl ThreadView {
 /// Whether the evaluator put its word in this call's result.
 fn judged(step: &Step) -> bool {
     matches!(step, Step::Tool { output: Some(o), .. } if steps::evaluator_word(o).is_some())
-}
-
-/// A call's icon by its kind.
-fn kind_icon(kind: Kind) -> Ico {
-    match kind {
-        Kind::Command => Ico::Terminal,
-        Kind::Read => Ico::FileText,
-        Kind::Edit => Ico::Pencil,
-        Kind::Search => Ico::Search,
-        Kind::Web | Kind::Browser => Ico::Globe,
-        Kind::Plan => Ico::ListChecks,
-        Kind::Other => Ico::Wrench,
-    }
 }
 
 /// A step's icon by what its call does; the agent's words a bubble, reasoning a brain.

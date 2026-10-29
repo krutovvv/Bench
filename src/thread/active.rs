@@ -30,8 +30,6 @@ pub struct ActiveThread {
     /// milestone's first step): the last starts open — what the agent does now — the others
     /// folded.
     pub flipped_runs: HashSet<(String, usize)>,
-    /// Chips of a milestone's chain opened to their steps (work key, the chip's first call).
-    pub open_chips: HashSet<(String, usize)>,
     /// Steps whose reasoning is shown whole, past its first lines (work key, step).
     pub step_whole: HashSet<(String, usize)>,
     pub open_source: Option<(String, String)>,
@@ -91,7 +89,6 @@ impl Default for ActiveThread {
             open_steps: Default::default(),
             step_whole: Default::default(),
             flipped_runs: Default::default(),
-            open_chips: Default::default(),
             open_source: None,
             texts: Default::default(),
             history_error: None,

@@ -12,6 +12,9 @@
 //! 3. The evaluator's words are the ones it put in a call's result (`evaluator_word`).
 //! 5. The work reads as sentences (`sentences`): neighbouring calls told together in order.
 //! 6. The agent's own words between calls head the sentences after them (`chapters`).
+//! 8. Inside a milestone a call is what it did (`detail`: the agent's echoed label, its
+//!    AppleScript, its script's file) beside what came back (`result_line`), the reasoning's
+//!    first sentence a beat between them (`beat`).
 //! 7. The work's strips are milestones (`milestones`): the agent's words, or a sentence where
 //!    it wrote none; inside, its calls as a chain of chips in order (`chips`).
 //! 4. The list folds into runs (`runs`): calls of one kind in a row are one line, told in words
@@ -500,6 +503,142 @@ pub fn milestones(steps: &[Step]) -> Vec<Milestone> {
         }
     }
     out
+}
+
+/// What exactly a call did, in the agent's own words where it wrote some (rule 8): the label it
+/// echoed (`echo "=== 1. может ли процесс управлять Things ==="`), what its AppleScript asks
+/// (`make new to do «ZZZ проверка»`), the file a script works on.
+pub fn detail(step: &Step) -> Option<String> {
+    let Step::Tool { name, args, .. } = step else {
+        return None;
+    };
+    if Kind::of(name) != Kind::Command {
+        return None;
+    }
+    let command = args.get("command").and_then(|c| c.as_str()).unwrap_or("");
+    let label = echo_label(command);
+    let script = apple_script(command).or_else(|| script_file(command));
+    match (label, script) {
+        (Some(l), Some(s)) => Some(format!("{l} — {s}")),
+        (l, s) => l.or(s),
+    }
+}
+
+/// The first line of what came back, for a person: past the labels the command echoed and the
+/// evaluator's words; an error without its position (`116:120: execution error:`); a long path as
+/// its file's name.
+pub fn result_line(step: &Step) -> Option<String> {
+    let Step::Tool { output: Some(o), .. } = step else {
+        return None;
+    };
+    let line = o.lines().map(str::trim).find(|l| {
+        !l.is_empty()
+            && !l.contains("[Evaluator")
+            && !l.starts_with("===")
+            && !l.starts_with("---")
+            && !l.starts_with("###")
+            && !l.starts_with("<harness")
+            && !l.starts_with("</harness")
+            && l.chars().any(char::is_alphanumeric)
+    })?;
+    let mut l = line.to_string();
+    // `116:120: execution error: Переменная …` — the position says nothing to a person.
+    if let Some(i) = l.find("execution error:") {
+        l = l[i + "execution error:".len()..].trim().to_string();
+    }
+    l = l.trim_start_matches("Error:").trim_start_matches("error:").trim().to_string();
+    let l = l
+        .split(' ')
+        .map(|w| if w.matches('/').count() >= 3 { format!("…/{}", base(w)) } else { w.to_string() })
+        .collect::<Vec<_>>()
+        .join(" ");
+    Some(first_line(&l, 140))
+}
+
+/// The reasoning before a call, as a beat between the rows: its first sentence.
+pub fn beat(text: &str) -> Option<String> {
+    let line = text.lines().map(str::trim).find(|l| !l.is_empty())?;
+    let line = line.replace(['`', '*'], "");
+    let end = line
+        .match_indices(". ")
+        .map(|(i, _)| i + 1)
+        .find(|&i| i >= 20)
+        .unwrap_or(line.len());
+    Some(first_line(&line[..end], 160)).filter(|b| !b.is_empty())
+}
+
+/// The first label a command echoes: words, not a separator or a variable.
+fn echo_label(command: &str) -> Option<String> {
+    let mut rest = command;
+    while let Some(i) = rest.find("echo ") {
+        rest = &rest[i + 5..];
+        let r = rest.trim_start();
+        let q = r.chars().next()?;
+        let text = if q == '"' || q == '\'' {
+            r[1..].split(q).next().unwrap_or("")
+        } else {
+            r.split([';', '&', '|', '\n']).next().unwrap_or("")
+        };
+        let t = text
+            .trim()
+            .trim_matches(|c: char| "=-#*:>".contains(c) || c.is_whitespace())
+            .trim();
+        if t.chars().filter(|c| c.is_alphabetic()).count() >= 3 && !t.contains('$') {
+            return Some(first_line(t, 70));
+        }
+    }
+    None
+}
+
+/// What an AppleScript asks of its app: the statement inside `tell application "…"`, its
+/// `set x to` dropped, a record's `name:"…"` said as «…».
+fn apple_script(command: &str) -> Option<String> {
+    if !command.contains("osascript") {
+        return None;
+    }
+    let after = |s: &str| -> Option<String> {
+        let i = s.find("tell application")?;
+        let rest = &s[i..];
+        let stmt = match rest.find(" to ") {
+            Some(j) if !rest[..j].contains('\n') => rest[j + 4..].to_string(),
+            _ => rest
+                .lines()
+                .skip(1)
+                .map(str::trim)
+                .find(|l| !l.is_empty() && !l.starts_with("--") && !l.starts_with("end"))?
+                .to_string(),
+        };
+        let stmt = stmt.split(['\'', '\n']).next().unwrap_or("").trim().to_string();
+        let stmt = match stmt.strip_prefix("set ").and_then(|r| r.split_once(" to ")) {
+            Some((_, r)) => r.to_string(),
+            None => stmt,
+        };
+        Some(stmt)
+    };
+    let stmt = after(command)?;
+    let stmt = match stmt.find("name:\"") {
+        Some(i) => {
+            let rest = &stmt[i + 6..];
+            let name = rest.split('"').next().unwrap_or("");
+            let head = stmt[..i].trim_end_matches(['{', ' ']).trim_end_matches("with properties").trim();
+            format!("{head} «{}»", first_line(name, 40))
+        }
+        None => stmt,
+    };
+    Some(first_line(&stmt, 80)).filter(|s| !s.is_empty())
+}
+
+/// The file a Python or Node script works on: the first quoted path in it, by its name.
+fn script_file(command: &str) -> Option<String> {
+    if !(command.contains("python") || command.contains("node")) || !command.contains("<<") {
+        return None;
+    }
+    let body = command.split_once("<<")?.1;
+    body.split(['\'', '"'])
+        .skip(1)
+        .step_by(2)
+        .find(|q| q.contains('/') && q.contains('.') && !q.contains(' '))
+        .map(base)
 }
 
 /// A chip of a milestone's chain: calls of one kind in a row, in the order they ran.
@@ -1145,6 +1284,41 @@ mod tests {
         assert_eq!((m[1].heading.as_str(), m[1].words), ("Found the cause.", true));
         let labels: Vec<String> = chips(&steps, &m[1].steps).into_iter().map(|c| c.label).collect();
         assert_eq!(labels, vec!["Edit things-do ×2", "Show things-do", "Read report"]);
+    }
+
+    #[test]
+    fn rule_8_what_a_call_did_and_what_came_back() {
+        let bash = |c: &str, out: &str| Step::Tool {
+            call_id: String::new(),
+            name: "bash".into(),
+            args: json!({ "command": c }),
+            preview: String::new(),
+            output: Some(out.into()),
+            failed: false,
+            diff: None,
+        };
+        let a = bash(
+            "echo \"=== 1. AppleScript: может ли мой процесс управлять Things ===\"; osascript -e 'tell application \"Things3\" to get name' 2>&1",
+            "=== 1. AppleScript: может ли мой процесс управлять Things ===\nThings3\n",
+        );
+        assert_eq!(
+            detail(&a).as_deref(),
+            Some("1. AppleScript: может ли мой процесс управлять Things — get name")
+        );
+        assert_eq!(result_line(&a).as_deref(), Some("Things3"));
+        let b = bash(
+            "osascript <<'OSA' 2>&1 | head -5\ntell application \"Things3\"\n\tset t to make new to do with properties {name:\"ZZZ проверка\", notes:x}\nend tell\nOSA",
+            "116:120: execution error: Переменная todo не определена. (-2753)",
+        );
+        assert_eq!(detail(&b).as_deref(), Some("make new to do «ZZZ проверка»"));
+        assert_eq!(result_line(&b).as_deref(), Some("Переменная todo не определена. (-2753)"));
+        let c = bash("python3 - <<'PY'\nsrc='/Users/v/files/task-notes.md'\nprint(1)\nPY", "pkg: /Users/v/.cache/uv/lib/site-packages/things_mcp");
+        assert_eq!(detail(&c).as_deref(), Some("task-notes.md"));
+        assert_eq!(result_line(&c).as_deref(), Some("pkg: …/things_mcp"));
+        assert_eq!(
+            beat("Big finding: AppleScript works right now. That means more.").as_deref(),
+            Some("Big finding: AppleScript works right now.")
+        );
     }
 
     #[test]

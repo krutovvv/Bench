@@ -248,8 +248,11 @@ fewer form fields. Then check what it did to signups and give me a short summary
                 t.open_work.insert(key.clone());
                 let listed = ::thread::steps::listed(&steps);
                 if let Some(k) = unfold.first().and_then(|i| listed.get(i.saturating_sub(1))) {
-                    t.open_steps.insert((key.clone(), *k));
-                    // Its milestone open, and the chip holding it.
+                    // `BENCH_DEMO_CARD=0`: its milestone open, its card not.
+                    if std::env::var("BENCH_DEMO_CARD").as_deref() != Ok("0") {
+                        t.open_steps.insert((key.clone(), *k));
+                    }
+                    // Its milestone open.
                     let ms = ::thread::steps::milestones(&steps);
                     let last = ms.len().saturating_sub(1);
                     for (i, m) in ms.iter().enumerate() {
@@ -258,11 +261,6 @@ fewer form fields. Then check what it did to signups and give me a short summary
                         }
                         if i != last {
                             t.flipped_runs.insert((key.clone(), m.steps[0]));
-                        }
-                        for chip in ::thread::steps::chips(&steps, &m.steps) {
-                            if chip.calls.contains(k) {
-                                t.open_chips.insert((key.clone(), chip.calls[0]));
-                            }
                         }
                     }
                 }

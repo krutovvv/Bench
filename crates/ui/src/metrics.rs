@@ -131,6 +131,8 @@ pub const THREAD_META: f32 = 13.;
 pub const THREAD_DETAIL: f32 = 12.;
 /// A call's command or output field at most, scrolling inside past it, as a text field does.
 pub const STEP_FIELD_MAX_H: f32 = 220.;
+/// A reasoning beat between a milestone's rows starts under the rows' text, past their icon.
+pub const STEP_BEAT_INSET: f32 = 46.;
 pub const BAR_TITLE: f32 = 13.;
 /// The short rule between the sidebar's part of the top bar and the title.
 pub const BAR_SEPARATOR_H: f32 = 16.;
