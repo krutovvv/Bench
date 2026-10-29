@@ -1,7 +1,8 @@
 // What a conversation's current turn is about, kept by the default extension's hooks: the
 // person's request (the last message they wrote), the plan the agent keeps (`todo`), the turn's
 // steps (top-level tool calls, a script's nested calls not counted) and the last few of them in a
-// line each. The step limit (`steps.ts`) and the evaluator (`judge/`) read it; nothing else does.
+// line each. The step limit (`steps.ts`), the plan's reminder (`planNudge`) and the evaluator
+// (`judge/`) read it; nothing else does.
 // In memory only (`kept.ts`): after a restart a turn starts counting again, which errs on the side
 // of working.
 
@@ -28,6 +29,8 @@ export interface Turn {
 	planId: string;
 	/** The steps at which the evaluator last read the plan. */
 	planAt: number;
+	/** Steps since the agent last wrote the plan (`todo`), across turns: the plan's reminder (`planNudge`). */
+	planStale: number;
 	/** Top-level tool calls in this turn. */
 	steps: number;
 	/** The last steps, a line each: the call and the start of its result. */
@@ -82,7 +85,7 @@ export interface Call {
 }
 
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
+const fresh = (request: string, plan: PlanStep[] = [], planId = "", planStale = 0): Turn => ({ request, plan, planId, planAt: 0, planStale, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
 
 const turns = slot<Turn>(() => fresh(""));
 
@@ -105,7 +108,7 @@ export function seeRequest(conversation: string, messages: readonly any[]): void
 	if (!text || text.startsWith(EVAL_OPEN) || text.startsWith(SUMMARY_PREFIX)) return;
 	const t = turns.get(conversation);
 	if (t.request === text && t.steps === 0) return;
-	const next = fresh(text, t.plan, t.planId);
+	const next = fresh(text, t.plan, t.planId, t.planStale);
 	next.opening = messages.filter((m) => m?.role === "user").length === 1;
 	// The agent's last words before this message: what the person answers to.
 	const before = [...messages.slice(0, at)].reverse().find((m) => m?.role === "assistant" && (m.content ?? []).some((b: any) => b?.type === "text" && String(b.text ?? "").trim()));
@@ -131,7 +134,8 @@ export function seeResult(conversation: string, call: { id?: string; name: strin
 		t.plan = planOf(call.arguments);
 		t.planId = String(call.id ?? "");
 		t.planAt = t.steps;
-	}
+		t.planStale = 0;
+	} else t.planStale++;
 	const args = JSON.stringify(call.arguments ?? {});
 	const out = resultText(result).replace(/\s+/g, " ").trim();
 	t.calls.push({ name: call.name, args: call.arguments ?? {}, failed: !notRun && !!result?.isError, notRun, out: cut(out, EVIDENCE) });
@@ -172,6 +176,23 @@ export function seeAnswer(conversation: string, message: any): void {
 	const t = turnOf(conversation);
 	t.said.push(cut(text, EVIDENCE));
 	if (t.said.length > KEPT) t.said.splice(0, t.said.length - KEPT);
+}
+
+/** Steps a plan with open items may go unchanged before the model is reminded of it. */
+export const PLAN_STALE_STEPS = 5;
+
+/**
+ * What the model is told after a step about its plan, if anything (the turn's plan, as `todo` wrote
+ * it). Models (Qwen above all) write a plan at the start and never touch it again, and the person
+ * reads a plan left as it was as work still at its first step: every few steps with open items
+ * unchanged, a line says so. With the evaluator on, its marks (`judge/plan.ts`) do this instead.
+ */
+export function planNudge(conversation: string): string | undefined {
+	const t = turnOf(conversation);
+	const open = t.plan.filter((p) => p.status === "in_progress" || p.status === "pending");
+	const current = open.find((p) => p.status === "in_progress") ?? open[0];
+	if (!current || !t.planStale || t.planStale % PLAN_STALE_STEPS) return undefined;
+	return `[Your plan has not changed for ${t.planStale} steps; it still shows "${current.content}" as the current step. If that step is done or you have moved on, call todo with the whole list now: the person reads the plan as where you are.]`;
 }
 
 /** The text a tool returned. */

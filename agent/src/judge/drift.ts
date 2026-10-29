@@ -8,6 +8,7 @@
 // checked every 3 steps. The model decides what to do.
 
 import { cut } from "../turn/turn.ts";
+import { limitReached } from "../turn/steps.ts";
 
 import { sure, type Point } from "./point.ts";
 
@@ -41,9 +42,10 @@ const LEANING: Record<string, (request: string) => string> = {
 export const course: Point = {
 	name: "course",
 	moment: "result",
-	ask({ turn }) {
+	ask({ conversation, turn }) {
 		const every = WORDS.has(turn.intent) ? WORDS_EVERY : DRIFT_EVERY;
-		if (!turn.request || turn.steps - turn.checkedAt < every) return undefined;
+		// Past the step limit the limit has told it to answer (`turn/steps.ts`): nothing to add.
+		if (!turn.request || turn.steps - turn.checkedAt < every || limitReached(conversation)) return undefined;
 		turn.checkedAt = turn.steps;
 		return {
 			questions: {

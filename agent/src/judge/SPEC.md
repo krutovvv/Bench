@@ -54,7 +54,7 @@ one thread are asked about at once. The default extension's hooks call the momen
   never back; when one finishes and none is under way, the next begins. The thread shows the plan
   so marked (`bench.plan`, read by the journal as a later snapshot of the same plan) and the model
   is told in a line, so it need not spend a step on `todo`. Its own `todo` call wins and the marks
-  start again from it. With the evaluator off or failing, the plan's reminder (`planNudge`) does
+  start again from it. With the evaluator off or failing, the plan's reminder (`turn/turn.ts` `planNudge`) does
   this job; with it on, the reminder is silent.
 - **course** (`drift.ts`, `result`, every 5 steps): on track, drifting to something not asked,
   looping, or done. Anything but on track, when sure (0.7), is a note with that step's result.
@@ -161,6 +161,21 @@ matters it comes last.
 
 The safe side wins every tie: the option that changes nothing is listed first (the model leans to
 the first), and below its threshold an answer changes nothing.
+
+## Who decides stop and done
+
+Each question has one owner, so no two speak about the same thing:
+
+- **Stopping a turn** is the step limit's alone (`turn/steps.ts`, not the evaluator's): past it
+  calls are refused and the model is told to answer. Neither course nor done is asked then.
+- **A single call that repeats an earlier one** is `repeat.ts`'s, before it runs (the call
+  refused once). **A run of steps going round** is `drift.ts`'s `looping`, after a result (a
+  note): it judges the course of the last steps, never one call against another.
+- **The work leaving the request, or looking done while the agent goes on** is `drift.ts`'s, mid
+  turn (a note; it never ends the turn).
+- **Whether the final answer is done** is `done.ts`'s, at the answer (sent back once).
+- **The plan's marks** are `plan.ts`'s; with the evaluator off or failing, the plan's reminder
+  (`turn/turn.ts` `planNudge`, which reads the same plan the turn keeps from `todo`).
 
 ## Growing it
 

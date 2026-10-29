@@ -10,7 +10,7 @@ import { defineExtension, defineTool, GenerationTask, hook, ProviderDoc, section
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
 import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
-import { clarify, planNudge, sessionSearch, todo } from "../builtin/ask.ts";
+import { clarify, sessionSearch, todo } from "../builtin/ask.ts";
 import { CronTask, cronTool } from "../builtin/cron.ts";
 import { ProcessTask, processTool } from "../builtin/process.ts";
 import { memoryTool } from "../builtin/memory.ts";
@@ -23,7 +23,7 @@ import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../turn/steps.ts";
 import { fitRequestFor, fitResultFor, seeUsage } from "../turn/window.ts";
 import { toolsToLoad } from "../judge/start.ts";
-import { markNotRun, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../turn/turn.ts";
+import { markNotRun, planNudge, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../turn/turn.ts";
 import { evaluatorFor, judgeActive } from "../judge/client.ts";
 import { PROVIDER as EVALUATOR } from "../judge/models.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
@@ -240,8 +240,8 @@ async function notesAfter(call: any, result: any, api: any, context: any): Promi
 	const judged = top ? await atResult(conversation, call, result, context?.abortSignal).catch(() => none) : none;
 	const ranked = !!judged.result;
 	if (judged.result) result = judged.result;
-	const nudge = planNudge(conversation, call);
-	const first = [evaluated ? undefined : nudge, ...judged.notes].filter((n): n is string => !!n);
+	const nudge = top && !evaluated ? planNudge(conversation) : undefined;
+	const first = [nudge, ...judged.notes].filter((n): n is string => !!n);
 	const withNotes = (notes: string[]) =>
 		notes.length || ranked ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
 	if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(first);
