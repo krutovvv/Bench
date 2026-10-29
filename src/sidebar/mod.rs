@@ -62,9 +62,11 @@ impl BenchApp {
                     .when(self.local_conn().is_none() && self.threads.list.is_empty(), |d| {
                         d.child(
                             div()
-                                .px_4()
-                                .py_2()
-                                .text_sm()
+                                // Where the rows' words start, as every line of the sidebar.
+                                .pl(px(bench_ui::SIDEBAR_TEXT_X))
+                                .pr_4()
+                                .py_1()
+                                .text_size(px(bench_ui::SIDEBAR_TEXT))
                                 .text_color(muted)
                                 .child("Connecting…"),
                         )
@@ -104,9 +106,10 @@ impl BenchApp {
 
     pub(crate) fn sidebar_note(&self, text: &'static str, cx: &mut Context<Self>) -> AnyElement {
         div()
-            .px_4()
-            .py_2()
-            .text_sm()
+            .pl(px(bench_ui::SIDEBAR_TEXT_X))
+            .pr_4()
+            .py_1()
+            .text_size(px(bench_ui::SIDEBAR_TEXT))
             .text_color(cx.theme().muted_foreground)
             .child(text)
             .into_any_element()
