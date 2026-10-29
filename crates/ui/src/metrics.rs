@@ -131,9 +131,6 @@ pub const THREAD_META: f32 = 13.;
 pub const THREAD_DETAIL: f32 = 12.;
 /// A step's side column (what came back), as Finder's Date Modified: a step under the detail.
 pub const THREAD_SIDE: f32 = 11.;
-/// A step under a milestone starts one disclosure in: its icon where the milestone's words start
-/// (the disclosure's 12 and the 8 after it); its opened parts start there too.
-pub const STEP_NESTED_INSET: f32 = 20.;
 pub const BAR_TITLE: f32 = 13.;
 /// The short rule between the sidebar's part of the top bar and the title.
 pub const BAR_SEPARATOR_H: f32 = 16.;

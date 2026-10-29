@@ -49,8 +49,8 @@ impl ThreadView {
                 let mut kids: Vec<AnyElement> = vec![];
                 for k in from..=to.min(steps.len().saturating_sub(1)) {
                     if steps[k].is_tool() {
-                        // Indented one disclosure: the step's icon under the milestone's words.
-                        self.push_step(key, k, steps, true, &mut kids, cx);
+                        // One left edge for all: the steps start where the milestone does.
+                        self.push_step(key, k, steps, &mut kids, cx);
                     }
                 }
                 rows.push(
@@ -144,28 +144,20 @@ impl ThreadView {
             .into_any_element()
     }
 
-    /// A step's row, and its card under it when open; `inner` under a run.
+    /// A step's row, and its card under it when open.
     fn push_step(
         &mut self,
         key: &str,
         k: usize,
         steps: &[Step],
-        inner: bool,
         rows: &mut Vec<AnyElement>,
         cx: &mut Context<Self>,
     ) {
         let open = self.thread.open_steps.contains(&(key.to_string(), k));
-        rows.push(self.render_step_row(key, k, &steps[k], inner, open, cx));
+        rows.push(self.render_step_row(key, k, &steps[k], open, cx));
         if open {
             let card = self.render_step_card(key, k, steps, cx);
-            // Under a milestone its parts start where the step's own icon does: the row's room,
-            // the disclosure's width, the gap after it.
-            rows.push(
-                div()
-                    .when(inner, |d| d.pl(px(bench_ui::STEP_NESTED_INSET)))
-                    .child(card)
-                    .into_any_element(),
-            );
+            rows.push(card);
         }
     }
 
@@ -177,7 +169,6 @@ impl ThreadView {
         key: &str,
         k: usize,
         step: &Step,
-        inner: bool,
         open: bool,
         cx: &mut Context<Self>,
     ) -> AnyElement {
@@ -200,10 +191,6 @@ impl ThreadView {
             .cursor_pointer()
             // On an open milestone's ground a step lights nothing on hover: the pointer says it
             // opens.
-            // Under a milestone: the room of its disclosure, so the icon starts where its words do.
-            .when(inner, |d| {
-                d.child(div().flex_none().invisible().child(Ico::ChevronRight.icon().xsmall()))
-            })
             .child(
                 div()
                     .flex_none()
