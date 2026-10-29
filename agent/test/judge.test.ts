@@ -16,9 +16,9 @@ process.env.BENCH_HOME = home;
 
 const { setHost } = await import("../src/host.ts");
 const { setSetting, writeAgent, readAgent } = await import("../src/config.ts");
-const { seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
+const { markNotRun, seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
 const { stepGate, stepNote } = await import("../src/builtin/steps.ts");
-const { endpointOf, checkJudge } = await import("../src/judge/client.ts");
+const { endpointOf, checkJudge, fitState } = await import("../src/judge/client.ts");
 const { atResult, atAnswer } = await import("../src/judge/index.ts");
 const { DRIFT_EVERY } = await import("../src/judge/drift.ts");
 const { PLAN_EVERY } = await import("../src/judge/plan.ts");
@@ -367,6 +367,55 @@ test("a call that repeats a failed one is refused once; a new step, or the same 
 	const before = seen.length;
 	assert.equal((await atCall("r1", { name: "read", arguments: { path: "a" } }, false)).block, undefined, "another tool: not asked");
 	assert.equal(seen.length, before);
+});
+
+test("repeat asks only about the same call, whole: other scripts, offsets and refused calls are not repeats", async () => {
+	seeRequest("r2", [user("Restore the skills from the backup")]);
+	const script = (body: string) => ({ name: "bash", arguments: { command: `cd /tmp && python3 - <<'EOF'\nimport json, glob, hashlib, os\n${body}\nEOF` } });
+	seeResult("r2", script("for f in glob.glob('/tmp/atm/sessions/*.json'): print(f, os.path.getsize(f))"), out("a.json 80048"));
+	reply = () => choice("repeat.repeat", { new: 0.01, same_failed: 0.01, same_result: 0.98 });
+	const before = seen.length;
+	// The same first 200 characters, another script: not asked at all.
+	assert.equal((await atCall("r2", script("d=json.load(open('/tmp/atm/sessions/request_dump_1.json')); print(len(d['request']['body']['messages']))"), false)).block, undefined);
+	// Another part of the same file: not asked.
+	seeResult("r2", { name: "read", arguments: { path: "SKILL.md", offset: 1, limit: 60 } }, out("1:aa|---"));
+	assert.equal((await atCall("r2", { name: "read", arguments: { path: "SKILL.md", offset: 60, limit: 80 } }, false)).block, undefined);
+	assert.equal(seen.length, before, "nothing to ask");
+	// The same call whole is asked, with both calls in full.
+	reply = (body) => {
+		assert.match(body.state.earlier_call, /getsize/);
+		return choice("repeat.repeat", { new: 0.05, same_failed: 0.05, same_result: 0.9 });
+	};
+	assert.match((await atCall("r2", script("for f in glob.glob('/tmp/atm/sessions/*.json'): print(f, os.path.getsize(f))"), false)).block!, /already have/);
+	// A refused call never ran: the next call is not read as repeating a failure, and no failure note comes.
+	const probe = { id: "c9", name: "bash", arguments: { command: "sqlite3 /tmp/s.db 'select 1'" } };
+	markNotRun("r2", "c9");
+	seeResult("r2", probe, { output: [{ type: "text", text: "Tool call blocked: [Evaluator: …]" }], isError: true });
+	assert.match(turnOf("r2").recent.at(-1)!, /NOT RUN/);
+	assert.equal(turnOf("r2").calls.at(-1)!.failed, false);
+	const asked = seen.length;
+	assert.equal((await atCall("r2", probe, false)).block, undefined, "the refused call is no earlier result");
+	assert.equal(seen.length, asked);
+});
+
+test("a near copy of a long call is stopped only when the evaluator is surer", async () => {
+	seeRequest("r3", [user("Run the smoke test")]);
+	const run = (n: number) => ({ name: "bash", arguments: { command: `cd /tmp && python3 /tmp/mcp_smoke.py --verbose --timeout 300 --server things --tags get_tags add_todo --retries ${n} 2>&1 | tail -20` } });
+	seeResult("r3", run(1), out("ok"));
+	reply = () => choice("repeat.repeat", { new: 0.1, same_failed: 0.0, same_result: 0.9 });
+	assert.equal((await atCall("r3", run(2), false)).block, undefined, "0.9 is not enough for a near copy");
+	reply = () => choice("repeat.repeat", { new: 0.02, same_failed: 0.0, same_result: 0.98 });
+	assert.match((await atCall("r3", run(3), false)).block!, /already have/);
+});
+
+test("a state too long for the server's window keeps the latest results and its parts' names", () => {
+	const found = Array.from({ length: 40 }, (_, i) => `result ${i} ` + "я".repeat(1990));
+	const fitted: any = fitState({ final_answer: "x".repeat(4000), found }, 20_000);
+	assert.ok(JSON.stringify(fitted).length <= 20_000);
+	assert.match(fitted.found.at(-1), /^result 39 /);
+	assert.equal(fitted.final_answer.length, 4000);
+	const parts: any = fitState({ list: { i0: "a".repeat(30_000), i1: "b" } }, 20_000);
+	assert.deepEqual(Object.keys(parts.list), ["i0", "i1"]);
 });
 
 test("an answer whose numbers none of the results gives is sent back once", async () => {

@@ -12,15 +12,16 @@ const SURE = 0.6;
 const SAY: Record<string, string> = {
 	retry: "[Evaluator: a passing failure (a timeout, the network): trying the same once more is reasonable — once.]",
 	fix: "[Evaluator: the call itself was wrong (its arguments, a path, the syntax): fix it from the error before trying again.]",
-	other_way: "[Evaluator: this way does not work here (blocked, missing, unsupported): do not repeat it or vary it; take another way.]",
+	other_way: "[Evaluator: this way does not work here (blocked, missing, unsupported): do not try it again as it is; find out why (where the thing really is, what is supported) or take another way.]",
 	ask: "[Evaluator: this needs the person (access, a key, a login, a decision): ask them instead of trying more.]",
 };
 
 export const failure: Point = {
 	name: "failure",
 	moment: "result",
-	ask({ call, result }) {
-		if (!call || !result?.isError) return undefined;
+	ask({ call, result, turn }) {
+		// A call refused before it ran did not fail: the refusal says why itself.
+		if (!call || !result?.isError || (turn.calls.at(-1)?.notRun ?? false)) return undefined;
 		return {
 			state: { failed_call: `${call.name} ${cut(JSON.stringify(call.arguments ?? {}), 600)}`, error: cut(resultText(result), 1500) },
 			questions: {

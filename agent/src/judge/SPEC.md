@@ -54,20 +54,30 @@ each point's answers under its own names. The default extension's hooks call the
 
 - **start** (`start.ts`, `request`, a turn's first): which of the thread's skills fits the request
   (a choice, "none" first) and which MCP servers the work needs (a choice of two each); a sure
-  answer is a line with that request: load this skill, use these servers' tools.
+  answer (a skill 0.8, a server 0.75) is a line with that request: load this skill, use these
+  servers' tools.
 - **risk** (`risk.ts`, `call`, approvals "manual" only): a command the patterns let through is
   judged — reads, changes the project, or harm hard to undo; harm (0.5) asks the person, as a
   pattern's hit does. It only adds questions.
 - **failure** (`failure.ts`, `result`, a failed call): retry once, fix the call, another way, or
-  ask the person (0.6), said with the error.
+  ask the person (0.6), said with the error. "Another way" still lets the agent find out why (a
+  path not where it thought is looked for, not given up).
 - **excerpt** (`excerpt.ts`, called by `builtin/window.ts`): a result past its share of the window
   is cut into parts of 1 500 characters, the parts put in the state (9 000 characters a request),
   and a choice over their names (and "none", last) keeps the parts that stand out; without an
   answer, the cut keeps head and tail as before.
 
-- **repeat** (`repeat.ts`, `call`, when the same tool was called in the last 3 steps): the call is
-  new, repeats a failed one, or repeats one whose result the agent has, nothing changed since; a
-  repeat (both kinds summed, 0.85) is refused once with the reason — the same call again runs.
+- **repeat** (`repeat.ts`, `call`): which earlier call of the last 3 the next one is the same
+  as is the code's to say, on the whole arguments — a short value (a path, an offset, a pattern)
+  that differs is another call; a long one (a command, a script) mostly alike by its words (0.8) is
+  a near copy. A line's start cannot say it: in a thread restoring skills from a backup every
+  `cd /tmp && python3 - <<'EOF' import json…` read alike in 200 characters, and 12 different calls
+  were refused as repeats. The evaluator, shown both calls whole and what was done between, judges
+  what the code cannot: new (another part, a fixed error, something changed since), a repeat of a
+  failed one, or of one whose result the agent has. A repeat (both kinds summed, 0.85; a near copy
+  0.95, as it is often a fix) is refused once with the reason — the same call again runs. A call
+  refused before it ran (a repeat, the step limit, the person) is no failure and no earlier result
+  (`markNotRun`): the next call is not read as repeating it, and the failure point is not asked.
 - **listing** (`listing.ts`, `result`): a JSON list of 8 items or more (a shop's or a web search's)
   comes ordered by use for the request, the items that stand out first, every item kept.
 - **claims** (`claims.ts`, `answer`): an answer with numbers after 3 steps or more is checked
@@ -124,4 +134,7 @@ by the evaluator.
 ## Known limitations
 
 - What a turn is, is kept in memory: after a restart of the agent a turn's steps count from zero.
-- The evaluator's state is cut to 24 000 characters (a local server's window is about 16K tokens).
+- Every state is fitted to 20 000 characters before it is sent (`fitState`: the largest member
+  shrinks, a list losing its oldest items, named parts keeping their names); a server that still
+  says its window is exceeded (Russian and code are dense in tokens) is asked once more with half.
+  At 24 000 and with the turn's results unfitted, the answer's check failed on long turns (2 of 4 in that thread).

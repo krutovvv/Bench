@@ -10,8 +10,9 @@ import { mcpServerTools } from "../mcp/mcp.ts";
 import { cut } from "../builtin/turn.ts";
 import type { Point } from "./point.ts";
 
-/** How sure the evaluator must be to name a skill, or a server. */
-const SURE_SKILL = 0.6;
+/** How sure the evaluator must be to name a skill, or a server: the skills that fitted came at
+ *  0.83–0.95, a wrong one (computer-use for a folder of backups) at 0.71. */
+const SURE_SKILL = 0.8;
 const SURE_SERVER = 0.75;
 /** The most skills and servers offered (a choice holds at most 255 options). */
 const MAX_SKILLS = 120;

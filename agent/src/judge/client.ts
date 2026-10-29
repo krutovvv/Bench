@@ -46,8 +46,30 @@ export interface ChoiceAnswer {
 const TIMEOUT_MS = 150_000;
 /** After a failure the evaluator is left alone this long. */
 const QUIET_MS = 60_000;
-/** The most of a state sent, in characters (a local server's window is ~16K tokens). */
-export const STATE_CAP = 24_000;
+/** The most of a state sent, in characters (a local server's window is ~16K tokens; Russian and
+ *  code take more tokens a character than English: 24 000 overflowed it). */
+export const STATE_CAP = 20_000;
+
+/**
+ * The state within `cap` characters: its largest member shrinks until it fits — a list loses its
+ * oldest items first (the latest results matter most), a text its end. What a point put in stays;
+ * only how much of it.
+ */
+export function fitState(state: unknown, cap = STATE_CAP): unknown {
+	if (!state || typeof state !== "object" || JSON.stringify(state).length <= cap) return state;
+	const s: Record<string, any> = { ...(state as Record<string, any>) };
+	for (let guard = 0; guard < 200 && JSON.stringify(s).length > cap; guard++) {
+		const [k] = Object.entries(s).map(([k, v]) => [k, JSON.stringify(v ?? "").length] as const).sort((a, b) => b[1] - a[1])[0];
+		const v = s[k];
+		if (Array.isArray(v) && v.length > 1) s[k] = v.slice(Math.ceil(v.length / 4));
+		else if (Array.isArray(v)) s[k] = v.map((x) => (typeof x === "string" ? x.slice(0, Math.floor(x.length / 2)) : x));
+		else if (typeof v === "string") s[k] = v.slice(0, Math.floor(v.length / 2));
+		// Named parts (a listing's items, a result's parts) keep their names: each text shrinks.
+		else if (v && typeof v === "object") s[k] = Object.fromEntries(Object.entries(v).map(([n, x]) => [n, typeof x === "string" ? x.slice(0, Math.floor(x.length / 2)) : x]));
+		else break;
+	}
+	return s;
+}
 
 /** Each address's end of quiet after a failure. */
 const quietUntil = new Map<string, number>();
@@ -95,13 +117,21 @@ export async function ask(
 	const s = judgeFor(conversation);
 	if (!s || Date.now() < (quietUntil.get(s.base_url!) ?? 0)) return undefined;
 	const started = Date.now();
-	try {
-		const r = await fetch(endpointOf(s.base_url!), {
+	const post = (cap: number) =>
+		fetch(endpointOf(s.base_url!), {
 			method: "POST",
 			headers: { "Content-Type": "application/json", ...(s.api_key ? { Authorization: `Bearer ${s.api_key}` } : {}) },
-			body: JSON.stringify({ model: s.model?.trim() || "jev-latest", state, questions }),
+			body: JSON.stringify({ model: s.model?.trim() || "jev-latest", state: fitState(state, cap), questions }),
 			signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(TIMEOUT_MS)]) : AbortSignal.timeout(TIMEOUT_MS),
 		});
+	try {
+		let r = await post(STATE_CAP);
+		// Over the server's window still (a text dense in tokens): once more with half as much.
+		if (r.status === 422) {
+			const text = await r.text();
+			if (!/context/i.test(text)) throw new Error(`HTTP 422: ${text.slice(0, 300)}`);
+			r = await post(STATE_CAP / 2);
+		}
 		if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 300)}`);
 		const answers = ((await r.json()) as any)?.answers ?? {};
 		host().count(conversation, "call");

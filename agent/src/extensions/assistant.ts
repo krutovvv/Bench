@@ -23,7 +23,7 @@ import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../builtin/steps.ts";
 import { fitRequestFor, fitResultFor, seeUsage } from "../builtin/window.ts";
 import { toolsToLoad } from "../judge/start.ts";
-import { seeAnswer, seeRequest, seeResult, turnOf } from "../builtin/turn.ts";
+import { markNotRun, seeAnswer, seeRequest, seeResult, turnOf } from "../builtin/turn.ts";
 import { judgeActive } from "../judge/client.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
@@ -143,27 +143,10 @@ export const assistant = defineExtension({
 		} as any),
 		hook(ToolTask, {
 			beforeTool: async (call: any, api: any, context: any) => {
-				// The person's hold, felt before any next step — the current answer and the step
-				// already running are let through; nothing new begins until the hold lifts.
-				// The conversation is the hook's `api`'s, not the call's (Pi's ToolCall has no id of it).
-				const info = host().thread(api.conversationId);
-				if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
-				// A step of the turn (a script's nested calls are its own): refused past the project's limit.
-				if (!call.parent) {
-					const refused = stepGate(String(api.conversationId));
-					if (refused) return { block: refused };
-				}
-				const shell = ["bash", "ssh_run"].includes(call.name) && !!info && approvalsMode(info.agent) === "manual";
-				const command = String(call.arguments?.command ?? call.args?.command ?? "");
-				const hit = shell ? DANGEROUS.find(([re]) => re.test(command))?.[1] : undefined;
-				// The evaluator: a repeat of a failed or known call is refused (`judge/repeat.ts`); with
-				// approvals on, a command the patterns let through is judged too (`judge/risk.ts`).
-				const judged = call.parent ? {} : await atCall(String(api.conversationId), call, shell && !hit, context?.abortSignal).catch(() => ({}) as { block?: string; approve?: string });
-				if (judged.block) return { block: judged.block };
-				const why = hit ?? judged.approve;
-				if (!why || !info) return undefined;
-				const choice = await host().approve(info.id, String(call.id), command, why);
-				return choice === "deny" ? { block: `The person declined this command (${why}). Do not retry it; ask or choose another way.` } : undefined;
+				const r = await gate(call, api, context);
+				// A refused call is marked so: the turn reads its result as never run, not as a failure.
+				if (r?.block && !call.parent) markNotRun(String(api.conversationId), call.id);
+				return r;
 			},
 			// The file's errors from the project's language servers, with the edit that made them
 			// (`lsp.ts`): the model sees them as an editor shows them, without asking.
@@ -185,6 +168,31 @@ export const assistant = defineExtension({
 		} as any),
 	],
 } as any);
+
+/** Before a call: the person's hold, the step limit, the evaluator's repeat and risk, approvals. */
+async function gate(call: any, api: any, context: any): Promise<{ block?: string } | undefined> {
+	// The person's hold, felt before any next step — the current answer and the step
+	// already running are let through; nothing new begins until the hold lifts.
+	// The conversation is the hook's `api`'s, not the call's (Pi's ToolCall has no id of it).
+	const info = host().thread(api.conversationId);
+	if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
+	// A step of the turn (a script's nested calls are its own): refused past the project's limit.
+	if (!call.parent) {
+		const refused = stepGate(String(api.conversationId));
+		if (refused) return { block: refused };
+	}
+	const shell = ["bash", "ssh_run"].includes(call.name) && !!info && approvalsMode(info.agent) === "manual";
+	const command = String(call.arguments?.command ?? call.args?.command ?? "");
+	const hit = shell ? DANGEROUS.find(([re]) => re.test(command))?.[1] : undefined;
+	// The evaluator: a repeat of a failed or known call is refused (`judge/repeat.ts`); with
+	// approvals on, a command the patterns let through is judged too (`judge/risk.ts`).
+	const judged = call.parent ? {} : await atCall(String(api.conversationId), call, shell && !hit, context?.abortSignal).catch(() => ({}) as { block?: string; approve?: string });
+	if (judged.block) return { block: judged.block };
+	const why = hit ?? judged.approve;
+	if (!why || !info) return undefined;
+	const choice = await host().approve(info.id, String(call.id), command, why);
+	return choice === "deny" ? { block: `The person declined this command (${why}). Do not retry it; ask or choose another way.` } : undefined;
+}
 
 /** The notes that come with a call's result, and the result as the evaluator left it; undefined: unchanged. */
 async function notesAfter(call: any, result: any, api: any, context: any): Promise<any> {

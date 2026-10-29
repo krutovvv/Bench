@@ -48,11 +48,24 @@ export interface Turn {
 	load: string[];
 	/** The last call the evaluator stopped as a repeat (`judge/repeat.ts`): the same again goes through. */
 	stopped: string;
+	/** The last steps whole: each call's arguments in full, whether it failed or was never run. */
+	calls: Call[];
+	/** The ids of calls refused before they ran (a repeat, the step limit, the person): not failures. */
+	notRun: Set<string>;
+}
+
+/** A step as `judge/repeat.ts` compares it: its arguments whole, not a line's start. */
+export interface Call {
+	name: string;
+	args: any;
+	failed: boolean;
+	notRun: boolean;
+	out: string;
 }
 
 const turns = new Map<string, Turn>();
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "" });
+const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set() });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {
@@ -78,9 +91,15 @@ export function countStep(conversation: string): number {
 	return ++turnOf(conversation).steps;
 }
 
+/** A call was refused before it ran: its result is the reason, not a failure of the call. */
+export function markNotRun(conversation: string, id: unknown): void {
+	if (id != null) turnOf(conversation).notRun.add(String(id));
+}
+
 /** A call finished: remember it in a line, and the plan when it was `todo`. */
 export function seeResult(conversation: string, call: { id?: string; name: string; arguments?: any }, result: any): void {
 	const t = turnOf(conversation);
+	const notRun = call.id != null && t.notRun.delete(String(call.id));
 	if (call.name === "todo" && !result?.isError) {
 		t.plan = planOf(call.arguments);
 		t.planId = String(call.id ?? "");
@@ -88,6 +107,14 @@ export function seeResult(conversation: string, call: { id?: string; name: strin
 	}
 	const args = JSON.stringify(call.arguments ?? {});
 	const out = resultText(result).replace(/\s+/g, " ").trim();
+	t.calls.push({ name: call.name, args: call.arguments ?? {}, failed: !notRun && !!result?.isError, notRun, out: cut(out, EVIDENCE) });
+	if (t.calls.length > RECENT) t.calls.splice(0, t.calls.length - RECENT);
+	// A refused call never ran: said as such, so that the next one is not read as repeating a failure.
+	if (notRun) {
+		t.recent.push(`${call.name} ${cut(args, 200)} → NOT RUN (refused before it ran) ${cut(out, 160)}`);
+		if (t.recent.length > RECENT) t.recent.splice(0, t.recent.length - RECENT);
+		return;
+	}
 	t.recent.push(`${call.name} ${cut(args, 200)}${result?.isError ? " → ERROR " : " → "}${cut(out, 160)}`);
 	if (t.recent.length > RECENT) t.recent.splice(0, t.recent.length - RECENT);
 	t.evidence.push(`${call.name} ${cut(args, 120)} → ${cut(out, EVIDENCE)}`);
