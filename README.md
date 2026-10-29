@@ -9,8 +9,8 @@ The experience of the best coding-agent apps, on a model you run and control.<br
 And a starting point: fork it, and have your agent build what you need into it.</p>
 
 <p align="center">
-  <a href="https://github.com/krutovvv/bench/releases/latest"><b>Download</b></a> (macOS, Linux, Windows) ·
-  <a href="https://krutovvv.github.io/bench/"><b>Try the demo in your browser</b></a>
+  <a href="https://github.com/krutovvv/Bench/releases/latest"><b>Download</b></a> (macOS, Linux, Windows) ·
+  <a href="https://krutovvv.github.io/Bench/"><b>Try the demo in your browser</b></a>
 </p>
 
 <p align="center">

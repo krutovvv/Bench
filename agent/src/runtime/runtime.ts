@@ -147,7 +147,7 @@ export class Runtime {
 			// Pi's coding tools work in the conversation's directory — on its project's machine, when
 			// that is another one (`machine/ssh.ts`).
 			env: ({ conversationId, cwd }: any) => envFor(String(conversationId), cwd),
-			identity: { attribution: { name: "bench-agent", url: "https://github.com/krutovvv/bench" } },
+			identity: { attribution: { name: "bench-agent", url: "https://github.com/krutovvv/Bench" } },
 			settings: {
 				// Six tries back off over about a minute: long enough to ride out a busy model (503
 				// model_busy when a bot and a thread write at once) and a restart of the agent.

@@ -50,7 +50,7 @@ actions!(
 );
 
 /// Where Bench's sources and its issues are.
-const REPOSITORY: &str = "https://github.com/krutovvv/bench";
+const REPOSITORY: &str = "https://github.com/krutovvv/Bench";
 
 /// The menu bar and its keys, once at start.
 pub fn install(cx: &mut App) {
