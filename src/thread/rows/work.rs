@@ -171,6 +171,8 @@ impl ThreadView {
                             .on_click(cx.listener(
                                 move |this, _, _, cx| {
                                     this.claim_click(cx);
+                                    // The button's, not the line's too: it does not fold.
+                                    cx.stop_propagation();
                                     this.set_paused(!held, cx);
                                 },
                             )),
@@ -179,6 +181,7 @@ impl ThreadView {
                             bench_ui::head_icon_button("work-stop", Ico::Square, "Stop", cx)
                                 .on_click(cx.listener(move |this, _, _, cx| {
                                     this.claim_click(cx);
+                                    cx.stop_propagation();
                                     if let Some(thread) = stop_view.id.clone() {
                                         this.tell(protocol::StopThread { thread }, cx);
                                     }
@@ -221,6 +224,7 @@ impl ThreadView {
                             .on_click(cx.listener(
                                 move |this, _, _, cx| {
                                     this.claim_click(cx);
+                                    cx.stop_propagation();
                                     this.fork_at(&ak_fork, cx);
                                 },
                             )),
@@ -229,6 +233,7 @@ impl ThreadView {
                             bench_ui::head_icon_button(&copy_id, Ico::Copy, "Copy", cx).on_click(
                                 cx.listener(move |this, _, window, cx| {
                                     this.claim_click(cx);
+                                    cx.stop_propagation();
                                     this.copy_answer(&ak_copy, window, cx);
                                 }),
                             ),
@@ -249,6 +254,7 @@ impl ThreadView {
                             .on_click(cx.listener(
                                 move |this, _, window, cx| {
                                     this.claim_click(cx);
+                                    cx.stop_propagation();
                                     this.app
                                         .update(cx, |app, cx| {
                                             app.toggle_speak(&ak, atext.clone(), window, cx)
