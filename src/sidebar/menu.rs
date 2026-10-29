@@ -64,7 +64,7 @@ pub(super) fn color_row(
 }
 
 /// The menu of a sidebar item (its "⋯" and a right click), the same for a thread and a
-/// project: a project's own entries (the Explorer, its Settings), then pin, color, rename, delete.
+/// project: a project's own entries (its Code view, its Settings), then pin, color, rename, delete.
 pub(super) fn item_menu(
     view: Entity<BenchApp>,
     item: Item,
@@ -87,12 +87,13 @@ pub(super) fn item_menu(
         let (rename, del) = (item.clone(), item.clone());
         let menu = match &item {
             Item::Project(id) => {
-                // Its files, prompts, skills and tools in the Explorer, here; its Settings (name,
-                // where it lives, model, Telegram) — the gear the row had, kept in its menu.
+                // Its files, prompts, skills and tools: the Code view (the window's Chat | Code,
+                // named as it is there); its Settings (name, where it lives, model, Telegram) —
+                // the gear the row had, kept in its menu.
                 menu.item({
                     let id = id.clone();
-                    PopupMenuItem::new("Explorer")
-                        .icon(Ico::FolderTree.icon())
+                    PopupMenuItem::new("Code")
+                        .icon(Ico::Code.icon())
                         .on_click(act(Box::new(move |this, window, cx| {
                             this.show_explorer(id.clone(), window, cx)
                         })))
