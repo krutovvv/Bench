@@ -79,9 +79,8 @@ pub struct BenchApp {
     pub prompts_for: Option<String>,
     /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
     pub agents: HashMap<String, agents::AgentLink>,
-    /// BENCH_SUBJECT was opened (once).
+    /// `BENCH_DEMO=new-project` was opened (once, `workspace/layout.rs`).
     pub subject_opened: bool,
-    /// A step's tab being reopened: (thread, turn, url, the tabs before).
     /// A click in a thread landed in something that types (a terminal, an editor) or acts (a
     /// fold, a button): it keeps the focus. The window's pointer, so the app's.
     pub click_claimed: bool,

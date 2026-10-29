@@ -1,4 +1,5 @@
-//! Settings → Providers (models, fallback, voice, service keys) and Messages (Telegram).
+//! The gear (Bench → Settings…, ⌘,): its tabs Agents (each agent's models, fallback, voice and
+//! evaluator; servers' agents added and removed), Presets and Appearance.
 
 pub(crate) mod state;
 pub(crate) mod agent_form;

@@ -1,6 +1,6 @@
 //! The git repo a thread works in (its folder's, or — a thread with no folder of its own — the
-//! repo of the files its agent edited, remembered here), and what the title bar's repo chip shows
-//! of it: its branch, uncommitted files, newest commits.
+//! repo of the files its agent edited, remembered here), and what the repo chip under its
+//! composer (`thread/composer/foot.rs`) shows of it: its branch, uncommitted files, newest commits.
 
 use std::collections::HashMap;
 
@@ -223,7 +223,7 @@ impl BenchApp {
     }
 }
 
-/// What the title bar's repo chip knows of each repo folder (read in the background; dropped when a
+/// What the repo chip knows of each repo folder (read in the background; dropped when a
 /// run ends, as the agent may have committed), and the folders being read.
 #[derive(Default)]
 pub struct GitState {
@@ -231,7 +231,7 @@ pub struct GitState {
     pub reading: std::collections::HashSet<String>,
 }
 
-/// What the title bar's repository chip opens: the few things worth knowing about the repo the
+/// What the repository chip opens: the few things worth knowing about the repo the
 /// thread works in, read with git where it lives (this Mac, or over SSH).
 #[derive(Clone, Debug)]
 pub struct RepoInfo {
