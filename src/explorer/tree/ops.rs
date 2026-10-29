@@ -177,6 +177,12 @@ impl BenchApp {
                         });
                         this.explorer.listings.insert(f.listing_key(), entries);
                     }
+                    // A folder kept open that is gone since (a skill deleted): forgotten, not
+                    // an error each time the project is opened.
+                    Err(err) if is_gone(&format!("{err:#}")) => {
+                        this.explorer.open.remove(&format!("d:{}", f.listing_key()));
+                        this.keep_explorer();
+                    }
                     Err(err) => this.toast(NotificationType::Error, format!("{err:#}"), window, cx),
                 }
                 cx.notify();
@@ -488,4 +494,9 @@ impl Explorer {
             })
         })
     }
+}
+
+/// The agent's answer for a folder that is not there (here: Node's ENOENT; over SSH: the shell's).
+fn is_gone(err: &str) -> bool {
+    err.contains("ENOENT") || err.to_lowercase().contains("no such file")
 }
