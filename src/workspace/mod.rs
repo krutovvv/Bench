@@ -82,8 +82,19 @@ impl BenchApp {
         cx.notify();
     }
 
+    /// The gear is the chat's: from the Code view it goes back to the threads first, so closing
+    /// it leaves the chat whole, not the Explorer beside a thread.
+    pub fn leave_code_for_gear(&mut self, cx: &mut Context<Self>) {
+        if self.left_dock.shows(Panel::Explorer) {
+            self.close_explorer(cx);
+        }
+    }
+
     /// Show `center` in the middle, reading what it needs.
     pub fn open_center(&mut self, center: Center, window: &mut Window, cx: &mut Context<Self>) {
+        if center == Center::Settings {
+            self.leave_code_for_gear(cx);
+        }
         self.center = center;
         if center == Center::Settings {
             self.load_providers(window, cx);

@@ -652,6 +652,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
             .ok()
             .and_then(|t| t.parse().ok())
             .unwrap_or(0);
+        app.leave_code_for_gear(cx);
         app.center = crate::workspace::Center::Settings;
     }
     cx.notify();
