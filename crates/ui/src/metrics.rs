@@ -68,9 +68,10 @@ pub const BUBBLE_PX: f32 = 14.;
 pub const BUBBLE_PY: f32 = 8.;
 pub const BUBBLE_R: f32 = 16.;
 /// The pinned composer (the chat): one line of a field, as Claude's — the plus, the text, the
-/// mic and Send — its corner, the air under it in the window.
+/// mic and Send — its corner, the air under it in the window: its foot's line centred where the
+/// sidebar's foot (the agent, the gear) is, one line across the window's bottom.
 pub const COMPOSER_CARD_R: f32 = 14.;
-pub const COMPOSER_CARD_PB: f32 = 12.;
+pub const COMPOSER_CARD_PB: f32 = (SIDEBAR_FOOT_H - COMPOSER_FOOT_H) / 2.;
 /// gpui-kit's `.small()` button: 24 pt high.
 pub const SMALL_BUTTON_H: f32 = 24.;
 /// The line under the composer (its project, repo, meters), as Claude's: its small buttons'
