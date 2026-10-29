@@ -13,7 +13,8 @@ import path from "node:path";
 import type { ClassifierQuestion } from "@earendil-works/pi-ai";
 import { BENCH_HOME, readAgent } from "../config.ts";
 import { host } from "../host.ts";
-import { answering, classifyOn, classifyPair, evaluatorReady, evaluatorSettings, type EvaluatorServer } from "./models.ts";
+import { CHARS_PER_TOKEN } from "../turn/window.ts";
+import { answering, classifyOn, classifyPair, evaluatorReady, evaluatorSettings, WINDOW, type EvaluatorServer } from "./models.ts";
 
 export interface Choice {
 	type: "choice";
@@ -36,16 +37,21 @@ export interface ChoiceAnswer {
 	probabilities: Record<string, number>;
 }
 
-/** The most of a state sent, in characters (a local server's window is ~16K tokens; Russian and
- *  code take more tokens a character than English: 24 000 overflowed it). */
-export const STATE_CAP = 20_000;
+/** A share of the evaluator's window (`WINDOW`) in characters, at the agent's cautious count
+ *  (`CHARS_PER_TOKEN`, as the thread's window is reckoned). */
+export const evaluatorChars = (share: number): number => Math.floor(WINDOW * CHARS_PER_TOKEN * share);
+
+/** The share a state may take: the rest is its questions and options (a search's lines take a
+ *  quarter, `search.ts`) and the server's own template. 19 660 characters on the local server: at
+ *  24 000 its window overflowed on Russian and code, at 20 000 it held. */
+const STATE_SHARE = 0.4;
 
 /**
  * The state within `cap` characters: its largest member shrinks until it fits — a list loses its
  * oldest items first (the latest results matter most), a text its end. What a point put in stays;
  * only how much of it.
  */
-export function fitState(state: unknown, cap = STATE_CAP): unknown {
+export function fitState(state: unknown, cap = evaluatorChars(STATE_SHARE)): unknown {
 	if (!state || typeof state !== "object" || JSON.stringify(state).length <= cap) return state;
 	const s: Record<string, any> = { ...(state as Record<string, any>) };
 	for (let guard = 0; guard < 200 && JSON.stringify(s).length > cap; guard++) {
@@ -99,9 +105,12 @@ export async function ask(
 	if (!judgeActive(conversation)) return undefined;
 	const started = Date.now();
 	const once = (cap: number) => classifyPair({ state: fitState(state, cap) as any, questions: asPi(questions) }, { signal });
-	let r = await once(STATE_CAP);
-	// Over the server's window still (a text dense in tokens): once more with half as much.
-	if (r.stopReason === "error" && /422/.test(r.errorMessage ?? "") && /context/i.test(r.errorMessage ?? "")) r = await once(STATE_CAP / 2);
+	const cap = evaluatorChars(STATE_SHARE);
+	let r = await once(cap);
+	// Over the server's window still: the cap counts characters, the server tokens, and a text dense
+	// in them (Russian, code, JSON escapes) may not fit. The local shim shortens such a record on its
+	// own; a System One server without it refuses it (422, "context"), so it is asked once more with half.
+	if (r.stopReason === "error" && /422/.test(r.errorMessage ?? "") && /context/i.test(r.errorMessage ?? "")) r = await once(cap / 2);
 	if (r.stopReason !== "stop") {
 		if (r.stopReason === "error") log({ conversation, point, ms: Date.now() - started, error: r.errorMessage });
 		return undefined;

@@ -210,7 +210,8 @@ by the evaluator.
 ## Known limitations
 
 - What a turn is, is kept in memory: after a restart of the agent a turn's steps count from zero.
-- Every state is fitted to 20 000 characters before it is sent (`fitState`: the largest member
+- Every state is fitted to 40% of the evaluator's window (16 384 tokens at 3 characters each:
+  19 660 characters) before it is sent (`fitState`: the largest member
   shrinks, a list losing its oldest items, named parts keeping their names); a server that still
   says its window is exceeded (Russian and code are dense in tokens) is asked once more with half.
   At 24 000 and with the turn's results unfitted, the answer's check failed on long turns (2 of 4 in that thread).
