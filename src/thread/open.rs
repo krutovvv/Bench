@@ -52,7 +52,7 @@ impl BenchApp {
         self.reset_chat(cx);
         // A thread seen before shows its last state now, and catches up when its journal comes.
         let journal = if self.demo {
-            self.demo_threads.get(id.as_str()).cloned()
+            self.demo_state.threads.get(id.as_str()).cloned()
         } else {
             self.threads.cache.remove(id.as_str())
         };

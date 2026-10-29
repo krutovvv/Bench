@@ -3,12 +3,8 @@
 
 use std::collections::HashMap;
 
-use web_time::Instant;
-
-use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::select::SelectState;
 use gpui_kit::*;
 
 pub(crate) mod agents;
@@ -27,10 +23,6 @@ mod subscriptions;
 use crate::env::ProjectEnv;
 use crate::thread::{ActiveThread, ThreadView};
 use crate::workspace::{Center, Dock, DockPosition, Panel};
-
-use crate::app::model::EFFORTS;
-
-pub type Choice = SelectState<Vec<SharedString>>;
 
 /// This machine's own project (the agent's general environment): installing, building, looking
 /// after the machine. A server's is a project named after it ("Dev"); Host is first in the sidebar.
@@ -75,12 +67,8 @@ pub struct BenchApp {
     /// Projects' environments, by project id (`ProjectEnv::id`), each read once something shows
     /// it: the Explorer (`explorer.project`), a settings or a part's tab (`DocKey`).
     pub envs: HashMap<String, ProjectEnv>,
-    /// The project whose prompts `prompts` holds (they follow the open thread's project).
-    pub prompts_for: Option<String>,
     /// Every agent, by the host it runs on ("" = this Mac's): `app/agents.rs`.
     pub agents: HashMap<String, agents::AgentLink>,
-    /// `BENCH_DEMO=new-project` was opened (once, `workspace/layout.rs`).
-    pub subject_opened: bool,
     /// A click in a thread landed in something that types (a terminal, an editor) or acts (a
     /// fold, a button): it keeps the focus. The window's pointer, so the app's.
     pub click_claimed: bool,
@@ -90,15 +78,10 @@ pub struct BenchApp {
     /// What waits for a second press (a delete, closing an unsaved tab): `armed.rs`.
     pub armed: armed::Armed,
 
-    /// The last lines of the open thread's agent's log, read as its status item opens.
-    pub agent_log: Vec<String>,
     /// A made-up session for screenshots (`BENCH_DEMO=1`, src/demo/mod.rs): nothing is connected.
     pub demo: bool,
-    /// The demo's threads by session id (opening one shows its turns; nothing is fetched).
-    pub demo_threads: HashMap<String, ::thread::Thread>,
-    /// The agent refused a restart over running work: the next press (within a minute)
-    /// restarts anyway.
-    pub restart_armed: Option<Instant>,
+    /// The demo's own data (`demo/mod.rs`).
+    pub demo_state: crate::demo::DemoState,
     pub appearance: bench_ui::theme::Appearance,
 
     /// What the middle of the window shows (`workspace.rs`).
@@ -113,15 +96,9 @@ pub struct BenchApp {
     pub nav: crate::workspace::history::NavHistory,
     /// The Explorer's state (`src/explorer/`).
     pub explorer: crate::explorer::Explorer,
-    /// Settings → Prompts.
-    pub prompts: Vec<crate::thread::composer::prompts::Prompt>,
-    pub effort_choice: Entity<Choice>,
 
     /// Keeps the `/`-list keystroke interceptor alive (main.rs).
     pub _slash_keys: Option<gpui_kit::Subscription>,
-    /// The project's Settings page, so a demo can show a part of it lower down.
-    pub env_scroll: ScrollHandle,
-
 
     pub(crate) _subscriptions: Vec<Subscription>,
     pub(crate) _tasks: Vec<Task<()>>,
@@ -147,17 +124,7 @@ impl BenchApp {
         }
         let sidebar = crate::sidebar::state::SidebarState::new(window, cx);
         let new_project = crate::settings::new_project::NewProject::new(window, cx);
-        let effort_labels: Vec<SharedString> =
-            EFFORTS.iter().map(|e| SharedString::from(*e)).collect();
-        let effort_choice = cx.new(|cx| {
-            SelectState::new(
-                effort_labels,
-                Some(IndexPath::new(EFFORTS.len() - 1)),
-                window,
-                cx,
-            )
-        });
-        let subs = Self::subscriptions(&sidebar.search, &new_project.path, &effort_choice, window, cx);
+        let subs = Self::subscriptions(&sidebar.search, &new_project.path, window, cx);
         let tasks = Self::timers(window, cx);
 
         let mut app = Self {
@@ -174,13 +141,10 @@ impl BenchApp {
             git: Default::default(),
             window: window.window_handle(),
             envs: HashMap::new(),
-            prompts_for: None,
             agents: HashMap::new(),
-            subject_opened: false,
             click_claimed: false,
             click_at: None,
             armed: Default::default(),
-            agent_log: Vec::new(),
             appearance: crate::settings::appearance::load(),
             center: Center::Chat,
             left_dock: Dock::new(DockPosition::Left, &[Panel::Threads, Panel::Explorer], true),
@@ -190,13 +154,9 @@ impl BenchApp {
             active_thread,
             beside_thread: None,
             explorer: Default::default(),
-            prompts: vec![],
-            effort_choice,
             _slash_keys: None,
             demo: false,
-            demo_threads: HashMap::new(),
-            restart_armed: None,
-            env_scroll: ScrollHandle::new(),
+            demo_state: Default::default(),
             _subscriptions: subs,
             _tasks: tasks,
         };

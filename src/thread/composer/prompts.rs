@@ -27,7 +27,7 @@ impl BenchApp {
             move || rest::get(&conn, &path),
             |this, r, _, cx| {
                 if let Ok(v) = r {
-                    this.prompts = v["prompts"]
+                    this.threads.prompts = v["prompts"]
                         .as_array()
                         .into_iter()
                         .flatten()

@@ -19,6 +19,10 @@ pub struct ThreadStore {
     pub reopen: Option<(String, protocol::ThreadId)>,
     /// A new chat's thread is being made (an insert or a message came before it existed).
     pub creating: bool,
+    /// The saved prompts `@` offers, and the project they are of (they follow the open
+    /// thread's project).
+    pub prompts: Vec<crate::thread::composer::prompts::Prompt>,
+    pub prompts_for: Option<String>,
 }
 
 impl ThreadStore {
@@ -30,6 +34,8 @@ impl ThreadStore {
             references: HashMap::new(),
             reopen,
             creating: false,
+            prompts: vec![],
+            prompts_for: None,
         }
     }
 }

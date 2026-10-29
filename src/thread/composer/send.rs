@@ -5,7 +5,6 @@
 
 use std::sync::Arc;
 
-use gpui_kit::component::IndexPath;
 use gpui_kit::component::WindowExt as _;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::*;
@@ -24,7 +23,6 @@ impl BenchApp {
     pub fn set_efforts(
         &mut self,
         levels: Vec<String>,
-        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
         let current = self.defaults.efforts.get(self.thread(cx).effort).cloned();
@@ -36,32 +34,6 @@ impl BenchApp {
         self.defaults.effort = at(default).unwrap_or(last);
         self.active_thread
             .update(cx, |v, _| v.thread.effort = selected);
-        let labels: Vec<SharedString> = self
-            .defaults.efforts
-            .iter()
-            .map(|e| SharedString::from(e.clone()))
-            .collect();
-        self.effort_choice.update(cx, |s, cx| {
-            s.set_items(labels, window, cx);
-            s.set_selected_index(Some(IndexPath::new(selected)), window, cx)
-        });
-    }
-
-    /// An open thread takes the level at once (its next turn runs on it; the agent confirms
-    /// with its `info`); a chat not made yet takes it with its first message.
-    pub fn set_effort(&mut self, i: usize, cx: &mut Context<Self>) {
-        let id = self.active_thread.update(cx, |v, _| {
-            v.thread.effort = i;
-            v.thread.effort_other = None;
-            v.thread.effort_pending = v.thread.id.is_none();
-            v.thread.id.clone()
-        });
-        if let Some(thread) = id {
-            let at = self.thread_ref(cx);
-            let effort = self.defaults.efforts[i].clone();
-            self.send_at(&at, protocol::SetEffort { thread, effort }, cx);
-        }
-        cx.notify();
     }
 
     /// Send's Stop, ⌘.: the open thread's run.

@@ -1,7 +1,6 @@
 //! The agent's defaults for what Bench shows before a thread says its own: the reasoning level
 //! a new chat starts on, the models the picker offers, the approval mode, the context window.
 
-use gpui_kit::component::IndexPath;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
@@ -13,7 +12,7 @@ impl BenchApp {
         self.active_thread
             .update(cx, |v, _| v.thread.effort_pending = false);
         self.defaults.ready = false;
-        self.rest(window, cx, |c| rest::agent_defaults(c, ""), |this, r, window, cx| {
+        self.rest(window, cx, |c| rest::agent_defaults(c, ""), |this, r, _window, cx| {
             this.defaults.ready = true;
             let Ok((effort, model, models, approval, context)) = r else {
                 return;
@@ -33,9 +32,6 @@ impl BenchApp {
                     v.thread.effort = i;
                     v.thread.effort_other = None;
                     v.thread.effort_pending = false;
-                });
-                this.effort_choice.update(cx, |s, cx| {
-                    s.set_selected_index(Some(IndexPath::new(i)), window, cx)
                 });
             }
         });

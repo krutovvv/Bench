@@ -5,17 +5,15 @@
 use std::time::Duration;
 
 use gpui_kit::component::input::{InputEvent, InputState};
-use gpui_kit::component::select::SelectEvent;
 use gpui_kit::*;
 
-use super::{BenchApp, Choice};
+use super::BenchApp;
 
 impl BenchApp {
     #[allow(clippy::too_many_arguments)]
     pub(super) fn subscriptions(
         search: &Entity<InputState>,
         project_path: &Entity<InputState>,
-        effort_choice: &Entity<Choice>,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Vec<Subscription> {
@@ -54,18 +52,6 @@ impl BenchApp {
                             this.new_project.path_entry = false;
                             this.set_new_project(path, window, cx);
                         }
-                    }
-                },
-            ),
-            cx.subscribe_in(
-                effort_choice,
-                window,
-                |this, _, ev: &SelectEvent<Vec<SharedString>>, _, cx| {
-                    let SelectEvent::Confirm(Some(label)) = ev else {
-                        return;
-                    };
-                    if let Some(i) = this.defaults.efforts.iter().position(|e| e == label.as_ref()) {
-                        this.set_effort(i, cx);
                     }
                 },
             ),

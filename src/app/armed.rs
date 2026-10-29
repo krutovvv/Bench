@@ -1,5 +1,6 @@
 //! What waits for a second press before it is done: deleting a thread, a project, a file, a task,
-//! an agent or an endpoint; removing a part of a project; closing a tab with unsaved changes. One
+//! an agent or an endpoint; removing a part of a project; closing a tab with unsaved changes;
+//! restarting the agent over running work (`restart`). One
 //! thing at a time in the window: arming another, or Esc, lets the first one go. Keys name the
 //! kind of thing first (`thread:<id>`, `p:<id>`, `del:<file>`, `close:<tab>`, `env:<project>:…`).
 

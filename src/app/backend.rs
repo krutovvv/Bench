@@ -1,19 +1,15 @@
 //! The agent's process and macOS notifications: restart it, test a notification.
 
-use std::time::Duration;
-
-use web_time::Instant;
-
 use gpui_kit::component::notification::NotificationType;
 
 use crate::client::connection::{self};
 
 use super::*;
 
+/// The `armed` key of a restart the agent refused over running work: the next press interrupts it.
+const RESTART: &str = "restart";
+
 impl BenchApp {
-    /// Restart the agent on the machine we are connected to, then reconnect. Its runs are
-    /// durable, so it never refuses (the `Busy` branch: a backend that refused while work ran,
-    /// pressed again within a minute, restarted anyway).
     /// The agent panel's notification line: refresh what macOS allows, and with `test` also
     /// send one — the way to see for oneself that Bench can say it is done from the background.
     pub fn notif(&mut self, test: bool, cx: &mut Context<Self>) {
@@ -37,13 +33,13 @@ impl BenchApp {
     }
 
     /// Restart this Mac's agent, then reconnect. Its runs are durable: one it was in the middle
-    /// of resumes. A run it is in refuses the first press; a second within a minute interrupts
-    /// it.
+    /// of resumes. A run it is in refuses the first press; the second (`armed`, `restart`)
+    /// interrupts it.
     pub fn restart_agent(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let interrupt = self
-            .restart_armed
-            .take()
-            .is_some_and(|t| t.elapsed() < Duration::from_secs(60));
+        let interrupt = self.armed.is(RESTART);
+        if interrupt {
+            self.armed.clear();
+        }
         self.toast(
             NotificationType::Info,
             if interrupt {
@@ -66,7 +62,7 @@ impl BenchApp {
                     this.reconnect_agent(String::new(), window, cx);
                 }
                 Ok(connection::Restart::Busy(what)) => {
-                    this.restart_armed = Some(Instant::now());
+                    this.armed.arm(RESTART);
                     this.toast(
                         NotificationType::Warning,
                         format!("Not restarted: {what}. Press restart again to interrupt it and restart."),
@@ -100,7 +96,7 @@ impl BenchApp {
                 .background_spawn(async move { connection::agent_log(&target, 12) })
                 .await;
             let _ = this.update(cx, |this, cx| {
-                this.agent_log = log;
+                this.sidebar.agent_log = log;
                 cx.notify();
             });
         })

@@ -38,8 +38,8 @@ impl BenchApp {
     /// The demo's hooks on the window (`BENCH_DEMO=new-project`, `BENCH_DEMO_RENAME`,
     /// `BENCH_DEMO_SEARCH`), once.
     fn demo_hooks(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.subject_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
-            self.subject_opened = true;
+        if !self.demo_state.new_project_opened && std::env::var("BENCH_DEMO").as_deref() == Ok("new-project") {
+            self.demo_state.new_project_opened = true;
             self.new_project_form(window, cx);
         }
         // `BENCH_DEMO_BESIDE=<thread id>`: that thread beside the open one.
@@ -74,9 +74,9 @@ impl Render for BenchApp {
         let project = self.thread(cx).project.clone();
         if !self.demo
             && self.local_conn().is_some()
-            && self.prompts_for.as_deref() != Some(project.as_str())
+            && self.threads.prompts_for.as_deref() != Some(project.as_str())
         {
-            self.prompts_for = Some(project);
+            self.threads.prompts_for = Some(project);
             self.load_prompts(window, cx);
         }
         if self.demo {

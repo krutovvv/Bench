@@ -30,6 +30,8 @@ pub struct SidebarState {
     pub renaming: Option<Renaming>,
     /// The panel's keys (↑ ↓ ⌫) while it has the focus, after a click on a thread.
     pub focus: FocusHandle,
+    /// The last lines of the open thread's agent's log, read as its popover opens.
+    pub agent_log: Vec<String>,
 }
 
 impl SidebarState {
@@ -47,6 +49,7 @@ impl SidebarState {
             marks: super::marks::load(),
             renaming: None,
             focus: cx.focus_handle(),
+            agent_log: vec![],
         }
     }
 }

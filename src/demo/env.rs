@@ -90,7 +90,7 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
     // `BENCH_ENV=model` to the Model block.
     let to = std::env::var("BENCH_ENV").ok();
     if matches!(to.as_deref(), Some("telegram") | Some("model")) {
-        let scroll = app.env_scroll.clone();
+        let scroll = app.explorer.settings_scroll.clone();
         let model = to.as_deref() == Some("model");
         cx.spawn(async move |this, cx| {
             cx.background_executor()

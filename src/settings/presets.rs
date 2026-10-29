@@ -90,17 +90,17 @@ impl BenchApp {
             window,
             cx,
             move || rest::get(&conn, "/api/presets"),
-            |this, r, window, cx| {
+            |this, r, _window, cx| {
                 if let Ok(v) = r {
-                    this.set_presets(Presets::from(&v), window, cx);
+                    this.set_presets(Presets::from(&v), cx);
                 }
             },
         );
     }
 
-    fn set_presets(&mut self, p: Presets, window: &mut Window, cx: &mut Context<Self>) {
+    fn set_presets(&mut self, p: Presets, cx: &mut Context<Self>) {
         if !p.reasoning.is_empty() && p.reasoning != self.defaults.efforts {
-            self.set_efforts(p.reasoning.clone(), window, cx);
+            self.set_efforts(p.reasoning.clone(), cx);
         }
         self.gear.presets = p;
         cx.notify();
@@ -146,7 +146,7 @@ impl BenchApp {
             |this, r, window, cx| match r {
                 Ok(v) => {
                     this.gear.preset_editor = None;
-                    this.set_presets(Presets::from(&v["presets"]), window, cx);
+                    this.set_presets(Presets::from(&v["presets"]), cx);
                 }
                 Err(e) => this.toast(NotificationType::Error, format!("{e:#}"), window, cx),
             },

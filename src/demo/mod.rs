@@ -34,13 +34,21 @@ use serde_json::json;
 impl BenchApp {
     /// A demo thread in the center's view, as if it were opened (nothing is fetched).
     pub(crate) fn show_demo_thread(&mut self, id: &str, cx: &mut App) {
-        let journal = self.demo_threads.get(id).cloned().unwrap_or_default();
+        let journal = self.demo_state.threads.get(id).cloned().unwrap_or_default();
         open_thread(self, cx, |t| {
             t.id = Some(id.into());
             t.journal = journal;
             t.loaded = true;
         });
     }
+}
+
+/// What the demo keeps in the window: its threads by id (opening one shows its turns; nothing is
+/// fetched), and whether `BENCH_DEMO=new-project` was opened (once, `workspace/layout.rs`).
+#[derive(Default)]
+pub struct DemoState {
+    pub threads: std::collections::HashMap<String, ::thread::Thread>,
+    pub new_project_opened: bool,
 }
 
 /// The open thread's state, set up (before anything is drawn).
@@ -307,7 +315,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
             });
         }
     }
-    app.demo_threads.insert("d-landing".into(), landing.clone());
+    app.demo_state.threads.insert("d-landing".into(), landing.clone());
     open_thread(app, cx, |t| {
         t.journal = landing;
         t.id = Some("d-landing".into());
@@ -390,7 +398,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
         _ => Some("d-site"),
     };
     if let Some(id) = open {
-        let journal = app.demo_threads.get(id).cloned().unwrap_or_default();
+        let journal = app.demo_state.threads.get(id).cloned().unwrap_or_default();
         let project = app.project_of_thread("", &id.into());
         open_thread(app, cx, |t| {
             t.id = Some(id.into());

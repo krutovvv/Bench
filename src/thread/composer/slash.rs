@@ -78,6 +78,7 @@ impl ThreadView {
         };
         if let Some((_, q)) = prompt_token(&text) {
             return app
+                .threads
                 .prompts
                 .iter()
                 .filter(|p| !p.path.is_empty())
@@ -151,7 +152,7 @@ impl ThreadView {
                 let title = &c.name[1..];
                 let body = self
                     .app(cx)
-                    .and_then(|a| a.prompts.iter().find(|p| p.title == title))
+                    .and_then(|a| a.threads.prompts.iter().find(|p| p.title == title))
                     .map(|p| p.body.clone())
                     .unwrap_or_default();
                 format!("{}{body}", &text[..start])

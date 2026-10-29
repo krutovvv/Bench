@@ -72,6 +72,8 @@ pub struct Find {
 
 #[derive(Default)]
 pub struct Explorer {
+    /// A project's Settings page's scroll, so a demo can show a part of it lower down.
+    pub settings_scroll: ScrollHandle,
     /// The project shown (as `ProjectEnv` names it: "general" is this Mac's Host).
     pub project: String,
     /// Open nodes of the tree (`tree.rs` names them).

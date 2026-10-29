@@ -36,7 +36,7 @@ impl BenchApp {
             .id("env-page")
             .size_full()
             .overflow_y_scroll()
-            .track_scroll(&self.env_scroll)
+            .track_scroll(&self.explorer.settings_scroll)
             .px(inset)
             .pb(inset)
             // The gear's column (`settings_page`): the form in the middle, its widest SETTINGS_W.

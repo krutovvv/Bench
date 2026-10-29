@@ -40,7 +40,7 @@ impl BenchApp {
             ("connecting…".into(), bench_ui::faint(&theme))
         };
         let state_color = if error.is_some() && !connected { theme.danger } else { muted };
-        let log = self.agent_log.clone();
+        let log = self.sidebar.agent_log.clone();
         let where_ = self.target_of(&host).label();
         let name = where_.clone();
         let view = cx.entity();

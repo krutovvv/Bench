@@ -46,7 +46,7 @@ fn thread(app: &mut BenchApp, id: &str, title: &str, subject: &str, journal: Jou
             .collect();
         app.inserts.by_thread.insert(id.into(), list);
     }
-    app.demo_threads.insert(id.into(), t);
+    app.demo_state.threads.insert(id.into(), t);
 }
 
 /// One thread per subject, so every sidebar group opens to something.
