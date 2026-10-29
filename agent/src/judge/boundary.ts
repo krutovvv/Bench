@@ -5,7 +5,8 @@
 // answered); sure of it, the conversation is compacted now, in the background — Pi places the
 // summary at the next boundary and the work goes on meanwhile. Pi's own threshold stays the floor.
 
-import { compactionAt } from "../config.ts";
+import { DEFAULT_COMPACTION_POLICY } from "@earendil-works/pi-durable";
+import { compactionAt, compactionPolicy } from "../config.ts";
 import { usedTokens, windowTokens } from "../turn/window.ts";
 import { host } from "../host.ts";
 import { slot } from "../turn/kept.ts";
@@ -19,18 +20,18 @@ const REARM = 0.5;
 const SURE = 0.8;
 /** Steps between two questions. */
 const EVERY = 3;
-/** Pi's defaults (`DEFAULT_COMPACTION_POLICY`): the answer's reserve, the background compaction's lead. */
-const RESERVE = 16_384;
-const BACKGROUND = 32_768;
 
 /** Per conversation: compacted at this band already (until it falls under `REARM`), and the step last asked at. */
 const band = slot(() => ({ fired: false, askedAt: -EVERY }));
 
-/** Where Pi compacts: its threshold, and where its background compaction starts. */
+/** Where Pi compacts: its threshold, and where its background compaction starts — read from the
+ *  policy it uses for the project (its share of the window, `compactionPolicy`, else Pi's default)
+ *  as Pi reads it: the window less the reserve, less the background's lead. */
 export function thresholds(agent: string, window = windowTokens()): { at: number; background: number } {
 	const share = compactionAt(agent);
-	const at = share ? Math.floor(window * share) : window - RESERVE;
-	return { at, background: share ? at - Math.floor(window * 0.05) : at - BACKGROUND };
+	const policy = share ? compactionPolicy(share, window) : DEFAULT_COMPACTION_POLICY;
+	const at = window - policy.reserveTokens;
+	return { at, background: at - policy.backgroundTokens };
 }
 
 export const boundary: Point = {

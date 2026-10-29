@@ -634,6 +634,12 @@ test("well on its way to Pi's threshold, a part of the work that just ended is c
 	const { thresholds } = await import("../src/judge/boundary.ts");
 	const { fitRequest, tokensOf } = await import("../src/turn/window.ts");
 	seeRequest("b1", [user("Do the three parts")]);
+	// Pi's own: its default policy, or the project's share of the window as `compactionPolicy` makes it.
+	const settings = readAgent("project:p");
+	assert.deepEqual(thresholds("project:p", 100_000), { at: 100_000 - 16_384, background: 100_000 - 16_384 - 32_768 });
+	writeAgent("project:p", { ...settings, compaction: 0.6 });
+	assert.deepEqual(thresholds("project:p", 100_000), { at: 60_000, background: 55_000 });
+	writeAgent("project:p", settings);
 	const { at } = thresholds("project:p");
 	const fill = (share: number) => {
 		const chars = Math.floor(share * at * (4 * 1000)) / tokensOf(4000);
