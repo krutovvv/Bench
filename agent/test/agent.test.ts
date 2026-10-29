@@ -130,7 +130,7 @@ test("a title asks a thinking-by-default server not to think; OpenRouter, OpenAI
 });
 
 test("compaction: the summary is made without reasoning, kept across a restart, left to Pi on a failure", async () => {
-	const { compactWithoutReasoning, transcript } = await import("../src/builtin/compaction.ts");
+	const { compactWithoutReasoning, transcript } = await import("../src/turn/compaction.ts");
 	const before = (compactWithoutReasoning as any).handlers.beforeCompact;
 	const model = { api: "openai-completions", baseUrl: "http://10.0.0.2:8000/v1", maxTokens: 32000 };
 	let asked: any;

@@ -1,11 +1,11 @@
-// The evaluator at a request that would overflow the model's window (`builtin/window.ts`): of the
+// The evaluator at a request that would overflow the model's window (`turn/window.ts`): of the
 // earlier results and call arguments worth cutting, which does the agent's next step still need?
 // The window keeps those and cuts the others first — before, the largest went first, needed or not.
 
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import { ask, judgeActive } from "./client.ts";
 import { baseState } from "./point.ts";
-import { turnOf } from "../builtin/turn.ts";
+import { turnOf } from "../turn/turn.ts";
 
 /** How many blocks one request weighs, and how much of each the evaluator reads. */
 const PER_REQUEST = 12;

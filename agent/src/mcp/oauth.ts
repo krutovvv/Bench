@@ -53,9 +53,6 @@ export const authProviderFor = (provider: McpOAuthProvider) => adaptOAuthProvide
 
 export const needsAuth = (e: unknown) => e instanceof McpOAuthAuthorizationRequiredError || /requires authentication|unauthorized|401/i.test(String((e as Error)?.message ?? e));
 
-/** Whether a server has credentials kept. */
-export const signedIn = (agent: string, name: string) => fs.existsSync(file(agent, name));
-
 let callback: OAuthCallbackServer | undefined;
 
 /**

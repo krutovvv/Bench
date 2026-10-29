@@ -3,7 +3,7 @@
 // and builds on it; three steps later it finds out. Sure that the result shows a failure, it is
 // said with the result, before the next step leans on it.
 
-import { cut, resultText } from "../builtin/turn.ts";
+import { cut, resultText } from "../turn/turn.ts";
 import { sure, type Point } from "./point.ts";
 
 /** How sure the evaluator must be to speak. */

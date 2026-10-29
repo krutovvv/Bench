@@ -55,32 +55,6 @@ export const todo = defineTool({
 	},
 });
 
-/** Steps a plan with open items may go unchanged before the model is reminded of it. */
-export const PLAN_STALE_STEPS = 5;
-
-/** Each conversation's plan as its last `todo` left it: the step it shows as current, and the
- * steps taken since. Kept in memory: after a restart the next `todo` starts it again. */
-const plans = new Map<string, { current: string; since: number }>();
-
-/**
- * What the model is told after a tool call about its plan, if anything. Models (Qwen above all)
- * write a plan at the start and never touch it again, and the person reads a plan left as it was
- * as work still at its first step: every few steps with open items unchanged, a line says so.
- */
-export function planNudge(conversation: string, call: { name: string; arguments?: any }): string | undefined {
-	if (call.name === "todo") {
-		const todos: { content?: string; status?: string }[] = Array.isArray(call.arguments?.todos) ? call.arguments.todos : [];
-		const open = todos.filter((t) => t.status === "in_progress" || t.status === "pending");
-		const current = open.find((t) => t.status === "in_progress") ?? open[0];
-		if (current) plans.set(conversation, { current: String(current.content ?? ""), since: 0 });
-		else plans.delete(conversation);
-		return undefined;
-	}
-	const plan = plans.get(conversation);
-	if (!plan || ++plan.since % PLAN_STALE_STEPS) return undefined;
-	return `[Your plan has not changed for ${plan.since} steps; it still shows "${plan.current}" as the current step. If that step is done or you have moved on, call todo with the whole list now: the person reads the plan as where you are.]`;
-}
-
 export const sessionSearch = defineTool({
 	name: "session_search",
 	description: "Search the person's past sessions (their text) when they refer to earlier work: 'what did we do about X'.",

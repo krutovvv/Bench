@@ -21,8 +21,19 @@ import { projects } from "../builtin/projects.ts";
 import { quote, sshOptions } from "../machine/ssh.ts";
 
 /** The servers as code mode's namespaces (`mcp__<server>__`), with what each says of itself; the
- *  codemode extension reads this list as it is at each script (`extensions.ts`). */
+ *  codemode extension reads this list as it is at each script (`extensions.ts`). One list for every
+ *  agent (Pi's extension takes one), rebuilt from `namespaces` whenever an agent's servers connect. */
 export const NAMESPACES: CodemodeNamespace[] = [];
+/** Each server's namespace as it last said it, key "<agent>/<server>": kept while it reconnects,
+ *  dropped once its agent's servers connect without it. */
+const namespaces = new Map<string, CodemodeNamespace>();
+
+/** NAMESPACES as `namespaces` has them now, one per prefix. */
+function syncNamespaces(): void {
+	const byPrefix = new Map<string, CodemodeNamespace>();
+	for (const n of namespaces.values()) if (!byPrefix.has(n.prefix)) byPrefix.set(n.prefix, n);
+	NAMESPACES.splice(0, NAMESPACES.length, ...byPrefix.values());
+}
 
 const sanitize = (s: string) => s.replace(/[^A-Za-z0-9_]/g, "_");
 
@@ -55,9 +66,11 @@ const known = new Map<string, ToolRegistration[]>();
 
 /**
  * An agent's MCP tools. A server that is down or reconnecting keeps its tools declared as they were
- * last listed, each answering that it is reconnecting: the tools sit at the head of every request,
- * and a list that shrinks and grows back rewrites it, the model server's prefix cache with it (on a
- * local model, a minute of prefill each time). A server taken out of mcp.json loses them.
+ * last listed, each answering that it is reconnecting. For a direct tool that is the cache: direct
+ * tools sit at the head of every request, and a list that shrinks and grows back rewrites it, the
+ * model server's prefix cache with it (on a local model, a minute of prefill each time). A script's
+ * or a deferred tool is not in the request; its stand-in says the server is reconnecting where the
+ * call would otherwise find no such tool. A server taken out of mcp.json loses them.
  */
 export const mcpTools = (agent: string): ToolRegistration[] =>
 	[...servers.entries()]
@@ -83,12 +96,30 @@ export const mcpStatus = (agent?: string) =>
  *  terminal's ssh_run is (an insert has a tool that acts on it), unless its mcp.json says otherwise. */
 const INSERT_SERVER = "browser";
 
+/** A server's exposure when no rule names a tool: its own, else the insert's server direct, else codemode. */
+const defaultExposure = (spec: any, server: string): string => spec.exposure ?? (server === INSERT_SERVER ? "direct" : "codemode");
+
 function exposureOf(spec: any, server: string, tool: string): string {
 	const rules: Record<string, string> = spec.toolExposure ?? {};
 	if (rules[tool]) return rules[tool] === "codemode-deferred" ? "codemode" : rules[tool];
 	for (const [pattern, e] of Object.entries(rules))
 		if (pattern.includes("*") && new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`).test(tool)) return e;
-	return spec.exposure ?? (server === INSERT_SERVER ? "direct" : "codemode");
+	return defaultExposure(spec, server);
+}
+
+/**
+ * An agent's servers whose tools are behind code mode, from its mcp.json as configured (not as
+ * connected: the prompt names them before they connect): enabled, and code mode their default or
+ * some tool's (`toolExposure`). The prompt says these are reached from a script (`prompt.ts`).
+ */
+export function scriptedServers(agent: string): string[] {
+	return Object.entries(agentMcp(agent))
+		.filter(([name, spec]: [string, any]) => {
+			if (!spec || spec.enabled === false) return false;
+			const all = [defaultExposure(spec, name), ...Object.values<string>(spec.toolExposure ?? {})];
+			return all.some((e) => String(e).startsWith("codemode"));
+		})
+		.map(([name]) => name);
 }
 
 const home = (v: unknown) => (typeof v === "string" ? v.replace(/^~(?=\/|$)/, os.homedir()) : v);
@@ -116,7 +147,7 @@ export async function connectMcp(agent?: string, timeoutMs = 30000): Promise<voi
 	}
 }
 
-/** An agent's connected servers and their tools' names (the evaluator's view of what a turn can use). */
+/** One connected server as the evaluator sees it: its tools' names and how they are reached. */
 export interface ServerTools {
 	name: string;
 	/** Its tools' common start, `mcp__<server>__` as Pi names them. */
@@ -176,7 +207,14 @@ export async function ensureMcp(agent: string): Promise<boolean> {
 async function connectAgent(agent: string, timeoutMs: number): Promise<void> {
 	await Promise.all([...servers.entries()].filter(([, s]) => s.agent === agent).map(([k, s]) => (servers.delete(k), s.client?.close().catch(() => {}))));
 	const env = agentEnv(agent);
-	await Promise.all(Object.entries(agentMcp(agent)).map(([name, raw]: [string, any]) => connectServer(agent, name, raw, env, timeoutMs)));
+	const specs = agentMcp(agent);
+	// A server no longer in its mcp.json (or turned off) is no namespace of scripts any more.
+	for (const key of namespaces.keys()) {
+		const [owner, name] = [key.slice(0, key.indexOf("/")), key.slice(key.indexOf("/") + 1)];
+		if (owner === agent && (!specs[name] || specs[name].enabled === false)) namespaces.delete(key);
+	}
+	syncNamespaces();
+	await Promise.all(Object.entries(specs).map(([name, raw]: [string, any]) => connectServer(agent, name, raw, env, timeoutMs)));
 }
 
 /** One server of an agent, connected anew: its tools, or why not. */
@@ -194,9 +232,8 @@ async function connectServer(agent: string, name: string, raw: any, env: Record<
 		await withTimeout(client.connect(transport), timeoutMs, "connect timed out");
 		const prefix = `mcp__${sanitize(name)}__`;
 		const own = { name, prefix, description: client.instructions?.trim().slice(0, 600) || client.serverInfo?.title || undefined };
-		const at = NAMESPACES.findIndex((n) => n.prefix === prefix);
-		if (at >= 0) NAMESPACES[at] = own;
-		else NAMESPACES.push(own);
+		namespaces.set(`${agent}/${name}`, own);
+		syncNamespaces();
 		// Connected only once it listed its tools: one that times out here is tried again (`ensureMcp`).
 		const listed = await withTimeout(client.listTools(), timeoutMs, "tools/list timed out").catch(async (e) => {
 			await client.close().catch(() => {});
@@ -302,13 +339,18 @@ function dropHeader(agent: string, name: string, header: string): void {
 	fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
 }
 
+/** `p`, or `message` as an error after `ms`; the timer goes with whichever comes first. */
 function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
-	return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
+	let timer: NodeJS.Timeout | undefined;
+	const late = new Promise<T>((_, reject) => (timer = setTimeout(() => reject(new Error(message)), ms)));
+	return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }
 
 export async function closeMcp(): Promise<void> {
 	await Promise.all([...servers.values()].map((s) => s.client?.close().catch(() => {})));
 	servers.clear();
+	namespaces.clear();
+	syncNamespaces();
 }
 
 /** A server's error as the person can act on it. */

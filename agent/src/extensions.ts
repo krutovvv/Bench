@@ -24,7 +24,6 @@ import { CodemodeSandbox } from "@earendil-works/pi-codemode";
 import { hasDeferred, NAMESPACES } from "./mcp/mcp.ts";
 import { createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchExtension } from "@earendil-works/pi-durable/tool-search";
-import * as piTools from "@earendil-works/pi-durable/tools";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -33,7 +32,7 @@ import * as cron from "./builtin/cron.ts";
 import * as memory from "./builtin/memory.ts";
 import * as skills from "./builtin/skills.ts";
 import { agentDir, agents } from "./config.ts";
-import { createAnchoredEdit, createAnchoredRead } from "./builtin/hashline.ts";
+import { codingTools } from "./builtin/hashline.ts";
 import { assistant, images } from "./extensions/assistant.ts";
 import { host } from "./host.ts";
 import { mcpTools } from "./mcp/mcp.ts";
@@ -42,17 +41,16 @@ import * as prompt from "./prompt.ts";
 
 /** What a user extension's default export receives. */
 export const blocks = () => {
-	const coding = piTools.createCodingTools({ images });
-	const byName = Object.fromEntries((coding.tools ?? []).map((t: any) => [t.name, t]));
+	const byName = Object.fromEntries(codingTools({ images }).map((t: any) => [t.name, t]));
 	return {
 		pi,
 		ai,
 		host,
 		prompt,
 		tools: {
-			read: createAnchoredRead({ images }),
+			read: byName.read,
 			write: byName.write,
-			edit: createAnchoredEdit(),
+			edit: byName.edit,
 			bash: byName.bash,
 			clarify: ask.clarify,
 			todo: ask.todo,

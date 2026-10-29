@@ -134,12 +134,12 @@ export interface AgentSettings {
 	approvals?: string;
 	/** Commands the person approved "always": never asked again in these settings' threads. */
 	allowed?: string[];
-	/** The most steps (tool calls) in one turn; past it the run ends with an answer (`builtin/steps.ts`). Unset: no limit. */
+	/** The most steps (tool calls) in one turn; past it the run ends with an answer (`turn/steps.ts`). Unset: no limit. */
 	stepLimit?: number;
 	/**
-	 * The project's use of the evaluator (`judge/`), if the gear's connection is on too. Off unless
-	 * turned on: on a shared GPU it takes the room other utilities need (image generation, OCR…),
-	 * so it is on where its speed is worth it. An object, for the choices that may join it.
+	 * The project's use of the evaluator (`judge/`), where the gear has a server. On in a new
+	 * project (`builtin/projects.ts`); turned off where the project's utilities need the shared GPU
+	 * (image generation, OCR…). An object, for the choices that may join it.
 	 */
 	evaluator?: { enabled?: boolean };
 }

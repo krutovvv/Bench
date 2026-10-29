@@ -2,22 +2,13 @@
 // works on a server (`machine/ssh.ts`) has its files there. Either way they go through Pi's
 // `ExecutionEnv` — this machine's, or that one's over SSH.
 
-import { execFile } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { BACKGROUND_CONTEXT as ctx } from "@earendil-works/chord/context";
 import { getOrThrow } from "@earendil-works/pi-durable/env";
 import { dataUrl, expand, HttpError, isDir, required, type Module } from "../http.ts";
-import { machineEnv } from "../machine/ssh.ts";
-
-/** A path on `machine` (its `~` its login directory) and its environment there; None: this one's. */
-export async function onMachine(machine: string | null | undefined, p: string) {
-	if (!machine) return undefined;
-	const env = await machineEnv(machine, "");
-	const abs = p === "~" ? env.cwd : p.startsWith("~/") ? path.posix.join(env.cwd, p.slice(2)) : path.posix.resolve(env.cwd, p || ".");
-	return { env, path: abs };
-}
+import { onMachine, shOut as runSh } from "../machine/sh.ts";
 
 /** Pi's file errors as HTTP answers. */
 const fsCall = async <T>(f: () => Promise<T>): Promise<T> => {
@@ -42,20 +33,13 @@ async function shIn(machine: string | null, dir: string, script: string, args: s
 	return (await shOut(machine, dir, script, args)).split("\n").filter(Boolean).slice(0, cap);
 }
 
-/** What a POSIX script run in `dir` printed, whole (`shIn` runs it). */
-export async function shOut(machine: string | null, dir: string, script: string, args: string[]): Promise<string> {
-	const full = `cd "$1" || exit 1; shift; ${script}`;
-	const m = await onMachine(machine, dir);
-	let out = "";
-	if (m) {
-		const r = await m.env.exec(["sh", "-c", full, "sh", m.path, ...args], { onOutput: (t: string) => (out += t) }, ctx);
-		if (!r.ok) throw new HttpError(400, r.error.message);
-	} else {
-		out = await new Promise<string>((resolve) =>
-			execFile("sh", ["-c", full, "sh", expand(dir), ...args], { maxBuffer: 64 << 20 }, (_e, stdout) => resolve(String(stdout ?? ""))),
-		);
+/** What a POSIX script run in `dir` printed (`machine/sh.ts`), its failure a 400. */
+async function shOut(machine: string | null, dir: string, script: string, args: string[]): Promise<string> {
+	try {
+		return await runSh(machine, dir, script, args);
+	} catch (e) {
+		throw new HttpError(400, String((e as Error)?.message ?? e));
 	}
-	return out;
 }
 
 /** A file's text at HEAD of the repository it is in; null: not in one, or not committed. */
@@ -176,7 +160,7 @@ export default (): Module => ({
 		},
 		// The Explorer's editor marks the lines changed since the last commit (`git show HEAD:`).
 		"GET /api/git/head": async (req) => ({ text: await textAtHead(req.query.get("machine"), required(req.query.get("path"), "path")) }),
-		// A file as a tree has it (a turn's start or end, `runtime/turns.ts`): its text, or null
+		// A file as a tree has it (a turn's start or end, `runtime/changes.ts`): its text, or null
 		// when the tree has no such file (made, or removed, in that turn).
 		"GET /api/git/show": async (req) => {
 			const root = required(req.query.get("root"), "root");

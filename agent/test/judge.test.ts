@@ -16,10 +16,10 @@ process.env.BENCH_HOME = home;
 
 const { setHost } = await import("../src/host.ts");
 const { setSetting, writeAgent, readAgent } = await import("../src/config.ts");
-const { markNotRun, seeNestedResult, seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
+const { markNotRun, seeNestedResult, seeRequest, seeResult, turnOf } = await import("../src/turn/turn.ts");
 const { keptThrough } = await import("../src/judge/keep.ts");
 const { resultsOf: results, personsWords, touchedFiles, afterSummary } = await import("../src/judge/summary.ts");
-const { stepGate, stepNote } = await import("../src/builtin/steps.ts");
+const { stepGate, stepNote } = await import("../src/turn/steps.ts");
 const { checkJudge, fitState } = await import("../src/judge/client.ts");
 const { baseOf } = await import("../src/judge/models.ts");
 const { atResult, atAnswer } = await import("../src/judge/index.ts");
@@ -295,8 +295,8 @@ test("off, no point asks and the hooks change nothing", async () => {
 });
 
 const { atRequest, atCall } = await import("../src/judge/index.ts");
-const { fitResultFor } = await import("../src/builtin/window.ts");
-const { seeAnswer } = await import("../src/builtin/turn.ts");
+const { fitResultFor } = await import("../src/turn/window.ts");
+const { seeAnswer } = await import("../src/turn/turn.ts");
 
 test("at a turn's start the fitting skill is named for the first request, once", async () => {
 	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
@@ -387,6 +387,19 @@ test("a call that repeats a failed one is refused once; a new step, or the same 
 	assert.equal(seen.length, before);
 });
 
+test("two calls asked about at once each get their own answer's reading (tools run in parallel)", async () => {
+	seeRequest("r3", [user("Find the price on DNS")]);
+	const probe = { name: "bash", arguments: { command: "node probe.mjs" } };
+	const long = (n: number) => ({ name: "ssh_run", arguments: { command: `cd /srv/app && for f in logs/*.log; do grep -c 'price' "$f"; done | sort | uniq -c | head -${n}` } });
+	seeResult("r3", probe, { output: [{ type: "text", text: "died" }], isError: true });
+	seeResult("r3", long(20), { output: [{ type: "text", text: "died" }], isError: true });
+	reply = () => choice("repeat.repeat", { new: 0.08, same_failed: 0.9, same_result: 0.02 });
+	// The same probe (sure at 0.85) and a near copy of the long one (sure only at 0.95), asked together.
+	const [same, near] = await Promise.all([atCall("r3", probe, false), atCall("r3", long(30), false)]);
+	assert.match(same.block!, /repeats one that just failed/, "the same call, read as the same");
+	assert.equal(near.block, undefined, "the near copy, read as a near copy");
+});
+
 test("repeat asks only about the same call, whole: other scripts, offsets and refused calls are not repeats", async () => {
 	seeRequest("r2", [user("Restore the skills from the backup")]);
 	const script = (body: string) => ({ name: "bash", arguments: { command: `cd /tmp && python3 - <<'EOF'\nimport json, glob, hashlib, os\n${body}\nEOF` } });
@@ -475,7 +488,7 @@ test("the MCP tools named at the start are offered from the next step, once", as
 });
 
 test("an overflowing request cuts what the next step needs least first", async () => {
-	const { fitRequestFor } = await import("../src/builtin/window.ts");
+	const { fitRequestFor } = await import("../src/turn/window.ts");
 	seeRequest("w1", [user("Find the DNS price")]);
 	const big = (t: string) => ({ role: "toolResult", toolCallId: "1", content: [{ type: "text", text: t + " " + "x".repeat(200_000) }] });
 	const msgs = [user("Find the DNS price"), big("OLD menu page"), big("DNS PRICE 10 499"), user("go on")];
@@ -632,8 +645,14 @@ test("mid-turn, a skill that fits what the agent does now is named once", async 
 
 test("well on its way to Pi's threshold, a part of the work that just ended is compacted now, once", async () => {
 	const { thresholds } = await import("../src/judge/boundary.ts");
-	const { fitRequest, tokensOf } = await import("../src/builtin/window.ts");
+	const { fitRequest, tokensOf } = await import("../src/turn/window.ts");
 	seeRequest("b1", [user("Do the three parts")]);
+	// Pi's own: its default policy, or the project's share of the window as `compactionPolicy` makes it.
+	const settings = readAgent("project:p");
+	assert.deepEqual(thresholds("project:p", 100_000), { at: 100_000 - 16_384, background: 100_000 - 16_384 - 32_768 });
+	writeAgent("project:p", { ...settings, compaction: 0.6 });
+	assert.deepEqual(thresholds("project:p", 100_000), { at: 60_000, background: 55_000 });
+	writeAgent("project:p", settings);
 	const { at } = thresholds("project:p");
 	const fill = (share: number) => {
 		const chars = Math.floor(share * at * (4 * 1000)) / tokensOf(4000);
@@ -695,12 +714,30 @@ test("a queued message that corrects the work under way is judged a correction; 
 });
 
 test("a section is held until the next compaction", async () => {
-	const { frozen, thaw } = await import("../src/builtin/frozen.ts");
+	const { frozen, thaw } = await import("../src/turn/frozen.ts");
 	let n = 0;
 	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v1");
 	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v1", "held");
 	thaw("z1");
 	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v2", "read anew after a compaction");
+});
+
+test("what is kept of a conversation goes when its thread closes", async () => {
+	const { frozen } = await import("../src/turn/frozen.ts");
+	const { forget } = await import("../src/turn/kept.ts");
+	const { seeUsage, fitRequest, usedTokens } = await import("../src/turn/window.ts");
+	seeRequest("gone", [user("the work")]);
+	stepGate("gone");
+	await frozen("gone", "notes", () => "v1");
+	fitRequest("gone", [user("x".repeat(3000))], 100_000);
+	seeUsage("gone", { input: 5000 });
+	assert.equal(turnOf("gone").steps, 1);
+	assert.ok(usedTokens("gone") > 0);
+	forget("gone");
+	assert.equal(turnOf("gone").steps, 0, "a turn with nothing known");
+	assert.equal(turnOf("gone").request, "");
+	assert.equal(usedTokens("gone"), 0, "no count of the window");
+	assert.equal(await frozen("gone", "notes", () => "v2"), "v2", "the sections read anew");
 });
 
 test("each message is read for what it asks; an approval is answered in words, and its course is checked sooner", async () => {

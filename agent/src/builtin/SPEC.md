@@ -12,9 +12,9 @@ references: [thread-objects, projects-and-agents]
 
 The tools the default "assistant" extension gives a thread beside Pi's own read, write, edit and
 bash, and the small stores behind them: `ssh_run` (`ssh.ts`), background processes, cron,
-memory, skills, `clarify` and approvals (`ask.ts`), projects, the
+memory, skills, `clarify` (`ask.ts`), the approvals' patterns (`approvals.ts`), projects, the
 servers' agents, presets, grep/glob/ls (`search.ts`), code navigation (`navigate.ts`, the `lsp`
-tool), and line-anchored read and edit (`hashline.ts`). Each tool's line in the prompt is in
+tool; `diagnostics.ts`), and line-anchored read and edit (`hashline.ts`). Each tool's line in the prompt is in
 `agent/src/prompt.ts`.
 
 ## Boundary
@@ -41,10 +41,6 @@ tool), and line-anchored read and edit (`hashline.ts`). Each tool's line in the 
   project is waited for 20 s, then said to be loading.
 - **A background process does not outlive the agent**: `background` (a run's Stop and end leave
   it alone) and `abandonOnRestart` (a restart ends it for good, "stopped by restart").
-- **What is sent fits the model's window** (`window.ts`): a tool's result past its share (12%)
-  keeps its head and tail with a line on how to ask for less; a request that would overflow has
-  its largest old results and call arguments cut in that request only, the provider's own count
-  correcting the estimate. Pi's compaction still does the lasting work.
 - **Memory is per project**: a project's notes and what it knows of the person are its own
   (`memories/MEMORY.md`, `memories/USER.md` in its environment); Host's are Host's.
 - The list of servers' agents is this Mac's agent's setting (`servers.ts`), not project rows.

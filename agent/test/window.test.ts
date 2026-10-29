@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CHARS_PER_TOKEN, cutMiddle, fitRequest, fitResult, seeUsage } from "../src/builtin/window.ts";
+import { CHARS_PER_TOKEN, cutMiddle, fitRequest, fitResult, seeUsage } from "../src/turn/window.ts";
 
 const W = 131072;
 const text = (t: string) => ({ output: [{ type: "text", text: t }] });
@@ -53,4 +53,16 @@ test("what the provider counted beyond the estimate makes the next request cut s
 	// The system prompt and tools' descriptions took 45K more than the messages.
 	seeUsage("r3", { input: 83_400 + 45_000 });
 	assert.ok(fitRequest("r3", msgs, W), "now it would not fit");
+});
+
+test("the notes after a result follow it whole: only the tool's own output is cut", async () => {
+	const { withNotes } = await import("../src/turn/window.ts");
+	const big = "HEAD" + "m".repeat(52_000 * 3) + "TAIL";
+	const note = "[src/a.ts:3 error: x is not defined]";
+	const r = await withNotes("n1", text(big), [note], undefined, W);
+	assert.equal(r.output.length, 2);
+	assert.match(r.output[0].text, /characters cut out here/);
+	assert.equal(r.output[1].text, note, "the note, uncut, after the output");
+	const small = text("ok");
+	assert.equal(await withNotes("n1", small, [], undefined, W), small, "nothing to change: the result itself");
 });

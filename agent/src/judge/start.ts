@@ -11,7 +11,7 @@
 import { skillsFor, machineOf } from "../repo.ts";
 import { mcpServerTools, reachOf, type ServerTools } from "../mcp/mcp.ts";
 import { projects } from "../builtin/projects.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /** How sure the evaluator must be to name a skill, or a server: the skills that fitted came at
@@ -30,13 +30,11 @@ const MAX_PROJECTS = 40;
 /** The most tools offered at once this way. */
 const MAX_LOAD = 30;
 
-/** The skills and servers asked about this turn, by question name. */
-const offered = new Map<string, { skills: string[]; servers: ServerTools[] }>();
-
-export const start: Point = {
+/** The skills and servers asked about: `s<i>` and `server<i>` are the i-th. */
+export const start: Point<{ skills: string[]; servers: ServerTools[] }> = {
 	name: "start",
 	moment: "request",
-	async ask({ conversation, turn, thread }) {
+	async ask({ turn, thread }) {
 		if (turn.started || !turn.request || turn.steps > 0 || !thread) return undefined;
 		turn.started = true;
 		const skills = (await skillsFor(thread.agent, thread.cwd, machineOf(thread.project)).catch(() => [])).slice(0, MAX_SKILLS);
@@ -45,7 +43,6 @@ export const start: Point = {
 		// evaluator does not see.
 		const opening = turn.opening;
 		if (!skills.length && !servers.length && !opening) return undefined;
-		offered.set(conversation, { skills: skills.map((k) => k.name), servers });
 		const questions: Record<string, any> = {};
 		const all = projects.list();
 		const here = all.find((p) => p.id === thread.project);
@@ -78,13 +75,11 @@ export const start: Point = {
 		});
 		return {
 			questions,
+			context: { skills: skills.map((k) => k.name), servers },
 			...(opening ? { state: { thread_project: here?.name ?? "Host (the agent's own environment)", thread_folder: thread.cwd, projects: all.slice(0, MAX_PROJECTS).map((p) => p.name) } } : {}),
 		};
 	},
-	apply({ conversation, turn }, answers) {
-		const o = offered.get(conversation);
-		offered.delete(conversation);
-		if (!o) return undefined;
+	apply({ turn }, answers, o) {
 		const lines: string[] = [];
 		// Before anything else: what only the person can say is asked, not guessed.
 		if ((answers.clear?.probabilities?.ask_first ?? 0) >= SURE_UNCLEAR)

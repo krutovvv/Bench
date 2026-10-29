@@ -6,7 +6,7 @@
 // Explorer's "Specs" (`GET /api/specs`).
 
 import path from "node:path";
-import { shOut } from "./modules/files.ts";
+import { shOut } from "./machine/sh.ts";
 
 export interface Spec {
 	id: string;

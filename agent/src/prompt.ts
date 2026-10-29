@@ -3,13 +3,12 @@
 // instructions, the skills it can load, and the notes it keeps. Short on purpose: a local model
 // at 60–150 tokens/s pays for every line, and for every extra round a "verify everything" rule causes.
 
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, agentMcp, isProject, timezone } from "./config.ts";
-import { evaluatorOn } from "./judge/client.ts";
-import { evaluatorReady } from "./judge/models.ts";
+import { agentDir, isProject, timezone } from "./config.ts";
+import { scriptedServers } from "./mcp/mcp.ts";
+import { evaluatorFor } from "./judge/client.ts";
 import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
 import { machineOf, repoOf, skillsFor } from "./repo.ts";
@@ -70,12 +69,10 @@ export function environment(s: ThreadFacts): string {
  *  much data go through one script, many small judgments through the classifier, not the model. */
 function scripts(s: ThreadFacts): string {
 	// The servers behind code mode by name: their tools are not listed, only found in a script.
-	const scripted = Object.entries(agentMcp(s.agent))
-		.filter(([, spec]: [string, any]) => (spec?.exposure ?? "codemode").startsWith("codemode"))
-		.map(([name]) => name);
+	const scripted = scriptedServers(s.agent);
 	const servers = scripted.length ? ` This project's MCP servers ${scripted.join(", ")} are reached that way: find their tools with searchTools() and describeNamespace() in a script.` : "";
 	const line = `Many calls or much data (an MCP server's records, many files or pages): one codemode script calls the tools, filters and counts, and prints only what matters.${servers}`;
-	if (!evaluatorReady() || !evaluatorOn(s.agent)) return line;
+	if (!evaluatorFor(s.agent)) return line;
 	return `${line} Many small judgments in it (is this urgent, which kind, does it match the request): ask the evaluator in the script, models.classify(await models.getModelOfType("classifier", "bench", "evaluator"), { state, questions }) — it answers in well under a second at no cost — and print only what it decided.`;
 }
 
@@ -96,33 +93,10 @@ function settings(s: ThreadFacts): string | undefined {
 }
 
 /** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory, read where
- * it is (a project's server too: `repo.ts`). */
+ * it is (`repo.ts`: here, or on a project's server). */
 export async function projectContext(s: ThreadFacts): Promise<string | undefined> {
-	const machine = machineOf(s.project);
-	if (machine) {
-		const { instructions } = await repoOf(s.cwd, machine).catch(() => ({ instructions: [] }));
-		const parts = instructions.map((i) => `## ${path.posix.relative(s.cwd, i.file) || path.posix.basename(i.file)}\n\n${i.text}`);
-		return parts.length ? `# Project instructions\n\n${parts.join("\n\n")}` : undefined;
-	}
-	if (path.resolve(s.cwd) === os.homedir()) return undefined;
-	let root = s.cwd;
-	try {
-		root = execFileSync("git", ["-C", s.cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", timeout: 2000, stdio: ["ignore", "pipe", "ignore"] }).trim() || s.cwd;
-	} catch {}
-	const dirs: string[] = [];
-	for (let d = path.resolve(s.cwd); ; d = path.dirname(d)) {
-		dirs.unshift(d);
-		if (d === root || d === path.dirname(d)) break;
-	}
-	const parts: string[] = [];
-	for (const d of dirs)
-		for (const name of ["AGENTS.md", "CLAUDE.md"]) {
-			const f = path.join(d, name);
-			if (fs.existsSync(f)) {
-				parts.push(`## ${path.relative(s.cwd, f) || name}\n\n${fs.readFileSync(f, "utf8").trim().slice(0, 20000)}`);
-				break;
-			}
-		}
+	const { instructions } = await repoOf(s.cwd, machineOf(s.project)).catch(() => ({ instructions: [] }));
+	const parts = instructions.map((i) => `## ${path.posix.relative(s.cwd, i.file) || path.posix.basename(i.file)}\n\n${i.text}`);
 	return parts.length ? `# Project instructions\n\n${parts.join("\n\n")}` : undefined;
 }
 

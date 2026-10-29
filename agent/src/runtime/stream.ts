@@ -12,9 +12,8 @@ import type { Usage } from "../protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
 import { FAIL_KIND } from "./journal.ts";
 import { usagePayload } from "./usage.ts";
-import { evaluatorOn } from "../judge/client.ts";
-import { evaluatorReady } from "../judge/models.ts";
-import { thaw } from "../builtin/frozen.ts";
+import { evaluatorFor } from "../judge/client.ts";
+import { thaw } from "../turn/frozen.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
@@ -46,7 +45,6 @@ export class Stream {
 			case "run_start":
 				if (!live.busy) {
 					live.busy = true;
-					live.generation++;
 					this.beginRun(live);
 				}
 				break;
@@ -92,7 +90,7 @@ export class Stream {
 			// moves without waiting for the thread to be read again. A failed compaction is not one.
 			case "compaction_end":
 				if (!e.error) {
-					// The prompt's sections are read anew after it (`builtin/frozen.ts`).
+					// The prompt's sections are read anew after it (`turn/frozen.ts`).
 					thaw(String(live.conversation.id));
 					live.usage.compactions = (live.usage.compactions ?? 0) + 1;
 					this.emitUsage(live);
@@ -150,7 +148,7 @@ export class Stream {
 
 	/** The thread's numbers as Bench shows them. */
 	usageOf(live: Live): Usage {
-		return usagePayload(resolveModel().model, live.usage, resolveModel().contextLength, evaluatorReady() && evaluatorOn(live.row.agent));
+		return usagePayload(resolveModel().model, live.usage, resolveModel().contextLength, evaluatorFor(live.row.agent));
 	}
 
 	emitUsage(live: Live): void {
@@ -171,7 +169,7 @@ export class Stream {
 		live.fail = undefined;
 		live.usage.started = Date.now();
 		live.usage.output = 0;
-		this.rt.turns.begin(live);
+		this.rt.changes.begin(live);
 		this.rt.report(live.row.id, { kind: "start" });
 		this.rt.tell(live.row.id, { kind: "run", value: true });
 		this.rt.listChanged();
@@ -201,7 +199,7 @@ export class Stream {
 		// Whatever the person held, the run is over: the hold lets go, nobody waits on it.
 		this.rt.holds.end(live);
 		// What the turn changed in its repository, into the journal under its answer.
-		void this.rt.turns.settle(live).catch((err) => console.error("[turn changes]", err));
+		void this.rt.changes.settle(live).catch((err) => console.error("[turn changes]", err));
 		this.rt.tell(live.row.id, { kind: "run", value: false });
 		// The turn's blended rate, as one number worth remembering.
 		const turnSecs = Math.max(1, (Date.now() - live.usage.started) / 1000);

@@ -3,7 +3,7 @@
 // the likeliest first. Every item stays; the model reads the best before the rest. As `search.ts`
 // does for grep, for the lists that are not lines.
 
-import { cut, resultText } from "../builtin/turn.ts";
+import { cut, resultText } from "../turn/turn.ts";
 import type { Point, Seen } from "./point.ts";
 
 /** Fewer items than this are read as they are. */

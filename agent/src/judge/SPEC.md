@@ -23,9 +23,11 @@ servers, as many as the person keeps, one the main and one its fallback; the pai
 model: the main server, or the fallback when it fails (a failed server is quiet a minute). There is
 no switch there: no server, no evaluator. A project's switch (Settings → Model → Evaluator, its
 `evaluator` in settings.json, Host's too) is its use — **on in a new project**, off where its
-utilities need the shared GPU (the balancer stops one to start the other). `judgeFor(conversation)`
-is the one place that answers whether a thread uses it; every point, the excerpt, the window's cut
-and a script's `models.classify()` (refused with the reason in `beforeTool`) ask it. Off, everything
+utilities need the shared GPU (the balancer stops one to start the other). `evaluatorFor(agent)`
+is the one place that answers whether a project's threads use it: the prompt's line on it, the
+thread's meters and a script's `models.classify()` (refused with the reason in `beforeTool`) ask it;
+every point, the excerpt and the window's cut ask `judgeActive(conversation)` — that, and a server
+not quiet after a failure. Off, everything
 goes the classic way. A script's calls of the classifier are not steps the points weigh or results
 they read.
 
@@ -36,8 +38,11 @@ at, whether it asks now and what (typed questions, and what it adds to the state
 answers change — a result reordered, a note to the model, the turn sent back, an entry for the
 thread, the plan's marks. `index.ts` keeps them in `POINTS` and asks every point of a moment that
 has a question now in one request: one state (the turn's request, plan and last steps, kept by
-`builtin/turn.ts`, plus what each point adds), every question evaluated against it in parallel,
-each point's answers under its own names. The default extension's hooks call the moments
+`turn/turn.ts`, plus what each point adds), every question evaluated against it in parallel,
+each point's answers under its own names. What a point's `apply` needs of its asking (the skills
+or servers it offered, the likeness it compared) comes back with the answers as the asking's
+`context`, never through a map by conversation: Pi runs a step's tools in parallel, and two calls of
+one thread are asked about at once. The default extension's hooks call the moments
 (`extensions/assistant.ts`): `result` in `afterTool`, `answer` in `onYield`.
 
 - **search** (`search.ts`, `result`: grep, glob, a grep or find through bash): a list of twelve
@@ -49,7 +54,7 @@ each point's answers under its own names. The default extension's hooks call the
   never back; when one finishes and none is under way, the next begins. The thread shows the plan
   so marked (`bench.plan`, read by the journal as a later snapshot of the same plan) and the model
   is told in a line, so it need not spend a step on `todo`. Its own `todo` call wins and the marks
-  start again from it. With the evaluator off or failing, the plan's reminder (`planNudge`) does
+  start again from it. With the evaluator off or failing, the plan's reminder (`turn/turn.ts` `planNudge`) does
   this job; with it on, the reminder is silent.
 - **course** (`drift.ts`, `result`, every 5 steps): on track, drifting to something not asked,
   looping, or done. Anything but on track, when sure (0.7), is a note with that step's result.
@@ -106,7 +111,7 @@ each point's answers under its own names. The default extension's hooks call the
 - **failure** (`failure.ts`, `result`, a failed call): retry once, fix the call, another way, or
   ask the person (0.6), said with the error. "Another way" still lets the agent find out why (a
   path not where it thought is looked for, not given up).
-- **excerpt** (`excerpt.ts`, called by `builtin/window.ts`): a result past its share of the window
+- **excerpt** (`excerpt.ts`, called by `turn/window.ts`): a result past its share of the window
   is cut into parts of 1 500 characters, the parts put in the state (9 000 characters a request),
   and a choice over their names (and "none", last) keeps the parts that stand out; without an
   answer, the cut keeps head and tail as before.
@@ -129,8 +134,8 @@ each point's answers under its own names. The default extension's hooks call the
   comes ordered by use for the request, the items that stand out first, every item kept.
 - **claims** (`claims.ts`, `answer`): an answer with numbers after 3 steps or more is checked
   against all the turn found (`turn.found`, 40 results); unsupported (0.8) sends it back once.
-- **keep** (`keep.ts`, called by `builtin/window.ts`): when a request would overflow the window, the
-  earlier results the next step needs least are cut first. At compaction (`builtin/compaction.ts`,
+- **keep** (`keep.ts`, called by `turn/window.ts`): when a request would overflow the window, the
+  earlier results the next step needs least are cut first. At compaction (`turn/compaction.ts`,
   `keptThrough`) the latest 48 results are weighed for what the rest of the work needs word for
   word — exact text, ids, paths a summary loses — and those (0.3, at most 8 000 characters) follow
   the summary under "Kept word for word". What follows a summary (`summary.ts`, `afterSummary`,
@@ -157,6 +162,21 @@ matters it comes last.
 The safe side wins every tie: the option that changes nothing is listed first (the model leans to
 the first), and below its threshold an answer changes nothing.
 
+## Who decides stop and done
+
+Each question has one owner, so no two speak about the same thing:
+
+- **Stopping a turn** is the step limit's alone (`turn/steps.ts`, not the evaluator's): past it
+  calls are refused and the model is told to answer. Neither course nor done is asked then.
+- **A single call that repeats an earlier one** is `repeat.ts`'s, before it runs (the call
+  refused once). **A run of steps going round** is `drift.ts`'s `looping`, after a result (a
+  note): it judges the course of the last steps, never one call against another.
+- **The work leaving the request, or looking done while the agent goes on** is `drift.ts`'s, mid
+  turn (a note; it never ends the turn).
+- **Whether the final answer is done** is `done.ts`'s, at the answer (sent back once).
+- **The plan's marks** are `plan.ts`'s; with the evaluator off or failing, the plan's reminder
+  (`turn/turn.ts` `planNudge`, which reads the same plan the turn keeps from `todo`).
+
 ## Growing it
 
 A new idea is a file with a `Point` and a line in `POINTS`; a new moment is a dispatcher in
@@ -179,7 +199,7 @@ measured — or an HTTP error) keeps that address quiet for a minute. Every requ
 evaluator by; the thread's meters count its requests and how often it changed the course
 (`Usage.judge_calls`, `judge_nudges`).
 
-## The step limit (`builtin/steps.ts`)
+## The step limit (`turn/steps.ts`)
 
 Not the evaluator's, but on the same turn: a project's most steps in one turn (Settings → Model →
 Step limit, none by default). Past it every call is refused with the reason and every request to
@@ -190,7 +210,8 @@ by the evaluator.
 ## Known limitations
 
 - What a turn is, is kept in memory: after a restart of the agent a turn's steps count from zero.
-- Every state is fitted to 20 000 characters before it is sent (`fitState`: the largest member
+- Every state is fitted to 40% of the evaluator's window (16 384 tokens at 3 characters each:
+  19 660 characters) before it is sent (`fitState`: the largest member
   shrinks, a list losing its oldest items, named parts keeping their names); a server that still
   says its window is exceeded (Russian and code are dense in tokens) is asked once more with half.
   At 24 000 and with the turn's results unfitted, the answer's check failed on long turns (2 of 4 in that thread).

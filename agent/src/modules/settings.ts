@@ -32,7 +32,7 @@ function patchConfig(agent: string, patch: any): void {
 			// The project's use of the evaluator (`judge/`); the gear's connection is the other half.
 			writeAgent(agent, { ...readAgent(agent), evaluator: m.enabled ? { enabled: true } : undefined });
 		} else if (k === "step_limit" && m && typeof m === "object") {
-			// The most steps in a turn, or null: no limit (`builtin/steps.ts`).
+			// The most steps in a turn, or null: no limit (`turn/steps.ts`).
 			const n = Math.floor(Number(m.steps));
 			writeAgent(agent, { ...readAgent(agent), stepLimit: n > 0 ? n : undefined });
 		} else if (k === "approvals" && m && typeof m === "object" && m.mode !== undefined) {

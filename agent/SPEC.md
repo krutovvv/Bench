@@ -39,6 +39,8 @@ the list of servers' agents.
   language servers, audio, settings, backup, commands.
 - `runtime/` — the threads' core (`agent-runtime`).
 - `builtin/` — the agent's own tools and the stores behind them (`agent-tools`).
+- `turn/` — the hooks' own state of a turn, kept per conversation: the step limit, the window's
+  fitting, the prompt held until a compaction, the compaction's summary (`agent-turn`).
 - `machine/` — where the tools work (`agent-machine`).
 - `judge/` — the evaluator, a System One model asked at a turn's searches, on its way and at
   its end; the step limit beside it (`agent-judge`).

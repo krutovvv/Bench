@@ -9,7 +9,7 @@
 // were, as a list that changes rewrites the prompt's head and the server's cache with it.
 
 import { mcpServerTools, reachOf, type ServerTools } from "../mcp/mcp.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /**
@@ -28,13 +28,11 @@ const SURE_SERVER = 0.85;
 /** The most servers asked about. */
 const MAX_SERVERS = 12;
 
-/** The servers asked about this request, by conversation. */
-const asked = new Map<string, ServerTools[]>();
-
-export const step: Point = {
+/** The servers asked about at this request: `server<i>` is the i-th. */
+export const step: Point<ServerTools[]> = {
 	name: "step",
 	moment: "request",
-	ask({ conversation, turn, thread }) {
+	ask({ turn, thread }) {
 		if (!turn.request || turn.steps === 0 || !thread) return undefined;
 		const last = turn.calls.at(-1);
 		const questions: Record<string, any> = {};
@@ -54,7 +52,6 @@ export const step: Point = {
 		const servers = mcpServerTools(thread.agent)
 			.slice(0, MAX_SERVERS)
 			.filter((s) => !used(s) && !turn.named.has(`server:${s.name}`));
-		asked.set(conversation, servers);
 		servers.forEach((s, i) => {
 			questions[`server${i}`] = {
 				type: "choice",
@@ -62,11 +59,9 @@ export const step: Point = {
 				criteria: { not_needed: "The next step does not need these tools.", needed: "The next step needs these tools." },
 			};
 		});
-		return Object.keys(questions).length ? { questions } : undefined;
+		return Object.keys(questions).length ? { questions, context: servers } : undefined;
 	},
-	apply({ conversation, turn }, answers) {
-		const servers = asked.get(conversation) ?? [];
-		asked.delete(conversation);
+	apply({ turn }, answers, servers) {
 		const plain = (answers.think?.probabilities?.plain ?? 0) >= SURE_PLAIN;
 		const fit = servers.filter((_, i) => (answers[`server${i}`]?.probabilities?.needed ?? 0) >= SURE_SERVER);
 		for (const s of fit) turn.named.add(`server:${s.name}`);

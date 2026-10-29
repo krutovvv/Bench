@@ -33,7 +33,7 @@ export type { QueuedItem, ThreadItem };
 /** A display-only entry: why a run stopped. It has no `model`, so the model never sees it. */
 export const FAIL_KIND = "bench.fail";
 
-/** What a turn changed in its repository (`turns.ts`): display-only, as a fail note. */
+/** What a turn changed in its repository (`changes.ts`): display-only, as a fail note. */
 export const CHANGES_KIND = "bench.changes";
 
 /** A turn's review: findings on its changes (`review.ts`), display-only. */
@@ -45,6 +45,10 @@ export const PLAN_KIND = "bench.plan";
 
 /** Pi's compaction summary: a new context, with the older entries left out of what the model reads. */
 export const COMPACTION_KIND = "pi.compaction";
+/** How the summary begins as the user message the model reads after a compaction: the start of Pi's
+ *  `SUMMARY_PREFIX` (pi-durable 1.4.0, `harness/compaction.js`, not exported). Neither the person's
+ *  words nor a new turn. */
+export const SUMMARY_PREFIX = "The conversation history before this point was compacted";
 
 export const INBOX_KIND = InboxDoc.definition.kind;
 export const INSERTS_KIND = Inserts.definition.kind;
@@ -53,7 +57,7 @@ export const BLOCK_OPEN = "<block-state>";
 export const BLOCK_CLOSE = "</block-state>";
 
 /** The evaluator's own message to the model, appended after an answer (`judge/done.ts`): not the
- *  person's, so it neither starts a turn (`builtin/turn.ts`) nor shows in the thread. */
+ *  person's, so it neither starts a turn (`turn/turn.ts`) nor shows in the thread. */
 export const EVAL_OPEN = "<evaluator>";
 export const EVAL_CLOSE = "</evaluator>";
 

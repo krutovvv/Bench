@@ -4,8 +4,8 @@
 // order: nothing is dropped, so a wrong guess costs a line of reading, not a missed match.
 // Not sure enough, the result stays as the tool gave it.
 
-import { cut, resultText } from "../builtin/turn.ts";
-import { STATE_CAP } from "./client.ts";
+import { cut, resultText } from "../turn/turn.ts";
+import { evaluatorChars } from "./client.ts";
 import type { Point, Seen } from "./point.ts";
 
 /** Fewer lines than this are read as they are. */
@@ -48,9 +48,9 @@ export const search: Point = {
 	ask(seen) {
 		const list = listOfSeen(seen);
 		if (!list) return undefined;
-		// As many lines as fit the state's room, in their order.
+		// As many lines as fit their share of the evaluator's window (a quarter), in their order.
 		const options: Record<string, string> = {};
-		let room = STATE_CAP - 8000;
+		let room = evaluatorChars(0.25);
 		for (const [i, line] of list.items.entries()) {
 			const shown = cut(line, LINE);
 			if ((room -= shown.length + 12) < 0 || i >= 250) break;

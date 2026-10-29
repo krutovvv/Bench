@@ -4,10 +4,10 @@
 // own, `bench.plan`, read as a later snapshot of the same plan) and the model is told in a line,
 // so it need not spend a step on `todo` to tick items. Its own `todo` call always wins: it
 // rewrites the plan, and the marks start again from it. With the evaluator off, the plan's
-// reminder does this job (`builtin/ask.ts` `planNudge`).
+// reminder does this job (`turn/turn.ts` `planNudge`).
 
 import type { PlanStep } from "../protocol.gen.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import { PLAN_KIND } from "../runtime/journal.ts";
 import { sure, type Point } from "./point.ts";
 

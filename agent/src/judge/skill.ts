@@ -6,7 +6,7 @@
 
 import { skillsFor, machineOf } from "../repo.ts";
 import { host } from "../host.ts";
-import { cut } from "../builtin/turn.ts";
+import { cut } from "../turn/turn.ts";
 import type { Point } from "./point.ts";
 
 /** Steps between two looks. */
@@ -15,10 +15,8 @@ export const SKILL_EVERY = 10;
 const SURE = 0.8;
 const MAX_SKILLS = 120;
 
-/** The skills offered at this look, by conversation. */
-const offered = new Map<string, string[]>();
-
-export const skill: Point = {
+/** The skills offered at this look: `s<i>` is the i-th. */
+export const skill: Point<string[]> = {
 	name: "skill",
 	moment: "result",
 	async ask({ conversation, turn }) {
@@ -31,8 +29,8 @@ export const skill: Point = {
 			.filter((k) => !loaded.has(k.name) && !turn.named.has(`skill:${k.name}`))
 			.slice(0, MAX_SKILLS);
 		if (!skills.length) return undefined;
-		offered.set(conversation, skills.map((k) => k.name));
 		return {
+			context: skills.map((k) => k.name),
 			questions: {
 				skill: {
 					type: "choice",
@@ -43,9 +41,7 @@ export const skill: Point = {
 			},
 		};
 	},
-	apply({ conversation, turn }, answers) {
-		const names = offered.get(conversation) ?? [];
-		offered.delete(conversation);
+	apply({ turn }, answers, names) {
 		const a = answers.skill;
 		if (!a || a.choice === "none" || (a.probabilities?.[a.choice] ?? 0) < SURE) return undefined;
 		const name = names[Number(a.choice.slice(1))];

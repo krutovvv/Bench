@@ -29,6 +29,10 @@ export interface EvaluatorSettings {
 export const PROVIDER = "bench";
 export const MODEL = "evaluator";
 
+/** The evaluator's window in tokens: the local server's (h2o-lightning-4b behind its shim, `MAX_LEN`).
+ *  What is sent to it is sized from this (`client.ts` `evaluatorChars`). */
+export const WINDOW = 16_384;
+
 /** A local server starts its container and loads its model on the first request (90 s measured
  *  behind a GPU balancer that first stops speech to text): that one may take this long. */
 export const TIMEOUT_MS = 150_000;
@@ -83,7 +87,7 @@ export function modelOf(server: EvaluatorServer): ClassifierModel<"typesafe-syst
 		baseUrl: baseOf(server.base_url),
 		input: ["text"],
 		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-		contextWindow: 16_384,
+		contextWindow: WINDOW,
 	};
 }
 

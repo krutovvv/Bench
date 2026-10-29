@@ -40,7 +40,7 @@ export interface Host {
 	run(agent: string, prompt: string, opts: { source: string; title?: string; cwd?: string }): Promise<{ threadId: string; text: string }>;
 	/** Sends text to a delivery target ("telegram:<chat>"). */
 	deliver(target: string, text: string): Promise<void>;
-	/** Stops the thread's run, as the person's Stop does (the step limit, `builtin/steps.ts`). */
+	/** Stops the thread's run, as the person's Stop does (the step limit, `turn/steps.ts`). */
 	stop(threadId: string): void;
 	/** A display-only entry in the conversation's thread (the model never reads it): the evaluator's marks. */
 	write(conversationId: string | number, entry: { kind: string; data: unknown }): void;
