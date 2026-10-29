@@ -50,16 +50,25 @@ pub struct MediaState {
 /// How many measured runs predict the next.
 pub const KEPT_RUNS: usize = 12;
 
-/// Dictation recognized while it goes: at each pause, the whole speech so far, one run at a time; its
-/// text replaces the last after what the composer held before. Stopping is the last pause.
+/// Dictation recognized while it goes: at each pause, the speech since the last closed sentence, one
+/// run at a time; its text replaces the last after the closed ones. Once runs grow slow, a sentence
+/// that ends at a long pause is closed: its text kept, its speech no longer sent. Stopping is the
+/// last pause.
 pub struct LiveDictation {
     /// The composer's text before the dictation's first words: they go after it. Read when the
     /// first run is back, not when the mic is clicked — the thread's view is busy with the click.
     pub base: Option<String>,
     /// Where to look for the next pause from, in samples.
     pub looked: usize,
-    /// The speech the last run had, in samples.
+    /// The speech the last run had, in samples (its end).
     pub ran: usize,
+    /// Where the open speech starts (after the last closed sentence), in samples.
+    pub from: usize,
+    /// The closed sentences' text, and the open speech's as the last run recognized it (and where
+    /// that run's speech ended).
+    pub closed: String,
+    pub open: String,
+    pub open_end: usize,
     /// A run is out; the last result shown, and the number the next run gets.
     pub running: bool,
     pub shown: u64,
@@ -68,13 +77,13 @@ pub struct LiveDictation {
     /// The recording stopped: the dictation ends with the run out, or `last` after it.
     pub finishing: bool,
     /// The whole recording, for a run once the one out is back (speech came after it).
-    pub last: Option<Vec<u8>>,
+    pub last: Option<(Vec<u8>, usize)>,
     pub failed: bool,
 }
 
 impl LiveDictation {
     pub fn new() -> Self {
-        Self { base: None, looked: 0, ran: 0, running: false, shown: 0, next: 0, finishing: false, last: None, failed: false }
+        Self { base: None, looked: 0, ran: 0, from: 0, closed: String::new(), open: String::new(), open_end: 0, running: false, shown: 0, next: 0, finishing: false, last: None, failed: false }
     }
 }
 

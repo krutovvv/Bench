@@ -32,12 +32,14 @@ async function post(url: string, init: RequestInit): Promise<Response> {
 	}
 }
 
-export async function transcribe(agent: string, audio: Buffer, mime: string, filename = mime.includes("wav") ? "audio.wav" : "audio.ogg"): Promise<string> {
+/** `prompt`: the text said before this audio (dictation recognized in pieces), the OpenAI API's hint. */
+export async function transcribe(agent: string, audio: Buffer, mime: string, filename = mime.includes("wav") ? "audio.wav" : "audio.ogg", prompt = ""): Promise<string> {
 	const { o, base, key } = endpoint(agent, "stt");
 	const form = new FormData();
 	form.append("file", new Blob([new Uint8Array(audio)], { type: mime }), filename);
 	form.append("model", String(o.model ?? "whisper-1"));
 	if (o.language) form.append("language", String(o.language));
+	if (prompt) form.append("prompt", prompt);
 	const r = await post(`${base}/audio/transcriptions`, { method: "POST", headers: key ? { Authorization: `Bearer ${key}` } : {}, body: form });
 	if (!r.ok) throw new Error(`transcription failed: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`);
 	const j: any = await r.json();

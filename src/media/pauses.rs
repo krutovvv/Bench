@@ -47,6 +47,34 @@ fn measure(samples: &[f32], rate: u32) -> (Vec<f32>, usize, f32, f32) {
     (all, win, silent, silent * 2.)
 }
 
+/// How long the silence starting at sample `from` lasts so far, in seconds.
+pub fn silence_from(samples: &[f32], rate: u32, from: usize) -> f32 {
+    let (all, win, silent, _) = measure(samples, rate);
+    all.iter().skip(from / win).take_while(|l| **l < silent).count() as f32 * SLICE
+}
+
+/// How long a run may take before dictation is closed at a sentence's end (`commit_pause`).
+pub const BRISK: f32 = 3.;
+
+/// The pause that closes a sentence for good — its text kept, its speech no longer sent — or None:
+/// runs are still brisk (their predicted time under `BRISK`), so nothing needs closing. The slower
+/// a run would be, the shorter the pause that will do: a long dictation closes at nearly every
+/// sentence, a short one never.
+pub fn commit_pause(predicted: f32) -> Option<f32> {
+    if predicted < BRISK {
+        None
+    } else if predicted < BRISK * 3. {
+        Some(1.2)
+    } else {
+        Some(0.8)
+    }
+}
+
+/// The recognized text ends a sentence.
+pub fn ends_sentence(text: &str) -> bool {
+    text.trim_end().ends_with(['.', '?', '!', '…'])
+}
+
 /// Whether there was speech since sample `from` (stopping sends the speech again only then).
 pub fn spoke_since(samples: &[f32], rate: u32, from: usize) -> bool {
     let (all, win, _, loud) = measure(samples, rate);
@@ -212,6 +240,20 @@ mod tests {
         assert!(!spoke_since(&s, RATE, after_run), "only silence after the last run");
         let s = join(&[sound(3., 0.3), sound(0.7, 0.), sound(1.5, 0.3)]);
         assert!(spoke_since(&s, RATE, after_run), "words after it");
+    }
+
+    #[test]
+    fn a_sentence_is_closed_only_when_runs_grow_slow_and_the_pause_is_long_enough() {
+        assert_eq!(commit_pause(1.5), None, "brisk: nothing to close");
+        assert_eq!(commit_pause(4.), Some(1.2));
+        assert_eq!(commit_pause(20.), Some(0.8), "slow: a shorter pause does");
+        assert!(ends_sentence("Он выключен."));
+        assert!(ends_sentence("Включить? "));
+        assert!(!ends_sentence("и чтобы текст"));
+        let s = join(&[sound(3., 0.3), sound(1.3, 0.), sound(1., 0.3)]);
+        let at = (3.0 * RATE as f32) as usize;
+        let quiet = silence_from(&s, RATE, at);
+        assert!((1.2..1.4).contains(&quiet), "silence {quiet}");
     }
 
     #[test]

@@ -8,7 +8,7 @@ use gpui_kit::*;
 
 use crate::client::rest;
 use crate::media::audio::{Playback, Recorder};
-use crate::media::pauses::{Cut, predict, worth_a_run};
+use crate::media::pauses::{Cut, commit_pause, ends_sentence, predict, worth_a_run};
 use crate::media::state::{KEPT_RUNS, LiveDictation};
 
 /// Ticks of the waveform's repaint (33 ms) between two looks for a pause.
@@ -35,7 +35,7 @@ impl BenchApp {
                     self.rest(
                         window,
                         cx,
-                        move |c| rest::transcribe(c, &wav),
+                        move |c| rest::transcribe(c, &wav, ""),
                         |this, r, window, cx| {
                             this.media.transcribing = false;
                             let send = std::mem::take(&mut this.media.send_after_transcribe);
@@ -105,42 +105,51 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// While recording: at a pause after speech, the whole speech so far is recognized again — when
-    /// no run is out and the new speech is worth the run's cost.
+    /// While recording: once runs grow slow, a sentence the last run ended at a long pause is
+    /// closed; then, at a pause after speech, the open speech is recognized again — when no run is
+    /// out and the new speech is worth the run's predicted time.
     fn at_pause(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let (Some(rec), Some(live)) = (self.media.recorder.as_ref(), self.media.live.as_ref()) else {
+        let (Some(rec), Some(live)) = (self.media.recorder.as_ref(), self.media.live.as_mut()) else {
             return;
         };
         // One run at a time: a pause meanwhile waits, and the next run takes the speech as it is then.
         if live.running {
             return;
         }
-        let (looked, ran) = (live.looked, live.ran);
+        let rate = rec.rate() as f32;
+        // The open speech's text ends a sentence, the run that read it is the last, and the pause
+        // after it is long enough for how slow the open speech has grown: closed.
+        if live.open_end == live.ran && live.ran > live.from && ends_sentence(&live.open) {
+            let open_secs = (live.ran - live.from) as f32 / rate;
+            if let Some(need) = commit_pause(predict(&self.media.runs, open_secs)) {
+                if rec.silence_from(live.ran) >= need {
+                    let open = std::mem::take(&mut live.open);
+                    live.closed = join_text(&live.closed, &open);
+                    live.from = live.ran;
+                }
+            }
+        }
+        let (looked, ran, from) = (live.looked, live.ran, live.from);
         match rec.cut_after(looked) {
             Some(Cut::Speech(at)) => {
-                let (len, rate) = (rec.len(), rec.rate() as f32);
-                let worth = worth_a_run((len - ran) as f32 / rate, predict(&self.media.runs, len as f32 / rate));
-                let wav = worth.then(|| rec.wav_between(0, len));
-                if let Some(live) = self.media.live.as_mut() {
-                    live.looked = at;
-                    if worth {
-                        live.ran = len;
-                    }
+                let len = rec.len();
+                let open_secs = (len - from) as f32 / rate;
+                let worth = worth_a_run((len - ran) as f32 / rate, predict(&self.media.runs, open_secs));
+                let wav = worth.then(|| rec.wav_between(from, len));
+                live.looked = at;
+                if worth {
+                    live.ran = len;
                 }
                 if let Some(Ok(wav)) = wav {
-                    self.run_live(wav, false, window, cx);
+                    self.run_live(wav, len, false, window, cx);
                 }
             }
-            Some(Cut::Silence(at)) => {
-                if let Some(live) = self.media.live.as_mut() {
-                    live.looked = at;
-                }
-            }
+            Some(Cut::Silence(at)) => live.looked = at,
             None => {}
         }
     }
 
-    /// The recording stopped: one more run of the whole speech when some came after the last run
+    /// The recording stopped: one more run of the open speech when words came after the last run
     /// (now, or once the run out is back); else the dictation ends with what is shown.
     fn stop_live(&mut self, rec: Recorder, window: &mut Window, cx: &mut Context<Self>) {
         let Some(live) = self.media.live.as_mut() else {
@@ -148,11 +157,13 @@ impl BenchApp {
         };
         // Words after the last run, not just time: silence since is not worth a run.
         let more = rec.spoke_since(live.ran);
+        let len = rec.len();
         live.finishing = true;
-        let wav = if more { rec.finish().ok() } else { None };
+        let wav = if more { rec.wav_between(live.from, len).ok() } else { None };
+        drop(rec);
         match (wav, live.running) {
-            (Some(wav), false) => self.run_live(wav, true, window, cx),
-            (Some(wav), true) => live.last = Some(wav),
+            (Some(wav), false) => self.run_live(wav, len, true, window, cx),
+            (Some(wav), true) => live.last = Some((wav, len)),
             (None, true) => {}
             (None, false) => self.end_live(window, cx),
         }
@@ -168,16 +179,19 @@ impl BenchApp {
         cx.notify();
     }
 
-    /// One run of the whole speech so far (`last`: at the recording's end). Its text replaces the
-    /// last shown unless a later run's is already there; after the recording stopped, the run out
-    /// is followed by the whole recording's when speech came after it, else the dictation ends.
-    fn run_live(&mut self, wav: Vec<u8>, last: bool, window: &mut Window, cx: &mut Context<Self>) {
+    /// One run of the open speech (ending at sample `end`; `last`: at the recording's end). Its text replaces the open text shown unless a later
+    /// run's is already there; after the recording stopped, the run out is followed by the open
+    /// speech's when words came after it, else the dictation ends.
+    fn run_live(&mut self, wav: Vec<u8>, end: usize, last: bool, window: &mut Window, cx: &mut Context<Self>) {
         let Some(live) = self.media.live.as_mut() else {
             return;
         };
         let seq = live.next;
         live.next += 1;
         live.running = true;
+        // No context from the closed text: tried on dev, the 0.6B wrote the speech after it in
+        // lower case without commas as often as it helped (`rest::transcribe` keeps the field).
+        let prompt = String::new();
         // Seconds of speech in it: a 16-bit mono WAV, its header 44 bytes.
         let secs = wav_secs(&wav);
         let started = std::time::Instant::now();
@@ -185,7 +199,7 @@ impl BenchApp {
         self.rest(
             window,
             cx,
-            move |c| rest::transcribe(c, &wav),
+            move |c| rest::transcribe(c, &wav, &prompt),
             move |this, r, window, cx| {
                 let took = started.elapsed().as_secs_f32();
                 let Some(live) = this.media.live.as_mut() else {
@@ -216,17 +230,19 @@ impl BenchApp {
                 let newest = seq + 1 >= live.shown;
                 if let Some(text) = text.filter(|_| newest) {
                     live.shown = seq + 1;
+                    live.open = text;
+                    live.open_end = end;
                     let composer = this.active_thread.read(cx).composer.clone();
                     let live = this.media.live.as_mut().expect("checked above");
                     let base = live.base.get_or_insert_with(|| composer.read(cx).value().to_string()).clone();
-                    let joined = if base.trim().is_empty() { text } else if text.trim().is_empty() { base } else { format!("{} {text}", base.trim_end()) };
+                    let joined = join_text(&join_text(&base, &live.closed), &live.open);
                     composer.update(cx, |s, cx| s.set_value(joined, window, cx));
                 }
                 let live = this.media.live.as_mut().expect("checked above");
                 if last || (live.finishing && live.last.is_none()) {
                     this.end_live(window, cx);
-                } else if let Some(wav) = live.last.take() {
-                    this.run_live(wav, true, window, cx);
+                } else if let Some((wav, end)) = live.last.take() {
+                    this.run_live(wav, end, true, window, cx);
                 } else {
                     this.media.transcribing = false;
                 }
@@ -308,4 +324,13 @@ impl BenchApp {
 fn wav_secs(wav: &[u8]) -> f32 {
     let rate = wav.get(24..28).map(|b| u32::from_le_bytes([b[0], b[1], b[2], b[3]])).unwrap_or(48_000).max(1);
     (wav.len().saturating_sub(44) / 2) as f32 / rate as f32
+}
+
+/// Two texts with a space between, either may be empty.
+fn join_text(a: &str, b: &str) -> String {
+    match (a.trim().is_empty(), b.trim().is_empty()) {
+        (true, _) => b.trim().to_string(),
+        (_, true) => a.trim_end().to_string(),
+        _ => format!("{} {}", a.trim_end(), b.trim()),
+    }
 }

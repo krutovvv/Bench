@@ -114,6 +114,11 @@ impl Recorder {
         super::pauses::cut(&self.samples.lock().unwrap(), self.rate, from)
     }
 
+    /// How long the silence at sample `from` lasts so far, in seconds (`pauses.rs`).
+    pub fn silence_from(&self, from: usize) -> f32 {
+        super::pauses::silence_from(&self.samples.lock().unwrap(), self.rate, from)
+    }
+
     /// Whether there was speech since sample `from` (`pauses.rs`).
     pub fn spoke_since(&self, from: usize) -> bool {
         super::pauses::spoke_since(&self.samples.lock().unwrap(), self.rate, from)

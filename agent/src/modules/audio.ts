@@ -7,7 +7,7 @@ export default (): Module => ({
 	routes: {
 		"POST /api/audio/transcribe": async (req) => {
 			try {
-				return { transcript: await transcribe(agentOf(req), dataUrl(req.body?.data_url), String(req.body?.mime_type ?? "audio/wav")) };
+				return { transcript: await transcribe(agentOf(req), dataUrl(req.body?.data_url), String(req.body?.mime_type ?? "audio/wav"), undefined, String(req.body?.prompt ?? "")) };
 			} catch (e) {
 				throw new HttpError(502, String((e as Error).message));
 			}

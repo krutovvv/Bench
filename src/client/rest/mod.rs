@@ -249,7 +249,8 @@ pub fn speak(conn: &Connection, text: &str) -> Result<Vec<u8>> {
     data_url_bytes(v["data_url"].as_str().unwrap_or_default())
 }
 
-pub fn transcribe(conn: &Connection, wav: &[u8]) -> Result<String> {
+/// `prompt`: the text said before this audio, a hint for the recognizer (dictation in pieces).
+pub fn transcribe(conn: &Connection, wav: &[u8], prompt: &str) -> Result<String> {
     let data_url = format!(
         "data:audio/wav;base64,{}",
         base64::engine::general_purpose::STANDARD.encode(wav)
@@ -258,7 +259,7 @@ pub fn transcribe(conn: &Connection, wav: &[u8]) -> Result<String> {
         conn,
         "POST",
         "/api/audio/transcribe",
-        json!({"data_url": data_url, "mime_type": "audio/wav"}),
+        json!({"data_url": data_url, "mime_type": "audio/wav", "prompt": prompt}),
         180,
     )?;
     Ok(v["transcript"]
