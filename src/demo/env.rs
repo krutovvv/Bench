@@ -34,7 +34,6 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
             }
         },
         "compaction": 0.9,
-        "code_mode": true,
         "evaluator": true,
         "evaluator_ready": true,
         "window": 131072,

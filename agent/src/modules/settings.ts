@@ -27,8 +27,6 @@ function patchConfig(agent: string, patch: any): void {
 			// A share of the window (0.9), or null: Pi's own policy again.
 			const at = m.at === null || m.at === undefined ? undefined : Number(m.at);
 			writeAgent(agent, { ...readAgent(agent), compaction: at });
-		} else if (k === "code_mode" && m && typeof m === "object" && m.enabled !== undefined) {
-			writeAgent(agent, { ...readAgent(agent), codeMode: Boolean(m.enabled) || undefined });
 		} else if (k === "evaluator" && m && typeof m === "object" && m.enabled !== undefined) {
 			// The project's use of the evaluator (`judge/`); the gear's connection is the other half.
 			writeAgent(agent, { ...readAgent(agent), evaluator: m.enabled ? { enabled: true } : undefined });

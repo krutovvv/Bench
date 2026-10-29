@@ -50,7 +50,7 @@ the product, equal in weight:
   Bench), or this Mac's agent working on a server over SSH with nothing installed there; a
   project optionally kept in its folder.
 - A project's environment: soul, MCP servers (with OAuth), language servers, skills, prompts,
-  code mode, compaction, approvals, its Telegram bot, a schedule; exported to and imported from
+  compaction, approvals, its Telegram bot, a schedule; exported to and imported from
   one file.
 - The Explorer: the project's tree, documents in tabs, the thread beside, ⌘P / ⌘⇧F, language
   servers' problems, hover and definition, git changes against HEAD, a terminal in the bottom

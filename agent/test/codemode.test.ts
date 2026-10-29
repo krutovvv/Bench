@@ -1,6 +1,6 @@
-// Code mode (extensions.ts, a project's `codeMode`) on a real Pi harness in a temporary
-// BENCH_HOME with a stub model: off, the model is not offered `codemode`; on, from the next turn
-// it is, and one script calls several tools and returns only what it chose to print.
+// Code mode (extensions.ts) on a real Pi harness in a temporary BENCH_HOME with a stub model:
+// every thread is offered `codemode` beside its other tools, and one script calls several tools
+// and returns only what it chose to print.
 
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -13,7 +13,7 @@ const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-codemode-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
 
-const { readAgent, saveProvider, writeAgent } = await import("../src/config.ts");
+const { saveProvider, writeAgent } = await import("../src/config.ts");
 const { Runtime } = await import("../src/runtime/runtime.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 
@@ -45,10 +45,6 @@ const model = http.createServer((req, res) => {
 		}
 		const names = (json.tools ?? []).map((t: any) => t.function?.name);
 		offered.push(names);
-		if (!names.includes("codemode")) {
-			res.end(chunk({ role: "assistant", content: "No code mode." }) + chunk({}, "stop") + "data: [DONE]\n\n");
-			return;
-		}
 		res.end(
 			chunk({ role: "assistant", tool_calls: [{ index: 0, id: `call_cm`, type: "function", function: { name: "codemode", arguments: JSON.stringify({ code: SCRIPT }) } }] }) +
 				chunk({}, "tool_calls") +
@@ -72,7 +68,7 @@ const until = async (what: () => boolean, ms = 15000) => {
 	}
 };
 
-test("code mode is the project's choice: off, no codemode tool; on, one script runs several tools", async () => {
+test("every thread has code mode: one script runs several tools", async () => {
 	saveProvider({ id: "stub", name: "Stub", base_url: `http://127.0.0.1:${port}/v1`, api_key: "k", api_mode: "chat_completions", models: { m: {} } });
 	writeAgent("default", { defaultProvider: "stub", defaultModel: "m" } as any);
 	let done = 0;
@@ -85,14 +81,8 @@ test("code mode is the project's choice: off, no codemode tool; on, one script r
 
 	await rt.submit(row.id, "look");
 	await until(() => done === 1);
-	assert.ok(!offered[0].includes("codemode"), "off by default");
-
-	// Turned on in the project's Settings: the same thread has it from its next turn.
-	writeAgent("default", { ...readAgent("default"), codeMode: true });
-	await rt.submit(row.id, "look again");
-	await until(() => done === 2);
-	assert.ok(offered[1].includes("codemode"));
-	assert.ok(offered[1].includes("bash"), "the other tools stay offered beside it");
+	assert.ok(offered[0].includes("codemode"));
+	assert.ok(offered[0].includes("bash"), "the other tools stay offered beside it");
 	assert.match(results.at(-1)!, /alpha\+beta/, "only what the script printed comes back");
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 });

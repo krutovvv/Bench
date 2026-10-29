@@ -11,7 +11,7 @@ references: [explorer, projects-and-agents]
 # A project's environment
 
 What a project's agent works with — its soul (`SYSTEM.md`), MCP and language servers, skills,
-prompts, the model's settings (reasoning, approvals, code mode, compaction), its Telegram bot,
+prompts, the model's settings (reasoning, approvals, the evaluator, compaction), its Telegram bot,
 its schedule, where it lives — as Bench edits it. The files themselves are the agent's
 (`~/.bench/projects/<id>/` on the project's agent, and a folder's `.agents/skills`); the agent
 changes the same files when asked, from any thread of the project.

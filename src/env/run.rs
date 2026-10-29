@@ -1,5 +1,5 @@
 //! How the project's threads run: how hard it thinks, what it may run without asking, whether it
-//! works in code mode (a script that calls many tools in one step), its step limit (the most
+//! uses the evaluator, its step limit (the most
 //! tool calls in one turn, then an answer), when its conversations are
 //! summarized (compaction, a share of the model's window): a group of General,
 //! chosen once, not per chat — its threads start on these; the model is one for every project
@@ -22,8 +22,6 @@ pub struct RunEnv {
     pub compaction: Option<f64>,
     /// The model's window, in tokens (what the share is of).
     pub window: u64,
-    /// Its threads get Pi's code mode (`codemode`) from their next turn.
-    pub code_mode: bool,
     /// The most steps in one turn; None: no limit.
     pub step_limit: Option<u64>,
     /// Its threads use the evaluator (off by default: on a shared GPU it takes other utilities' room).
@@ -77,7 +75,6 @@ impl Section for Run {
     fn apply(&self, e: &mut ProjectEnv, v: &serde_json::Value, _w: &mut Window, _cx: &mut App) {
         e.run.compaction = v["compaction"].as_f64();
         e.run.window = v["window"].as_u64().unwrap_or(0);
-        e.run.code_mode = v["code_mode"].as_bool().unwrap_or(false);
         e.run.step_limit = v["step_limit"].as_u64();
         e.run.evaluator = v["evaluator"].as_bool().unwrap_or(false);
         e.run.evaluator_ready = v["evaluator_ready"].as_bool().unwrap_or(false);
@@ -137,26 +134,8 @@ impl SettingsForm for Run {
             &e.run.approvals,
             cx,
         );
-        // On or off: a switch, as a Mac's settings have it (saved as the choices are, "On"/"Off").
-        let code_mode = {
-            let (view, pid) = (view.clone(), pid.clone());
-            div()
-                .flex()
-                .justify_end()
-                .child(
-                    gpui_kit::component::switch::Switch::new("env-code-mode")
-                        .checked(e.run.code_mode)
-                        .on_click(move |on, window, cx| {
-                            let value = if *on { "On" } else { "Off" }.to_string();
-                            let pid = pid.clone();
-                            view.update(cx, |this, cx| {
-                                this.env_set_run(&pid, "code_mode", value, window, cx)
-                            });
-                        }),
-                )
-                .into_any_element()
-        };
-        // The evaluator: a switch, saved at once as code mode's is.
+        // The evaluator: on or off, a switch as a Mac's settings have it (saved as the choices
+        // are, "On"/"Off").
         let evaluator = {
             let (view, pid) = (view.clone(), pid.clone());
             div()
@@ -225,13 +204,6 @@ impl SettingsForm for Run {
                 cx,
             )
             .into_any_element(),
-            settings_field(
-                "Code mode",
-                "A script calls many tools in one step: fewer steps for work in code",
-                code_mode,
-                cx,
-            )
-            .into_any_element(),
             settings_field("Evaluator", evaluator_note, evaluator, cx).into_any_element(),
             settings_field(
                 "Step limit",
@@ -252,11 +224,10 @@ impl SettingsForm for Run {
 }
 
 impl BenchApp {
-    /// One of the running choices — its reasoning level, its approvals, code mode, the step
+    /// One of the running choices — its reasoning level, its approvals, the evaluator, the step
     /// limit, compaction —
     /// set for the project. A click applies it at once (a choice has no draft); the project's
-    /// next threads start on it, a thread already begun keeps what it started with (code mode
-    /// alone reaches its threads from their next turn).
+    /// next threads start on it, a thread already begun keeps what it started with.
     pub fn env_set_run(
         &mut self,
         id: &str,
@@ -276,7 +247,6 @@ impl BenchApp {
         let body = match what {
             "reasoning" => json!({"config": {"agent": {"reasoning_effort": value}}}),
             "compaction" => json!({"config": {"compaction": {"at": value.parse::<f64>().ok()}}}),
-            "code_mode" => json!({"config": {"code_mode": {"enabled": value == "On"}}}),
             "step_limit" => json!({"config": {"step_limit": {"steps": value.parse::<u64>().ok()}}}),
             "evaluator" => json!({"config": {"evaluator": {"enabled": value == "On"}}}),
             _ => json!({"config": {"approvals": {"mode": value}}}),

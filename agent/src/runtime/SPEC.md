@@ -44,8 +44,7 @@ Bench (`journal.ts`), the pause (`hold.ts`), the queue (`queue.ts`), questions a
   its entry by it, never by its words. A message sent while a run is live waits in Pi's inbox as a
   follow-up; "send now" steers it into the run after the current tool round.
 - **The model is one for every thread** — the general agent's, followed at every turn with the
-  thread's effort and extensions — so a change in the gear or a project's code mode takes effect
-  from the next turn.
+  thread's effort and extensions — so a change in the gear takes effect from the next turn.
 - **The fallback is a pi-ai provider of ours**: Pi retries only with the same model, so one
   provider stands for the pair and sends the same request to the fallback on an error or a
   silence. Pi sees one response; the thread's `info {fallback}` lets Bench show it.

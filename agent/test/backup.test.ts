@@ -26,7 +26,7 @@ test("an environment goes from one project to another through its file", async (
 		fs.writeFileSync(path.join(envA, "files", "work.txt"), "not carried");
 		fs.writeFileSync(path.join(envA, "mcp.json"), JSON.stringify({ mcpServers: { crm: { url: "https://crm.example/mcp" }, docs: { command: "docs" } } }));
 		fs.writeFileSync(path.join(envA, "lsp.json"), JSON.stringify({ servers: { rust: { command: "rust-analyzer" } } }));
-		fs.writeFileSync(path.join(envA, "settings.json"), JSON.stringify({ codeMode: true, defaultModel: "m" }));
+		fs.writeFileSync(path.join(envA, "settings.json"), JSON.stringify({ stepLimit: 50, defaultModel: "m" }));
 		fs.mkdirSync(path.join(home, "mcp-oauth"), { recursive: true });
 		fs.writeFileSync(path.join(home, "mcp-oauth", `project_${a.id}__crm.json`), JSON.stringify({ tokens: { access_token: "t" } }));
 		await s.rest("PUT", `/api/projects/${a.id}/telegram`, { token: "123:abc", allowed_users: ["42"] });
@@ -55,7 +55,7 @@ test("an environment goes from one project to another through its file", async (
 		assert.equal(mcp.docs.command, "docs");
 		assert.ok(fs.existsSync(path.join(home, "mcp-oauth", `project_${b.id}__crm.json`)));
 		const envNow = await s.rest("GET", `/api/projects/${b.id}/env`);
-		assert.equal(envNow.code_mode, true);
+		assert.equal(envNow.step_limit, 50);
 		assert.deepEqual(envNow.cron.map((j: any) => j.name), ["Digest"]);
 		assert.equal(envNow.telegram.token, "123:abc");
 		assert.equal((await s.rest("GET", `/api/projects/${a.id}/env`)).telegram, null);

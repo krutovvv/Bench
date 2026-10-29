@@ -1,6 +1,6 @@
 // A project's environment as one file, for a backup or a move to another project (another
 // machine, another agent): its soul, prompts, skills, MCP and language servers, its settings
-// (code mode, compaction, approvals), memories, extensions, the MCP servers' sign-ins, its
+// (compaction, approvals, the step limit), memories, extensions, the MCP servers' sign-ins, its
 // scheduled jobs and its Telegram bot. Not its threads and not its work files (`files/`, its
 // folder): those stay where the work is.
 //

@@ -120,9 +120,6 @@ lets you keep many more projects going at once.
 
 ## The agent's settings, per project
 
-- **Code mode or classic tool calls.** In code mode the model writes one script that calls many
-  tools in a single step: fewer steps for work in code. Or the standard agent loop, a tool call per
-  step.
 - **An evaluator.** A small, fast model (a System One server, Jev's API) decides where the main
   model spends its steps: it refuses a repeat of a call that already failed, trims long results to
   what the request needs, checks the course on long runs. Some steps get much faster.
@@ -131,7 +128,7 @@ lets you keep many more projects going at once.
 - **Reasoning and approvals**: how hard it thinks, and what it may run without asking.
 - **A fallback model** that takes over when the main one fails or goes silent.
 
-![A project's settings: code mode, the evaluator, the step limit, compaction, the Telegram bot](docs/shots/settings.png)
+![A project's settings: the evaluator, the step limit, compaction, the Telegram bot](docs/shots/settings.png)
 
 ## Telegram
 

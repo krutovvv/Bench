@@ -61,7 +61,7 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   - soul (`SYSTEM.md`);
   - MCP servers (`mcp.json`, OAuth where needed), language servers (`lsp.json`);
   - skills, prompts;
-  - model: reasoning, approvals, code mode, compaction;
+  - model: reasoning, approvals, evaluator, step limit, compaction;
   - Telegram bot;
   - schedule (cron).
 
@@ -136,7 +136,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Bench's id for each message is Pi's `requestId`: the row shown on Enter is matched by it, never by its words |
 | Plan, questions | the agent's own `todo` and `clarify` calls in the journal, the answer the call's result (`docs/thread-objects.md`) |
 | Pause | the conversation document `bench.hold` (`hold.ts`) and a gate in `beforeTool`: a held run stays held across a restart |
-| Code mode | Pi's `codemode` extension (`@earendil-works/pi-codemode`, a QuickJS sandbox): one step runs a script that calls the thread's tools and returns only what it prints. A project's choice (`codeMode` in its agent settings, Settings → Model → Code mode); `forAgent` adds it to the conversation's extensions at every turn, so a thread takes a change from its next turn |
+| Code mode | Pi's `codemode` extension (`@earendil-works/pi-codemode`, a QuickJS sandbox): one step runs a script that calls the thread's tools and returns only what it prints. Every thread has it beside the tools it calls directly (`forAgent` adds it to the conversation's extensions at every turn): not a mode for code, several steps in one |
 | Fork | `conversation.fork(at)`: "Fork from here" on an answer makes a new thread through that entry |
 | `/terminal` | tool `ssh_run` (`builtin/ssh.ts`); without a host it takes the thread's terminal insert |
 | `/tools` | no tool of its own: the utility's input and output come in `<block-state>` |

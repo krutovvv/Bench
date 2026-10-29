@@ -15,7 +15,8 @@
 //
 // An agent chooses its extensions in settings.json ("extensions": ["assistant", "research"]).
 // "codemode" is Pi's code mode: one script calls many tools, and only what it prints reaches the
-// model. A project turns it on in its Settings (`codeMode`), so it joins that project's threads.
+// model. Every thread has it, beside the tools it can call directly: not a mode for code, a way to
+// do several steps in one.
 
 import * as ai from "@earendil-works/pi-ai";
 import * as pi from "@earendil-works/pi-durable";
@@ -30,7 +31,7 @@ import * as ask from "./builtin/ask.ts";
 import * as cron from "./builtin/cron.ts";
 import * as memory from "./builtin/memory.ts";
 import * as skills from "./builtin/skills.ts";
-import { agentDir, agents, readAgent } from "./config.ts";
+import { agentDir, agents } from "./config.ts";
 import { createAnchoredEdit, createAnchoredRead } from "./builtin/hashline.ts";
 import { assistant, images } from "./extensions/assistant.ts";
 import { host } from "./host.ts";
@@ -136,9 +137,9 @@ export async function loadExtensions(registry: { install(e: pi.Extension): void 
 	}
 }
 
-/** An agent's extensions, as objects for `configure()`: its own by name, else the built-in one; always its MCP and tool search. */
+/** An agent's extensions, as objects for `configure()`: its own by name, else the built-in one; always its MCP, tool search and code mode. */
 export function forAgent(names: string[] | undefined, agent: string): pi.Extension[] {
-	const wanted = [...new Set([...(names?.length ? names : ["assistant"]), "tool-search", ...(readAgent(agent).codeMode ? ["codemode"] : [])])];
+	const wanted = [...new Set([...(names?.length ? names : ["assistant"]), "tool-search", "codemode"])];
 	// Its own extensions by name, else the built-in ones; its own MCP servers. A project takes
 	// nothing of Host's: Host's extensions and servers are Host's threads' alone.
 	const list = wanted.map((n) => loaded.get(`${agent}:${n}`)?.extension ?? loaded.get(n)?.extension).filter(Boolean) as pi.Extension[];

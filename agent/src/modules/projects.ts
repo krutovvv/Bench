@@ -118,7 +118,6 @@ export default ({ rt, publish }: Ctx): Module => ({
 					// What its machine lacks for them is said before any is started (no Node there).
 					lsp: { servers: readLsp(agent), states: { ...lspStates(agent), ...(await lspNeeds(agent, projects.get(id)?.machine ?? undefined)) } },
 					compaction: compactionAt(agent) ?? null,
-					code_mode: Boolean(readAgent(agent).codeMode),
 					step_limit: readAgent(agent).stepLimit ?? null,
 					// Its switch for the evaluator, and whether the gear's connection is on (the switch says so).
 					evaluator: Boolean(readAgent(agent).evaluator?.enabled),
