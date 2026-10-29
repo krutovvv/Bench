@@ -445,7 +445,7 @@ impl BenchApp {
             page.push(
                 bench_ui::settings_field(
                     "Text while speaking",
-                    "Each pause in dictation sends what was said, so the words come in as you speak (this computer's Bench)",
+                    "Each pause in dictation sends what was said, so the words come in as you speak (local Bench)",
                     div()
                         .flex()
                         .justify_end()

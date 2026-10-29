@@ -191,7 +191,7 @@ impl BenchApp {
             return;
         };
         let machine = match self.terminal_machine(&term.project) {
-            m if m.is_empty() => "this computer".to_string(),
+            m if m.is_empty() => "local".to_string(),
             m => m,
         };
         let text = if self.demo {
@@ -281,7 +281,7 @@ impl BenchApp {
         };
         let at = self.location(&active.project);
         let machine = match at.machine_here() {
-            m if m.is_empty() => "this computer".to_string(),
+            m if m.is_empty() => "local".to_string(),
             m => m,
         };
         let note = format!("{machine} · {}", at.folder.unwrap_or_default())

@@ -258,7 +258,7 @@ impl BenchApp {
                 .pt_2()
                 .text_sm()
                 .text_color(muted)
-                .child("Bench installs its agent there over SSH (it needs Node.js 22.18+) and starts it. It keeps its own threads, models, skills and Telegram there and works without this computer; its models are set here once it answers.")
+                .child("Bench installs its agent there over SSH (it needs Node.js 22.18+) and starts it. It keeps its own threads, models, skills and Telegram there and works on its own; its models are set here once it answers.")
                 .into_any_element(),
         );
         out.push(

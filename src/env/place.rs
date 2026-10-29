@@ -142,8 +142,8 @@ impl SettingsForm for Place {
         let mut out = vec![];
         let (agent, hint, bad) = if at.agent.is_empty() {
             (
-                "This computer".to_string(),
-                "Its models and voice are this computer's, in the gear",
+                "Local".to_string(),
+                "Its models and voice are the local agent's, in the gear",
                 false,
             )
         } else {
@@ -164,7 +164,7 @@ impl SettingsForm for Place {
             out.push(
                 settings_field(
                     "Works on",
-                    "This computer's agent works there over SSH; nothing is installed on it",
+                    "The local agent works there over SSH; nothing is installed on it",
                     text(format!("{m} — {}", address_of(app, m)), false, cx),
                     cx,
                 )
