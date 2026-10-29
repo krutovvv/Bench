@@ -13,7 +13,7 @@ const SEEN = 700;
 
 /** Each block's probability of being the one the next step needs (by batch); undefined: no evaluator or no answer. */
 export async function neededness(conversation: string, blocks: string[], signal?: AbortSignal): Promise<number[] | undefined> {
-	if (!judgeActive() || blocks.length < 2) return undefined;
+	if (!judgeActive(conversation) || blocks.length < 2) return undefined;
 	const out: number[] = [];
 	for (let from = 0; from < blocks.length; from += PER_REQUEST) {
 		const batch = blocks.slice(from, from + PER_REQUEST);

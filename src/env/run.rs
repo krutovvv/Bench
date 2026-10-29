@@ -26,6 +26,10 @@ pub struct RunEnv {
     pub code_mode: bool,
     /// The most steps in one turn; None: no limit.
     pub step_limit: Option<u64>,
+    /// Its threads use the evaluator (off by default: on a shared GPU it takes other utilities' room).
+    pub evaluator: bool,
+    /// The gear's connection to the evaluator is on: without it the switch does nothing yet.
+    pub evaluator_ready: bool,
 }
 
 /// The step limits offered; the first is none.
@@ -75,6 +79,8 @@ impl Section for Run {
         e.run.window = v["window"].as_u64().unwrap_or(0);
         e.run.code_mode = v["code_mode"].as_bool().unwrap_or(false);
         e.run.step_limit = v["step_limit"].as_u64();
+        e.run.evaluator = v["evaluator"].as_bool().unwrap_or(false);
+        e.run.evaluator_ready = v["evaluator_ready"].as_bool().unwrap_or(false);
     }
 }
 
@@ -150,6 +156,30 @@ impl SettingsForm for Run {
                 )
                 .into_any_element()
         };
+        // The evaluator: a switch, saved at once as code mode's is.
+        let evaluator = {
+            let (view, pid) = (view.clone(), pid.clone());
+            div()
+                .flex()
+                .justify_end()
+                .child(
+                    gpui_kit::component::switch::Switch::new("env-evaluator")
+                        .checked(e.run.evaluator)
+                        .on_click(move |on, window, cx| {
+                            let value = if *on { "On" } else { "Off" }.to_string();
+                            let pid = pid.clone();
+                            view.update(cx, |this, cx| {
+                                this.env_set_run(&pid, "evaluator", value, window, cx)
+                            });
+                        }),
+                )
+                .into_any_element()
+        };
+        let evaluator_note = if e.run.evaluator_ready {
+            "A small model decides where the main one spends steps: faster work; on a shared GPU it takes the room other utilities need"
+        } else {
+            "Its connection is off: Settings → Agents → Evaluator first"
+        };
         // A limit not offered (set in settings.json) is shown as its number, chosen.
         let mut limits: Vec<String> = STEP_LIMITS.iter().map(|s| s.to_string()).collect();
         let current = e.run.step_limit.map(|n| n.to_string()).unwrap_or("None".into());
@@ -202,6 +232,7 @@ impl SettingsForm for Run {
                 cx,
             )
             .into_any_element(),
+            settings_field("Evaluator", evaluator_note, evaluator, cx).into_any_element(),
             settings_field(
                 "Step limit",
                 "The most steps in one turn; then it stops and answers with what is done",
@@ -247,6 +278,7 @@ impl BenchApp {
             "compaction" => json!({"config": {"compaction": {"at": value.parse::<f64>().ok()}}}),
             "code_mode" => json!({"config": {"code_mode": {"enabled": value == "On"}}}),
             "step_limit" => json!({"config": {"step_limit": {"steps": value.parse::<u64>().ok()}}}),
+            "evaluator" => json!({"config": {"evaluator": {"enabled": value == "On"}}}),
             _ => json!({"config": {"approvals": {"mode": value}}}),
         };
         let asked = id.clone();

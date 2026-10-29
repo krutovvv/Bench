@@ -467,8 +467,8 @@ impl BenchApp {
             );
             page.push(
                 bench_ui::settings_field(
-                    "Use the evaluator",
-                    "Picks a turn's skill and tools, keeps what long results need, orders searches, marks the plan, checks the course, failures, risky commands and whether a turn is done. Off: the classic way",
+                    "Connect the evaluator",
+                    "Projects that turn it on in their Settings (Model → Evaluator) use it: a turn's skill and tools, what long results need, searches, the plan, the course, failures, repeats, risky commands, the answer. Off: none does",
                     div()
                         .flex()
                         .justify_end()

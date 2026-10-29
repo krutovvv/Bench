@@ -34,6 +34,9 @@ setHost({
 	write: (_c: string, entry: any) => void written.push(entry),
 } as any);
 
+// The project's switch on (off by default); each test turns the gear's connection on or off.
+writeAgent("project:p", { ...readAgent("project:p"), evaluator: { enabled: true } });
+
 // The old single-point helpers, through the dispatcher: what the model would read.
 const rankSearch = async (c: string, call: any, result: any) => (await atResult(c, call, result)).result;
 const checkCourse = async (c: string) => (await atResult(c, { name: "bash", arguments: { command: "true" } }, out("ok"))).notes[0];
@@ -242,6 +245,22 @@ test("an item never moves back, an unsure answer leaves it, and the model's own 
 	seeResult("c8", todo([{ content: "Write the game", status: "completed" }, { content: "Add sounds", status: "in_progress" }]), out("ok"));
 	assert.equal(turnOf("c8").planAt, turnOf("c8").steps, "read again from the model's plan in a few steps");
 	assert.equal(turnOf("c8").plan[1].content, "Add sounds");
+});
+
+test("a project that did not turn the evaluator on is never asked about, the gear's connection on", async () => {
+	setSetting("judge", { enabled: true, base_url: base });
+	writeAgent("project:p", { ...readAgent("project:p"), evaluator: undefined });
+	try {
+		const before = seen.length;
+		seeRequest("np", [user("Make the game")]);
+		for (let i = 0; i < 11; i++) {
+			stepGate("np");
+			assert.deepEqual(await atResult("np", grep, out(lines)), { notes: [] });
+		}
+		assert.equal(seen.length, before);
+	} finally {
+		writeAgent("project:p", { ...readAgent("project:p"), evaluator: { enabled: true } });
+	}
 });
 
 test("off, no point asks and the hooks change nothing", async () => {

@@ -141,6 +141,12 @@ export interface AgentSettings {
 	codeMode?: boolean;
 	/** The most steps (tool calls) in one turn; past it the run ends with an answer (`builtin/steps.ts`). Unset: no limit. */
 	stepLimit?: number;
+	/**
+	 * The project's use of the evaluator (`judge/`), if the gear's connection is on too. Off unless
+	 * turned on: on a shared GPU it takes the room other utilities need (image generation, OCR…),
+	 * so it is on where its speed is worth it. An object, for the choices that may join it.
+	 */
+	evaluator?: { enabled?: boolean };
 }
 
 /** A project's environment is an agent directory too ("project:<id>"), in projects/<id>/. */

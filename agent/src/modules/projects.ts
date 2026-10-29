@@ -1,6 +1,7 @@
 // Projects and their environment: the soul, MCP servers, skills, prompts, the Telegram
 // bot, the schedule. "general" is the Host project: the agent's own environment.
 
+import { judgeSettings } from "../judge/client.ts";
 import fs from "node:fs";
 import path from "node:path";
 import { agentDir, agentMcp, compactionAt, getSetting, readAgent, resolveModel, setSetting, writeAgentMcp } from "../config.ts";
@@ -114,6 +115,9 @@ export default ({ rt, publish }: Ctx): Module => ({
 					compaction: compactionAt(agent) ?? null,
 					code_mode: Boolean(readAgent(agent).codeMode),
 					step_limit: readAgent(agent).stepLimit ?? null,
+					// Its switch for the evaluator, and whether the gear's connection is on (the switch says so).
+					evaluator: Boolean(readAgent(agent).evaluator?.enabled),
+					evaluator_ready: Boolean(judgeSettings()),
 					window: resolveModel().contextLength,
 					project: p,
 					dir,

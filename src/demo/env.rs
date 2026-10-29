@@ -35,6 +35,8 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
         },
         "compaction": 0.9,
         "code_mode": true,
+        "evaluator": true,
+        "evaluator_ready": true,
         "window": 131072,
         "telegram": {
             "username": "northwind_blog_bot",
@@ -85,14 +87,21 @@ pub fn env(app: &mut BenchApp, id: &str, window: &mut Window, cx: &mut Context<B
             ),
         ];
     }
-    // `BENCH_ENV=telegram`: the page scrolls to the Telegram block a beat after opening.
-    if std::env::var("BENCH_ENV").as_deref() == Ok("telegram") {
+    // `BENCH_ENV=telegram`: the page scrolls to the Telegram block a beat after opening;
+    // `BENCH_ENV=model` to the Model block.
+    let to = std::env::var("BENCH_ENV").ok();
+    if matches!(to.as_deref(), Some("telegram") | Some("model")) {
         let scroll = app.env_scroll.clone();
+        let model = to.as_deref() == Some("model");
         cx.spawn(async move |this, cx| {
             cx.background_executor()
                 .timer(std::time::Duration::from_millis(900))
                 .await;
-            scroll.scroll_to_bottom();
+            if model {
+                scroll.set_offset(point(px(0.), px(-620.)));
+            } else {
+                scroll.scroll_to_bottom();
+            }
             let _ = this.update(cx, |_app, cx| cx.notify());
         })
         .detach();

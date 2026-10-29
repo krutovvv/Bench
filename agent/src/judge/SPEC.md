@@ -13,9 +13,16 @@ A System One model (TypeSafe's Jev, or a server with its API: `POST /v1/systemon
 typed questions in, each option's calibrated probability out, in well under a second) that the
 agent asks at fixed points of a turn, so that decisions the thread's model would spend a step on,
 or never make, are made fast. The thread's model never calls it and never sees it: it sees
-results the evaluator changed, and notes beside them. It is the agent's, not a project's: one
-switch in the gear (Settings → Agents → Evaluator, the `judge` setting), because on a local GPU
-it shares the card with speech to text and the person chooses one or the other.
+results the evaluator changed, and notes beside them.
+
+It takes two switches. The gear's (Settings → Agents → Evaluator, the `judge` setting) is the
+connection: the server, its model, its key. A project's (Settings → Model → Evaluator, its
+`evaluator` in settings.json, Host's too) is its use, **off unless turned on**: on a shared GPU the
+evaluator takes the room the other utilities need — speech to text, image generation, OCR, a
+translator — and the balancer stops one to start the other, so it is on in the projects where its
+speed is worth it (a lot of code, large volumes) and off where those utilities are used.
+`judgeFor(conversation)` is the one place that answers whether a thread uses it; every point,
+the excerpt and the window's cut ask it. Off in either, everything goes the classic way.
 
 ## Points and moments
 

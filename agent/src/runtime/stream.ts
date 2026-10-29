@@ -12,6 +12,7 @@ import type { Usage } from "../protocol.gen.ts";
 import type { Live, Runtime } from "./runtime.ts";
 import { FAIL_KIND } from "./journal.ts";
 import { usagePayload } from "./usage.ts";
+import { evaluatorOn, judgeSettings } from "../judge/client.ts";
 
 const ctx = BACKGROUND_CONTEXT;
 
@@ -145,7 +146,7 @@ export class Stream {
 
 	/** The thread's numbers as Bench shows them. */
 	usageOf(live: Live): Usage {
-		return usagePayload(resolveModel().model, live.usage, resolveModel().contextLength);
+		return usagePayload(resolveModel().model, live.usage, resolveModel().contextLength, !!judgeSettings() && evaluatorOn(live.row.agent));
 	}
 
 	emitUsage(live: Live): void {

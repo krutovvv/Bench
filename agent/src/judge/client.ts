@@ -10,7 +10,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { BENCH_HOME, getSetting } from "../config.ts";
+import { BENCH_HOME, getSetting, readAgent } from "../config.ts";
 import { host } from "../host.ts";
 
 export interface JudgeSettings {
@@ -58,9 +58,21 @@ export function judgeSettings(): JudgeSettings | undefined {
 	return s?.enabled && s.base_url?.trim() ? s : undefined;
 }
 
-/** On, set and not quiet after a failure: the points may ask; otherwise the classic way. */
-export function judgeActive(): boolean {
+/** The project (or Host) turned the evaluator on in its Settings: off unless it did. */
+export function evaluatorOn(agent: string): boolean {
+	return readAgent(agent).evaluator?.enabled === true;
+}
+
+/** The evaluator's settings for a conversation: the gear's connection on, and its project's switch. */
+export function judgeFor(conversation: string): JudgeSettings | undefined {
 	const s = judgeSettings();
+	const agent = s ? host().thread(conversation)?.agent : undefined;
+	return s && agent && evaluatorOn(agent) ? s : undefined;
+}
+
+/** On for this conversation and not quiet after a failure: the points may ask; otherwise the classic way. */
+export function judgeActive(conversation: string): boolean {
+	const s = judgeFor(conversation);
 	return !!s && Date.now() >= (quietUntil.get(s.base_url!) ?? 0);
 }
 
@@ -80,7 +92,7 @@ export async function ask(
 	questions: Record<string, Question>,
 	signal?: AbortSignal,
 ): Promise<Record<string, ChoiceAnswer> | undefined> {
-	const s = judgeSettings();
+	const s = judgeFor(conversation);
 	if (!s || Date.now() < (quietUntil.get(s.base_url!) ?? 0)) return undefined;
 	const started = Date.now();
 	try {

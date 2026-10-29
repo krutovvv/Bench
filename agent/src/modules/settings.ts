@@ -28,6 +28,9 @@ function patchConfig(agent: string, patch: any): void {
 			writeAgent(agent, { ...readAgent(agent), compaction: at });
 		} else if (k === "code_mode" && m && typeof m === "object" && m.enabled !== undefined) {
 			writeAgent(agent, { ...readAgent(agent), codeMode: Boolean(m.enabled) || undefined });
+		} else if (k === "evaluator" && m && typeof m === "object" && m.enabled !== undefined) {
+			// The project's use of the evaluator (`judge/`); the gear's connection is the other half.
+			writeAgent(agent, { ...readAgent(agent), evaluator: m.enabled ? { enabled: true } : undefined });
 		} else if (k === "step_limit" && m && typeof m === "object") {
 			// The most steps in a turn, or null: no limit (`builtin/steps.ts`).
 			const n = Math.floor(Number(m.steps));

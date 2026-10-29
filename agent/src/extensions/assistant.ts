@@ -193,7 +193,7 @@ async function notesAfter(call: any, result: any, api: any, context: any): Promi
 	const top = !call.parent;
 	if (top) seeResult(conversation, call, result);
 	// Read before the evaluator is asked: when it fails now, this step still had the classic reminder's turn.
-	const evaluated = top && judgeActive();
+	const evaluated = top && judgeActive(conversation);
 	const none: { result?: any; notes: string[] } = { notes: [] };
 	const judged = top ? await atResult(conversation, call, result, context?.abortSignal).catch(() => none) : none;
 	const ranked = !!judged.result;

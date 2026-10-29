@@ -27,7 +27,7 @@ const STANDS_OUT = 5;
 
 /** `text` cut to `budget` characters by what the request needs; undefined: no evaluator, or no answer. */
 export async function excerpt(conversation: string, text: string, budget: number, signal?: AbortSignal): Promise<string | undefined> {
-	if (!judgeActive()) return undefined;
+	if (!judgeActive(conversation)) return undefined;
 	const parts = partsOf(text);
 	const seen = parts.slice(0, Math.floor((PER_REQUEST * MAX_REQUESTS) / PART));
 	const score: number[] = new Array(parts.length).fill(-1);

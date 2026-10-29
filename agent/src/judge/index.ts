@@ -27,7 +27,7 @@ export const POINTS: Point[] = [start, repeat, risk, search, listing, failure, p
 
 /** Ask the points of `moment` that have a question now; their effects, in `POINTS` order. */
 async function at(moment: Moment, seen: Seen, signal?: AbortSignal): Promise<Effect[]> {
-	if (!judgeActive()) return [];
+	if (!judgeActive(seen.conversation)) return [];
 	const asking: [Point, Asked][] = [];
 	for (const p of POINTS.filter((p) => p.moment === moment)) {
 		const a = await p.ask(seen);
