@@ -73,8 +73,7 @@ impl BenchApp {
             match Recorder::start() {
                 Ok(r) => {
                     self.media.recorder = Some(r);
-                    let base = self.active_thread.read(cx).composer.read(cx).value().to_string();
-                    self.media.live = self.media.live_pref.then(|| LiveDictation::new(base));
+                    self.media.live = self.media.live_pref.then(LiveDictation::new);
                     let mut tick = 0u32;
                     self.media.wave_ticker = Some(cx.spawn_in(window, async move |this, cx| {
                         loop {
@@ -211,9 +210,10 @@ impl BenchApp {
                 let newest = seq + 1 >= live.shown;
                 if let Some(text) = text.filter(|_| newest) {
                     live.shown = seq + 1;
-                    let base = live.base.clone();
-                    let joined = if base.trim().is_empty() { text } else if text.trim().is_empty() { base } else { format!("{} {text}", base.trim_end()) };
                     let composer = this.active_thread.read(cx).composer.clone();
+                    let live = this.media.live.as_mut().expect("checked above");
+                    let base = live.base.get_or_insert_with(|| composer.read(cx).value().to_string()).clone();
+                    let joined = if base.trim().is_empty() { text } else if text.trim().is_empty() { base } else { format!("{} {text}", base.trim_end()) };
                     composer.update(cx, |s, cx| s.set_value(joined, window, cx));
                 }
                 let live = this.media.live.as_mut().expect("checked above");

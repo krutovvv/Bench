@@ -46,8 +46,9 @@ pub struct MediaState {
 /// Dictation recognized while it goes: at each pause, the whole speech so far, one run at a time; its
 /// text replaces the last after what the composer held before. Stopping is the last pause.
 pub struct LiveDictation {
-    /// The composer's text when dictation began: the draft goes after it.
-    pub base: String,
+    /// The composer's text before the dictation's first words: they go after it. Read when the
+    /// first run is back, not when the mic is clicked — the thread's view is busy with the click.
+    pub base: Option<String>,
     /// Where to look for the next pause from, in samples.
     pub looked: usize,
     /// The speech the last run had, in samples.
@@ -66,8 +67,8 @@ pub struct LiveDictation {
 }
 
 impl LiveDictation {
-    pub fn new(base: String) -> Self {
-        Self { base, looked: 0, ran: 0, running: false, shown: 0, next: 0, speed: 0.3, finishing: false, last: None, failed: false }
+    pub fn new() -> Self {
+        Self { base: None, looked: 0, ran: 0, running: false, shown: 0, next: 0, speed: 0.3, finishing: false, last: None, failed: false }
     }
 }
 
