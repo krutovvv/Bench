@@ -25,21 +25,10 @@ impl BenchApp {
         // Its bar stands over the tree, level with the documents' tabs beside it (their height,
         // the rule under them); the tree scrolls under it.
         let bar = self.explorer_picker(cx);
-        // Under it Files | Threads, a bar level with the document's head beside it (its height,
-        // its softer rule): two bars on the left meet two on the right.
-        let band = h_flex()
-            .flex_none()
-            .h(px(bench_ui::BLOCK_HEAD_H))
-            .px(px(bench_ui::SIDEBAR_ROW_INSET))
-            .items_center()
-            .border_b_1()
-            .border_color(cx.theme().border.opacity(0.6))
-            .child(self.explorer_side_switch(cx));
         let rows = self.render_explorer(window, cx);
         v_flex()
             .size_full()
             .child(bar)
-            .child(band)
             .child(
                 v_flex()
                     .id("explorer")
@@ -237,6 +226,17 @@ impl BenchApp {
             .border_color(cx.theme().border)
             .child(div().min_w_0().child(picker))
             .child(div().flex_1())
+            // What the panel lists, as Xcode's navigator picks it: two small glyphs, the shown one
+            // in the accent — the files, or the project's threads to pick the one beside.
+            .child(self.explorer_side_button(false, cx))
+            .child(self.explorer_side_button(true, cx))
+            .child(
+                div()
+                    .w(px(bench_ui::HAIRLINE))
+                    .h(px(bench_ui::BADGE))
+                    .mx_0p5()
+                    .bg(cx.theme().border),
+            )
             .child(
                 bench_ui::icon_button("ex-refresh", Ico::RefreshCw, "Read it again", false, cx)
                     .on_click(cx.listener(|this, _, w, cx| this.refresh_explorer(w, cx))),
@@ -248,27 +248,19 @@ impl BenchApp {
             .into_any_element()
     }
 
-    /// What the panel lists, the files or the project's threads (to pick the one beside): the
-    /// title bar's capsule, words and glyphs, so the second list is plain to see — a band of its
-    /// own under the head, the project's name keeps the head.
-    fn explorer_side_switch(&mut self, cx: &mut Context<Self>) -> AnyElement {
-        let app = cx.entity().downgrade();
-        bench_ui::mode_switch_full(
-            "ex-side",
-            &[
-                (Ico::Folder, "Files", "The project's files"),
-                (Ico::MessageSquare, "Threads", "The project's threads"),
-            ],
-            usize::from(self.explorer.threads),
-            cx,
-            std::rc::Rc::new(move |k, _, cx| {
-                let _ = app.update(cx, |this, cx| {
-                    this.explorer.threads = k == 1;
-                    cx.notify();
-                });
-            }),
-        )
-        .into_any_element()
+    /// One of the panel's two lists, as a navigator's glyph: the folder or the threads.
+    fn explorer_side_button(&mut self, threads: bool, cx: &mut Context<Self>) -> AnyElement {
+        let (id, ico, tip) = if threads {
+            ("ex-side-threads", Ico::MessageSquare, "The project's threads")
+        } else {
+            ("ex-side-files", Ico::Folder, "The project's files")
+        };
+        bench_ui::icon_button(id, ico, tip, self.explorer.threads == threads, cx)
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.explorer.threads = threads;
+                cx.notify();
+            }))
+            .into_any_element()
     }
 
     /// The Threads side: the shown project's threads as the sidebar draws them, pinned first.
