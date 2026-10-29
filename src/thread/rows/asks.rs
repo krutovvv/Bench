@@ -189,9 +189,11 @@ impl ThreadView {
             });
         let body =
             if settled {
-                v_flex().pl_6().text_size(px(bench_ui::THREAD_META)).when_some(card.answer.clone(), |d, a| {
+                // The answer in the question's columns: its check under the question's mark, at
+                // its size, its words under the question's.
+                v_flex().text_size(px(bench_ui::THREAD_META)).when_some(card.answer.clone(), |d, a| {
                     if a.is_empty() {
-                        d.child(div().text_color(muted).child("No answer"))
+                        d.child(div().pl_6().text_color(muted).child("No answer"))
                     } else {
                         d.child(
                             h_flex()
@@ -200,9 +202,9 @@ impl ThreadView {
                                 .child(
                                     Ico::CircleCheck
                                         .icon()
-                                        .xsmall()
+                                        .small()
                                         .text_color(theme.success)
-                                        .mt(px(bench_ui::ICON_ON_SMALL_LINE)),
+                                        .mt(px(bench_ui::ICON_ON_LINE)),
                                 )
                                 .child(div().flex_1().min_w_0().child(a)),
                         )
