@@ -22,13 +22,14 @@ import { repeat } from "./repeat.ts";
 import { listing } from "./listing.ts";
 import { claims } from "./claims.ts";
 import { step } from "./step.ts";
+import { intent } from "./intent.ts";
 import { quiet } from "./quiet.ts";
 import { watch } from "./watch.ts";
 import { skill } from "./skill.ts";
 import { boundary } from "./boundary.ts";
 
 /** Every point, in the order their effects apply. A new idea: a file with a `Point`, a line here. */
-export const POINTS: Point[] = [start, step, repeat, risk, search, listing, failure, quiet, watch, plan, course, skill, boundary, claims, done];
+export const POINTS: Point[] = [intent, start, step, repeat, risk, search, listing, failure, quiet, watch, plan, course, skill, boundary, claims, done];
 
 /** Ask the points of `moment` that have a question now; their effects, in `POINTS` order. */
 async function at(moment: Moment, seen: Seen, signal?: AbortSignal): Promise<Effect[]> {

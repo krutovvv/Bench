@@ -165,7 +165,11 @@ test("the course is checked every so many steps; only a sure 'off' is said", asy
 	assert.equal(await checkCourse("c4"), undefined, "once per stretch");
 	steps("c4", DRIFT_EVERY);
 	reply = () => choice("course.course", { on_track: 0.4, drifting: 0.6, looping: 0, done: 0 });
-	assert.equal(await checkCourse("c4"), undefined, "unsure: quiet");
+	assert.match((await checkCourse("c4"))!, /Stop here: answer the person now/, "told once, still off: a stop");
+	seeRequest("c4", [user("Make the game better")]);
+	steps("c4", DRIFT_EVERY);
+	reply = () => choice("course.course", { on_track: 0.4, drifting: 0.6, looping: 0, done: 0 });
+	assert.equal(await checkCourse("c4"), undefined, "unsure, untold: quiet");
 });
 
 test("an unfinished answer after work is sent back once; a question, a short turn or the limit are not", async () => {
@@ -508,7 +512,7 @@ test("leaning off course at two checks running is a soft line with the request; 
 	steps("d1", DRIFT_EVERY);
 	assert.match((await checkCourse("d1"))!, /may be moving away from what the person asked: «Restore the Things skills/);
 	steps("d1", DRIFT_EVERY);
-	assert.equal(await checkCourse("d1"), undefined, "said, then counted anew");
+	assert.match((await checkCourse("d1"))!, /Stop here/, "said, and still leaning: a stop");
 });
 
 test("a script's nested call is no way around repeat: it is weighed against the calls before it", async () => {
@@ -689,4 +693,27 @@ test("a section is held until the next compaction", async () => {
 	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v1", "held");
 	thaw("z1");
 	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v2", "read anew after a compaction");
+});
+
+test("each message is read for what it asks; an approval is answered in words, and its course is checked sooner", async () => {
+	setSetting("judge", { enabled: true, base_url: base });
+	const said = { role: "assistant", content: [{ type: "text", text: "Done: the tools are final. Three limits remain: the deadline does not clear, the trash stays." }] };
+	seeRequest("i1", [user("set up Things"), said, user("the dash is fine, the deadline doesn't matter, the trash I'll empty myself")]);
+	reply = (body) => {
+		assert.match(body.state.agent_answer_before_it, /tools are final/);
+		const q = body.questions["intent.intent"];
+		assert.deepEqual(Object.keys(q.criteria)[0], "work", "working as asked first");
+		return { answers: { ...choice("intent.intent", { work: 0.1, question: 0.05, approval: 0.8, correction: 0.03, choice: 0.02 }).answers } };
+	};
+	const { hints } = await atRequest("i1");
+	assert.match(hints[0], /approves or comments on work already done/);
+	assert.equal(turnOf("i1").intent, "approval");
+	// Asked once a message; every later question of the evaluator sees what it asks.
+	reply = (body) => {
+		assert.equal(body.questions["intent.intent"], undefined);
+		assert.match(body.state.what_the_message_asks, /change nothing, start nothing/);
+		return choice("course.course", { on_track: 0.1, drifting: 0.85, looping: 0.03, done: 0.02 });
+	};
+	steps("i1", 3);
+	assert.match((await checkCourse("i1"))!, /did not ask for/, "words wanted: checked at 3 steps");
 });

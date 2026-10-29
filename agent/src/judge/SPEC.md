@@ -50,11 +50,22 @@ each point's answers under its own names. The default extension's hooks call the
   looping, or done. Anything but on track, when sure (0.7), is a note with that step's result.
   Leaning the same way off course (drifting or looping at 0.4) at two checks running is a softer
   note with the person's request: in the backup thread drifting stood at 0.42–0.47 four times over
-  twenty minutes and nothing was said.
+  twenty minutes and nothing was said. Off course again after either word (sure, or leaning), the
+  note says to stop and answer — the soft word alone was read and passed by. After a question, an
+  approval or a choice (`intent.ts`) the course is checked every 3 steps.
 - **done** (`done.ts`, `answer`, after five steps or more): an answer judged unfinished,
   unchecked or off target (0.8) sends the agent back once, with the reason, by Pi's continuation —
   an `<evaluator>` message the thread does not show and that is not a new turn.
 
+- **intent** (`intent.ts`, `request`, before the first step on each message of the person): what the
+  message is, read against the agent's answer it follows (`turn.previous`) — a task, a question,
+  an approval or feedback, a correction, or a choice among the agent's options (0.6). The line
+  with the request says how far the turn goes: a task all of what it names and nothing else (more
+  is offered in a line, not done), a question words, an approval a few lines and no change, a
+  correction exactly what it names, a choice what was chosen. The turn keeps the reading, and
+  every later question of the evaluator sees it (`baseState`'s `what_the_message_asks`). An agent
+  that does everything right does too much: told "fine, not critical" after "the tools are
+  final", it spent 36 steps building three things nobody asked for.
 - **start** (`start.ts`, `request`, a turn's first): which of the thread's skills fits the request
   (a choice, "none" first) and which MCP servers the work needs (a choice of two each); a sure
   answer (a skill 0.8, a server 0.75) is a line with that request: load this skill, use these
@@ -147,8 +158,6 @@ A new idea is a file with a `Point` and a line in `POINTS`; a new moment is a di
 `index.ts` and the hook that calls it. The likeliest next ones, each a narrow decision the thread's
 model now spends a step or a long context on:
 
-- **before a request** (`beforeRequest`): whether the request is a question to answer at once or
-  work to plan.
 - **after a result**: what of a long file, page or command output matters for the request (the
   model reads the likeliest parts first, as with a search); deep research's sources and passages
   scored before the model reads them.

@@ -7,6 +7,7 @@
 import type { PlanStep } from "../protocol.gen.ts";
 import { cut, planLines, type Turn } from "../builtin/turn.ts";
 import type { ChoiceAnswer, Question } from "./client.ts";
+import { INTENT_SCOPE } from "./intent.ts";
 
 /**
  * When a point may ask: `request` before a request to the model (`beforeRequest`), `call` before a
@@ -74,6 +75,7 @@ export function baseState(turn: Turn, steps = 20): Record<string, unknown> {
 	return {
 		request: cut(turn.request, 4000),
 		...(turn.plan.length ? { plan: planLines(turn.plan) } : {}),
+		...(turn.intent ? { what_the_message_asks: INTENT_SCOPE[turn.intent] ?? turn.intent } : {}),
 		steps_so_far: turn.steps,
 		last_steps: turn.recent.slice(-steps),
 	};

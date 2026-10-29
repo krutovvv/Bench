@@ -3,7 +3,9 @@
 // is done. Anything but "on track", when it is sure, is said to the model with the result of the
 // step it came after. Unsure but leaning the same way off course at two checks running — drifting
 // at 0.42–0.47 four times over twenty minutes, said nothing at 0.7 — it is a softer line with the
-// person's request, a turn of the head rather than a stop. The model decides what to do.
+// person's request, a turn of the head rather than a stop. Off course again after either, it is
+// told to stop and answer. When the message wanted words, not work (`intent.ts`), the course is
+// checked every 3 steps. The model decides what to do.
 
 import { cut } from "../builtin/turn.ts";
 
@@ -15,6 +17,13 @@ export const DRIFT_EVERY = 5;
 const SURE = 0.7;
 /** Leaning off course this much, at two checks running, is a softer line. */
 const LEAN = 0.4;
+/** Steps between checks when the message wanted words, not work (`intent.ts`): a few steps are already many. */
+const WORDS_EVERY = 3;
+const WORDS = new Set(["question", "approval", "choice"]);
+
+/** Off course again after a word about it: the agent did not turn, so it is told to stop. */
+const STOP = (r: string) =>
+	`[Evaluator: you were told your steps leave what the person asked («${r}»), and they still do. Stop here: answer the person now — what is done, and what more you would do, as an offer.]`;
 
 const SAY: Record<string, string> = {
 	drifting:
@@ -33,7 +42,8 @@ export const course: Point = {
 	name: "course",
 	moment: "result",
 	ask({ turn }) {
-		if (!turn.request || turn.steps - turn.checkedAt < DRIFT_EVERY) return undefined;
+		const every = WORDS.has(turn.intent) ? WORDS_EVERY : DRIFT_EVERY;
+		if (!turn.request || turn.steps - turn.checkedAt < every) return undefined;
 		turn.checkedAt = turn.steps;
 		return {
 			questions: {
@@ -54,14 +64,18 @@ export const course: Point = {
 	},
 	apply({ turn }, answers) {
 		const c = sure(answers.course, SURE);
-		if (c && SAY[c]) {
-			turn.leaning = "";
-			return { note: SAY[c] };
-		}
 		const p = answers.course?.probabilities ?? {};
 		const lean = (["drifting", "looping"] as const).find((k) => Number(p[k] ?? 0) >= LEAN) ?? "";
+		// Told once already, and still off: the word becomes a stop.
+		if (turn.warned && (c === "drifting" || c === "looping" || lean)) return { note: STOP(cut(turn.request, 300)) };
+		if (c && SAY[c]) {
+			turn.leaning = "";
+			if (c !== "done") turn.warned = true;
+			return { note: SAY[c] };
+		}
 		const again = !!lean && turn.leaning === lean;
 		turn.leaning = again ? "" : lean;
+		if (again) turn.warned = true;
 		return again ? { note: LEANING[lean](cut(turn.request, 300)) } : undefined;
 	},
 };

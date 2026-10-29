@@ -60,6 +60,14 @@ export interface Turn {
 	named: Set<string>;
 	/** The steps at which the evaluator last looked for a skill mid-turn (`judge/skill.ts`). */
 	skillAt: number;
+	/** The agent's answer before the person's message: what the message answers to (`judge/intent.ts`). */
+	previous: string;
+	/** What the person's message is, as the evaluator read it (`judge/intent.ts`): "" unknown. */
+	intent: string;
+	/** The evaluator was asked what the message is. */
+	intentAsked: boolean;
+	/** The evaluator already said softly that the work leaves the request (`judge/drift.ts`). */
+	warned: boolean;
 }
 
 /** A step as `judge/repeat.ts` compares it: its arguments whole, not a line's start. */
@@ -73,7 +81,7 @@ export interface Call {
 
 const turns = new Map<string, Turn>();
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0 });
+const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {
@@ -93,6 +101,9 @@ export function seeRequest(conversation: string, messages: readonly any[]): void
 	if (t?.request === text && t.steps === 0) return;
 	const next = fresh(text, t?.plan, t?.planId);
 	next.opening = messages.filter((m) => m?.role === "user").length === 1;
+	// The agent's last words before this message: what the person answers to.
+	const before = [...messages.slice(0, -1)].reverse().find((m) => m?.role === "assistant" && (m.content ?? []).some((b: any) => b?.type === "text" && String(b.text ?? "").trim()));
+	next.previous = before ? cut((before.content ?? []).filter((b: any) => b?.type === "text").map((b: any) => String(b.text)).join("\n").trim(), 3000) : "";
 	turns.set(conversation, next);
 }
 
