@@ -6,7 +6,7 @@
 import { sure, type Point } from "./point.ts";
 
 /** Steps between two checks. */
-export const DRIFT_EVERY = 20;
+export const DRIFT_EVERY = 10;
 /** How sure the evaluator must be to speak. */
 const SURE = 0.7;
 

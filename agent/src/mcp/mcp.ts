@@ -84,6 +84,11 @@ export async function connectMcp(agent?: string, timeoutMs = 30000): Promise<voi
 	}
 }
 
+/** An agent's connected servers and their tools' names (the evaluator's view of what a turn can use). */
+export function mcpServerTools(agent: string): { name: string; tools: string[] }[] {
+	return [...servers.values()].filter((s) => s.agent === agent && s.client && !s.error).map((s) => ({ name: s.name, tools: s.tools.map((t: any) => String(t.name ?? t.definition?.name ?? "")) }));
+}
+
 /** A server that failed is tried again with a message this long after, no sooner. */
 const RETRY_MS = 60_000;
 /** How long such a retry may hold the message up. */

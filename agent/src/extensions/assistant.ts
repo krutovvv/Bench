@@ -22,10 +22,10 @@ import { machineOf } from "../repo.ts";
 import { compactWithoutReasoning } from "../builtin/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../builtin/steps.ts";
-import { fitRequest, fitResult, seeUsage } from "../builtin/window.ts";
-import { seeRequest, seeResult } from "../builtin/turn.ts";
+import { fitRequest, fitResultFor, seeUsage } from "../builtin/window.ts";
+import { seeAnswer, seeRequest, seeResult } from "../builtin/turn.ts";
 import { judgeActive } from "../judge/client.ts";
-import { atAnswer, atResult } from "../judge/index.ts";
+import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
 import { environment, inserted, notes, projectContext, skills, soul } from "../prompt.ts";
 import { Inserts } from "../runtime/inserts.ts";
@@ -121,15 +121,21 @@ export const assistant = defineExtension({
 		// the provider's count after it correcting the estimate. The answer is the evaluator's to
 		// check once (`judge/done.ts`).
 		hook(GenerationTask, {
-			beforeRequest: (request: any, api: any) => {
+			// A turn's first request also carries the evaluator's word on its skill and servers (`judge/start.ts`).
+			beforeRequest: async (request: any, api: any, context: any) => {
 				const conversation = String(api.conversationId);
 				seeRequest(conversation, request.messages);
+				const hints = await atRequest(conversation, context?.abortSignal).catch(() => [] as string[]);
 				const note = stepNote(conversation);
-				const messages = note ? [...request.messages, note] : request.messages;
+				const extra = [...hints.map((h) => ({ role: "user", content: h, timestamp: Date.now() })), ...(note ? [note] : [])];
+				const messages = extra.length ? [...request.messages, ...extra] : request.messages;
 				const fitted = fitRequest(conversation, messages);
-				return fitted || note ? { messages: fitted ?? messages } : undefined;
+				return fitted || extra.length ? { messages: fitted ?? messages } : undefined;
 			},
-			afterResponse: (message: any, api: any) => seeUsage(String(api.conversationId), message?.usage),
+			afterResponse: (message: any, api: any) => {
+				seeUsage(String(api.conversationId), message?.usage);
+				seeAnswer(String(api.conversationId), message);
+			},
 			onYield: async (answer: any, api: any, context: any) => {
 				const back = await atAnswer(String(api.conversationId), answer, context?.abortSignal).catch(() => undefined);
 				return back ? { continue: back } : undefined;
@@ -147,12 +153,13 @@ export const assistant = defineExtension({
 					const refused = stepGate(String(api.conversationId));
 					if (refused) return { block: refused };
 				}
-				if (call.name !== "bash" || !info || approvalsMode(info.agent) !== "manual") return undefined;
+				if (!["bash", "ssh_run"].includes(call.name) || !info || approvalsMode(info.agent) !== "manual") return undefined;
 				const command = String(call.arguments?.command ?? call.args?.command ?? "");
-				const hit = DANGEROUS.find(([re]) => re.test(command));
-				if (!hit) return undefined;
-				const choice = await host().approve(info.id, String(call.id), command, hit[1]);
-				return choice === "deny" ? { block: `The person declined this command (${hit[1]}). Do not retry it; ask or choose another way.` } : undefined;
+				// The patterns first; what they let through, the evaluator judges too (`judge/risk.ts`).
+				const why = DANGEROUS.find(([re]) => re.test(command))?.[1] ?? (call.parent ? undefined : await atCall(String(api.conversationId), call, context?.abortSignal).catch(() => undefined));
+				if (!why) return undefined;
+				const choice = await host().approve(info.id, String(call.id), command, why);
+				return choice === "deny" ? { block: `The person declined this command (${why}). Do not retry it; ask or choose another way.` } : undefined;
 			},
 			// The file's errors from the project's language servers, with the edit that made them
 			// (`lsp.ts`): the model sees them as an editor shows them, without asking.
@@ -164,7 +171,7 @@ export const assistant = defineExtension({
 			// Last, what the model reads is cut to its share of the window (`builtin/window.ts`).
 			afterTool: async (call: any, result: any, api: any, context: any) => {
 				const done = await notesAfter(call, result, api, context);
-				return fitResult(done ?? result) ?? done;
+				return (await fitResultFor(String(api.conversationId), done ?? result, context?.abortSignal)) ?? done;
 			},
 		} as any),
 	],

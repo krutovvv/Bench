@@ -468,7 +468,7 @@ impl BenchApp {
             page.push(
                 bench_ui::settings_field(
                     "Use the evaluator",
-                    "Orders long searches, checks the course every 20 steps and whether a turn is done. Off: the classic way",
+                    "Picks a turn's skill and tools, keeps what long results need, orders searches, marks the plan, checks the course, failures, risky commands and whether a turn is done. Off: the classic way",
                     div()
                         .flex()
                         .justify_end()

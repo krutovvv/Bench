@@ -14,6 +14,7 @@
 // corrected by the provider's own count after every answer.
 
 import { resolveModel } from "../config.ts";
+import { excerpt } from "../judge/excerpt.ts";
 
 /** Characters per token, on the safe side: Russian text runs near 3, code near 3.5. */
 export const CHARS_PER_TOKEN = 3;
@@ -51,6 +52,20 @@ export function fitResult(result: any, window = windowTokens()): any {
 	// Each text block keeps its share of the budget.
 	const output = blocks.map((b) => (b?.type === "text" ? { ...b, text: cutMiddle(String(b.text ?? ""), Math.max(500, Math.floor((budget * String(b.text ?? "").length) / total)), why) } : b));
 	return { ...result, output };
+}
+
+/**
+ * As `fitResult`, but with the evaluator on, the parts the request needs instead of head and tail
+ * (`judge/excerpt.ts`); its answer missing, the cut as before.
+ */
+export async function fitResultFor(conversation: string, result: any, signal?: AbortSignal, window = windowTokens()): Promise<any> {
+	const budget = Math.floor(window * RESULT_SHARE * CHARS_PER_TOKEN);
+	const blocks: any[] = result?.output ?? [];
+	const text = blocks.filter((b) => b?.type === "text").map((b) => String(b.text ?? "")).join("\n");
+	if (text.length <= budget) return undefined;
+	const picked = await excerpt(conversation, text, budget, signal).catch(() => undefined);
+	if (picked) return { ...result, output: [{ type: "text", text: picked }, ...blocks.filter((b) => b?.type !== "text")] };
+	return fitResult(result, window);
 }
 
 /** What the provider counted beyond the estimate of what was sent, per conversation. */

@@ -256,3 +256,80 @@ test("off, no point asks and the hooks change nothing", async () => {
 	assert.equal(await atAnswer("c9", { role: "assistant", content: [{ type: "text", text: "Done." }] }), undefined);
 	assert.equal(seen.length, before);
 });
+
+const { atRequest, atCall } = await import("../src/judge/index.ts");
+const { fitResultFor } = await import("../src/builtin/window.ts");
+const { seeAnswer } = await import("../src/builtin/turn.ts");
+
+test("at a turn's start the fitting skill is named for the first request, once", async () => {
+	setSetting("judge", { enabled: true, base_url: base });
+	const dir = path.join(home, "projects", "p", "skills", "price-check");
+	fs.mkdirSync(dir, { recursive: true });
+	fs.writeFileSync(path.join(dir, "SKILL.md"), "---\nname: price-check\ndescription: Compare a product's prices across shops\n---\nSteps.");
+	seeRequest("s1", [user("Compare Arctic prices")]);
+	reply = (body) => {
+		const k = Object.keys(body.questions.start ? {} : body.questions).find((q) => q === "start.skill")!;
+		const opts = Object.keys(body.questions[k].criteria);
+		assert.equal(opts[0], "none", "naming none first");
+		return choice("start.skill", { none: 0.1, [opts[1]]: 0.85 });
+	};
+	const hints = await atRequest("s1");
+	assert.equal(hints.length, 1);
+	assert.match(hints[0], /the skill "price-check" fits it: load it with skill_view/);
+	assert.deepEqual(await atRequest("s1"), [], "once a turn");
+});
+
+test("a failed step is judged; a sure word goes with the error", async () => {
+	seeRequest("f1", [user("Find the price on DNS")]);
+	reply = (body) => {
+		assert.match(body.state.error, /403/);
+		return choice("failure.failure", { go_on: 0.1, retry: 0.05, fix: 0.05, other_way: 0.75, ask: 0.05 });
+	};
+	const r = await atResult("f1", { name: "bash", arguments: { command: "curl dns-shop.ru" } }, { output: [{ type: "text", text: "HTTP 403" }], isError: true });
+	assert.match(r.notes[0], /this way does not work here/);
+	reply = () => choice("failure.failure", { go_on: 0.5, retry: 0.3, fix: 0.1, other_way: 0.05, ask: 0.05 });
+	assert.deepEqual((await atResult("f1", { name: "bash", arguments: {} }, { output: [{ type: "text", text: "boom" }], isError: true })).notes, []);
+});
+
+test("with approvals on, a command the evaluator judges hard to undo is asked; a harmless one is not", async () => {
+	reply = () => choice("risk.risk", { reads: 0.1, changes: 0.2, harm: 0.7 });
+	assert.match((await atCall("a1", { name: "bash", arguments: { command: "psql -c 'drop table users'" } }))!, /hard to undo/);
+	reply = () => choice("risk.risk", { reads: 0.9, changes: 0.05, harm: 0.05 });
+	assert.equal(await atCall("a1", { name: "bash", arguments: { command: "ls" } }), undefined);
+});
+
+test("the plan's check sees the agent's own words and longer results", async () => {
+	seeRequest("pe", [user("Compare prices")]);
+	seeResult("pe", todo([{ content: "Ozon price", status: "in_progress" }, { content: "DNS price", status: "pending" }]), out("ok"));
+	seeAnswer("pe", { content: [{ type: "text", text: "Ozon: the lowest is 9 753 ₽ from the seller Arctic." }] });
+	reply = () => ({ answers: {} });
+	for (let i = 0; i < PLAN_EVERY; i++) {
+		stepGate("pe");
+		const c = { name: "mcp__ozon__ozon_search", arguments: { q: "arctic" } };
+		const r = out("price 9753 seller Arctic " + "x".repeat(400));
+		seeResult("pe", c, r);
+		await atResult("pe", c, r);
+	}
+	const st = seen.at(-1).body.state;
+	assert.match(st.agent_said[0], /9 753/);
+	assert.ok(st.recent_results.at(-1).length > 300, "results at more length than a line");
+});
+
+test("a long result keeps the parts the request needs, in order; without the evaluator, head and tail", async () => {
+	seeRequest("x1", [user("Find the price of Liquid Freezer III")]);
+	const page = Array.from({ length: 60 }, (_, i) => (i === 41 ? "PRICE: Liquid Freezer III Pro 360 — 9 753 ₽\n" : `menu link ${i} `.repeat(90) + "\n")).join("");
+	reply = (body) => {
+		const parts = body.state.long_result;
+		const hit = Object.keys(parts).find((k) => /PRICE/.test(parts[k]));
+		return choice("part", hit ? { none: 0.03, [hit]: 0.94 } : { none: 0.9 });
+	};
+	const r = await fitResultFor("x1", out(page), undefined, 4000);
+	const text = r.output[0].text as string;
+	assert.match(text, /^\[Evaluator: a long result/);
+	assert.match(text, /PRICE: Liquid Freezer III Pro 360/);
+	assert.ok(text.length < page.length / 4);
+	setSetting("judge", { enabled: false, base_url: base });
+	const plain = await fitResultFor("x1", out(page), undefined, 4000);
+	assert.match(plain.output[0].text, /characters cut out here/);
+	setSetting("judge", { enabled: true, base_url: base });
+});

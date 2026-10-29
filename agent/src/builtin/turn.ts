@@ -9,6 +9,9 @@ import type { PlanStep } from "../protocol.gen.ts";
 
 /** How many steps a turn remembers, a line each. */
 const RECENT = 24;
+/** How many results, and of the agent's own words, a turn keeps at more length (`EVIDENCE`). */
+const KEPT = 8;
+const EVIDENCE = 600;
 
 export interface Turn {
 	/** The person's request: their last message's text. */
@@ -29,11 +32,17 @@ export interface Turn {
 	continued: boolean;
 	/** The steps at which the evaluator last checked the course. */
 	checkedAt: number;
+	/** The last results at more length than `recent` (what was found, what was done). */
+	evidence: string[];
+	/** The agent's own last words between its steps (what it says it did and found). */
+	said: string[];
+	/** The evaluator looked at the turn's start (`judge/start.ts`). */
+	started: boolean;
 }
 
 const turns = new Map<string, Turn>();
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0 });
+const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {
@@ -71,6 +80,22 @@ export function seeResult(conversation: string, call: { id?: string; name: strin
 	const out = resultText(result).replace(/\s+/g, " ").trim();
 	t.recent.push(`${call.name} ${cut(args, 200)}${result?.isError ? " → ERROR " : " → "}${cut(out, 160)}`);
 	if (t.recent.length > RECENT) t.recent.splice(0, t.recent.length - RECENT);
+	t.evidence.push(`${call.name} ${cut(args, 120)} → ${cut(out, EVIDENCE)}`);
+	if (t.evidence.length > KEPT) t.evidence.splice(0, t.evidence.length - KEPT);
+}
+
+/** The model's message (`afterResponse`): its words between steps, kept for the evaluator. */
+export function seeAnswer(conversation: string, message: any): void {
+	const text = (message?.content ?? [])
+		.filter((b: any) => b?.type === "text")
+		.map((b: any) => String(b.text ?? ""))
+		.join(" ")
+		.replace(/\s+/g, " ")
+		.trim();
+	if (!text) return;
+	const t = turnOf(conversation);
+	t.said.push(cut(text, EVIDENCE));
+	if (t.said.length > KEPT) t.said.splice(0, t.said.length - KEPT);
 }
 
 /** The text a tool returned. */

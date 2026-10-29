@@ -9,21 +9,25 @@ import { cut, planLines, type Turn } from "../builtin/turn.ts";
 import type { ChoiceAnswer, Question } from "./client.ts";
 
 /**
- * When a point may ask: `result` after every top-level tool call (before the model reads the
- * result), `answer` when the model gives its final answer. New moments (before a call, before a
- * request to the model) get a dispatcher in `index.ts` and a hook in `extensions/assistant.ts`.
+ * When a point may ask: `request` before a request to the model (`beforeRequest`), `call` before a
+ * top-level call runs (`beforeTool`), `result` after
+ * every top-level tool call (before the model reads the result), `answer` when the model gives its
+ * final answer. A new moment (before a call, at compaction) gets a dispatcher in `index.ts` and a
+ * hook in `extensions/assistant.ts`.
  */
-export type Moment = "result" | "answer";
+export type Moment = "request" | "call" | "result" | "answer";
 
 /** What a point sees at its moment. */
 export interface Seen {
 	conversation: string;
 	turn: Turn;
-	/** At `result`: the call and what it returned (as the points before this one left it). */
+	/** At `call` and `result`: the call; at `result`, what it returned (as the points before this one left it). */
 	call?: { id?: string; name: string; arguments?: any };
 	result?: any;
 	/** At `answer`: the model's final message. */
 	answer?: any;
+	/** At `request`: what the thread is (its agent, folder, project), for what it can use. */
+	thread?: import("../host.ts").ThreadFacts;
 }
 
 export interface Asked {
@@ -44,13 +48,17 @@ export interface Effect {
 	write?: { kind: string; data: unknown };
 	/** The plan as the evaluator now reads it: the turn keeps it, the thread shows it. */
 	plan?: PlanStep[];
+	/** A line for the model with this request only (`request` only). */
+	hint?: string;
+	/** Ask the person before the call runs, saying why (`call` only). */
+	approve?: string;
 }
 
 export interface Point {
 	name: string;
 	moment: Moment;
 	/** The questions to ask now, or undefined: nothing to ask at this moment. */
-	ask(seen: Seen): Asked | undefined;
+	ask(seen: Seen): Asked | undefined | Promise<Asked | undefined>;
 	/** What the answers change; undefined: nothing (unsure, or the answer agrees with things as they are). */
 	apply(seen: Seen, answers: Record<string, ChoiceAnswer>): Effect | undefined;
 }

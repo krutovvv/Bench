@@ -37,6 +37,9 @@ export const plan: Point = {
 		if (!open.length) return undefined;
 		turn.planAt = turn.steps;
 		return {
+			// What was found and done at more length than a line a step, and the agent's own words:
+			// a line each was too little to see an item finished.
+			state: { agent_said: turn.said.slice(-6), recent_results: turn.evidence },
 			questions: Object.fromEntries(
 				open.map(([p, i]) => [
 					`item${i}`,

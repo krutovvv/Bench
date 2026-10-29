@@ -31,18 +31,37 @@ each point's answers under its own names. The default extension's hooks call the
 - **search** (`search.ts`, `result`: grep, glob, a grep or find through bash): a list of twelve
   lines or more comes with the likeliest places for the request first, with their probability; the
   others follow in their order. Nothing is dropped.
-- **plan** (`plan.ts`, `result`, every 5 steps while the plan has open items): each open item —
+- **plan** (`plan.ts`, `result`, every 5 steps while the plan has open items, reading the agent's
+  own last words and its last results at more length than a line): each open item —
   not started, in progress, finished. A sure answer (0.85 finished, 0.7 begun) moves it forward,
   never back; when one finishes and none is under way, the next begins. The thread shows the plan
   so marked (`bench.plan`, read by the journal as a later snapshot of the same plan) and the model
   is told in a line, so it need not spend a step on `todo`. Its own `todo` call wins and the marks
   start again from it. With the evaluator off or failing, the plan's reminder (`planNudge`) does
   this job; with it on, the reminder is silent.
-- **course** (`drift.ts`, `result`, every 20 steps): on track, drifting to something not asked,
+- **course** (`drift.ts`, `result`, every 10 steps): on track, drifting to something not asked,
   looping, or done. Anything but on track, when sure (0.7), is a note with that step's result.
 - **done** (`done.ts`, `answer`, after five steps or more): an answer judged unfinished,
   unchecked or off target (0.8) sends the agent back once, with the reason, by Pi's continuation —
   an `<evaluator>` message the thread does not show and that is not a new turn.
+
+- **start** (`start.ts`, `request`, a turn's first): which of the thread's skills fits the request
+  (a choice, "none" first) and which MCP servers the work needs (a choice of two each); a sure
+  answer is a line with that request: load this skill, use these servers' tools.
+- **risk** (`risk.ts`, `call`, approvals "manual" only): a command the patterns let through is
+  judged — reads, changes the project, or harm hard to undo; harm (0.5) asks the person, as a
+  pattern's hit does. It only adds questions.
+- **failure** (`failure.ts`, `result`, a failed call): retry once, fix the call, another way, or
+  ask the person (0.6), said with the error.
+- **excerpt** (`excerpt.ts`, called by `builtin/window.ts`): a result past its share of the window
+  is cut into parts of 1 500 characters, the parts put in the state (9 000 characters a request),
+  and a choice over their names (and "none", last) keeps the parts that stand out; without an
+  answer, the cut keeps head and tail as before.
+
+What the local server taught: a yes/no (`noul`) read every option alike (0.20), so every question
+is a choice; an option's text is read from its start only, so long texts go in the state and the
+options are short names; "none" first takes nearly all the probability, so where finding matters
+it comes last.
 
 The safe side wins every tie: the option that changes nothing is listed first (the model leans to
 the first), and below its threshold an answer changes nothing.

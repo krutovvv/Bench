@@ -10,21 +10,26 @@
 import { host } from "../host.ts";
 import { turnOf } from "../builtin/turn.ts";
 import { ask, judgeActive, type ChoiceAnswer, type Question } from "./client.ts";
-import { baseState, type Effect, type Moment, type Point, type Seen } from "./point.ts";
+import { baseState, type Asked, type Effect, type Moment, type Point, type Seen } from "./point.ts";
 import { search } from "./search.ts";
 import { course } from "./drift.ts";
 import { plan } from "./plan.ts";
 import { done } from "./done.ts";
+import { start } from "./start.ts";
+import { failure } from "./failure.ts";
+import { risk } from "./risk.ts";
 
 /** Every point, in the order their effects apply. A new idea: a file with a `Point`, a line here. */
-export const POINTS: Point[] = [search, plan, course, done];
+export const POINTS: Point[] = [start, risk, search, failure, plan, course, done];
 
 /** Ask the points of `moment` that have a question now; their effects, in `POINTS` order. */
 async function at(moment: Moment, seen: Seen, signal?: AbortSignal): Promise<Effect[]> {
 	if (!judgeActive()) return [];
-	const asking = POINTS.filter((p) => p.moment === moment)
-		.map((p) => [p, p.ask(seen)] as const)
-		.filter((x): x is [Point, NonNullable<ReturnType<Point["ask"]>>] => !!x[1]);
+	const asking: [Point, Asked][] = [];
+	for (const p of POINTS.filter((p) => p.moment === moment)) {
+		const a = await p.ask(seen);
+		if (a) asking.push([p, a]);
+	}
 	if (!asking.length) return [];
 	const state = Object.assign(baseState(seen.turn), ...asking.map(([, a]) => a.state ?? {}));
 	const questions: Record<string, Question> = {};
@@ -52,6 +57,18 @@ export async function atResult(conversation: string, call: Seen["call"], result:
 	const effects = await at("result", seen, signal);
 	const changed = effects.some((e) => e.result);
 	return { ...(changed ? { result: seen.result } : {}), notes: effects.map((e) => e.note).filter((n): n is string => !!n) };
+}
+
+/** Before a request to the model (`beforeRequest`): lines for it with this request only. */
+export async function atRequest(conversation: string, signal?: AbortSignal): Promise<string[]> {
+	const effects = await at("request", { conversation, turn: turnOf(conversation), thread: host().thread(conversation) }, signal);
+	return effects.map((e) => e.hint).filter((h): h is string => !!h);
+}
+
+/** Before a command runs with approvals on (`beforeTool`): why to ask the person first, if so. */
+export async function atCall(conversation: string, call: Seen["call"], signal?: AbortSignal): Promise<string | undefined> {
+	const effects = await at("call", { conversation, turn: turnOf(conversation), call }, signal);
+	return effects.find((e) => e.approve)?.approve;
 }
 
 /** At the model's final answer (`onYield`): the message that sends it back, if any. */

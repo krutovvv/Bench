@@ -144,7 +144,7 @@ export function ranked(a: ChoiceAnswer | undefined): [string, number][] {
 /** Every answer in the log in a line: the choice and its probability (a ranking's top three). */
 function brief(answers: Record<string, any>): Record<string, string> {
 	return Object.fromEntries(
-		Object.entries(answers).map(([k, a]) => [k, ranked(a).slice(0, 3).map(([o, p]) => `${o}:${p.toFixed(2)}`).join(" ")]),
+		Object.entries(answers).map(([k, a]) => [k, typeof a?.noul === "number" ? `yes:${a.noul.toFixed(2)}` : ranked(a).slice(0, 3).map(([o, p]) => `${o}:${p.toFixed(2)}`).join(" ")]),
 	);
 }
 
