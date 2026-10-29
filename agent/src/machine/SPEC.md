@@ -29,6 +29,10 @@ be on another machine than its agent is `projects-and-agents` (`docs/remote-proj
   writing allowed only in the folder and the temp folders (`sandbox-exec` on macOS, bubblewrap
   on Linux when installed).
 
+`sh.ts` runs one POSIX script in a folder of the project's machine — over the same connection, or
+here — for what reads it in one go (a turn's git trees, a review's diff, the specs, the Explorer's
+searches); its failures are plain errors, the routes saying what they mean in HTTP.
+
 `settings.ts` routes the project's own settings files (`SYSTEM.md`, `mcp.json`, skills, prompts)
 to this agent's machine wherever the work is, so the agent can change its environment from any
 thread; every other path and every command goes to the conversation's environment.

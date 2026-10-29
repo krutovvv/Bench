@@ -11,7 +11,7 @@
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
 import { randomUUID } from "node:crypto";
 import { projects } from "../builtin/projects.ts";
-import { shOut } from "../modules/files.ts";
+import { shOut } from "../machine/sh.ts";
 import { REVIEW_KIND } from "./journal.ts";
 import type { Runtime } from "./runtime.ts";
 

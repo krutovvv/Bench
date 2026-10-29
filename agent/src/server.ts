@@ -6,7 +6,7 @@
 // Writes its port and token to ~/.bench/server.json.
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { onMachine } from "./modules/files.ts";
+import { onMachine } from "./machine/sh.ts";
 import { randomBytes } from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";

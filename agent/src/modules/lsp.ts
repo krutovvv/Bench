@@ -6,7 +6,7 @@ import { defaultCwd } from "../config.ts";
 import { projects } from "../builtin/projects.ts";
 import { HttpError, required, type Module } from "../http.ts";
 import { definitionAt, hoverAt, knownProblems, problemsOf, type Spot } from "../lsp/lsp.ts";
-import { onMachine } from "./files.ts";
+import { onMachine } from "../machine/sh.ts";
 
 /** A project's servers: its agent, the folder they run in, and its machine. "general" is Host. */
 async function serversOf(id: string): Promise<{ agent: string; root: string; machine?: string }> {

@@ -8,7 +8,6 @@ import path from "node:path";
 import { Type } from "@earendil-works/pi-ai";
 import { defineExtension, defineTool, GenerationTask, hook, ProviderDoc, section, ToolTask } from "@earendil-works/pi-durable";
 import { createNodePhotonImages } from "@earendil-works/pi-durable/images/node";
-import { createCodingTools } from "@earendil-works/pi-durable/tools";
 import { approvalsMode } from "../config.ts";
 import { clarify, sessionSearch, todo } from "../builtin/ask.ts";
 import { CronTask, cronTool } from "../builtin/cron.ts";
@@ -53,7 +52,7 @@ const DANGEROUS: [RegExp, string][] = [
 ];
 
 import { globTool, grepTool, lsTool } from "../builtin/search.ts";
-import { createAnchoredEdit, createAnchoredRead } from "../builtin/hashline.ts";
+import { codingTools } from "../builtin/hashline.ts";
 import { lspTool, placeOf } from "../builtin/navigate.ts";
 import { diagnosticsFor, knownDiagnostics } from "../lsp/lsp.ts";
 
@@ -78,8 +77,7 @@ const diagnosticsTool = defineTool({
 // over them, and without a processor Pi refuses the file instead of resizing it.
 export const images = await createNodePhotonImages();
 // Pi's coding tools, with read and edit by line anchors (`builtin/hashline.ts`).
-const Coding = createCodingTools({ images });
-const coding = (Coding.tools ?? []).map((t: any) => (t.name === "read" ? createAnchoredRead({ images }) : t.name === "edit" ? createAnchoredEdit() : t));
+const coding = codingTools({ images });
 
 /** The specs each conversation was told of: one line per spec per thread, not per file. */
 const toldSpecs = slot(() => new Set<string>());

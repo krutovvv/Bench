@@ -3,7 +3,6 @@
 // instructions, the skills it can load, and the notes it keeps. Short on purpose: a local model
 // at 60–150 tokens/s pays for every line, and for every extra round a "verify everything" rule causes.
 
-import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -95,33 +94,10 @@ function settings(s: ThreadFacts): string | undefined {
 }
 
 /** AGENTS.md (or CLAUDE.md) from the repository root down to the working directory, read where
- * it is (a project's server too: `repo.ts`). */
+ * it is (`repo.ts`: here, or on a project's server). */
 export async function projectContext(s: ThreadFacts): Promise<string | undefined> {
-	const machine = machineOf(s.project);
-	if (machine) {
-		const { instructions } = await repoOf(s.cwd, machine).catch(() => ({ instructions: [] }));
-		const parts = instructions.map((i) => `## ${path.posix.relative(s.cwd, i.file) || path.posix.basename(i.file)}\n\n${i.text}`);
-		return parts.length ? `# Project instructions\n\n${parts.join("\n\n")}` : undefined;
-	}
-	if (path.resolve(s.cwd) === os.homedir()) return undefined;
-	let root = s.cwd;
-	try {
-		root = execFileSync("git", ["-C", s.cwd, "rev-parse", "--show-toplevel"], { encoding: "utf8", timeout: 2000, stdio: ["ignore", "pipe", "ignore"] }).trim() || s.cwd;
-	} catch {}
-	const dirs: string[] = [];
-	for (let d = path.resolve(s.cwd); ; d = path.dirname(d)) {
-		dirs.unshift(d);
-		if (d === root || d === path.dirname(d)) break;
-	}
-	const parts: string[] = [];
-	for (const d of dirs)
-		for (const name of ["AGENTS.md", "CLAUDE.md"]) {
-			const f = path.join(d, name);
-			if (fs.existsSync(f)) {
-				parts.push(`## ${path.relative(s.cwd, f) || name}\n\n${fs.readFileSync(f, "utf8").trim().slice(0, 20000)}`);
-				break;
-			}
-		}
+	const { instructions } = await repoOf(s.cwd, machineOf(s.project)).catch(() => ({ instructions: [] }));
+	const parts = instructions.map((i) => `## ${path.posix.relative(s.cwd, i.file) || path.posix.basename(i.file)}\n\n${i.text}`);
 	return parts.length ? `# Project instructions\n\n${parts.join("\n\n")}` : undefined;
 }
 

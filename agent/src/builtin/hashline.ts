@@ -10,7 +10,7 @@
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool } from "@earendil-works/pi-durable";
-import { createEditTool, createReadTool, type ReadToolOptions } from "@earendil-works/pi-durable/tools";
+import { createCodingTools, createEditTool, createReadTool, type ReadToolOptions } from "@earendil-works/pi-durable/tools";
 import * as Diff from "diff";
 
 /** A line's hash: two base-36 characters of its FNV-1a, trailing `\r` aside. */
@@ -217,4 +217,10 @@ export function createAnchoredEdit(): any {
 			});
 		},
 	} as any);
+}
+
+/** Pi's coding tools (read, write, edit, bash) with read and edit by line anchors: what a thread
+ *  is given (`extensions/assistant.ts`) and what a person's own extension builds from (`extensions.ts`). */
+export function codingTools(options: ReadToolOptions): any[] {
+	return (createCodingTools(options as any).tools ?? []).map((t: any) => (t.name === "read" ? createAnchoredRead(options) : t.name === "edit" ? createAnchoredEdit() : t));
 }
