@@ -24,12 +24,13 @@ pub struct ActiveThread {
     /// The live work this view opened on its own, so the agent's words show where they will
     /// settle. The person touching it (either way) takes it over; at the run's end it folds.
     pub(crate) auto_work: Option<String>,
-    /// Steps of an opened work opened to their card (work key, step), any number at once.
+    /// The step of an opened work opened to its card (work key, step): one per work at a time.
     pub open_steps: HashSet<(String, usize)>,
-    /// Milestones of an opened work folded or unfolded against how they start (work key, the
-    /// milestone's first step): the last starts open — what the agent does now — the others
-    /// folded.
-    pub flipped_runs: HashSet<(String, usize)>,
+    /// The one milestone of an opened work shown open, by the work row's key (the milestone's
+    /// first step; `usize::MAX`, none); not set, its last — what the agent does now.
+    pub open_milestone: std::collections::HashMap<String, usize>,
+    /// A step's code blocks shown whole past their first lines, by the block's id.
+    pub open_fields: HashSet<String>,
     /// Steps whose reasoning is shown whole, past its first lines (work key, step).
     pub step_whole: HashSet<(String, usize)>,
     pub open_source: Option<(String, String)>,
@@ -88,7 +89,8 @@ impl Default for ActiveThread {
             auto_work: None,
             open_steps: Default::default(),
             step_whole: Default::default(),
-            flipped_runs: Default::default(),
+            open_fields: Default::default(),
+            open_milestone: Default::default(),
             open_source: None,
             texts: Default::default(),
             history_error: None,

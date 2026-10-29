@@ -1,8 +1,8 @@
 //! The opened work as strips of milestones: the agent's own words, or a sentence of its calls
 //! where it wrote none, in order, the last open — what the agent does now. Inside a milestone its
-//! calls in order, each on a row: what it did, in the agent's own words where it wrote some, and
-//! what came back, beside it; the reasoning's first sentence a quiet beat between them. A row
-//! opens to its card: why, what the evaluator said, what was sent, what came back. Nothing scrolls but a long command or output inside its own field.
+//! calls in order, each on a row under the milestone's words, its icon where they start: what it
+//! did, in the agent's own words where it wrote some, and what came back, beside it. A row opens
+//! to its card: why, what the evaluator said, what was sent, what came back. Nothing scrolls but a long command or output inside its own field.
 //! What a call is said as is `::thread::steps`.
 
 use ::thread::Step;
@@ -12,6 +12,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::thread::ThreadView;
+use crate::media::text::{FOLD_AFTER_LINES, render_code};
 use crate::thread::rows::tool_labels::pretty;
 use bench_ui::icons::Ico;
 
@@ -19,8 +20,6 @@ use bench_ui::icons::Ico;
 const WHY_LINES: usize = 5;
 /// …and its characters, for reasoning written as one long paragraph.
 const WHY_CHARS: usize = 420;
-/// The lines a command or output field holds before it scrolls inside.
-const FIELD_LINES: usize = 10;
 
 impl ThreadView {
     pub(crate) fn render_steps(
@@ -38,50 +37,29 @@ impl ThreadView {
         let mut from = 0usize;
         for (i, m) in milestones.iter().enumerate() {
             let to = m.steps.iter().copied().max().unwrap_or(from);
-            let flipped = self
-                .thread
-                .flipped_runs
-                .contains(&(key.to_string(), m.steps[0]));
-            let open = (i == last) != flipped;
+            // One milestone open at a time: the person's choice, else the last.
+            let open = match self.thread.open_milestone.get(key) {
+                Some(first) => *first == m.steps[0],
+                None => i == last,
+            };
             let calls: Vec<usize> = m.steps.iter().copied().filter(|k| steps[*k].is_tool()).collect();
             rows.push(self.render_milestone_row(key, steps, m, &calls, open, cx));
             if open && !calls.is_empty() {
-                let mut beat_shown = false;
+                // Its steps under its strip with air above and below: no frame, no fill.
+                let mut kids: Vec<AnyElement> = vec![];
                 for k in from..=to.min(steps.len().saturating_sub(1)) {
-                    match &steps[k] {
-                        // A run of thoughts is one beat: the first sentence of the first.
-                        Step::Thought(t) if !beat_shown => {
-                            beat_shown = true;
-                            if let Some(b) = steps::beat(t) {
-                                rows.push(self.render_beat(b, cx));
-                            }
-                        }
-                        Step::Tool { .. } => {
-                            beat_shown = false;
-                            self.push_step(key, k, steps, true, &mut rows, cx);
-                        }
-                        _ => {}
+                    if steps[k].is_tool() {
+                        // Indented one disclosure: the step's icon under the milestone's words.
+                        self.push_step(key, k, steps, true, &mut kids, cx);
                     }
                 }
+                rows.push(
+                    v_flex().pt_2().pb_3().children(kids).into_any_element(),
+                );
             }
             from = to + 1;
         }
-        v_flex().p_1p5().gap_0p5().children(rows).into_any_element()
-    }
-
-    /// The reasoning between calls, as a beat: its first sentence, quiet, under the calls' text.
-    fn render_beat(&mut self, beat: String, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme().clone();
-        div()
-            .pl(px(bench_ui::STEP_BEAT_INSET))
-            .pr_2()
-            .py_0p5()
-            .truncate()
-            .italic()
-            .text_size(px(bench_ui::THREAD_DETAIL))
-            .text_color(bench_ui::faint(&theme))
-            .child(beat)
-            .into_any_element()
+        v_flex().p_2p5().gap_0p5().children(rows).into_any_element()
     }
 
     /// A milestone's strip: the disclosure, the agent's words (or the sentence of its calls), and
@@ -99,7 +77,7 @@ impl ThreadView {
         let faint = bench_ui::faint(&theme);
         let failed = calls.iter().filter(|k| matches!(steps[**k], Step::Tool { failed: true, .. })).count();
         let judged = calls.iter().any(|k| judged(&steps[*k]));
-        let flip = (key.to_string(), m.steps[0]);
+        let first = m.steps[0];
         h_flex()
             .id(SharedString::from(format!("milestone-{key}-{}", m.steps[0])))
             .min_h(px(bench_ui::LIST_ROW_H))
@@ -108,7 +86,11 @@ impl ThreadView {
             .items_center()
             .rounded_md()
             .text_size(px(bench_ui::THREAD_META))
-            .when(!calls.is_empty(), |d| d.cursor_pointer().hover(|s| s.bg(theme.list_hover)))
+            .when(!calls.is_empty(), |d| d.cursor_pointer())
+            // Open, its strip stays as hovered, in the person's bubble's grey: the one grey of
+            // the block.
+            .when(open && !calls.is_empty(), |d| d.bg(theme.secondary))
+            .when(!calls.is_empty() && !open, |d| d.hover(|s| s.bg(theme.secondary)))
             .child(
                 div()
                     .flex_none()
@@ -149,12 +131,15 @@ impl ThreadView {
             .when(judged, |d| {
                 d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
             })
-            .on_click(cx.listener(move |this, _, _, cx| {
-                this.claim_click(cx);
-                if !this.thread.flipped_runs.remove(&flip) {
-                    this.thread.flipped_runs.insert(flip.clone());
+            .on_click(cx.listener({
+                let key = key.to_string();
+                move |this, _, _, cx| {
+                    this.claim_click(cx);
+                    // Opening one folds the one open; a click on the open one folds it.
+                    let to = if open { usize::MAX } else { first };
+                    this.thread.open_milestone.insert(key.clone(), to);
+                    cx.notify();
                 }
-                cx.notify();
             }))
             .into_any_element()
     }
@@ -173,13 +158,11 @@ impl ThreadView {
         rows.push(self.render_step_row(key, k, &steps[k], inner, open, cx));
         if open {
             let card = self.render_step_card(key, k, steps, cx);
+            // Under a milestone its parts start where the step's own icon does: the row's room,
+            // the disclosure's width, the gap after it.
             rows.push(
                 div()
-                    .when(inner, |d| d.pl_6())
-                    .pl_6()
-                    .pr_2()
-                    .pt_0p5()
-                    .pb_2()
+                    .when(inner, |d| d.pl(px(bench_ui::STEP_NESTED_INSET)))
                     .child(card)
                     .into_any_element(),
             );
@@ -208,26 +191,35 @@ impl ThreadView {
         h_flex()
             .id(SharedString::from(format!("steprow-{key}-{k}")))
             .min_h(px(bench_ui::LIST_ROW_H))
-            .when(inner, |d| d.pl_6())
-            .when(!inner, |d| d.pl_2())
+            .pl_2()
             .pr_2()
             .gap_2()
             .items_center()
             .rounded_md()
             .text_size(px(bench_ui::THREAD_META))
             .cursor_pointer()
-            .when(open, |d| d.bg(theme.accent))
-            .when(!open, |d| d.hover(|s| s.bg(theme.list_hover)))
+            // On an open milestone's ground a step lights nothing on hover: the pointer says it
+            // opens.
+            // Under a milestone: the room of its disclosure, so the icon starts where its words do.
+            .when(inner, |d| {
+                d.child(div().flex_none().invisible().child(Ico::ChevronRight.icon().xsmall()))
+            })
             .child(
                 div()
                     .flex_none()
-                    .text_color(if failed { theme.danger } else { theme.muted_foreground })
+                    // Open, its icon in the text's ink: which row the parts below are of.
+                    .text_color(if failed {
+                        theme.danger
+                    } else if open {
+                        theme.foreground
+                    } else {
+                        theme.muted_foreground
+                    })
                     .child(if failed { Ico::CircleAlert } else { step_icon(step) }.icon().xsmall()),
             )
             .child(
                 h_flex()
-                    .w_3_5()
-                    .flex_none()
+                    .flex_1()
                     .min_w_0()
                     .gap_1p5()
                     .items_baseline()
@@ -242,21 +234,32 @@ impl ThreadView {
                         )
                     }),
             )
+            // What came back, as Finder's side column: one width on every row, small, quiet,
+            // to the right edge.
             .child(
-                div()
-                    .flex_1()
+                h_flex()
+                    .flex_none()
+                    .w_1_3()
                     .min_w_0()
-                    .truncate()
-                    .text_size(px(bench_ui::THREAD_DETAIL))
-                    .text_color(if failed { theme.danger } else { faint })
-                    .children(result.map(|r| if failed { r } else { format!("→ {r}") })),
+                    .justify_end()
+                    .child(
+                        div()
+                            .min_w_0()
+                            .truncate()
+                            .text_size(px(bench_ui::THREAD_SIDE))
+                            .text_color(if failed { theme.danger } else { faint })
+                            .children(result),
+                    ),
             )
             .when(judged(step), |d| {
                 d.child(div().flex_none().text_color(faint).child(Ico::Scale.icon().xsmall()))
             })
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.claim_click(cx);
+                // One step open at a time in a work, as one milestone is: opening one closes
+                // the one open; a click on the open one closes it.
                 if !this.thread.open_steps.remove(&toggle) {
+                    this.thread.open_steps.retain(|(w, _)| *w != toggle.0);
                     this.thread.open_steps.insert(toggle.clone());
                 }
                 cx.notify();
@@ -264,8 +267,9 @@ impl ThreadView {
             .into_any_element()
     }
 
-    /// A step's card, under its row: why, the evaluator's word, what was sent, what came back —
-    /// the journal's own text, selectable. A long command or output scrolls in its field.
+    /// A step's parts, under its row as a changed file's diff is under its row: no frame of
+    /// their own, aligned with the row's text — why, the evaluator's word, what was sent, what
+    /// came back; code as the answers' code blocks, cut at its first lines with "Show all".
     fn render_step_card(
         &mut self,
         key: &str,
@@ -274,7 +278,8 @@ impl ThreadView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let theme = cx.theme().clone();
-        let mut parts: Vec<(&str, String, bool)> = vec![];
+        // (title, body, the code block's language — empty for plain output; none: prose)
+        let mut parts: Vec<(&str, String, Option<&str>)> = vec![];
         match &steps[k] {
             Step::Tool {
                 name,
@@ -283,30 +288,31 @@ impl ThreadView {
                 diff,
                 ..
             } => {
-                parts.push(("Why", steps::reasoning_before(steps, k).join("\n\n"), false));
+                parts.push(("Why", steps::reasoning_before(steps, k).join("\n\n"), None));
                 if let Some(word) = output.as_deref().and_then(steps::evaluator_word) {
-                    parts.push(("Evaluator", word.to_string(), false));
+                    parts.push(("Evaluator", word.to_string(), None));
                 }
                 match args.get("command").and_then(|c| c.as_str()) {
                     Some(c) if Kind::of(name) == Kind::Command => {
-                        parts.push(("Command", c.to_string(), true))
+                        parts.push(("Command", c.to_string(), Some("bash")))
                     }
-                    _ => parts.push(("Sent", pretty(args), true)),
+                    _ => parts.push(("Sent", pretty(args), Some("json"))),
                 }
                 if let Some(d) = diff {
-                    parts.push(("Changes", d.clone(), true));
+                    parts.push(("Changes", d.clone(), Some("diff")));
                 }
-                parts.push(("Received", output.clone().unwrap_or_default(), true));
+                parts.push(("Received", output.clone().unwrap_or_default(), Some("")));
             }
-            Step::Note(t) => parts.push(("The agent said", t.clone(), false)),
-            Step::Thought(t) => parts.push(("Thinking", t.clone(), false)),
+            Step::Note(t) => parts.push(("The agent said", t.clone(), None)),
+            Step::Thought(t) => parts.push(("Thinking", t.clone(), None)),
         }
         parts.retain(|(_, body, _)| !body.trim().is_empty());
         let whole = self.thread.step_whole.contains(&(key.to_string(), k));
         let mut cut = false;
         if !whole {
             for (_, body, code) in parts.iter_mut() {
-                if !*code && (body.lines().count() > WHY_LINES || body.chars().count() > WHY_CHARS) {
+                let long = body.lines().count() > WHY_LINES || body.chars().count() > WHY_CHARS;
+                if code.is_none() && long {
                     let head = body.lines().take(WHY_LINES).collect::<Vec<_>>().join("\n");
                     *body = match head.char_indices().nth(WHY_CHARS) {
                         Some((i, _)) => format!("{}…", head[..i].trim_end()),
@@ -316,81 +322,89 @@ impl ThreadView {
                 }
             }
         }
-        let sections: Vec<AnyElement> = parts
-            .into_iter()
-            .map(|(title, body, code)| {
-                let id = format!("stepcard-{key}-{k}-{title}");
-                let tall = code && body.lines().count() > FIELD_LINES;
-                let text = self.thread.texts.plain(&id, &body, cx);
-                // A field: the command, the output. Past its height it scrolls inside with its
-                // padding kept, as a text field does; the thread around it never does.
-                let field = v_flex()
-                    .bg(theme.secondary)
-                    .border_1()
-                    .rounded_md()
-                    .border_color(theme.border.opacity(0.7))
-                    .font_family(bench_ui::theme::MONO)
-                    .text_size(theme.mono_font_size)
-                    .text_color(theme.foreground);
-                let shown = if tall {
-                    let scroll = self.work_scroll.entry(id.clone()).or_default().clone();
-                    field
-                        .h(px(bench_ui::STEP_FIELD_MAX_H))
-                        .child(crate::inserts::scroll_pane(
-                            SharedString::from(id),
-                            &scroll,
-                            div().px_2p5().py_2().child(text),
-                        ))
-                        .into_any_element()
-                } else if code {
-                    field.child(div().px_2p5().py_2().child(text)).into_any_element()
-                } else {
-                    div()
-                        .text_size(px(bench_ui::THREAD_META))
-                        .text_color(theme.foreground)
-                        .child(text)
-                        .into_any_element()
-                };
-                v_flex()
-                    .gap_1()
-                    .child(
+        let mut sections: Vec<AnyElement> = vec![];
+        for (n, (title, body, code)) in parts.into_iter().enumerate() {
+            let id = format!("stepcard-{key}-{k}-{title}");
+            // Code as the answers show it: the language on the left, Copy on the right, a long
+            // one folded to its first lines with "Show all · N lines".
+            let shown = match code {
+                Some(lang) => {
+                    let md = format!("```{lang}\n{}\n```", body.trim_end());
+                    let view = self.thread.texts.markdown(&id, &md, cx);
+                    let lines = body.lines().count();
+                    let long = lines > FOLD_AFTER_LINES;
+                    let opened = self.thread.open_fields.contains(&id);
+                    let more = long.then(|| {
+                        let id = id.clone();
                         div()
+                            .id(SharedString::from(format!("{id}-more")))
+                            .px_3()
+                            .py_1()
                             .text_size(px(bench_ui::THREAD_DETAIL))
                             .text_color(theme.muted_foreground)
-                            .child(title),
-                    )
-                    .child(shown)
-                    .into_any_element()
-            })
-            .collect();
-        let toggle = (key.to_string(), k);
+                            .border_t_1()
+                            .border_color(theme.border)
+                            .cursor_pointer()
+                            .hover(|s| s.text_color(theme.foreground))
+                            .child(if opened { "Show less".to_string() } else { format!("Show all · {lines} lines") })
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.claim_click(cx);
+                                if !this.thread.open_fields.remove(&id) {
+                                    this.thread.open_fields.insert(id.clone());
+                                }
+                                cx.notify();
+                            }))
+                            .into_any_element()
+                    });
+                    // The block's head names the part ("Command", "Received"); the fence's
+                    // language only colours it.
+                    render_code(view, &format!("step-{key}-{k}"), n, title.to_string(), body, long && !opened, more, cx)
+                }
+                // Words (why, the evaluator's): their name above them, quiet, the text, a long
+                // one cut with "Show all".
+                None => {
+                    let text = self.thread.texts.plain(&id, &body, cx);
+                    let toggle = (key.to_string(), k);
+                    v_flex()
+                        .gap_1()
+                        .child(
+                            div()
+                                .text_size(px(bench_ui::THREAD_DETAIL))
+                                .text_color(theme.muted_foreground)
+                                .child(title),
+                        )
+                        .child(div().text_size(px(bench_ui::THREAD_META)).child(text))
+                        .when(cut || whole, |d| {
+                            d.child(
+                                div()
+                                    .id(SharedString::from(format!("{id}-more")))
+                                    .text_size(px(bench_ui::THREAD_DETAIL))
+                                    .text_color(theme.muted_foreground)
+                                    .cursor_pointer()
+                                    .hover(|s| s.text_color(theme.foreground))
+                                    .child(if whole { "Show less" } else { "Show all" })
+                                    .on_click(cx.listener(move |this, _, _, cx| {
+                                        this.claim_click(cx);
+                                        if !this.thread.step_whole.remove(&toggle) {
+                                            this.thread.step_whole.insert(toggle.clone());
+                                        }
+                                        cx.notify();
+                                    })),
+                            )
+                        })
+                        .into_any_element()
+                }
+            };
+            sections.push(shown);
+        }
+        // The same room on both sides as the row's own; air above and below, as a milestone's
+        // steps have.
         v_flex()
-            .px_3p5()
-            .py_3()
-            .gap_3()
-            .bg(theme.background)
-            .border_1()
-            .rounded_lg()
-            .border_color(theme.border.opacity(0.7))
+            .px_2()
+            .pt_2()
+            .pb_4()
+            .gap_2p5()
             .children(sections)
-            .when(cut || whole, |d| {
-                d.child(
-                    div()
-                        .id(SharedString::from(format!("stepwhole-{key}-{k}")))
-                        .text_size(px(bench_ui::THREAD_DETAIL))
-                        .text_color(theme.muted_foreground)
-                        .cursor_pointer()
-                        .hover(|s| s.text_color(theme.foreground))
-                        .child(if whole { "Show less" } else { "Show all" })
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.claim_click(cx);
-                            if !this.thread.step_whole.remove(&toggle) {
-                                this.thread.step_whole.insert(toggle.clone());
-                            }
-                            cx.notify();
-                        })),
-                )
-            })
             .into_any_element()
     }
 }

@@ -129,10 +129,11 @@ pub const BAR_TEXT: f32 = 12.;
 pub const THREAD_META: f32 = 13.;
 /// The second line of a thread's row (a run's calls under its title): a step quieter than meta.
 pub const THREAD_DETAIL: f32 = 12.;
-/// A call's command or output field at most, scrolling inside past it, as a text field does.
-pub const STEP_FIELD_MAX_H: f32 = 220.;
-/// A reasoning beat between a milestone's rows starts under the rows' text, past their icon.
-pub const STEP_BEAT_INSET: f32 = 46.;
+/// A step's side column (what came back), as Finder's Date Modified: a step under the detail.
+pub const THREAD_SIDE: f32 = 11.;
+/// A step under a milestone starts one disclosure in: its icon where the milestone's words start
+/// (the disclosure's 12 and the 8 after it); its opened parts start there too.
+pub const STEP_NESTED_INSET: f32 = 20.;
 pub const BAR_TITLE: f32 = 13.;
 /// The short rule between the sidebar's part of the top bar and the title.
 pub const BAR_SEPARATOR_H: f32 = 16.;

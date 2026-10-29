@@ -218,13 +218,13 @@ fn answer_style(view: TextView, cx: &App) -> TextView {
 
 /// A code block taller than this shows its first lines and a “Show all” line: a log dump must
 /// not take the window when nobody is going to read it.
-pub(super) const FOLD_AFTER_LINES: usize = 10;
+pub(crate) const FOLD_AFTER_LINES: usize = 10;
 pub(super) const FOLD_PREVIEW_H: f32 = 140.;
 
 /// A code block in an answer, as chat UIs show one: a header with the language on the left and
 /// a copy button on the right, the highlighted code under it (one frame around both). A long one
 /// comes folded (`folded`) with the caller's `more` line below.
-pub(super) fn render_code(
+pub(crate) fn render_code(
     body: TextView,
     i: &str,
     k: usize,

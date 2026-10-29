@@ -241,26 +241,24 @@ fewer form fields. Then check what it did to signups and give me a short summary
             if std::env::var("BENCH_DEMO_SCROLL").is_err() {
                 if let Some(ix) = landing.rows().iter().position(|r| r.key() == key) {
                     // SAFETY: the demo sets it once, before any other thread reads the env.
-                    unsafe { std::env::set_var("BENCH_DEMO_SCROLL", format!("{ix}:0")) };
+                    // `BENCH_DEMO_WORK_DOWN=<px>`: that much further down into it.
+                    let down = std::env::var("BENCH_DEMO_WORK_DOWN").unwrap_or_else(|_| "0".into());
+                    unsafe { std::env::set_var("BENCH_DEMO_SCROLL", format!("{ix}:{down}")) };
                 }
             }
             open_thread(app, cx, move |t| {
                 t.open_work.insert(key.clone());
-                let listed = ::thread::steps::listed(&steps);
+                // The i-th call (the list counts the agent's words and reasoning too).
+                let listed: Vec<usize> = (0..steps.len()).filter(|k| steps[*k].is_tool()).collect();
                 if let Some(k) = unfold.first().and_then(|i| listed.get(i.saturating_sub(1))) {
                     // `BENCH_DEMO_CARD=0`: its milestone open, its card not.
                     if std::env::var("BENCH_DEMO_CARD").as_deref() != Ok("0") {
                         t.open_steps.insert((key.clone(), *k));
                     }
                     // Its milestone open.
-                    let ms = ::thread::steps::milestones(&steps);
-                    let last = ms.len().saturating_sub(1);
-                    for (i, m) in ms.iter().enumerate() {
-                        if !m.steps.contains(k) {
-                            continue;
-                        }
-                        if i != last {
-                            t.flipped_runs.insert((key.clone(), m.steps[0]));
+                    for m in ::thread::steps::milestones(&steps) {
+                        if m.steps.contains(k) {
+                            t.open_milestone.insert(key.clone(), m.steps[0]);
                         }
                     }
                 }
