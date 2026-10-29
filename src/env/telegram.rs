@@ -134,7 +134,7 @@ impl Section for Telegram {
         }
     }
 
-    /// An empty token keeps the saved one.
+    /// The field shows the saved token, so it is sent as it stands: blank removes the bot.
     fn save(
         &self,
         app: &mut BenchApp,
@@ -155,7 +155,8 @@ impl Section for Telegram {
             .filter(|u| !u.is_empty())
             .collect();
         let mut body = json!({ "allowed_users": users });
-        if !token.is_empty() {
+        // Check before the fields were filled sends no blank that would remove the bot.
+        if e.telegram.dirty || !token.is_empty() {
             body["token"] = json!(token);
         }
         // Sent always: blank clears it, and the bot falls back to the agent's env again.
