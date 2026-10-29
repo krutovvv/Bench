@@ -1,6 +1,6 @@
 //! The app's menu in the macOS menu bar, laid out as a Mac app's: Bench (Settings…, Hide, Quit),
 //! File (a new thread, project, window; a file opened, saved, closed), Edit (the text's own and
-//! the searches), View (Chat or Code, the docks, the text's size, full screen), Thread (stop,
+//! the searches), View (Back and Forward, Chat or Code, the docks, the text's size, full screen), Thread (stop,
 //! dictate, delete), Window, Help. Each item is an action with its key here — the menu shows the
 //! key beside it — and the window acts on it (`listen`, on the window's root in
 //! `workspace/layout.rs`). Keys that belong to a field too (⌘⌫ deletes a line in it) stay in
@@ -28,6 +28,8 @@ actions!(
         CloseTab,
         FindThreads,
         ToggleCode,
+        GoBack,
+        GoForward,
         ToggleSidebar,
         ThreadBeside,
         ToggleTerminal,
@@ -66,6 +68,8 @@ pub fn install(cx: &mut App) {
         KeyBinding::new("cmd-k", FindThreads, None),
         KeyBinding::new("cmd-f", FindThreads, None),
         KeyBinding::new("cmd-e", ToggleCode, None),
+        KeyBinding::new("cmd-[", GoBack, None),
+        KeyBinding::new("cmd-]", GoForward, None),
         KeyBinding::new("cmd-\\", ToggleSidebar, None),
         KeyBinding::new("cmd-j", ThreadBeside, None),
         KeyBinding::new("ctrl-`", ToggleTerminal, None),
@@ -121,6 +125,9 @@ pub fn install(cx: &mut App) {
             MenuItem::action("Search…", FindThreads),
         ]),
         Menu::new("View").items([
+            MenuItem::action("Back", GoBack),
+            MenuItem::action("Forward", GoForward),
+            MenuItem::separator(),
             MenuItem::action("Chat or Code", ToggleCode),
             MenuItem::action("Sidebar", ToggleSidebar),
             MenuItem::action("Thread Beside", ThreadBeside),
@@ -177,6 +184,8 @@ pub fn listen(root: Div, cx: &mut Context<BenchApp>) -> Div {
         }))
         .on_action(cx.listener(|this, _: &FindThreads, window, cx| this.open_search(window, cx)))
         .on_action(cx.listener(|this, _: &ToggleCode, window, cx| this.toggle_side(window, cx)))
+        .on_action(cx.listener(|this, _: &GoBack, window, cx| this.go_back(window, cx)))
+        .on_action(cx.listener(|this, _: &GoForward, window, cx| this.go_forward(window, cx)))
         .on_action(cx.listener(|this, _: &ToggleSidebar, _, cx| this.toggle_sidebar(cx)))
         .on_action(cx.listener(|this, _: &ThreadBeside, window, cx| {
             this.toggle_thread_beside(window, cx)

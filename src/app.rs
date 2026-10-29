@@ -110,6 +110,8 @@ pub struct BenchApp {
     pub left_dock: Dock,
     pub right_dock: Dock,
     pub bottom_dock: Dock,
+    /// Back and forward over the threads and documents the center showed (`workspace/history.rs`).
+    pub nav: crate::workspace::history::NavHistory,
     /// The Explorer's state (`src/explorer/`).
     pub explorer: crate::explorer::Explorer,
     /// Settings → Prompts.
@@ -185,6 +187,7 @@ impl BenchApp {
             left_dock: Dock::new(DockPosition::Left, &[Panel::Threads, Panel::Explorer], true),
             right_dock: Dock::new(DockPosition::Right, &[Panel::Thread], false),
             bottom_dock: Dock::new(DockPosition::Bottom, &[Panel::Terminal], false),
+            nav: Default::default(),
             active_thread,
             beside_thread: None,
             explorer: Default::default(),

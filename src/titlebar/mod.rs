@@ -15,7 +15,8 @@ mod tail;
 impl BenchApp {
     /// The top bar's lead, left of the center's header: room for the window's buttons, the
     /// sidebar's fold (hide or show, ⌘\), a short rule; the title follows it, as a Mac's
-    /// unified title bar has it, whether the sidebar is shown or not.
+    /// unified title bar has it, whether the sidebar is shown or not. Back and forward follow the
+    /// fold, as Finder's and Claude's (`workspace/history.rs`).
     pub(crate) fn render_window_lead(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let shown = self.shown_panel(crate::workspace::DockPosition::Left).is_some();
@@ -37,6 +38,29 @@ impl BenchApp {
                     cx,
                 )
                 .on_click(cx.listener(|this, _, _, cx| this.toggle_sidebar(cx))),
+            )
+            .child(
+                h_flex()
+                    .child(
+                        bench_ui::nav_button(
+                            "nav-back",
+                            bench_ui::icons::Ico::ChevronLeft,
+                            "Back  ⌘[",
+                            self.can_go_back(cx),
+                            cx,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| this.go_back(window, cx))),
+                    )
+                    .child(
+                        bench_ui::nav_button(
+                            "nav-forward",
+                            bench_ui::icons::Ico::ChevronRight,
+                            "Forward  ⌘]",
+                            self.can_go_forward(cx),
+                            cx,
+                        )
+                        .on_click(cx.listener(|this, _, window, cx| this.go_forward(window, cx))),
+                    ),
             )
             .child(
                 div()

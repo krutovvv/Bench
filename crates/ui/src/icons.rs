@@ -49,6 +49,7 @@ icons! {
     Bot => "bot",
     Brain => "brain",
     ChevronDown => "chevron-down",
+    ChevronLeft => "chevron-left",
     ChevronRight => "chevron-right",
     CircleAlert => "circle-alert",
     CircleCheck => "circle-check",

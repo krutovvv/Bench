@@ -61,6 +61,27 @@ pub fn icon_button(
         .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
 }
 
+/// Back or forward in a title bar, as Finder's and Safari's: an `icon_button` while there is
+/// somewhere to go, the glyph faint and still when there is not.
+pub fn nav_button(
+    id: impl Into<ElementId>,
+    icon: Ico,
+    tip: &'static str,
+    enabled: bool,
+    cx: &App,
+) -> Stateful<Div> {
+    if enabled {
+        return icon_button(id, icon, tip, false, cx);
+    }
+    let theme = cx.theme().clone();
+    div()
+        .id(id)
+        .flex_none()
+        .p_1()
+        .text_color(crate::text::faint(&theme))
+        .child(icon.live(false))
+}
+
 /// A composer's round button beside Send, as Claude's and Messages' plus and mic: Send's size,
 /// its glyph at the icon's own size, a soft disc on hover.
 pub fn round_icon_button(

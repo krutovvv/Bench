@@ -89,6 +89,7 @@ impl Render for BenchApp {
             let at = self.thread_ref(cx);
             self.update_browser_stream(&at);
         }
+        self.note_place(cx);
         let theme = cx.theme().clone();
         let body = match self.center {
             Center::Chat => div()
