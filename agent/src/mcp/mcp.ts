@@ -1,13 +1,15 @@
 // MCP servers, per agent: the agent's mcp.json (`{ "mcpServers": { name: { command, args, env, cwd }
 // | { url, headers } } }`, Pi's format), through the official client @earendil-works/pi-mcp. Tools
-// are named mcp__<server>__<tool>, as in Pi. `exposure` as in Pi's docs/mcp.md: "direct" (declared
-// to the model), "deferred" (found with tool_search), "hidden" (not reachable); "codemode", Pi's
-// default, is treated as deferred here. `toolExposure` overrides it per tool (`*` patterns).
-// Without `exposure`, a server with many tools is deferred and a small one direct. A project worked
+// are named mcp__<server>__<tool>, as in Pi. `exposure` as in Pi's docs/mcp.md: "codemode", the
+// default (called from codemode scripts only: neither offered to the model nor listed, found with
+// searchTools()), "direct" (offered to the model, scripts call it too), "deferred" (found with
+// tool_search), "hidden" (not reachable). `toolExposure` overrides it per tool (`*` patterns). A
+// script gets a tool's CallToolResult whole; each server is a namespace of code mode. A project worked
 // on a server runs its command servers there (`stdioTransport`).
 
 import { Type } from "@earendil-works/pi-ai";
 import { defineTool, type ToolRegistration } from "@earendil-works/pi-durable";
+import type { CodemodeNamespace } from "@earendil-works/pi-durable/codemode";
 import { McpClient, StdioTransport, StreamableHttpTransport, toLlmContent } from "@earendil-works/pi-mcp";
 import { authorize, authProviderFor, needsAuth, oauthProvider } from "./oauth.ts";
 import { createHash } from "node:crypto";
@@ -18,8 +20,9 @@ import { agentDir, agentMcp, agents, agentEnv, isProject } from "../config.ts";
 import { projects } from "../builtin/projects.ts";
 import { quote, sshOptions } from "../machine/ssh.ts";
 
-/** Without `exposure`: servers with more tools than this are deferred behind tool_search. */
-const DEFER_OVER = 12;
+/** The servers as code mode's namespaces (`mcp__<server>__`), with what each says of itself; the
+ *  codemode extension reads this list as it is at each script (`extensions.ts`). */
+export const NAMESPACES: CodemodeNamespace[] = [];
 
 const sanitize = (s: string) => s.replace(/[^A-Za-z0-9_]/g, "_");
 
@@ -35,6 +38,8 @@ interface Server {
 	name: string;
 	client?: McpClient;
 	tools: ToolRegistration[];
+	/** Each tool's exposure, by its name here. */
+	exposures: Map<string, string>;
 	error?: string;
 	/** It asked for OAuth: "Authorize" signs in. */
 	needsAuth?: boolean;
@@ -74,12 +79,12 @@ export const mcpTools = (agent: string): ToolRegistration[] =>
 export const mcpStatus = (agent?: string) =>
 	[...servers.values()].filter((s) => !agent || s.agent === agent).map((s) => ({ agent: s.agent, name: s.name, tools: s.tools.length, error: s.error, connected: Boolean(s.client) && !s.error, needsAuth: !!s.needsAuth }));
 
-function exposureOf(spec: any, tool: string, count: number): string {
+function exposureOf(spec: any, tool: string): string {
 	const rules: Record<string, string> = spec.toolExposure ?? {};
-	if (rules[tool]) return rules[tool];
+	if (rules[tool]) return rules[tool] === "codemode-deferred" ? "codemode" : rules[tool];
 	for (const [pattern, e] of Object.entries(rules))
 		if (pattern.includes("*") && new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`).test(tool)) return e;
-	return spec.exposure ?? (count > DEFER_OVER ? "deferred" : "direct");
+	return spec.exposure ?? "codemode";
 }
 
 const home = (v: unknown) => (typeof v === "string" ? v.replace(/^~(?=\/|$)/, os.homedir()) : v);
@@ -108,8 +113,15 @@ export async function connectMcp(agent?: string, timeoutMs = 30000): Promise<voi
 }
 
 /** An agent's connected servers and their tools' names (the evaluator's view of what a turn can use). */
-export function mcpServerTools(agent: string): { name: string; tools: string[] }[] {
-	return [...servers.values()].filter((s) => s.agent === agent && s.client && !s.error).map((s) => ({ name: s.name, tools: s.tools.map((t: any) => String(t.name ?? t.definition?.name ?? "")) }));
+/** An agent's connected servers: their tools, and those the model may be offered (the rest are
+ *  for scripts, or direct already). */
+export function mcpServerTools(agent: string): { name: string; tools: string[]; loadable: string[] }[] {
+	return [...servers.values()]
+		.filter((s) => s.agent === agent && s.client && !s.error)
+		.map((s) => {
+			const tools = s.tools.map((t: any) => String(t.name ?? t.definition?.name ?? ""));
+			return { name: s.name, tools, loadable: tools.filter((t) => s.exposures.get(t) === "deferred") };
+		});
 }
 
 /** A server that failed is tried again with a message this long after, no sooner. */
@@ -147,7 +159,7 @@ async function connectServer(agent: string, name: string, raw: any, env: Record<
 	if (!raw || raw.enabled === false) return;
 	await servers.get(`${agent}/${name}`)?.client?.close().catch(() => {});
 	const spec = fill(raw, env);
-	const server: Server = { agent, name, tools: [], tried: Date.now() };
+	const server: Server = { agent, name, tools: [], exposures: new Map(), tried: Date.now() };
 	servers.set(`${agent}/${name}`, server);
 	try {
 		const client = new McpClient({ name: "bench", version: "1.0.0" });
@@ -156,19 +168,28 @@ async function connectServer(agent: string, name: string, raw: any, env: Record<
 			: stdioTransport(agent, spec, env);
 		await withTimeout(client.connect(transport), timeoutMs, "connect timed out");
 		server.client = client;
+		const prefix = `mcp__${sanitize(name)}__`;
+		const own = { name, prefix, description: client.instructions?.trim().slice(0, 600) || client.serverInfo?.title || undefined };
+		const at = NAMESPACES.findIndex((n) => n.prefix === prefix);
+		if (at >= 0) NAMESPACES[at] = own;
+		else NAMESPACES.push(own);
 		const listed = await withTimeout(client.listTools(), timeoutMs, "tools/list timed out");
 		server.tools = listed
-			.map((t: any) => ({ t, exposure: exposureOf(spec, t.name, listed.length) }))
+			.map((t: any) => ({ t, exposure: exposureOf(spec, t.name).replace("codemode-deferred", "codemode") }))
 			.filter(({ exposure }) => exposure !== "hidden")
+			.map((x) => (server.exposures.set(mcpName(name, x.t.name), x.exposure), x))
 			.map(({ t, exposure }) =>
 				defineTool({
 					name: mcpName(name, t.name),
 					description: t.description || `${t.name} (MCP server ${name})`,
 					parameters: Type.Unsafe({ ...t.inputSchema, type: "object", properties: t.inputSchema?.properties ?? {} }),
 					deferred: exposure !== "direct",
+					...(exposure === "codemode" ? { callers: ["tools"] } : {}),
+					// A script gets the CallToolResult whole (its structuredContent too); the model, its text.
+					structuredOutputSchema: Type.Unknown(),
 					execute: async (args: any, _api: any, context: any) => {
 						const result = await client.callTool(t.name, args ?? {}, { signal: context?.abortSignal, timeout: (spec.timeout ?? 60) * 1000 } as any);
-						return { output: toLlmContent(result) as any, ...(result.isError ? { isError: true } : {}) };
+						return { output: toLlmContent(result) as any, structuredOutput: result as any, ...(result.isError ? { isError: true } : {}) };
 					},
 				} as any),
 			);

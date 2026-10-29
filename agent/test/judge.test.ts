@@ -20,7 +20,8 @@ const { markNotRun, seeNestedResult, seeRequest, seeResult, turnOf } = await imp
 const { keptThrough } = await import("../src/judge/keep.ts");
 const { resultsOf: results, personsWords, touchedFiles, afterSummary } = await import("../src/judge/summary.ts");
 const { stepGate, stepNote } = await import("../src/builtin/steps.ts");
-const { endpointOf, checkJudge, fitState } = await import("../src/judge/client.ts");
+const { checkJudge, fitState } = await import("../src/judge/client.ts");
+const { baseOf } = await import("../src/judge/models.ts");
 const { atResult, atAnswer } = await import("../src/judge/index.ts");
 const { DRIFT_EVERY } = await import("../src/judge/drift.ts");
 const { PLAN_EVERY } = await import("../src/judge/plan.ts");
@@ -57,7 +58,14 @@ const server = http.createServer((req, res) => {
 		const body = JSON.parse(data);
 		seen.push({ url: req.url, auth: req.headers.authorization, body });
 		res.setHeader("Content-Type", "application/json");
-		res.end(JSON.stringify(reply(body)));
+		// A real server answers every question; one the test leaves out is answered unsure.
+		const r = reply(body);
+		const neutral = (q: any) => {
+			const options = Object.keys(q.criteria ?? {});
+			return q.type === "noul" ? { type: "noul", noul: 0.5 } : { type: "choice", choice: options[0], confidence: 0, probabilities: Object.fromEntries(options.map((o) => [o, 1 / options.length])) };
+		};
+		const answers = Object.fromEntries(Object.entries(body.questions ?? {}).map(([id, q]) => [id, r?.answers?.[id] ?? neutral(q)]));
+		res.end(JSON.stringify(r?.answers ? { ...r, answers } : r));
 	});
 });
 await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
@@ -103,15 +111,15 @@ test("past the project's step limit calls are refused with the reason, and the r
 const grep = { name: "grep", arguments: { pattern: "jump" } };
 const lines = Array.from({ length: 20 }, (_, i) => `src/game.js:${i + 1}:line ${i + 1}`).join("\n");
 
-test("off, the evaluator is never asked and nothing changes", async () => {
-	setSetting("judge", { enabled: false, base_url: base });
+test("no server in the gear, the evaluator is never asked and nothing changes", async () => {
+	setSetting("judge", {});
 	seeRequest("c3", [user("Make the tap jump")]);
 	assert.equal(await rankSearch("c3", grep, out(lines)), undefined);
 	assert.equal(seen.length, 0);
 });
 
 test("a long search comes likeliest first, every line kept", async () => {
-	setSetting("judge", { enabled: true, base_url: `${base}/v1/`, model: "local", api_key: "sk-none" });
+	setSetting("judge", { servers: [{ id: "e", base_url: `${base}/v1/`, model: "local", api_key: "sk-none" }] });
 	reply = () => choice("search.place", { "7": 0.6, "12": 0.3, "1": 0.01 });
 	const r = await rankSearch("c3", grep, out(lines + "\n… 4 more: narrow the path or the pattern."));
 	const text = r.output[0].text as string;
@@ -131,15 +139,15 @@ test("a short list, an unsure answer or a failing server leave the result as it 
 	reply = () => {
 		throw new Error("down");
 	};
-	setSetting("judge", { enabled: true, base_url: "http://127.0.0.1:9" });
+	setSetting("judge", { servers: [{ id: "e", base_url: "http://127.0.0.1:9" }] });
 	assert.equal(await rankSearch("c3", grep, out(lines)), undefined, "refused: the classic way");
 	assert.equal(await rankSearch("c3", grep, out(lines)), undefined, "and quiet a while after");
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 });
 
 test("an address is taken with or without /v1", () => {
-	assert.equal(endpointOf("https://api.typesafe.ai"), "https://api.typesafe.ai/v1/systemone");
-	assert.equal(endpointOf("http://h:10292/v1/"), "http://h:10292/v1/systemone");
+	assert.equal(baseOf("https://api.typesafe.ai"), "https://api.typesafe.ai/v1");
+	assert.equal(baseOf("http://h:10292/v1/"), "http://h:10292/v1");
 });
 
 test("the journal leaves the evaluator's message out of the thread", () => {
@@ -197,13 +205,13 @@ test("an unfinished answer after work is sent back once; a question, a short tur
 });
 
 test("the gear's Check asks one question with the fields as typed, the saved key when none is typed", async () => {
-	setSetting("judge", { enabled: false, base_url: base, api_key: "sk-saved" });
+	setSetting("judge", { servers: [{ id: "e", base_url: base, api_key: "sk-saved" }] });
 	reply = () => ({ model: "h2oai/h2o-lightning-4b", answers: { billing: { type: "noul", noul: 0.93 } } });
-	const ok = await checkJudge({ base_url: base, model: "" });
+	const ok = await checkJudge({ id: "e", base_url: base, model: "" });
 	assert.equal(ok.ok, true);
-	assert.match(ok.message, /^Works · h2oai\/h2o-lightning-4b · \d+ ms$/);
+	assert.match(ok.message, /^Works · jev-latest · \d+ ms$/);
 	assert.equal(seen.at(-1).auth, "Bearer sk-saved");
-	reply = () => ({ answers: {} });
+	reply = () => ({ result: "not System One" });
 	assert.deepEqual(await checkJudge({ base_url: base }), { ok: false, message: "It answered, but not as a System One server" });
 	assert.equal((await checkJudge({ base_url: "http://127.0.0.1:9" })).ok, false);
 	assert.equal((await checkJudge({})).ok, false);
@@ -212,7 +220,7 @@ test("the gear's Check asks one question with the fields as typed, the saved key
 const todo = (todos: { content: string; status: string }[]) => ({ id: "call-plan", name: "todo", arguments: { todos: todos.map((t, i) => ({ id: `${i + 1}`, ...t })) } });
 
 test("the evaluator marks the plan forward every few steps, in one request with the course; the thread gets an entry", async () => {
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 	seeRequest("c8", [user("Make the game")]);
 	seeResult("c8", todo([{ content: "Write the game", status: "in_progress" }, { content: "Test it", status: "pending" }, { content: "Deliver", status: "pending" }]), out("ok"));
 	written.length = 0;
@@ -258,7 +266,7 @@ test("an item never moves back, an unsure answer leaves it, and the model's own 
 });
 
 test("a project that did not turn the evaluator on is never asked about, the gear's connection on", async () => {
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 	writeAgent("project:p", { ...readAgent("project:p"), evaluator: undefined });
 	try {
 		const before = seen.length;
@@ -274,7 +282,7 @@ test("a project that did not turn the evaluator on is never asked about, the gea
 });
 
 test("off, no point asks and the hooks change nothing", async () => {
-	setSetting("judge", { enabled: false, base_url: base });
+	setSetting("judge", {});
 	const before = seen.length;
 	seeRequest("c9", [user("Make the game")]);
 	seeResult("c9", todo([{ content: "Write the game", status: "in_progress" }]), out("ok"));
@@ -291,7 +299,7 @@ const { fitResultFor } = await import("../src/builtin/window.ts");
 const { seeAnswer } = await import("../src/builtin/turn.ts");
 
 test("at a turn's start the fitting skill is named for the first request, once", async () => {
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 	const dir = path.join(home, "projects", "p", "skills", "price-check");
 	fs.mkdirSync(dir, { recursive: true });
 	fs.writeFileSync(path.join(dir, "SKILL.md"), "---\nname: price-check\ndescription: Compare a product's prices across shops\n---\nSteps.");
@@ -358,10 +366,10 @@ test("a long result keeps the parts the request needs, in order; without the eva
 	assert.match(text, /^\[Evaluator: a long result/);
 	assert.match(text, /PRICE: Liquid Freezer III Pro 360/);
 	assert.ok(text.length < page.length / 4);
-	setSetting("judge", { enabled: false, base_url: base });
+	setSetting("judge", {});
 	const plain = await fitResultFor("x1", out(page), undefined, 4000);
 	assert.match(plain.output[0].text, /characters cut out here/);
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 });
 
 test("a call that repeats a failed one is refused once; a new step, or the same again, runs", async () => {
@@ -482,7 +490,7 @@ test("an overflowing request cuts what the next step needs least first", async (
 });
 
 test("the thread's opening message, leaving open where the work belongs, is asked about first; a later one is not", async () => {
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 	const { projects } = await import("../src/builtin/projects.ts");
 	projects.save({ id: "p", name: "Blog" });
 	projects.save({ id: "q", name: "Assistant TG" });
@@ -544,9 +552,9 @@ test("at compaction, the results the work needs word for word follow the summary
 	assert.match(kept, /## Kept word for word/);
 	assert.match(kept, /54ebcfe4a69f0c/);
 	assert.doesNotMatch(kept, /a b c/);
-	setSetting("judge", { enabled: false, base_url: base });
+	setSetting("judge", {});
 	assert.equal(await keptThrough("k1", blocks), "", "no evaluator: nothing added");
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 });
 
 test("a step is not asked whether it is plain while the template moves its head; a thread without reasoning says so on every request", async () => {
@@ -675,7 +683,7 @@ test("after a summary: the person's words in force, the files in work as they ar
 
 test("a queued message that corrects the work under way is judged a correction; a next task is not", async () => {
 	const { correctsTheWork } = await import("../src/judge/correction.ts");
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 	seeRequest("m1", [user("Restore the skills")]);
 	reply = (body) => {
 		assert.match(body.state.new_message, /Assistant TG/);
@@ -696,7 +704,7 @@ test("a section is held until the next compaction", async () => {
 });
 
 test("each message is read for what it asks; an approval is answered in words, and its course is checked sooner", async () => {
-	setSetting("judge", { enabled: true, base_url: base });
+	setSetting("judge", { servers: [{ id: "e", base_url: base }] });
 	const said = { role: "assistant", content: [{ type: "text", text: "Done: the tools are final. Three limits remain: the deadline does not clear, the trash stays." }] };
 	seeRequest("i1", [user("set up Things"), said, user("the dash is fine, the deadline doesn't matter, the trash I'll empty myself")]);
 	reply = (body) => {

@@ -383,7 +383,14 @@ pub fn providers() -> (serde_json::Value, serde_json::Value, serde_json::Value) 
         "fallback_providers": [{"provider": "openrouter", "model": "qwen/qwen3.8-flash"}],
         "stt": {"provider": "openai", "openai": {"base_url": "http://192.168.1.100:10240/v1", "model": "whisper-1", "language": "ru"}},
         "tts": {"provider": "openai", "openai": {"base_url": "http://192.168.1.100:10240/v1", "model": "tts-1", "voice": "alloy"}},
-        "judge": {"enabled": true, "base_url": "http://192.168.1.100:10292", "model": "h2o-lightning-4b", "api_key": "sk-none"}
+        "judge": {
+            "servers": [
+                {"id": "local-jev", "name": "Local Jev", "base_url": "http://192.168.1.100:10292", "model": "h2o-lightning-4b", "api_key": "sk-none"},
+                {"id": "openrouter", "name": "OpenRouter", "base_url": "https://openrouter.ai/api", "model": "typesafe/jev-1.13", "api_key": "sk-or-demo"}
+            ],
+            "main": "local-jev",
+            "fallback": "openrouter"
+        }
     });
     (endpoints, serde_json::json!({}), yaml)
 }

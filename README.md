@@ -120,9 +120,10 @@ lets you keep many more projects going at once.
 
 ## The agent's settings, per project
 
-- **An evaluator.** A small, fast model (a System One server, Jev's API) decides where the main
-  model spends its steps: it refuses a repeat of a call that already failed, trims long results to
-  what the request needs, checks the course on long runs. Some steps get much faster.
+- **An evaluator.** A small, fast model (a System One server, Jev's API; a main one and a
+  fallback in the gear) decides where the main model spends its steps: it refuses a repeat of a
+  call that already failed, trims long results to what the request needs, checks the course on long
+  runs. Code mode scripts ask it too, for the many small decisions over the data they fetch.
 - **Compaction.** When a long conversation is summarized, as a share of the model's window.
 - **A step limit** for long sessions: past it the agent stops and answers with what is done.
 - **Reasoning and approvals**: how hard it thinks, and what it may run without asking.

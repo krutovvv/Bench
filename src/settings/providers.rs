@@ -43,27 +43,17 @@ pub struct Voice {
     pub tts_voice: Entity<InputState>,
 }
 
-/// The evaluator: on or off (saved at once, as a switch is), its server, model and key.
-pub struct Judge {
-    pub enabled: bool,
-    pub url: Entity<InputState>,
-    pub model: Entity<InputState>,
-    pub key: Entity<InputState>,
-    /// The last check: (ok, what it said).
-    pub check: Option<(bool, String)>,
-}
-
 #[derive(Default)]
 pub struct Providers {
     pub loaded: bool,
     pub endpoints: Vec<EndpointForm>,
     pub voice: Option<Voice>,
-    pub judge: Option<Judge>,
+    pub judge: super::evaluator::Judge,
     pub fallback: Option<(String, String)>,
     _subscriptions: Vec<Subscription>,
 }
 
-fn field(
+pub(super) fn field(
     window: &mut Window,
     cx: &mut Context<BenchApp>,
     text: &str,
@@ -78,7 +68,7 @@ fn field(
     })
 }
 
-fn text(input: &Entity<InputState>, cx: &App) -> String {
+pub(super) fn text(input: &Entity<InputState>, cx: &App) -> String {
     input.read(cx).value().trim().to_string()
 }
 
@@ -129,8 +119,10 @@ impl BenchApp {
             move |conn| {
                 let endpoints = rest::custom_endpoints(conn)?;
                 let env = rest::env_vars(conn)?;
-                let yaml: Value =
+                let mut yaml: Value =
                     serde_yaml::from_str(&rest::config_raw(conn)?).unwrap_or(Value::Null);
+                // The evaluator's servers as the agent reads them (an earlier one-server setting too).
+                yaml["judge"] = rest::judge(conn)?;
                 Ok((endpoints, env, yaml))
             },
             |this, r, window, cx| match r {
@@ -261,23 +253,7 @@ impl BenchApp {
             ),
             tts_voice: field(window, cx, &y(&["tts", "openai", "voice"]), "e.g. alloy"),
         });
-        self.gear.providers.judge = Some(Judge {
-            enabled: yaml["judge"]["enabled"].as_bool().unwrap_or(false),
-            url: field(
-                window,
-                cx,
-                &y(&["judge", "base_url"]),
-                "https://api.typesafe.ai or http://host:port",
-            ),
-            model: field(window, cx, &y(&["judge", "model"]), "jev-latest"),
-            key: field(
-                window,
-                cx,
-                &y(&["judge", "api_key"]),
-                "If the server asks for one",
-            ),
-            check: None,
-        });
+        self.fill_judge(&yaml["judge"], window, cx);
 
         self.gear.providers.loaded = true;
         cx.notify();
@@ -497,77 +473,4 @@ impl BenchApp {
         );
     }
 
-    /// The evaluator on or off, saved at once; its threads take it from their next step.
-    pub fn set_judge(&mut self, on: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(j) = &mut self.gear.providers.judge else {
-            return;
-        };
-        j.enabled = on;
-        cx.notify();
-        self.save_judge_config(json!({"judge": {"enabled": on}}), window, cx);
-    }
-
-    pub fn save_judge(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(j) = &self.gear.providers.judge else {
-            return;
-        };
-        let config = json!({"judge": {
-            "enabled": j.enabled,
-            "base_url": text(&j.url, cx),
-            "model": text(&j.model, cx),
-            "api_key": text(&j.key, cx),
-        }});
-        self.save_judge_config(config, window, cx);
-    }
-
-    /// Ask the server one question with the fields as typed, before or after saving them.
-    pub fn check_judge(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(j) = &mut self.gear.providers.judge else {
-            return;
-        };
-        let body = json!({
-            "base_url": text(&j.url, cx),
-            "model": text(&j.model, cx),
-            "api_key": text(&j.key, cx),
-        });
-        j.check = Some((true, "Checking… a local server may load its model first".into()));
-        cx.notify();
-        self.rest_on(
-            self.gear.agent.clone(),
-            window,
-            cx,
-            move |conn| rest::check_judge(conn, body),
-            |this, r, _, cx| {
-                let Some(j) = &mut this.gear.providers.judge else {
-                    return;
-                };
-                j.check = Some(match r {
-                    Ok(v) => (
-                        v["ok"].as_bool() == Some(true),
-                        v["message"].as_str().unwrap_or("Doesn't answer").to_string(),
-                    ),
-                    Err(e) => (false, format!("{e:#}")),
-                });
-                cx.notify();
-            },
-        );
-    }
-
-    fn save_judge_config(&mut self, config: Value, window: &mut Window, cx: &mut Context<Self>) {
-        self.rest_on(
-            self.gear.agent.clone(),
-            window,
-            cx,
-            move |conn| rest::merge_config(conn, config),
-            |this, r, window, cx| match r {
-                Ok(()) => this.toast(NotificationType::Success, "Evaluator saved", window, cx),
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Evaluator: {e:#}"),
-                    window,
-                    cx,
-                ),
-            },
-        );
-    }
 }

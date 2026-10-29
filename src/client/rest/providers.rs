@@ -65,6 +65,30 @@ pub fn check_judge(conn: &Connection, body: Value) -> Result<Value> {
     send(conn, "POST", "/api/judge/check", body, 170)
 }
 
+/// The evaluator's servers: `{servers: [{id, name, base_url, model, api_key}], main, fallback}`.
+/// Each change below answers with the list as it is then.
+pub fn judge(conn: &Connection) -> Result<Value> {
+    get(conn, "/api/judge")
+}
+
+/// Add or change a server; no `api_key` keeps the saved one.
+pub fn judge_save(conn: &Connection, body: Value) -> Result<Value> {
+    send(conn, "PUT", "/api/judge/server", body, 30)
+}
+
+pub fn judge_delete(conn: &Connection, id: &str) -> Result<Value> {
+    send(conn, "DELETE", "/api/judge/server", json!({"id": id}), 30)
+}
+
+pub fn judge_main(conn: &Connection, id: &str) -> Result<Value> {
+    send(conn, "POST", "/api/judge/main", json!({"id": id}), 30)
+}
+
+/// The fallback server, or none.
+pub fn judge_fallback(conn: &Connection, id: Option<&str>) -> Result<Value> {
+    send(conn, "POST", "/api/judge/fallback", json!({"id": id}), 30)
+}
+
 /// The agent's `.env` keys the agent knows or holds: name → `{is_set, redacted_value,
 /// description, category, channel_managed, custom}`.
 pub fn env_vars(conn: &Connection) -> Result<Value> {

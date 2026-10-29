@@ -8,6 +8,7 @@ import { listSkills as skillsOf } from "../builtin/skills.ts";
 import { HttpError, agentOf, type Ctx, type Module } from "../http.ts";
 import { mcpStatus } from "../mcp/mcp.ts";
 import { checkJudge } from "../judge/client.ts";
+import { deleteServer, evaluatorView, makeFallback, makeMain, saveServer } from "../judge/models.ts";
 import { BUILD } from "../instance.ts";
 
 /**
@@ -38,6 +39,16 @@ function patchConfig(agent: string, patch: any): void {
 			writeAgent(agent, { ...readAgent(agent), approvals: String(m.mode) });
 		} else setSetting(k, deepMerge(getSetting(k), v));
 	}
+}
+
+/** A change to the evaluator's servers, answered with the list as it is now; a refusal as a 400. */
+function judgeChange(change: () => unknown) {
+	try {
+		change();
+	} catch (e) {
+		throw new HttpError(400, (e as Error).message);
+	}
+	return evaluatorView();
 }
 
 function listSkills(agent: string) {
@@ -92,6 +103,12 @@ export default ({ rt }: Ctx): Module => ({
 		},
 		// The evaluator's Check in the gear, with the settings as typed (`judge/client.ts`).
 		"POST /api/judge/check": (req) => checkJudge(req.body ?? {}),
+		// The evaluator's servers in the gear (`judge/models.ts`): a list, one main, one fallback.
+		"GET /api/judge": () => evaluatorView(),
+		"PUT /api/judge/server": (req) => judgeChange(() => saveServer(req.body ?? {})),
+		"DELETE /api/judge/server": (req) => judgeChange(() => deleteServer(String(req.body?.id ?? ""))),
+		"POST /api/judge/main": (req) => judgeChange(() => makeMain(String(req.body?.id ?? ""))),
+		"POST /api/judge/fallback": (req) => judgeChange(() => makeFallback(req.body?.id ? String(req.body.id) : null)),
 		"GET /api/providers/custom-endpoints": () => {
 			const current = readAgent("default").defaultProvider;
 			const endpoints = providers().map((p) => ({

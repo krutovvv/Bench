@@ -21,6 +21,7 @@
 import * as ai from "@earendil-works/pi-ai";
 import * as pi from "@earendil-works/pi-durable";
 import { CodemodeSandbox } from "@earendil-works/pi-codemode";
+import { NAMESPACES } from "./mcp/mcp.ts";
 import { createCodemodeExtension } from "@earendil-works/pi-durable/codemode";
 import { createToolSearchExtension } from "@earendil-works/pi-durable/tool-search";
 import * as piTools from "@earendil-works/pi-durable/tools";
@@ -106,8 +107,10 @@ async function loadFile(agent: string, file: string): Promise<Loaded> {
 
 /** Loads the built-in and every agent's extensions into the registry; `onChange` after a reload. */
 export async function loadExtensions(registry: { install(e: pi.Extension): void }, onChange: () => void): Promise<void> {
-	// Code mode without `models.*`: the scripts are for the thread's own tools.
-	const codemode = createCodemodeExtension({ sandbox: new CodemodeSandbox({ memoryLimitBytes: 256 * 1024 * 1024 }), models: false });
+	// Code mode with `models.*`, as Pi has it: a script asks the evaluator (`bench/evaluator`,
+	// `judge/models.ts`) for many small decisions, where its project uses it (`extensions/assistant.ts`).
+	// Each MCP server is a namespace of its scripts (`mcp/mcp.ts` keeps the list as they connect).
+	const codemode = createCodemodeExtension({ sandbox: new CodemodeSandbox({ memoryLimitBytes: 256 * 1024 * 1024 }), namespaces: NAMESPACES });
 	const builtin: pi.Extension[] = [assistant as any, createToolSearchExtension() as any, codemode as any, ...agents().map(mcpExtension)];
 	for (const e of builtin) {
 		loaded.set(e.name, { name: e.name, source: "builtin", extension: e });

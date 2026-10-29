@@ -155,9 +155,9 @@ impl SettingsForm for Run {
                 .into_any_element()
         };
         let evaluator_note = if e.run.evaluator_ready {
-            "A small model decides where the main one spends steps: faster work; on a shared GPU it takes the room other utilities need"
+            "A small model checks the agent's steps and answers its scripts' many small questions: faster work; on a shared GPU it takes the room other utilities need"
         } else {
-            "Its connection is off: Settings → Agents → Evaluator first"
+            "No server for it yet: Settings → Agents → Evaluator first"
         };
         // A limit not offered (set in settings.json) is shown as its number, chosen.
         let mut limits: Vec<String> = STEP_LIMITS.iter().map(|s| s.to_string()).collect();

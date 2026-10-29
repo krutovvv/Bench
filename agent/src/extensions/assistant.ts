@@ -24,7 +24,8 @@ import { stepGate, stepNote } from "../builtin/steps.ts";
 import { fitRequestFor, fitResultFor, seeUsage } from "../builtin/window.ts";
 import { toolsToLoad } from "../judge/start.ts";
 import { markNotRun, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../builtin/turn.ts";
-import { judgeActive } from "../judge/client.ts";
+import { judgeActive, judgeFor } from "../judge/client.ts";
+import { PROVIDER as EVALUATOR } from "../judge/models.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
 import { steer } from "../runtime/steer.ts";
@@ -178,6 +179,12 @@ export const assistant = defineExtension({
 	],
 } as any);
 
+/** Code mode's own calls of a model (`models.classify()`, `models.generateImages()`): a script's
+ *  use of the evaluator is not a step the evaluator weighs, nor a result it reads. */
+function ownCall(call: any): boolean {
+	return String(call.name).startsWith("pi.codemode.");
+}
+
 /** Before a call: the person's hold, the step limit, the evaluator's repeat and risk, approvals. */
 async function gate(call: any, api: any, context: any): Promise<{ block?: string } | undefined> {
 	// The person's hold, felt before any next step — the current answer and the step
@@ -185,6 +192,14 @@ async function gate(call: any, api: any, context: any): Promise<{ block?: string
 	// The conversation is the hook's `api`'s, not the call's (Pi's ToolCall has no id of it).
 	const info = host().thread(api.conversationId);
 	if (info && !(await host().hold(info.id, context?.abortSignal))) return { block: "The person stopped the run." };
+	// A script asking the evaluator: only where the project uses it (its Settings, the gear's servers).
+	if (ownCall(call)) {
+		const model = call.arguments?.model ?? call.args?.model;
+		const evaluator = (typeof model === "string" ? model.split("/")[0] : model?.provider) === EVALUATOR;
+		return evaluator && !judgeFor(String(api.conversationId))
+			? { block: "The evaluator is off in this project (its Settings → Model → Evaluator) or has no server in the gear: decide these in the script's code, or by reading them yourself." }
+			: undefined;
+	}
 	// A step of the turn (a script's nested calls are its own): refused past the project's limit.
 	if (!call.parent) {
 		const refused = stepGate(String(api.conversationId));

@@ -15,14 +15,19 @@ agent asks at fixed points of a turn, so that decisions the thread's model would
 or never make, are made fast. The thread's model never calls it and never sees it: it sees
 results the evaluator changed, and notes beside them.
 
-It takes two switches. The gear's (Settings → Agents → Evaluator, the `judge` setting) is the
-connection: the server, its model, its key. A project's (Settings → Model → Evaluator, its
-`evaluator` in settings.json, Host's too) is its use, **off unless turned on**: on a shared GPU the
-evaluator takes the room the other utilities need — speech to text, image generation, OCR, a
-translator — and the balancer stops one to start the other, so it is on in the projects where its
-speed is worth it (a lot of code, large volumes) and off where those utilities are used.
-`judgeFor(conversation)` is the one place that answers whether a thread uses it; every point,
-the excerpt and the window's cut ask it. Off in either, everything goes the classic way.
+It is Pi's classifier model `bench/evaluator` (`models.ts`), one model for two users: these points,
+and code mode scripts, which ask it with `models.classify()` for many small decisions over the data
+they hold (Pi's design: MCP fetches, the script processes, the classifier decides, the frontier
+model reasons). The gear (Settings → Agents → Evaluator, the `judge` setting) lists System One
+servers, as many as the person keeps, one the main and one its fallback; the pair answers as one
+model: the main server, or the fallback when it fails (a failed server is quiet a minute). There is
+no switch there: no server, no evaluator. A project's switch (Settings → Model → Evaluator, its
+`evaluator` in settings.json, Host's too) is its use — **on in a new project**, off where its
+utilities need the shared GPU (the balancer stops one to start the other). `judgeFor(conversation)`
+is the one place that answers whether a thread uses it; every point, the excerpt, the window's cut
+and a script's `models.classify()` (refused with the reason in `beforeTool`) ask it. Off, everything
+goes the classic way. A script's calls of the classifier are not steps the points weigh or results
+they read.
 
 ## Points and moments
 

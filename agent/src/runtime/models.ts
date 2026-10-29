@@ -9,6 +9,7 @@ import { openAICompletionsApi } from "@earendil-works/pi-ai/api/openai-completio
 import { projects } from "../builtin/projects.ts";
 import { agents, compactionAt, compactionPolicy, resolveFallback, resolveModel, type ModelChoice } from "../config.ts";
 import { fallbackProvider } from "./fallback.ts";
+import { evaluatorProvider } from "../judge/models.ts";
 import { steered } from "./steer.ts";
 import type { ThreadInfo } from "../protocol.gen.ts";
 import type { ThreadRow } from "../store.ts";
@@ -22,6 +23,11 @@ export class Models {
 	private registered = new Set<string>();
 	/** Why the main model last failed over to the fallback (the status bar says it). */
 	private fallbackWhy = "";
+
+	constructor() {
+		// The evaluator, Pi's classifier `bench/evaluator`: code mode's `models.classify()` asks it.
+		this.pi.setProvider(evaluatorProvider());
+	}
 
 	/**
 	 * Registers the model every thread runs with (and its fallback, when one is set) and returns

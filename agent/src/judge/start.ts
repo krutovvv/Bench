@@ -31,7 +31,7 @@ const MAX_PROJECTS = 40;
 const MAX_LOAD = 30;
 
 /** The skills and servers asked about this turn, by question name. */
-const offered = new Map<string, { skills: string[]; servers: string[]; tools: string[][] }>();
+const offered = new Map<string, { skills: string[]; servers: string[]; tools: string[][]; loadable: string[][] }>();
 
 export const start: Point = {
 	name: "start",
@@ -45,7 +45,7 @@ export const start: Point = {
 		// evaluator does not see.
 		const opening = turn.opening;
 		if (!skills.length && !servers.length && !opening) return undefined;
-		offered.set(conversation, { skills: skills.map((k) => k.name), servers: servers.map((s) => s.name), tools: servers.map((s) => s.tools) });
+		offered.set(conversation, { skills: skills.map((k) => k.name), servers: servers.map((s) => s.name), tools: servers.map((s) => s.tools), loadable: servers.map((s) => s.loadable) });
 		const questions: Record<string, any> = {};
 		const all = projects.list();
 		const here = all.find((p) => p.id === thread.project);
@@ -99,9 +99,14 @@ export const start: Point = {
 			}
 		}
 		const chosen = o.servers.map((s, i) => [s, i] as const).filter(([, i]) => (answers[`server${i}`]?.probabilities?.needed ?? 0) >= SURE_SERVER);
+		// A server behind code mode (Pi's default) is named for a script; a deferred one's tools are
+		// offered from the next step; a direct one is offered already.
 		if (chosen.length) {
-			lines.push(`the tools it needs are likely those of ${chosen.map(([s]) => `"${s}" (mcp__${s}__*)`).join(", ")}, offered from your next step`);
-			turn.load = chosen.flatMap(([, i]) => o.tools[i]).slice(0, MAX_LOAD);
+			const scripted = chosen.filter(([, i]) => o.loadable[i].length < o.tools[i].length);
+			const loaded = chosen.filter(([, i]) => o.loadable[i].length);
+			if (scripted.length) lines.push(`the tools it needs are likely those of ${scripted.map(([s]) => `"${s}" (tools.mcp__${s}__* in a codemode script)`).join(", ")}`);
+			if (loaded.length) lines.push(`the tools it needs are likely those of ${loaded.map(([s]) => `"${s}" (mcp__${s}__*)`).join(", ")}, offered from your next step`);
+			turn.load = loaded.flatMap(([, i]) => o.loadable[i]).slice(0, MAX_LOAD);
 		}
 		return lines.length ? { hint: `[Evaluator, for this request: ${lines.join("; ")}.]` } : undefined;
 	},

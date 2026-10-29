@@ -7,7 +7,9 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { agentDir, isProject, timezone } from "./config.ts";
+import { agentDir, agentMcp, isProject, timezone } from "./config.ts";
+import { evaluatorOn } from "./judge/client.ts";
+import { evaluatorReady } from "./judge/models.ts";
 import { LIMITS, readEntries } from "./builtin/memory.ts";
 import { listSkills } from "./builtin/skills.ts";
 import { machineOf, repoOf, skillsFor } from "./repo.ts";
@@ -56,11 +58,25 @@ export function environment(s: ThreadFacts): string {
 		// The tools for code, said once: a long thread spent most of its steps reading files through
 		// bash in small windows and editing them with scripts.
 		"Files: find with grep (text), glob (names) and ls (a folder's tree); read a file whole with read (up to 2000 lines at once, not in small pieces); change it with edit, all its changes in one call (edits[]); new files with write. bash is for running things — builds, tests, git — not for reading or editing files.",
+		scripts(s),
 		settings(s),
 		PLATFORM[s.source] ?? PLATFORM.local,
 	]
 		.filter(Boolean)
 		.join("\n");
+}
+
+/** Code mode, said once, and the evaluator inside it where the project uses it: many calls and
+ *  much data go through one script, many small judgments through the classifier, not the model. */
+function scripts(s: ThreadFacts): string {
+	// The servers behind code mode by name: their tools are not listed, only found in a script.
+	const scripted = Object.entries(agentMcp(s.agent))
+		.filter(([, spec]: [string, any]) => (spec?.exposure ?? "codemode").startsWith("codemode"))
+		.map(([name]) => name);
+	const servers = scripted.length ? ` This project's MCP servers ${scripted.join(", ")} are reached that way: find their tools with searchTools() and describeNamespace() in a script.` : "";
+	const line = `Many calls or much data (an MCP server's records, many files or pages): one codemode script calls the tools, filters and counts, and prints only what matters.${servers}`;
+	if (!evaluatorReady() || !evaluatorOn(s.agent)) return line;
+	return `${line} Many small judgments in it (is this urgent, which kind, does it match the request): ask the evaluator in the script, models.classify(await models.getModelOfType("classifier", "bench", "evaluator"), { state, questions }) — it answers in well under a second at no cost — and print only what it decided.`;
 }
 
 /** Where the thread's project keeps its settings, which the person edits in the project's
@@ -70,7 +86,7 @@ function settings(s: ThreadFacts): string | undefined {
 	const dir = path.join(path.dirname(agentDir("project:x")), s.project);
 	const machine = machineOf(s.project);
 	return [
-		`This project's settings live in ${dir}${machine ? `, on the machine you run on (not on ${machine}) — read, write and edit reach them there all the same` : ""}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}), lsp.json (its language servers), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them).`,
+		`This project's settings live in ${dir}${machine ? `, on the machine you run on (not on ${machine}) — read, write and edit reach them there all the same` : ""}: SYSTEM.md (its soul: what it is, how to work in it), mcp.json (its MCP servers, Pi's format: {"mcpServers": {"<name>": {"command", "args", "env"} or {"url", "headers"}}}; "exposure": "direct" offers a server's tools to you directly, not only to scripts), lsp.json (its language servers), skills/<name>/SKILL.md, prompts/. The person edits them in the project's Settings in Bench; change them with read, write and edit only when asked. Keys go into mcp.json as \${NAME}, their values into the agent's env (ask for them).`,
 		machine &&
 			`What runs where: its language servers and its command MCP servers run on ${machine}, in its folder (an MCP server with "local": true runs here; URL ones are wherever they are); skills come from both places — the settings' skills/ here, and .agents/skills in its folder on ${machine}.`,
 		"A standing rule for this project goes into its SYSTEM.md; its memory notes are for facts worth keeping, not for the same rule again.",
