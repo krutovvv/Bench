@@ -545,32 +545,32 @@ test("at compaction, the results the work needs word for word follow the summary
 	setSetting("judge", { enabled: true, base_url: base });
 });
 
-test("a plain step goes without reasoning; a server's tools that fit it are a line for that step", async () => {
+test("a step is not asked whether it is plain while the template moves its head; a thread without reasoning says so on every request", async () => {
 	const { steer, steered } = await import("../src/runtime/steer.ts");
+	const { PLAIN_STEPS } = await import("../src/judge/step.ts");
 	seeRequest("p1", [user("Run the tests and fix what fails")]);
 	stepGate("p1");
 	seeResult("p1", { name: "write", arguments: { path: "t.mjs", content: "x" } }, out("ok"));
 	reply = (body) => {
-		assert.ok(body.questions["step.think"]);
-		return choice("step.think", { think: 0.05, plain: 0.95 });
-	};
-	assert.equal((await atRequest("p1")).plain, true);
-	// After a failure the model reasons: not asked.
-	seeResult("p1", { name: "bash", arguments: { command: "node t.mjs" } }, { output: [{ type: "text", text: "boom" }], isError: true });
-	reply = (body) => {
-		assert.equal(body.questions["step.think"], undefined);
+		assert.equal(!!body.questions["step.think"], PLAIN_STEPS);
 		return { answers: {} };
 	};
-	assert.equal((await atRequest("p1")).plain, false);
-	// The word reaches the request once: reasoning left out, the template's switch put in.
+	await atRequest("p1");
+	const local = { api: "openai-completions", baseUrl: "http://gpu:8000/v1" };
 	let seenOptions: any;
 	const api = steered({ streamSimple: (_m: any, _c: any, o: any) => (seenOptions = o) });
-	steer("sess", { plain: true });
-	api.streamSimple({}, {}, { sessionId: "sess", reasoning: "low" });
+	// A thread at "off": Pi sends no reasoning; the template's switch goes with every request.
+	api.streamSimple({}, {}, { sessionId: "s" });
+	assert.equal((await seenOptions.onPayload({ messages: [] }, local)).chat_template_kwargs.enable_thinking, false);
+	// A thread with reasoning is left as Pi sends it.
+	api.streamSimple({}, {}, { sessionId: "s", reasoning: "low" });
+	assert.equal(seenOptions.reasoning, "low");
+	assert.equal(seenOptions.onPayload, undefined);
+	// A step's word, once.
+	steer("s", { plain: true });
+	api.streamSimple({}, {}, { sessionId: "s", reasoning: "low" });
 	assert.equal(seenOptions.reasoning, undefined);
-	const payload = await seenOptions.onPayload({ messages: [] }, { api: "openai-completions", baseUrl: "http://gpu:8000/v1" });
-	assert.equal(payload.chat_template_kwargs.enable_thinking, false);
-	api.streamSimple({}, {}, { sessionId: "sess", reasoning: "low" });
+	api.streamSimple({}, {}, { sessionId: "s", reasoning: "low" });
 	assert.equal(seenOptions.reasoning, "low", "once");
 });
 
@@ -682,13 +682,7 @@ test("a queued message that corrects the work under way is judged a correction; 
 	assert.equal(await correctsTheWork("m1", "and later, a weekly report"), false);
 });
 
-test("answers without reasoning are sent back as generated; a section is held until the next compaction", async () => {
-	const { emptyThinking } = await import("../src/runtime/thinking.ts");
-	const local = { api: "openai-completions", baseUrl: "http://gpu:10200/v1" };
-	const p = emptyThinking({ messages: [{ role: "user", content: "x" }, { role: "assistant", content: "a" }, { role: "assistant", content: "b", reasoning_content: "why" }] }, local);
-	assert.equal(p.messages[1].reasoning_content, "\n");
-	assert.equal(p.messages[2].reasoning_content, "why");
-	assert.equal(emptyThinking({ messages: [{ role: "assistant", content: "a" }] }, { api: "openai-completions", baseUrl: "https://openrouter.ai/api/v1" }), undefined);
+test("a section is held until the next compaction", async () => {
 	const { frozen, thaw } = await import("../src/builtin/frozen.ts");
 	let n = 0;
 	assert.equal(await frozen("z1", "notes", () => `v${++n}`), "v1");

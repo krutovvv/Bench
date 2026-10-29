@@ -126,5 +126,6 @@ impl ProjectEntry {
 
 pub const APPROVAL_MODES: &[&str] = &["off", "smart", "manual"];
 
-pub const EFFORTS: &[&str] = &["low", "medium", "xhigh"];
+/// The reasoning levels until the presets are read; "off" is none at all.
+pub const EFFORTS: &[&str] = &["off", "low", "medium", "xhigh"];
 

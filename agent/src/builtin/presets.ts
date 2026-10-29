@@ -32,7 +32,9 @@ export const DEFAULT_PRESETS: Presets = {
 		{ at: 0.8, name: "" },
 		{ at: 0.9, name: "Code" },
 	],
-	reasoning: ["low", "medium", "high", "xhigh"],
+	// As the dev server's template names them: it refuses "high" and "minimal" (HTTP 400); "off" is
+	// no reasoning, sent as the template's switch on every request of the thread (`runtime/steer.ts`).
+	reasoning: ["off", "low", "medium", "xhigh"],
 };
 
 /** The presets in force: each kind as edited, else the built-in one. */

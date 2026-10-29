@@ -3,11 +3,11 @@
 // (`models.ts`): a request whose provider session (Pi's `ProviderDoc`, one per conversation) has a
 // word waiting takes it, once. Today the one word is "no reasoning for this step"
 // (`judge/step.ts`): a step that reads, lists or runs needs none, and a local model spends its
-// slowest tokens there. Reasoning off changes only the end of the prompt (the template's
-// generation switch), never its head; and every request renders the history's answers without
-// reasoning as they were generated (`thinking.ts` `emptyThinking`), so the cache stays whole.
+// slowest tokens there. It is held (`judge/step.ts` `PLAIN_STEPS`) while the model server's
+// template puts its reasoning line at the prompt's start: a step without reasoning then rewrites
+// the head, and the next step with it rewrites it back.
 
-import { emptyThinking, noThinking } from "./thinking.ts";
+import { noThinking } from "./thinking.ts";
 
 export interface Word {
 	/** No reasoning for this request. */
@@ -29,23 +29,28 @@ function take(session: unknown): Word | undefined {
 	return w;
 }
 
-/** A model's API whose requests take their session's word (`steer`). */
+/**
+ * A model's API whose requests take their session's word (`steer`), and whose requests without
+ * reasoning say so. Pi sends nothing for a thread whose level is "off", and a server that thinks by
+ * default thinks anyway; so such a request carries the template's switch (`noThinking`). The
+ * same for every request of the thread keeps the prompt's head the same: on the dev server's
+ * template the switch also takes the reasoning line out of the system prompt's start, so a thread
+ * that went from reasoning to none and back read its whole prompt again each time (measured: 0
+ * of 7 303 tokens from the cache), while one that stays either way keeps it all.
+ */
 export function steered<A extends { stream?: any; streamSimple?: any }>(api: A): A {
 	const wrap = (fn: any) =>
 		fn &&
 		((model: any, context: any, options: any = {}) => {
 			const w = take(options?.sessionId);
-			const plain = !!w?.plain && !!options.reasoning;
-			const { reasoning, onPayload, ...rest } = options;
+			const plain = !!w?.plain || options.reasoning === undefined;
+			if (!plain) return fn(model, context, options);
+			const { reasoning: _r, onPayload, ...rest } = options;
 			return fn(model, context, {
 				...rest,
-				...(plain || reasoning === undefined ? {} : { reasoning }),
-				// Every request: answers without reasoning rendered as generated (`emptyThinking`), so
-				// the history the cache holds is the history sent.
 				onPayload: async (payload: unknown, m: any) => {
-					let p = (await onPayload?.(payload, m)) ?? payload;
-					p = emptyThinking(p, m) ?? p;
-					return plain ? (noThinking(p, m) ?? p) : p;
+					const p = (await onPayload?.(payload, m)) ?? payload;
+					return noThinking(p, m) ?? p;
 				},
 			});
 		});
