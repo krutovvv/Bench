@@ -14,10 +14,9 @@ import { projects } from "../builtin/projects.ts";
 import { shOut } from "../modules/files.ts";
 import { specsOf } from "../specs.ts";
 import { CHANGES_KIND } from "./journal.ts";
-import type { Live, Runtime } from "./runtime.ts";
+import type { Live } from "./runtime.ts";
 
 const ctx = BACKGROUND_CONTEXT;
-
 
 export { CHANGES_KIND };
 
@@ -57,13 +56,8 @@ export function parseNumstat(root: string, out: string): FileChange[] {
 }
 
 export class Turns {
-	private rt: Runtime;
 	/** Each running thread's tree as its run began. */
 	private base = new Map<string, Promise<{ root: string; tree: string } | null>>();
-
-	constructor(rt: Runtime) {
-		this.rt = rt;
-	}
 
 	/** Where the thread works: its machine (none: this one) and folder. */
 	private place(live: Live): { machine: string | null; dir: string } | null {

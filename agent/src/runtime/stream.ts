@@ -46,7 +46,6 @@ export class Stream {
 			case "run_start":
 				if (!live.busy) {
 					live.busy = true;
-					live.generation++;
 					this.beginRun(live);
 				}
 				break;

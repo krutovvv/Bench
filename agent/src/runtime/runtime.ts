@@ -67,8 +67,6 @@ export interface Live {
 	busy: boolean;
 	/** The run's holds as last committed to its `bench.hold` document (src/hold.ts). */
 	holds: Hold[];
-	generation: number;
-	abort?: AbortController;
 	/** Text of the in-flight assistant message per content block, to turn snapshots into deltas. */
 	blocks: Map<number, { type: string; text: string }>;
 	/** The message being written has begun a tool call: its words are narration, not an answer. */
@@ -108,7 +106,7 @@ export class Runtime {
 	readonly inserts = new ThreadInserts(this);
 	readonly titles = new Titles(this);
 	readonly processes = new Processes(this);
-	readonly turns = new Turns(this);
+	readonly turns = new Turns();
 	readonly reviews = new Reviews(this);
 
 	private registry!: ReturnType<typeof createRegistry>;
@@ -248,7 +246,6 @@ export class Runtime {
 			conversation,
 			busy: false,
 			holds: hold?.holds ?? [],
-			generation: 0,
 			blocks: new Map(),
 			answer: "",
 			prompts: new Map(),
@@ -328,9 +325,7 @@ export class Runtime {
 			return;
 		}
 		live.busy = true;
-		live.generation++;
 		await this.holds.clear(live);
-		live.abort = new AbortController();
 		// The run is live from here: Pi's own run_start comes later and finds the thread busy.
 		this.stream.beginRun(live);
 		await live.conversation.submit({ type: "input", content, requestId: request }, ctx);
@@ -340,7 +335,6 @@ export class Runtime {
 	async interrupt(id: string): Promise<void> {
 		const live = await this.thread(id);
 		if (!live) return;
-		live.abort?.abort();
 		await this.holds.stop(live);
 		this.asks.declineAll(live);
 		await live.conversation.abort(ctx);

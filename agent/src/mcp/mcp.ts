@@ -116,7 +116,7 @@ export async function connectMcp(agent?: string, timeoutMs = 30000): Promise<voi
 	}
 }
 
-/** An agent's connected servers and their tools' names (the evaluator's view of what a turn can use). */
+/** One connected server as the evaluator sees it: its tools' names and how they are reached. */
 export interface ServerTools {
 	name: string;
 	/** Its tools' common start, `mcp__<server>__` as Pi names them. */
@@ -302,8 +302,11 @@ function dropHeader(agent: string, name: string, header: string): void {
 	fs.writeFileSync(file, JSON.stringify(doc, null, 2) + "\n");
 }
 
+/** `p`, or `message` as an error after `ms`; the timer goes with whichever comes first. */
 function withTimeout<T>(p: Promise<T>, ms: number, message: string): Promise<T> {
-	return Promise.race([p, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
+	let timer: NodeJS.Timeout | undefined;
+	const late = new Promise<T>((_, reject) => (timer = setTimeout(() => reject(new Error(message)), ms)));
+	return Promise.race([p, late]).finally(() => clearTimeout(timer));
 }
 
 export async function closeMcp(): Promise<void> {

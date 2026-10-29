@@ -82,10 +82,6 @@ export function skillsIn(root: string, scope: SkillScope): Skill[] {
 	return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function findSkill(agent: string, name: string, folder?: string): Skill | undefined {
-	return listSkills(agent, folder).find((s) => s.name === name || path.basename(s.dir) === name);
-}
-
 const text = (t: unknown) => ({ output: [{ type: "text" as const, text: typeof t === "string" ? t : JSON.stringify(t) }] });
 
 export const skillView = defineTool({

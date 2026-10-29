@@ -35,7 +35,7 @@ test("a turn's changes go into the journal; the index is untouched; nothing chan
 
 	const written: any[] = [];
 	const live: any = { row: { id: "t1", cwd: repo, project: "" }, conversation: { submit: async (s: any) => void written.push(s) } };
-	const turns = new Turns({} as any);
+	const turns = new Turns();
 
 	turns.begin(live);
 	await new Promise((r) => setTimeout(r, 300));

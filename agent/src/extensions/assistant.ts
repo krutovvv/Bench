@@ -192,7 +192,7 @@ function ownCall(call: any): boolean {
 
 /** A script's model call on the evaluator (`bench/evaluator`), not another provider's model. */
 function evaluatorModel(call: any): boolean {
-	const model = call.arguments?.model ?? call.args?.model;
+	const model = call.arguments?.model;
 	return (typeof model === "string" ? model.split("/")[0] : model?.provider) === EVALUATOR;
 }
 
@@ -215,7 +215,7 @@ async function gate(call: any, api: any, context: any): Promise<{ block?: string
 		if (refused) return { block: refused };
 	}
 	const shell = ["bash", "ssh_run"].includes(call.name) && !!info && approvalsMode(info.agent) === "manual";
-	const command = String(call.arguments?.command ?? call.args?.command ?? "");
+	const command = String(call.arguments?.command ?? "");
 	const hit = shell ? DANGEROUS.find(([re]) => re.test(command))?.[1] : undefined;
 	// The evaluator: a repeat of a failed or known call is refused (`judge/repeat.ts`); with
 	// approvals on, a command the patterns let through is judged too (`judge/risk.ts`). A script's
