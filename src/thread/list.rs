@@ -16,8 +16,10 @@ pub struct View {
     pub rows: Vec<Row>,
     /// The thread's version they were made at.
     pub(super) version: u64,
-    /// Which thread they are of: another one starts at the top.
+    /// Which thread they are of: another one opens at its end.
     pub(super) owner: Option<String>,
+    /// A thread just opened whose rows have not come yet: it lands at its end once they do.
+    land: bool,
     /// While a run is live, a timer repaints once a second (its clock).
     pub(super) ticker: Option<Task<()>>,
     /// The person sent a message: once the rows have changed and are laid out, the composer is
@@ -49,6 +51,7 @@ impl Default for View {
             rows: vec![],
             version: u64::MAX,
             owner: None,
+            land: false,
             ticker: None,
             reveal: Reveal::Off,
             room: px(0.),
@@ -120,7 +123,8 @@ impl View {
     }
 
     /// Give the list `rows` and answer the first row that changed. Unchanged rows keep their
-    /// measured heights; a thread of another owner starts at the top, not following.
+    /// measured heights; a thread of another owner opens at its end (its last message and the
+    /// composer in view), now or once its history comes.
     pub(super) fn sync(&mut self, owner: Option<&str>, rows: Vec<Row>, follow: bool) -> usize {
         if follow {
             self.reveal = Reveal::Armed;
@@ -129,8 +133,9 @@ impl View {
             self.owner = owner.map(str::to_string);
             self.rows = rows;
             self.list.reset(self.rows.len() + 3);
-            self.list.scroll_to(ListOffset::default());
             self.reveal = Reveal::Off;
+            self.land = true;
+            self.land_at_end();
             return 0;
         }
         // Rows at their place are measured again (the reader keeps their place, even inside a row
@@ -154,6 +159,15 @@ impl View {
         if self.reveal == Reveal::Armed && first < self.rows.len() {
             self.reveal = Reveal::Check;
         }
+        self.land_at_end();
         first
+    }
+
+    /// The opened thread to its end, once it has rows (its history may come a moment later).
+    fn land_at_end(&mut self) {
+        if self.land && !self.rows.is_empty() {
+            self.land = false;
+            self.to_end();
+        }
     }
 }

@@ -33,11 +33,12 @@ deletes threads (`open.rs`).
 
 - **Nothing moves the list but the person.** A run that ends, a row that grows, an answer that
   arrives never scroll the thread, as code in an editor does not scroll while it changes. The one
-  exception: after the person sends, the composer is brought back into view if the new rows
-  pushed it past the bottom edge.
+  exceptions: after the person sends, the composer is brought back into view if the new rows
+  pushed it past the bottom edge; and a thread the person opens lands at its end (its last
+  message and the composer in view), once its history has come.
 - Rows reach the list by diff (`thread::diff`): unchanged rows keep their measured heights, only
   the count is spliced at the end, so the reader keeps their place even inside a row being
-  written. Another thread starts at its top.
+  written. Another thread opens at its end.
 - `gpui::list` lays out only what is on screen; a thread of thousands of rows costs what a
   screenful costs.
 - Only the thread scrolls (with a Mac overlay scrollbar); a block inside it does not scroll on

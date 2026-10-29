@@ -25,9 +25,11 @@ impl ThreadView {
             self.demo_scrolled = true;
             self.thread.tv.to_end();
         }
-        // `BENCH_DEMO_SCROLL=<item>:<px>`: the thread scrolled to there (a reader in the middle).
-        if !self.demo_scrolled {
-            if let Some((i, o)) = std::env::var("BENCH_DEMO_SCROLL").ok().and_then(|v| {
+        // `BENCH_DEMO_SCROLL=<item>:<px>`: the thread scrolled to there (a reader in the middle);
+        // `BENCH_DEMO=top` is `0:0`. After the rows' first sync, which lands the thread at its end.
+        if !self.demo_scrolled && !self.thread.tv.rows.is_empty() {
+            let top = (std::env::var("BENCH_DEMO").as_deref() == Ok("top")).then(|| "0:0".to_string());
+            if let Some((i, o)) = top.or_else(|| std::env::var("BENCH_DEMO_SCROLL").ok()).and_then(|v| {
                 let (i, o) = v.split_once(':')?;
                 Some((i.parse::<usize>().ok()?, o.parse::<f32>().ok()?))
             }) {
