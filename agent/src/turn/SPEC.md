@@ -27,7 +27,8 @@ result and compaction, and what they keep about a conversation between them.
   (that is Pi's journal): after a restart of the agent a turn's steps count from zero, which errs on
   the side of working.
 - **What is sent fits the model's window** (`window.ts`): a tool's result past its share (12%)
-  keeps its head and tail with a line on how to ask for less; a request that would overflow has its
+  keeps its head and tail with a line on how to ask for less, and the notes the hooks add after it
+  (diagnostics, a spec, the evaluator's) follow it uncut; a request that would overflow has its
   largest old results and call arguments cut in that request only, the provider's own count
   correcting the estimate. Pi's compaction still does the lasting work.
 - **The prompt's head holds until a compaction** (`frozen.ts`): a section that changed (a note

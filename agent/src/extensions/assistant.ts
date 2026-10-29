@@ -21,7 +21,7 @@ import { machineOf } from "../repo.ts";
 import { compactWithoutReasoning } from "../turn/compaction.ts";
 import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../turn/steps.ts";
-import { fitRequestFor, fitResultFor, seeUsage } from "../turn/window.ts";
+import { fitRequestFor, seeUsage, withNotes } from "../turn/window.ts";
 import { toolsToLoad } from "../judge/start.ts";
 import { markNotRun, planNudge, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../turn/turn.ts";
 import { evaluatorFor, judgeActive } from "../judge/client.ts";
@@ -165,20 +165,20 @@ export const assistant = defineExtension({
 			// The plan left unchanged for several steps (`planNudge`): the model is reminded to update it.
 			// With the evaluator on (`judge/`), its points instead: a long search's matches come
 			// likeliest first, the plan's items are marked, the course is checked.
-			// Last, what the model reads is cut to its share of the window (`turn/window.ts`).
+			// The tool's own output is cut to its share of the window first (`turn/window.ts`), and the
+			// notes follow it whole: a cut of the joined text would drop them with the middle.
 			afterTool: async (call: any, result: any, api: any, context: any) => {
 				if (ownCall(call)) {
 					// A script's question to the evaluator counts with the points' (the thread's meters).
 					if (String(call.name).endsWith(".classify") && evaluatorModel(call) && !result?.isError) host().count(String(api.conversationId), "call");
 					return undefined;
 				}
-				const done = await notesAfter(call, result, api, context);
-				const fitted = (await fitResultFor(String(api.conversationId), done ?? result, context?.abortSignal)) ?? done;
+				const after = await notesAfter(call, result, api, context);
+				const noted = await withNotes(String(api.conversationId), after.result, after.notes, context?.abortSignal);
 				// The MCP tools the evaluator named at the turn's start are offered from the next step.
 				const load = call.parent ? [] : toolsToLoad(turnOf(String(api.conversationId)));
-				if (!load.length) return fitted;
-				const base = fitted ?? result;
-				return { ...base, control: { ...(base.control ?? {}), addTools: [...(base.control?.addTools ?? []), ...load] } };
+				if (!load.length) return noted === result ? undefined : noted;
+				return { ...noted, control: { ...(noted.control ?? {}), addTools: [...(noted.control?.addTools ?? []), ...load] } };
 			},
 		} as any),
 	],
@@ -228,8 +228,8 @@ async function gate(call: any, api: any, context: any): Promise<{ block?: string
 	return choice === "deny" ? { block: `The person declined this command (${why}). Do not retry it; ask or choose another way.` } : undefined;
 }
 
-/** The notes that come with a call's result, and the result as the evaluator left it; undefined: unchanged. */
-async function notesAfter(call: any, result: any, api: any, context: any): Promise<any> {
+/** The result as the evaluator left it (reordered, or as it was), and the notes that come after it. */
+async function notesAfter(call: any, result: any, api: any, context: any): Promise<{ result: any; notes: string[] }> {
 	const conversation = String(api.conversationId);
 	const top = !call.parent;
 	if (top) seeResult(conversation, call, result);
@@ -238,16 +238,12 @@ async function notesAfter(call: any, result: any, api: any, context: any): Promi
 	const evaluated = top && judgeActive(conversation);
 	const none: { result?: any; notes: string[] } = { notes: [] };
 	const judged = top ? await atResult(conversation, call, result, context?.abortSignal).catch(() => none) : none;
-	const ranked = !!judged.result;
 	if (judged.result) result = judged.result;
 	const nudge = top && !evaluated ? planNudge(conversation) : undefined;
-	const first = [nudge, ...judged.notes].filter((n): n is string => !!n);
-	const withNotes = (notes: string[]) =>
-		notes.length || ranked ? { ...result, output: [...(result.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : undefined;
-	if (!["read", "edit", "write"].includes(call.name) || result?.isError) return withNotes(first);
+	const notes = [nudge, ...judged.notes].filter((n): n is string => !!n);
+	if (!["read", "edit", "write"].includes(call.name) || result?.isError) return { result, notes };
 	const info = host().thread(api.conversationId);
-	if (!info) return withNotes(first);
-	const notes: string[] = [...first];
+	if (!info) return { result, notes };
 	const spec = await specNote(info, String(api.conversationId), String(call.arguments?.path ?? "")).catch(() => undefined);
 	if (spec) notes.push(spec);
 	if (call.name !== "read") {
@@ -255,5 +251,5 @@ async function notesAfter(call: any, result: any, api: any, context: any): Promi
 		const diag = at ? await diagnosticsFor(info.agent, info.cwd, at.machine, at.file, at.text).catch(() => undefined) : undefined;
 		if (diag) notes.push(diag);
 	}
-	return withNotes(notes);
+	return { result, notes };
 }

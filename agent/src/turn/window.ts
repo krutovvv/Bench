@@ -70,6 +70,16 @@ export async function fitResultFor(conversation: string, result: any, signal?: A
 	return fitResult(result, window);
 }
 
+/**
+ * What the model reads after a call: the tool's own output fitted to its share (`fitResultFor`),
+ * then the notes the hooks add (diagnostics, a spec, the plan's reminder, the evaluator's), whole —
+ * a cut of the joined text would drop them with the middle. The result itself when nothing changed.
+ */
+export async function withNotes(conversation: string, result: any, notes: string[], signal?: AbortSignal, window = windowTokens()): Promise<any> {
+	const own = (await fitResultFor(conversation, result, signal, window)) ?? result;
+	return notes.length ? { ...own, output: [...(own.output ?? []), ...notes.map((text) => ({ type: "text", text }))] } : own;
+}
+
 /** Per conversation: the estimate of the last request's messages, and what the provider counted beyond it. */
 const counts = slot<{ sent?: number; overhead: number }>(() => ({ overhead: 0 }));
 
