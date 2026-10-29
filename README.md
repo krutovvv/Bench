@@ -4,8 +4,9 @@
 
 <h1 align="center">Bench</h1>
 
-<p align="center"><b>A desktop client for coding with an AI agent on your own models.</b><br>
-Local and LAN models over an API, projects on this machine or on your servers, chat and an IDE in one window.</p>
+<p align="center"><b>A first-class agent interface for local models.</b><br>
+The experience of the best coding-agent apps, on a model you run and control.<br>
+And a starting point: fork it, and have your agent build what you need into it.</p>
 
 <p align="center">
   <a href="https://github.com/krutovvv/bench/releases/latest"><b>Download</b></a> (macOS, Linux, Windows) ·
@@ -18,6 +19,27 @@ Local and LAN models over an API, projects on this machine or on your servers, c
 
 > **Alpha.** Everything works and I use it every day, but it is not yet as fast or as reliable
 > as I want it to be, especially with remote projects. Expect rough edges and changes.
+
+## Why
+
+Local models are strong now. What they lack is an interface. The commercial agent apps are
+polished down to the details: the agent's steps fold away neatly, voice input just works, a small
+model helps the big one along, the window is fast. For a local model I could not find a single UI
+that does this well. And even a good one may not fit the way you work.
+
+So Bench is two things:
+
+- **An agent UI for local models, done properly.** Fast (native, in Rust), carefully worked out,
+  pleasant to look at, and built around a model under your own control: your workflow does not
+  depend on anyone's servers or pricing.
+- **A boilerplate for your own interface.** Bench ships with its specs (a `SPEC.md` beside every
+  module) and skills for coding agents (`AGENTS.md`, `.agents/skills/`), so an agent can find its
+  way around the code from the first minute. A feature is missing? Fork the repository, point your
+  coding agent at it, and ask for the feature. Bench itself is built this way: by vibe coding, from
+  inside itself.
+
+It is also an example: you can vibe-code an interface for yourself that is fast, good-looking and
+shaped around your own work.
 
 ## What Bench is, in four lines
 
@@ -150,9 +172,19 @@ because every step is kept on disk.
 - **The structure and logic** come from Claude Code's desktop app and from Zed's workspace (its
   docks, panels and tabs).
 
-Bench is also built from inside itself: I talk to the agent in Bench, and it changes Bench's code,
-checks the change on its own copy of the app and rebuilds it. [`AGENTS.md`](AGENTS.md) is what an
-agent reads first.
+## Make it yours
+
+Bench is built from inside itself: I talk to the agent in Bench, and it changes Bench's code,
+checks the change on its own copy of the app with made-up data, commits it and rebuilds the app.
+Everything that loop needs is in the repository, so it works in your fork too:
+
+- [`AGENTS.md`](AGENTS.md): what an agent reads first, the concepts and where everything is;
+- [`docs/map.md`](docs/map.md): the file for each common change;
+- `SPEC.md` beside every module: why it is built the way it is, linked into one tree;
+- [`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md): the UI pieces with pictures,
+  the look's rules, how to check a change with a screenshot, the GPUI reference.
+
+Fork, open it with your coding agent (or in Bench itself), describe the feature.
 
 ## Build
 
