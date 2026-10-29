@@ -46,8 +46,11 @@ each point's answers under its own names. The default extension's hooks call the
   is told in a line, so it need not spend a step on `todo`. Its own `todo` call wins and the marks
   start again from it. With the evaluator off or failing, the plan's reminder (`planNudge`) does
   this job; with it on, the reminder is silent.
-- **course** (`drift.ts`, `result`, every 10 steps): on track, drifting to something not asked,
+- **course** (`drift.ts`, `result`, every 5 steps): on track, drifting to something not asked,
   looping, or done. Anything but on track, when sure (0.7), is a note with that step's result.
+  Leaning the same way off course (drifting or looping at 0.4) at two checks running is a softer
+  note with the person's request: in the backup thread drifting stood at 0.42–0.47 four times over
+  twenty minutes and nothing was said.
 - **done** (`done.ts`, `answer`, after five steps or more): an answer judged unfinished,
   unchecked or off target (0.8) sends the agent back once, with the reason, by Pi's continuation —
   an `<evaluator>` message the thread does not show and that is not a new turn.
@@ -55,7 +58,12 @@ each point's answers under its own names. The default extension's hooks call the
 - **start** (`start.ts`, `request`, a turn's first): which of the thread's skills fits the request
   (a choice, "none" first) and which MCP servers the work needs (a choice of two each); a sure
   answer (a skill 0.8, a server 0.75) is a line with that request: load this skill, use these
-  servers' tools.
+  servers' tools. At the thread's opening message (`turn.opening`; a later one leans on what was
+  said before, which the evaluator does not see) it is also asked, with the thread's project and
+  folder and the person's other projects in the state, whether the request leaves open what only
+  the person can say — which project the work belongs to, which program, what result; sure (0.75),
+  the line says to ask with `clarify` before any other step. Sixty steps went to the wrong project
+  before the person said "not here, in Assistant TG".
 - **risk** (`risk.ts`, `call`, approvals "manual" only): a command the patterns let through is
   judged — reads, changes the project, or harm hard to undo; harm (0.5) asks the person, as a
   pattern's hit does. It only adds questions.
@@ -78,12 +86,18 @@ each point's answers under its own names. The default extension's hooks call the
   0.95, as it is often a fix) is refused once with the reason — the same call again runs. A call
   refused before it ran (a repeat, the step limit, the person) is no failure and no earlier result
   (`markNotRun`): the next call is not read as repeating it, and the failure point is not asked.
+  A script's nested calls (codemode) are asked about too, and kept whole for it
+  (`seeNestedResult`, not steps of the turn): a script is no way around a refusal, or around
+  `risk` with approvals on.
 - **listing** (`listing.ts`, `result`): a JSON list of 8 items or more (a shop's or a web search's)
   comes ordered by use for the request, the items that stand out first, every item kept.
 - **claims** (`claims.ts`, `answer`): an answer with numbers after 3 steps or more is checked
   against all the turn found (`turn.found`, 40 results); unsupported (0.8) sends it back once.
 - **keep** (`keep.ts`, called by `builtin/window.ts`): when a request would overflow the window, the
-  earlier results the next step needs least are cut first.
+  earlier results the next step needs least are cut first. At compaction (`builtin/compaction.ts`,
+  `keptThrough`) the latest 48 results are weighed for what the rest of the work needs word for
+  word — exact text, ids, paths a summary loses — and those (0.3, at most 8 000 characters) follow
+  the summary under "Kept word for word".
 - **start** also offers the named servers' tools from the turn's next step (`control.addTools` on
   its first result, as `tool_search` does).
 
@@ -104,15 +118,13 @@ A new idea is a file with a `Point` and a line in `POINTS`; a new moment is a di
 `index.ts` and the hook that calls it. The likeliest next ones, each a narrow decision the thread's
 model now spends a step or a long context on:
 
-- **before a request** (`beforeRequest`): which skills and tools a turn needs (instead of the
-  model's `tool_search`, and the 170 tools it once loaded); whether the request is a question to
-  answer at once or work to plan; whether to ask the person first (`clarify`).
+- **before a request** (`beforeRequest`): whether the request is a question to answer at once or
+  work to plan.
 - **after a result**: what of a long file, page or command output matters for the request (the
   model reads the likeliest parts first, as with a search); a failed command — retry, fix, or ask;
   deep research's sources and passages scored before the model reads them.
 - **before a call** (`beforeTool`): how dangerous a command is, for approvals (instead of the
   regular expressions); whether a call repeats one that just failed.
-- **at compaction**: which entries to keep word for word.
 - **memory**: whether an exchange is worth remembering.
 
 ## Off, unset or failing

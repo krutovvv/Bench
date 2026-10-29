@@ -23,7 +23,7 @@ import { sshRun } from "../builtin/ssh.ts";
 import { stepGate, stepNote } from "../builtin/steps.ts";
 import { fitRequestFor, fitResultFor, seeUsage } from "../builtin/window.ts";
 import { toolsToLoad } from "../judge/start.ts";
-import { markNotRun, seeAnswer, seeRequest, seeResult, turnOf } from "../builtin/turn.ts";
+import { markNotRun, seeAnswer, seeNestedResult, seeRequest, seeResult, turnOf } from "../builtin/turn.ts";
 import { judgeActive } from "../judge/client.ts";
 import { atAnswer, atCall, atRequest, atResult } from "../judge/index.ts";
 import { host } from "../host.ts";
@@ -145,7 +145,7 @@ export const assistant = defineExtension({
 			beforeTool: async (call: any, api: any, context: any) => {
 				const r = await gate(call, api, context);
 				// A refused call is marked so: the turn reads its result as never run, not as a failure.
-				if (r?.block && !call.parent) markNotRun(String(api.conversationId), call.id);
+				if (r?.block) markNotRun(String(api.conversationId), call.id);
 				return r;
 			},
 			// The file's errors from the project's language servers, with the edit that made them
@@ -185,8 +185,9 @@ async function gate(call: any, api: any, context: any): Promise<{ block?: string
 	const command = String(call.arguments?.command ?? call.args?.command ?? "");
 	const hit = shell ? DANGEROUS.find(([re]) => re.test(command))?.[1] : undefined;
 	// The evaluator: a repeat of a failed or known call is refused (`judge/repeat.ts`); with
-	// approvals on, a command the patterns let through is judged too (`judge/risk.ts`).
-	const judged = call.parent ? {} : await atCall(String(api.conversationId), call, shell && !hit, context?.abortSignal).catch(() => ({}) as { block?: string; approve?: string });
+	// approvals on, a command the patterns let through is judged too (`judge/risk.ts`). A script's
+	// nested calls (codemode) too: a script is no way around either.
+	const judged = await atCall(String(api.conversationId), call, shell && !hit, context?.abortSignal).catch(() => ({}) as { block?: string; approve?: string });
 	if (judged.block) return { block: judged.block };
 	const why = hit ?? judged.approve;
 	if (!why || !info) return undefined;
@@ -199,6 +200,7 @@ async function notesAfter(call: any, result: any, api: any, context: any): Promi
 	const conversation = String(api.conversationId);
 	const top = !call.parent;
 	if (top) seeResult(conversation, call, result);
+	else seeNestedResult(conversation, call, result);
 	// Read before the evaluator is asked: when it fails now, this step still had the classic reminder's turn.
 	const evaluated = top && judgeActive(conversation);
 	const none: { result?: any; notes: string[] } = { notes: [] };

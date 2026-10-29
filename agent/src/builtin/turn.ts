@@ -52,6 +52,10 @@ export interface Turn {
 	calls: Call[];
 	/** The ids of calls refused before they ran (a repeat, the step limit, the person): not failures. */
 	notRun: Set<string>;
+	/** The thread's first message: nothing said before it that the request could lean on. */
+	opening: boolean;
+	/** The course the evaluator leaned to, unsure, at its last check (`judge/drift.ts`): "" on track. */
+	leaning: string;
 }
 
 /** A step as `judge/repeat.ts` compares it: its arguments whole, not a line's start. */
@@ -65,7 +69,7 @@ export interface Call {
 
 const turns = new Map<string, Turn>();
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set() });
+const fresh = (request: string, plan: PlanStep[] = [], planId = ""): Turn => ({ request, plan, planId, planAt: 0, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "" });
 
 /** The conversation's turn; one with nothing known yet when it was never seen. */
 export function turnOf(conversation: string): Turn {
@@ -83,7 +87,9 @@ export function seeRequest(conversation: string, messages: readonly any[]): void
 	if (!text || text.startsWith(EVAL_OPEN)) return;
 	const t = turns.get(conversation);
 	if (t?.request === text && t.steps === 0) return;
-	turns.set(conversation, fresh(text, t?.plan, t?.planId));
+	const next = fresh(text, t?.plan, t?.planId);
+	next.opening = messages.filter((m) => m?.role === "user").length === 1;
+	turns.set(conversation, next);
 }
 
 /** A top-level call is about to run. */
@@ -123,6 +129,14 @@ export function seeResult(conversation: string, call: { id?: string; name: strin
 		t.found.push(`${call.name} ${cut(args, 160)} → ${cut(out, FOUND)}`);
 		if (t.found.length > FOUND_KEPT) t.found.splice(0, t.found.length - FOUND_KEPT);
 	}
+}
+
+/** A script's nested call finished (codemode): kept whole for `judge/repeat.ts`, not a step of the turn. */
+export function seeNestedResult(conversation: string, call: { id?: string; name: string; arguments?: any }, result: any): void {
+	const t = turnOf(conversation);
+	const notRun = call.id != null && t.notRun.delete(String(call.id));
+	t.calls.push({ name: call.name, args: call.arguments ?? {}, failed: !notRun && !!result?.isError, notRun, out: cut(resultText(result).replace(/\s+/g, " ").trim(), EVIDENCE) });
+	if (t.calls.length > RECENT) t.calls.splice(0, t.calls.length - RECENT);
 }
 
 /** The model's message (`afterResponse`): its words between steps, kept for the evaluator. */

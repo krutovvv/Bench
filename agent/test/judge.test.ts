@@ -16,7 +16,9 @@ process.env.BENCH_HOME = home;
 
 const { setHost } = await import("../src/host.ts");
 const { setSetting, writeAgent, readAgent } = await import("../src/config.ts");
-const { markNotRun, seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
+const { markNotRun, seeNestedResult, seeRequest, seeResult, turnOf } = await import("../src/builtin/turn.ts");
+const { keptThrough } = await import("../src/judge/keep.ts");
+const { results } = await import("../src/builtin/compaction.ts");
 const { stepGate, stepNote } = await import("../src/builtin/steps.ts");
 const { endpointOf, checkJudge, fitState } = await import("../src/judge/client.ts");
 const { atResult, atAnswer } = await import("../src/judge/index.ts");
@@ -221,7 +223,8 @@ test("the evaluator marks the plan forward every few steps, in one request with 
 	stepGate("c8");
 	const r = await atResult("c8", { name: "bash", arguments: { command: "true" } }, out("ok"));
 	const q = seen.at(-1).body.questions;
-	assert.deepEqual(Object.keys(q.plan ? {} : q).sort(), ["plan.item0", "plan.item1", "plan.item2"]);
+	// The course is checked at the same step (both every 5): one request, each point its own questions.
+	assert.deepEqual(Object.keys(q).sort(), ["course.course", "plan.item0", "plan.item1", "plan.item2"]);
 	assert.deepEqual(Object.keys(q["plan.item0"].criteria), ["in_progress", "pending", "completed"], "its status as it stands first");
 	assert.match(r.notes[0], /done: "Write the game"; now: "Test it"/);
 	assert.deepEqual(turnOf("c8").plan.map((p) => p.status), ["completed", "in_progress", "pending"]);
@@ -469,4 +472,72 @@ test("an overflowing request cuts what the next step needs least first", async (
 	assert.match(out2[1].content[0].text, /cut here/, "the old page cut");
 	assert.match(out2[2].content[0].text, /^DNS PRICE/);
 	assert.ok(out2[2].content[0].text.length > 150_000, "the needed one kept whole");
+});
+
+test("the thread's opening message, leaving open where the work belongs, is asked about first; a later one is not", async () => {
+	setSetting("judge", { enabled: true, base_url: base });
+	const { projects } = await import("../src/builtin/projects.ts");
+	projects.save({ id: "p", name: "Blog" });
+	projects.save({ id: "q", name: "Assistant TG" });
+	seeRequest("o1", [user("restore the skills from the Hermes backup")]);
+	reply = (body) => {
+		assert.equal(body.state.thread_project, "Blog");
+		assert.ok(body.state.projects.includes("Assistant TG"));
+		assert.deepEqual(Object.keys(body.questions["start.clear"].criteria), ["clear", "ask_first"], "starting first");
+		return { answers: { ...choice("start.clear", { clear: 0.15, ask_first: 0.85 }).answers, ...choice("start.skill", { none: 0.9 }).answers } };
+	};
+	const hints = await atRequest("o1");
+	assert.match(hints[0], /ask them with clarify/);
+	// A later message leans on what was said before: not asked.
+	seeRequest("o1", [user("restore the skills from the Hermes backup"), { role: "assistant", content: [] }, user("yes, go on")]);
+	reply = (body) => {
+		assert.equal(body.questions["start.clear"], undefined);
+		return choice("start.skill", { none: 0.9 });
+	};
+	await atRequest("o1");
+});
+
+test("leaning off course at two checks running is a soft line with the request; once is not", async () => {
+	seeRequest("d1", [user("Restore the Things skills into Assistant TG")]);
+	reply = () => choice("course.course", { on_track: 0.3, drifting: 0.45, looping: 0.15, done: 0.1 });
+	steps("d1", DRIFT_EVERY);
+	assert.equal(await checkCourse("d1"), undefined, "once: quiet");
+	steps("d1", DRIFT_EVERY);
+	assert.match((await checkCourse("d1"))!, /may be moving away from what the person asked: «Restore the Things skills/);
+	steps("d1", DRIFT_EVERY);
+	assert.equal(await checkCourse("d1"), undefined, "said, then counted anew");
+});
+
+test("a script's nested call is no way around repeat: it is weighed against the calls before it", async () => {
+	seeRequest("n1", [user("Set up the cron jobs")]);
+	const job = { name: "cron", arguments: { action: "list" } };
+	seeResult("n1", job, out('{"jobs":[]}'));
+	reply = () => choice("repeat.repeat", { new: 0.05, same_failed: 0.0, same_result: 0.95 });
+	assert.match((await atCall("n1", { ...job, parent: "x" } as any, false)).block!, /already have/);
+	seeNestedResult("n1", { name: "cron", arguments: { action: "create", name: "weekly" } }, out("ok"));
+	assert.equal(turnOf("n1").calls.at(-1)!.args.name, "weekly");
+	assert.equal(turnOf("n1").steps, 0, "not a step of the turn");
+});
+
+test("at compaction, the results the work needs word for word follow the summary", async () => {
+	seeRequest("k1", [user("Restore the skills")]);
+	const messages = [
+		{ role: "assistant", content: [{ type: "toolCall", id: "a", name: "bash", arguments: { command: "sha256sum SKILL.md" } }] },
+		{ role: "toolResult", toolCallId: "a", content: [{ type: "text", text: "54ebcfe4a69f0c SKILL.md" }] },
+		{ role: "assistant", content: [{ type: "toolCall", id: "b", name: "bash", arguments: { command: "ls" } }] },
+		{ role: "toolResult", toolCallId: "b", content: [{ type: "text", text: "a b c" }] },
+	];
+	const blocks = results(messages);
+	assert.match(blocks[0], /sha256sum.*\n54ebcfe4a69f0c/s);
+	reply = (body) => {
+		assert.match(body.questions.keep.instructions, /word for word/);
+		return choice("keep", { b0: 0.8, b1: 0.1, none: 0.1 });
+	};
+	const kept = await keptThrough("k1", blocks);
+	assert.match(kept, /## Kept word for word/);
+	assert.match(kept, /54ebcfe4a69f0c/);
+	assert.doesNotMatch(kept, /a b c/);
+	setSetting("judge", { enabled: false, base_url: base });
+	assert.equal(await keptThrough("k1", blocks), "", "no evaluator: nothing added");
+	setSetting("judge", { enabled: true, base_url: base });
 });
