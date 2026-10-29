@@ -11,6 +11,9 @@ use crate::media::audio::{Playback, Recorder};
 use crate::media::pauses::{Cut, commit_pause, ends_sentence, predict, worth_a_run};
 use crate::media::state::{KEPT_RUNS, LiveDictation};
 
+/// The longest dictation, in seconds: then it stops as if the mic were clicked.
+const MAX_RECORDING: f32 = 300.;
+
 /// Ticks of the waveform's repaint (33 ms) between two looks for a pause.
 const PAUSE_LOOK: u32 = 6;
 
@@ -29,7 +32,14 @@ impl BenchApp {
                 cx.notify();
                 return;
             }
-            match rec.finish() {
+            // Only the speech goes, without the silence around it; nothing said, nothing sent (a
+            // mic left on in a quiet room sent minutes of silence and held the recognizer up).
+            let speech = match rec.speech_span(0) {
+                Some((a, b)) => rec.wav_between(a, b),
+                None => Err(anyhow::anyhow!("nothing was said")),
+            };
+            drop(rec);
+            match speech {
                 Ok(wav) => {
                     self.media.transcribing = true;
                     self.rest(
@@ -82,6 +92,12 @@ impl BenchApp {
                             tick += 1;
                             let alive = this.update_in(cx, |this, window, cx| {
                                 cx.notify();
+                                // A mic left on stops by itself; what was said goes as when stopped.
+                                if this.media.recorder.as_ref().is_some_and(|r| r.secs() >= MAX_RECORDING) {
+                                    this.toast(NotificationType::Info, "Dictation stopped at 5 minutes", window, cx);
+                                    this.toggle_mic(window, cx);
+                                    return false;
+                                }
                                 // A look for a pause every ~0.2 s.
                                 if tick % PAUSE_LOOK == 0 && this.media.live.is_some() {
                                     this.at_pause(window, cx);
@@ -135,7 +151,9 @@ impl BenchApp {
                 let len = rec.len();
                 let open_secs = (len - from) as f32 / rate;
                 let worth = worth_a_run((len - ran) as f32 / rate, predict(&self.media.runs, open_secs));
-                let wav = worth.then(|| rec.wav_between(from, len));
+                // From the speech's first words: the silence before them is not sent.
+                let start = rec.speech_span(from).map_or(from, |(a, _)| a);
+                let wav = worth.then(|| rec.wav_between(start, len));
                 live.looked = at;
                 if worth {
                     live.ran = len;
@@ -155,11 +173,12 @@ impl BenchApp {
         let Some(live) = self.media.live.as_mut() else {
             return;
         };
-        // Words after the last run, not just time: silence since is not worth a run.
+        // Words after the last run, not just time: silence since is not worth a run; and only the
+        // speech goes, without the silence around it.
         let more = rec.spoke_since(live.ran);
         let len = rec.len();
         live.finishing = true;
-        let wav = if more { rec.wav_between(live.from, len).ok() } else { None };
+        let wav = if more { rec.speech_span(live.from).and_then(|(a, b)| rec.wav_between(a, b).ok()) } else { None };
         drop(rec);
         match (wav, live.running) {
             (Some(wav), false) => self.run_live(wav, len, true, window, cx),

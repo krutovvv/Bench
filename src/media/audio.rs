@@ -9,7 +9,8 @@ use anyhow::{Result, anyhow, bail};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 pub struct Recorder {
-    stream: cpal::Stream,
+    /// Kept alive while recording: dropping the recorder stops the microphone.
+    _stream: cpal::Stream,
     samples: Arc<Mutex<Vec<f32>>>,
     rate: u32,
 }
@@ -58,7 +59,7 @@ impl Recorder {
         };
         stream.play()?;
         Ok(Self {
-            stream,
+            _stream: stream,
             samples,
             rate,
         })
@@ -90,16 +91,6 @@ impl Recorder {
         v.iter().sum::<f32>() / v.len() as f32
     }
 
-    /// Stop and return a 16-bit mono WAV.
-    pub fn finish(self) -> Result<Vec<u8>> {
-        drop(self.stream);
-        let samples = std::mem::take(&mut *self.samples.lock().unwrap());
-        if samples.len() < self.rate as usize / 4 {
-            bail!("recording too short");
-        }
-        wav(&samples, self.rate)
-    }
-
     /// How many samples are recorded, and at what rate.
     pub fn len(&self) -> usize {
         self.samples.lock().unwrap().len()
@@ -117,6 +108,16 @@ impl Recorder {
     /// How long the silence at sample `from` lasts so far, in seconds (`pauses.rs`).
     pub fn silence_from(&self, from: usize) -> f32 {
         super::pauses::silence_from(&self.samples.lock().unwrap(), self.rate, from)
+    }
+
+    /// The speech since sample `from`, without the silence around it (`pauses.rs`); None: nothing said.
+    pub fn speech_span(&self, from: usize) -> Option<(usize, usize)> {
+        super::pauses::speech_span(&self.samples.lock().unwrap(), self.rate, from)
+    }
+
+    /// How long it has recorded, in seconds.
+    pub fn secs(&self) -> f32 {
+        self.len() as f32 / self.rate as f32
     }
 
     /// Whether there was speech since sample `from` (`pauses.rs`).

@@ -75,6 +75,25 @@ pub fn ends_sentence(text: &str) -> bool {
     text.trim_end().ends_with(['.', '?', '!', '…'])
 }
 
+/// The speech in what was recorded since sample `from`: from a little before its first loud slice to
+/// a little after its last, in samples; None when nothing was said (a mic left on in a quiet room).
+/// What is sent is this, never the silence around it.
+pub fn speech_span(samples: &[f32], rate: u32, from: usize) -> Option<(usize, usize)> {
+    let (all, win, _, loud) = measure(samples, rate);
+    let first = from / win;
+    let now = all.get(first..)?;
+    if (now.iter().filter(|l| **l > loud).count() as f32) * SLICE < MIN_SPEECH {
+        return None;
+    }
+    let margin = (MARGIN / SLICE) as usize;
+    let start = now.iter().position(|l| *l > loud)?.saturating_sub(margin);
+    let end = (now.iter().rposition(|l| *l > loud)? + 1 + margin).min(now.len());
+    Some(((first + start) * win, ((first + end) * win).min(samples.len())))
+}
+
+/// Silence kept around the speech that is sent, in seconds.
+const MARGIN: f32 = 0.3;
+
 /// Whether there was speech since sample `from` (stopping sends the speech again only then).
 pub fn spoke_since(samples: &[f32], rate: u32, from: usize) -> bool {
     let (all, win, _, loud) = measure(samples, rate);
@@ -254,6 +273,15 @@ mod tests {
         let at = (3.0 * RATE as f32) as usize;
         let quiet = silence_from(&s, RATE, at);
         assert!((1.2..1.4).contains(&quiet), "silence {quiet}");
+    }
+
+    #[test]
+    fn only_the_speech_is_sent_and_nothing_when_nothing_was_said() {
+        assert_eq!(speech_span(&sound(60., 0.), RATE, 0), None, "a minute of a quiet room");
+        let s = join(&[sound(10., 0.), sound(3., 0.3), sound(20., 0.)]);
+        let (a, b) = speech_span(&s, RATE, 0).expect("speech");
+        let (a, b) = (a as f32 / RATE as f32, b as f32 / RATE as f32);
+        assert!((9.6..10.).contains(&a) && (13.0..13.4).contains(&b), "{a}..{b}");
     }
 
     #[test]
