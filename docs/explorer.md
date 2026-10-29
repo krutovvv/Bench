@@ -105,8 +105,8 @@ one click away) and grows by putting the same parts in more places, not by new c
   a time (`right_dock`): the open **thread** beside the code (the same `ThreadView` entity the
   center shows, so the IDE costs no second chat). Files are never kept beside: they open as tabs. In
   the threads view the right dock holds a second thread, its own `ThreadView` with its own
-  composer, run and queue, opened with a thread's "Open beside" (`src/thread/beside.rs`); ⌘J
-  folds it.
+  composer, run and queue, kept in code (`src/thread/beside.rs`, `BENCH_DEMO_BESIDE`) but no longer offered in the
+  sidebar's menu: two runs at once ask more of a local model than most have; ⌘J folds it.
 - **Code goes to the thread as references.** ⌘L sends the selection (or the whole file) to the
   composer as a chip naming the file and lines; a tab dragged onto the thread, or its menu's
   "Add to thread", sends the file. A message carries them under its words as fenced blocks with

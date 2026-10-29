@@ -35,7 +35,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | open, delete or search threads | `src/thread/open.rs` |
 | make anything wait for a second press (delete, remove, close unsaved) | `src/app/armed.rs` (`self.armed.confirm(key)`), the control `bench_ui::confirm_buttons` |
 | change what a thread on screen keeps (its composer, its run, its events) | `src/thread/view.rs` (`ThreadView`), its state `src/thread/active.rs` (`ActiveThread`, `ThreadRef`) |
-| change the second thread beside the open one ("Open beside") or the right dock's thread head | `src/thread/beside.rs`, `src/thread/panel.rs`; the menu item in `src/sidebar/menu.rs` |
+| change the second thread beside the open one (kept in code, not offered in the menu) or the right dock's thread head | `src/thread/beside.rs`, `src/thread/panel.rs` |
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
 | change dictation (the mic, text while speaking: pieces sent at pauses) | `src/media/voice.rs`, the pauses `src/media/pauses.rs` (tests), the recorder `src/media/audio.rs`; its switch in the gear's Voice (`src/settings/mod.rs`), kept in `dictation.json` |
 | change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu, `top.rs` the strip over it; loading projects: `project_list.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |

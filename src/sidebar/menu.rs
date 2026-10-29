@@ -63,8 +63,11 @@ pub(super) fn color_row(
         .into_any_element()
 }
 
-/// The menu of a sidebar item (its "⋯" and a right click), the same for a thread and a
-/// project: a project's own entries (its Code view, its Settings), then pin, color, rename, delete.
+/// The menu of a sidebar item (its "⋯" and a right click), ordered as Finder's: what is done
+/// most first (a project's new thread, its Code view, its Settings), then its name and pin, its
+/// color, and its removal last. A thread has the same tail. (A thread opened beside another —
+/// `open_beside` — is not offered here: two threads at once ask more of a local model than most
+/// have; the Code view's thread panel is where a thread sits beside something.)
 pub(super) fn item_menu(
     view: Entity<BenchApp>,
     item: Item,
@@ -85,66 +88,61 @@ pub(super) fn item_menu(
         let key = item.mark_key();
         let (pin_key, swatch_view, swatch_key) = (key.clone(), view.clone(), key.clone());
         let (rename, del) = (item.clone(), item.clone());
+        // This Mac's Host is always first: no pin. An agent's Host keeps its name and is never
+        // removed (a server's agent leaves Bench in the gear).
+        let project = match &item {
+            Item::Project(id) => Some(crate::app::model::ProjectKey::parse(id)),
+            Item::Thread(_) => None,
+        };
+        let host = project.as_ref().is_some_and(|k| k.is_host());
+        let pinnable = !project.as_ref().is_some_and(|k| k.is_host() && k.agent.is_empty());
         let menu = match &item {
             Item::Project(id) => {
-                // Its files, prompts, skills and tools: the Code view (the window's Chat | Code,
-                // named as it is there); its Settings (name, where it lives, model, Telegram) —
-                // the gear the row had, kept in its menu.
-                menu.item({
-                    let id = id.clone();
+                let (new_in, code, settings) = (id.clone(), id.clone(), id.clone());
+                menu.item(
+                    PopupMenuItem::new("New Thread")
+                        .icon(Ico::Plus.icon())
+                        .on_click(act(Box::new(move |this, window, cx| {
+                            this.new_thread_in(new_in.clone(), cx);
+                            this.focus_composer(window, cx);
+                        }))),
+                )
+                // Its files, prompts, skills and tools: the Code view, named as the window's
+                // Chat | Code names it.
+                .item(
                     PopupMenuItem::new("Code")
                         .icon(Ico::Code.icon())
                         .on_click(act(Box::new(move |this, window, cx| {
-                            this.show_explorer(id.clone(), window, cx)
-                        })))
-                })
-                .item({
-                    let id = id.clone();
-                    PopupMenuItem::new("Settings")
+                            this.show_explorer(code.clone(), window, cx)
+                        }))),
+                )
+                // Its name, where it lives, model, Telegram.
+                .item(
+                    PopupMenuItem::new("Settings…")
                         .icon(Ico::Settings.icon())
                         .on_click(act(Box::new(move |this, window, cx| {
-                            this.open_project_settings(id.clone(), window, cx)
-                        })))
-                })
-                .separator()
-            }
-            // A second thread beside the open one (or beside the document in the center).
-            Item::Thread(id) => {
-                let id = id.clone();
-                menu.item(
-                    PopupMenuItem::new("Open beside")
-                        .icon(Ico::PanelRight.icon())
-                        .on_click(act(Box::new(move |this, window, cx| {
-                            this.open_beside(id.clone(), window, cx)
+                            this.open_project_settings(settings.clone(), window, cx)
                         }))),
                 )
                 .separator()
             }
+            Item::Thread(_) => menu,
         };
-        // This Mac's Host is always first: no pin. An agent's Host is never removed (a server's
-        // agent leaves Bench in the gear).
-        let key_of = |i: &Item| match i {
-            Item::Project(id) => Some(crate::app::model::ProjectKey::parse(id)),
-            Item::Thread(_) => None,
-        };
-        let host = key_of(&item).is_some_and(|k| k.is_host());
-        let pinnable = !key_of(&item).is_some_and(|k| k.is_host() && k.agent.is_empty());
-        menu.when(pinnable, |menu| {
+        menu.when(!host, |menu| {
+            menu.item(
+                PopupMenuItem::new("Rename…")
+                    .icon(Ico::Pencil.icon())
+                    .on_click(act(Box::new(move |this, window, cx| {
+                        this.start_rename(rename.clone(), window, cx)
+                    }))),
+            )
+        })
+        .when(pinnable, |menu| {
             menu.item(
                 PopupMenuItem::new(if pinned { "Unpin" } else { "Pin" })
                     .icon(Ico::Pin.icon())
                     .on_click(act(Box::new(move |this, _, cx| {
                         this.toggle_pin(pin_key.clone(), cx)
-                    }))),
-            )
-        })
-        // A thread is renamed here; a project in its environment (its Name).
-        .when(matches!(rename, Item::Thread(_)), |menu| {
-            menu.item(
-                PopupMenuItem::new("Rename")
-                    .icon(Ico::Pencil.icon())
-                    .on_click(act(Box::new(move |this, window, cx| {
-                        this.start_rename(rename.clone(), window, cx)
                     }))),
             )
         })
@@ -158,7 +156,7 @@ pub(super) fn item_menu(
             menu.separator().item(
                 PopupMenuItem::new(match del {
                     Item::Thread(_) => "Delete…",
-                    Item::Project(_) => "Remove project…",
+                    Item::Project(_) => "Remove Project…",
                 })
                 .icon(Ico::Trash.icon())
                 .on_click(act(Box::new(move |this, window, cx| match &del {

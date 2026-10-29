@@ -75,7 +75,8 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
   beside). It is the familiar view of a project, built into Bench: no external editor is
   referenced or needed.
   The window is Zed's workspace: a left dock (threads or Explorer), the center, a right dock.
-  Two threads can sit side by side: a thread's menu in the sidebar has "Open beside".
+  A thread sits beside the documents in the Code view; two threads side by side (`src/thread/beside.rs`)
+  stay in code but are not offered: two runs at once ask more of a local model than most have.
 - **The gear** (Bench → Settings… in the macOS menu, ⌘,) holds the app's settings, in tabs: Agents (each one's models and voice;
   add and remove servers' agents), Presets (MCP and language servers a project takes with one
   click, compaction shares, reasoning levels), Appearance.
