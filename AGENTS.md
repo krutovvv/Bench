@@ -1,5 +1,9 @@
 # AGENTS.md: Bench
 
+> **Work in progress (2026-10-30):** a whole-project audit is being fixed. Read
+> `docs/handoff/README.md` (the task and its state) and `docs/handoff/principles.md` (the owner's
+> rules) before anything else.
+
 Read this first. Then `docs/map.md` to find the file for your change — open that file, not its
 neighbours. Read the skill `.agents/skills/bench-kit/SKILL.md` before any UI or insert work, and
 `.agents/skills/bench-structure/SKILL.md` (in Russian) before adding a feature, a module, a file

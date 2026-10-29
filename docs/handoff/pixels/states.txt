@@ -1,0 +1,28 @@
+demo BENCH_DEMO=1
+landing BENCH_DEMO=landing
+top BENCH_DEMO=top
+long BENCH_DEMO=long
+server BENCH_DEMO=server
+tool BENCH_DEMO=tool
+toolhtml BENCH_DEMO=tool BENCH_DEMO_TOOL=html
+toolpreview BENCH_DEMO=tool BENCH_DEMO_TOOL=preview
+toollong BENCH_DEMO=tool BENCH_DEMO_TOOL=long
+exdiff BENCH_DEMO=explorer BENCH_EXPLORER=diff
+env BENCH_DEMO=env
+expart BENCH_DEMO=explorer BENCH_EXPLORER=part
+exlsp BENCH_DEMO=explorer BENCH_EXPLORER=lsp
+exlspnew BENCH_DEMO=explorer BENCH_EXPLORER=lsp-new
+exterm BENCH_DEMO=explorer BENCH_EXPLORER=terminal
+exprob BENCH_DEMO=explorer BENCH_EXPLORER=problems
+gear0 BENCH_DEMO=1 BENCH_PANEL=providers BENCH_GEAR_TAB=0
+gear1 BENCH_DEMO=1 BENCH_PANEL=providers BENCH_GEAR_TAB=1
+gear2 BENCH_DEMO=1 BENCH_PANEL=providers BENCH_GEAR_TAB=2
+work BENCH_DEMO=1 BENCH_DEMO_WORK=1:0
+clarify BENCH_DEMO=1 BENCH_CLARIFY=1
+clarifyans BENCH_DEMO=1 BENCH_CLARIFY=answered
+procs BENCH_DEMO=1 BENCH_DEMO_PROCS=1
+queue BENCH_DEMO=1 BENCH_DEMO_QUEUE=1
+pop BENCH_DEMO=1 BENCH_DEMO_POP=agent
+slash BENCH_DEMO=1 BENCH_DEMO_TYPE=/
+newproj BENCH_DEMO=new-project
+newthread BENCH_DEMO=new
