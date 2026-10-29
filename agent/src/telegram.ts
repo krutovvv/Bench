@@ -106,7 +106,7 @@ function activityWord(name: string): string {
 		read: "reading…", edit: "editing…", write: "editing…", search_replace: "editing…",
 		grep: "searching…", glob: "searching…", ls: "searching…", session_search: "searching…", tool_search: "searching…",
 		web_fetch: "checking the web…", web_search: "checking the web…",
-		delegate: "delegating…", todo: "planning…", memory: "taking notes…",
+		todo: "planning…", memory: "taking notes…",
 		cron: "the schedule…", clarify: "asking you…", skill_view: "a skill…", skill_manage: "a skill…",
 	};
 	return words[name] ?? `using ${base}…`;
@@ -265,13 +265,6 @@ async function startBot(rt: Runtime, cfg: Config, project: string): Promise<void
 			// Counted, not listed: the status line says the kind of the newest call, in a word.
 			t.steps++;
 			t.word = activityWord(e.name);
-			schedule(t);
-		} else if (e.kind === "subagent") {
-			const t = turns.get(threadId);
-			if (!t) return;
-			t.steps++;
-			// A delegation says what it delegated — it is a readable line in its own right.
-			t.text = `👥 ${e.goal.slice(0, 110)}`;
 			schedule(t);
 		} else if (e.kind === "complete") {
 			const t = turns.get(threadId);

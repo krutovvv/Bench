@@ -43,13 +43,12 @@ const ctx = BACKGROUND_CONTEXT;
 /** Tell every connected Bench something (crates/protocol `Event`). */
 export type Publish = (event: Event) => void;
 
-/** What a run does, for listeners in this process (Telegram, scheduled runs, subagents' parents):
+/** What a run does, for listeners in this process (Telegram, scheduled runs):
  * not the wire — Bench reads a thread from its journal and its `ThreadEvent`s. */
 export type RunEvent =
 	| { kind: "start" }
 	| { kind: "delta"; text: string }
 	| { kind: "tool"; name: string }
-	| { kind: "subagent"; goal: string }
 	| { kind: "ask"; ask: Ask; question: string }
 	| { kind: "complete"; text: string };
 export type RunListener = (threadId: string, e: RunEvent) => void;

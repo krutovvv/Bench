@@ -4,7 +4,7 @@
 //! at its beginning with the agent's steps unfolded.
 //!
 //! No agent, nothing of the person's: invented chats in the sidebar and one
-//! open session that shows what the agent's client can do — steps and a subagent, an answer with
+//! open session that shows what the agent's client can do — steps, an answer with
 //! a code block, a chart, a diagram, a formula, a video and a voice reply, its sources, the
 //! files it changed, a process still running. The media live in `assets/demo/`.
 
@@ -530,7 +530,7 @@ fewer form fields. Then check what it did to signups and give me a short summary
     // The new project's page has its own hook: `BENCH_DEMO=new-project` (thread/mod.rs).
     // `BENCH_CLARIFY=1` (with `BENCH_CLARIFY_MULTI=1`) over a demo thread: the agent's question
     // — its journal item and the live prompt that lets it be answered — inside the work that
-    // asked it, its choices long enough to show they wrap.
+    // asked it, its choices long enough to show they wrap; `=answered` once answered.
     if std::env::var("BENCH_CLARIFY").is_ok() {
         let multi = std::env::var("BENCH_CLARIFY_MULTI").is_ok();
         let question = "Как оформить разделы шестерни (Settings)?";
@@ -562,6 +562,16 @@ fewer form fields. Then check what it did to signups and give me a short summary
                     multi,
                 },
             ]));
+            // `BENCH_CLARIFY=answered`: the same question once answered, as it stays in the thread.
+            if std::env::var("BENCH_CLARIFY").as_deref() == Ok("answered") {
+                t.journal.apply(protocol::ThreadEvent::Append(vec![protocol::ThreadItem::Asked {
+                    key: "demo-asked".into(),
+                    seq: 9992,
+                    id: "demo".into(),
+                    answer: Some(choices[0].clone()),
+                }]));
+                return;
+            }
             t.journal.apply(protocol::ThreadEvent::Asks(vec![protocol::Ask {
                 id: "demo".into(),
                 kind: protocol::AskKind::Clarify,

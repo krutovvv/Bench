@@ -272,8 +272,18 @@ impl ThreadView {
                 if this.thread.auto_work.as_deref() == Some(work_key.as_str()) {
                     this.thread.auto_work = None;
                 }
-                if !this.thread.open_work.remove(&work_key) {
+                let folded = this.thread.open_work.remove(&work_key);
+                if !folded {
                     this.thread.open_work.insert(work_key.clone());
+                }
+                // Remembered past this visit: back in the thread, the live work stays as left.
+                if let Some(id) = this.thread.id.as_ref().map(|i| i.as_str().to_string()) {
+                    let shut = this.work_shut.entry(id).or_default();
+                    if folded {
+                        shut.insert(work_key.clone());
+                    } else {
+                        shut.remove(&work_key);
+                    }
                 }
                 cx.notify();
             }));

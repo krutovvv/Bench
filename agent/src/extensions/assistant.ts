@@ -1,5 +1,5 @@
 // The assistant: Bench's default extension. Pi's own coding tools (read, write, edit, bash) and
-// tool search, plus the person-facing tools (clarify, todo, memory, skills, cron, delegate,
+// tool search, plus the person-facing tools (clarify, todo, memory, skills, cron,
 // session_search) and the inserts' tools (ssh_run). Its prompt is a
 // few short sections (src/prompt.ts). An agent can select other extensions next to it or instead
 // of it (its settings.json "extensions").
@@ -15,7 +15,6 @@ import { CronTask, cronTool } from "../builtin/cron.ts";
 import { ProcessTask, processTool } from "../builtin/process.ts";
 import { memoryTool } from "../builtin/memory.ts";
 import { skillManage, skillView } from "../builtin/skills.ts";
-import { delegate } from "../builtin/subagent.ts";
 import { resolveComment } from "../builtin/review.ts";
 import { specFor, specsOf } from "../specs.ts";
 import { machineOf } from "../repo.ts";
@@ -96,7 +95,7 @@ async function specNote(info: { cwd: string; project?: string }, conversation: s
 
 export const assistant = defineExtension({
 	name: "assistant",
-	tools: [...coding, grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, resolveComment, memoryTool, skillView, skillManage, cronTool, delegate, sessionSearch, sshRun, processTool],
+	tools: [...coding, grepTool, globTool, lsTool, diagnosticsTool, lspTool, clarify, todo, resolveComment, memoryTool, skillView, skillManage, cronTool, sessionSearch, sshRun, processTool],
 	tasks: [CronTask, ProcessTask],
 	sections: [
 		section("soul", s(soul), { tag: false }),

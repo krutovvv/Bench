@@ -315,6 +315,11 @@ impl ThreadView {
     /// texts to the answer that replaces it, the live thinking its fold to its piece of work.
     /// Made anew, either would change on screen at the run's end.
     fn carry_over(&mut self, rows: &[Row]) {
+        let mut shut = self
+            .thread
+            .id
+            .as_ref()
+            .and_then(|id| self.work_shut.get_mut(id.as_str()));
         let t = &mut self.thread;
         for (k, old) in t.tv.rows.iter().enumerate() {
             match (old, rows.get(k)) {
@@ -322,10 +327,15 @@ impl ThreadView {
                     t.texts.rename("answer-writing-", &format!("answer-{key}-"));
                     t.texts.rename("code-writing-", &format!("code-{key}-"));
                 }
-                (Row::Work { key: was, .. }, Some(Row::Work { key, .. }))
-                    if was != key && t.open_work.remove(was) =>
-                {
-                    t.open_work.insert(key.clone());
+                (Row::Work { key: was, .. }, Some(Row::Work { key, .. })) if was != key => {
+                    if t.open_work.remove(was) {
+                        t.open_work.insert(key.clone());
+                    }
+                    if let Some(shut) = shut.as_deref_mut() {
+                        if shut.remove(was) {
+                            shut.insert(key.clone());
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -333,7 +343,8 @@ impl ThreadView {
         // The live work opens on its own: thinking, steps and the agent's words show in the
         // list they belong to, and the stream's narration enters where its note will sit —
         // nothing vanishes from a seat of its own. The run's end folds what the view opened;
-        // a person who clicked the line keeps it their way, open or shut.
+        // a person who clicked the line keeps it their way, open or shut — also after leaving
+        // the thread and coming back (`work_shut`).
         let live_key = |rs: &[Row]| {
             rs.iter().find_map(|r| match r {
                 Row::Work {
@@ -351,7 +362,11 @@ impl ThreadView {
                 t.open_work.insert(k.to_string());
                 t.auto_work = Some(k.to_string());
             }
-            (None, Some(k), _) if t.auto_work.is_none() && !t.open_work.contains(k) => {
+            (None, Some(k), _)
+                if t.auto_work.is_none()
+                    && !t.open_work.contains(k)
+                    && !shut.as_deref().is_some_and(|s| s.contains(k)) =>
+            {
                 t.open_work.insert(k.to_string());
                 t.auto_work = Some(k.to_string());
             }

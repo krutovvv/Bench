@@ -182,16 +182,20 @@ pub fn pick_row(
 
 /// A whole answer of its own in a card (a `clarify` choice): as wide as the card, its text
 /// wrapped over lines. A button cannot be this: its label is one line, and it would push the
-/// card past the thread's column.
+/// card past the thread's column. One line of it is as tall as a field (`FIELD_H`), so the
+/// card's own-answer field under the choices lines up with them rather than stepping down.
 pub fn choice_row(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
+    use crate::metrics::{FIELD_H, HAIRLINE, THREAD_META};
+    const LINE: f32 = 20.;
     let theme = cx.theme().clone();
     div()
         .id(id)
         .w_full()
         .min_w_0()
         .px_2p5()
-        .py_1p5()
-        .text_size(px(crate::metrics::THREAD_META))
+        .py(px((FIELD_H - 2. * HAIRLINE - LINE) / 2.))
+        .text_size(px(THREAD_META))
+        .line_height(px(LINE))
         .rounded_md()
         .bg(theme.background)
         .border_1()

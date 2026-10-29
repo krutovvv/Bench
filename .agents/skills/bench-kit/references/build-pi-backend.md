@@ -65,7 +65,6 @@ lists what is Pi's, what is a package and what is ours.
 - **Pi conversation ids are integers**: store as integer text, convert both ways.
 - **Register every stored session's model before `harness.resume()`**, or resumed runs fail
   with `no_model`; then watch sessions with live tasks so their answers reach the index.
-- **A subagent's conversation has no session of its own**: `host().adopt(child, parent)`.
 - **A cron job's sleeping task is aborted and re-created on every change** (`task_id` on the job),
   or an update leaves two tasks firing.
 - **MCP blows the context**: one server with 170 tools is 150k tokens. Defer big servers
@@ -103,10 +102,6 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   `sleepUntil`s its next run, so it survives restarts and a run missed while down happens on
   start; a `memo` per firing keeps a restart mid-run from running it twice. Jobs are rows in
   `bench.sqlite` with the task's `task_id`; a change aborts the task and arms a new one (`arm`).
-- **Delegate** (`builtin/subagent.ts`): child conversations owned by the tool call's task
-  (`createConversation({ownership: {kind: "task", taskId}})`), found again by `ownerTaskId` on a
-  replay, so a rerun after a crash reuses them; up to 4 run in parallel, without `delegate`;
-  `host().adopt(child, parent)` makes them act for the parent's session.
 - **tasks, ssh_run** (`builtin/*.ts`): plain `defineTool`s. Their data is in `bench.sqlite`
   (tasks) or where it lives (`~/.ssh/config`); Bench reads the same through REST (`/api/tasks`,
   …). Without an explicit `host` argument `ssh_run` uses what the thread has inserted

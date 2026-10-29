@@ -137,7 +137,8 @@ impl ThreadView {
 
     /// The question, in the work that asked it. Waiting and live, it is a card one can answer
     /// (choices, one's own words, or its cross to decline; an approval offers its choices). Once settled —
-    /// or waiting on an agent that no longer asks — it says what was asked and what was answered.
+    /// or waiting on an agent that no longer asks — the same card, its frame neutral, says what was
+    /// asked and what was answered.
     fn render_ask_card(&mut self, card: &AskCard, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let muted = theme.muted_foreground;
@@ -151,39 +152,6 @@ impl ThreadView {
         // Only the question the agent is waiting for right now takes answers: the journal also
         // shows settled ones and, after a restart, ones nobody waits for.
         let live = !settled && self.thread.journal.asks().iter().any(|a| a.id == card.id);
-        // Answered: history, not a form — a quiet entry as a step of the work is: its icon, the
-        // question in grey, the answer under it (or "No answer", fainter). No frame.
-        if settled {
-            let faint = bench_ui::faint(&theme);
-            let answer = card.answer.clone().unwrap_or_default();
-            return h_flex()
-                .id(SharedString::from(format!("ask-card-{}", card.id)))
-                .w_full()
-                .min_w_0()
-                .gap_2()
-                .items_start()
-                .text_size(px(bench_ui::THREAD_META))
-                .child(
-                    if approve { Ico::CircleAlert } else { Ico::CircleHelp }
-                        .icon()
-                        .xsmall()
-                        .text_color(faint)
-                        .mt(px(bench_ui::ICON_ON_SMALL_LINE)),
-                )
-                .child(
-                    v_flex()
-                        .flex_1()
-                        .min_w_0()
-                        .gap_0p5()
-                        .child(div().text_color(muted).child(card.question.clone()))
-                        .child(if answer.is_empty() {
-                            div().text_color(faint).child("No answer")
-                        } else {
-                            div().text_color(theme.foreground).child(answer)
-                        }),
-                )
-                .into_any_element();
-        }
         let head = h_flex()
             .gap_2()
             .items_start()
@@ -221,7 +189,7 @@ impl ThreadView {
             });
         let body =
             if settled {
-                v_flex().pl_6().when_some(card.answer.clone(), |d, a| {
+                v_flex().pl_6().text_size(px(bench_ui::THREAD_META)).when_some(card.answer.clone(), |d, a| {
                     if a.is_empty() {
                         d.child(div().text_color(muted).child("No answer"))
                     } else {
@@ -234,7 +202,7 @@ impl ThreadView {
                                         .icon()
                                         .xsmall()
                                         .text_color(theme.success)
-                                        .mt(px(bench_ui::ICON_ON_LINE * 2.)),
+                                        .mt(px(bench_ui::ICON_ON_SMALL_LINE)),
                                 )
                                 .child(div().flex_1().min_w_0().child(a)),
                         )
@@ -378,8 +346,10 @@ impl ThreadView {
             .gap_2()
             .border_1()
             .rounded_lg()
-            .border_color(accent.opacity(0.5))
-            .bg(accent.opacity(0.04))
+            .when(settled, |d| d.border_color(theme.border))
+            .when(!settled, |d| {
+                d.border_color(accent.opacity(0.5)).bg(accent.opacity(0.04))
+            })
             .child(head)
             .when_some(card.detail.clone(), |d, cmd| {
                 d.child(

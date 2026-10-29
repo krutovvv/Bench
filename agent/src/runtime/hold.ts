@@ -115,7 +115,7 @@ export class Holds {
 		await this.change(live, (h) => h.splice(0).length > 0);
 	}
 
-	/** Called before every tool call (a subagent's with its parent's session): waits while the
+	/** Called before every tool call: waits while the
 	 * run's document says it is held; false when the person stopped it meanwhile. */
 	async wait(threadId: string, signal?: AbortSignal): Promise<boolean> {
 		const row = this.rt.store.get(threadId);

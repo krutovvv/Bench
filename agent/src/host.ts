@@ -24,16 +24,12 @@ export interface Host {
 	/** Waits while the person holds the run at a step boundary; resolves at once when free.
 	 * False when the run was stopped while it waited: the step must not begin. */
 	hold(threadId: string, signal?: AbortSignal): Promise<boolean>;
-	/** A subagent's conversation acts for its parent's session. */
-	adopt(conversationId: string | number, threadId: string): void;
-	/** How many threads other than `threadId` are running a turn now (each holds one of the model server's slots). */
-	busyElsewhere(threadId: string): number;
 	/** Ask the person; `callId` is the asking call's, the id their answer comes back to. The
 	 * answer, or "" when declined or timed out. */
 	ask(threadId: string, callId: string, question: string, choices: string[], multiSelect: boolean, signal?: AbortSignal): Promise<string>;
 	/** "once" | "session" | "always" | "deny". */
 	approve(threadId: string, callId: string, command: string, description: string): Promise<string>;
-	/** What a run did, for the listeners in this process (`RunEvent`: a subagent started…). */
+	/** What a run did, for the listeners in this process (`RunEvent`). */
 	report(threadId: string, e: RunEvent): void;
 	/** The background processes of a conversation, oldest first (`builtin/process.ts`). */
 	processes(conversationId: string | number): Promise<Process[]>;

@@ -19,23 +19,17 @@ import type { ThreadRow } from "../store.ts";
 /** The runtime as its tools' host. */
 export function hostOf(rt: Runtime): Host {
 	const info = (row: ThreadRow): ThreadFacts => ({ id: row.id, agent: row.agent, cwd: row.cwd, source: row.source, chat_id: row.chat_id, project: row.project ?? "", inserts: rt.live.get(row.id)?.inserts ?? [] });
-	/** Subagents' conversations act for their parent's session. */
-	const adopted = new Map<string, string>();
 	return {
 		thread: (conversationId) => {
 			const key = String(conversationId);
 			const live = rt.byConversation.get(key);
 			if (live) return info(live.row);
-			const parent = adopted.get(key);
-			const row = parent ? rt.store.get(parent) : rt.store.byConversation(key);
+			const row = rt.store.byConversation(key);
 			return row ? info(row) : undefined;
 		},
-		adopt: (conversationId, threadId) => void adopted.set(String(conversationId), threadId),
-		// A subagent's call waits on its parent's hold too: the person holds the whole work.
 		hold: (threadId, signal) => rt.holds.wait(threadId, signal),
 		processes: (conversationId) => rt.processes.list(conversationId),
 		stopProcess: (id) => rt.processes.stop(id),
-		busyElsewhere: (threadId) => [...rt.live.values()].filter((l) => l.busy && l.row.id !== threadId).length,
 		ask: (threadId, callId, question, choices, _multiSelect, signal) => rt.asks.question(threadId, callId, question, choices, signal),
 		approve: (threadId, callId, command, description) => rt.asks.approve(threadId, callId, command, description),
 		report: (threadId, e) => rt.report(threadId, e),
@@ -59,8 +53,7 @@ export function hostOf(rt: Runtime): Host {
 		},
 		count: (conversationId, what) => {
 			const key = String(conversationId);
-			const parent = adopted.get(key);
-			const live = rt.byConversation.get(key) ?? (parent ? rt.live.get(parent) : undefined);
+			const live = rt.byConversation.get(key);
 			if (!live) return;
 			if (what === "call") live.usage.judge = (live.usage.judge ?? 0) + 1;
 			else live.usage.nudges = (live.usage.nudges ?? 0) + 1;

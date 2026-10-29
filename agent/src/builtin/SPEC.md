@@ -12,7 +12,7 @@ references: [thread-objects, projects-and-agents]
 
 The tools the default "assistant" extension gives a thread beside Pi's own read, write, edit and
 bash, and the small stores behind them: `ssh_run` (`ssh.ts`), background processes, cron,
-subagents (`delegate`), memory, skills, `clarify` and approvals (`ask.ts`), projects, the
+memory, skills, `clarify` and approvals (`ask.ts`), projects, the
 servers' agents, presets, grep/glob/ls (`search.ts`), code navigation (`navigate.ts`, the `lsp`
 tool), and line-anchored read and edit (`hashline.ts`). Each tool's line in the prompt is in
 `agent/src/prompt.ts`.
@@ -25,11 +25,13 @@ tool), and line-anchored read and edit (`hashline.ts`). Each tool's line in the 
   SSH, and in a project kept in its folder, without knowing which.
 - A tool that leaves something in the thread leaves it in Pi's terms (`thread-objects`): the plan
   is the `todo` call's arguments, a question is the `clarify` call and its result, a process is a
-  conversation background task (`bench.process`), a subagent is a child conversation owned by the
-  tool's task, a scheduled job is a durable `defineTask` sleeping until its next run.
+  conversation background task (`bench.process`), a scheduled job is a durable `defineTask` sleeping until its next run.
 
 ## Decisions
 
+- **No subagents.** A `delegate` tool (children conversations owned by its call, after Pi's
+  example) was removed on 2026-10-29: a local model answers one or two requests at once, so
+  subagents only slowed the thread, and their work showed nowhere and could not be stopped.
 - **Edits by anchors, for weak models.** `read` shows every line as `LINE:HASH|text`; `edit`
   names lines by those anchors instead of reproducing old text — the step weak and fast models
   fail most. A stale anchor is refused with the lines as they are now, never applied elsewhere.

@@ -163,12 +163,11 @@ impl BenchApp {
         );
         for i in 0..self.gear.providers.endpoints.len() {
             let e = &self.gear.providers.endpoints[i];
-            let (name, url, model, context, parallel, key) = (
+            let (name, url, model, context, key) = (
                 e.name.clone(),
                 e.url.clone(),
                 e.model.clone(),
                 e.context.clone(),
-                e.parallel.clone(),
                 e.key.clone(),
             );
             let current = e.current;
@@ -260,12 +259,6 @@ impl BenchApp {
                         "Context length",
                         "Tokens",
                         gpui_kit::component::input::Input::new(&context).into_any_element(),
-                        cx,
-                    ))
-                    .child(bench_ui::settings_field(
-                        "Parallel requests",
-                        "How many its server answers at once; subagents keep to it",
-                        gpui_kit::component::input::Input::new(&parallel).into_any_element(),
                         cx,
                     ))
                     .child(bench_ui::settings_field(
