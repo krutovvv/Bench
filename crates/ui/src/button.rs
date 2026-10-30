@@ -157,6 +157,30 @@ pub fn form_action(
         .child(label.into())
 }
 
+/// A small bordered chip that does something when clicked (a preset to add, a page's host, a
+/// pane strip's text button). Its size of text is the caller's.
+pub fn chip(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
+    let theme = cx.theme();
+    let (hover, ink) = (theme.list_hover, theme.foreground);
+    h_flex()
+        .id(id)
+        .gap_1()
+        .px_2()
+        .py_0p5()
+        .items_center()
+        .border_1()
+        .rounded_md()
+        .border_color(theme.border)
+        .cursor_pointer()
+        .hover(move |s| s.bg(hover).text_color(ink))
+}
+
+/// `chip` with less room at its sides, for a mark or a word that stands beside others (a flag, a
+/// host).
+pub fn chip_tight(id: impl Into<ElementId>, cx: &App) -> Stateful<Div> {
+    chip(id, cx).px_1p5()
+}
+
 /// Delete without a dialog: the first click arms it (red, "Confirm delete"), the second deletes.
 /// The caller keeps `armed` and clears it on any other click.
 pub fn arm_delete_button(id: impl Into<ElementId>, armed: bool, cx: &App) -> Stateful<Div> {

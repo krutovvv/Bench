@@ -296,7 +296,7 @@ impl BenchApp {
         let mut fields: Vec<AnyElement> = vec![];
         let pick_row = |id: &'static str, labels: Vec<String>, at: usize, server: bool, cx: &mut Context<Self>| {
             let names = labels.clone();
-            crate::inserts::tools::view::segmented_tall_owned(id, labels, at, cx, move |this, k, _, cx| {
+            bench_ui::segmented(id, labels, at, cx, bench_ui::on_pick(cx, move |this: &mut Self, k, _, cx| {
                 if let Some(f) = this.new_project.form.as_mut() {
                     if server {
                         f.machine = Some(names[k].clone());
@@ -305,7 +305,9 @@ impl BenchApp {
                     }
                 }
                 cx.notify();
-            })
+            }))
+            .flex_wrap()
+            .into_any_element()
         };
         match place {
             Place::ThisMac => {

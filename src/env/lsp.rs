@@ -307,15 +307,7 @@ fn new_lsp_card(app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> C
                 .filter_map(|x| x.as_str().map(str::to_string))
                 .collect();
             let (key, spec, id) = (key.clone(), spec.clone(), e.id.clone());
-            div()
-                .id(SharedString::from(format!("env-lsp-preset-{key}")))
-                .px_2()
-                .py_0p5()
-                .rounded_md()
-                .border_1()
-                .border_color(theme.border)
-                .cursor_pointer()
-                .hover(|s| s.bg(theme.list_hover))
+            bench_ui::chip(SharedString::from(format!("env-lsp-preset-{key}")), cx)
                 .child(
                     h_flex()
                         .gap_1()

@@ -2,35 +2,19 @@
 //! many as the person keeps, one of them the main and one its fallback, as the main model has its
 //! own. No switch: a project's Settings say whether its threads use it (`agent/src/judge/`).
 
-use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
-use gpui_kit::prelude::FluentBuilder as _;
+use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
 use crate::app::BenchApp;
-use super::providers::{field, text};
+use super::server_form::{ServerForm, card_action, field, input_row, text};
 use crate::client::rest;
-
-/// One server, as its form shows it.
-pub struct JudgeServer {
-    /// "" for one not saved yet.
-    pub id: String,
-    pub name: Entity<InputState>,
-    pub url: Entity<InputState>,
-    pub model: Entity<InputState>,
-    pub key: Entity<InputState>,
-    /// The key as saved, to send only a change.
-    pub key_value: String,
-    /// The last check: (ok, what it said).
-    pub check: Option<(bool, String)>,
-}
 
 /// The servers, and which is the main one and which its fallback.
 #[derive(Default)]
 pub struct Judge {
-    pub servers: Vec<JudgeServer>,
+    pub servers: Vec<ServerForm>,
     pub main: Option<String>,
     pub fallback: Option<String>,
 }
@@ -43,7 +27,7 @@ impl BenchApp {
             .as_array()
             .into_iter()
             .flatten()
-            .map(|x| JudgeServer {
+            .map(|x| ServerForm {
                 id: s(x, "id"),
                 name: field(window, cx, &s(x, "name"), "Name"),
                 url: field(window, cx, &s(x, "base_url"), "https://api.typesafe.ai or http://host:port"),
@@ -62,7 +46,7 @@ impl BenchApp {
     }
 
     pub fn add_judge_server(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.gear.providers.judge.servers.push(JudgeServer {
+        self.gear.providers.judge.servers.push(ServerForm {
             id: String::new(),
             name: field(window, cx, "", "Name, e.g. Local Jev"),
             url: field(window, cx, "", "https://api.typesafe.ai or http://host:port"),
@@ -76,15 +60,9 @@ impl BenchApp {
 
     fn judge_body(&self, i: usize, cx: &App) -> Value {
         let j = &self.gear.providers.judge.servers[i];
-        let mut body = json!({
-            "id": j.id,
-            "name": text(&j.name, cx),
-            "base_url": text(&j.url, cx),
-            "model": text(&j.model, cx),
-        });
+        let mut body = j.body(cx);
         // Only a changed key: an empty one keeps the saved one.
-        let key = text(&j.key, cx);
-        if key != j.key_value {
+        if let Some(key) = j.changed_key(cx) {
             body["api_key"] = json!(key);
         }
         body
@@ -146,7 +124,7 @@ impl BenchApp {
                 j.check = Some(match r {
                     Ok(v) => (
                         v["ok"].as_bool() == Some(true),
-                        v["message"].as_str().unwrap_or("Doesn't answer").to_string(),
+                        ServerForm::check_message(&v),
                     ),
                     Err(e) => (false, format!("{e:#}")),
                 });
@@ -200,11 +178,9 @@ impl BenchApp {
         let (main, fallback) = (j.main.clone(), j.fallback.clone());
         for i in 0..j.servers.len() {
             let s = &self.gear.providers.judge.servers[i];
-            let (name, url, model, key) = (s.name.clone(), s.url.clone(), s.model.clone(), s.key.clone());
-            let saved = !s.id.is_empty();
+            let saved = s.saved();
             let is_main = saved && main.as_deref() == Some(&s.id);
             let is_fallback = saved && fallback.as_deref() == Some(&s.id);
-            let check = s.check.clone();
             let named = text(&s.name, cx);
             let title = if !saved {
                 "New server".to_string()
@@ -215,74 +191,31 @@ impl BenchApp {
             };
             let armed = saved && self.armed.is(&format!("judge:{}", s.id));
             let mut actions = vec![
-                bench_ui::secondary_button(("judge-delete", i), if armed { "Confirm delete" } else { "Delete" })
-                    .small()
-                    .on_click(cx.listener(move |this, _, w, cx| this.delete_judge_server(i, w, cx)))
-                    .into_any_element(),
-                bench_ui::secondary_button(("judge-check", i), "Check")
-                    .small()
-                    .on_click(cx.listener(move |this, _, w, cx| this.check_judge_server(i, w, cx)))
-                    .into_any_element(),
+                card_action(("judge-delete", i), if armed { "Confirm delete" } else { "Delete" }, false, move |this, w, cx| this.delete_judge_server(i, w, cx), cx),
+                card_action(("judge-check", i), "Check", false, move |this, w, cx| this.check_judge_server(i, w, cx), cx),
             ];
             if saved && !is_main {
-                actions.push(
-                    bench_ui::secondary_button(("judge-main", i), "Make main")
-                        .small()
-                        .on_click(cx.listener(move |this, _, w, cx| this.make_judge_main(i, w, cx)))
-                        .into_any_element(),
-                );
-                actions.push(
-                    bench_ui::secondary_button(("judge-fallback", i), if is_fallback { "No fallback" } else { "Make fallback" })
-                        .small()
-                        .on_click(cx.listener(move |this, _, w, cx| this.toggle_judge_fallback(i, w, cx)))
-                        .into_any_element(),
-                );
+                actions.push(card_action(("judge-main", i), "Make main", false, move |this, w, cx| this.make_judge_main(i, w, cx), cx));
+                actions.push(card_action(("judge-fallback", i), if is_fallback { "No fallback" } else { "Make fallback" }, false, move |this, w, cx| this.toggle_judge_fallback(i, w, cx), cx));
             }
-            actions.push(
-                bench_ui::primary_button(("judge-save", i), "Save")
-                    .small()
-                    .on_click(cx.listener(move |this, _, w, cx| this.save_judge_server(i, w, cx)))
-                    .into_any_element(),
-            );
-            let role = if is_main { Some(("main", theme.primary)) } else if is_fallback { Some(("fallback", muted)) } else { None };
-            page.push(
-                v_flex()
-                    .pt_3()
-                    .child(
-                        h_flex()
-                            .gap_2()
-                            .pb_1()
-                            .items_center()
-                            .child(div().text_base().font_weight(FontWeight::SEMIBOLD).child(title))
-                            .when_some(role, |d, (word, color)| d.child(div().text_sm().text_color(color).child(word))),
-                    )
-                    .child(bench_ui::settings_field("Name", "How it is listed", gpui_kit::component::input::Input::new(&name).into_any_element(), cx))
-                    .child(bench_ui::settings_field("Server", "Its address; /v1/systemone is added", gpui_kit::component::input::Input::new(&url).into_any_element(), cx))
-                    .child(bench_ui::settings_field("Model", "", gpui_kit::component::input::Input::new(&model).into_any_element(), cx))
-                    .child(bench_ui::settings_field("API key", "If the server asks for one", gpui_kit::component::input::Input::new(&key).into_any_element(), cx))
-                    .child(
-                        h_flex()
-                            .py_2()
-                            .gap_2()
-                            .items_center()
-                            .child(div().flex_1().min_w_0().truncate().text_sm().map(|d| match check {
-                                Some((ok, msg)) => d.text_color(if ok { muted } else { theme.danger }).child(msg),
-                                None => d,
-                            }))
-                            .children(actions),
-                    )
-                    .into_any_element(),
-            );
+            actions.push(card_action(("judge-save", i), "Save", true, move |this, w, cx| this.save_judge_server(i, w, cx), cx));
+            let role = if is_main {
+                Some(("main".into(), theme.primary))
+            } else if is_fallback {
+                Some(("fallback".into(), muted))
+            } else {
+                None
+            };
+            let rows = vec![
+                input_row("Name", "How it is listed", &s.name, cx),
+                input_row("Server", "Its address; /v1/systemone is added", &s.url, cx),
+                input_row("Model", "", &s.model, cx),
+                input_row("API key", "If the server asks for one", &s.key, cx),
+            ];
+            page.push(bench_ui::settings_card(title, role, rows, s.check_line(), actions, cx).into_any_element());
         }
         page.push(
-            div()
-                .id("judge-add")
-                .py_2()
-                .text_size(px(bench_ui::SIDEBAR_TEXT))
-                .text_color(theme.primary)
-                .cursor_pointer()
-                .hover(|s| s.opacity(0.8))
-                .child("Add a server…")
+            bench_ui::settings_add("judge-add", "Add a server…", cx)
                 .on_click(cx.listener(|this, _, window, cx| this.add_judge_server(window, cx)))
                 .into_any_element(),
         );

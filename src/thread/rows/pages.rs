@@ -56,13 +56,7 @@ impl ThreadView {
                 let active = open_host.as_deref() == Some(&host);
                 let single = (pages.len() == 1).then(|| pages[0].clone());
                 let (h, key) = (host.clone(), key.clone());
-                h_flex()
-                    .id(SharedString::from(format!("src-{key}-{n}")))
-                    .gap_1()
-                    .px_1p5()
-                    .py_0p5()
-                    .border_1()
-                    .rounded_md()
+                bench_ui::chip_tight(SharedString::from(format!("src-{key}-{n}")), cx)
                     .text_size(px(bench_ui::THREAD_META))
                     .border_color(if active { theme.primary } else { theme.border })
                     .text_color(if active {
@@ -70,8 +64,6 @@ impl ThreadView {
                     } else {
                         theme.muted_foreground
                     })
-                    .cursor_pointer()
-                    .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
                     .child(Ico::Globe.icon().xsmall())
                     .child(host)
                     .when(pages.len() > 1, |d| {

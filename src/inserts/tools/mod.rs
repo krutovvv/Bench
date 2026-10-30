@@ -135,13 +135,18 @@ impl InsertKind for Tools {
                 .into_any_element(),
         ];
         if !modes.is_empty() {
-            out.push(crate::inserts::tools::view::segmented(
-                "insert-tool-mode",
-                modes,
-                app.inserts.tools.mode(tool),
-                cx,
-                |this, k, window, cx| this.set_tool_mode(k, window, cx),
-            ));
+            out.push(
+                bench_ui::segmented_cells(
+                    "insert-tool-mode",
+                    modes.iter().copied(),
+                    app.inserts.tools.mode(tool),
+                    cx,
+                    bench_ui::on_pick(cx, |this: &mut BenchApp, k, window, cx| {
+                        this.set_tool_mode(k, window, cx)
+                    }),
+                )
+                .into_any_element(),
+            );
         }
         out
     }

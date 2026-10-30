@@ -1,46 +1,27 @@
-//! Settings → Providers and Messages, for an agent (the gear's), through the agent's
-//! API: providers (OpenAI-compatible endpoints, OpenRouter among them), the fallback model,
-//! voice (speech to text, text to speech), the evaluator (a System One model the agent asks at
-//! a turn's searches, on its way and at its end: `agent/src/judge/`) and Telegram. A key is set
-//! on the card that uses it, never in a list of names.
+//! The gear's providers, for an agent (the gear's), through the agent's API: OpenAI-compatible
+//! endpoints, OpenRouter among them, one the main model. Beside them `fallback.rs`, `voice.rs`,
+//! `evaluator.rs`. A key is set on the card that uses it, never in a list of names.
 
 use std::collections::HashMap;
 
 use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
+use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 use serde_json::{Value, json};
 
+use super::server_form::{ServerForm, card_action, field, input_row, text};
+use super::voice::Voice;
 use crate::app::BenchApp;
 use crate::client::rest::{self};
 
 /// A custom endpoint's form.
 pub struct EndpointForm {
-    /// "" for one not saved yet.
-    pub id: String,
+    pub server: ServerForm,
     pub current: bool,
-    /// The key as shown (its redacted `.env` value when the endpoint refers to one), to send only
-    /// a change.
-    pub key_value: String,
     /// Where the key lives when it is a `.env` reference (`${NAME}`).
     pub key_env: Option<String>,
-    pub name: Entity<InputState>,
-    pub url: Entity<InputState>,
-    pub model: Entity<InputState>,
     pub context: Entity<InputState>,
-    pub key: Entity<InputState>,
-    /// The last check: (ok, what it said).
-    pub check: Option<(bool, String)>,
-}
-
-pub struct Voice {
-    pub stt_url: Entity<InputState>,
-    pub stt_model: Entity<InputState>,
-    pub stt_lang: Entity<InputState>,
-    pub stt_key: Entity<InputState>,
-    pub tts_url: Entity<InputState>,
-    pub tts_model: Entity<InputState>,
-    pub tts_voice: Entity<InputState>,
 }
 
 #[derive(Default)]
@@ -51,25 +32,6 @@ pub struct Providers {
     pub judge: super::evaluator::Judge,
     pub fallback: Option<(String, String)>,
     _subscriptions: Vec<Subscription>,
-}
-
-pub(super) fn field(
-    window: &mut Window,
-    cx: &mut Context<BenchApp>,
-    text: &str,
-    hint: &str,
-) -> Entity<InputState> {
-    let text = text.to_string();
-    let hint = hint.to_string();
-    cx.new(|cx| {
-        let mut s = InputState::new(window, cx).placeholder(hint);
-        s.set_value(text, window, cx);
-        s
-    })
-}
-
-pub(super) fn text(input: &Entity<InputState>, cx: &App) -> String {
-    input.read(cx).value().trim().to_string()
 }
 
 impl BenchApp {
@@ -89,7 +51,6 @@ impl BenchApp {
 
     // ---- loading ----------------------------------------------------------------------
 
-    /// Fill both tabs from the agent.
     /// The gear shows the agent under `host`: its providers, fallback and voice are read anew.
     pub(crate) fn show_gear_agent(
         &mut self,
@@ -185,16 +146,18 @@ impl BenchApp {
                     None => preview.clone(),
                 };
                 EndpointForm {
-                    id: s("id"),
+                    server: ServerForm {
+                        id: s("id"),
+                        name: field(window, cx, &s("name"), "Name"),
+                        url: field(window, cx, &s("base_url"), "http://host:port/v1"),
+                        model: field(window, cx, &s("model"), "Default model"),
+                        key: field(window, cx, &key_value, "If the server asks for one"),
+                        key_value,
+                        check: None,
+                    },
                     current: e["is_current"].as_bool().unwrap_or(false),
-                    name: field(window, cx, &s("name"), "Name"),
-                    url: field(window, cx, &s("base_url"), "http://host:port/v1"),
-                    model: field(window, cx, &s("model"), "Default model"),
-                    context: field(window, cx, &context, "e.g. 131072"),
-                    key: field(window, cx, &key_value, "If the server asks for one"),
-                    key_value,
                     key_env,
-                    check: None,
+                    context: field(window, cx, &context, "e.g. 131072"),
                 }
             })
             .collect();
@@ -207,52 +170,7 @@ impl BenchApp {
             )
         });
 
-        let y = |path: &[&str]| {
-            let mut v = &yaml;
-            for p in path {
-                v = &v[*p];
-            }
-            v.as_str().unwrap_or_default().to_string()
-        };
-        self.gear.providers.voice = Some(Voice {
-            stt_url: field(
-                window,
-                cx,
-                &y(&["stt", "openai", "base_url"]),
-                "http://host:port/v1",
-            ),
-            stt_model: field(
-                window,
-                cx,
-                &y(&["stt", "openai", "model"]),
-                "e.g. whisper-1",
-            ),
-            stt_lang: field(
-                window,
-                cx,
-                &y(&["stt", "openai", "language"]),
-                "e.g. en, ru; empty = auto",
-            ),
-            stt_key: field(
-                window,
-                cx,
-                &y(&["stt", "openai", "api_key"]),
-                "If the server asks for one",
-            ),
-            tts_url: field(
-                window,
-                cx,
-                &y(&["tts", "openai", "base_url"]),
-                "http://host:port/v1",
-            ),
-            tts_model: field(
-                window,
-                cx,
-                &y(&["tts", "openai", "model"]),
-                "e.g. gpt-4o-mini-tts",
-            ),
-            tts_voice: field(window, cx, &y(&["tts", "openai", "voice"]), "e.g. alloy"),
-        });
+        self.gear.providers.voice = Some(Voice::from_config(&yaml, window, cx));
         self.fill_judge(&yaml["judge"], window, cx);
 
         self.gear.providers.loaded = true;
@@ -269,35 +187,31 @@ impl BenchApp {
 
     pub fn add_endpoint(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.gear.providers.endpoints.push(EndpointForm {
-            id: String::new(),
+            server: ServerForm {
+                id: String::new(),
+                name: field(window, cx, "", "Name, e.g. local"),
+                url: field(window, cx, "", "http://host:port/v1"),
+                model: field(window, cx, "", "Default model"),
+                key: field(window, cx, "", "If the server asks for one"),
+                key_value: String::new(),
+                check: None,
+            },
             current: false,
-            key_value: String::new(),
             key_env: None,
-            name: field(window, cx, "", "Name, e.g. local"),
-            url: field(window, cx, "", "http://host:port/v1"),
-            model: field(window, cx, "", "Default model"),
             context: field(window, cx, "", "e.g. 131072"),
-            key: field(window, cx, "", "If the server asks for one"),
-            check: None,
         });
         cx.notify();
     }
 
     fn endpoint_body(&self, i: usize, cx: &App) -> Value {
         let e = &self.gear.providers.endpoints[i];
-        let mut body = json!({
-            "id": e.id,
-            "name": text(&e.name, cx),
-            "base_url": text(&e.url, cx),
-            "model": text(&e.model, cx),
-            "discover_models": true,
-        });
+        let mut body = e.server.body(cx);
+        body["discover_models"] = json!(true);
         if let Ok(n) = text(&e.context, cx).parse::<u64>() {
             body["context_length"] = json!(n);
         }
         // Only a changed key: an unchanged one stays where it is (often a .env reference).
-        let key = text(&e.key, cx);
-        if !key.is_empty() && key != e.key_value {
+        if let Some(key) = e.server.changed_key(cx).filter(|k| !k.is_empty()) {
             body["api_key"] = json!(key);
         }
         body
@@ -308,7 +222,7 @@ impl BenchApp {
         if body["name"].as_str().unwrap_or_default().is_empty()
             || body["base_url"].as_str().unwrap_or_default().is_empty()
         {
-            self.gear.providers.endpoints[i].check = Some((false, "Enter a name and an address".into()));
+            self.gear.providers.endpoints[i].server.check = Some((false, "Enter a name and an address".into()));
             cx.notify();
             return;
         }
@@ -334,7 +248,7 @@ impl BenchApp {
 
     pub fn check_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
         let body = self.endpoint_body(i, cx);
-        self.gear.providers.endpoints[i].check = Some((true, "Checking…".into()));
+        self.gear.providers.endpoints[i].server.check = Some((true, "Checking…".into()));
         cx.notify();
         self.rest_on(
             self.gear.agent.clone(),
@@ -345,18 +259,12 @@ impl BenchApp {
                 let Some(e) = this.gear.providers.endpoints.get_mut(i) else {
                     return;
                 };
-                e.check = Some(match r {
+                e.server.check = Some(match r {
                     Ok(v) if v["ok"].as_bool() == Some(true) => {
                         let n = v["models"].as_array().map_or(0, |a| a.len());
                         (true, format!("Works · {n} models"))
                     }
-                    Ok(v) => (
-                        false,
-                        v["message"]
-                            .as_str()
-                            .unwrap_or("Doesn't answer")
-                            .to_string(),
-                    ),
+                    Ok(v) => (false, ServerForm::check_message(&v)),
                     Err(e) => (false, format!("{e:#}")),
                 });
                 cx.notify();
@@ -365,7 +273,7 @@ impl BenchApp {
     }
 
     pub fn make_endpoint_default(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let id = self.gear.providers.endpoints[i].id.clone();
+        let id = self.gear.providers.endpoints[i].server.id.clone();
         self.rest_on(
             self.gear.agent.clone(),
             window,
@@ -385,7 +293,7 @@ impl BenchApp {
 
     /// Delete a provider: a form not saved yet just goes; a saved one goes on the second click.
     pub fn delete_endpoint(&mut self, i: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let id = self.gear.providers.endpoints[i].id.clone();
+        let id = self.gear.providers.endpoints[i].server.id.clone();
         if id.is_empty() {
             self.gear.providers.endpoints.remove(i);
             cx.notify();
@@ -412,65 +320,53 @@ impl BenchApp {
         );
     }
 
-    /// The fallback model: one (provider, model), or none.
-    pub fn set_fallback(
-        &mut self,
-        pick: Option<(String, String)>,
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let list = match &pick {
-            Some((p, m)) => json!([{"provider": p, "model": m}]),
-            None => json!([]),
-        };
-        self.gear.providers.fallback = pick;
-        cx.notify();
-        self.rest_on(
-            self.gear.agent.clone(),
-            window,
-            cx,
-            move |conn| rest::merge_config(conn, json!({"fallback_providers": list})),
-            |this, r, window, cx| match r {
-                Ok(()) => this.load_agent_settings(window, cx),
-                Err(e) => this.toast(
-                    NotificationType::Error,
-                    format!("Fallback: {e:#}"),
-                    window,
-                    cx,
-                ),
-            },
-        );
-    }
+    // ---- the page -----------------------------------------------------------------------
 
-    pub fn save_voice(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(v) = &self.gear.providers.voice else {
-            return;
-        };
-        let mut stt = json!({
-            "base_url": text(&v.stt_url, cx),
-            "model": text(&v.stt_model, cx),
-            "language": text(&v.stt_lang, cx),
-        });
-        stt["api_key"] = json!(text(&v.stt_key, cx));
-        let tts = json!({
-            "base_url": text(&v.tts_url, cx),
-            "model": text(&v.tts_model, cx),
-            "voice": text(&v.tts_voice, cx),
-        });
-        let config = json!({
-            "stt": {"provider": "openai", "openai": stt},
-            "tts": {"provider": "openai", "openai": tts},
-        });
-        self.rest_on(
-            self.gear.agent.clone(),
-            window,
-            cx,
-            move |conn| rest::merge_config(conn, config),
-            |this, r, window, cx| match r {
-                Ok(()) => this.toast(NotificationType::Success, "Voice saved", window, cx),
-                Err(e) => this.toast(NotificationType::Error, format!("Voice: {e:#}"), window, cx),
-            },
+    /// The gear's models: a heading, a card per provider, "Add".
+    pub(crate) fn render_providers(&mut self, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let primary = cx.theme().primary;
+        let mut page = vec![
+            bench_ui::settings_heading(
+                // One model for every thread of this agent's projects: the main one and the
+                // fallback below.
+                format!("Models · {} · its projects", Self::agent_name(&self.gear.agent)),
+                vec![],
+                cx,
+            )
+            .into_any_element(),
+        ];
+        for i in 0..self.gear.providers.endpoints.len() {
+            let e = &self.gear.providers.endpoints[i];
+            let saved = e.server.saved();
+            let title = if saved { e.server.id.clone() } else { "New provider".into() };
+            let key_hint = match &e.key_env {
+                Some(name) => format!("In .env as {name}"),
+                None => "If the server asks for one".into(),
+            };
+            let armed = saved && self.armed.is(&format!("endpoint:{}", e.server.id));
+            let mut actions = vec![
+                card_action(("ep-delete", i), if armed { "Confirm delete" } else { "Delete" }, false, move |this, w, cx| this.delete_endpoint(i, w, cx), cx),
+                card_action(("ep-check", i), "Check", false, move |this, w, cx| this.check_endpoint(i, w, cx), cx),
+            ];
+            if saved && !e.current {
+                actions.push(card_action(("ep-default", i), "Make main", false, move |this, w, cx| this.make_endpoint_default(i, w, cx), cx));
+            }
+            actions.push(card_action(("ep-save", i), "Save", true, move |this, w, cx| this.save_endpoint(i, w, cx), cx));
+            let role = e.current.then(|| ("main model".into(), primary));
+            let rows = vec![
+                input_row("Name", "How it is listed", &e.server.name, cx),
+                input_row("Address", "OpenAI-compatible, ends in /v1", &e.server.url, cx),
+                input_row("Default model", "The model it serves first", &e.server.model, cx),
+                input_row("Context length", "Tokens", &e.context, cx),
+                input_row("API key", key_hint, &e.server.key, cx),
+            ];
+            page.push(bench_ui::settings_card(title, role, rows, e.server.check_line(), actions, cx).into_any_element());
+        }
+        page.push(
+            bench_ui::settings_add("ep-add", "Add a provider…", cx)
+                .on_click(cx.listener(|this, _, window, cx| this.add_endpoint(window, cx)))
+                .into_any_element(),
         );
+        page
     }
-
 }

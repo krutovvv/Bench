@@ -15,7 +15,7 @@ pub mod view;
 #[path = "view_web.rs"]
 pub mod view;
 
-use gpui_kit::component::{ActiveTheme as _, h_flex};
+use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
@@ -96,13 +96,8 @@ impl InsertKind for Terminal {
         let id = app.inserts.terminal.tabs[t].id;
         if app.inserts.terminal.tabs[t].background {
             return vec![
-                h_flex()
-                    .id(("term-bg-badge", id))
-                    .gap_1()
-                    .px_1p5()
-                    .border_1()
-                    .rounded_md()
-                    .border_color(theme.border)
+                bench_ui::chip_tight(("term-bg-badge", id), cx)
+                    .py_0()
                     .text_sm()
                     .text_color(theme.muted_foreground)
                     .cursor_pointer()

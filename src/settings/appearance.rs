@@ -39,48 +39,28 @@ impl BenchApp {
                 )
                 .child(control)
         };
-        // The kit's segmented control (a Mac's): a grey track, the chosen one raised.
-        let segmented = |id: &'static str,
-                         items: Vec<(&'static str, bool, bench_ui::theme::Appearance)>,
-                         cx: &mut Context<Self>| {
-            bench_ui::segment_track(&theme)
-                .children(items.into_iter().enumerate().map(|(k, (label, on, next))| {
-                    bench_ui::segment(div().id((id, k)), on, &theme)
-                        .child(label)
-                        .on_click(cx.listener(move |this, _, window, cx| {
-                            this.set_appearance(next.clone(), window, cx)
-                        }))
-                }))
-                .into_any_element()
-        };
-
-        let modes = [
-            ("Light", Mode::Light),
-            ("Dark", Mode::Dark),
-            ("System", Mode::System),
-        ]
-        .into_iter()
-        .map(|(l, m)| {
-            (
-                l,
-                a.mode == m,
-                bench_ui::theme::Appearance {
-                    mode: m,
-                    ..a.clone()
-                },
-            )
-        })
-        .collect();
+        let modes = [Mode::Light, Mode::Dark, Mode::System];
+        let chosen = modes.iter().position(|m| *m == a.mode).unwrap_or(usize::MAX);
+        let mode = bench_ui::segmented(
+            "mode",
+            ["Light", "Dark", "System"],
+            chosen,
+            cx,
+            bench_ui::on_pick(cx, move |this: &mut Self, k, window, cx| {
+                let next = bench_ui::theme::Appearance {
+                    mode: modes[k].clone(),
+                    ..this.appearance.clone()
+                };
+                this.set_appearance(next, window, cx)
+            }),
+        )
+        .into_any_element();
         // The page's own width: these rows are rows of the same list, and a narrower column for
         // them alone read as a mistake (their rules ended short of every other rule).
         v_flex().w_full().child(
             v_flex()
                 .w_full()
-                .child(row(
-                    "Mode",
-                    "Light, dark, or follow macOS.",
-                    segmented("mode", modes, cx),
-                )),
+                .child(row("Mode", "Light, dark, or follow macOS.", mode)),
         )
     }
 }

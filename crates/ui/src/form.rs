@@ -193,6 +193,57 @@ pub fn settings_row(
         .child(control)
 }
 
+/// One of several things a settings page keeps (a provider, an evaluator server): its title and
+/// the word for its role, its rows, then what its last check said (`(ok, words)`, red when not
+/// ok) with its actions at the right end.
+pub fn settings_card(
+    title: impl Into<SharedString>,
+    role: Option<(SharedString, Hsla)>,
+    rows: Vec<AnyElement>,
+    check: Option<(bool, SharedString)>,
+    actions: Vec<AnyElement>,
+    cx: &App,
+) -> Div {
+    let theme = cx.theme();
+    let (muted, danger) = (theme.muted_foreground, theme.danger);
+    v_flex()
+        .pt_3()
+        .child(
+            h_flex()
+                .gap_2()
+                .pb_1()
+                .items_center()
+                .child(div().text_base().font_weight(FontWeight::SEMIBOLD).child(title.into()))
+                .when_some(role, |d, (word, color)| {
+                    d.child(div().text_sm().text_color(color).child(word))
+                }),
+        )
+        .children(rows)
+        .child(
+            h_flex()
+                .py_2()
+                .gap_2()
+                .items_center()
+                .child(div().flex_1().min_w_0().truncate().text_sm().map(|d| match check {
+                    Some((ok, words)) => d.text_color(if ok { muted } else { danger }).child(words),
+                    None => d,
+                }))
+                .children(actions),
+        )
+}
+
+/// The link under a list of cards that adds one ("Add a provider…").
+pub fn settings_add(id: impl Into<ElementId>, label: impl Into<SharedString>, cx: &App) -> Stateful<Div> {
+    div()
+        .id(id)
+        .py_2()
+        .text_size(px(crate::metrics::SIDEBAR_TEXT))
+        .text_color(cx.theme().primary)
+        .cursor_pointer()
+        .hover(|s| s.opacity(0.8))
+        .child(label.into())
+}
+
 /// A group's title on a settings page, with air above; its actions
 /// ("+ Add", "Check") on the right.
 pub fn settings_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>, cx: &App) -> Div {
@@ -218,23 +269,67 @@ pub fn settings_heading(title: impl Into<SharedString>, actions: Vec<AnyElement>
         .children(actions)
 }
 
+/// `cx.listener` for a pick: the handler a segmented control takes, on the view that draws it.
+pub fn on_pick<T: 'static>(
+    cx: &Context<T>,
+    on: impl Fn(&mut T, usize, &mut Window, &mut Context<T>) + 'static,
+) -> OnPick {
+    let view = cx.weak_entity();
+    std::rc::Rc::new(move |k, window, cx| {
+        view.update(cx, |this, cx| on(this, k, window, cx)).ok();
+    })
+}
+
 /// Pick one of a few, as a Mac's segmented control: a grey track, the chosen segment a raised
 /// chip on the page's ground, the others words in the muted colour (`segment_track`,
-/// `segment`; the header's Chat | Code is the same).
+/// `segment`; the header's Chat | Code is the same). `flex_wrap` on it where a narrow column
+/// should wrap the segments instead of clipping them.
 pub fn segmented(
     id: &'static str,
-    labels: &[SharedString],
+    labels: impl IntoIterator<Item = impl Into<SharedString>>,
     chosen: usize,
     cx: &App,
     on_pick: OnPick,
 ) -> Div {
     let theme = cx.theme().clone();
-    segment_track(&theme).children(labels.iter().enumerate().map(|(k, label)| {
+    segment_track(&theme).children(labels.into_iter().enumerate().map(|(k, label)| {
         let pick = on_pick.clone();
         segment(div().id((id, k)), k == chosen, &theme)
-            .child(label.clone())
+            .child(label.into())
             .on_click(move |_, window, cx| pick(k, window, cx))
     }))
+}
+
+/// Pick one in a pane's strip, where a track would be too tall: square cells sharing their
+/// borders, the chosen one in the accent.
+pub fn segmented_cells(
+    id: &'static str,
+    labels: impl IntoIterator<Item = impl Into<SharedString>>,
+    chosen: usize,
+    cx: &App,
+    on_pick: OnPick,
+) -> Div {
+    let theme = cx.theme().clone();
+    h_flex()
+        .flex_none()
+        .border_1()
+        .rounded_md()
+        .overflow_hidden()
+        .border_color(theme.border)
+        .children(labels.into_iter().enumerate().map(|(k, label)| {
+            let pick = on_pick.clone();
+            div()
+                .id((id, k))
+                .px_2()
+                .py_0p5()
+                .text_sm()
+                .cursor_pointer()
+                .when(k > 0, |d| d.border_l_1().border_color(theme.border))
+                .when(k == chosen, |d| d.bg(theme.primary).text_color(theme.primary_foreground))
+                .when(k != chosen, |d| d.hover(|s| s.bg(theme.list_hover)))
+                .child(label.into())
+                .on_click(move |_, window, cx| pick(k, window, cx))
+        }))
 }
 
 /// A segmented control's track: the segments sit in it with a hair of air round them.

@@ -273,7 +273,6 @@ impl ExplorerParts for Mcp {
             // The person's presets above the form (the gear's Presets tab): one fills it in —
             // its name and config, keys and all — to look at and Save; or write one by hand.
             let have: Vec<&str> = e.mcp.servers.iter().map(|m| m.name.as_str()).collect();
-            let theme = cx.theme().clone();
             let chips = app
                 .gear.presets
                 .mcp
@@ -281,15 +280,7 @@ impl ExplorerParts for Mcp {
                 .filter(|(n, _, _)| !have.contains(&n.as_str()))
                 .map(|(n, title, spec)| {
                     let (n, spec, id) = (n.clone(), spec.clone(), e.id.clone());
-                    div()
-                        .id(SharedString::from(format!("env-mcp-preset-{n}")))
-                        .px_2()
-                        .py_0p5()
-                        .rounded_md()
-                        .border_1()
-                        .border_color(theme.border)
-                        .cursor_pointer()
-                        .hover(|s| s.bg(theme.list_hover))
+                    bench_ui::chip(SharedString::from(format!("env-mcp-preset-{n}")), cx)
                         .child(title.clone())
                         .on_click(cx.listener(move |this, _, window, cx| {
                             this.click_claimed = true;

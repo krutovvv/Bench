@@ -102,19 +102,19 @@ impl SettingsForm for Run {
                          cur: &str,
                          cx: &mut Context<BenchApp>| {
             let chosen = opts.iter().position(|o| o == cur).unwrap_or(usize::MAX);
-            let labels: Vec<SharedString> = opts.iter().map(|o| o.clone().into()).collect();
-            let (view, pid) = (view.clone(), pid.clone());
-            let pick: bench_ui::OnPick = std::rc::Rc::new(move |k, window, cx| {
-                let value = opts[k].clone();
-                let pid = pid.clone();
-                view.update(cx, |this, cx| {
-                    this.env_set_run(&pid, kind, value, window, cx)
-                });
-            });
+            let pid = pid.clone();
             div()
                 .flex()
                 .justify_end()
-                .child(bench_ui::segmented(id, &labels, chosen, cx, pick))
+                .child(bench_ui::segmented(
+                    id,
+                    opts.clone(),
+                    chosen,
+                    cx,
+                    bench_ui::on_pick(cx, move |this: &mut BenchApp, k, window, cx| {
+                        this.env_set_run(&pid, kind, opts[k].clone(), window, cx)
+                    }),
+                ))
                 .into_any_element()
         };
         let reasoning = segmented(

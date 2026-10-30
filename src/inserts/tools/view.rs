@@ -22,16 +22,17 @@ impl BenchApp {
     ) -> AnyElement {
         let theme = cx.theme().clone();
         let source = self.inserts.tools.html_source;
-        let toggle = segmented(
+        let toggle = bench_ui::segmented_cells(
             "tool-html-view",
-            &["Rendered", "HTML"],
+            ["Rendered", "HTML"],
             source as usize,
             cx,
-            |this, k, _, cx| {
+            bench_ui::on_pick(cx, |this: &mut Self, k, _, cx| {
                 this.inserts.tools.html_source = k == 1;
                 cx.notify();
-            },
-        );
+            }),
+        )
+        .into_any_element();
         let body = if source {
             div()
                 .flex_1()
@@ -185,16 +186,17 @@ impl BenchApp {
                                 "Count"
                             })
                             .into_any_element(),
-                        segmented_owned(
+                        bench_ui::segmented_cells(
                             "tool-count",
                             labels,
                             chosen,
                             cx,
-                            move |this, k, window, cx| {
+                            bench_ui::on_pick(cx, move |this: &mut Self, k, window, cx| {
                                 this.inserts.tools.counts.insert(tool, counts_vec[k]);
                                 this.run_tool(window, cx)
-                            },
-                        ),
+                            }),
+                        )
+                        .into_any_element(),
                         small_button("tool-gen", "Generate", cx, |this, window, cx| {
                             this.generate_tool(window, cx)
                         }),
@@ -215,20 +217,12 @@ impl BenchApp {
                             on: bool,
                             tip: &'static str,
                             cx: &mut Context<Self>| {
-                    div()
-                        .id(("regex-flag", k))
-                        .px_1p5()
-                        .py_0p5()
+                    bench_ui::chip_tight(("regex-flag", k), cx)
                         .text_sm()
                         .font_family(bench_ui::theme::MONO)
-                        .border_1()
-                        .rounded_md()
-                        .border_color(theme.border)
-                        .cursor_pointer()
                         .when(on, |d| {
                             d.bg(theme.primary).text_color(theme.primary_foreground)
                         })
-                        .when(!on, |d| d.hover(|s| s.bg(theme.list_hover)))
                         .child(label)
                         .tooltip(move |window, cx| Tooltip::new(tip).build(window, cx))
                         .on_click(cx.listener(move |this, _, window, cx| {
@@ -365,91 +359,10 @@ pub(crate) fn small_button(
     cx: &mut Context<BenchApp>,
     on: impl Fn(&mut BenchApp, &mut Window, &mut Context<BenchApp>) + 'static,
 ) -> AnyElement {
-    let theme = cx.theme().clone();
-    div()
-        .id(id)
+    bench_ui::chip(id, cx)
         .flex_none()
-        .px_2()
-        .py_0p5()
         .text_sm()
-        .border_1()
-        .rounded_md()
-        .border_color(theme.border)
-        .cursor_pointer()
-        .hover(|s| s.bg(theme.list_hover))
         .child(label)
         .on_click(cx.listener(move |this, _, window, cx| on(this, window, cx)))
-        .into_any_element()
-}
-
-/// Pick one: square cells sharing borders, the chosen one in the accent.
-pub(crate) fn segmented(
-    id: &'static str,
-    labels: &[&'static str],
-    chosen: usize,
-    cx: &mut Context<BenchApp>,
-    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
-) -> AnyElement {
-    segmented_owned(
-        id,
-        labels.iter().map(|s| s.to_string()).collect(),
-        chosen,
-        cx,
-        on,
-    )
-}
-
-pub(crate) fn segmented_owned(
-    id: &'static str,
-    labels: Vec<String>,
-    chosen: usize,
-    cx: &mut Context<BenchApp>,
-    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
-) -> AnyElement {
-    let theme = cx.theme().clone();
-    h_flex()
-        .flex_none()
-        .border_1()
-        .rounded_md()
-        .overflow_hidden()
-        .border_color(theme.border)
-        .children(labels.into_iter().enumerate().map(|(k, label)| {
-            let on = on.clone();
-            div()
-                .id((id, k))
-                .px_2()
-                .py_0p5()
-                .text_sm()
-                .cursor_pointer()
-                .when(k > 0, |d| d.border_l_1().border_color(theme.border))
-                .when(k == chosen, |d| {
-                    d.bg(theme.primary).text_color(theme.primary_foreground)
-                })
-                .when(k != chosen, |d| d.hover(|s| s.bg(theme.list_hover)))
-                .child(label)
-                .on_click(cx.listener(move |this, _, window, cx| on(this, k, window, cx)))
-        }))
-        .into_any_element()
-}
-
-/// `segmented` as tall as a text field, for a form's row beside fields; labels are made
-/// at run time (a form's list of servers).
-pub(crate) fn segmented_tall_owned(
-    id: &'static str,
-    labels: Vec<String>,
-    chosen: usize,
-    cx: &mut Context<BenchApp>,
-    on: impl Fn(&mut BenchApp, usize, &mut Window, &mut Context<BenchApp>) + Clone + 'static,
-) -> AnyElement {
-    let theme = cx.theme().clone();
-    // The kit's segmented control; in a narrow popover the segments wrap instead of clipping.
-    bench_ui::segment_track(&theme)
-        .flex_wrap()
-        .children(labels.into_iter().enumerate().map(|(k, label)| {
-            let on = on.clone();
-            bench_ui::segment(div().id((id, k)), k == chosen, &theme)
-                .child(label)
-                .on_click(cx.listener(move |this, _, window, cx| on(this, k, window, cx)))
-        }))
         .into_any_element()
 }

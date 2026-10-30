@@ -205,18 +205,19 @@ impl BenchApp {
             .unwrap_or(labels.len());
         labels.push("New server…".into());
         let names = labels.clone();
-        let pick = crate::inserts::tools::view::segmented_tall_owned(
+        let pick = bench_ui::segmented(
             "agent-server",
             labels,
             at,
             cx,
-            move |this, k, _, cx| {
+            bench_ui::on_pick(cx, move |this: &mut Self, k, _, cx| {
                 if let Some(f) = this.gear.agent_form.as_mut() {
                     f.host = (k + 1 < names.len()).then(|| names[k].clone());
                 }
                 cx.notify();
-            },
-        );
+            }),
+        )
+        .flex_wrap();
         let mut out = vec![
             bench_ui::settings_field(
                 "Server",
