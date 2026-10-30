@@ -90,7 +90,7 @@ export const compactWithoutReasoning = hook(CompactionTask, {
 			const res: any = await host().duringStream(String(api.conversationId), () => api.models.complete(
 				model,
 				{ systemPrompt: SYSTEM, messages: [{ role: "user", content: `<conversation>\n${transcript(compaction.messages)}\n</conversation>\n\n${FORMAT}${focus}`, timestamp: Date.now() }] },
-				{ reasoningEffort: undefined, maxTokens: Math.min(Math.floor(0.8 * DEFAULT_COMPACTION_POLICY.reserveTokens), model.maxTokens || Infinity), cacheRetention: "none", onPayload: noThinking },
+				{ signal: context?.abortSignal, reasoningEffort: undefined, maxTokens: Math.min(Math.floor(0.8 * DEFAULT_COMPACTION_POLICY.reserveTokens), model.maxTokens || Infinity), cacheRetention: "none", onPayload: noThinking },
 			), context?.abortSignal);
 			const summary = (res?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
 			if (res?.stopReason !== "stop" || !summary) return undefined;

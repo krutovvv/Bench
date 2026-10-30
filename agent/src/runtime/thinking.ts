@@ -4,7 +4,9 @@
  * A request with no reasoning asked for, made so on an OpenAI-compatible server that thinks by
  * default (vLLM, SGLang, llama.cpp serving Qwen and the like): Pi sends nothing there unless the
  * model maps "off", so the template's switch goes in (`chat_template_kwargs.enable_thinking`).
- * OpenRouter and OpenAI get Pi's own "off", Anthropic's API thinks only when asked.
+ * OpenRouter and OpenAI get Pi's own "off", Anthropic's API thinks only when asked. Pi's
+ * `qwen-chat-template` would say only on or off: on the dev server `reasoning_effort` also reaches
+ * the template as a line by level (measured), and that would be lost, so the levels stay as they are.
  */
 export function noThinking(payload: any, model: { api?: string; baseUrl?: string; provider?: string }): any {
 	const url = model.baseUrl ?? "";

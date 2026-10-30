@@ -35,6 +35,8 @@ const skipFind = SKIP.map((d) => `-name ${d} -prune -o`).join(" ");
 
 export const grepTool = defineTool({
 	name: "grep",
+	// Only reads: run again after a restart, it finds what is there then.
+	replay: "safe",
 	description:
 		"Search file contents with a regular expression (ripgrep syntax), in a folder (default: the working directory) or one file. Returns file:line:text, at most `limit` matches. Use it instead of bash grep or sed to find where something is; then read the file around it.",
 	parameters: Type.Object({
@@ -60,6 +62,8 @@ export const grepTool = defineTool({
 
 export const globTool = defineTool({
 	name: "glob",
+	// Only reads: run again after a restart, it finds what is there then.
+	replay: "safe",
 	description:
 		"Find files by name with a glob, e.g. **/*.rs, src/**/mod.rs or *.config.js, under a folder (default the working directory). Returns paths, at most `limit`. Use it instead of bash find or ls -R.",
 	parameters: Type.Object({
@@ -80,6 +84,8 @@ export const globTool = defineTool({
 
 export const lsTool = defineTool({
 	name: "ls",
+	// Only reads: run again after a restart, it finds what is there then.
+	replay: "safe",
 	description:
 		"A folder's tree: folders end with /, depth 2 by default (at most 4), at most 300 entries; .git, node_modules, target and the like are left out. Use it to see how a project is laid out.",
 	parameters: Type.Object({

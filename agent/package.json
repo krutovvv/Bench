@@ -16,8 +16,9 @@
   "dependencies": {
     "@earendil-works/chord": "1.4.0",
     "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-codemode": "1.4.0",
     "@earendil-works/pi-durable": "1.4.0",
-    "@earendil-works/pi-mcp": "1.1.0",
+    "@earendil-works/pi-mcp": "1.4.0",
     "croner": "10.0.1",
     "diff": "8.0.4",
     "grammy": "1.46.0",
