@@ -7,6 +7,7 @@ use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use super::menu::item_menu;
 use crate::app::BenchApp;
@@ -110,14 +111,14 @@ impl BenchApp {
             .id(("thread", i))
             .group(group)
             .relative()
-            .gap_1()
+            .gap(Gap::Xs)
             // A rounded row set in from the sidebar's edges (the open one a soft pill, as a
             // Mac's source list); its title starts where the project's name does, so a project
             // and its threads read as one column (a Mac's sidebar: rows flush with their header).
             .mx(px(bench_ui::SIDEBAR_ROW_INSET))
             .rounded_md()
             .pl(px(bench_ui::SIDEBAR_TEXT_X - bench_ui::SIDEBAR_ROW_INSET))
-            .pr_2()
+            .pr(Gap::M)
             .py(px(bench_ui::THREAD_ROW_PY))
             .cursor_pointer()
             // The open chat: the sidebar's selected ground; hovered: the list's.
@@ -127,7 +128,7 @@ impl BenchApp {
                 h_flex()
                     .flex_1()
                     .min_w_0()
-                    .gap_2()
+                    .gap(Gap::M)
                     .items_center()
                     .when(nested, |d| d.child(bench_ui::nest_corner(cx)))
                     // A working session's title carries a moving highlight, to find it at a glance.
@@ -135,7 +136,7 @@ impl BenchApp {
                         h_flex()
                             .flex_1()
                             .min_w_0()
-                            .gap_1()
+                            .gap(Gap::Xs)
                             .items_center()
                             .child(match self.renaming_field(&Item::Thread(s.id.clone())) {
                                 // Renamed in place: the field where the title was.
@@ -167,7 +168,7 @@ impl BenchApp {
                                                     .with_size(gpui_kit::component::Size::Size(px(
                                                         SIDEBAR_TEXT / 0.875,
                                                     )))
-                                                    .px_0(),
+                                                    .px(Gap::Zero),
                                             ),
                                     )
                                     .into_any_element(),

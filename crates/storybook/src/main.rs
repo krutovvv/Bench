@@ -128,7 +128,7 @@ impl Render for Story {
                 cx,
             ));
 
-        let gaps = stack(Gap::S).children([Gap::Xs, Gap::S, Gap::M, Gap::L, Gap::Xl].map(|g| {
+        let gaps = stack(Gap::S).children([Gap::Xxs, Gap::Xs, Gap::S, Gap::M, Gap::Ml, Gap::L, Gap::Xl, Gap::Xxl, Gap::Huge].map(|g| {
             row(g)
                 .child(small(cx).w(px(40.)).child(format!("{g:?}")))
                 .children((0..4).map(|_| {

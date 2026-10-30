@@ -7,6 +7,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use super::ThreadView;
 use ::thread::{Row, Step};
@@ -68,12 +69,12 @@ impl ThreadView {
                     let theme = cx.theme();
                     v_flex()
                         .w(px(bench_ui::POPOVER_S))
-                        .py_1()
+                        .py(Gap::Xs)
                         .children(stats.iter().map(|(k, v)| {
                             h_flex()
-                                .px_3()
-                                .py_0p5()
-                                .gap_4()
+                                .px(Gap::L)
+                                .py(Gap::Xxs)
+                                .gap(Gap::Xl)
                                 .text_sm()
                                 .child(
                                     div()
@@ -141,8 +142,8 @@ impl ThreadView {
                 };
             h_flex()
                 .id("fallback")
-                .px_2()
-                .gap_1()
+                .px(Gap::M)
+                .gap(Gap::Xs)
                 .items_center()
                 .text_color(theme.danger)
                 .text_size(px(bench_ui::BAR_TEXT))
@@ -279,9 +280,9 @@ fn speed_panel(
     let theme = cx.theme();
     let row = |k: &str, v: String| {
         h_flex()
-            .px_3()
-            .py_0p5()
-            .gap_4()
+            .px(Gap::L)
+            .py(Gap::Xxs)
+            .gap(Gap::Xl)
             .text_sm()
             .child(
                 div()
@@ -291,12 +292,12 @@ fn speed_panel(
             )
             .child(div().child(v))
     };
-    let mut panel = v_flex().w(px(bench_ui::POPOVER_M)).py_2();
+    let mut panel = v_flex().w(px(bench_ui::POPOVER_M)).py(Gap::M);
     if samples.is_empty() {
         panel = panel.child(
             div()
-                .px_3()
-                .pb_1()
+                .px(Gap::L)
+                .pb(Gap::Xs)
                 .text_sm()
                 .text_color(theme.muted_foreground)
                 .child("The chart fills in while the next answer is written."),
@@ -316,8 +317,8 @@ fn speed_panel(
         });
         panel = panel.child(
             h_flex()
-                .mx_3()
-                .mb_2()
+                .mx(Gap::L)
+                .mb(Gap::M)
                 .h(px(bench_ui::SPEED_CHART_H))
                 .gap(px(bench_ui::SPEED_BAR_GAP))
                 .items_end()

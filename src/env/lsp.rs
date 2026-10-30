@@ -10,6 +10,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::{Value, json};
 
 use super::section::{
@@ -235,8 +236,8 @@ impl ExplorerParts for Lsp {
                 .child(code(&e.lsp.json, cx))
                 .child(
                     div()
-                        .px_3()
-                        .py_2()
+                        .px(Gap::L)
+                        .py(Gap::M)
                         .border_t_1()
                         .border_color(theme.border)
                         .text_color(if bad {
@@ -310,7 +311,7 @@ fn new_lsp_card(app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> C
             bench_ui::chip(SharedString::from(format!("env-lsp-preset-{key}")), cx)
                 .child(
                     h_flex()
-                        .gap_1()
+                        .gap(Gap::Xs)
                         .child(title.clone())
                         .when(!exts.is_empty(), |d| {
                             d.child(
@@ -331,12 +332,12 @@ fn new_lsp_card(app: &BenchApp, e: &ProjectEnv, cx: &mut Context<BenchApp>) -> C
     let form = std::mem::replace(&mut card.body, div().into_any_element());
     card.body = v_flex()
         .when(!chips.is_empty(), |d| {
-            d.child(h_flex().flex_wrap().gap_1p5().px_3().pt_2().children(chips))
+            d.child(h_flex().flex_wrap().gap(Gap::S).px(Gap::L).pt(Gap::M).children(chips))
         })
         .child(
             div()
-                .px_3()
-                .pt_2()
+                .px(Gap::L)
+                .pt(Gap::M)
                 .text_sm()
                 .text_color(theme.muted_foreground)
                 .child("Each installs itself on first use, into Bench's folder on the machine where the project's files are (~/.bench/lsp): it needs npm there. The list is the gear's Presets; another server for this project alone: its name and its entry below (a command, its args, the extensions it knows), then Save."),

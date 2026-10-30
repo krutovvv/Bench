@@ -5,6 +5,7 @@ use gpui_kit::component::menu::PopupMenuItem;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::sidebar::items::Item;
@@ -50,14 +51,14 @@ pub(super) fn color_row(
                 view.update(cx, |this, cx| this.set_color(id.clone(), k, cx));
             })
     };
-    // The menu reserves a 16px icon column on the left (the other items have icons), which
+    // The menu reserves an icon column on the left (the other items have icons), which
     // pushes this row off-centre; pull it back by that width so the swatches sit symmetric.
     h_flex()
         .flex_1()
         .justify_center()
-        .gap_2()
-        .ml(px(-16.))
-        .py_1()
+        .gap(Gap::M)
+        .ml(px(-bench_ui::MENU_ICON_COL))
+        .py(Gap::Xs)
         .children((0..bench_ui::MARK_COUNT).map(|c| swatch(Some(c))))
         .child(swatch(None))
         .into_any_element()

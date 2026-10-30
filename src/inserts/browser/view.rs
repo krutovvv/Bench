@@ -8,12 +8,10 @@ use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::thread::ThreadRef;
-
-/// A step's frame at most this tall in the thread.
-const MAX_H: f32 = 620.;
 
 impl BenchApp {
     /// Thread `at`'s tab `tab`.
@@ -28,7 +26,7 @@ impl BenchApp {
         let Some((frame, w, h, live)) = self.tab_frame(&tab) else {
             return div()
                 .id(SharedString::from(format!("site-wait-{tab}")))
-                .py_2()
+                .py(Gap::M)
                 .cursor_pointer()
                 .child(
                     ShimmerText::new("Opening the page…")
@@ -55,7 +53,7 @@ impl BenchApp {
             .get(&tab)
             .map(|b| f32::from(b.size.width))
             .unwrap_or(720.);
-        let height = (width * fh / fw.max(1.)).min(MAX_H);
+        let height = (width * fh / fw.max(1.)).min(bench_ui::BROWSER_MAX_H);
         let (pw, ph) = if w > 0. { (w, h) } else { (fw, fh) };
         let focus = self
             .inserts.browser
@@ -86,7 +84,7 @@ impl BenchApp {
         v_flex()
             .w_full()
             .min_w_0()
-            .gap_1()
+            .gap(Gap::Xs)
             .child(
                 div()
                     .id(SharedString::from(format!("site-{tab}")))

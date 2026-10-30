@@ -17,6 +17,7 @@ mod thread_row;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::sidebar::order::{DraggedProject, ProjectPlace};
@@ -62,8 +63,8 @@ impl BenchApp {
                     .min_h_0()
                     .overflow_y_scroll()
                     // Room under the last group before the foot's hairline.
-                    .pt_1()
-                    .pb_3()
+                    .pt(Gap::Xs)
+                    .pb(Gap::L)
                     .children(list)
                     // This Mac's agent not up yet, and nothing to list.
                     .when(self.local_conn().is_none() && self.threads.list.is_empty(), |d| {
@@ -71,8 +72,8 @@ impl BenchApp {
                             div()
                                 // Where the rows' words start, as every line of the sidebar.
                                 .pl(px(bench_ui::SIDEBAR_TEXT_X))
-                                .pr_4()
-                                .py_1()
+                                .pr(Gap::Xl)
+                                .py(Gap::Xs)
                                 .text_size(px(bench_ui::SIDEBAR_TEXT))
                                 .text_color(muted)
                                 .child("Connecting…"),
@@ -88,10 +89,10 @@ impl BenchApp {
         let finding = self.sidebar.finding.is_some();
         v_flex()
             .flex_none()
-            .pt_2()
+            .pt(Gap::M)
             // Air under them before the first group, as Claude's before its sections.
-            .pb_3()
-            .gap_px()
+            .pb(Gap::L)
+            .gap(Gap::Hair)
             // "+", as each project's head has it: the same action, the same glyph (Claude's "New").
             .child(
                 bench_ui::nav_row("nav-new-thread", Ico::Plus, "New thread", "⌘N", false, cx)
@@ -114,8 +115,8 @@ impl BenchApp {
     pub(crate) fn sidebar_note(&self, text: &'static str, cx: &mut Context<Self>) -> AnyElement {
         div()
             .pl(px(bench_ui::SIDEBAR_TEXT_X))
-            .pr_4()
-            .py_1()
+            .pr(Gap::Xl)
+            .py(Gap::Xs)
             .text_size(px(bench_ui::SIDEBAR_TEXT))
             .text_color(cx.theme().muted_foreground)
             .child(text)

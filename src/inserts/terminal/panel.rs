@@ -9,6 +9,7 @@ use gpui_kit::component::h_flex;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::v_flex;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::thread::composer::attachments::{Reference, TerminalRef};
@@ -336,8 +337,8 @@ impl BenchApp {
             h_flex()
                 .flex_none()
                 .h(px(bench_ui::metrics::BLOCK_HEAD_H))
-                .px_2()
-                .gap_2()
+                .px(Gap::M)
+                .gap(Gap::M)
                 .items_center()
                 // No fill: the bar is the editor's ground with a rule under it, as Xcode's
                 // debug area; the terminals a segmented control, as Chat | Code.

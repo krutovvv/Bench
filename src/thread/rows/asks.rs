@@ -10,6 +10,7 @@ use gpui_kit::component::input::Input;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 use thread::{AskCard, PlanStep};
 
 use crate::thread::ThreadView;
@@ -72,9 +73,9 @@ impl ThreadView {
                         _ => (Ico::CircleEmpty, faint, theme.foreground, false),
                     };
                     h_flex()
-                        .gap_2()
-                        .py_0p5()
-                        .pl(px(16. * depth(t) as f32))
+                        .gap(Gap::M)
+                        .py(Gap::Xxs)
+                        .pl(px(bench_ui::PLAN_INDENT * depth(t) as f32))
                         .items_center()
                         .text_size(px(bench_ui::THREAD_META))
                         .child(icon.icon().xsmall().text_color(color))
@@ -130,7 +131,7 @@ impl ThreadView {
             .flex_none()
             .child(head)
             .when(open, |d| {
-                d.child(v_flex().px_3().py_2().gap_0p5().children(steps))
+                d.child(v_flex().px(Gap::L).py(Gap::M).gap(Gap::Xxs).children(steps))
             })
             .into_any_element()
     }
@@ -153,7 +154,7 @@ impl ThreadView {
         // shows settled ones and, after a restart, ones nobody waits for.
         let live = !settled && self.thread.journal.asks().iter().any(|a| a.id == card.id);
         let head = h_flex()
-            .gap_2()
+            .gap(Gap::M)
             .items_start()
             .text_size(px(bench_ui::THREAD_META))
             .child(
@@ -193,11 +194,11 @@ impl ThreadView {
                 // its size, its words under the question's.
                 v_flex().text_size(px(bench_ui::THREAD_META)).when_some(card.answer.clone(), |d, a| {
                     if a.is_empty() {
-                        d.child(div().pl_6().text_color(muted).child("No answer"))
+                        d.child(div().pl(Gap::Xxl).text_color(muted).child("No answer"))
                     } else {
                         d.child(
                             h_flex()
-                                .gap_2()
+                                .gap(Gap::M)
                                 .items_start()
                                 .child(
                                     Ico::CircleCheck
@@ -211,7 +212,7 @@ impl ThreadView {
                     }
                 })
             } else if !live {
-                v_flex().pl_6().child(div().text_color(muted).child(format!(
+                v_flex().pl(Gap::Xxl).child(div().text_color(muted).child(format!(
                     "Waiting for your answer…{}",
                     if card.choices.is_empty() {
                         String::new()
@@ -229,8 +230,8 @@ impl ThreadView {
                     _ => "OK",
                 };
                 v_flex()
-                    .gap_2()
-                    .child(h_flex().flex_wrap().gap_2().children(
+                    .gap(Gap::M)
+                    .child(h_flex().flex_wrap().gap(Gap::M).children(
                         card.choices.iter().enumerate().map(|(k, c)| {
                             let choice = c.clone();
                             let id = card.id.clone();
@@ -261,8 +262,8 @@ impl ThreadView {
                             let on = picked.contains(&k);
                             h_flex()
                                 .id(("clarify-pick", k))
-                                .gap_2()
-                                .py_1()
+                                .gap(Gap::M)
+                                .py(Gap::Xs)
                                 .items_start()
                                 .text_size(px(bench_ui::THREAD_META))
                                 .cursor_pointer()
@@ -296,18 +297,18 @@ impl ThreadView {
                     .collect();
                 let any_picked = !picked.is_empty();
                 v_flex()
-                    .gap_2()
+                    .gap(Gap::M)
                     .when(!choices.is_empty(), |d| {
                         if card.multi {
-                            d.child(v_flex().pl_6().children(choices))
+                            d.child(v_flex().pl(Gap::Xxl).children(choices))
                         } else {
-                            d.child(v_flex().pl_6().gap_2().children(choices))
+                            d.child(v_flex().pl(Gap::Xxl).gap(Gap::M).children(choices))
                         }
                     })
                     .child(
                         h_flex()
-                            .pl_6()
-                            .gap_2()
+                            .pl(Gap::Xxl)
+                            .gap(Gap::M)
                             .items_center()
                             .child(
                                 div()
@@ -342,8 +343,8 @@ impl ThreadView {
             .id(SharedString::from(format!("ask-card-{}", card.id)))
             .w_full()
             .min_w_0()
-            .p_3()
-            .gap_2()
+            .p(Gap::L)
+            .gap(Gap::M)
             .border_1()
             .rounded_lg()
             .when(settled, |d| d.border_color(theme.border))

@@ -7,6 +7,7 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use bench_ui::icons::Ico;
 
@@ -41,9 +42,6 @@ fn slash_body(
 }
 
 
-/// Rows the command list shows before it scrolls, and their height.
-const SLASH_ROWS: f32 = 8.;
-const SLASH_ROW: f32 = 30.;
 
 impl ThreadView {
     /// Commands matching a bare `/word`, in a small list right above the input.
@@ -59,7 +57,7 @@ impl ThreadView {
         }
         // Under the line, or above it when the window has no room below (the window's edge is
         // there): the list's own height decides.
-        let list_h = (matches.len() as f32).min(SLASH_ROWS) * SLASH_ROW + 10.;
+        let list_h = (matches.len() as f32).min(bench_ui::SLASH_ROWS) * bench_ui::SLASH_ROW_H + bench_ui::SLASH_PAD;
         let below = f32::from(self.composer_y) + bench_ui::TURN_Y + 30.;
         let room = f32::from(self.viewport_h) - 36. - below;
         let top = if room < list_h && f32::from(self.composer_y) > list_h + 48. {
@@ -72,9 +70,9 @@ impl ThreadView {
             let on = i == sel;
             h_flex()
                 .id(("slash", i))
-                .h(px(SLASH_ROW))
-                .px_3()
-                .gap_3()
+                .h(px(bench_ui::SLASH_ROW_H))
+                .px(Gap::L)
+                .gap(Gap::L)
                 .items_center()
                 .text_base()
                 .cursor_pointer()
@@ -119,10 +117,10 @@ impl ThreadView {
                         .border_1()
                         .rounded_md()
                         .border_color(theme.border)
-                        .py_1()
+                        .py(Gap::Xs)
                         .child(slash_body(
                             "slash-list",
-                            (n as f32).min(SLASH_ROWS) * SLASH_ROW,
+                            (n as f32).min(bench_ui::SLASH_ROWS) * bench_ui::SLASH_ROW_H,
                             &self.slash_scroll,
                             rows,
                         )),
@@ -157,8 +155,8 @@ impl ThreadView {
                 .id(("slash", i))
                 .flex_none()
                 .h(px(bench_ui::COMPLETION_ROW_H))
-                .px_2()
-                .gap_2()
+                .px(Gap::M)
+                .gap(Gap::M)
                 .items_center()
                 .rounded_md()
                 .text_size(px(bench_ui::SIDEBAR_TEXT))
@@ -196,10 +194,10 @@ impl ThreadView {
                     .border_color(theme.border.opacity(0.7))
                     .rounded_lg()
                     .shadow_lg()
-                    .p_1()
+                    .p(Gap::Xs)
                     .child(slash_body(
                         "slash-list",
-                        (n as f32).min(SLASH_ROWS) * bench_ui::COMPLETION_ROW_H,
+                        (n as f32).min(bench_ui::SLASH_ROWS) * bench_ui::COMPLETION_ROW_H,
                         &self.slash_scroll,
                         rows,
                     )),
@@ -238,8 +236,8 @@ impl ThreadView {
             h_flex()
                 .id(("ref", k))
                 .h(px(bench_ui::CHIP_H))
-                .px_1p5()
-                .gap_1()
+                .px(Gap::S)
+                .gap(Gap::Xs)
                 .items_center()
                 .rounded_md()
                 .border_1()
@@ -324,10 +322,10 @@ impl ThreadView {
                         div().relative().child(Ico::Mic.icon().small()).child(
                             div()
                                 .absolute()
-                                .right(px(-2.))
+                                .right(px(-bench_ui::MIC_BAR_OUT))
                                 .bottom(px(bench_ui::HAIRLINE))
                                 .w(px(bench_ui::CARET_W))
-                                .h(px(2. + level * 9.))
+                                .h(px(bench_ui::MIC_BAR_MIN_H + level * bench_ui::MIC_BAR_RANGE_H))
                                 .rounded(px(bench_ui::HAIRLINE))
                                 .bg(theme.foreground),
                         ),
@@ -366,12 +364,12 @@ impl ThreadView {
             .when(in_list && !empty, |d| {
                 // Their line in the row's grown bottom band: bottom-anchored by their own
                 // height, at the text's left edge.
-                d.top(px(row_h - bench_ui::AVATAR - 2.))
+                d.top(px(row_h - bench_ui::AVATAR - bench_ui::ICON_ON_LINE))
                     .left(px(bench_ui::CHAT_TEXT))
             })
             .h(px(bench_ui::AVATAR))
             .items_center()
-            .gap_1()
+            .gap(Gap::Xs)
             .when(
                 in_list && !(rec || trans) && !self.tools_shown,
                 |d| d.opacity(0.).group_hover("composer-row", |s| s.opacity(1.)),
@@ -448,7 +446,7 @@ impl ThreadView {
         let chips = (!chips.is_empty()).then(|| {
             h_flex()
                 .flex_wrap()
-                .gap_2()
+                .gap(Gap::M)
                 .when(in_list, |d| {
                     d.pr(px(bench_ui::COMPOSER_TOOLS_W)).pb(px(bench_ui::COMPOSER_PB))
                 })
@@ -542,7 +540,7 @@ impl ThreadView {
                     .w_full()
                     .px(px(bench_ui::COMPOSER_CARD_PX))
                     .py(px(bench_ui::COMPOSER_CARD_PY))
-                    .gap_2()
+                    .gap(Gap::M)
                     .rounded(px(bench_ui::COMPOSER_CARD_R))
                     .border_1()
                     .border_color(theme.border)
@@ -553,7 +551,7 @@ impl ThreadView {
                         h_flex()
                             .w_full()
                             .items_end()
-                            .gap_1()
+                            .gap(Gap::Xs)
                             // The small buttons centred on Send's height, the line they share.
                             .children(attach.take())
                             // Its line centred on the buttons' height.
@@ -562,7 +560,7 @@ impl ThreadView {
                                     .flex_1()
                                     .min_w_0()
                                     .pl(px(bench_ui::ICON_BUTTON_PAD))
-                                    .py(px((bench_ui::SEND_BUTTON - bench_ui::LEAD * 14.) / 2.))
+                                    .py(px((bench_ui::SEND_BUTTON - bench_ui::LEAD * bench_ui::THREAD_TEXT) / 2.))
                                     .child(field),
                             )
                             .children(mic.take())

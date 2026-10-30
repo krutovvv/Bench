@@ -7,6 +7,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
@@ -58,7 +59,7 @@ impl BenchApp {
                         .anchor(gpui_kit::Anchor::BottomLeft)
                         // Its sections pad themselves, so their rules run edge to edge as a
                         // Mac popover's separators do (the panel's own padding inset them).
-                        .p_0()
+                        .p(Gap::Zero)
                         .default_open(self.sidebar.agent_popover_open)
                         .trigger(
                             // Opening the panel asks macOS what it allows now (the choice may
@@ -69,9 +70,7 @@ impl BenchApp {
                                     .ghost()
                                     .small()
                                     .child(
-                                        h_flex()
-                                            .gap_1p5()
-                                            .items_center()
+                                        bench_ui::row(Gap::S)
                                             .text_size(px(bench_ui::SIDEBAR_TEXT))
                                             .child(bench_ui::dot(dot))
                                             .child(div().text_color(theme.foreground).child(name))
@@ -100,9 +99,7 @@ impl BenchApp {
                                 })
                             };
                             let line = |ok: bool, warn: bool, text: String| {
-                                h_flex()
-                                    .gap_2()
-                                    .items_center()
+                                bench_ui::row(Gap::M)
                                     .text_size(px(bench_ui::SIDEBAR_TEXT))
                                     .child(dot(ok, warn))
                                     // A URL or a refusal is longer than the panel: it wraps
@@ -112,7 +109,7 @@ impl BenchApp {
                             let icon = |id: &'static str, ico: Ico, tip: &'static str| {
                                 div()
                                     .id(id)
-                                    .p_1()
+                                    .p(Gap::Xs)
                                     .cursor_pointer()
                                     .text_color(muted)
                                     .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
@@ -143,9 +140,9 @@ impl BenchApp {
                                 .overflow_hidden()
                                 .child(bench_ui::popover_section(false, cx).child(
                                     h_flex()
-                                        .gap_2()
+                                        .gap(Gap::M)
                                         .items_start()
-                                        .child(v_flex().flex_1().min_w_0().gap_1().children(lines))
+                                        .child(v_flex().flex_1().min_w_0().gap(Gap::Xs).children(lines))
                                         .child(
                                             icon("backend-reconnect", Ico::RefreshCw, "Reconnect")
                                                 .on_click(move |_, window, cx| {
@@ -180,11 +177,9 @@ impl BenchApp {
                                     let auth = crate::system::notify::AUTH
                                         .load(std::sync::atomic::Ordering::Relaxed);
                                     bench_ui::popover_section(true, cx)
-                                        .gap_1()
+                                        .gap(Gap::Xs)
                                         .child(
-                                            h_flex()
-                                                .gap_2()
-                                                .items_center()
+                                            bench_ui::row(Gap::M)
                                                 .child(bench_ui::popover_title("Notifications", cx))
                                                 .child(div().flex_1())
                                                 .child(
@@ -234,7 +229,7 @@ impl BenchApp {
                                 // problem says itself before the status has anything to say.
                                 .child(
                                     bench_ui::popover_section(true, cx)
-                                        .gap_px()
+                                        .gap(Gap::Hair)
                                         .child(bench_ui::popover_title("Log · ~/.bench/server.log", cx))
                                         .when(log.is_empty(), |d| {
                                             d.child(

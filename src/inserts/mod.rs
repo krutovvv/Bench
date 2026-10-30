@@ -25,6 +25,7 @@ use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::inserts::state::Insert;
@@ -386,7 +387,7 @@ impl ThreadView {
         let folded = ins.folded;
         let fold = div()
             .id(SharedString::from(format!("{id}-fold")))
-            .p_0p5()
+            .p(Gap::Xxs)
             .cursor_pointer()
             .text_color(muted)
             .hover(|s| s.text_color(theme.foreground))
@@ -408,7 +409,7 @@ impl ThreadView {
                 this.patch_insert(&fold_at, &fold_id, patch, cx);
             }));
         let title_el: AnyElement = if switches.is_empty() {
-            div().px_1().child(title).into_any_element()
+            div().px(Gap::Xs).child(title).into_any_element()
         } else {
             let app = self.app.clone();
             let (ins_id, at) = (ins.id.clone(), at.clone());
@@ -444,7 +445,7 @@ impl ThreadView {
                 .into_any_element()
         };
         let head = bench_ui::block_head(&theme, body.is_some())
-            .gap_1()
+            .gap(Gap::Xs)
             .child(fold)
             .child(title_el)
             .child(div().flex_1())
@@ -467,8 +468,8 @@ impl ThreadView {
             .child(head)
             .children(body.map(|b| {
                 match inset {
-                    Inset::Padded => div().px_3().py_2(),
-                    Inset::Rows => div().py_2(),
+                    Inset::Padded => div().px(Gap::L).py(Gap::M),
+                    Inset::Rows => div().py(Gap::M),
                     Inset::Flush => div(),
                 }
                 .child(b)

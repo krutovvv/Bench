@@ -5,13 +5,11 @@
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::thread::ThreadView;
 
 /// How far down the thread's area the welcome starts, as a share of the window's height: over
-/// the middle, as an empty window's message sits on a Mac.
-const WELCOME_TOP: f32 = 0.22;
-
 impl ThreadView {
     pub(crate) fn render_welcome(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
@@ -25,7 +23,7 @@ impl ThreadView {
 
         let head = v_flex()
             .items_center()
-            .gap_2()
+            .gap(Gap::M)
             .child(bench_ui::logo_mark(bench_ui::WELCOME_MARK, cx))
             .child(
                 div()
@@ -39,7 +37,7 @@ impl ThreadView {
         let below = if no_model {
             v_flex()
                 .items_center()
-                .gap_3()
+                .gap(Gap::L)
                 .max_w(px(bench_ui::WELCOME_NOTE_W))
                 .text_center()
                 .text_size(px(bench_ui::THREAD_META))
@@ -69,7 +67,7 @@ impl ThreadView {
                 .filter(|k| k.offered(app, &at))
                 .filter_map(|k| Some((k.word(), k.welcome()?)))
                 .collect();
-            let chips = h_flex().flex_wrap().justify_center().gap_2().children(kinds.into_iter().map(
+            let chips = h_flex().flex_wrap().justify_center().gap(Gap::M).children(kinds.into_iter().map(
                 |(word, chip)| {
                     let slash = format!("/{}", word.word);
                     let (key, typed) = (word.key.to_string(), format!("{slash} "));
@@ -91,7 +89,7 @@ impl ThreadView {
             ));
             v_flex()
                 .items_center()
-                .gap_3()
+                .gap(Gap::L)
                 .child(
                     div()
                         .text_size(px(bench_ui::THREAD_META))
@@ -106,7 +104,7 @@ impl ThreadView {
             .w_full()
             .items_center()
             .px(px(bench_ui::CHAT_LEFT))
-            .pt(window.viewport_size().height * WELCOME_TOP)
+            .pt(window.viewport_size().height * bench_ui::WELCOME_TOP)
             .gap(px(bench_ui::WELCOME_GAP))
             .child(head)
             .child(below)

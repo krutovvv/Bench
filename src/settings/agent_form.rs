@@ -9,6 +9,7 @@ use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::json;
 
 use crate::app::BenchApp;
@@ -180,7 +181,7 @@ impl BenchApp {
         let Some(form) = self.gear.agent_form.as_ref() else {
             return vec![
                 h_flex()
-                    .py_2()
+                    .py(Gap::M)
                     .child(
                         bench_ui::secondary_button("gear-agent-add", "+ Agent on a server")
                             .small()
@@ -256,7 +257,7 @@ impl BenchApp {
         );
         out.push(
             div()
-                .pt_2()
+                .pt(Gap::M)
                 .text_sm()
                 .text_color(muted)
                 .child("Bench installs its agent there over SSH (it needs Node.js 22.18+) and starts it. It keeps its own threads, models, skills and Telegram there and works on its own; its models are set here once it answers.")
@@ -264,9 +265,9 @@ impl BenchApp {
         );
         out.push(
             h_flex()
-                .pt_3()
-                .pb_2()
-                .gap_2()
+                .pt(Gap::L)
+                .pb(Gap::M)
+                .gap(Gap::M)
                 .child(
                     bench_ui::primary_button("gear-agent-save", "Add agent")
                         .small()

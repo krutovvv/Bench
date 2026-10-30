@@ -6,6 +6,7 @@ use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::h_flex;
 use gpui_kit::component::input::EditorState;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 /// What the corner shows: the open file's editor and its path, or nothing.
 #[derive(Default)]
@@ -44,11 +45,11 @@ impl Render for CursorItem {
         div().h_full().child(
             h_flex()
                 .h_full()
-                .pr_1()
+                .pr(Gap::Xs)
                 .items_center()
                 .text_size(px(bench_ui::BAR_TEXT))
                 .text_color(cx.theme().muted_foreground)
-                .children(words.into_iter().map(|w| div().px_2().child(w))),
+                .children(words.into_iter().map(|w| div().px(Gap::M).child(w))),
         )
     }
 }

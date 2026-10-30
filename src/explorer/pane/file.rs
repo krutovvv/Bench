@@ -7,6 +7,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::explorer::pane::item::Item;
 use crate::explorer::pane::view::note;
@@ -294,7 +295,7 @@ fn save_button(id: SharedString, dirty: bool, cx: &App) -> Stateful<Div> {
     div()
         .id(id)
         .flex_none()
-        .px_2()
+        .px(Gap::M)
         .rounded_md()
         .cursor_pointer()
         .when(dirty, |d| {

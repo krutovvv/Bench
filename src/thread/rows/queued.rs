@@ -5,6 +5,7 @@ use gpui_kit::component::input::Textarea;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::thread::ThreadView;
 use bench_ui::icons::Ico;
@@ -40,7 +41,7 @@ impl ThreadView {
         let id = SharedString::from(key.to_string());
         let actions = h_flex()
             .flex_none()
-            .gap_1()
+            .gap(Gap::Xs)
             .items_center()
             .text_size(px(bench_ui::THREAD_META))
             .text_color(theme.muted_foreground)

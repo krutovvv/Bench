@@ -10,8 +10,9 @@ pub mod view;
 
 use gpui_kit::component::button::{Button, ButtonVariants as _};
 use gpui_kit::component::shimmer::ShimmerText;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::inserts::state::Insert;
@@ -140,9 +141,7 @@ impl InsertKind for Browser {
         {
             app.inserts.browser.reopening = None;
             return Some(
-                h_flex()
-                    .gap_2()
-                    .items_center()
+                bench_ui::row(Gap::M)
                     .child(
                         div()
                             .flex_1()
@@ -186,9 +185,7 @@ impl InsertKind for Browser {
         }
         // Its tab went away (the browser restarted, the tab was closed).
         Some(
-            h_flex()
-                .gap_2()
-                .items_center()
+            bench_ui::row(Gap::M)
                 .child(
                     div()
                         .flex_1()

@@ -10,6 +10,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::json;
 
 use crate::app::BenchApp;
@@ -261,7 +262,7 @@ impl BenchApp {
                 .into_any_element()
         };
         let cards = h_flex()
-            .gap_2()
+            .gap(Gap::M)
             .items_stretch()
             .child(card(0, Ico::Laptop, "Host", "A folder here. This agent's Host runs it.".into(), Place::ThisMac, false, cx))
             .child(card(
@@ -314,9 +315,7 @@ impl BenchApp {
                 let has = folder.is_some();
                 fields.push(label("Folder"));
                 fields.push(
-                    h_flex()
-                        .gap_2()
-                        .items_center()
+                    bench_ui::row(Gap::M)
                         .child(
                             div()
                                 .flex_1()
@@ -384,9 +383,9 @@ impl BenchApp {
             .w_full()
             .max_w(px(bench_ui::PAGE_W))
             .mx_auto()
-            .pt_8()
-            .pb_8()
-            .gap_2()
+            .pt(Gap::Huge)
+            .pb(Gap::Huge)
+            .gap(Gap::M)
             .child(div().text_xl().font_weight(FontWeight::SEMIBOLD).child("New project"))
             .child(
                 div()
@@ -409,22 +408,22 @@ impl BenchApp {
             .child(
                 // A long folder wraps inside the note, the icon at its first line.
                 h_flex()
-                    .gap_2()
+                    .gap(Gap::M)
                     .items_start()
-                    .px_3()
-                    .py_2p5()
+                    .px(Gap::L)
+                    .py(Gap::Ml)
                     .rounded_lg()
                     .bg(theme.secondary)
                     .text_sm()
                     .text_color(muted)
-                    .child(div().flex_none().pt_0p5().child(Ico::Info.icon().small().text_color(muted)))
+                    .child(div().flex_none().pt(Gap::Xxs).child(Ico::Info.icon().small().text_color(muted)))
                     .child(div().flex_1().min_w_0().child(summary)),
             )
             .child(
                 h_flex()
-                    .pt_4()
+                    .pt(Gap::Xl)
                     .justify_end()
-                    .gap_2()
+                    .gap(Gap::M)
                     .child(
                         bench_ui::form_action("project-cancel", "Cancel", false, cx)
                             .on_click(cx.listener(|this, _, _, cx| this.cancel_project_form(cx))),
@@ -448,9 +447,7 @@ impl BenchApp {
     fn environment_row(&self, environment: Option<String>, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
         let has = environment.is_some();
-        h_flex()
-            .gap_2()
-            .items_center()
+        bench_ui::row(Gap::M)
             .child(
                 div()
                     .flex_1()

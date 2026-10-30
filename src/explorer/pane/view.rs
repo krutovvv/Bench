@@ -7,6 +7,7 @@ use gpui_kit::component::menu::ContextMenuExt as _;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
@@ -126,9 +127,9 @@ impl BenchApp {
             let pick = n;
             h_flex()
                 .id(("quick", n))
-                .px_3()
-                .py_1()
-                .gap_2()
+                .px(Gap::L)
+                .py(Gap::Xs)
+                .gap(Gap::M)
                 .items_center()
                 .cursor_pointer()
                 .when(n == sel, |d| d.bg(theme.list_active))
@@ -170,14 +171,14 @@ impl BenchApp {
                             }
                             cx.stop_propagation();
                         }))
-                        .child(div().p_2().child(Input::new(&input)))
+                        .child(div().p(Gap::M).child(Input::new(&input)))
                         .child(
                             div()
                                 .id("quick-list")
                                 .flex_1()
                                 .min_h_0()
                                 .overflow_y_scroll()
-                                .pb_1()
+                                .pb(Gap::Xs)
                                 .when(!listed, |d| d.child(note("Listing the folder…", cx)))
                                 .children(rows),
                         ),
@@ -190,7 +191,7 @@ impl BenchApp {
 /// One muted line, padded.
 pub(crate) fn note(text: &str, cx: &App) -> AnyElement {
     div()
-        .p_3()
+        .p(Gap::L)
         .text_color(cx.theme().muted_foreground)
         .child(text.to_string())
         .into_any_element()

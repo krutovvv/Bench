@@ -7,12 +7,12 @@ use crate::metrics::Gap;
 
 /// Children side by side, centered vertically, `gap` apart.
 pub fn row(gap: Gap) -> Div {
-    h_flex().items_center().gap(gap.px())
+    h_flex().items_center().gap(gap)
 }
 
 /// Children one under another, `gap` apart, as wide as the column.
 pub fn stack(gap: Gap) -> Div {
-    v_flex().w_full().gap(gap.px())
+    v_flex().w_full().gap(gap)
 }
 
 /// A row whose children go to both ends (a title left, actions right).

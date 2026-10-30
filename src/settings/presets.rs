@@ -8,6 +8,7 @@ use gpui_kit::component::input::EditorState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::{Value, json};
 
 use crate::app::BenchApp;
@@ -160,7 +161,7 @@ impl BenchApp {
         let muted = cx.theme().muted_foreground;
         let p = self.gear.presets.clone();
         let mut out = vec![div()
-            .pt_4()
+            .pt(Gap::Xl)
             .text_sm()
             .text_color(muted)
             .child("What a project takes with one click (+ Add in its environment), and the choices of its Model section. Kept by the local agent; a server's projects take them too. Keys can be written right into a preset.")
@@ -193,8 +194,8 @@ impl BenchApp {
             for (name, note) in lines {
                 out.push(
                     h_flex()
-                        .gap_2()
-                        .py_1p5()
+                        .gap(Gap::M)
+                        .py(Gap::S)
                         .border_b_1()
                         .border_color(cx.theme().border)
                         .child(div().flex_none().child(name))
@@ -218,14 +219,14 @@ impl BenchApp {
                 Some(text) => {
                     out.push(
                         div()
-                            .pt_2()
+                            .pt(Gap::M)
                             .child(crate::env::section::code(&text, cx))
                             .into_any_element(),
                     );
                     out.push(
                         h_flex()
-                            .py_2()
-                            .gap_2()
+                            .py(Gap::M)
+                            .gap(Gap::M)
                             .child(
                                 bench_ui::primary_button(
                                     SharedString::from(format!("preset-save-{kind}")),
@@ -265,7 +266,7 @@ impl BenchApp {
                 }
                 None => out.push(
                     h_flex()
-                        .py_2()
+                        .py(Gap::M)
                         .child(
                             bench_ui::secondary_button(
                                 SharedString::from(format!("preset-edit-{kind}")),

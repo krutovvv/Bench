@@ -11,6 +11,7 @@ use ::thread::{Row, Step};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::explorer::pane::doc::Turn;
 use crate::thread::ThreadView;
@@ -168,8 +169,8 @@ impl ThreadView {
                     .id(SharedString::from(format!("chg-{key}-{k}")))
                     .group(group.clone())
                     .h(px(bench_ui::LIST_ROW_H))
-                    .px_3()
-                    .gap_2()
+                    .px(Gap::L)
+                    .gap(Gap::M)
                     .items_center()
                     .text_size(px(bench_ui::THREAD_META))
                     .cursor_pointer()
@@ -210,7 +211,7 @@ impl ThreadView {
                     .child(
                         h_flex()
                             .flex_none()
-                            .gap_1p5()
+                            .gap(Gap::S)
                             .font_family(bench_ui::theme::MONO)
                             .text_size(theme.mono_font_size)
                             .when(f.add > 0, |d| d.child(div().text_color(theme.success).child(format!("+{}", f.add))))
@@ -252,7 +253,7 @@ impl ThreadView {
             }
         }
         // The rows' own air under the head, as a list in a Mac sidebar.
-        let rows = (!rows.is_empty()).then(|| v_flex().py_1().children(rows));
+        let rows = (!rows.is_empty()).then(|| v_flex().py(Gap::Xs).children(rows));
         let review_head = review.map(|r| self.render_review_head(key, r, review_open, cx));
         let k = key.to_string();
         bench_ui::block_frame(cx)
@@ -360,15 +361,15 @@ impl ThreadView {
             };
             h_flex()
                 .id(SharedString::from(format!("finding-{key}-{k}")))
-                .px_3()
-                .py_1()
-                .gap_2()
+                .px(Gap::L)
+                .py(Gap::Xs)
+                .gap(Gap::M)
                 .items_start()
                 .text_size(px(bench_ui::THREAD_META))
                 .child(
                     div()
                         .flex_none()
-                        .pt_0p5()
+                        .pt(Gap::Xxs)
                         .text_color(theme.warning)
                         .child(Ico::CircleAlert.icon().xsmall()),
                 )
@@ -402,12 +403,12 @@ impl ThreadView {
             app.focus_composer(window, cx);
         }));
         v_flex()
-            .mt_1()
-            .pt_1()
+            .mt(Gap::Xs)
+            .pt(Gap::Xs)
             .border_t_1()
             .border_color(theme.border.opacity(0.6))
             .children(rows)
-            .child(h_flex().px_3().py_1().justify_end().child(send))
+            .child(h_flex().px(Gap::L).py(Gap::Xs).justify_end().child(send))
             .into_any_element()
     }
 
@@ -490,8 +491,8 @@ impl ThreadView {
                 .into_any_element(),
         };
         div()
-            .px_3()
-            .pb_1()
+            .px(Gap::L)
+            .pb(Gap::Xs)
             .text_size(px(bench_ui::THREAD_META))
             .child(body)
             .into_any_element()

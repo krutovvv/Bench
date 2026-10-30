@@ -4,6 +4,7 @@
 
 use gpui_kit::component::{ActiveTheme as _, h_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::workspace::{DockPosition, Panel};
@@ -28,8 +29,8 @@ impl BenchApp {
             .flex_none()
             .w_full()
             .h(px(bench_ui::STATUS_H))
-            .px_1()
-            .gap_1()
+            .px(Gap::Xs)
+            .gap(Gap::Xs)
             .items_center()
             .bg(theme.status_bar)
             .border_t_1()

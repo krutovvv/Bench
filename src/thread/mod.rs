@@ -35,6 +35,7 @@ use ::thread::Row;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use bench_ui::icons::Ico;
 
@@ -195,8 +196,8 @@ impl ThreadView {
                             h_flex()
                                 .id("jump")
                                 .h(px(bench_ui::CHIP_H))
-                                .px_3()
-                                .gap_1()
+                                .px(Gap::L)
+                                .gap(Gap::Xs)
                                 .items_center()
                                 .rounded_full()
                                 .bg(theme.popover)
@@ -260,8 +261,8 @@ impl ThreadView {
                         .px(px(side))
                         .pb(px(bench_ui::COMPOSER_CARD_PB))
                         // The line under it close, as Claude's: its chips' hover is the air.
-                        .gap_1()
-                        .when(waiting, |d| d.child(div().pb_1().child(self.render_waiting_line(cx))))
+                        .gap(Gap::Xs)
+                        .when(waiting, |d| d.child(div().pb(Gap::Xs).child(self.render_waiting_line(cx))))
                         .child(composer)
                         .child(foot),
                 ),
@@ -276,8 +277,8 @@ impl ThreadView {
         h_flex()
             .id("waiting")
             .h(px(bench_ui::CHIP_H))
-            .px_3()
-            .gap_2()
+            .px(Gap::L)
+            .gap(Gap::M)
             .items_center()
             .rounded(px(bench_ui::COMPOSER_CARD_R))
             .bg(theme.warning.opacity(0.12))
@@ -502,7 +503,7 @@ impl ThreadView {
                         .pl(px(look::text_x()))
                         .pr(px(look::text_right()))
                         .py(px(bench_ui::TURN_Y))
-                        .gap_3()
+                        .gap(Gap::L)
                         .items_center()
                         .child(
                             div()

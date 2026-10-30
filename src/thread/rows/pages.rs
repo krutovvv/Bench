@@ -6,6 +6,7 @@ use ::thread::{Row, Step};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::thread::ThreadView;
 use ::thread::tool_labels::{host_of, tool_urls};
@@ -85,8 +86,8 @@ impl ThreadView {
             .collect();
         let list = (!pages.is_empty()).then(|| {
             v_flex()
-                .mt_1()
-                .pl_2()
+                .mt(Gap::Xs)
+                .pl(Gap::M)
                 .border_l_1()
                 .border_color(theme.border)
                 .children(pages.into_iter().enumerate().map(|(n, url)| {
@@ -107,7 +108,7 @@ impl ThreadView {
         });
         Some(
             v_flex()
-                .child(h_flex().flex_wrap().gap_1().children(chips))
+                .child(h_flex().flex_wrap().gap(Gap::Xs).children(chips))
                 .children(list)
                 .into_any_element(),
         )

@@ -8,6 +8,7 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use devtools::{Kind, Tool};
@@ -42,8 +43,8 @@ impl BenchApp {
         } else if self.inserts.tools.preview.trim().is_empty() {
             div()
                 .flex_1()
-                .px_4()
-                .py_3()
+                .px(Gap::Xl)
+                .py(Gap::L)
                 .text_size(px(bench_ui::THREAD_META))
                 .whitespace_normal()
                 .text_color(theme.muted_foreground)
@@ -53,7 +54,7 @@ impl BenchApp {
             crate::inserts::scroll_pane(
                 "tool-html",
                 &self.inserts.tools.html_scroll,
-                div().px_4().py_3().text_size(px(bench_ui::THREAD_META)).child(
+                div().px(Gap::Xl).py(Gap::L).text_size(px(bench_ui::THREAD_META)).child(
                     TextView::html("tool-html-view-body", self.inserts.tools.preview.clone())
                         .selectable(true),
                 ),
@@ -92,7 +93,7 @@ impl BenchApp {
             div()
                 .id("tool-copy")
                 .flex_none()
-                .p_1()
+                .p(Gap::Xs)
                 .rounded_sm()
                 .cursor_pointer()
                 .text_color(theme.muted_foreground)
@@ -152,8 +153,8 @@ impl BenchApp {
                         "tool-preview",
                         &self.inserts.tools.preview_scroll,
                         div()
-                            .px_4()
-                            .py_3()
+                            .px(Gap::Xl)
+                            .py(Gap::L)
                             .text_size(px(bench_ui::THREAD_META))
                             .child(crate::media::text::markdown(
                                 "tool-md",
@@ -232,9 +233,9 @@ impl BenchApp {
                 };
                 let pattern_row = h_flex()
                     .flex_none()
-                    .px_3()
-                    .py_2()
-                    .gap_2()
+                    .px(Gap::L)
+                    .py(Gap::M)
+                    .gap(Gap::M)
                     .items_center()
                     .border_b_1()
                     .border_color(theme.border)
@@ -309,7 +310,7 @@ impl BenchApp {
                         div()
                             .flex_1()
                             .min_h_0()
-                            .p_4()
+                            .p(Gap::Xl)
                             .flex()
                             .items_center()
                             .justify_center()

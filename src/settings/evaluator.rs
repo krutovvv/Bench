@@ -5,6 +5,7 @@
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::{Value, json};
 
 use crate::app::BenchApp;
@@ -168,7 +169,7 @@ impl BenchApp {
         let mut page = vec![
             bench_ui::settings_heading("Evaluator · System One API", vec![], cx).into_any_element(),
             div()
-                .pb_1()
+                .pb(Gap::Xs)
                 .text_sm()
                 .text_color(muted)
                 .child("A small model asked many quick questions: the agent's own checks on its way, and code mode scripts' models.classify(). Projects that turn it on in their Settings use the main server, the fallback when it fails. No server: none does")

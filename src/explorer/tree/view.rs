@@ -9,6 +9,7 @@ use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMen
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::explorer::{DocKey, FileRef, Named};
 use crate::app::BenchApp;
@@ -35,8 +36,8 @@ impl BenchApp {
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .pt_1()
-                    .pb_1()
+                    .pt(Gap::Xs)
+                    .pb(Gap::Xs)
                     .children(rows),
             )
             .into_any_element()
@@ -179,9 +180,7 @@ impl BenchApp {
             .ghost()
             .small()
             .child(
-                h_flex()
-                    .gap_1()
-                    .items_center()
+                bench_ui::row(Gap::Xs)
                     .child(
                         div()
                             .text_size(px(bench_ui::BAR_TITLE))
@@ -215,7 +214,7 @@ impl BenchApp {
             .h(bench_ui::bar_h(cx))
             .pl(px(bench_ui::SIDEBAR_ROW_INSET - bench_ui::ICON_BUTTON_PAD))
             .pr(px(bench_ui::SIDEBAR_ROW_INSET))
-            .gap_1()
+            .gap(Gap::Xs)
             .items_center()
             .border_b_1()
             .border_color(cx.theme().border)
@@ -229,7 +228,7 @@ impl BenchApp {
                 div()
                     .w(px(bench_ui::HAIRLINE))
                     .h(px(bench_ui::BADGE))
-                    .mx_0p5()
+                    .mx(Gap::Xxs)
                     .bg(cx.theme().border),
             )
             .child(
@@ -405,7 +404,7 @@ impl BenchApp {
         div()
             .id(SharedString::from(format!("ex-rm-{}", f.listing_key())))
             .flex_none()
-            .px_1()
+            .px(Gap::Xs)
             .cursor_pointer()
             .text_xs()
             .when(!armed, |d| {
@@ -436,8 +435,8 @@ impl BenchApp {
             div()
                 .flex_none()
                 .pl(bench_ui::tree_pl(indent))
-                .pr_2()
-                .py_0p5()
+                .pr(Gap::M)
+                .py(Gap::Xxs)
                 .child(Input::new(&n.input).small())
                 .into_any_element(),
         )
@@ -465,8 +464,8 @@ pub(crate) fn quiet(text: &str, depth: usize, cx: &App) -> AnyElement {
     div()
         .flex_none()
         .pl(bench_ui::tree_pl(depth + 1))
-        .pr_2()
-        .py_0p5()
+        .pr(Gap::M)
+        .py(Gap::Xxs)
         .text_xs()
         .text_color(cx.theme().muted_foreground)
         .child(text.to_string())

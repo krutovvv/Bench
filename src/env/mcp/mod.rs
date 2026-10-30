@@ -10,6 +10,7 @@ use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::{Value, json};
 
 use super::section::{
@@ -217,9 +218,7 @@ impl ExplorerParts for Mcp {
         );
         head.push(add("env-mcp-add", &e.id, "mcp", cx).into_any_element());
         Some(
-            h_flex()
-                .gap_3()
-                .items_center()
+            bench_ui::row(Gap::L)
                 .children(head)
                 .into_any_element(),
         )
@@ -289,7 +288,7 @@ impl ExplorerParts for Mcp {
                 });
             let body = std::mem::replace(&mut card.body, div().into_any_element());
             card.body = v_flex()
-                .child(h_flex().flex_wrap().gap_1p5().px_3().pt_2().children(chips))
+                .child(h_flex().flex_wrap().gap(Gap::S).px(Gap::L).pt(Gap::M).children(chips))
                 .child(body)
                 .into_any_element();
             return Some(card);

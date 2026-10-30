@@ -3,30 +3,60 @@
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 
-/// The spacing steps. Everything between elements is one of these.
+/// The spacing steps. Everything between elements is one of these, in rems, so they follow the
+/// theme's size: at its 14 px, Xs is 3.5 and Xl is 14. Say them as `.gap(Gap::M)`, `.px(Gap::L)`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Gap {
-    /// 2 px: an icon and its label inside a chip.
+    Zero,
+    /// A hairline: the lines of a log.
+    Hair,
+    /// An eighth of the font: a label and its hint.
+    Xxs,
+    /// A quarter: fields of a form, items of a tight row.
     Xs,
-    /// 4 px: fields of a form, items of a tight row.
+    /// Three eighths: an icon and its label.
     S,
-    /// 8 px: buttons of a row, blocks of a card.
+    /// Half: buttons of a row, blocks of a card.
     M,
-    /// 12 px: groups inside a block.
+    /// Five eighths: a settings row's air.
+    Ml,
+    /// Three quarters: the inset inside a block.
     L,
-    /// 16 px: the inset from a panel's edge.
+    /// The font's size: the inset from a panel's edge.
     Xl,
+    /// One and a half: air over a group.
+    Xxl,
+    /// Twice: air over a page.
+    Huge,
 }
 
 impl Gap {
-    pub fn px(self) -> Pixels {
-        px(match self {
-            Gap::Xs => 2.,
-            Gap::S => 4.,
-            Gap::M => 8.,
-            Gap::L => 12.,
-            Gap::Xl => 16.,
-        })
+    fn length(self) -> DefiniteLength {
+        match self {
+            Gap::Zero => px(0.).into(),
+            Gap::Hair => px(HAIRLINE).into(),
+            Gap::Xxs => rems(0.125).into(),
+            Gap::Xs => rems(0.25).into(),
+            Gap::S => rems(0.375).into(),
+            Gap::M => rems(0.5).into(),
+            Gap::Ml => rems(0.625).into(),
+            Gap::L => rems(0.75).into(),
+            Gap::Xl => rems(1.).into(),
+            Gap::Xxl => rems(1.5).into(),
+            Gap::Huge => rems(2.).into(),
+        }
+    }
+}
+
+impl From<Gap> for DefiniteLength {
+    fn from(gap: Gap) -> Self {
+        gap.length()
+    }
+}
+
+impl From<Gap> for Length {
+    fn from(gap: Gap) -> Self {
+        Length::Definite(gap.length())
     }
 }
 
@@ -274,6 +304,40 @@ pub const SPEED_CHART_H: f32 = 56.;
 pub const SPEED_BAR_GAP: f32 = 1.;
 
 // ---- Attachments and inserts --------------------------------------------------------------
+
+/// The size of the thread's words, in points.
+pub const THREAD_TEXT: f32 = 14.;
+/// A utility insert: its least height, and the air its panes keep round their lines.
+pub const TOOL_MIN_H: f32 = 200.;
+pub const TOOL_LINES_PAD: f32 = 24.;
+/// The tallest a terminal or a browser tab gets in a thread.
+pub const TERMINAL_MAX_H: f32 = 280.;
+pub const BROWSER_MAX_H: f32 = 620.;
+/// A terminal view's own padding above and below its lines, together.
+pub const TERMINAL_PAD_Y: f32 = 16.;
+/// The largest box an image or a video takes in an answer; a document's first page; a diagram or
+/// a Markdown file's width and a diagram's height; how much of a long Markdown file shows.
+pub const MEDIA_MAX_W: f32 = 560.;
+pub const MEDIA_MAX_H: f32 = 420.;
+pub const MEDIA_PAGE_W: f32 = 240.;
+pub const MEDIA_WIDE_W: f32 = 720.;
+pub const DIAGRAM_MAX_H: f32 = 620.;
+pub const MARKDOWN_PREVIEW_H: f32 = 280.;
+/// A new thread's welcome stands this far down the window (a share of its height).
+pub const WELCOME_TOP: f32 = 0.22;
+/// A plan's nested step: its indent per level.
+pub const PLAN_INDENT: f32 = 16.;
+/// The mic's level bar while dictating: how far past the glyph it stands, its height from silence
+/// to loud.
+pub const MIC_BAR_OUT: f32 = 2.;
+pub const MIC_BAR_MIN_H: f32 = 2.;
+pub const MIC_BAR_RANGE_H: f32 = 9.;
+/// The `/` list in the document's composer: its row, how many show, the air inside it.
+pub const SLASH_ROW_H: f32 = 30.;
+pub const SLASH_ROWS: f32 = 8.;
+pub const SLASH_PAD: f32 = 10.;
+/// The menu's icon column, which a row without an icon pulls back over to sit centred.
+pub const MENU_ICON_COL: f32 = 16.;
 
 /// An attachment's chip: its widest, its icon's square, its remove badge and the badge's inset.
 pub const ATTACHMENT_MAX_W: f32 = 260.;

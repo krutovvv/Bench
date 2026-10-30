@@ -13,6 +13,7 @@ pub(crate) mod voice;
 
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 
@@ -116,7 +117,7 @@ impl BenchApp {
                     },
                     h_flex()
                         .justify_end()
-                        .gap_2()
+                        .gap(Gap::M)
                         .children(update)
                         .children(remove)
                         .child((if shown { bench_ui::primary_button } else { bench_ui::secondary_button })(SharedString::from(format!("gear-agent-{host}")), if shown { "Shown below" } else { "Show" })
@@ -135,7 +136,7 @@ impl BenchApp {
         if !self.gear.providers.loaded {
             page.push(
                 div()
-                    .py_2p5()
+                    .py(Gap::Ml)
                     .text_base()
                     .text_color(muted)
                     .child(if self.conn_of(&self.gear.agent).is_some() {

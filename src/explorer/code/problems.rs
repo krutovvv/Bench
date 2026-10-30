@@ -6,6 +6,7 @@
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::explorer::pane::item::Item;
 use crate::explorer::{DocKey, FileRef};
@@ -299,7 +300,7 @@ impl BenchApp {
                 .id("problems")
                 .size_full()
                 .overflow_y_scroll()
-                .py_1()
+                .py(Gap::Xs)
                 .children(rows)
                 .into_any_element(),
         };

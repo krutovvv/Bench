@@ -17,15 +17,13 @@ pub mod view;
 
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::inserts::state::Insert;
 use crate::inserts::InsertKind;
 use crate::thread::ThreadRef;
 use bench_ui::icons::Ico;
-
-/// The tallest a terminal gets in a thread; its program's screen is this many rows.
-const MAX_H: f32 = 280.;
 
 pub struct Terminal;
 
@@ -97,7 +95,7 @@ impl InsertKind for Terminal {
         if app.inserts.terminal.tabs[t].background {
             return vec![
                 bench_ui::chip_tight(("term-bg-badge", id), cx)
-                    .py_0()
+                    .py(Gap::Zero)
                     .text_sm()
                     .text_color(theme.muted_foreground)
                     .cursor_pointer()
@@ -147,12 +145,12 @@ impl InsertKind for Terminal {
         }
         let line = match tab.session.layout().line_h {
             h if h > 1. => h,
-            _ => 20.,
+            _ => bench_ui::TERMINAL_LINE_H,
         };
-        // Its program sees the whole MAX_H, whatever the view shows.
+        // Its program sees the whole height it may take, whatever the view shows.
         tab.session
-            .set_min_rows((((MAX_H - 16.) / line).floor() as usize).max(4));
-        let h = terminal_height(&tab.session).min(MAX_H);
+            .set_min_rows((((bench_ui::TERMINAL_MAX_H - bench_ui::TERMINAL_PAD_Y) / line).floor() as usize).max(4));
+        let h = terminal_height(&tab.session).min(bench_ui::TERMINAL_MAX_H);
         Some(
             div()
                 .h(px(h))
@@ -217,7 +215,7 @@ impl InsertKind for Terminal {
 fn terminal_height(session: &crate::inserts::terminal::session::Session) -> f32 {
     let line = match session.layout().line_h {
         h if h > 1. => h,
-        _ => 20.,
+        _ => bench_ui::TERMINAL_LINE_H,
     };
-    session.used_rows().min(1000).max(1) as f32 * line + 16.
+    session.used_rows().min(1000).max(1) as f32 * line + bench_ui::TERMINAL_PAD_Y
 }

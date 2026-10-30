@@ -84,7 +84,7 @@ impl View {
         }
         let viewport = match self.list.viewport_bounds().size.height {
             h if h > px(0.) => h,
-            _ => window_h - px(36.),
+            _ => window_h - px(bench_ui::TITLE_BAR_H),
         };
         let tail = self
             .list

@@ -9,6 +9,7 @@ use gpui_kit::component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::model::ProjectKey;
 use crate::thread::view::ThreadView;
@@ -28,7 +29,7 @@ impl ThreadView {
             .w_full()
             .min_w_0()
             .h(px(bench_ui::COMPOSER_FOOT_H))
-            .gap_1()
+            .gap(Gap::Xs)
             .items_center()
             .text_size(px(bench_ui::BAR_TEXT))
             .child(project)
@@ -56,8 +57,8 @@ impl ThreadView {
         };
         if !picks {
             return h_flex()
-                .px_2()
-                .gap_1()
+                .px(Gap::M)
+                .gap(Gap::Xs)
                 .items_center()
                 .text_color(cx.theme().muted_foreground)
                 .child(Ico::Folder.icon().xsmall())

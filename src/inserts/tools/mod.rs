@@ -16,9 +16,6 @@ use crate::inserts::{InsertKind, Switch, clip};
 use crate::thread::ThreadRef;
 use devtools::{GROUPS, Tool};
 
-/// The tool's least height in the thread (it grows with its text).
-const MIN_H: f32 = 200.;
-
 pub struct Tools;
 
 fn tool_of(ins: &Insert) -> Tool {
@@ -170,9 +167,9 @@ impl InsertKind for Tools {
             e.read(cx).value().lines().count()
         };
         let n = lines(&app.inserts.tools.input).max(lines(&app.inserts.tools.output)) + 2;
-        let want = px(n as f32 * bench_ui::editor_line(cx) + bench_ui::BLOCK_HEAD_H + 24.);
+        let want = px(n as f32 * bench_ui::editor_line(cx) + bench_ui::BLOCK_HEAD_H + bench_ui::TOOL_LINES_PAD);
         let cap = window.bounds().size.height * 0.5;
-        let h = want.max(px(MIN_H)).min(cap.max(px(MIN_H)));
+        let h = want.max(px(bench_ui::TOOL_MIN_H)).min(cap.max(px(bench_ui::TOOL_MIN_H)));
         Some(
             div()
                 .h(h)

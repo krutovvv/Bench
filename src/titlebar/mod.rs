@@ -6,6 +6,7 @@
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::workspace::Center;
@@ -25,7 +26,7 @@ impl BenchApp {
             .h(bench_ui::header_h(cx))
             .pl(px(bench_ui::WINDOW_BUTTONS_W))
             // The fold, back and forward one even row, as Finder's: each glyph its box, one step apart.
-            .gap_1()
+            .gap(Gap::Xs)
             .items_center()
             .bg(theme.title_bar)
             .border_b_1()
@@ -63,7 +64,7 @@ impl BenchApp {
             .child(
                 // As far from the last glyph as the title is from it.
                 div()
-                    .ml_1()
+                    .ml(Gap::Xs)
                     .w(px(bench_ui::HAIRLINE))
                     .h(px(bench_ui::BAR_SEPARATOR_H))
                     .bg(theme.border),
@@ -88,9 +89,9 @@ impl BenchApp {
         if self.center == Center::Doc {
             let name = self.project_name(&self.explorer.project);
             return bar
-                .pl_4()
-                .pr_2()
-                .gap_1()
+                .pl(Gap::Xl)
+                .pr(Gap::M)
+                .gap(Gap::Xs)
                 .child(
                     div()
                         .flex_1()
@@ -125,14 +126,14 @@ impl BenchApp {
             .map(|v| self.thread_title(v.read(cx).thread.id.as_ref()));
             let theme = cx.theme().clone();
             return bar
-                .pl_4()
-                .pr_2()
-                .gap_1()
+                .pl(Gap::Xl)
+                .pr(Gap::M)
+                .gap(Gap::Xs)
                 .child(
                     h_flex()
                         .flex_1()
                         .min_w_0()
-                        .gap_1p5()
+                        .gap(Gap::S)
                         .items_center()
                         // The header's title: the sidebar's size, semibold; its chips the bars' size.
                         .text_size(px(bench_ui::BAR_TITLE))
@@ -175,7 +176,7 @@ impl BenchApp {
         let title: SharedString = if self.center == Center::NewProject { "New project" } else { "Settings" }.into();
         bar.child(
             div()
-                .px_4()
+                .px(Gap::Xl)
                 .text_size(px(bench_ui::BAR_TITLE))
                 .font_weight(FontWeight::SEMIBOLD)
                 .child(title),
@@ -184,7 +185,7 @@ impl BenchApp {
         .child(
             div()
                 .id("settings-close")
-                .px_3()
+                .px(Gap::L)
                 .h_full()
                 .flex()
                 .items_center()

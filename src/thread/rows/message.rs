@@ -4,6 +4,7 @@ use ::thread::Row;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::thread::ThreadView;
 use bench_ui::icons::Ico;
@@ -50,13 +51,13 @@ impl ThreadView {
                 d.child(
                     h_flex()
                         .flex_wrap()
-                        .gap_2()
+                        .gap(Gap::M)
                         .when(!text.is_empty(), |d| d.mt(px(bench_ui::ATTACHED_MT)))
                         .pb(px(bench_ui::ATTACHED_PB))
                         .children(attached),
                 )
             });
-        let body = body.when_some(actions, |d, a| d.child(div().pt_2().child(a)));
+        let body = body.when_some(actions, |d, a| d.child(div().pt(Gap::M).child(a)));
         // The chat: the person's words in a grey bubble on the right, as Messages has them
         // (a queued one outlined, not filled: it has not gone yet).
         if crate::thread::look::USER_BUBBLE {
@@ -118,10 +119,10 @@ impl ThreadView {
         // run is not a chat reply to roll again; it acted, checked itself, and this is it.
         let actions = h_flex()
             .absolute()
-            .top(px(TURN_Y + 3.))
+            .top(px(TURN_Y + bench_ui::ICON_ON_SMALL_LINE))
             .right_0()
-            .pl_1()
-            .gap_0p5()
+            .pl(Gap::Xs)
+            .gap(Gap::Xxs)
             .items_center()
             .bg(theme.background)
             .when(!(playing || speaking), |d| {
@@ -159,7 +160,7 @@ impl ThreadView {
                 })),
             );
         let body = v_flex()
-            .gap_3()
+            .gap(Gap::L)
             .children(self.answer_body(key, text, cx))
             .when_some(error, |d, e| {
                 d.child(
@@ -189,7 +190,7 @@ impl ThreadView {
             })
             .child(
                 crate::thread::look::turn(if after_work { None } else { Some(true) }, body, cx)
-                    .when(after_work, |d| d.pt_0()),
+                    .when(after_work, |d| d.pt(Gap::Zero)),
             )
             // A pure chat answer carries its two where they are; an answer after work wears
             // them on the work line itself, in the transport's seat (`work.rs`).
@@ -216,10 +217,10 @@ impl ThreadView {
         cx: &mut Context<Self>,
     ) -> AnyElement {
         let body = v_flex()
-            .gap_3()
+            .gap(Gap::L)
             .children(self.answer_body("writing", text, cx));
         crate::thread::look::turn(if after_work { None } else { Some(true) }, body, cx)
-            .when(after_work, |d| d.pt_0())
+            .when(after_work, |d| d.pt(Gap::Zero))
             .into_any_element()
     }
 

@@ -8,6 +8,7 @@ use gpui_kit::component::input::EditorState;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::Value;
 
 use super::ProjectEnv;
@@ -234,7 +235,7 @@ pub fn save(
     div()
         .id(SharedString::from(format!("env-card-save-{what}")))
         .flex_none()
-        .px_2()
+        .px(Gap::M)
         .rounded_md()
         .when(dirty, |d| {
             d.cursor_pointer()
@@ -297,7 +298,7 @@ pub fn remove(
 
 /// A card's body of fields: padded, spaced.
 pub fn pad(d: Div) -> AnyElement {
-    d.px_3().py_2().gap_2().into_any_element()
+    d.px(Gap::L).py(Gap::M).gap(Gap::M).into_any_element()
 }
 
 /// A text: a code editor as tall as its wrapped text (the page scrolls, not it).
@@ -338,8 +339,8 @@ pub fn new_card(
                 // The ring's clearance under the name, or its 3 px slide under the editor's first
                 // line (the ring is drawn outside the box).
                 div()
-                    .px_3()
-                    .pt_2()
+                    .px(Gap::L)
+                    .pt(Gap::M)
                     .pb(px(bench_ui::RING_CLEAR))
                     .child(gpui_kit::component::input::Input::new(&e.new_name)),
             )
@@ -361,8 +362,8 @@ pub fn form_actions(
     dirty.then(|| {
         h_flex()
             .w_full()
-            .py_2()
-            .gap_2()
+            .py(Gap::M)
+            .gap(Gap::M)
             .justify_end()
             .child(
                 bench_ui::form_action(
@@ -421,8 +422,8 @@ pub fn choices(
             h_flex()
                 .id((id, k))
                 .h(px(bench_ui::FIELD_H))
-                .px_3()
-                .gap_2()
+                .px(Gap::L)
+                .gap(Gap::M)
                 .items_center()
                 .cursor_pointer()
                 .when(k > 0, |d| {

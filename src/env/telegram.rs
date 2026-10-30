@@ -2,8 +2,9 @@
 //! the bot's token and who may write to it.
 
 use gpui_kit::component::input::{Input, InputState};
-use gpui_kit::component::{ActiveTheme as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _};
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::{Value, json};
 
 use super::section::{SaveCall, Section, SettingsForm, form_actions};
@@ -271,9 +272,7 @@ impl SettingsForm for Telegram {
             settings_field(
                 "Connection",
                 "How the bot reaches Telegram now; Check starts it anew with the fields as they stand",
-                h_flex()
-                    .gap_2()
-                    .items_center()
+                bench_ui::row(Gap::M)
                     .child(bench_ui::dot(dot))
                     .child(div().flex_1().min_w_0().child(line))
                     .child(

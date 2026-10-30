@@ -9,6 +9,7 @@ use gpui_kit::component::h_flex;
 use gpui_kit::component::input::{Input, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::{Value, json};
 
 use super::section::{SaveCall, Section, SettingsForm, form_actions, text};
@@ -193,7 +194,7 @@ impl SettingsForm for Place {
                 "Folder",
                 hint,
                 h_flex()
-                    .gap_2()
+                    .gap(Gap::M)
                     .child(div().flex_1().child(Input::new(&e.place.folder)))
                     .when(local, |d| {
                         d.child(

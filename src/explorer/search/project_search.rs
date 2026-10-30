@@ -2,6 +2,7 @@
 //! file with the caret on it.
 
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::explorer::tree::view::{act, quiet};
 use crate::explorer::{DocKey, FileRef, Find};
@@ -36,9 +37,9 @@ impl BenchApp {
         let mut out = vec![
             h_flex()
                 .flex_none()
-                .px_2()
-                .pb_1()
-                .gap_1()
+                .px(Gap::M)
+                .pb(Gap::Xs)
+                .gap(Gap::Xs)
                 .items_center()
                 .child(div().flex_1().child(Input::new(&f.input).small()))
                 .child(close)
@@ -61,9 +62,9 @@ impl BenchApp {
                         out.push(
                             h_flex()
                                 .flex_none()
-                                .px_3()
-                                .pt_1()
-                                .gap_1p5()
+                                .px(Gap::L)
+                                .pt(Gap::Xs)
+                                .gap(Gap::S)
                                 .items_center()
                                 .text_sm()
                                 .child(ico.icon().small().text_color(color))
@@ -77,8 +78,8 @@ impl BenchApp {
                             .id(("ex-hit", n))
                             .flex_none()
                             .pl(bench_ui::tree_pl(2))
-                            .pr_2()
-                            .gap_2()
+                            .pr(Gap::M)
+                            .gap(Gap::M)
                             .text_xs()
                             .cursor_pointer()
                             .hover(|s| s.bg(theme.list_hover))

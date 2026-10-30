@@ -6,6 +6,7 @@ use gpui_kit::component::shimmer::ShimmerText;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::thread::ThreadView;
 use ::thread::tool_labels::activity_word;
@@ -108,7 +109,7 @@ impl ThreadView {
         let summary = h_flex()
             .id(SharedString::from(format!("work-{key}")))
             .group(tgroup.clone())
-            .gap_1p5()
+            .gap(Gap::S)
             .items_center()
             .min_w_0()
             .text_size(px(bench_ui::THREAD_META))
@@ -160,7 +161,7 @@ impl ThreadView {
                     h_flex()
                         .flex_none()
                         .ml_auto()
-                        .gap_1()
+                        .gap(Gap::Xs)
                         .child(
                             bench_ui::head_icon_button(
                                 "work-hold",
@@ -202,7 +203,7 @@ impl ThreadView {
                     h_flex()
                         .flex_none()
                         .ml_auto()
-                        .gap_1()
+                        .gap(Gap::Xs)
                         .items_center()
                         .when(
                             !(tplay || tspeak) && !self.tools_shown,
@@ -322,7 +323,7 @@ impl ThreadView {
         crate::thread::look::turn(
             Some(true),
             v_flex()
-                .gap_3()
+                .gap(Gap::L)
                 .when(!no_steps, |d| d.child(summary))
                 .children(list)
                 .children(artifacts),

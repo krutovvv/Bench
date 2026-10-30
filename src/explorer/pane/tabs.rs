@@ -7,6 +7,7 @@ use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::explorer::{DocKey, FileRef};
 use crate::app::BenchApp;
@@ -25,9 +26,9 @@ impl Render for DraggedTab {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
         h_flex()
-            .px_3()
-            .py_1()
-            .gap_1p5()
+            .px(Gap::L)
+            .py(Gap::Xs)
+            .gap(Gap::S)
             .items_center()
             .rounded_md()
             .border_1()

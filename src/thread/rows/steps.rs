@@ -10,6 +10,7 @@ use ::thread::steps::{self, Kind, Milestone};
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::thread::ThreadView;
 use crate::media::text::{FOLD_AFTER_LINES, render_code};
@@ -52,12 +53,12 @@ impl ThreadView {
                     }
                 }
                 rows.push(
-                    v_flex().pt_2().pb_3().children(kids).into_any_element(),
+                    v_flex().pt(Gap::M).pb(Gap::L).children(kids).into_any_element(),
                 );
             }
             from = to + 1;
         }
-        v_flex().p_2p5().gap_0p5().children(rows).into_any_element()
+        v_flex().p(Gap::Ml).gap(Gap::Xxs).children(rows).into_any_element()
     }
 
     /// A milestone's strip: the disclosure, the agent's words (or the sentence of its calls), and
@@ -79,8 +80,8 @@ impl ThreadView {
         h_flex()
             .id(SharedString::from(format!("milestone-{key}-{}", m.steps[0])))
             .min_h(px(bench_ui::LIST_ROW_H))
-            .px_2()
-            .gap_2()
+            .px(Gap::M)
+            .gap(Gap::M)
             .items_center()
             .rounded_md()
             .text_size(px(bench_ui::THREAD_META))
@@ -180,9 +181,9 @@ impl ThreadView {
         h_flex()
             .id(SharedString::from(format!("steprow-{key}-{k}")))
             .min_h(px(bench_ui::LIST_ROW_H))
-            .pl_2()
-            .pr_2()
-            .gap_2()
+            .pl(Gap::M)
+            .pr(Gap::M)
+            .gap(Gap::M)
             .items_center()
             .rounded_md()
             .text_size(px(bench_ui::THREAD_META))
@@ -206,7 +207,7 @@ impl ThreadView {
                 h_flex()
                     .flex_1()
                     .min_w_0()
-                    .gap_1p5()
+                    .gap(Gap::S)
                     .items_baseline()
                     .child(div().flex_none().text_color(theme.foreground).child(said.action))
                     .when_some(what, |d, w| {
@@ -346,7 +347,7 @@ impl ThreadView {
                     let text = self.thread.texts.plain(&id, &body, cx);
                     let toggle = (key.to_string(), k);
                     v_flex()
-                        .gap_1()
+                        .gap(Gap::Xs)
                         .when(title != "Why", |d| {
                             d.child(
                                 div()
@@ -381,10 +382,10 @@ impl ThreadView {
         // The same room on both sides as the row's own; air above and below, as a milestone's
         // steps have.
         v_flex()
-            .px_2()
-            .pt_2()
-            .pb_4()
-            .gap_2p5()
+            .px(Gap::M)
+            .pt(Gap::M)
+            .pb(Gap::Xl)
+            .gap(Gap::Ml)
             .children(sections)
             .into_any_element()
     }

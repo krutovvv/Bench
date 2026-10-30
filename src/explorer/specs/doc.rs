@@ -6,6 +6,7 @@ use bench_ui::icons::Ico;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::client::rest;
@@ -124,7 +125,7 @@ impl BenchApp {
                 });
                 links.push(
                     h_flex()
-                        .gap_3()
+                        .gap(Gap::L)
                         .flex_wrap()
                         .text_size(px(bench_ui::BAR_TEXT))
                         .child(div().flex_none().w(px(bench_ui::SPEC_LINK_LABEL_W)).text_color(bench_ui::faint(&theme)).child(label))
@@ -151,14 +152,14 @@ impl BenchApp {
                         .w_full()
                         .max_w(px(bench_ui::SPEC_COLUMN_W))
                         .mx_auto()
-                        .px_6()
-                        .py_4()
-                        .gap_4()
+                        .px(Gap::Xxl)
+                        .py(Gap::Xl)
+                        .gap(Gap::Xl)
                         .when(!links.is_empty(), |d| {
                             d.child(
                                 v_flex()
-                                    .gap_1()
-                                    .pb_3()
+                                    .gap(Gap::Xs)
+                                    .pb(Gap::L)
                                     .border_b_1()
                                     .border_color(theme.border.opacity(0.6))
                                     .children(links),

@@ -7,6 +7,7 @@ use gpui_kit::component::input::Input;
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use bench_ui::icons::Ico;
@@ -137,9 +138,9 @@ impl BenchApp {
         for (name, rows) in self.search_sections() {
             body.push(
                 div()
-                    .px_3()
-                    .pt_2()
-                    .pb_1()
+                    .px(Gap::L)
+                    .pt(Gap::M)
+                    .pb(Gap::Xs)
                     .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
                     .font_weight(FontWeight::SEMIBOLD)
                     .text_color(theme.muted_foreground)
@@ -154,7 +155,7 @@ impl BenchApp {
         if n == 0 {
             body.push(
                 div()
-                    .p_3()
+                    .p(Gap::L)
                     .text_color(theme.muted_foreground)
                     .child(if searching { "Searching…" } else { "Nothing found" })
                     .into_any_element(),
@@ -184,14 +185,14 @@ impl BenchApp {
                             }
                             cx.stop_propagation();
                         }))
-                        .child(div().p_2().child(Input::new(&self.sidebar.search)))
+                        .child(div().p(Gap::M).child(Input::new(&self.sidebar.search)))
                         .child(
                             v_flex()
                                 .id("search-list")
                                 .flex_1()
                                 .min_h_0()
                                 .overflow_y_scroll()
-                                .pb_1()
+                                .pb(Gap::Xs)
                                 .children(body),
                         ),
                 )
@@ -228,10 +229,10 @@ impl BenchApp {
         };
         h_flex()
             .id(("found", n))
-            .mx_1()
-            .px_2()
-            .py_1()
-            .gap_2()
+            .mx(Gap::Xs)
+            .px(Gap::M)
+            .py(Gap::Xs)
+            .gap(Gap::M)
             .rounded_md()
             .items_center()
             .cursor_pointer()

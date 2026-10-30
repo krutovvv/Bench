@@ -7,6 +7,7 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 impl ThreadView {
     /// A file going with a message: a small picture for an image, else its icon, and the name.
@@ -50,7 +51,7 @@ impl ThreadView {
                     .border_1()
                     .border_color(theme.border)
             } else {
-                b.p_0p5()
+                b.p(Gap::Xxs)
             }
         };
         // A picture shows as a square of itself, without its name: the name tells nothing about
@@ -90,9 +91,9 @@ impl ThreadView {
                 .id(id.clone())
                 .max_w(px(bench_ui::ATTACHMENT_MAX_W))
                 .h(px(bench_ui::CHIP_H))
-                .pl_1()
-                .pr_2()
-                .gap_1p5()
+                .pl(Gap::Xs)
+                .pr(Gap::M)
+                .gap(Gap::S)
                 .items_center()
                 .border_1()
                 .rounded_md()

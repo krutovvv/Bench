@@ -10,6 +10,7 @@ use gpui_kit::component::text::{
 use gpui_kit::component::{ActiveTheme as _, WindowExt as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 /// `$…$`: a formula as Unicode text in italics. Money ("$5 and $10") is not one: TeX math
 /// never starts or ends with a space.
@@ -71,7 +72,7 @@ impl MarkdownPlugin for BlockMath {
     fn render(&self, node: &MarkdownNode, _: &mut Window, _: &mut App) -> impl IntoElement {
         div()
             .w_full()
-            .py_1()
+            .py(Gap::Xs)
             .flex()
             .justify_center()
             .italic()

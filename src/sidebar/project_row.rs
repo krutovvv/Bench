@@ -10,6 +10,7 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use super::menu::item_menu;
 use super::order::DraggedProject;
@@ -121,8 +122,8 @@ impl BenchApp {
                 parts.push(
                     div()
                         .pl(px(bench_ui::SIDEBAR_TEXT_X))
-                        .pr_4()
-                        .py_1()
+                        .pr(Gap::Xl)
+                        .py(Gap::Xs)
                         // The note belongs to the head: the heading's own size.
                         .text_xs()
                         .text_color(muted)
@@ -195,7 +196,7 @@ impl BenchApp {
             // One pixel more breath under a heading than a plain pb_1: projects are
             // sections, and the eye wants the groups further apart than the threads inside.
             .pb(px(bench_ui::GROUP_HEAD_PB))
-            .gap_1p5()
+            .gap(Gap::S)
             .items_center()
             // A section's header, as a Mac's sidebar has them: small, semibold, secondary.
             .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))

@@ -9,18 +9,13 @@ use gpui_kit::component::tooltip::Tooltip;
 use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use super::text::{FOLD_AFTER_LINES, Texts, answer_segments, markdown, render_code};
 use crate::app::BenchApp;
 use crate::media::{self, Fetched, Kind, Loaded, Segment, file_name};
 use crate::thread::ThreadRef;
 use bench_ui::icons::Ico;
-
-/// The largest box an image or preview takes, in points.
-pub(super) const MAX_W: f32 = 560.;
-const MAX_H: f32 = 420.;
-/// A Markdown file shows this much until unfolded.
-const PREVIEW_H: f32 = 280.;
 
 fn fit_points((w, h): (f32, f32), max_w: f32, max_h: f32) -> (f32, f32) {
     let k = (max_w / w).min(max_h / h).min(1.);
@@ -51,7 +46,7 @@ impl BenchApp {
         let mut chips: Vec<AnyElement> = vec![];
         let flush = |chips: &mut Vec<AnyElement>, out: &mut Vec<AnyElement>| {
             if !chips.is_empty() {
-                out.push(h_flex().flex_wrap().gap_2().children(chips.drain(..)).into_any_element());
+                out.push(h_flex().flex_wrap().gap(Gap::M).children(chips.drain(..)).into_any_element());
             }
         };
         for (k, s) in answer_segments(text).into_iter().enumerate() {
@@ -187,10 +182,10 @@ impl BenchApp {
         // A file as one line: icon, name, where it is, then the actions.
         let row = |extra: Option<AnyElement>, note: Option<(String, Hsla)>| {
             h_flex()
-                .max_w(px(MAX_W))
-                .gap_2()
-                .px_2()
-                .py_1()
+                .max_w(px(bench_ui::MEDIA_MAX_W))
+                .gap(Gap::M)
+                .px(Gap::M)
+                .py(Gap::Xs)
                 .items_center()
                 .border_1()
                 .rounded_md()
@@ -208,7 +203,7 @@ impl BenchApp {
         let open_button = |local: PathBuf, tip: &'static str| {
             div()
                 .id(id("open"))
-                .p_1()
+                .p(Gap::Xs)
                 .cursor_pointer()
                 .text_color(theme.muted_foreground)
                 .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
@@ -221,8 +216,8 @@ impl BenchApp {
             // A video keeps a 16:9 frame while its first picture is made, so the chat barely moves.
             Loaded::Pending if kind == Kind::Video => {
                 return div()
-                    .w(px(MAX_W))
-                    .h(px(MAX_W * 9. / 16.))
+                    .w(px(bench_ui::MEDIA_MAX_W))
+                    .h(px(bench_ui::MEDIA_MAX_W * 9. / 16.))
                     .flex()
                     .items_center()
                     .justify_center()
@@ -271,7 +266,7 @@ impl BenchApp {
                        max_w: f32,
                        badge: Option<AnyElement>,
                        tip: SharedString| {
-            let (w, h) = fit(size, max_w, MAX_H);
+            let (w, h) = fit(size, max_w, bench_ui::MEDIA_MAX_H);
             div()
                 .id(id("picture"))
                 .relative()
@@ -304,7 +299,7 @@ impl BenchApp {
 
         match kind {
             Kind::Image => match fetched.size {
-                Some(size) => picture(local.clone().into(), size, MAX_W, None, open_tip)
+                Some(size) => picture(local.clone().into(), size, bench_ui::MEDIA_MAX_W, None, open_tip)
                     .on_click(opener(local.clone()))
                     .into_any_element(),
                 None => row(Some(open_button(local, "Open").into_any_element()), None)
@@ -317,9 +312,9 @@ impl BenchApp {
                 );
                 match fetched.thumb {
                     Some((thumb, size)) => v_flex()
-                        .gap_1()
+                        .gap(Gap::Xs)
                         .child(
-                            picture(thumb.into(), size, 240., None, open_tip)
+                            picture(thumb.into(), size, bench_ui::MEDIA_PAGE_W, None, open_tip)
                                 .on_click(opener(local.clone())),
                         )
                         .child(line)
@@ -345,7 +340,7 @@ impl BenchApp {
                 let starting = self.media.video_loading.as_deref() == Some(&key);
                 let badge = |icon: AnyElement| {
                     div()
-                        .p_3()
+                        .p(Gap::L)
                         .rounded_full()
                         .bg(gpui_kit::black().opacity(0.55))
                         .text_color(gpui_kit::white())
@@ -358,14 +353,14 @@ impl BenchApp {
                     (Some(f), _) => picture(
                         ImageSource::Render(f),
                         size,
-                        MAX_W,
+                        bench_ui::MEDIA_MAX_W,
                         None,
                         "Click to stop".into(),
                     ),
                     (None, playing) => picture(
                         thumb.into(),
                         size,
-                        MAX_W,
+                        bench_ui::MEDIA_MAX_W,
                         Some(badge(if starting || playing {
                             Ico::Loader.live(true)
                         } else {
@@ -378,9 +373,9 @@ impl BenchApp {
                         },
                     ),
                 };
-                let box_size = fit_points(size, MAX_W, MAX_H);
+                let box_size = fit_points(size, bench_ui::MEDIA_MAX_W, bench_ui::MEDIA_MAX_H);
                 v_flex()
-                    .gap_1()
+                    .gap(Gap::Xs)
                     .child(shown.on_click(cx.listener(move |this, _, window, cx| {
                         if !here {
                             cx.open_with_system(&l2);
@@ -398,7 +393,7 @@ impl BenchApp {
                 let (k2, l2) = (key.clone(), local.clone());
                 let play = div()
                     .id(id("play"))
-                    .p_1()
+                    .p(Gap::Xs)
                     .cursor_pointer()
                     .text_color(if playing {
                         theme.primary
@@ -417,9 +412,7 @@ impl BenchApp {
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.toggle_media_audio(k2.clone(), l2.clone(), cx)
                     }));
-                h_flex()
-                    .gap_1()
-                    .items_center()
+                bench_ui::row(Gap::Xs)
                     .child(play)
                     .child(
                         row(
@@ -434,7 +427,7 @@ impl BenchApp {
                         .flex_1()
                         .min_w_0(),
                     )
-                    .max_w(px(MAX_W))
+                    .max_w(px(bench_ui::MEDIA_MAX_W))
                     .into_any_element()
             }
             Kind::Markdown => {
@@ -443,15 +436,15 @@ impl BenchApp {
                 let open = self.media.open.contains(&key);
                 let k2 = key.clone();
                 v_flex()
-                    .max_w(px(MAX_W + 160.))
+                    .max_w(px(bench_ui::MEDIA_WIDE_W))
                     .border_1()
                     .rounded_md()
                     .border_color(theme.border)
                     .child(
                         h_flex()
-                            .gap_2()
-                            .px_2()
-                            .py_1()
+                            .gap(Gap::M)
+                            .px(Gap::M)
+                            .py(Gap::Xs)
                             .items_center()
                             .text_base()
                             .bg(theme.secondary)
@@ -477,9 +470,9 @@ impl BenchApp {
                     )
                     .child(
                         div()
-                            .px_3()
-                            .py_2()
-                            .when(long && !open, |d| d.max_h(px(PREVIEW_H)).overflow_hidden())
+                            .px(Gap::L)
+                            .py(Gap::M)
+                            .when(long && !open, |d| d.max_h(px(bench_ui::MARKDOWN_PREVIEW_H)).overflow_hidden())
                             .child(markdown(id("md"), text, cx)),
                     )
                     .when(long, |d| {
@@ -539,7 +532,7 @@ impl BenchApp {
         let id = SharedString::from(format!("diagram-{i}-{k}"));
         match self.media.diagrams.get(&(code.clone(), theme.is_dark())) {
             Some(Loaded::Ready((svg, size))) => {
-                let (w, h) = fit(*size, MAX_W + 160., MAX_H + 200.);
+                let (w, h) = fit(*size, bench_ui::MEDIA_WIDE_W, bench_ui::DIAGRAM_MAX_H);
                 let open = svg.clone();
                 div()
                     .id(id)

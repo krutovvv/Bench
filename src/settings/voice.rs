@@ -5,6 +5,7 @@ use gpui_kit::component::input::InputState;
 use gpui_kit::component::notification::NotificationType;
 use gpui_kit::component::{Sizable as _, h_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 use serde_json::{Value, json};
 
 use super::server_form::{field, input_row, text};
@@ -110,7 +111,7 @@ impl BenchApp {
             )
             .into_any_element(),
             h_flex()
-                .py_2()
+                .py(Gap::M)
                 .child(div().flex_1())
                 .child(
                     bench_ui::primary_button("voice-save", "Save")

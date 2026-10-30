@@ -5,8 +5,9 @@
 //! arranged ones. Pin is the same order at its front: pinning puts a project first, dragging one
 //! says its place outright and lets its pin go.
 
-use gpui_kit::component::{ActiveTheme as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::client::connection;
@@ -35,9 +36,7 @@ pub struct DraggedProject {
 impl Render for DraggedProject {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let theme = cx.theme();
-        h_flex()
-            .gap_1p5()
-            .items_center()
+        bench_ui::row(Gap::S)
             .pl(px(bench_ui::SIDEBAR_TEXT_X))
             .pr(px(bench_ui::SIDEBAR_ROW_INSET))
             .py(px(bench_ui::GROUP_HEAD_PB))

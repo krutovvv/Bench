@@ -3,6 +3,7 @@
 
 use gpui_kit::component::{ActiveTheme as _, h_flex, v_flex};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use bench_ui::theme::Appearance;
 
@@ -25,15 +26,15 @@ impl BenchApp {
 
         let row = |title: &'static str, hint: &'static str, control: AnyElement| {
             h_flex()
-                .gap_4()
-                .py_3()
+                .gap(Gap::Xl)
+                .py(Gap::L)
                 .items_center()
                 .border_b_1()
                 .border_color(theme.border)
                 .child(
                     v_flex()
                         .flex_1()
-                        .gap_0p5()
+                        .gap(Gap::Xxs)
                         .child(div().text_base().child(title))
                         .child(div().text_sm().text_color(muted).child(hint)),
                 )

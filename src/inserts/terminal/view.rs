@@ -11,6 +11,7 @@ use alacritty_terminal::term::color::Colors;
 use alacritty_terminal::vte::ansi::{Color, CursorShape, Rgb};
 use gpui_kit::component::{ActiveTheme as _, Theme};
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::app::BenchApp;
 use crate::inserts::terminal::session::{Layout, Palette, Session, Size};
@@ -372,8 +373,8 @@ impl BenchApp {
             // Rows past the view's height (see Session::min_rows) stay hidden.
             .overflow_hidden()
             .bg(theme.background)
-            .px_4()
-            .py_2()
+            .px(Gap::Xl)
+            .py(Gap::M)
             .track_focus(&focus)
             .cursor(if session.hover.lock().unwrap().is_some() {
                 CursorStyle::PointingHand

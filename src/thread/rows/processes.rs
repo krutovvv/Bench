@@ -3,6 +3,7 @@
 //! or ended, each one stoppable (`process.kill`) and with its latest output a click away.
 
 use gpui_kit::*;
+use bench_ui::Gap;
 
 use crate::thread::ThreadView;
 use crate::media::text::plain_text;
@@ -117,9 +118,9 @@ impl ThreadView {
                     .child(
                         h_flex()
                             .id(("proc", k))
-                            .px_2()
-                            .py_1()
-                            .gap_2()
+                            .px(Gap::M)
+                            .py(Gap::Xs)
+                            .gap(Gap::M)
                             .items_center()
                             .text_size(px(bench_ui::THREAD_META))
                             .cursor_pointer()
@@ -163,7 +164,7 @@ impl ThreadView {
                                     div()
                                         .id(("proc-stop", k))
                                         .flex_none()
-                                        .px_1p5()
+                                        .px(Gap::S)
                                         .text_color(muted)
                                         .hover(|s| {
                                             s.bg(theme.danger).text_color(theme.danger_foreground)
@@ -197,8 +198,8 @@ impl ThreadView {
                             // The output under its command, a strip of the block (a box in the box
                             // was one frame too many), in the code's own size.
                             div()
-                                .px_3()
-                                .py_2()
+                                .px(Gap::L)
+                                .py(Gap::M)
                                 .bg(theme.secondary.opacity(0.6))
                                 .border_t_1()
                                 .border_color(theme.border.opacity(0.6))
