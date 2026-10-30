@@ -42,8 +42,8 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change the second thread beside the open one (kept in code, not offered in the menu) or the right dock's thread head | `src/thread/beside.rs`, `src/thread/panel.rs` |
 | change an answer's media (images, video, audio, diagrams, formulas, code blocks) | `src/media/` (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`) |
 | change dictation (the mic, text while speaking: pieces sent at pauses) | `src/media/voice.rs`, the pauses `src/media/pauses.rs` (tests), the recorder `src/media/audio.rs`; its switch in the gear's Voice (`src/settings/voice.rs`), kept in `dictation.json` |
-| change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu; loading projects: `project_list.rs`; which Telegram threads show: `telegram.rs`); what is done to a thread or project there — pin, color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
-| the projects' order in the sidebar: a project's group dragged above or below another | `src/sidebar/order.rs` (the order, `project_rank`, `ProjectPlace`, `drop_zone`, kept in `project-order.json`), its handle the head and its place the whole group in `project_row.rs`, the sort in `items.rs`, the end of the list in `mod.rs`; pin is the front of the same order (`marks.rs`), a drop lets it go; the line and the half-of-a-block arithmetic `bench_ui::drop_line`, `drop_edge` |
+| change the sidebar | `src/sidebar/` (`mod.rs` the panel, `project_row.rs` a project, `thread_row.rs` a thread, `menu.rs` the ⋯ menu; loading projects: `project_list.rs`; which Telegram threads show: `telegram.rs`); what is done to a thread or project there — pin (a thread's), color, rename, delete, ↑ ↓ ⌫ — `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs` |
+| the projects' order in the sidebar: a project's group dragged above or below another | `src/sidebar/order.rs` (the order, `project_rank`, `ProjectPlace`, `drop_zone`, kept in `project-order.json`), its handle the head and its place the whole group in `project_row.rs`, the sort in `items.rs`, the end of the list in `mod.rs` (a project has no pin; a thread does, `marks.rs`); the line and the half-of-a-block arithmetic `bench_ui::drop_line`, `drop_edge` |
 | the agent's item, the gear (the left dock's foot) | `src/sidebar/agent.rs` |
 | the Code view's status bar (caret, thread beside, terminal) | `src/explorer/statusbar.rs` |
 | the line under the composer (project, repo, meters) | `src/thread/composer/foot.rs` |
@@ -102,7 +102,7 @@ src/
   titlebar/      the bar over the center: mod.rs, tail.rs (Chat | Code)
   sidebar/       the threads panel: mod.rs (New thread, New project, Search), search.rs (⌘K),
                  project_row.rs, project_list.rs, order.rs (a project dragged), thread_row.rs, menu.rs,
-                 items.rs (pin, color, rename, ⌫⌫, ↑↓), marks.rs, telegram.rs, agent.rs (the left
+                 items.rs (a thread's pin, color, rename, ⌫⌫, ↑↓), marks.rs, telegram.rs, agent.rs (the left
                  dock's foot: the agent, its popover, the gear), state.rs
   thread/        a thread on screen: view.rs (ThreadView), active.rs (ActiveThread, ThreadRef), mod.rs,
                  list.rs (gpui::list), look.rs (chat or document), meters.rs, speed.rs, open.rs, store.rs,

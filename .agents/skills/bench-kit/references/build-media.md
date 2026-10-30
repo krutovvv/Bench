@@ -145,7 +145,8 @@ Reference: `src/thread/composer/attachments.rs`, `src/media/attach.rs`, chips in
 - **Drop**: one layer over the whole window (`file_layer`, `src/workspace/layout.rs`), there at rest
   and invisible: it answers only to files, washes the window while one is over it, and its drop is
   the window's only one. The files go to the thread the person works in, the one whose composer has
-  the focus, else the open one (`BenchApp::drop_paths`). Screenshot thumbnails dragged from the macOS corner preview arrive as files in
+  the focus, else the open one, and that thread comes up if none shows; a folder is told it does not
+  attach (`BenchApp::drop_paths`). Screenshot thumbnails dragged from the macOS corner preview arrive as files in
   `/var/folders/…` that vanish — copy those before using them.
 - **⌘V**: in the composer (`src/thread/composer/input.rs`), on `v` + `modifiers.platform`, read
   `cx.read_from_clipboard()` (`src/thread/composer/attachments.rs`); `ClipboardEntry::Image(img)` (⌃⇧⌘4 screenshot: `img.format`,

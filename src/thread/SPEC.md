@@ -35,7 +35,8 @@ deletes threads (`open.rs`).
   arrives never scroll the thread, as code in an editor does not scroll while it changes. The one
   exceptions: after the person sends, the composer is brought back into view if the new rows
   pushed it past the bottom edge; and a thread the person opens lands at its end (its last
-  message and the composer in view), once its history has come.
+  message and the composer in view) and stays there while its rows find their heights, until its
+  height holds still for a second (ten at most); the wheel takes it back at once.
 - Rows reach the list by diff (`thread::diff`): unchanged rows keep their measured heights, only
   the count is spliced at the end, so the reader keeps their place even inside a row being
   written. Another thread opens at its end.

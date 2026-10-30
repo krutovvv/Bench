@@ -30,7 +30,7 @@ y ┌─────────────────────────
 |---|---|---|---|---|
 | Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header` in `src/titlebar/mod.rs`; Chat \| Code `src/titlebar/tail.rs` |
 | Actions | three rows | New thread, New project, Search (⌘K opens a list over the window) | `nav_row`, text at `SIDEBAR_TEXT_X` | `render_actions` in `src/sidebar/mod.rs`; the list `src/sidebar/search.rs` |
-| Sidebar list | rest | Host's threads first, then each project (pinned first) with its threads | rows at `SIDEBAR_ROW_INSET`, text at `SIDEBAR_TEXT_X` | `src/sidebar/mod.rs`; order and acts `src/sidebar/items.rs` |
+| Sidebar list | rest | Host's threads first, then each project, in the order the person dragged them, with its threads | rows at `SIDEBAR_ROW_INSET`, text at `SIDEBAR_TEXT_X` | `src/sidebar/mod.rs`; order and acts `src/sidebar/items.rs` |
 | Left dock's foot | `SIDEBAR_FOOT_H` 40 incl. its rule | the open thread's agent (where, a dot, "N working") and its popover; the gear (⌘,) | `SIDEBAR_ROW_INSET` | `render_foot`, `src/sidebar/agent.rs`, under any left panel (`workspace/layout.rs`) |
 | The thread | rest | rows from `crates/thread`, centred in `THREAD_MAX_W`; inserts where the journal puts them | `CHAT_LEFT` (`CHAT_LEFT_NARROW` in a dock) | `src/thread/mod.rs`; inserts `src/inserts/mod.rs` |
 | Composer | its text | plus, text, mic, Send in one rounded field; chips over the text | the column's sides | `src/thread/composer/input.rs` |
