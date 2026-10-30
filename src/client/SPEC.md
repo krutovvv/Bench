@@ -53,5 +53,7 @@ agent plugs into (`fake.rs`).
   it by hand, so trying Bench on other data leaves nothing running.
 - A server's agent is reached through an `ssh -L` tunnel; everything about connecting to the
   server is its block in `~/.ssh/config`, never duplicated in Bench.
+- Packages are installed aside and put in place in one step: `npm ci` empties `node_modules` first, and
+  on 2026-10-30 a DNS failure left two servers' running agents without packages.
 - Installation is recorded by a marker written only after a successful `npm ci`, never inferred
   from a `node_modules` folder (an interrupted install was not retried).

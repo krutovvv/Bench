@@ -121,12 +121,16 @@ NODE="$(command -v node)"
 "#;
 
 /// Unpacks the sources (a tar on stdin) into `$H/app`, installs its packages when the lock
-/// changed, and records the build. Its packages count as installed only once `npm ci` went
-/// through to the end (`.lock-installed`): one cut short is tried again.
+/// changed, and records the build. `npm ci` empties `node_modules` before it downloads, and the
+/// agent keeps loading from there, so a network failure would leave it running without packages:
+/// they are installed aside and put in place in one step. A failed install changes nothing and is
+/// tried again (`.lock-installed`).
 const INSTALL: &str = r#"set -e
 mkdir -p "$H/app"; cd "$H/app"; rm -rf src scripts; tar -xzf - 2>/dev/null
 if ! cmp -s package-lock.json .lock-installed || [ ! -d node_modules ]; then
-	PATH="$(dirname "$NODE"):$PATH" npm ci --omit=dev --no-audit --no-fund >/dev/null
+	rm -rf .install; mkdir .install; cp package.json package-lock.json .install/
+	(cd .install && PATH="$(dirname "$NODE"):$PATH" npm ci --omit=dev --no-audit --no-fund >/dev/null)
+	rm -rf node_modules; mv .install/node_modules node_modules; rm -rf .install
 	cp package-lock.json .lock-installed
 fi
 echo @BUILD@ > .build
