@@ -21,7 +21,7 @@ use crate::app::BenchApp;
 pub enum Center {
     /// The open thread.
     Chat,
-    /// An open document of the Explorer, with the tabs of the others (`src/explorer/view.rs`).
+    /// An open document of the Explorer, with the tabs of the others (`src/explorer/pane/view.rs`).
     Doc,
     /// The gear: agents, presets, appearance.
     Settings,

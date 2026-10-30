@@ -283,7 +283,7 @@ impl ThreadView {
                 }
                 cx.notify();
             }));
-        // Opened: the calls in order beside the chosen one, whole (`rows/steps.rs`).
+        // Opened: the calls in order beside the chosen one, whole (`thread/rows/steps.rs`).
         let items: Vec<AnyElement> = if open && !steps.is_empty() {
             vec![self.render_steps(key, steps, live, cx)]
         } else {

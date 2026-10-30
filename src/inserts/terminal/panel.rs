@@ -2,7 +2,7 @@
 //! as a `/terminal` insert (`state.rs` `Tab`, `session.rs`), each on its project's machine and
 //! started in its folder. Tabs appear when there is more than one (⌘T adds one for the shown
 //! project); they live while Bench runs. The active one's selection, or its last lines, go to
-//! the thread as a reference (`thread/attachments.rs` `TerminalRef`).
+//! the thread as a reference (`thread/composer/attachments.rs` `TerminalRef`).
 
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::h_flex;

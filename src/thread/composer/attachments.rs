@@ -93,7 +93,7 @@ impl CommentRef {
 }
 
 /// A language server's errors and warnings sent to the thread: of one file, or all the project's
-/// servers know (`explorer/problems.rs`), a line each.
+/// servers know (`explorer/code/problems.rs`), a line each.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProblemsRef {
     /// The file they are of; None: the project's.

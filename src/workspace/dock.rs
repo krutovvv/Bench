@@ -29,7 +29,7 @@ impl DockPosition {
 pub enum Panel {
     /// Projects and their threads (`src/sidebar/mod.rs`).
     Threads,
-    /// One project's tree (`src/explorer/tree.rs`).
+    /// One project's tree (`src/explorer/tree/`).
     Explorer,
     /// A thread beside the center (`src/thread/panel.rs`): beside a document, the open thread;
     /// beside the open thread, a second one (`src/thread/beside.rs`).

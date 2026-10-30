@@ -52,7 +52,7 @@ pub struct ActiveThread {
     /// are unfolded.
     pub reviewing: HashSet<String>,
     pub review_open: HashSet<String>,
-    /// The works whose background processes' card is unfolded (`thread/processes.rs`), and
+    /// The works whose background processes' card is unfolded (`thread/rows/processes.rs`), and
     /// the process whose output is shown.
     pub processes_open: HashSet<String>,
     pub process_open: Option<String>,

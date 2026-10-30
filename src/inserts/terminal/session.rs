@@ -1,6 +1,6 @@
 //! One terminal session: a PTY (portable-pty) running `/usr/bin/ssh <host>` on the shared
 //! connection (`ssh.rs`), its output parsed into a cell grid by `alacritty_terminal` on a reader
-//! thread. The view (`ui/terminal.rs`) locks the grid to paint it and sends key bytes back
+//! thread. The view (`terminal/view.rs`) locks the grid to paint it and sends key bytes back
 //! through `write`.
 
 use std::io::{Read, Write};

@@ -1,7 +1,7 @@
 //! The center's tabs: dragged to another place (or onto the thread, which takes the file), a
 //! menu each (close this, others, to the left, to the right, the saved, all; copy the path; add
 //! to the thread), and what is sent from the code to the thread — the selection or
-//! the whole file (⌘L) — as a reference (`thread/attachments.rs` `Reference`).
+//! the whole file (⌘L) — as a reference (`thread/composer/attachments.rs` `Reference`).
 
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::component::notification::NotificationType;

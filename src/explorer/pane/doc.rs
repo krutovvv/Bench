@@ -86,7 +86,7 @@ pub enum DocKey {
     /// A file's changes against HEAD, read only (`git.rs`).
     Diff(FileRef),
     /// What one turn of a thread changed in a file: the repository's trees at its start and end
-    /// (`code/turn_diff.rs`), read only.
+    /// (`explorer/code/turn_diff.rs`), read only.
     TurnDiff { file: FileRef, turn: Turn },
     /// A spec read with the graph around it (`explorer/specs/doc.rs`).
     Spec(FileRef),
