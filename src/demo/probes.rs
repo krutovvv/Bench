@@ -77,6 +77,19 @@ pub(super) fn drop_file(where_: String, window: &mut Window, cx: &mut Context<Be
                 window.dispatch_event(event.to_platform_input(), cx);
             }
         });
+        // Held there: a real pointer moving over the copy would otherwise end the carry.
+        while where_ == "tint" {
+            wait.timer(std::time::Duration::from_millis(100)).await;
+            let at = handle.update(cx, |_, window, _| window.viewport_size());
+            let Ok(size) = at else { return };
+            let position = point(size.width * 0.35, size.height * 0.5);
+            let paths = ExternalPaths([PathBuf::from(PROBE_FILE)].into_iter().collect());
+            let _ = handle.update(cx, |_, window, cx| {
+                for event in [FileDropEvent::Entered { position, paths }, FileDropEvent::Pending { position }] {
+                    window.dispatch_event(event.to_platform_input(), cx);
+                }
+            });
+        }
     })
     .detach();
 }
