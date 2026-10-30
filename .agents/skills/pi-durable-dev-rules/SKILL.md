@@ -15,11 +15,14 @@ mid-turn is picked up where it stopped. It ships in the pi monorepo next to `@ea
 
 Two things about it decide most design choices:
 
-- **The API is experimental.** Version 1.2.0 tracks the monorepo; breaking changes land in every
-  release. Quote and write against the version you have installed, and treat a signature difference as a
-  version difference rather than a mistake.
-- **It is a library for building agentic applications, not a coding-agent CLI.** For the Pi CLI, its
-  extensions, skills, MCP, and SDK, use the sibling skill `pi-dev-rules`.
+- **The API is experimental.** This snapshot describes version 1.2.0 (fetched 2026-10-13); Bench has
+  1.4.0 installed. Breaking changes land in every release: what changed since is
+  `agent/node_modules/@earendil-works/pi-durable/CHANGELOG.md`, the sources beside it and the live docs
+  at pi.dev/docs/latest. Quote and write against the version installed, and treat a signature
+  difference as a version difference rather than a mistake. `scripts/refresh.sh` rebuilds the bundles
+  from a local Pi checkout.
+- **It is a library for building agentic applications, not a coding-agent CLI.** Pi's MCP package, as
+  Bench uses it: `references/pi-mcp.md`.
 
 ## When to use this skill
 
@@ -49,6 +52,7 @@ Two things about it decide most design choices:
 | `references/durable-recipes.md` | Project setup, the catalogue of all 32 runnable examples, and 19 recipes with code: minimal chat, persistence and exactly-once input, live UI, agent events, structured-output tools, tool-calling tools, foreground and background subagents, child tasks with durable waits, coding agent, plan mode, per-conversation sandbox, tool override and wrappers, extension state and migration, hooks, compaction, code mode, tool search, conformance testing, plus the pitfall checklist |
 | `references/durable-spec.md` | The normative **Pico5 specification** bundled verbatim (5340 lines): records and lifetimes, documents and mutation ownership, transactions and storage ownership, tasks and the effect sandwich, structured concurrency, submissions and the inbox, extensions/hooks/tools, the built-in tasks, document observation, the storage contract and failure model, the backends, **API footguns**, and non-goals. Read section 12 before shipping |
 | `references/pi-ai-models.md` | The model layer bundled verbatim: `createModels()`/`builtinModels()`, provider factories and auth, querying the model catalog, environment variables, defining tools with TypeBox, constrained sampling, the event reference, image input, usage and cost, retries, and the message types that end up in entries |
+| `references/pi-mcp.md` | `@earendil-works/pi-mcp` as Pi's docs describe it: `exposure` (`codemode`, `direct`, `deferred`, `hidden`), `toolExposure`, how scripts and `tool_search` reach the tools, the fields of `mcp.json` |
 | `references/codemode-sandbox.md` | `@earendil-works/pi-codemode` bundled verbatim: what a script may call, the injected globals, the sandbox module surface, determinism and memory limits, and local versus remote sandboxes |
 
 ## Cheat sheet

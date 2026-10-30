@@ -54,7 +54,8 @@ lists what is Pi's, what is a package and what is ours.
 - `PROBE_MATCH=<title words> PROBE_SEND="prompt" ./target/debug/bench --probe local` — a turn
   through Bench's own client code (`src/client/probe.rs`; `PROBE_GET=/api/a,/api/b` prints REST
   answers, `PROBE_COMMAND`, `PROBE_SEARCH`).
-- `cd agent && node --test test/*.test.ts`.
+- `cd agent && node --test test/*.test.ts`. `test/process.test.ts` fails while a leftover `sleep 3032`
+  from an earlier run is alive: kill it.
 - `BENCH_AGENT_TRACE=<file>` dumps Pi's raw events; `BENCH_AGENT_NO_MCP=1` skips MCP servers.
 - Durability: `kill -9` the server mid-answer, start it again, the answer finishes; a cron job
   keeps its schedule across a kill.

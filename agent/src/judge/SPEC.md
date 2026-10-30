@@ -213,6 +213,9 @@ by the evaluator.
 
 ## Known limitations
 
+- pi-ai's System One parser requires an answer for every question asked, and a `bool` question needs
+  `criteria: {true, false}`. In a code mode script the catalog is async:
+  `await models.getModelOfType("classifier", "bench", "evaluator")`.
 - What a turn is, is kept in memory: after a restart of the agent a turn's steps count from zero.
 - Every state is fitted to 40% of the evaluator's window (16 384 tokens at 3 characters each:
   19 660 characters) before it is sent (`fitState`: the largest member

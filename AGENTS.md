@@ -113,7 +113,7 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Bench's id for each message is Pi's `requestId`: the row shown on Enter is matched by it, never by its words |
 | Plan, questions | the agent's own `todo` and `clarify` calls in the journal, the answer the call's result (`docs/thread-objects.md`) |
 | Pause | the conversation document `bench.hold` (`hold.ts`) and a gate in `beforeTool`: a held run stays held across a restart |
-| Code mode | Pi's `codemode` extension (`@earendil-works/pi-codemode`, a QuickJS sandbox): one step runs a script that calls the thread's tools and returns only what it prints. Every thread has it beside the tools it calls directly (`forAgent` adds it to the conversation's extensions at every turn): not a mode for code, several steps in one. Scripts reach MCP servers (each a namespace) and `models.*`: `models.classify()` on `bench/evaluator` where the project uses the evaluator |
+| Code mode | Pi's `codemode` extension (`@earendil-works/pi-codemode`, a QuickJS sandbox): one step runs a script that calls the thread's tools and returns only what it prints. Every thread has it beside the tools it calls directly (`forAgent` adds it to the conversation's extensions at every turn), with no setting: not a mode for code, several steps in one. Scripts reach MCP servers (each a namespace) and `models.*`: `models.classify()` on `bench/evaluator` where the project uses the evaluator |
 | Fork | `conversation.fork(at)`: "Fork from here" on an answer makes a new thread through that entry |
 | `/terminal` | tool `ssh_run` (`builtin/ssh.ts`); without a host it takes the thread's terminal insert |
 | `/tools` | no tool of its own: the utility's input and output come in `<block-state>` |
@@ -168,6 +168,7 @@ These hold over any habit of your own.
 
 ## How to work here
 
+- **The person writes in Russian; answer in Russian.**
 - **Bench develops itself, in one app.** The person works in `/Applications/Bench.app` and talks
   to you through it. It is only a client: threads, the queue and the agent live in the agent
   process and in `~/.bench`, so rebuilding and reopening it costs a few seconds and loses
@@ -183,7 +184,8 @@ These hold over any habit of your own.
 - **Back up before deleting data** (`~/.bench/backups/`).
 - **Screenshots only of your own copy** (`.agents/skills/bench-kit/scripts/shot.sh`, with
   `BENCH_DEMO=…` or `BENCH_HOME=<a copy>`), never the person's window.
-- **Disk space is tight.** Clean `target/` (`cargo clean --profile dev`) before it fills.
+- **Disk space is tight.** Clean `target/` (`cargo clean --profile dev`) before it fills. No second
+  target dir, so no Rust work in a separate worktree.
 - **Checks.** The main check of anything the person will see is the picture of your own copy: a
   change is not done until you have looked at it. Many screens touched: every demo state against a
   reference (`.agents/skills/bench-kit/scripts/pixels/`).

@@ -20,9 +20,9 @@ In Bench:
   `machine_here()` — the machine as this Mac reaches it; `files_machine()` — what the agent is
   asked with (`/api/fs?machine=`) when it works on another machine.
 - `src/app/places.rs` is the only place that says where things live: it puts `projects`
-  together from their sources (`local_projects`, `server_agents` with each one's Host,
-  `server_projects`) — `compose_projects` — and answers `location(project)`,
-  `thread_location()`, `env_target`, `create_cmd`, `rename_project`. Everything else asks it.
+  together from their sources (this Mac's agent's projects, the servers' agents with each one's
+  Host, each server's own projects) — `compose_projects` — and answers `location(project)`,
+  `thread_location()`, `env_target`, `rename_project`. Everything else asks it.
 
 ## The agent side
 
