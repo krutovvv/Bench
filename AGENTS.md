@@ -6,8 +6,8 @@ agent in `agent/`, a Node server on Pi Durable. The person writes in Russian: an
 Where to look:
 
 - Where the code for something is: `docs/map.md`. Then look at that file's whole folder.
-- What a thread, insert, card, project, agent or the Explorer is: `docs/concepts.md`.
-- How the agent uses Pi Durable: `docs/pi-durable.md`.
+- What a thread, insert, card, project, agent or the Explorer is: the skill `bench-concepts`.
+- How the agent uses Pi Durable: the skill `pi-durable-dev-rules`.
 - Why a module is built as it is: the `SPEC.md` in its folder. Read it before changing the module.
   A change that moves a decision updates the spec in the same commit.
 - UI work: the skill `bench-kit`. A new feature, module or refactor: the skill `bench-structure`.

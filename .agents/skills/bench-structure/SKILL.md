@@ -207,7 +207,7 @@ metadata:
 
 ## Где ещё смотреть
 
-- `AGENTS.md` — как здесь работать; `docs/concepts.md` — понятия Bench.
+- `AGENTS.md` — как здесь работать; скилл `bench-concepts` — понятия Bench.
 - `docs/map.md` — где лежит то, что нужно поменять.
 - `docs/architecture.md` — почему так; `docs/explorer.md` — окно и Explorer, фазы IDE.
 - `.agents/skills/bench-kit/SKILL.md` — как менять UI и проверять изменение снимками.

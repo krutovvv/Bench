@@ -12,7 +12,7 @@ metadata:
 
 # Bench Kit
 
-How to change what Bench shows. The words are in `docs/concepts.md`, how to work in `AGENTS.md`.
+How to change what Bench shows. The words are in the skill `bench-concepts`, how to work in `AGENTS.md`.
 
 ## Where to look, in this order
 

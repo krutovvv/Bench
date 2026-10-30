@@ -1,7 +1,7 @@
 # How the agent uses Pi Durable
 
-Each piece of Bench in Pi's terms. Read the row of what you change, then Pi's own docs
-(`.agents/skills/pi-durable-dev-rules/references/`) or sources (`agent/node_modules/@earendil-works/`).
+Each piece of Bench in Pi's terms. Read the row of what you change, then Pi's own docs beside this
+page or its sources (`agent/node_modules/@earendil-works/`).
 
 Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 

@@ -1,7 +1,11 @@
+---
+name: bench-concepts
+description: "Use to learn what a thread, insert, card, project, agent, Host or the Explorer is, before changing one of them."
+---
+
 # Bench's concepts
 
-The exact words for what Bench is made of, used unchanged in code, specs and answers. Read this
-before a change to threads, inserts, projects, agents or the Explorer.
+The exact words for what Bench is made of, used unchanged in code, specs and answers.
 
 Bench is a native desktop **workbench for working with an AI agent**. It is an open,
 thread-centric app, written from scratch in Rust and GPUI

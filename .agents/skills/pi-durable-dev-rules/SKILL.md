@@ -22,6 +22,10 @@ Two things about it decide most design choices:
 - **It is a library for building agentic applications, not a coding-agent CLI.** Pi's MCP package, as
   Bench uses it: `references/pi-mcp.md`.
 
+## How Bench uses it
+
+`references/bench-on-pi.md`: each piece of Bench in Pi's terms. Read its row for what you change.
+
 ## When to use this skill
 
 - Writing or reviewing code that imports `@earendil-works/pi-durable` or `@earendil-works/pi-ai`.
