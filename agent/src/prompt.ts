@@ -56,7 +56,7 @@ export function environment(s: ThreadFacts): string {
 		"Bench's own data (threads, settings) is reached through your tools, not files.",
 		// The tools for code, said once: a long thread spent most of its steps reading files through
 		// bash in small windows and editing them with scripts.
-		"Files: find with grep (text), glob (names) and ls (a folder's tree); read a file whole with read (up to 2000 lines at once, not in small pieces); change it with edit, all its changes in one call (edits[]); new files with write. bash is for running things — builds, tests, git — not for reading or editing files.",
+		"Files: find with grep (text), glob (names) and ls (a folder's tree); read a file whole with read (up to 2000 lines at once, not in small pieces); change it with edit, all its changes in one call (edits[]); new files with write. bash is for running things — builds, tests, git — not for reading, searching or editing files: not grep, cat, sed or find through bash. Commands already run in the working directory: do not cd to it first.",
 		scripts(s),
 		settings(s),
 		PLATFORM[s.source] ?? PLATFORM.local,

@@ -47,6 +47,6 @@ export const skill: Point<string[]> = {
 		const name = names[Number(a.choice.slice(1))];
 		if (!name) return undefined;
 		turn.named.add(`skill:${name}`);
-		return { note: `[Evaluator: the skill "${name}" fits what you are doing now: load it with skill_view and follow it.]` };
+		return { note: `[Evaluator: the skill "${name}" may fit what you are doing now: read it with skill_view; if it does not fit, go on without it.]` };
 	},
 };

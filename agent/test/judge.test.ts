@@ -314,7 +314,7 @@ test("at a turn's start the fitting skill is named for the first request, once",
 	};
 	const { hints } = await atRequest("s1");
 	assert.equal(hints.length, 1);
-	assert.match(hints[0], /the skill "price-check" fits it: load it with skill_view/);
+	assert.match(hints[0], /the skill "price-check" may fit it: read it with skill_view/);
 	assert.deepEqual((await atRequest("s1")).hints, [], "once a turn");
 });
 
@@ -643,7 +643,7 @@ test("mid-turn, a skill that fits what the agent does now is named once", async 
 		stepGate("k2");
 		notes = (await atResult("k2", { name: "read", arguments: { path: `f${i}` } }, out("x"))).notes;
 	}
-	assert.ok(notes.some((n) => /the skill "price-check" fits what you are doing now/.test(n)));
+	assert.ok(notes.some((n) => /the skill "price-check" may fit what you are doing now/.test(n)));
 	for (let i = 0; i < SKILL_EVERY; i++) {
 		stepGate("k2");
 		notes = (await atResult("k2", { name: "read", arguments: { path: `g${i}` } }, out("x"))).notes;

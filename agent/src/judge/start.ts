@@ -89,7 +89,7 @@ export const start: Point<{ skills: string[]; servers: ServerTools[] }> = {
 		if (skill && skill.choice !== "none" && p >= SURE_SKILL) {
 			const name = o.skills[Number(skill.choice.slice(1))];
 			if (name) {
-				lines.push(`the skill "${name}" fits it: load it with skill_view first and follow it`);
+				lines.push(`the skill "${name}" may fit it: read it with skill_view first; if it does not fit, go on without it`);
 				turn.named.add(`skill:${name}`);
 			}
 		}

@@ -83,7 +83,7 @@ export const plan: Point = {
 		return {
 			plan: next,
 			write: { kind: PLAN_KIND, data: { id: turn.planId, todos: next } },
-			note: `[Evaluator: your plan is marked — ${said}. Call todo only to change the plan itself.]`,
+			note: `[Evaluator: your plan is already marked, nothing to do — ${said}. Call todo only to change the plan itself.]`,
 		};
 	},
 };
