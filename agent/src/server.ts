@@ -62,6 +62,8 @@ for (const name of migrateProfiles()) console.log(`[migrate] agent ${name} → a
 for (const row of migrateServerRows()) console.log(`[migrate] ${row} is a server's agent now, not a project row`);
 for (const id of migrateProjectModels()) console.log(`[migrate] project ${id} follows the general model now (its settings.json in backups/)`);
 const rt = new Runtime(publish);
+/** How long Pi has to close when the agent stops; then it stops anyway. */
+const SHUTDOWN_MS = 5000;
 // A schedule changed: its project's environment did (the sidebar's mark follows).
 onJobsChanged((agent) => publish({ type: "env_changed", project: agent.startsWith("project:") ? agent.slice("project:".length) : "general" }));
 await rt.open();
@@ -166,5 +168,8 @@ if (!process.env.BENCH_AGENT_NO_MCP) void connectMcp("default").then(() => {
 
 for (const sig of ["SIGINT", "SIGTERM"])
 	process.on(sig, async () => {
+		// Pi counts a task cut off by a crash towards parking it, and a close not: without this every
+		// restart counted against whatever was waiting, as a thread in the line (`runtime/streams.ts`).
+		await Promise.race([rt.shutdown(), new Promise((done) => setTimeout(done, SHUTDOWN_MS))]);
 		process.exit(0);
 	});

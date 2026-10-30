@@ -270,10 +270,17 @@ export class Runtime {
 		return live;
 	}
 
+	/** The agent is stopping: Pi closes, and what was running stays pending for the next start. */
+	async shutdown(): Promise<void> {
+		await this.harness?.close(ctx);
+	}
+
 	async close(id: string): Promise<void> {
 		const live = this.live.get(id);
 		if (!live) return;
 		this.live.delete(id);
+		// A thread gone mid-run hears no end of it: its stream of the model's server is back now.
+		this.streams.leave(live.conversation.id);
 		this.byConversation.delete(String(live.conversation.id));
 		// What the hooks kept in memory about its conversation goes with it (`turn/kept.ts`).
 		forget(String(live.conversation.id));

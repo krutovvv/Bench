@@ -180,3 +180,17 @@ test("two threads at a limit of one: the second asks the model only when the fir
 	await until(() => !rt.isBusy(c.row.id));
 	await (rt.harness as any).close(BACKGROUND_CONTEXT);
 });
+
+test("the agent stopping: Pi closes though one thread is at the model and another in the line", async () => {
+	open.length = 0;
+	const rt = new Runtime(() => {});
+	await rt.open();
+	const [a, b] = [await rt.create("default", undefined, "local"), await rt.create("default", undefined, "local")];
+	await rt.submit(a.row.id, "job-a");
+	await until(() => open.length === 1);
+	await rt.submit(b.row.id, "job-b");
+	await until(() => rt.streams.placeOf(b.row.id) === 1);
+	const closed = await Promise.race([rt.shutdown().then(() => true), new Promise((done) => setTimeout(() => done(false), 4000))]);
+	assert.equal(closed, true);
+	open[0].answer();
+});
