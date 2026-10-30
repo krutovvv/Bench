@@ -148,10 +148,10 @@ impl BenchApp {
                         .right(px(bench_ui::SIDEBAR_ROW_INSET)),
                 )
             });
-        // The Host is always first, so it is no place for a project to land against; every other
-        // group is, and says so by taking the project in the air (`order.rs`).
+        // Every group takes the project in the air (`order.rs`); the Host, always first, only
+        // under itself.
         if host {
-            return zone.into_any_element();
+            return self.first_place_zone(zone, onto, cx).into_any_element();
         }
         self.drop_zone(zone, onto, cx).into_any_element()
     }
@@ -164,7 +164,6 @@ impl BenchApp {
         let GroupHead { g, name, id, new_in, telegram, cron, fold_key, collapsed } = head;
         let group: SharedString = format!("phead{g}").into();
         let mark = self.mark_of(&format!("p:{id}"));
-        let pinned = mark.pinned;
         // A chosen color is a tag's dot after the name (as Finder's); the name stays the text's.
         let color: Option<Hsla> = mark.color.and_then(bench_ui::mark_color);
         let armed = self.armed.is(&format!("p:{id}"));
@@ -172,8 +171,8 @@ impl BenchApp {
         let tag = color.filter(|_| renaming.is_none());
         // A project's head goes in the air: its group comes down where the person leaves it, so
         // the two they work in together stand under each other (`order.rs`). The Host is always
-        // first, so it never lifts.
-        let drag = (g != 0).then(|| DraggedProject {
+        // first, so it never lifts; a name being typed selects, not drags.
+        let drag = (g != 0 && renaming.is_none()).then(|| DraggedProject {
             id: id.clone(),
             name: name.clone(),
             color,
@@ -239,7 +238,7 @@ impl BenchApp {
             .child(
                 bench_ui::on_group_hover(group.clone()).child(
                     bench_ui::row_icon_button(("pmore", g), Ico::Ellipsis).dropdown_menu(
-                        item_menu(cx.entity(), Item::Project(id.clone()), pinned),
+                        item_menu(cx.entity(), Item::Project(id.clone()), false),
                     ),
                 ),
             )
@@ -265,7 +264,7 @@ impl BenchApp {
                     })),
             )
             .on_click(cx.listener(move |this, _, _, cx| this.toggle_group(fold_key.clone(), cx)))
-            .context_menu(item_menu(cx.entity(), Item::Project(id), pinned))
+            .context_menu(item_menu(cx.entity(), Item::Project(id), false))
             .into_any_element()
     }
 }

@@ -20,7 +20,7 @@ use gpui_kit::*;
 use bench_ui::Gap;
 
 use crate::app::BenchApp;
-use crate::sidebar::order::{DraggedProject, ProjectPlace};
+use crate::sidebar::order::DraggedProject;
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -35,12 +35,14 @@ impl BenchApp {
         let mut list: Vec<AnyElement> = vec![];
         // Projects, each with its threads: the sidebar's only unit. Host first, always: this
         // machine's own project, with the threads of no project, Telegram's and cron's; then
-        // the projects, pinned ones first (`items.rs` — ↑ ↓ walk the same order).
+        // the projects in the person's order (`items.rs` — ↑ ↓ walk the same order).
         let (loose, groups) = self.sidebar_groups();
         list.push(self.render_host(loose, cx));
+        let last = groups.last().map(|(p, _)| p.id.clone());
         for (g, (p, rows)) in groups.into_iter().enumerate() {
             list.push(self.render_project(g + 1, &p, rows, cx));
         }
+        list.extend(last.map(|id| self.last_place_zone(id, cx)));
 
         v_flex()
             .size_full()
@@ -54,11 +56,14 @@ impl BenchApp {
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                         this.sidebar_key(&ev.keystroke, window, cx)
                     }))
-                    // A project dropped past the last group — in the room under them — goes to the
-                    // end of the list; the groups above take theirs and stop the drop here.
-                    .on_drop(cx.listener(|this, d: &DraggedProject, _, cx| {
-                        this.drop_project(&d.id, ProjectPlace::Last, cx);
-                    }))
+                    // Out of the list, the project in the air lands nowhere: no line says so.
+                    .on_drag_move::<DraggedProject>(cx.listener(
+                        |this, ev: &DragMoveEvent<DraggedProject>, _, cx| {
+                            if !ev.bounds.contains(&ev.event.position) && this.sidebar.drop.take().is_some() {
+                                cx.notify();
+                            }
+                        },
+                    ))
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()

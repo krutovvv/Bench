@@ -36,7 +36,7 @@ pub struct Renaming {
 
 impl BenchApp {
     /// The threads as the sidebar groups them: the Host's (no project), then each project's,
-    /// pinned projects and pinned threads first.
+    /// projects in the person's order, pinned threads first.
     pub fn sidebar_groups(&self) -> (Vec<usize>, Vec<(ProjectEntry, Vec<usize>)>) {
         let visible = self.visible_threads();
         let mut loose: Vec<usize> = visible
@@ -53,13 +53,8 @@ impl BenchApp {
         let loose = self.nest_forks(loose);
         let mut projects = self.places.projects.clone();
         // The order the person put them in by dragging (`order.rs`); those never arranged keep
-        // their source's order, after them, pinned ones first (`marks.rs`).
-        projects.sort_by_key(|p| {
-            (
-                self.project_rank(&p.id),
-                !self.mark_of(&format!("p:{}", p.id)).pinned,
-            )
-        });
+        // their source's order, after them.
+        projects.sort_by_key(|p| self.project_rank(&p.id));
         let groups = projects
             .into_iter()
             .map(|p| {

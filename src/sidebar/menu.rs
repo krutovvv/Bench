@@ -89,14 +89,14 @@ pub(super) fn item_menu(
         let key = item.mark_key();
         let (pin_key, swatch_view, swatch_key) = (key.clone(), view.clone(), key.clone());
         let (rename, del) = (item.clone(), item.clone());
-        // This Mac's Host is always first: no pin. An agent's Host keeps its name and is never
-        // removed (a server's agent leaves Bench in the gear).
+        // A thread is pinned; a project takes its place by a drag (`order.rs`). An agent's Host
+        // keeps its name and is never removed (a server's agent leaves Bench in the gear).
         let project = match &item {
             Item::Project(id) => Some(crate::app::model::ProjectKey::parse(id)),
             Item::Thread(_) => None,
         };
         let host = project.as_ref().is_some_and(|k| k.is_host());
-        let pinnable = !project.as_ref().is_some_and(|k| k.is_host() && k.agent.is_empty());
+        let pinnable = matches!(item, Item::Thread(_));
         let menu = match &item {
             Item::Project(id) => {
                 let (new_in, code, settings) = (id.clone(), id.clone(), id.clone());

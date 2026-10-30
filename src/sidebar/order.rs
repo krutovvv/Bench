@@ -1,9 +1,8 @@
 //! The order of the sidebar's projects: the person makes it by dragging a project's group where
 //! they want it — working in two projects at once keeps them under each other, near the top.
-//! Kept on this Mac (`project-order.json`) as ids in order; a project not in it yet — a new one,
-//! or one whose agent has not answered — keeps the place its source gave and sits after the
-//! arranged ones. Pin is the same order at its front: pinning puts a project first, dragging one
-//! says its place outright and lets its pin go.
+//! Kept on this Mac (`project-order.json`) as ids in order; a project not in it yet — a new one —
+//! keeps the place its source gave and sits after the arranged ones; one whose agent has not
+//! answered keeps its place for when it does.
 
 use gpui_kit::component::{ActiveTheme as _};
 use gpui_kit::*;
@@ -99,9 +98,7 @@ impl BenchApp {
     }
 
     /// A group of projects as a place the project in the air lands against: the pointer's half of
-    /// it says the edge (`bench_ui::drop_edge`), and letting go takes that place. The list itself
-    /// is the place for the end of it (`sidebar/mod.rs`); the Host is no place at all, so it is
-    /// never wrapped in this.
+    /// it says the edge (`bench_ui::drop_edge`), and letting go takes that place.
     pub fn drop_zone(
         &mut self,
         zone: Stateful<Div>,
@@ -126,57 +123,109 @@ impl BenchApp {
         }))
     }
 
+    /// The Host's group: always first, so the project in the air lands under it, the first place.
+    pub fn first_place_zone(
+        &mut self,
+        zone: Stateful<Div>,
+        host: String,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        zone.on_drag_move::<DraggedProject>(cx.listener(
+            move |this, ev: &DragMoveEvent<DraggedProject>, _, cx| {
+                if ev.bounds.contains(&ev.event.position) {
+                    this.drag_over_project(&host, bench_ui::DropEdge::Below, cx);
+                }
+            },
+        ))
+        .on_drop(cx.listener(|this, d: &DraggedProject, _, cx| {
+            this.drop_project(&d.id, ProjectPlace::Front, cx);
+        }))
+    }
+
+    /// The room under the last group: the project in the air lands past it, and the line says so
+    /// under that group. It fills what the list has left, and is never less than a group's gap.
+    pub fn last_place_zone(&mut self, last: String, cx: &mut Context<Self>) -> AnyElement {
+        div()
+            .id("projects-end")
+            .flex_1()
+            .min_h(px(bench_ui::GROUP_GAP))
+            .on_drag_move::<DraggedProject>(cx.listener(
+                move |this, ev: &DragMoveEvent<DraggedProject>, _, cx| {
+                    if ev.bounds.contains(&ev.event.position) {
+                        this.drag_over_project(&last, bench_ui::DropEdge::Below, cx);
+                    }
+                },
+            ))
+            .on_drop(cx.listener(|this, d: &DraggedProject, _, cx| {
+                this.drop_project(&d.id, ProjectPlace::Last, cx);
+            }))
+            .into_any_element()
+    }
+
     /// The project `from` takes the place it was dropped in, and every project on screen then
     /// keeps the place the person has given it: from that drop on, the list is theirs and not
-    /// what the sources happened to return.
-    pub fn move_project(&mut self, from: &str, at: ProjectPlace, cx: &mut Context<Self>) {
+    /// what the sources happened to return. Those not on screen (an agent still connecting) keep
+    /// theirs, after these.
+    pub fn drop_project(&mut self, from: &str, at: ProjectPlace, cx: &mut Context<Self>) {
+        self.sidebar.drop = None;
         let (_, groups) = self.sidebar_groups();
-        let mut ids: Vec<String> = groups.into_iter().map(|(p, _)| p.id).collect();
-        let Some(moving) = ids.iter().position(|i| i == from) else {
-            // Not on the screen any more — a project removed, an agent gone: nothing to move.
-            return;
-        };
-        ids.remove(moving);
-        let to = match &at {
-            ProjectPlace::Front => 0,
-            ProjectPlace::Last => ids.len(),
-            ProjectPlace::On(onto, edge) => {
-                let k = ids.iter().position(|i| i == onto).unwrap_or(ids.len());
-                if *edge == bench_ui::DropEdge::Below {
-                    k + 1
-                } else {
-                    k
-                }
-            }
-        };
-        ids.insert(to.min(ids.len()), from.to_string());
-        self.sidebar.order = ids;
-        self.store_order();
+        let ids: Vec<String> = groups.into_iter().map(|(p, _)| p.id).collect();
+        if let Some(order) = placed(&ids, from, &at) {
+            let away = self.sidebar.order.iter().filter(|id| !ids.contains(id)).cloned();
+            self.sidebar.order = order.into_iter().chain(away.collect::<Vec<_>>()).collect();
+            let _ = std::fs::create_dir_all(connection::state_dir());
+            let _ = std::fs::write(path(), serde_json::to_vec(&self.sidebar.order).unwrap_or_default());
+        }
         cx.notify();
     }
+}
 
-    /// A project taken from the air and let go: it takes the place, and its pin goes with it — the
-    /// pin is the same wish, only ever at the front, and the list now says the place outright, so a
-    /// badge left on would promise what the list no longer does.
-    pub fn drop_project(&mut self, from: &str, at: ProjectPlace, cx: &mut Context<Self>) {
-        let key = format!("p:{from}");
-        if self.mark_of(&key).pinned {
-            self.toggle_pin(key, cx);
+/// The projects `ids` with `from` at the place `at`; None: nothing moves, as it is not there (a
+/// project removed meanwhile) or it was let go over itself.
+fn placed(ids: &[String], from: &str, at: &ProjectPlace) -> Option<Vec<String>> {
+    if matches!(at, ProjectPlace::On(onto, _) if onto == from) {
+        return None;
+    }
+    let mut ids = ids.to_vec();
+    let moving = ids.iter().position(|i| i == from)?;
+    ids.remove(moving);
+    let to = match at {
+        ProjectPlace::Front => 0,
+        ProjectPlace::Last => ids.len(),
+        ProjectPlace::On(onto, edge) => {
+            let k = ids.iter().position(|i| i == onto).unwrap_or(ids.len());
+            if *edge == bench_ui::DropEdge::Below { k + 1 } else { k }
         }
-        self.move_project(from, at, cx);
+    };
+    ids.insert(to.min(ids.len()), from.to_string());
+    Some(ids)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ProjectPlace, placed};
+    use bench_ui::DropEdge::{Above, Below};
+
+    fn ids() -> Vec<String> {
+        ["a", "b", "c"].map(String::from).to_vec()
     }
 
-    /// The saved order holds only the projects still listed; one that comes back later takes its
-    /// source's place after the arranged ones.
-    fn store_order(&self) {
-        let live: Vec<&String> = self.places.projects.iter().map(|p| &p.id).collect();
-        let order: Vec<&String> = self
-            .sidebar
-            .order
-            .iter()
-            .filter(|id| live.contains(id))
-            .collect();
-        let _ = std::fs::create_dir_all(connection::state_dir());
-        let _ = std::fs::write(path(), serde_json::to_vec(&order).unwrap_or_default());
+    fn on(id: &str, edge: bench_ui::DropEdge) -> ProjectPlace {
+        ProjectPlace::On(id.into(), edge)
+    }
+
+    #[test]
+    fn a_project_lands_where_it_was_let_go() {
+        assert_eq!(placed(&ids(), "c", &ProjectPlace::Front).unwrap(), ["c", "a", "b"]);
+        assert_eq!(placed(&ids(), "a", &ProjectPlace::Last).unwrap(), ["b", "c", "a"]);
+        assert_eq!(placed(&ids(), "a", &on("b", Below)).unwrap(), ["b", "a", "c"]);
+        assert_eq!(placed(&ids(), "c", &on("b", Above)).unwrap(), ["a", "c", "b"]);
+    }
+
+    #[test]
+    fn let_go_over_itself_or_gone_it_moves_nothing() {
+        assert_eq!(placed(&ids(), "b", &on("b", Above)), None);
+        assert_eq!(placed(&ids(), "b", &on("b", Below)), None);
+        assert_eq!(placed(&ids(), "x", &ProjectPlace::Front), None);
     }
 }

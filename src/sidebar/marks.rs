@@ -8,7 +8,6 @@ use std::sync::Mutex;
 use gpui_kit::*;
 use protocol::ThreadId;
 
-use super::order::ProjectPlace;
 use crate::app::BenchApp;
 use crate::client::connection;
 
@@ -51,16 +50,8 @@ impl BenchApp {
     }
 
     pub fn toggle_pin(&mut self, key: String, cx: &mut Context<Self>) {
-        let m = self.sidebar.marks.entry(key.clone()).or_default();
+        let m = self.sidebar.marks.entry(key).or_default();
         m.pinned = !m.pinned;
-        let pinned = m.pinned;
-        // A pinned project goes to the front of the projects — the front of the order the person
-        // makes by dragging, so the two never disagree about the first place (`order.rs`).
-        if pinned {
-            if let Some(id) = key.strip_prefix("p:") {
-                self.move_project(id, ProjectPlace::Front, cx);
-            }
-        }
         self.store_marks();
         cx.notify();
     }
