@@ -51,6 +51,8 @@ pub struct ThreadRow {
     pub paused: bool,
     /// Its run waits for the person's answer (a question, an approval).
     pub waiting: bool,
+    /// Its place in the line of threads waiting for their turn to work.
+    pub in_line: Option<u32>,
     /// Where it was started: "local" (Bench), "telegram", "cron", …
     pub source: String,
     /// The project it belongs to, as Bench keys projects (`ProjectKey`); its agent's Host when
@@ -76,6 +78,7 @@ impl ThreadRow {
             running: t.running,
             paused: t.paused,
             waiting: t.waiting,
+            in_line: t.in_line,
             source: t.source,
             project,
             host: host.to_string(),

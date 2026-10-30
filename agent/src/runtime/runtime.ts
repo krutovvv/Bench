@@ -5,6 +5,7 @@
 // - `models`: the model every thread runs with, and its fallback (models.ts);
 // - `stream`: a run's events turned into what Bench hears (stream.ts);
 // - `journal`: a thread read whole, and each commit's news told (thread.ts);
+// - `slots`: how many threads work at once (slots.ts);
 // - `holds`, `queue`, `asks`, `inserts`, `titles`, `processes`: the person's pause, the waiting
 //   messages, the questions, the inserts, the titles, the background processes (each its file);
 // - the tools' host and where they work (tools-host.ts).
@@ -23,6 +24,7 @@ import { projects } from "../builtin/projects.ts";
 import { AGENT_HOME, agents, defaultCwd, getSetting, readAgent, readConfig, reasoningEffort, setSetting } from "../config.ts";
 import { forAgent, installMcp, loadExtensions } from "../extensions.ts";
 import { HoldDoc, Holds, type Hold } from "./hold.ts";
+import { Slots } from "./slots.ts";
 import { setHost } from "../host.ts";
 import { envFor, hostOf } from "./tools-host.ts";
 import { ThreadInserts, type InsertView } from "./inserts.ts";
@@ -102,6 +104,7 @@ export class Runtime {
 	readonly stream = new Stream(this);
 	readonly journal = new Journal(this);
 	readonly holds = new Holds(this);
+	readonly slots = new Slots(this);
 	readonly queue = new Queue(this);
 	readonly asks = new Asks(this);
 	readonly inserts = new ThreadInserts(this);

@@ -1062,3 +1062,20 @@ fn a_held_run_stands_still_and_goes_on_from_there() {
     assert!(!t.paused());
     assert!(t.rows().iter().all(|r| !r.held()));
 }
+
+#[test]
+fn its_place_in_the_line_comes_and_goes_with_the_run() {
+    let mut t = Thread::open(ThreadOpen {
+        running: true,
+        in_line: Some(2),
+        ..Default::default()
+    });
+    assert_eq!(t.in_line(), Some(2));
+    t.apply(ThreadEvent::Line(Some(1)));
+    assert_eq!(t.in_line(), Some(1));
+    t.apply(ThreadEvent::Line(None));
+    assert_eq!(t.in_line(), None);
+    t.apply(ThreadEvent::Line(Some(3)));
+    t.apply(ThreadEvent::Run(false));
+    assert_eq!(t.in_line(), None, "a run that ended is in no line");
+}

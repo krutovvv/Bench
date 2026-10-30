@@ -229,6 +229,18 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
         if hooks.clarify.is_some() {
             clarify(hooks, open);
         }
+        if let Some(place) = hooks.in_line.as_ref().and_then(|n| n.parse().ok()) {
+            open.running = true;
+            open.in_line = Some(place);
+            open.items.push(ThreadItem::User {
+                key: "9000.0".into(),
+                seq: 9000,
+                text: "And the same for the changelog page.".into(),
+                at: Some(now * 1000.),
+                sub: None,
+                request: None,
+            });
+        }
     }
     for open in opens.values_mut() {
         open.usage = Some(Usage {
@@ -288,6 +300,13 @@ Friday — the next runs are listed above. If 18:45 is too late, make the hours 
         row("d-site", "Publish the release notes", Some("p-blog"), "desktop"),
         row("d-tool", "Cron for work hours", Some("p-me"), "desktop"),
     ];
+    let mut rows = rows;
+    if let (Some(place), Some(id)) = (hooks.in_line.as_ref().and_then(|n| n.parse().ok()), hooks.opens()) {
+        if let Some(row) = rows.iter_mut().find(|r| r.id == id) {
+            row.running = true;
+            row.in_line = Some(place);
+        }
+    }
     (rows, opens)
 }
 

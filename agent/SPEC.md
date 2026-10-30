@@ -22,7 +22,7 @@ the list of servers' agents.
   `~/.bench/pi.sqlite`, every step durable. How each Bench concept maps onto Pi — inserts,
   queue, plan, pause, code mode, fork, compaction, processes, MCP, Telegram — is the
   table "How the agent uses Pi Durable" in `AGENTS.md`; it is not repeated in the specs. What Pi
-  lacks is worked around here and said so in a comment (the pause, the fallback model, background
+  lacks is worked around here and said so in a comment (the pause, the threads at once, the fallback model, background
   processes); Pi is never patched.
 - **The wire is `protocol`'s.** The agent imports its types from the generated
   `src/protocol.gen.ts` and never defines a message shape of its own. JSON-RPC over

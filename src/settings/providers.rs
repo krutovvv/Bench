@@ -23,6 +23,8 @@ pub struct EndpointForm {
     /// Where the key lives when it is a `.env` reference (`${NAME}`).
     pub key_env: Option<String>,
     pub context: Entity<InputState>,
+    /// How many threads it works on at once; empty: all of them (`agent/src/runtime/slots.ts`).
+    pub parallel: Entity<InputState>,
 }
 
 #[derive(Default)]
@@ -126,10 +128,9 @@ impl BenchApp {
             .flatten()
             .map(|e| {
                 let s = |k: &str| e[k].as_str().unwrap_or_default().to_string();
-                let context = e["context_length"]
-                    .as_u64()
-                    .map(|n| n.to_string())
-                    .unwrap_or_default();
+                let number = |k: &str| e[k].as_u64().map(|n| n.to_string()).unwrap_or_default();
+                let context = number("context_length");
+                let parallel = number("parallel");
                 // `${NAME}`: the key lives in .env under NAME.
                 let preview = s("api_key_preview");
                 let key_env = preview
@@ -154,6 +155,7 @@ impl BenchApp {
                     current: e["is_current"].as_bool().unwrap_or(false),
                     key_env,
                     context: field(window, cx, &context, "e.g. 131072"),
+                    parallel: field(window, cx, &parallel, "All of them"),
                 }
             })
             .collect();
@@ -195,6 +197,7 @@ impl BenchApp {
             current: false,
             key_env: None,
             context: field(window, cx, "", "e.g. 131072"),
+            parallel: field(window, cx, "", "All of them"),
         });
         cx.notify();
     }
@@ -206,6 +209,8 @@ impl BenchApp {
         if let Ok(n) = text(&e.context, cx).parse::<u64>() {
             body["context_length"] = json!(n);
         }
+        // Empty clears it; anything but a number is no limit either.
+        body["parallel"] = json!(text(&e.parallel, cx));
         // Only a changed key: an unchanged one stays where it is (often a .env reference).
         if let Some(key) = e.server.changed_key(cx).filter(|k| !k.is_empty()) {
             body["api_key"] = json!(key);
@@ -401,6 +406,7 @@ impl BenchApp {
                 input_row("Address", "OpenAI-compatible, ends in /v1", &e.server.url, cx),
                 input_row("Default model", "The model it serves first", &e.server.model, cx),
                 input_row("Context length", "Tokens", &e.context, cx),
+                input_row("Threads at once", "As the main model: the others wait in line, each runs to its answer", &e.parallel, cx),
                 input_row("API key", key_hint, &e.server.key, cx),
             ];
             page.push(bench_ui::settings_card(title, role, rows, e.server.check_line(), actions, cx).into_any_element());

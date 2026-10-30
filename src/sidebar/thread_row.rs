@@ -59,6 +59,8 @@ impl BenchApp {
         };
         let meta: Option<String> = if s.running && paused {
             Some("paused".into())
+        } else if let Some(place) = s.in_line {
+            Some(format!("in line · {place}"))
         } else {
             branch
         };
@@ -97,7 +99,7 @@ impl BenchApp {
         };
         // A chosen color is a small dot after the title, as a Finder tag: the row itself stays
         // the list's. A paused run stands still: no shimmer, as nothing moves.
-        let working = !paused && (s.running || (open && self.thread(cx).live.is_some()));
+        let working = !paused && s.in_line.is_none() && (s.running || (open && self.thread(cx).live.is_some()));
         let tag = self
             .mark_of(s.id.as_str())
             .color

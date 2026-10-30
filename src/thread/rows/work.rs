@@ -78,6 +78,10 @@ impl ThreadView {
             _ => None,
         });
         let doing = live.then(|| match last_live {
+            // Other threads go first: nothing is being done yet (`agent/src/runtime/slots.ts`).
+            _ if self.thread.journal.in_line().is_some() => {
+                format!("In line · {}", self.thread.journal.in_line().unwrap_or_default())
+            }
             // Held: nothing is being done, and the line says so in the step's place.
             _ if paused => match &narrative {
                 Some(n) => format!("{n} · Paused"),

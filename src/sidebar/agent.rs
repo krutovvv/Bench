@@ -27,7 +27,7 @@ impl BenchApp {
         let working = self
             .threads.list
             .iter()
-            .filter(|t| t.host == host && t.running)
+            .filter(|t| t.host == host && t.running && t.in_line.is_none())
             .count();
         // Where it runs (this Mac, or its project's server) and a small dot that says the state —
         // green up, grey connecting, red down; then what it does, quieter.

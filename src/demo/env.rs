@@ -211,7 +211,7 @@ pub(super) fn endpoints() -> Value {
     json!({"endpoints": [
         {
             "id": "dev", "name": "dev", "base_url": "http://192.168.1.100:10137/v1",
-            "model": "Qwen3.8-Next-Flash", "context_length": 131072, "is_current": true
+            "model": "Qwen3.8-Next-Flash", "context_length": 131072, "parallel": 2, "is_current": true
         },
         {
             "id": "openrouter", "name": "OpenRouter", "base_url": "https://openrouter.ai/api/v1",

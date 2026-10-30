@@ -98,6 +98,8 @@ export class Asks {
 				resolve(answer);
 			};
 			live.prompts.set(ask.id, { resolve: done, ask });
+			// It waits for the person now: the slot goes to the next in line (`slots.ts`).
+			this.rt.slots.leave(live.row.id);
 			told();
 			this.rt.report(live.row.id, { kind: "ask", ask, question });
 		});

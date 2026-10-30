@@ -79,6 +79,9 @@ export const assistant = defineExtension({
 			// A turn's first request also carries the evaluator's word on its skill and servers (`judge/start.ts`).
 			beforeRequest: async (request: any, api: any, context: any) => {
 				const conversation = String(api.conversationId);
+				// Its turn among the threads that work at once, before anything is asked of a model.
+				const info = host().thread(api.conversationId);
+				if (info) await host().slot(info.id, context?.abortSignal);
 				seeRequest(conversation, request.messages);
 				const { hints, plain } = await atRequest(conversation, context?.abortSignal).catch(() => ({ hints: [] as string[], plain: false }));
 				// A plain step goes without reasoning: a word for its provider session (`runtime/steer.ts`).

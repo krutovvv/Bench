@@ -24,6 +24,9 @@ export interface Host {
 	/** Waits while the person holds the run at a step boundary; resolves at once when free.
 	 * False when the run was stopped while it waited: the step must not begin. */
 	hold(threadId: string, signal?: AbortSignal): Promise<boolean>;
+	/** Waits for the thread's turn among those that work at once (`runtime/slots.ts`); rejects when
+	 * the run is stopped while it waits. */
+	slot(threadId: string, signal?: AbortSignal): Promise<void>;
 	/** Ask the person; `callId` is the asking call's, the id their answer comes back to. The
 	 * answer, or "" when declined or timed out. */
 	ask(threadId: string, callId: string, question: string, choices: string[], multiSelect: boolean, signal?: AbortSignal): Promise<string>;

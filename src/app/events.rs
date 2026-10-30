@@ -59,6 +59,11 @@ impl BenchApp {
                 _ => {}
             }
         }
+        if let ThreadEvent::Line(place) = &event {
+            if let Some(row) = self.row_mut(host, thread) {
+                row.in_line = *place;
+            }
+        }
         // A hold or a run stills or stirs the thread's row in the sidebar at once.
         if let ThreadEvent::Holds(_) | ThreadEvent::Run(_) = &event {
             let (running, paused) = match views.first() {

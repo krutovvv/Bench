@@ -198,6 +198,7 @@ export class Stream {
 		live.busy = false;
 		// Whatever the person held, the run is over: the hold lets go, nobody waits on it.
 		this.rt.holds.end(live);
+		this.rt.slots.leave(live.row.id);
 		// What the turn changed in its repository, into the journal under its answer.
 		void this.rt.changes.settle(live).catch((err) => console.error("[turn changes]", err));
 		this.rt.tell(live.row.id, { kind: "run", value: false });

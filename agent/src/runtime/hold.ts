@@ -88,6 +88,9 @@ export class Holds {
 		const live = await this.rt.thread(id);
 		if (!live?.busy) return;
 		await this.change(live, (h) => !held(h) && h.push({ from: Date.now() }) > 0);
+		// A held run gives its slot up, and lets those behind it in the line go first.
+		this.rt.slots.leave(id);
+		this.rt.slots.changed();
 	}
 
 	/** Let the held run take its next step. */
@@ -96,6 +99,7 @@ export class Holds {
 		if (!live) return;
 		await this.change(live, (h) => closeHold(h, Date.now()));
 		this.gates.wake(String(live.conversation.id), true);
+		this.rt.slots.changed();
 	}
 
 	/** A stop outranks a hold: the call waiting at the gate is told to stop, not to go on. */

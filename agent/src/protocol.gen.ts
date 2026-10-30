@@ -68,7 +68,11 @@ processes: Array<Process>,
 /**
  * What the live run waits for the person to answer.
  */
-asks: Array<Ask>, info: ThreadInfo, 
+asks: Array<Ask>, 
+/**
+ * Its place in the line of threads waiting for their turn to work, from 1; `None`: not in it.
+ */
+in_line?: number, info: ThreadInfo, 
 /**
  * Its numbers so far; `None` before its first answer.
  */
@@ -166,7 +170,7 @@ export type ProcessState = "running" | "exited" | "stopped" | "restarted" | "fai
 
 export type StreamKind = "text" | "thought" | "narration";
 
-export type ThreadEvent = { "kind": "append", "value": Array<ThreadItem> } | { "kind": "stream", "value": [StreamKind, string] } | { "kind": "queue", "value": Array<QueuedItem> } | { "kind": "inserts", "value": { [key in string]?: InsertState } } | { "kind": "run", "value": boolean } | { "kind": "holds", "value": Array<Hold> } | { "kind": "process", "value": Process } | { "kind": "asks", "value": Array<Ask> } | { "kind": "info", "value": ThreadInfo } | { "kind": "usage", "value": Usage };
+export type ThreadEvent = { "kind": "append", "value": Array<ThreadItem> } | { "kind": "stream", "value": [StreamKind, string] } | { "kind": "queue", "value": Array<QueuedItem> } | { "kind": "inserts", "value": { [key in string]?: InsertState } } | { "kind": "run", "value": boolean } | { "kind": "holds", "value": Array<Hold> } | { "kind": "line", "value": number | null } | { "kind": "process", "value": Process } | { "kind": "asks", "value": Array<Ask> } | { "kind": "info", "value": ThreadInfo } | { "kind": "usage", "value": Usage };
 
 export type Event = { "type": "threads_changed" } | { "type": "thread", thread: ThreadId, event: ThreadEvent, } | { "type": "env_changed", project: string, };
 
@@ -185,6 +189,10 @@ paused: boolean,
  * Its run waits for the person: a question to answer or a command to approve.
  */
 waiting: boolean, 
+/**
+ * Its place in the line of threads waiting for their turn to work, from 1.
+ */
+in_line?: number, 
 /**
  * Where it was started: "local" (Bench), "telegram", "cron".
  */

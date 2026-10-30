@@ -343,6 +343,7 @@ export class Journal {
 			inserts: doc?.items ?? {},
 			running: live.busy,
 			holds: live.busy ? live.holds : [],
+			...(rt.slots.placeOf(id) ? { in_line: rt.slots.placeOf(id) } : {}),
 			processes: await rt.processes.list(live.conversation.id),
 			asks: rt.asks.of(live),
 			info: rt.models.info(live.row),

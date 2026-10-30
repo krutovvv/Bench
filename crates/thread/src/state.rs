@@ -26,6 +26,8 @@ pub struct Thread {
     running: bool,
     /// The live run's holds (the person's pauses); the last one open while it stands held.
     holds: Vec<Hold>,
+    /// Its place in the line of threads waiting for their turn to work.
+    in_line: Option<u32>,
     /// The background processes, as their last record said (`thread.process`).
     processes: Vec<Process>,
     /// What the live run waits for the person to answer.
@@ -56,6 +58,7 @@ impl Thread {
             inserts: o.inserts,
             running: o.running,
             holds: o.holds,
+            in_line: o.in_line,
             processes: o.processes,
             asks: o.asks,
             info: o.info,
@@ -74,6 +77,7 @@ impl Thread {
         self.inserts = o.inserts;
         self.running = o.running;
         self.holds = o.holds;
+        self.in_line = o.in_line;
         self.processes = o.processes;
         self.asks = o.asks;
         self.info = o.info;
@@ -119,9 +123,11 @@ impl Thread {
                     self.narrated.clear();
                     self.holds.clear();
                     self.asks.clear();
+                    self.in_line = None;
                 }
             }
             ThreadEvent::Holds(h) => self.holds = h,
+            ThreadEvent::Line(place) => self.in_line = place,
             ThreadEvent::Process(p) => match self.processes.iter_mut().find(|x| x.id == p.id) {
                 Some(x) => *x = p,
                 None => self.processes.push(p),
@@ -233,6 +239,11 @@ impl Thread {
     /// The run stands held: the person paused it and has not let it go on.
     pub fn paused(&self) -> bool {
         self.running && self.holds.last().is_some_and(|h| h.to.is_none())
+    }
+
+    /// Its place in the line of threads waiting for their turn to work, from 1.
+    pub fn in_line(&self) -> Option<u32> {
+        self.in_line
     }
 
     pub fn head(&self) -> u64 {

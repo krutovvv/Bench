@@ -86,6 +86,7 @@ with `BENCH_DEMO` set.
 | `BENCH_PANEL` | `providers` | The gear open |
 | `BENCH_GEAR_TAB` | `0`, `1`, `2` | On that tab |
 | `BENCH_DEMO_QUEUE` | `1` | Two messages and a plan waiting |
+| `BENCH_DEMO_LINE` | `<n>` | The open thread n-th in the line of threads waiting for their turn |
 | `BENCH_DEMO_DRAFT` | words | These words in the composer |
 | `BENCH_PREFILL` | words | These words in the composer, from the first frame |
 | `BENCH_DEMO_BESIDE` | `<thread id>` (`d-tool`) | That thread beside the open one |
