@@ -1,26 +1,28 @@
-// The evaluator on the way: every so many steps of a turn it is asked whether the last steps still
-// work on the person's request, have gone off to something else, go round in circles, or the work
-// is done. Anything but "on track", when it is sure, is said to the model with the result of the
-// step it came after. Unsure but leaning the same way off course at two checks running — drifting
-// at 0.42–0.47 four times over twenty minutes, said nothing at 0.7 — it is a softer line with the
-// person's request, a turn of the head rather than a stop. Off course again after either, it is
-// told to stop and answer. When the message wanted words, not work (`intent.ts`), the course is
-// checked every 3 steps. The model decides what to do.
+// The evaluator on the way: at every step of a turn from the second (near free, in the step's own
+// request) it is asked whether the last steps still work on the person's request, have gone off to
+// something else, go round in circles, or the work is done. It speaks by what has gathered, as one
+// step cannot tell a side trip from a needed detour. Sure, it is said at once. Unsure but leaning the
+// same way off course at three of the last four checks — drifting at 0.42–0.47 four times over twenty
+// minutes, said nothing at 0.7 — it is a softer line with the person's request. Off course again after
+// either, a few steps on so the agent could turn, it is told to stop and answer. The model decides
+// what to do.
 
 import { cut } from "../turn/turn.ts";
 import { limitReached } from "../turn/steps.ts";
 
 import { sure, type Point } from "./point.ts";
 
-/** Steps between two checks: a local model that wanders loses minutes a step. */
-export const DRIFT_EVERY = 5;
+/** The first step of a turn that is judged: one step says nothing of a course. */
+const FIRST_CHECK = 2;
 /** How sure the evaluator must be to speak. */
 const SURE = 0.7;
-/** Leaning off course this much, at two checks running, is a softer line. */
+/** Leaning off course this much counts toward a softer line. */
 const LEAN = 0.4;
-/** Steps between checks when the message wanted words, not work (`intent.ts`): a few steps are already many. */
-const WORDS_EVERY = 3;
-const WORDS = new Set(["question", "approval", "choice"]);
+/** The checks a leaning is counted over, and how many of them must lean the same way. */
+const LEAN_WINDOW = 4;
+const LEAN_ENOUGH = 3;
+/** Steps after a word from it before another: the agent gets the room to turn. */
+const ROOM_TO_TURN = 3;
 
 /** Off course again after a word about it: the agent did not turn, so it is told to stop. */
 const STOP = (r: string) =>
@@ -43,9 +45,8 @@ export const course: Point = {
 	name: "course",
 	moment: "result",
 	ask({ conversation, turn }) {
-		const every = WORDS.has(turn.intent) ? WORDS_EVERY : DRIFT_EVERY;
 		// Past the step limit the limit has told it to answer (`turn/steps.ts`): nothing to add.
-		if (!turn.request || turn.steps - turn.checkedAt < every || limitReached(conversation)) return undefined;
+		if (!turn.request || turn.steps < FIRST_CHECK || turn.steps === turn.checkedAt || limitReached(conversation)) return undefined;
 		turn.checkedAt = turn.steps;
 		return {
 			questions: {
@@ -68,16 +69,23 @@ export const course: Point = {
 		const c = sure(answers.course, SURE);
 		const p = answers.course?.probabilities ?? {};
 		const lean = (["drifting", "looping"] as const).find((k) => Number(p[k] ?? 0) >= LEAN) ?? "";
+		turn.leanings = [...turn.leanings, lean].slice(-LEAN_WINDOW);
+		if (turn.saidAt && turn.steps - turn.saidAt < ROOM_TO_TURN) return undefined;
+		const say = (note: string) => {
+			turn.saidAt = turn.steps;
+			turn.leanings = [];
+			return { note };
+		};
 		// Told once already, and still off: the word becomes a stop.
-		if (turn.warned && (c === "drifting" || c === "looping" || lean)) return { note: STOP(cut(turn.request, 300)) };
+		if (turn.warned && (c === "drifting" || c === "looping" || lean)) return say(STOP(cut(turn.request, 300)));
 		if (c && SAY[c]) {
-			turn.leaning = "";
 			if (c !== "done") turn.warned = true;
-			return { note: SAY[c] };
+			return say(SAY[c]);
 		}
-		const again = !!lean && turn.leaning === lean;
-		turn.leaning = again ? "" : lean;
-		if (again) turn.warned = true;
-		return again ? { note: LEANING[lean](cut(turn.request, 300)) } : undefined;
+		if (lean && turn.leanings.filter((l) => l === lean).length >= LEAN_ENOUGH) {
+			turn.warned = true;
+			return say(LEANING[lean](cut(turn.request, 300)));
+		}
+		return undefined;
 	},
 };

@@ -23,7 +23,6 @@ const { stepGate, stepNote } = await import("../src/turn/steps.ts");
 const { checkJudge, fitState } = await import("../src/judge/client.ts");
 const { baseOf } = await import("../src/judge/models.ts");
 const { atResult, atAnswer } = await import("../src/judge/index.ts");
-const { DRIFT_EVERY } = await import("../src/judge/drift.ts");
 const { PLAN_EVERY } = await import("../src/judge/plan.ts");
 const { SKILL_EVERY } = await import("../src/judge/skill.ts");
 const { itemsOf, PLAN_KIND } = await import("../src/runtime/journal.ts");
@@ -162,20 +161,23 @@ const steps = (c: string, n: number) => {
 	}
 };
 
-test("the course is checked every so many steps; only a sure 'off' is said", async () => {
+test("the course is asked at every step from the second; a sure 'off' is said at once, then room to turn, then a stop", async () => {
 	seeRequest("c4", [user("Make the game")]);
 	reply = () => choice("course.course", { on_track: 0.1, drifting: 0.85, looping: 0.04, done: 0.01 });
-	steps("c4", DRIFT_EVERY - 1);
-	assert.equal(await checkCourse("c4"), undefined, "not yet");
+	steps("c4", 1);
+	assert.equal(await checkCourse("c4"), undefined, "one step says nothing of a course");
 	steps("c4", 1);
 	assert.match((await checkCourse("c4"))!, /did not ask for/);
-	assert.equal(seen.at(-1).body.state.last_steps.length, DRIFT_EVERY);
-	assert.equal(await checkCourse("c4"), undefined, "once per stretch");
-	steps("c4", DRIFT_EVERY);
+	assert.equal(await checkCourse("c4"), undefined, "once per step");
+	for (let i = 0; i < 2; i++) {
+		steps("c4", 1);
+		assert.equal(await checkCourse("c4"), undefined, "room to turn");
+	}
+	steps("c4", 1);
 	reply = () => choice("course.course", { on_track: 0.4, drifting: 0.6, looping: 0, done: 0 });
 	assert.match((await checkCourse("c4"))!, /Stop here: answer the person now/, "told once, still off: a stop");
 	seeRequest("c4", [user("Make the game better")]);
-	steps("c4", DRIFT_EVERY);
+	steps("c4", 2);
 	reply = () => choice("course.course", { on_track: 0.4, drifting: 0.6, looping: 0, done: 0 });
 	assert.equal(await checkCourse("c4"), undefined, "unsure, untold: quiet");
 });
@@ -286,7 +288,7 @@ test("off, no point asks and the hooks change nothing", async () => {
 	const before = seen.length;
 	seeRequest("c9", [user("Make the game")]);
 	seeResult("c9", todo([{ content: "Write the game", status: "in_progress" }]), out("ok"));
-	for (let i = 0; i < DRIFT_EVERY + 1; i++) {
+	for (let i = 0; i < 6; i++) {
 		stepGate("c9");
 		assert.deepEqual(await atResult("c9", grep, out(lines)), { notes: [] });
 	}
@@ -525,14 +527,20 @@ test("the thread's opening message, leaving open where the work belongs, is aske
 	await atRequest("o1");
 });
 
-test("leaning off course at two checks running is a soft line with the request; once is not", async () => {
+test("leaning off course at three of the last four checks is a soft line with the request; a stray check is not", async () => {
 	seeRequest("d1", [user("Restore the Things skills into Assistant TG")]);
-	reply = () => choice("course.course", { on_track: 0.3, drifting: 0.45, looping: 0.15, done: 0.1 });
-	steps("d1", DRIFT_EVERY);
-	assert.equal(await checkCourse("d1"), undefined, "once: quiet");
-	steps("d1", DRIFT_EVERY);
+	const leaning = () => choice("course.course", { on_track: 0.3, drifting: 0.45, looping: 0.15, done: 0.1 });
+	const fine = () => choice("course.course", { on_track: 0.9, drifting: 0.05, looping: 0.03, done: 0.02 });
+	steps("d1", 1);
+	for (const [answer, note] of [[leaning, "one"], [fine, "on track between"], [leaning, "two of four"]] as const) {
+		reply = answer;
+		steps("d1", 1);
+		assert.equal(await checkCourse("d1"), undefined, note);
+	}
+	reply = leaning;
+	steps("d1", 1);
 	assert.match((await checkCourse("d1"))!, /may be moving away from what the person asked: «Restore the Things skills/);
-	steps("d1", DRIFT_EVERY);
+	steps("d1", 3);
 	assert.match((await checkCourse("d1"))!, /Stop here/, "said, and still leaning: a stop");
 });
 
@@ -760,7 +768,7 @@ test("each message is read for what it asks; an approval is answered in words, a
 		return choice("course.course", { on_track: 0.1, drifting: 0.85, looping: 0.03, done: 0.02 });
 	};
 	steps("i1", 3);
-	assert.match((await checkCourse("i1"))!, /did not ask for/, "words wanted: checked at 3 steps");
+	assert.match((await checkCourse("i1"))!, /did not ask for/, "the message's kind goes with every question");
 });
 
 test("a turn starts at the person's message though a section's update follows it; a compaction's summary is no new turn", () => {

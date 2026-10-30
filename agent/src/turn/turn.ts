@@ -59,8 +59,10 @@ export interface Turn {
 	notRun: Set<string>;
 	/** The thread's first message: nothing said before it that the request could lean on. */
 	opening: boolean;
-	/** The course the evaluator leaned to, unsure, at its last check (`judge/drift.ts`): "" on track. */
-	leaning: string;
+	/** What the evaluator leaned to, unsure, at its last checks of the course (`judge/drift.ts`): "" on track. */
+	leanings: string[];
+	/** The step at which it last said a word about the course; 0: none yet. */
+	saidAt: number;
 	/** What the evaluator already said this turn, once each: skills and servers named (`judge/skill.ts`, `judge/step.ts`). */
 	named: Set<string>;
 	/** The steps at which the evaluator last looked for a skill mid-turn (`judge/skill.ts`). */
@@ -85,7 +87,7 @@ export interface Call {
 }
 
 
-const fresh = (request: string, plan: PlanStep[] = [], planId = "", planStale = 0): Turn => ({ request, plan, planId, planAt: 0, planStale, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leaning: "", named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
+const fresh = (request: string, plan: PlanStep[] = [], planId = "", planStale = 0): Turn => ({ request, plan, planId, planAt: 0, planStale, steps: 0, recent: [], refused: 0, continued: false, checkedAt: 0, evidence: [], said: [], started: false, found: [], load: [], stopped: "", calls: [], notRun: new Set(), opening: false, leanings: [], saidAt: 0, named: new Set(), skillAt: 0, previous: "", intent: "", intentAsked: false, warned: false });
 
 const turns = slot<Turn>(() => fresh(""));
 

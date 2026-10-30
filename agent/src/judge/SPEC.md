@@ -60,13 +60,12 @@ one thread are asked about at once. The default extension's hooks call the momen
   is told in a line, so it need not spend a step on `todo`. Its own `todo` call wins and the marks
   start again from it. With the evaluator off or failing, the plan's reminder (`turn/turn.ts` `planNudge`) does
   this job; with it on, the reminder is silent.
-- **course** (`drift.ts`, `result`, every 5 steps): on track, drifting to something not asked,
-  looping, or done. Anything but on track, when sure (0.7), is a note with that step's result.
-  Leaning the same way off course (drifting or looping at 0.4) at two checks running is a softer
-  note with the person's request: in the backup thread drifting stood at 0.42–0.47 four times over
-  twenty minutes and nothing was said. Off course again after either word (sure, or leaning), the
-  note says to stop and answer — the soft word alone was read and passed by. After a question, an
-  approval or a choice (`intent.ts`) the course is checked every 3 steps.
+- **course** (`drift.ts`, `result`, every step from the second): on track, drifting to something not
+  asked, looping, or done. Sure (0.7), it is said at once. One step cannot tell a side trip from a needed
+  detour, so an unsure leaning (drifting or looping at 0.4) speaks only at three of the last four checks,
+  a softer line with the person's request: before this, one such turn drifted at 0.42–0.47 four times
+  over twenty minutes and nothing was said. After a word it stays quiet three steps, so the agent can
+  turn; off course then (sure, or leaning), it is told to stop and answer.
 - **done** (`done.ts`, `answer`, after five steps or more): an answer judged unfinished,
   unchecked or off target (0.8) sends the agent back once, with the reason, by Pi's continuation —
   an `<evaluator>` message the thread does not show and that is not a new turn.
