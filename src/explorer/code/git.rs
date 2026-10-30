@@ -5,7 +5,7 @@
 
 use bench_ui::icons::Ico;
 use gpui_base::input::LineMark;
-use gpui_kit::component::input::Editor;
+use gpui_kit::component::input::{Editor, EditorState};
 use gpui_kit::component::{ActiveTheme as _, v_flex};
 use gpui_kit::*;
 use similar::{DiffOp, TextDiff};
@@ -71,15 +71,7 @@ impl Item for DiffItem {
         app.ensure_doc(f.clone(), window, cx);
         let key = DocKey::Diff(f.clone());
         if !app.explorer.docs.contains_key(&key) {
-            // Plain text, like a `.patch` file in the tree (`lang.rs`): the diff's own query
-            // colours deletions and additions as keywords and strings.
-            let editor = crate::env::editor("text", window, cx);
-            editor.update(cx, |s, cx| {
-                s.set_disabled(true, cx);
-                // A diff's lines are not the file's: no numbers beside them.
-                s.set_line_number(false, window, cx);
-            });
-            app.explorer.docs.insert(key, Doc::new(editor));
+            app.explorer.docs.insert(key, Doc::new(diff_editor(window, cx)));
         }
         app.mark_changes(f, window, cx);
         true
@@ -91,8 +83,58 @@ impl Item for DiffItem {
         _window: &mut Window,
         cx: &mut Context<BenchApp>,
     ) -> AnyElement {
-        app.diff_pane(&self.0, cx)
+        app.head_diff_pane(&self.0, cx)
     }
+}
+
+/// A diff tab's editor: read only, no line numbers (a diff's lines are not the file's), plain
+/// text like a `.patch` file in the tree (`lang.rs`): the diff's own query colours deletions and
+/// additions as keywords and strings.
+pub(super) fn diff_editor(window: &mut Window, cx: &mut Context<BenchApp>) -> Entity<EditorState> {
+    let editor = crate::env::editor("text", window, cx);
+    editor.update(cx, |s, cx| {
+        s.set_disabled(true, cx);
+        s.set_line_number(false, window, cx);
+    });
+    editor
+}
+
+/// What a diff tab shows under its head.
+pub(super) enum DiffBody {
+    Note(&'static str),
+    Diff(Entity<EditorState>),
+}
+
+/// A diff tab: its title and the file's path, Open the file, the diff.
+pub(super) fn diff_pane(
+    open_id: &'static str,
+    title: String,
+    f: &FileRef,
+    body: DiffBody,
+    cx: &mut Context<BenchApp>,
+) -> AnyElement {
+    let file = f.clone();
+    let actions = vec![
+        bench_ui::form_action(open_id, "Open the file", false, cx)
+            .on_click(cx.listener(move |this, _, window, cx| {
+                this.open_doc(DocKey::File(file.clone()), window, cx)
+            }))
+            .into_any_element(),
+    ];
+    let head = bench_ui::ide_head(title, Some(f.path.clone().into()), actions, cx);
+    let body = match body {
+        DiffBody::Note(words) => note(words, cx),
+        DiffBody::Diff(editor) => Editor::new(&editor)
+            .line_height(relative(bench_ui::CODE_LEAD))
+            .appearance(false)
+            .h_full()
+            .into_any_element(),
+    };
+    v_flex()
+        .size_full()
+        .child(head)
+        .child(div().flex_1().min_h_0().child(body))
+        .into_any_element()
 }
 
 impl BenchApp {
@@ -172,7 +214,7 @@ impl BenchApp {
     }
 
     /// A file's changes against HEAD: where it is, Open the file, and the diff read only.
-    fn diff_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
+    fn head_diff_pane(&mut self, f: &FileRef, cx: &mut Context<Self>) -> AnyElement {
         let Some(d) = self.explorer.docs.get(&DocKey::Diff(f.clone())) else {
             return div().into_any_element();
         };
@@ -182,34 +224,12 @@ impl BenchApp {
             .docs
             .get(&DocKey::File(f.clone()))
             .map(|d| (d.loading, d.head.is_some()));
-        let file = f.clone();
-        let actions = vec![
-            bench_ui::form_action("diff-open", "Open the file", false, cx)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.open_doc(DocKey::File(file.clone()), window, cx)
-                }))
-                .into_any_element(),
-        ];
-        let head = bench_ui::ide_head(
-            format!("{} · changes since HEAD", f.name()),
-            Some(f.path.clone().into()),
-            actions,
-            cx,
-        );
         let body = match known {
-            Some((true, _)) | None => note("Reading…", cx),
-            Some((false, false)) => note("Not in a repository, or not committed yet", cx),
-            Some((false, true)) => Editor::new(&editor)
-                .line_height(relative(bench_ui::CODE_LEAD))
-                .appearance(false)
-                .h_full()
-                .into_any_element(),
+            Some((true, _)) | None => DiffBody::Note("Reading…"),
+            Some((false, false)) => DiffBody::Note("Not in a repository, or not committed yet"),
+            Some((false, true)) => DiffBody::Diff(editor),
         };
-        v_flex()
-            .size_full()
-            .child(head)
-            .child(div().flex_1().min_h_0().child(body))
-            .into_any_element()
+        diff_pane("diff-open", format!("{} · changes since HEAD", f.name()), f, body, cx)
     }
 
     /// A file's diff against HEAD in a tab of its own.

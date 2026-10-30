@@ -4,15 +4,14 @@
 //! same diff inline under the turn (`thread/rows/changed_files.rs`); this is its "Open in Code".
 
 use bench_ui::icons::Ico;
-use gpui_kit::component::input::Editor;
-use gpui_kit::component::{ActiveTheme as _, v_flex};
+use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
 use crate::client::rest;
 use crate::explorer::pane::doc::Turn;
 use crate::explorer::pane::item::Item;
-use crate::explorer::pane::view::note;
+use super::git::{DiffBody, diff_editor, diff_pane};
 use crate::explorer::{Doc, DocKey, FileRef};
 
 pub struct TurnDiffItem {
@@ -42,12 +41,7 @@ impl Item for TurnDiffItem {
         if app.explorer.docs.contains_key(&key) {
             return true;
         }
-        let editor = crate::env::editor("text", window, cx);
-        editor.update(cx, |s, cx| {
-            s.set_disabled(true, cx);
-            s.set_line_number(false, window, cx);
-        });
-        app.explorer.docs.insert(key.clone(), Doc::new(editor));
+        app.explorer.docs.insert(key.clone(), Doc::new(diff_editor(window, cx)));
         let Some((conn, _)) = app.env_target(&self.file.project) else {
             return true;
         };
@@ -73,35 +67,14 @@ impl Item for TurnDiffItem {
         let Some(d) = app.explorer.docs.get(&self.key()) else {
             return div().into_any_element();
         };
-        let (loading, editor) = (d.loading, d.editor.clone());
-        let file = self.file.clone();
-        let actions = vec![
-            bench_ui::form_action("turn-diff-open", "Open the file", false, cx)
-                .on_click(cx.listener(move |this, _, window, cx| {
-                    this.open_doc(DocKey::File(file.clone()), window, cx)
-                }))
-                .into_any_element(),
-        ];
-        let head = bench_ui::ide_head(
+        let body = if d.loading { DiffBody::Note("Reading…") } else { DiffBody::Diff(d.editor.clone()) };
+        diff_pane(
+            "turn-diff-open",
             format!("{} · changed in this turn", self.file.name()),
-            Some(self.file.path.clone().into()),
-            actions,
+            &self.file,
+            body,
             cx,
-        );
-        let body = if loading {
-            note("Reading…", cx)
-        } else {
-            Editor::new(&editor)
-                .line_height(relative(bench_ui::CODE_LEAD))
-                .appearance(false)
-                .h_full()
-                .into_any_element()
-        };
-        v_flex()
-            .size_full()
-            .child(head)
-            .child(div().flex_1().min_h_0().child(body))
-            .into_any_element()
+        )
     }
 }
 
