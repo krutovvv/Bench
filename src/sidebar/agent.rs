@@ -267,12 +267,24 @@ impl BenchApp {
                                                     .child("Nothing logged"),
                                             )
                                         })
-                                        .children(log.iter().map(|l| {
+                                        .children(log.iter().enumerate().map(|(i, l)| {
+                                            // One line each, cut with an ellipsis: a log row
+                                            // never grows the panel; the whole line is under the
+                                            // pointer on hover.
+                                            let tip: SharedString = l.clone().into();
                                             div()
+                                                .id(format!("agent-log-{i}"))
+                                                .w_full()
                                                 .text_size(px(bench_ui::SIDEBAR_HEAD_TEXT))
                                                 .text_color(muted)
-                                                .whitespace_normal()
+                                                .truncate()
                                                 .child(l.clone())
+                                                .tooltip(move |window, cx| {
+                                                    gpui_kit::component::tooltip::Tooltip::new(
+                                                        tip.clone(),
+                                                    )
+                                                    .build(window, cx)
+                                                })
                                         })),
                                 )
                                 .child(

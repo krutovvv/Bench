@@ -59,6 +59,24 @@ pub fn drop_hint(group: usize) -> Option<bench_ui::DropEdge> {
     })
 }
 
+/// `BENCH_DEMO_POP=agent`: the agent popover opens from the start, and with it lines long enough
+/// that the panel must cut them (`sidebar/agent.rs`). Pictures only.
+pub fn agent_log() -> Vec<String> {
+    if std::env::var("BENCH_DEMO_POP").as_deref() != Ok("agent") {
+        return vec![];
+    }
+    [
+        "[mcp] default/rust_lsp:6 default/playwright:25",
+        "[mcp] project:c15b4fa96b5b/yandex-metrika: connect timed out after 30000 ms, retrying in 5s (attempt 3 of 5)",
+        "[model] project_6ca7d18dde42.dev/Qwen3.8-Next-Flash failed (503: {\"code\":\"model_busy\",\"message\":\"Too many concurrent requests for Qwen3.8-Next-Flash; retry shortly\"}); answering with project_6ca7d18dde42.openrouter/qwen/qwen3.8-flash",
+        "[cron] project_dd3776fe5719: ran \"Morning brief\" in 42s",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect()
+}
+
+
 /// What the demo keeps in the window: its threads by id (opening one shows its turns; nothing is
 /// fetched), and whether `BENCH_DEMO=new-project` was opened (once, `workspace/layout.rs`).
 #[derive(Default)]
@@ -85,6 +103,7 @@ fn open_thread(app: &mut BenchApp, cx: &mut App, f: impl FnOnce(&mut crate::thre
 pub fn load(app: &mut BenchApp, cx: &mut Context<BenchApp>) {
     let now = crate::app::now_secs();
     app.demo = true;
+    app.sidebar.agent_log = crate::demo::agent_log();
     app.defaults.ready = true;
     app.defaults.context_length = 131_072;
     app.defaults.approval_mode = Some("smart".into());
