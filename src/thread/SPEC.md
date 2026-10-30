@@ -21,7 +21,7 @@ deletes threads (`open.rs`).
   module draws a `Row` and never reorders, merges or hides rows itself.
 - **The thread is its own entity**, `ThreadView` (as Zed's `AcpThreadView`): its state
   (`ActiveThread`), its composer, its run, its queue, its events. The center shows one; the right
-  dock a second beside it ("Open beside", `beside.rs`), fully independent.
+  dock a second beside it (`beside.rs`, kept in code, not offered), fully independent.
 - **Two rules keep the view and the app from being borrowed twice.** What a view asks of the
   app names the thread with a `ThreadRef` and never reads a view (the view asking may be drawing
   at that moment). What the app asks of a view never reads the app; when a view's click needs
@@ -52,6 +52,12 @@ deletes threads (`open.rs`).
   no avatars, the composer pinned under the list) or `Document` (avatars in a gutter, the
   composer as the last row, an editor's room past the end). Switching is one line; nothing else
   branches on it.
+- **A click on the thread itself gives the composer the focus; what handles a click stops it first.**
+  `ThreadView::press` holds the press from mouse down to an unmoved mouse up, and acts only when the
+  focus did not move. A fold, a button or an insert's terminal stops its own propagation
+  (`bench_ui::own_press`), so it never gets here.
+- **The composer sends on Enter** (Shift+Enter or ⌘Enter a new line) and grows to
+  `COMPOSER_MAX_LINES`, then scrolls inside.
 - Each kind of row is a file in `rows/`; the composer's parts are files in `composer/`. A new kind
   of agent message is a new row file (the `BlockKind` extension point, with an unknown kind drawn
   as text, is the intent of `architecture` §6, not yet cut out — unconfirmed how unknown kinds

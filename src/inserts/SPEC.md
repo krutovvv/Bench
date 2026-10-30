@@ -37,8 +37,8 @@ The agent keeps inserts in Pi's terms (`thread-objects`, `agent-runtime`): an en
 `bench.insert {id, key}` written where it was put — a write the model does not see and that is
 never queued, so it lands at once even mid-run — and its live state in the conversation's
 document `bench.inserts` (`{items:{id:{key,state,folded,removed,after?}}}`), changed in commits.
-Bench changes inserts only through the agent (`session.insert`, `session.insert.patch`) and
-reads them back from the thread. A removed insert keeps its entry and is marked removed.
+Bench changes inserts only through the agent (`thread.insert`, `thread.insert.patch`,
+`crates/protocol/src/rpc.rs`) and reads them back from the thread (`ThreadEvent::Inserts`). A removed insert keeps its entry and is marked removed.
 
 ## Invariants
 
@@ -47,6 +47,8 @@ reads them back from the thread. A removed insert keeps its entry and is marked 
 - A thread never switches mode or is renamed because of an insert.
 - A kind that can be live only once (the utilities) shows "click to show it here" on its older
   inserts.
+- A kind says how its body sits in the block (`inset`: `Padded`, `Rows`, `Flush`): the block adds
+  its padding or not, and no body cancels it with negative margins.
 - A kind says its own `/` word and choices (`word`, `choices`): adding a kind touches its folder,
   a line in `KINDS`, its state in `InsertsState`, and a line in the agent's `inserted()` — nothing
   else.

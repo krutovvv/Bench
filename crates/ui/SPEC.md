@@ -20,10 +20,20 @@ them, so a change to how a kind of thing looks is made here once and lands every
   protocol.
 - Every element is stateless: data and handlers in, an element out. State lives with the
   feature that uses the element.
-- **The only place with pixel values.** A size or a gap is a named constant in `metrics.rs`
-  (grouped by window area) or a `Gap` step; screens refer to those names. A piece a screen needs
+- **The only place with pixel values and spacing.** A size is a named constant in `metrics.rs`
+  (grouped by window area); a gap or an inset a `Gap` step, in rems (`.gap(Gap::M)`, `.px(Gap::L)`).
+  Screens refer to those names and write no bare Tailwind spacing. A piece a screen needs
   and this crate lacks is added here first, then used. Behaviour thresholds (a click's slop) are
   named constants beside the code that uses them, not here.
+
+## Decisions
+
+- **One element per pattern**: a family of similar things has one scaffold, and its users bring their
+  content: `code_frame` (an answer's code, a step card's), `settings_card` (a provider, an evaluator
+  server), `chip`, `fold_more` and its `fold_foot`, `fold_row`, `popover_section`, `segmented`.
+- **What handles a click stops its propagation**: every clickable element here says so (`own_press`),
+  so a press on it never reaches what is under it (a row, the thread, which would give the composer
+  the focus).
 
 ## The look
 
@@ -45,6 +55,6 @@ and the summary in `AGENTS.md` ("The look, in short"); they are not repeated her
 
 ## Known limitations
 
-- Whether a screen writes a raw pixel number is not checked mechanically: `px(…)` in `src/`
-  wraps named constants by convention, and a review catches the rest (unconfirmed: no test or
-  lint enforcing it was found).
+- Whether a screen writes a raw pixel number or a bare spacing is not checked mechanically: a review
+  catches it. Whether a change moved a pixel is: every demo state against a reference
+  (`.agents/skills/bench-kit/scripts/pixels/`), run by hand.

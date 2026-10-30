@@ -31,6 +31,10 @@ not quiet after a failure. Off, everything
 goes the classic way. A script's calls of the classifier are not steps the points weigh or results
 they read.
 
+**It is near free and fast** (about 160 ms on a local server): it is called at any potential benefit,
+avoiding only a duplicate question. **It stays optional**: the agent works the classic way without it,
+and both ways are tested.
+
 ## Points and moments
 
 Every place the evaluator is asked at is a `Point` (`point.ts`): the moment of a turn it may ask

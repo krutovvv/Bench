@@ -13,7 +13,8 @@ references: [agent, projects-and-agents]
 Everything Bench needs to reach an agent, as Zed's `client` crate: where the agent runs and how
 to reach it (`connection.rs`), installing it and bringing it up as its machine's service, the same on this Mac and over SSH
 (`launch.rs`, `service.rs`),
-its typed JSON-RPC session (`rpc/`), its REST API (`rest/`), and `bench --probe`.
+its typed JSON-RPC session (`rpc/`), its REST API (`rest/`), `bench --probe`, and the seam a fake
+agent plugs into (`fake.rs`).
 
 ## Contracts
 
@@ -28,6 +29,11 @@ its typed JSON-RPC session (`rpc/`), its REST API (`rest/`), and `bench --probe`
   port and token are remembered so the next launch reattaches.
 
 ## Decisions
+
+- **A fake agent behind one seam**, as Zed's `FakeFs` (`fake.rs`, `FakeAgent`, installed once at start
+  by `use_fake`): `Client`, `Connection` and the few readers of the machine (git, `~/.ssh/config`, a
+  terminal's program, the browser's gateway) ask it first; nothing else in Bench knows it is there. The
+  demo is its one implementation (`src/demo/agent.rs`).
 
 - **The agent is its machine's service, one mechanism everywhere**: launchd on macOS, systemd
   (user, lingering) on Linux. Bench never starts it as its own child: closing Bench stops no agent

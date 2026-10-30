@@ -30,3 +30,11 @@ panel and item is drawn by its own module (`sidebar`, `explorer`, `thread`, `env
   second thread beside a thread.
 - The center's tabs are the center's own bar under the title bar (tabs in the title bar dragged
   the window).
+- **The gear belongs to the chat.** Opened from the Code view it closes the Explorer first
+  (`leave_code_for_gear`), so closing it leaves the chat whole, not the Explorer beside a thread.
+- **A file carried in from the machine has one place**: a layer over every panel (`file_layer`,
+  `layout.rs`), invisible and answering only to files, so one wash reaches the whole window and its
+  drop is the window's only one. The files go to the thread the person works in, whatever the
+  layer lay over (`BenchApp::drop_paths`).
+- `render` only draws. What follows the place shown (the nav history, the browser's stream) is
+  `follow_shown` (`app/subscriptions.rs`).

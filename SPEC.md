@@ -42,7 +42,11 @@ the product, equal in weight:
 
 - Threads on Pi Durable: every step durable, a turn survives a restart of the agent or of
   Bench; a queue of messages while the agent works ("send now" steers); pause; fork from an
-  answer; the agent's plan, questions and approvals as cards; background processes; subagents.
+  answer; the agent's plan, questions and approvals as cards; background processes.
+- Code mode in every thread: one step runs a script that calls the thread's tools and MCP servers
+  and returns only what it prints.
+- An evaluator, a small fast model that steers a turn at fixed points, optional per project; a
+  step limit per project.
 - Inserts put with `/`: `/terminal` on the thread's machine, `/browser` (a thread's own tab in
   a server browser), the `/tools` utilities. Each is live, tells the agent what it shows with
   every message, has an agent tool, and is restored exactly.
@@ -50,7 +54,7 @@ the product, equal in weight:
   Bench), or this Mac's agent working on a server over SSH with nothing installed there; a
   project optionally kept in its folder.
 - A project's environment: soul, MCP servers (with OAuth), language servers, skills, prompts,
-  compaction, approvals, its Telegram bot, a schedule; exported to and imported from
+  compaction, approvals, the evaluator's use, a step limit, its Telegram bot, a schedule; exported to and imported from
   one file.
 - The Explorer: the project's tree, documents in tabs, the thread beside, ⌘P / ⌘⇧F, language
   servers' problems, hover and definition, git changes against HEAD, a terminal in the bottom

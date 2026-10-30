@@ -20,7 +20,7 @@ the list of servers' agents.
 
 - **Pi Durable does the work, unmodified and in Pi's terms**: a thread is a Pi conversation in
   `~/.bench/pi.sqlite`, every step durable. How each Bench concept maps onto Pi — inserts,
-  queue, plan, pause, code mode, fork, compaction, processes, subagents, MCP, Telegram — is the
+  queue, plan, pause, code mode, fork, compaction, processes, MCP, Telegram — is the
   table "How the agent uses Pi Durable" in `AGENTS.md`; it is not repeated in the specs. What Pi
   lacks is worked around here and said so in a comment (the pause, the fallback model, background
   processes); Pi is never patched.
@@ -42,16 +42,17 @@ the list of servers' agents.
 - `turn/` — the hooks' own state of a turn, kept per conversation: the step limit, the window's
   fitting, the prompt held until a compaction, the compaction's summary (`agent-turn`).
 - `machine/` — where the tools work (`agent-machine`).
-- `judge/` — the evaluator, a System One model asked at a turn's searches, on its way and at
-  its end; the step limit beside it (`agent-judge`).
+- `judge/` — the evaluator, Pi's classifier model `bench/evaluator`, asked at a turn's searches, on
+  its way and at its end (`agent-judge`).
 - `extensions.ts`, `extensions/assistant.ts` — Pi extensions: the default "assistant" (tools,
   prompt sections, hooks), the MCP servers' tools, and the person's own per agent, reloaded
-  without a restart.
+  without a restart. A thread's list always has Pi's code mode, and tool search where some tools
+  are `deferred` (`forAgent`).
 - `prompt.ts` — the system prompt as Pi sections (soul, environment, inserts, project, skills,
-  notes), each resent only when it changed so the provider's prompt cache stays warm, and short on
-  purpose: a local model pays for every line.
-- `mcp/`, `lsp/`, `telegram.ts` — MCP servers (pi-mcp, OAuth), a project's language servers,
-  the Telegram bots (grammY). MCP command servers and language servers of a project on a server
+  notes), all but inserts held as first read until the next compaction (`turn/frozen.ts`) so the
+  model server's cache stays warm, and short on purpose: a local model pays for every line.
+- `mcp/`, `lsp/`, `telegram.ts` — MCP servers (pi-mcp, OAuth, `agent-mcp`), a project's language
+  servers, the Telegram bots (grammY). MCP command servers and language servers of a project on a server
   run there, over the same SSH connection.
 
 Edges: `modules` → `runtime` → `extensions.ts` → `builtin`; the runtime also uses a few of
