@@ -20,6 +20,10 @@ pub struct View {
     pub(super) owner: Option<String>,
     /// A thread just opened whose rows have not come yet: it lands at its end once they do.
     land: bool,
+    /// It has just landed: the view holds it there while its rows find their heights.
+    pub(super) landed: bool,
+    /// What holds it at its end (`ThreadView::hold_landing`); ends by itself or with the view.
+    pub(super) landing: Option<Task<()>>,
     /// While a run is live, a timer repaints once a second (its clock).
     pub(super) ticker: Option<Task<()>>,
     /// The person sent a message: once the rows have changed and are laid out, the composer is
@@ -52,6 +56,8 @@ impl Default for View {
             version: u64::MAX,
             owner: None,
             land: false,
+            landed: false,
+            landing: None,
             ticker: None,
             reveal: Reveal::Off,
             room: px(0.),
@@ -168,6 +174,14 @@ impl View {
         if self.land && !self.rows.is_empty() {
             self.land = false;
             self.to_end();
+            self.list.set_follow_mode(FollowMode::Tail);
+            self.landed = true;
         }
+    }
+
+    /// The opened thread has landed: the list keeps to no end but the person's scrolling.
+    pub(crate) fn stop_landing(&mut self) {
+        self.landing = None;
+        self.list.set_follow_mode(FollowMode::Normal);
     }
 }

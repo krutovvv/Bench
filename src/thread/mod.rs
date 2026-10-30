@@ -44,7 +44,36 @@ const ROOM_EPSILON: f32 = 0.5;
 /// A press and its release closer than this are a click, not a drag (no text is selected).
 const CLICK_SLOP: f32 = 4.;
 
+/// How often the opening thread's height is looked at, how many looks it must hold still, and how
+/// many looks it gets at most.
+const LANDING_LOOK: Duration = Duration::from_millis(250);
+const LANDING_STILL: u32 = 4;
+const LANDING_LOOKS: u32 = 40;
+
 impl ThreadView {
+    /// A thread just opened stays at its end while its rows find their heights: a long answer is
+    /// parsed in the background, a picture fetched, and each grows after the first frame. The list
+    /// follows its tail (the wheel takes it back at once, `FollowMode::Tail`) until the thread's
+    /// height holds still; from then on nothing moves it but the person.
+    fn hold_landing(&mut self, cx: &mut Context<Self>) {
+        self.thread.tv.landing = Some(cx.spawn(async move |this, cx| {
+            let (mut height, mut still) = (None, 0);
+            for _ in 0..LANDING_LOOKS {
+                cx.background_executor().timer(LANDING_LOOK).await;
+                let now = this.update(cx, |v, _| v.thread.tv.list.max_offset_for_scrollbar().y);
+                let Ok(now) = now else {
+                    return;
+                };
+                still = if height == Some(now) { still + 1 } else { 0 };
+                height = Some(now);
+                if still >= LANDING_STILL {
+                    break;
+                }
+            }
+            let _ = this.update(cx, |v, _| v.thread.tv.stop_landing());
+        }));
+    }
+
     /// The rows of the thread into the list, if the thread changed since the last frame.
     fn sync_rows(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.thread.tv.reveal_after_send();
@@ -57,6 +86,9 @@ impl ThreadView {
             let follow = std::mem::take(&mut self.follow);
             let changed = self.thread.tv.sync(owner.as_deref(), rows, follow);
             self.parse_ahead(changed, cx);
+            if std::mem::take(&mut self.thread.tv.landed) {
+                self.hold_landing(cx);
+            }
             // The tail's new height is known only after this frame's layout: look again then.
             window.request_animation_frame();
         }

@@ -381,6 +381,7 @@ async fn script(hooks: &'static DemoHooks, this: WeakEntity<BenchApp>, cx: &mut 
     until(&this, cx, |_, cx| !view.read(cx).thread.tv.rows.is_empty() || hooks.opens().is_none()).await?;
     view.update(cx, |v, cx| {
         if let Some((i, o)) = scroll_to(hooks, v) {
+            v.thread.tv.stop_landing();
             v.thread.tv.list.scroll_to(ListOffset {
                 item_ix: i,
                 offset_in_item: px(o),
