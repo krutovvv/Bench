@@ -37,6 +37,11 @@ and the summary in `AGENTS.md` ("The look, in short"); they are not repeated her
   tests check the JSON against the palette. Light or dark follows the person's Mode; there is no
   theme or accent to choose.
 - A thread's or a project's mark is a Finder tag dot (`mark.rs`).
+- **A thing put down among other things lands beside one, never on it**: `DropEdge`, `drop_edge`
+  (which half of a block a point is in) and `drop_line` (the accent hairline over the block, half
+  of it past its edge). It is drawn over the block, not in its flow, so the list around it never
+  moves while something is held in the air. Any list that takes a reorder uses these, not its own
+  arithmetic; `src/sidebar/order.rs` is the one that does today.
 
 ## Known limitations
 

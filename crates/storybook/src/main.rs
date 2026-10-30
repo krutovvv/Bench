@@ -44,6 +44,18 @@ impl Story {
     }
 }
 
+/// A sidebar row with the drop line at one edge: what a group looks like while a row is held in
+/// the air over it. The line is drawn over the row, so nothing around it shifts.
+fn drop_row(id: &'static str, name: &'static str, edge: DropEdge, cx: &App) -> impl IntoElement {
+    let line = drop_line(edge, cx)
+        .left(px(SIDEBAR_ROW_INSET))
+        .right(px(SIDEBAR_ROW_INSET));
+    v_flex()
+        .relative()
+        .child(line)
+        .child(list_row(id, name, None, false, Some(false), None, cx))
+}
+
 /// A section of the page: its name, then what it shows.
 fn section(name: &'static str, body: impl IntoElement, cx: &App) -> Div {
     stack(Gap::M)
@@ -328,6 +340,16 @@ impl Render for Story {
                 "A choice of the agent's question — as wide as the card, its text wrapped.",
             ));
 
+        // A row held in the air over another lands at the edge of it the pointer is nearest: the
+        // line is over the block, so nothing around it moves.
+        let dropping = v_flex()
+            .w(px(280.))
+            .bg(theme.sidebar)
+            .rounded_md()
+            .py_2()
+            .child(drop_row("r4", "Northwind blog", DropEdge::Below, cx))
+            .child(drop_row("r5", "Bench", DropEdge::Above, cx));
+
         let files = row(Gap::L).children(
             [
                 "main.rs",
@@ -418,7 +440,8 @@ impl Render for Story {
                                     .flex_1()
                                     .child(section("Forms", forms, cx))
                                     .child(section("Lists", lists, cx))
-                                            .child(section("File icons", files, cx))
+                                    .child(section("Held in the air", dropping, cx))
+                                    .child(section("File icons", files, cx))
                                     .child(section("Bars", bars, cx))
                                     .child(section("Icons", icons, cx)),
                             ),

@@ -26,6 +26,12 @@ pub struct SidebarState {
     pub collapsed: HashSet<String>,
     /// Pins and colours of threads and projects (this Mac).
     pub marks: HashMap<String, Mark>,
+    /// The projects in the order the person put them by dragging (`order.rs`); those not in it
+    /// yet keep the place their source gave, after these.
+    pub order: Vec<String>,
+    /// The group the project in the air was last over, and at which edge of it: the line says so,
+    /// and only while GPUI says a drag is live, so this never outlives one.
+    pub drop: Option<(String, bench_ui::DropEdge)>,
     /// A thread or project being renamed in place.
     pub renaming: Option<Renaming>,
     /// The panel's keys (↑ ↓ ⌫) while it has the focus, after a click on a thread.
@@ -47,6 +53,8 @@ impl SidebarState {
                 .and_then(|b| serde_json::from_slice(&b).ok())
                 .unwrap_or_default(),
             marks: super::marks::load(),
+            order: super::order::load(),
+            drop: None,
             renaming: None,
             focus: cx.focus_handle(),
             agent_log: vec![],

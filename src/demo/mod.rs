@@ -43,6 +43,22 @@ impl BenchApp {
     }
 }
 
+
+/// `BENCH_DEMO_DROPLINE=<group>:<above|below>` draws the drop line over a project's group, the way
+/// it looks while another project is held in the air over it (`sidebar/order.rs`). Pictures only.
+pub fn drop_hint(group: usize) -> Option<bench_ui::DropEdge> {
+    let spec = std::env::var("BENCH_DEMO_DROPLINE").ok()?;
+    let (g, edge) = spec.split_once(':')?;
+    if g.parse::<usize>().ok()? != group {
+        return None;
+    }
+    Some(if edge == "above" {
+        bench_ui::DropEdge::Above
+    } else {
+        bench_ui::DropEdge::Below
+    })
+}
+
 /// What the demo keeps in the window: its threads by id (opening one shows its turns; nothing is
 /// fetched), and whether `BENCH_DEMO=new-project` was opened (once, `workspace/layout.rs`).
 #[derive(Default)]

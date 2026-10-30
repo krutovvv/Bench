@@ -52,7 +52,14 @@ impl BenchApp {
         loose.sort_by_key(|&i| !self.mark_of(self.threads.list[i].id.as_str()).pinned);
         let loose = self.nest_forks(loose);
         let mut projects = self.places.projects.clone();
-        projects.sort_by_key(|p| !self.mark_of(&format!("p:{}", p.id)).pinned);
+        // The order the person put them in by dragging (`order.rs`); those never arranged keep
+        // their source's order, after them, pinned ones first (`marks.rs`).
+        projects.sort_by_key(|p| {
+            (
+                self.project_rank(&p.id),
+                !self.mark_of(&format!("p:{}", p.id)).pinned,
+            )
+        });
         let groups = projects
             .into_iter()
             .map(|p| {

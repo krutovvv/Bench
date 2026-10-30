@@ -7,6 +7,7 @@ mod search;
 pub(crate) mod state;
 pub(crate) mod items;
 pub(crate) mod marks;
+pub(crate) mod order;
 mod menu;
 mod project_list;
 mod project_row;
@@ -18,6 +19,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::app::BenchApp;
+use crate::sidebar::order::{DraggedProject, ProjectPlace};
 use bench_ui::icons::Ico;
 
 impl BenchApp {
@@ -34,9 +36,9 @@ impl BenchApp {
         // machine's own project, with the threads of no project, Telegram's and cron's; then
         // the projects, pinned ones first (`items.rs` — ↑ ↓ walk the same order).
         let (loose, groups) = self.sidebar_groups();
-        list.extend(self.render_host(loose, cx));
+        list.push(self.render_host(loose, cx));
         for (g, (p, rows)) in groups.into_iter().enumerate() {
-            list.extend(self.render_project(g + 1, &p, rows, cx));
+            list.push(self.render_project(g + 1, &p, rows, cx));
         }
 
         v_flex()
@@ -50,6 +52,11 @@ impl BenchApp {
                     .track_focus(&self.sidebar.focus)
                     .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
                         this.sidebar_key(&ev.keystroke, window, cx)
+                    }))
+                    // A project dropped past the last group — in the room under them — goes to the
+                    // end of the list; the groups above take theirs and stop the drop here.
+                    .on_drop(cx.listener(|this, d: &DraggedProject, _, cx| {
+                        this.drop_project(&d.id, ProjectPlace::Last, cx);
                     }))
                     .flex_1()
                     .min_h_0()

@@ -7,11 +7,12 @@
 use gpui_kit::component::input::Input;
 use gpui_kit::component::menu::{ContextMenuExt as _, DropdownMenu as _};
 use gpui_kit::component::tooltip::Tooltip;
-use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex};
+use gpui_kit::component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::menu::item_menu;
+use super::order::DraggedProject;
 use crate::app::BenchApp;
 use crate::sidebar::items::Item;
 use bench_ui::icons::Ico;
@@ -38,7 +39,7 @@ impl BenchApp {
     /// Host: the machine's own agent and environment, for looking after the machine itself and
     /// the threads of no project; first in the sidebar, folded until opened (the key marks it
     /// open). A group as every project's.
-    pub(super) fn render_host(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> Vec<AnyElement> {
+    pub(super) fn render_host(&mut self, rows: Vec<usize>, cx: &mut Context<Self>) -> AnyElement {
         let fold_key = "open:loose".to_string();
         let head = GroupHead {
             g: 0,
@@ -61,7 +62,7 @@ impl BenchApp {
         p: &crate::app::model::ProjectEntry,
         rows: Vec<usize>,
         cx: &mut Context<Self>,
-    ) -> Vec<AnyElement> {
+    ) -> AnyElement {
         let fold_key = format!("p:{}", p.id);
         // A remote project's agent: connecting, or why it is not there.
         let note = Some(&p.agent)
@@ -89,38 +90,69 @@ impl BenchApp {
         self.render_group(head, note, rows, cx)
     }
 
-    /// A group: its head, then (unless folded) a note on its agent and its threads.
+    /// A group: its head, then (unless folded) a note on its agent and its threads. The whole
+    /// group is the place a dragged project lands against — above it or below it, never between
+    /// a head and its threads, which are one project — so the line says so over the group, and
+    /// the group is `relative` to hold that line where it belongs.
     fn render_group(
         &mut self,
         head: GroupHead,
         note: Option<String>,
         rows: Vec<usize>,
         cx: &mut Context<Self>,
-    ) -> Vec<AnyElement> {
+    ) -> AnyElement {
         let muted = cx.theme().muted_foreground;
         let collapsed = head.collapsed;
-        let mut out = vec![self.render_group_head(head, cx)];
-        if collapsed {
-            return out;
+        let g = head.g;
+        let id = head.id.clone();
+        // The Host is always first: nothing lands above it, and it never goes in the air.
+        let host = g == 0;
+        // The line over a group says where the project in the air will land, and it shows only
+        // while GPUI says a drag is live: a target left from a drag let go elsewhere cannot keep a
+        // line on screen.
+        let edge = cx
+            .has_active_drag()
+            .then(|| self.drop_edge_over(&id))
+            .flatten()
+            .or_else(|| crate::demo::drop_hint(g));
+        let mut parts: Vec<AnyElement> = vec![self.render_group_head(head, cx)];
+        if !collapsed {
+            if let Some(note) = note {
+                parts.push(
+                    div()
+                        .pl(px(bench_ui::SIDEBAR_TEXT_X))
+                        .pr_4()
+                        .py_1()
+                        // The note belongs to the head: the heading's own size.
+                        .text_xs()
+                        .text_color(muted)
+                        .truncate()
+                        .child(note)
+                        .into_any_element(),
+                );
+            }
+            for i in rows {
+                parts.push(self.render_thread_row(i, cx).into_any_element());
+            }
         }
-        if let Some(note) = note {
-            out.push(
-                div()
-                    .pl(px(bench_ui::SIDEBAR_TEXT_X))
-                    .pr_4()
-                    .py_1()
-                    // The note belongs to the head: the heading's own size.
-                    .text_xs()
-                    .text_color(muted)
-                    .truncate()
-                    .child(note)
-                    .into_any_element(),
-            );
+        let onto = id;
+        let zone = v_flex()
+            .id(("pgroup", g))
+            .relative()
+            .children(parts)
+            .when_some(edge, |d, edge| {
+                d.child(
+                    bench_ui::drop_line(edge, cx)
+                        .left(px(bench_ui::SIDEBAR_ROW_INSET))
+                        .right(px(bench_ui::SIDEBAR_ROW_INSET)),
+                )
+            });
+        // The Host is always first, so it is no place for a project to land against; every other
+        // group is, and says so by taking the project in the air (`order.rs`).
+        if host {
+            return zone.into_any_element();
         }
-        for i in rows {
-            out.push(self.render_thread_row(i, cx).into_any_element());
-        }
-        out
+        self.drop_zone(zone, onto, cx).into_any_element()
     }
 
     /// A group's head: the name, its tag dot and Telegram mark, then on hover "⋯" (its menu,
@@ -137,10 +169,22 @@ impl BenchApp {
         let armed = self.armed.is(&format!("p:{id}"));
         let renaming = self.renaming_field(&Item::Project(id.clone()));
         let tag = color.filter(|_| renaming.is_none());
+        // A project's head goes in the air: its group comes down where the person leaves it, so
+        // the two they work in together stand under each other (`order.rs`). The Host is always
+        // first, so it never lifts.
+        let drag = (g != 0).then(|| DraggedProject {
+            id: id.clone(),
+            name: name.clone(),
+            color,
+        });
         h_flex()
             .id(("phead", g))
             .group(group.clone())
             .cursor_pointer()
+            .when_some(drag, |d, drag| {
+                d.cursor(CursorStyle::OpenHand)
+                    .on_drag(drag, |d, _, _, cx| cx.new(|_| d.clone()))
+            })
             .pl(px(bench_ui::SIDEBAR_TEXT_X))
             .pr(px(bench_ui::SIDEBAR_ROW_INSET))
             .pt(if g == 0 {

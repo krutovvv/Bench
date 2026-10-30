@@ -61,6 +61,44 @@ pub fn group_chevron(collapsed: bool, group: SharedString, cx: &App) -> impl Int
         )
 }
 
+/// Where a row held in the air over another lands: above it or below it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DropEdge {
+    Above,
+    Below,
+}
+
+/// Which half of a block a point falls in: where a row held in the air lands against it — above
+/// if the pointer is in its upper half, below if in its lower. `on_drag_move` hands over its own
+/// bounds, so any list computes the edge the same way through this.
+pub fn drop_edge(y: Pixels, bounds: &Bounds<Pixels>) -> DropEdge {
+    if y < bounds.center().y {
+        DropEdge::Above
+    } else {
+        DropEdge::Below
+    }
+}
+
+/// The line that says where a row held in the air will land: `DROP_LINE` of the accent, at the
+/// edge of the block it is over the pointer is nearest. It is drawn over the block, not in its
+/// flow, so nothing in the list shifts while a row is being dragged; the block is `relative`, and
+/// the caller says how far in the line starts (`left`, `right`) — its rows' own inset.
+pub fn drop_line(edge: DropEdge, cx: &App) -> Div {
+    div()
+        .absolute()
+        .h(px(crate::metrics::DROP_LINE))
+        .rounded_full()
+        .bg(cx.theme().primary)
+        // Half of it past the block's edge: it reads as being between two blocks, not as a part
+        // of either.
+        .when(edge == DropEdge::Above, |d| {
+            d.top(px(-crate::metrics::DROP_LINE / 2.))
+        })
+        .when(edge == DropEdge::Below, |d| {
+            d.bottom(px(-crate::metrics::DROP_LINE / 2.))
+        })
+}
+
 /// A fork's corner before its title in the sidebar (└, as Claude nests a session's children): a
 /// hairline down and across in the faint ink, where the parent's title starts.
 pub fn nest_corner(cx: &App) -> Div {
@@ -395,7 +433,9 @@ fn file_kind(lower: &str, dir: bool) -> (Ico, Tone) {
 
 #[cfg(test)]
 mod tests {
-    use super::{Tone, file_kind};
+    use gpui_kit::{Bounds, Point, Size, px};
+
+    use super::{DropEdge, Tone, drop_edge, file_kind};
     use crate::icons::Ico;
 
     /// `file_kind` reads a name already lowered, as `file_icon` hands it over.
@@ -446,6 +486,23 @@ mod tests {
         assert_eq!(kind(".agents", true), (Ico::Folder, Tone::Muted));
         // A folder of one's own is plain.
         assert_eq!(kind("content", true), (Ico::Folder, Tone::Blue));
+    }
+
+    #[test]
+    fn a_point_says_which_half_of_a_block_it_is_in() {
+        let block = Bounds::new(
+            Point::new(px(0.), px(100.)),
+            Size {
+                width: px(200.),
+                height: px(40.),
+            },
+        );
+        assert_eq!(drop_edge(px(101.), &block), DropEdge::Above);
+        assert_eq!(drop_edge(px(119.), &block), DropEdge::Above);
+        // The middle line itself belongs below: a pointer that has reached it has passed the
+        // block's middle.
+        assert_eq!(drop_edge(px(120.), &block), DropEdge::Below);
+        assert_eq!(drop_edge(px(139.), &block), DropEdge::Below);
     }
 }
 

@@ -234,6 +234,9 @@ pub const STATUS_H: f32 = 29.;
 pub const SIDEBAR_FOOT_H: f32 = 40.;
 /// A mark's dot beside a name (Finder's tag).
 pub const TAG_DOT: f32 = 8.;
+
+/// Where a row dragged in the sidebar will land: the line that says it (`drop_line`).
+pub const DROP_LINE: f32 = 2.;
 /// A group head's marks (a Telegram bot, a schedule): a step under the head's controls (12), so
 /// they inform without asking to be clicked.
 pub const HEAD_MARK_ICON: f32 = 10.;
