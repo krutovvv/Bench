@@ -129,7 +129,7 @@ pub enum ThreadItem {
         #[serde(default)]
         multi: bool,
     },
-    /// What a turn changed in the repository the thread works in (`agent/src/runtime/turns.ts`):
+    /// What a turn changed in the repository the thread works in (`agent/src/runtime/changes.ts`):
     /// the trees at its start and end, and each file that differs. Written after the turn's answer.
     Changes {
         key: String,

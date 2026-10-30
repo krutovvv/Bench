@@ -1,6 +1,6 @@
 //! What one turn of a thread changed in a file, in a tab of its own (`DocKey::TurnDiff`), read
 //! only: the file as the repository's trees had it at the turn's start and end
-//! (`agent/src/runtime/turns.ts`, `GET /api/git/show`), as a unified diff. The thread shows the
+//! (`agent/src/runtime/changes.ts`, `GET /api/git/show`), as a unified diff. The thread shows the
 //! same diff inline under the turn (`thread/rows/changed_files.rs`); this is its "Open in Code".
 
 use bench_ui::icons::Ico;

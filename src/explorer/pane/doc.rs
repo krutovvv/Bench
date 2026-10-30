@@ -92,7 +92,7 @@ pub enum DocKey {
     Spec(FileRef),
 }
 
-/// A turn's trees in the repository it changed (`agent/src/runtime/turns.ts`).
+/// A turn's trees in the repository it changed (`agent/src/runtime/changes.ts`).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Turn {
     pub root: String,

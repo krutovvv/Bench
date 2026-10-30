@@ -1,5 +1,4 @@
-//! What an answer carries besides text: `MEDIA:<path>` files (the agent's delivery tag, as
-//! Hermes defined it), standalone `![](file)` images, ```mermaid diagrams and
+//! What an answer carries besides text: `MEDIA:<path>` files (the agent's delivery tag), standalone `![](file)` images, ```mermaid diagrams and
 //! LaTeX. Files come through the agent, so a remote (SSH) agent's files show too. Diagrams
 //! and formulas are drawn in plain Rust: a diagram as SVG, a formula as Unicode text.
 

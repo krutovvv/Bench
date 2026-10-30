@@ -1,5 +1,5 @@
 //! Changed files, one quiet folded line with the totals: under each turn's answer what that turn
-//! changed in its repository (`Row::Changes`, from git, `agent/src/runtime/turns.ts`); in a folder
+//! changed in its repository (`Row::Changes`, from git, `agent/src/runtime/changes.ts`); in a folder
 //! that is not a repository, under the last answer, every file the thread's work edited or wrote.
 //! Unfolded, a file per row; a click on a row shows its diff in place, under it — the thread is
 //! where the person works, so the change is read there. "Open in Code" on a row's hover opens

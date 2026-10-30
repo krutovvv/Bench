@@ -180,7 +180,7 @@ pub fn specs(conn: &Connection, machine: Option<&str>, path: &str) -> Result<Val
     get(conn, &format!("/api/specs?path={}{}", enc(path), on(machine)))
 }
 
-/// A file as a git tree has it (a turn's start or end, `agent/src/runtime/turns.ts`): its text,
+/// A file as a git tree has it (a turn's start or end, `agent/src/runtime/changes.ts`): its text,
 /// or None when the tree has no such file.
 pub fn git_show(
     conn: &Connection,

@@ -85,7 +85,7 @@ impl Word {
     }
 }
 
-/// A kind of insert. Its app-wide state (the terminals' shells, the browser, the task list, the
+/// A kind of insert. Its app-wide state (the terminals' shells, the browser, the
 /// tool) is `BenchApp`'s; the thread it sits in is `at` — any thread on screen, the open one or
 /// the one beside it — so every method is told which (`ThreadRef`). Its block is drawn inside that
 /// thread's `ThreadView` (`ThreadView::render_insert`); what the kind draws acts on the app.
@@ -118,7 +118,7 @@ pub trait InsertKind: Sync {
     fn words(&self) -> Vec<SlashCommand> {
         vec![self.word().command("Insert")]
     }
-    /// Kinds whose live state is one for the whole app (the task list, the tool): their
+    /// Kinds whose live state is one for the whole app (the utilities): their
     /// name. Of several such inserts one is live — the last clicked, else the newest in the
     /// thread; the others offer to show it there.
     fn shared(&self) -> Option<&'static str> {

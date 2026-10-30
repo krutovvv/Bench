@@ -114,7 +114,6 @@ impl BenchApp {
                 .and_then(|id| self.threads.list.iter().find(|s| &s.id == id))
                 .map(|s| s.title.clone())
                 .filter(|t| !t.is_empty())
-                // A thread about a task list is named after it until it has a title of its own.
                 .unwrap_or_else(|| "New thread".into())
                 .into();
             // A second thread beside this one: its title after a slash, a quieter one, with its

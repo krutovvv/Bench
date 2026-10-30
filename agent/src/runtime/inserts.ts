@@ -1,5 +1,5 @@
 // A thread is a document: the person's messages, the agent's answers, and the person's inserts —
-// tools put into the conversation with "/" (the terminal, the task lists, the utilities, the
+// tools put into the conversation with "/" (the terminal, the utilities, the
 // browser's tab). Each insert is a piece of the person's side of the thread, in
 // Pi's terms:
 //
