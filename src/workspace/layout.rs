@@ -34,6 +34,25 @@ fn quiet_divider(vertical: bool) -> gpui_kit::base::ResizeHandleRenderer {
     })
 }
 
+/// The window's one place for a file carried in from the machine: a layer over every panel of
+/// it, there at rest and invisible — it answers only to files, so clicks, wheels and hovers
+/// reach the panels under it as if it were not there. While a file is over the window, gpui's
+/// own drag state washes it (and washes nothing for the window's own drags, which carry another
+/// payload), and its drop is the window's only one: whatever the layer lies over, the files go
+/// to the thread the person works in (`BenchApp::drop_paths`). The layer lies over the panels
+/// rather than under them because each carries its own colour, and a parent's background never
+/// shows through a child's — above them is the one place a single wash reaches the whole window.
+fn file_layer(cx: &mut Context<BenchApp>) -> Div {
+    div()
+        .absolute()
+        .inset_0()
+        .drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active))
+        .on_drop(cx.listener(|this, paths: &ExternalPaths, window, cx| {
+            let paths = paths.paths().to_vec();
+            this.drop_paths(paths, window, cx);
+        }))
+}
+
 impl BenchApp {
     /// The demo's hooks on the window (`BENCH_DEMO=new-project`, `BENCH_DEMO_RENAME`,
     /// `BENCH_DEMO_SEARCH`), once.
@@ -102,7 +121,8 @@ impl Render for BenchApp {
         };
 
         // The window's one top bar, edge to edge over the docks: room for the window's buttons,
-        // the sidebar's fold, a short rule, then the center's header (`titlebar/`).
+        // the sidebar's fold, a short rule, then the center's header (`titlebar/`). Its two parts
+        // carry the file's wash themselves, being the coloured ones.
         let header = h_flex()
             .flex_none()
             .w_full()
@@ -131,6 +151,8 @@ impl Render for BenchApp {
             }))
             .child(header)
             .child(div().flex_1().min_h_0().child(content))
+            // The file's place, over the panels and under ⌘K's list.
+            .child(file_layer(cx))
             // ⌘K's list, over everything while it is open (`sidebar/search.rs`).
             .children(self.render_search(cx));
         base

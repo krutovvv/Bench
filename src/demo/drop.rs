@@ -1,7 +1,10 @@
 //! A probe for the file drop: `BENCH_DEMO_DROP=<where>` makes Bench itself carry a file into the
 //! window (the same `FileDropEvent`s macOS sends for a drag from the desktop) and drop it, so a
 //! screenshot shows whether the thread under it took it as an attachment. `where`: `chat` — the
-//! middle, `right` — the right dock's width at the middle's height, `between` — between the docks.
+//! middle, `right` — the right dock's width at the middle's height, `between` — between the docks,
+//! `foot` — the bottom edge, over the composer's meters, `side` — the sidebar. `tint` — only
+//! carries the file in and holds it there (no drop): the picture shows the window's accept-as-it-is
+//! wash.
 
 use std::path::PathBuf;
 
@@ -31,17 +34,22 @@ impl BenchApp {
                     let at = match where_.as_str() {
                         "chat" => point(size.width * 0.5, size.height * 0.5),
                         "right" => point(size.width * 0.88, size.height * 0.5),
+                        "foot" => point(size.width * 0.5, size.height - px(12.)),
+                        "side" => point(size.width * 0.10, size.height * 0.5),
                         _ => point(size.width * 0.35, size.height * 0.5),
                     };
                     let paths = ExternalPaths([PathBuf::from(PROBE_FILE)].into_iter().collect());
-                    for event in [
+                    let mut events = vec![
                         FileDropEvent::Entered {
                             position: at,
                             paths,
                         },
                         FileDropEvent::Pending { position: at },
-                        FileDropEvent::Submit { position: at },
-                    ] {
+                    ];
+                    if where_ != "tint" {
+                        events.push(FileDropEvent::Submit { position: at });
+                    }
+                    for event in events {
                         window.dispatch_event(event.to_platform_input(), cx);
                     }
                 });

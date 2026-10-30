@@ -194,6 +194,29 @@ impl BenchApp {
         composer.update(cx, |s, cx| s.focus(window, cx));
     }
 
+    /// Files carried in from the machine go to the thread the person is working in — the one
+    /// whose composer has the focus, else the open one — and wait there with the next message
+    /// (`thread/composer/attachments.rs`).
+    pub fn drop_paths(
+        &mut self,
+        paths: Vec<std::path::PathBuf>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let focused = self
+            .thread_views()
+            .into_iter()
+            .find(|v| {
+                v.read(cx)
+                    .composer
+                    .read(cx)
+                    .focus_handle(cx)
+                    .is_focused(window)
+            });
+        let view = focused.unwrap_or_else(|| self.active_thread.clone());
+        view.update(cx, |v, cx| v.add_attachments(paths, cx));
+    }
+
     pub fn toast(
         &self,
         kind: NotificationType,
