@@ -39,8 +39,10 @@ export class Titles {
 			// A title needs no reasoning: off, also on a server that thinks unless told not to.
 			const ask = (onPayload?: (p: any, m: any) => any) => (this.rt.models.pi as any).complete(model, context, { reasoningEffort: undefined, maxTokens: 400, onPayload });
 			// A server that refuses the switch answers with an error: asked again without it.
-			let res: any = await ask(noThinking).catch(() => undefined);
-			if (!res || res.stopReason === "error") res = await ask();
+			const res: any = await this.rt.streams.during(`title:${live.row.id}`, async () => {
+				const first: any = await ask(noThinking).catch(() => undefined);
+				return !first || first.stopReason === "error" ? ask() : first;
+			});
 			const out = (res?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
 			const m = out.match(/"title"\s*:\s*"([^"]+)"/);
 			const title = (m?.[1] ?? out.replace(/<think>[\s\S]*?<\/think>/g, "")).trim().replace(/^["']|["'.]$/g, "").slice(0, 80);

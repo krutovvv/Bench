@@ -120,7 +120,7 @@ export class Reviews {
 
 		const models = this.rt.models;
 		const model = models.model(models.ref(row.agent));
-		const res: any = await (models.pi as any).complete(model, { systemPrompt: REVIEW_PROMPT, messages: [{ role: "user", content: message, timestamp: Date.now() }] }, { maxTokens: 4000 });
+		const res: any = await this.rt.streams.during(`review:${row.id}`, () => (models.pi as any).complete(model, { systemPrompt: REVIEW_PROMPT, messages: [{ role: "user", content: message, timestamp: Date.now() }] }, { maxTokens: 4000 }));
 		if (res?.stopReason === "error") throw new Error(res.errorMessage ?? "the model stopped with an error");
 		const out = (res?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("");
 		const found = parseFindings(changes.root, out);

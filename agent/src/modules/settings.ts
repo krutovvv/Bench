@@ -85,7 +85,7 @@ export default ({ rt }: Ctx): Module => ({
 			const prev = providers().find((p) => p.id === id);
 			const models = { ...(prev?.models ?? {}), ...(b.model ? { [b.model]: b.context_length ? { context_length: Number(b.context_length) } : {} } : {}) };
 			saveProvider({ id, name: b.name ?? id, base_url: b.base_url, api_key: b.api_key || prev?.api_key, api_mode: prev?.api_mode ?? "chat_completions", models, context_length: b.context_length ? Number(b.context_length) : prev?.context_length, parallel: b.parallel === undefined ? prev?.parallel : Number(b.parallel) > 0 ? Math.floor(Number(b.parallel)) : undefined });
-			rt.slots.changed();
+			rt.streams.changed();
 			return { ok: true, id };
 		},
 		"POST /api/providers/custom-endpoints/validate": async (req) => {
@@ -150,7 +150,7 @@ export default ({ rt }: Ctx): Module => ({
 				if (!p) throw new HttpError(404, `no provider ${id}`);
 				const g = readAgent("default");
 				writeAgent("default", { ...g, defaultProvider: id, defaultModel: Object.keys(p.models)[0] ?? g.defaultModel });
-				rt.slots.changed();
+				rt.streams.changed();
 				return { ok: true };
 			},
 		],

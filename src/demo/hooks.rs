@@ -76,7 +76,7 @@ hooks! {
     panel = "BENCH_PANEL",
     /// <0|1|2>: on that tab.
     gear_tab = "BENCH_GEAR_TAB",
-    /// <n>: the open thread n-th in the line of threads waiting for their turn.
+    /// <n>: the open thread n-th in the line of threads waiting for a stream of the model.
     in_line = "BENCH_DEMO_LINE",
     /// Two messages and a plan waiting.
     queue = "BENCH_DEMO_QUEUE",

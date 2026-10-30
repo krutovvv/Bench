@@ -23,7 +23,7 @@ pub struct EndpointForm {
     /// Where the key lives when it is a `.env` reference (`${NAME}`).
     pub key_env: Option<String>,
     pub context: Entity<InputState>,
-    /// How many threads it works on at once; empty: all of them (`agent/src/runtime/slots.ts`).
+    /// How many requests its server takes at once; empty: no limit (`agent/src/runtime/streams.ts`).
     pub parallel: Entity<InputState>,
 }
 
@@ -155,7 +155,7 @@ impl BenchApp {
                     current: e["is_current"].as_bool().unwrap_or(false),
                     key_env,
                     context: field(window, cx, &context, "e.g. 131072"),
-                    parallel: field(window, cx, &parallel, "All of them"),
+                    parallel: field(window, cx, &parallel, "No limit"),
                 }
             })
             .collect();
@@ -197,7 +197,7 @@ impl BenchApp {
             current: false,
             key_env: None,
             context: field(window, cx, "", "e.g. 131072"),
-            parallel: field(window, cx, "", "All of them"),
+            parallel: field(window, cx, "", "No limit"),
         });
         cx.notify();
     }
@@ -406,7 +406,7 @@ impl BenchApp {
                 input_row("Address", "OpenAI-compatible, ends in /v1", &e.server.url, cx),
                 input_row("Default model", "The model it serves first", &e.server.model, cx),
                 input_row("Context length", "Tokens", &e.context, cx),
-                input_row("Threads at once", "As the main model: the others wait in line, each runs to its answer", &e.parallel, cx),
+                input_row("Streams", "How many requests its server takes at once, as its config says. As the main model: a thread at work keeps one, the others wait in line", &e.parallel, cx),
                 input_row("API key", key_hint, &e.server.key, cx),
             ];
             page.push(bench_ui::settings_card(title, role, rows, e.server.check_line(), actions, cx).into_any_element());

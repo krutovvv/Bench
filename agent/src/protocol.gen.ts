@@ -70,7 +70,7 @@ processes: Array<Process>,
  */
 asks: Array<Ask>, 
 /**
- * Its place in the line of threads waiting for their turn to work, from 1; `None`: not in it.
+ * Its place in the line of threads waiting for a stream of the model, from 1; `None`: not in it.
  */
 in_line?: number, info: ThreadInfo, 
 /**
@@ -190,7 +190,7 @@ paused: boolean,
  */
 waiting: boolean, 
 /**
- * Its place in the line of threads waiting for their turn to work, from 1.
+ * Its place in the line of threads waiting for a stream of the model, from 1.
  */
 in_line?: number, 
 /**

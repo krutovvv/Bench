@@ -9,6 +9,7 @@
 // restart places the one already made; any failure leaves the compaction to Pi, as before. With the
 // evaluator on, what the rest of the work needs as it is follows the summary (`judge/summary.ts`).
 
+import { host } from "../host.ts";
 import { CompactionTask, DEFAULT_COMPACTION_POLICY, AgentDoc, hook } from "@earendil-works/pi-durable";
 import { noThinking } from "../runtime/thinking.ts";
 import { afterSummary } from "../judge/summary.ts";
@@ -85,11 +86,12 @@ export const compactWithoutReasoning = hook(CompactionTask, {
 			const model = ref && api.models.getModel(ref.provider, ref.modelId);
 			if (!model) return undefined;
 			const focus = compaction.instructions ? `\n\nAdditional focus: ${compaction.instructions}` : "";
-			const res: any = await api.models.complete(
+			// Outside a run it takes a stream of the model's server of its own; in one, its run's.
+			const res: any = await host().duringStream(String(api.conversationId), () => api.models.complete(
 				model,
 				{ systemPrompt: SYSTEM, messages: [{ role: "user", content: `<conversation>\n${transcript(compaction.messages)}\n</conversation>\n\n${FORMAT}${focus}`, timestamp: Date.now() }] },
 				{ reasoningEffort: undefined, maxTokens: Math.min(Math.floor(0.8 * DEFAULT_COMPACTION_POLICY.reserveTokens), model.maxTokens || Infinity), cacheRetention: "none", onPayload: noThinking },
-			);
+			), context?.abortSignal);
 			const summary = (res?.content ?? []).filter((b: any) => b.type === "text").map((b: any) => b.text).join("").trim();
 			if (res?.stopReason !== "stop" || !summary) return undefined;
 			// What a summary would lose that the work still needs — the person's words in force, the

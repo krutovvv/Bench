@@ -51,7 +51,7 @@ pub struct ThreadRow {
     pub paused: bool,
     /// Its run waits for the person's answer (a question, an approval).
     pub waiting: bool,
-    /// Its place in the line of threads waiting for their turn to work.
+    /// Its place in the line of threads waiting for a stream of the model.
     pub in_line: Option<u32>,
     /// Where it was started: "local" (Bench), "telegram", "cron", …
     pub source: String,

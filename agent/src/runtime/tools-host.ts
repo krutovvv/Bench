@@ -28,7 +28,8 @@ export function hostOf(rt: Runtime): Host {
 			return row ? info(row) : undefined;
 		},
 		hold: (threadId, signal) => rt.holds.wait(threadId, signal),
-		slot: (threadId, signal) => rt.slots.enter(threadId, signal),
+		stream: (conversation, signal) => rt.streams.enter(conversation, signal),
+		duringStream: (holder, ask, signal) => rt.streams.during(holder, ask, signal),
 		processes: (conversationId) => rt.processes.list(conversationId),
 		stopProcess: (id) => rt.processes.stop(id),
 		ask: (threadId, callId, question, choices, _multiSelect, signal) => rt.asks.question(threadId, callId, question, choices, signal),

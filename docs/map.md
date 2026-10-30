@@ -54,7 +54,7 @@ One page to open before reading code. Find the row, open that file, not its neig
 | change a /tools utility | `crates/devtools/src/` (pure functions with tests) |
 | change what Bench sends or receives | a method or an event: `crates/protocol` (`rpc.rs` one type per method with its answer, `event.rs`, `thread.rs`), its handler in `agent/src/modules/`, Bench's side `app.request`/`send`/`send_at` (`src/app/agents.rs`), events in `src/app/events.rs`; the socket `src/client/rpc/`; REST `src/client/rest/` |
 | change the agent's answer to an RPC or a REST route | `agent/src/modules/<area>.ts` |
-| change how many threads work at once, the line they wait in | `agent/src/runtime/slots.ts`, its gate in `agent/src/extensions/assistant.ts`, the field on the provider's card `src/settings/providers.rs` |
+| change how many requests the model's server is sent at once, the line threads wait in | `agent/src/runtime/streams.ts`, its gate in `agent/src/extensions/assistant.ts`, the field on the provider's card `src/settings/providers.rs` |
 | change how the agent runs a thread | `agent/src/runtime/runtime.ts` (the core) and its part for the job (`stream.ts`, `queue.ts`, `hold.ts`, `asks.ts`, `inserts.ts`, `title.ts`, `models.ts`); what Bench reads of it: `agent/src/runtime/journal.ts` |
 | change how work is done on a server (a project's machine over SSH) | `agent/src/machine/ssh.ts` (Pi's `ExecutionEnv`; its tests are Pi's conformance suite, `test/ssh-env.test.ts`) |
 | change the agents Bench talks to (this Mac's, servers') | `src/app/agents.rs` (links), the list of servers' agents in `agent/src/builtin/servers.ts`; adding/removing in `src/settings/agent_form.rs` |
@@ -131,7 +131,7 @@ agent/src/
   modules/       each area's RPC and REST: threads, commands, projects, agents, presets, cron, files, lsp,
                  audio, settings, backup, specs
   runtime/       the threads' core: runtime.ts (make, open, send, stop, fork); parts reached as rt.<part>:
-                 models, fallback, stream, journal (Journal), hold, slots, queue, asks, inserts, title, usage,
+                 models, fallback, stream, journal (Journal), hold, streams, queue, asks, inserts, title, usage,
                  changes, review, steer, thinking; tools-host.ts (the tools' host, envFor), run.ts
   prompt.ts      the prompt sections
   extensions.ts, extensions/   Pi's extensions: loaded, chosen per agent (forAgent); assistant.ts (the

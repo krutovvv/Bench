@@ -312,7 +312,7 @@ pub struct ThreadOpen {
     /// What the live run waits for the person to answer.
     #[serde(default)]
     pub asks: Vec<Ask>,
-    /// Its place in the line of threads waiting for their turn to work, from 1; `None`: not in it.
+    /// Its place in the line of threads waiting for a stream of the model, from 1; `None`: not in it.
     #[ts(optional)]
     #[serde(default)]
     pub in_line: Option<u32>,
@@ -555,7 +555,7 @@ pub enum ThreadEvent {
     Run(bool),
     /// The person held the run or let it go on: the run's holds, whole.
     Holds(Vec<Hold>),
-    /// Its place in the line of threads waiting for their turn to work, from 1; `None`: out of it.
+    /// Its place in the line of threads waiting for a stream of the model, from 1; `None`: out of it.
     Line(Option<u32>),
     /// A background process started, wrote output or ended: its record, whole.
     Process(Process),

@@ -32,7 +32,7 @@ pub struct ThreadSummary {
     /// Its run waits for the person: a question to answer or a command to approve.
     #[serde(default)]
     pub waiting: bool,
-    /// Its place in the line of threads waiting for their turn to work, from 1.
+    /// Its place in the line of threads waiting for a stream of the model, from 1.
     #[ts(optional)]
     #[serde(default)]
     pub in_line: Option<u32>,

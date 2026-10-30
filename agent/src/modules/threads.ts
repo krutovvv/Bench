@@ -21,7 +21,7 @@ export default ({ rt }: Ctx): Module => ({
 						running: rt.isBusy(s.id),
 						paused: rt.holds.isPaused(s.id),
 						waiting: (rt.live.get(s.id)?.prompts.size ?? 0) > 0,
-						...(rt.slots.placeOf(s.id) ? { in_line: rt.slots.placeOf(s.id) } : {}),
+						...(rt.streams.placeOf(s.id) ? { in_line: rt.streams.placeOf(s.id) } : {}),
 						source: s.source,
 						updated: s.updated,
 						cwd: s.cwd,

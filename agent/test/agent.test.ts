@@ -21,7 +21,7 @@ const { notes, skills } = await import("../src/prompt.ts");
 setSetting("timezone", "Asia/Yekaterinburg");
 writeAgent("default", { defaultProvider: "dev", defaultModel: "m" });
 const session = { id: "s1", agent: "default", cwd: home, source: "local" };
-setHost({ thread: () => session } as any);
+setHost({ thread: () => session, duringStream: (_: string, ask: () => Promise<unknown>) => ask() } as any);
 const run = async (tool: any, args: any) => {
 	const r = await tool.execute(args, { conversationId: 1 }, undefined);
 	return JSON.parse(r.output[0].text);
@@ -110,13 +110,13 @@ test("skills: a project's own, its folder's .agents/skills and .claude/skills up
 	assert.deepEqual(listSkills("default").map((k: any) => [k.name, k.scope]), [["general-only", "general"], ["shared", "general"]]);
 	// A thread working in the folder has them in its prompt and loads them, files and all.
 	const thread = { id: "s2", agent: `project:${p.id}`, cwd: sub, source: "local" };
-	setHost({ thread: () => thread } as any);
+	setHost({ thread: () => thread, duringStream: (_: string, ask: () => Promise<unknown>) => ask() } as any);
 	try {
 		assert.match((await skills(thread))!, /- kit: the repo's kit/);
 		const r = await skillView.execute({ name: "kit" }, { conversationId: 1 } as any, undefined as any);
 		assert.match((r as any).output[0].text, /Steps\.[\s\S]*references\/more\.md/);
 	} finally {
-		setHost({ thread: () => session } as any);
+		setHost({ thread: () => session, duringStream: (_: string, ask: () => Promise<unknown>) => ask() } as any);
 	}
 });
 

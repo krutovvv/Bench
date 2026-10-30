@@ -37,4 +37,4 @@ What the gear keeps while it is open is `Gear` (`state.rs`).
   threads use it (`agent-judge`).
 - **The gear belongs to the chat** (`workspace`): opened from the Code view it closes the Explorer
   first, so closing it leaves the chat whole.
-- A provider's "Threads at once" is its `parallel`: read from the main provider only, as there is one model for every thread (`agent/src/runtime/slots.ts`). Empty: no limit.
+- A provider's "Streams" is its `parallel`, what its server's own config says it takes at once: read from the main provider only, as there is one model for every thread (`agent/src/runtime/streams.ts`). Empty: no limit.

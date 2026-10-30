@@ -78,7 +78,7 @@ impl ThreadView {
             _ => None,
         });
         let doing = live.then(|| match last_live {
-            // Other threads go first: nothing is being done yet (`agent/src/runtime/slots.ts`).
+            // The model's streams are taken: nothing is being done yet (`agent/src/runtime/streams.ts`).
             _ if self.thread.journal.in_line().is_some() => {
                 format!("In line · {}", self.thread.journal.in_line().unwrap_or_default())
             }

@@ -26,7 +26,7 @@ pub struct Thread {
     running: bool,
     /// The live run's holds (the person's pauses); the last one open while it stands held.
     holds: Vec<Hold>,
-    /// Its place in the line of threads waiting for their turn to work.
+    /// Its place in the line of threads waiting for a stream of the model.
     in_line: Option<u32>,
     /// The background processes, as their last record said (`thread.process`).
     processes: Vec<Process>,
@@ -241,7 +241,7 @@ impl Thread {
         self.running && self.holds.last().is_some_and(|h| h.to.is_none())
     }
 
-    /// Its place in the line of threads waiting for their turn to work, from 1.
+    /// Its place in the line of threads waiting for a stream of the model, from 1.
     pub fn in_line(&self) -> Option<u32> {
         self.in_line
     }

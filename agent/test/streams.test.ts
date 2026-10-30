@@ -1,4 +1,4 @@
-// How many threads work at once (`runtime/slots.ts`): the line by itself, then on a real Pi harness
+// How many requests the model's server takes at once (`runtime/streams.ts`): the line by itself, then on a real Pi harness
 // in a temporary BENCH_HOME, whose stub model answers when the test lets it.
 
 import assert from "node:assert/strict";
@@ -8,12 +8,12 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-slots-"));
+const home = fs.mkdtempSync(path.join(os.tmpdir(), "bench-streams-"));
 process.env.BENCH_HOME = home;
 process.env.BENCH_AGENT_NO_MCP = "1";
 
 const { saveProvider, writeAgent } = await import("../src/config.ts");
-const { Line } = await import("../src/runtime/slots.ts");
+const { Line } = await import("../src/runtime/streams.ts");
 const { Runtime } = await import("../src/runtime/runtime.ts");
 const { BACKGROUND_CONTEXT } = await import("@earendil-works/chord/context");
 
@@ -99,6 +99,24 @@ test("a stop while it waits takes it out of the line; a held thread lets the nex
 	assert.deepEqual(gone, ["a", "d", "c"]);
 });
 
+test("a request on the side goes before the line; a run's stream it finds its own", async () => {
+	const { l } = line();
+	const gone: string[] = [];
+	go(l, gone, "a");
+	go(l, gone, "b");
+	l.enter("title", undefined, true).then(() => gone.push("title"));
+	await tick();
+	assert.equal(l.placeOf("title"), undefined, "no place to be told");
+	assert.equal(l.placeOf("b"), 1);
+	l.leave("a");
+	await tick();
+	assert.deepEqual(gone, ["a", "title"]);
+	assert.equal(l.holds("title"), true);
+	l.leave("title");
+	await tick();
+	assert.deepEqual(gone, ["a", "title", "b"]);
+});
+
 // ---- on Pi --------------------------------------------------------------------------------------
 
 const chunk = (delta: any, finish: string | null = null) =>
@@ -147,12 +165,12 @@ test("two threads at a limit of one: the second asks the model only when the fir
 	await until(() => open.length === 1);
 	assert.equal(open[0].said, "job-a");
 	await rt.submit(b.row.id, "job-b");
-	await until(() => rt.slots.placeOf(b.row.id) === 1);
+	await until(() => rt.streams.placeOf(b.row.id) === 1);
 	await rt.submit(c.row.id, "job-c");
-	await until(() => rt.slots.placeOf(c.row.id) === 2);
+	await until(() => rt.streams.placeOf(c.row.id) === 2);
 	assert.equal(open.length, 1, "the others do not reach the model");
 	await rt.interrupt(b.row.id);
-	await until(() => rt.slots.placeOf(b.row.id) === undefined && rt.slots.placeOf(c.row.id) === 1);
+	await until(() => rt.streams.placeOf(b.row.id) === undefined && rt.streams.placeOf(c.row.id) === 1);
 	await until(() => !rt.isBusy(b.row.id));
 	open[0].answer();
 	await until(() => open.length === 2);
