@@ -42,7 +42,8 @@ deletes threads (`open.rs`).
 - `gpui::list` lays out only what is on screen; a thread of thousands of rows costs what a
   screenful costs.
 - Only the thread scrolls (with a Mac overlay scrollbar); a block inside it does not scroll on
-  its own, except a terminal, an editor, or a tool pane with its own wheel.
+  its own, except a terminal, an editor, or a tool pane with its own wheel. Where a block does
+  have its wheel, the thread behind it holds still: the block takes the event and stops it.
 
 ## Decisions
 

@@ -63,6 +63,13 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
 - A scroll column elsewhere (the sidebar, a popover's list):
   `v_flex().id("x").overflow_y_scroll().track_scroll(&handle)`; `ScrollHandle`: `offset()`,
   `max_offset()`, `scroll_to_item(ix)`, `top_item()`.
+- **Such a column scrolls together with every other scrollable under the pointer.** gpui's
+  `track_scroll` listener runs in the Bubble phase for *all* hitboxes the wheel passes — an
+  inner list does not win over the thread's `gpui::list`, both move. Where the wheel belongs to
+  the inner one alone (the `/` list over the thread, a terminal, a browser pane), take the wheel
+  yourself: `.on_scroll_wheel(...)` on the column — set the handle's offset, clamped to
+  `max_offset()` — and `cx.stop_propagation()` (`src/thread/composer/input.rs` `slash_body`,
+  `src/inserts/terminal/view.rs`).
 - **A scroll container ignores the last child's margin** → append a real spacer
   (`div().h_3().flex_none()`).
 - The thread's scrollbar is a Mac's overlay one (`gpui_kit::component::scroll::Scrollbar`); don't add others.

@@ -12,6 +12,36 @@ use bench_ui::icons::Ico;
 
 use crate::thread::ThreadView;
 
+/// The `/` list's scrollable body: its rows in a window of `rows` rows, and the wheel is the
+/// list's alone — the thread behind it must not run away while the person picks a command.
+/// gpui hands a wheel to every scrollable under the pointer at once, so the list scrolls here,
+/// clamped to what it has, and the event stops (`rows` is how many fit, `row_h` their height).
+fn slash_body(
+    id: &'static str,
+    row_h: f32,
+    rows: f32,
+    scroll: &ScrollHandle,
+    items: Vec<AnyElement>,
+) -> AnyElement {
+    let handle = scroll.clone();
+    v_flex()
+        .id(id)
+        .max_h(px(row_h * rows))
+        .overflow_y_scroll()
+        .track_scroll(&handle)
+        .on_scroll_wheel(move |ev: &ScrollWheelEvent, _, cx| {
+            let line_h = px(row_h);
+            let dy = f32::from(ev.delta.pixel_delta(line_h).y);
+            let max = f32::from(handle.max_offset().y);
+            let next = (f32::from(handle.offset().y) + dy).clamp(-max, 0.).round();
+            handle.set_offset(point(px(0.), px(next)));
+            cx.stop_propagation();
+        })
+        .children(items)
+        .into_any_element()
+}
+
+
 /// Rows the command list shows before it scrolls, and their height.
 const SLASH_ROWS: f32 = 8.;
 const SLASH_ROW: f32 = 30.;
@@ -38,7 +68,7 @@ impl ThreadView {
         } else {
             bench_ui::TURN_Y + 30.
         };
-        let rows = matches.into_iter().enumerate().map(|(i, c)| {
+        let rows: Vec<AnyElement> = matches.into_iter().enumerate().map(|(i, c)| {
             let on = i == sel;
             h_flex()
                 .id(("slash", i))
@@ -68,7 +98,9 @@ impl ThreadView {
                         .child(c.category),
                 )
                 .on_click(cx.listener(move |this, _, window, cx| this.pick_slash(i, window, cx)))
-        });
+                .into_any_element()
+        })
+        .collect();
         Some(
             // Under the line being typed, from where the text starts: the composer
             // is the thread's last row, and the thread scrolls on past it, so there is room below.
@@ -88,14 +120,7 @@ impl ThreadView {
                         .rounded_md()
                         .border_color(theme.border)
                         .py_1()
-                        .child(
-                            v_flex()
-                                .id("slash-list")
-                                .max_h(px(SLASH_ROW * SLASH_ROWS))
-                                .overflow_y_scroll()
-                                .track_scroll(&self.slash_scroll)
-                                .children(rows),
-                        ),
+                        .child(slash_body("slash-list", SLASH_ROW, SLASH_ROWS, &self.slash_scroll, rows)),
                 )
                 .into_any_element(),
         )
@@ -111,7 +136,7 @@ impl ThreadView {
         theme: &gpui_kit::component::Theme,
         cx: &mut Context<Self>,
     ) -> AnyElement {
-        let rows = matches.into_iter().enumerate().map(|(i, c)| {
+        let rows: Vec<AnyElement> = matches.into_iter().enumerate().map(|(i, c)| {
             let on = i == sel;
             let (fg, quiet, faint) = if on {
                 (
@@ -149,7 +174,9 @@ impl ThreadView {
                     }
                 }))
                 .on_click(cx.listener(move |this, _, window, cx| this.pick_slash(i, window, cx)))
-        });
+                .into_any_element()
+        })
+        .collect();
         div()
             .absolute()
             .left_0()
@@ -164,14 +191,13 @@ impl ThreadView {
                     .rounded_lg()
                     .shadow_lg()
                     .p_1()
-                    .child(
-                        v_flex()
-                            .id("slash-list")
-                            .max_h(px(bench_ui::COMPLETION_ROW_H * SLASH_ROWS))
-                            .overflow_y_scroll()
-                            .track_scroll(&self.slash_scroll)
-                            .children(rows),
-                    ),
+                    .child(slash_body(
+                        "slash-list",
+                        bench_ui::COMPLETION_ROW_H,
+                        SLASH_ROWS,
+                        &self.slash_scroll,
+                        rows,
+                    )),
             )
             .into_any_element()
     }
