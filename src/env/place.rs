@@ -142,8 +142,8 @@ impl SettingsForm for Place {
         let mut out = vec![];
         let (agent, hint, bad) = if at.agent.is_empty() {
             (
-                "Local".to_string(),
-                "Its models and voice are the local agent's, in the gear",
+                "Host".to_string(),
+                "Its models and voice are this agent's Host, in the gear",
                 false,
             )
         } else {

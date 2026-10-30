@@ -263,7 +263,7 @@ impl BenchApp {
         let cards = h_flex()
             .gap_2()
             .items_stretch()
-            .child(card(0, Ico::Laptop, "Local", "A folder here. The local agent runs it.".into(), Place::ThisMac, false, cx))
+            .child(card(0, Ico::Laptop, "Host", "A folder here. This agent's Host runs it.".into(), Place::ThisMac, false, cx))
             .child(card(
                 1,
                 Ico::Link,

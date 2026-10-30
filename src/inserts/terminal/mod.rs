@@ -46,7 +46,7 @@ impl InsertKind for Terminal {
         crate::inserts::Word {
             word: "terminal",
             aliases: &[],
-            desc: "Local terminal",
+            desc: "Host terminal",
             key: "ssh:local",
         }
     }
