@@ -71,11 +71,11 @@ covers: [src/app/places.rs, src/app/agents.rs]
 
 Pi Durable даёт каждой беседе **среду выполнения** — `ExecutionEnv` (файловая система и оболочка,
 `@earendil-works/pi-durable/env`). Все инструменты Pi (`read`, `write`, `edit`, `bash`) работают
-только через неё. Сейчас агент даёт всем беседам `NodeExecutionEnv` — свою машину
-(`runtime.ts`, `env:`).
+только через неё. Агент выбирает её для каждой беседы в одном месте
+(`agent/src/runtime/tools-host.ts`, `envFor`).
 
-- `env` получает `conversationId` беседы → её проект → его машина. Без машины — как сейчас
-  `NodeExecutionEnv`; для SSH-алиаса — **`SshExecutionEnv`** (`agent/src/machine/ssh.ts`): та же
+- `env` получает `conversationId` беседы → её проект → его машина. Без машины —
+  `NodeExecutionEnv`, своя машина; для SSH-алиаса — **`SshExecutionEnv`** (`agent/src/machine/ssh.ts`): та же
   `ExecutionEnv`, но через SSH. Pi не меняется, инструменты не знают, где они работают.
 - **Одно постоянное соединение на сервер**: OpenSSH с `ControlMaster`/`ControlPersist` (свой
   `ControlPath` в `~/.bench/ssh/`). Каждая команда и каждая файловая операция идёт по нему без нового

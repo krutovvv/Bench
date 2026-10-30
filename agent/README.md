@@ -12,12 +12,13 @@ and talks to it over a WebSocket and a REST API; over SSH it does the same on an
   `bash`) and its `tool_search` for deferred tools.
 - **Official and popular packages for the rest**: `@earendil-works/pi-mcp` (MCP servers),
   [grammY](https://grammy.dev) (Telegram), [croner](https://croner.56k.guru) (cron expressions).
-- **Its own code, about 9k lines**: the server and its modules, each with its RPC and REST routes
+- **Its own code**: the server and its modules, each with its RPC and REST routes
   (`src/server.ts`, `src/modules/`; the wire is written from `crates/protocol` into
   `src/protocol.gen.ts`), the threads' core and the bridge from Pi's events to Bench's
   (`src/runtime/`), settings and the session index (`src/config.ts`, `src/store.ts`), the
   assistant extension (`src/extensions/assistant.ts`) with a short prompt (`src/prompt.ts`) and
-  tools of its own (`src/builtin/`), where tools work (`src/machine/`: a server over SSH, a
+  tools of its own (`src/builtin/`), what its hooks keep of a turn (`src/turn/`), the evaluator
+  (`src/judge/`), where tools work (`src/machine/`: a server over SSH, a
   project kept in its folder), language servers (`src/lsp/`), MCP and its sign-in (`src/mcp/`),
   Telegram (`src/telegram.ts`, a bot per project, through a proxy where `TELEGRAM_PROXY` or
   `HTTPS_PROXY` is set).
@@ -25,8 +26,9 @@ and talks to it over a WebSocket and a REST API; over SSH it does the same on an
 ## Extensions
 
 An extension is Pi's unit of behaviour: tools, prompt sections, hooks, durable tasks. Built in:
-`assistant` (the default), `mcp:<agent>` (the MCP servers from its `mcp.json`, Pi's format and
-`exposure`, connected with its first session) and `tool-search`. Your own go in
+`assistant` (the default), `codemode` (every thread's), `mcp:<agent>` (the MCP servers from its
+`mcp.json`, Pi's format and `exposure`, connected with its first thread) and `tool-search` (where
+some tools are `deferred`). Your own go in
 `~/.bench/agents/default/extensions/<name>.ts` and are picked up without a restart: a changed file is imported
 again and Pi replaces the extension in place (new turns use the new code). A file exports a
 function that receives the building blocks, so it needs no packages of its own:
@@ -35,7 +37,7 @@ function that receives the building blocks, so it needs no packages of its own:
 export default ({ pi, tools, prompt }) =>
 	pi.defineExtension({
 		name: "research",
-		tools: [tools.read, tools.bash, tools.delegate],
+		tools: [tools.read, tools.bash],
 		sections: [pi.section("role", () => "You research a question with sources and answer briefly.")],
 	});
 ```
@@ -53,14 +55,14 @@ The agent picks its extensions in `~/.bench/agents/default/settings.json`:
 | `lsp`, `diagnostics` | definitions, references, outline, hover and problems from the project's language servers; edits come back with their diagnostics |
 | `clarify` | a question with choices (Bench's card, Telegram's buttons) |
 | `todo` | the plan Bench shows over the composer |
-| `memory` | notes kept across sessions: the project's `memories/MEMORY.md`, the shared `USER.md`; only when asked |
+| `memory` | notes kept across threads: the project's `memories/MEMORY.md`, the shared `USER.md`; only when asked |
 | `skill_view`, `skill_manage` | the agent's skills (`skills/<…>/SKILL.md`), listed in the prompt |
 | `cron` | scheduled prompts: durable Pi tasks that sleep until their time; answers go to Telegram or the app |
-| `delegate` | subagents: child conversations owned by the call, run in parallel |
 | `process` | a command in the background, its output's tail kept, its exit the outcome |
-| `session_search` | the text of past sessions |
+| `session_search` | the text of past threads |
 | `ssh_run` | a command on this Mac or a `~/.ssh/config` server; without a host, on the project's machine or the thread's terminal insert |
-| `tool_search` + `mcp__<server>__<tool>` | MCP servers; a server with many tools is deferred behind tool_search |
+| code mode's script tool | one step runs a script that calls the thread's tools, MCP servers (each a namespace) and `models.*`; only what it prints reaches the model |
+| `mcp__<server>__<tool>`, `tool_search` | an MCP server's tools where its `exposure` offers them: `direct` to the model, `deferred` behind `tool_search`; by default they are the scripts' (`src/mcp/SPEC.md`) |
 
 Web search comes from the official MCP servers of Tavily or Brave, added to an agent's `mcp.json`.
 
@@ -101,7 +103,6 @@ directory, plus `memories/`), `app/` (the installed server), `server.json` (port
 ```bash
 npm ci
 node src/server.ts                         # writes ~/.bench/server.json
-node scripts/probe.ts "What time is it?"   # a turn through the protocol
 node --test test/*.test.ts
 ```
 

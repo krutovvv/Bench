@@ -127,7 +127,9 @@ lets you keep many more projects going at once.
 - **Compaction.** When a long conversation is summarized, as a share of the model's window.
 - **A step limit** for long sessions: past it the agent stops and answers with what is done.
 - **Reasoning and approvals**: how hard it thinks, and what it may run without asking.
-- **A fallback model** that takes over when the main one fails or goes silent.
+
+The model itself is the gear's, one for every project, with a fallback that takes over when the
+main one fails or goes silent.
 
 ![A project's settings: the evaluator, the step limit, compaction, the Telegram bot](docs/shots/settings.png)
 

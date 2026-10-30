@@ -1,9 +1,5 @@
 # AGENTS.md: Bench
 
-> **Work in progress (2026-10-30):** a whole-project audit is being fixed. Read
-> `docs/handoff/README.md` (the task and its state) and `docs/handoff/principles.md` (the owner's
-> rules) before anything else.
-
 Read this first. Then `docs/map.md` to find the file for your change — open that file, not its
 neighbours. Read the skill `.agents/skills/bench-kit/SKILL.md` before any UI or insert work, and
 `.agents/skills/bench-structure/SKILL.md` (in Russian) before adding a feature, a module, a file
@@ -91,41 +87,18 @@ are projects. A server's agent is always reinstalled to match this Bench (`launc
 
 ## The code map
 
-**Where is X: `docs/map.md`** (one table of common changes and the file for each). Why it is
-built this way: `docs/architecture.md`. In short:
+**Where is X: `docs/map.md`**, one table of common changes and the file for each, and the tree of
+the source. Why it is built this way: `docs/architecture.md` and each module's `SPEC.md`. In short:
 
 | Where | What |
 |---|---|
-| `crates/ui` (`bench_ui`) | Every element and size: theme (radius 4 / 6), Lucide icons, `Gap`, text, buttons, fields, blocks, rows, forms, lists, bars. The only place with pixel values |
-| `crates/storybook` | All elements on one page (`cargo run -p storybook`); `reference/` has the pictures |
-| `crates/protocol` | The wire, in one place: every method a type with its answer (`rpc.rs`, `Request`), what the agent says unasked (`event.rs`, `Event`), a thread (`thread.rs`: `ThreadOpen`, `ThreadEvent`); `cargo test -p protocol` writes `agent/src/protocol.gen.ts` |
-| `crates/thread` | The thread as rows from Pi's journal; the rules of order are tests |
-| `crates/devtools` | The /tools utilities as tested pure functions |
-| `src/main.rs`, `src/app.rs` | Start; `BenchApp`: the window's state and its construction. Only these two are loose in `src/`: every other file is in the folder named for where it is in the window or what it does |
-| `src/app/` | What belongs to the whole app: `model.rs` (the plain data every area uses: `ProjectKey`, `Location`, `ProjectEntry`, `Target`; what one area keeps lives in its folder), `events.rs` (the agents' `protocol::Event`s applied: to the views showing a thread, the sidebar's list), `keys.rs` (shortcuts), `menu.rs` (the macOS menu: Settings…, New Window), `armed.rs` (what waits for a second press: deletes, closing unsaved), `defaults.rs` (the agent's defaults), `subscriptions.rs` (what `new` listens to, its timers), `backend.rs` (the agent's restart, its log), `repo.rs` (a thread's git repo) |
-| `src/app/places.rs`, `src/app/agents.rs` | **Projects and agents**: where each project lives, the sidebar's projects from their sources; the links to this Mac's and servers' agents |
-| `src/client/` | Talking to the agent, as Zed's `client`: `rpc/` (`Client`: a `crates/protocol` request answered as a future of its own response type; `Incoming` what the agent says unasked), `rest/` (REST: files, providers; `with_settings` where a call is about agent settings), `connection.rs` (where it runs, the tunnel), `launch.rs` (installing it and bringing it up, the same script here or over SSH), `service.rs` (the agent as its machine's service: launchd, systemd), `probe.rs` (`bench --probe`) |
-| `src/workspace/` | The window as Zed's workspace: `dock.rs` the docks as Zed's (`Dock`: a list of `Panel`s, one shown; `left_dock` threads or Explorer, `right_dock` a thread beside the center (the open one beside a document, a second one beside a thread: `src/thread/beside.rs`), `bottom_dock` the project's terminals, with tabs, `src/inserts/terminal/panel.rs`), `mod.rs` the `Center` (thread, document, settings) and `render_panel`; `layout.rs` draws them around the center |
-| `src/titlebar/` | The bar over the center: the thread's title, the documents' project, a settings page's title; at its right end only Chat \| Code (`tail.rs`). The thread's project, repo and meters are the line under its composer (`src/thread/composer/foot.rs`); the Code view has its own status bar under the documents (`src/explorer/statusbar.rs`: the caret, the thread beside ⌘J, the terminal ⌃`); the chat has none |
-| `src/sidebar/` | The threads panel, as Claude's sidebar: New thread, New project, Search over the list (`search.rs`: ⌘K, a list over the window), projects (`project_row.rs`, `project_list.rs`), threads (`thread_row.rs`), the menu, what is done to an item (`items.rs`: pin, color, rename, ⌫⌫, ↑↓; `marks.rs`); the left dock's foot under any panel: the agent and its popover, the gear (`agent.rs`) |
-| `src/thread/` | A thread on screen as its own entity, `ThreadView` (`view.rs`: its `ActiveThread`, composer, events; the app is reached through a weak handle and told which thread with a `ThreadRef`), on `gpui::list` (`mod.rs`, `list.rs`), laid out as a chat — bubbles and a composer pinned under the list — or as a document, chosen in `look.rs`; `rows/` what the list shows (one file per kind of row: `message.rs`, `work.rs`, `queued.rs`, `asks.rs`, `processes.rs`, `changed_files.rs`, `extras.rs`); `composer/` the next message (`input.rs`, `slash.rs`, `attachments.rs`, `drafts.rs`, `send.rs`); its meters (`meters.rs`, `speed.rs`); opening threads (`open.rs`, the app's) and every agent's threads (`store.rs`); the right dock's thread panel (`panel.rs`, `beside.rs`) |
-| `src/settings/` | The gear (`mod.rs`: Agents, Presets, Appearance tabs; `agent_form.rs`, `presets.rs`, `providers.rs`, `appearance.rs`) and the new project's page (`new_project.rs`) |
-| `src/inserts/` | **The insert registry** (`mod.rs`: `InsertKind` with its `/` word and choices, `KINDS`; `slash.rs` the `/` list; `state.rs` each thread's inserts and each kind's state) and one folder per kind: `terminal`, `tools`, `browser` — each `mod.rs` + `state.rs` (+ `view.rs`) |
-| `src/explorer/` | **The Explorer**: a project as an IDE shows it — `tree/` its tree in the left dock (drawn, its parts, its context menus, new/rename/delete), `pane/` documents in the center with tabs as Zed's pane (each kind an `Item`: `item.rs`, a file `file.rs`, the tabs' keys `doc.rs`, kept between starts `persistence.rs`), `search/` ⌘P and ⌘⇧F, `code/` the language servers in the editor, the Problems tab ⌘⇧M, lines changed since HEAD and a file's diff |
-| `src/env/` | A project's environment: `Section` (its data, save, revert) and one of two: `SettingsForm` in `FORMS` (fields on the Settings page `page.rs`) or `ExplorerParts` in `PARTS` (parts in the Explorer's tree, opened in the middle), one file per section |
-| `src/media/` | What an answer carries besides text and how it shows (`view.rs`, `text.rs`, `playback.rs`, `chip.rs`), fetching, diagrams, LaTeX; attachments sent, the microphone and playback (`audio.rs`, `video.rs`, `voice.rs`) |
-| `src/system/` | What Bench asks of the machine: `ssh.rs`, `sshconfig.rs` (the servers of `~/.ssh/config`), `notify.rs` |
-| `src/demo/` | A made-up session for screenshots (`BENCH_DEMO=1\|top\|landing\|long\|new\|server\|tool\|env\|explorer`, `env` being the blog's Settings, `explorer` the blog in the Explorer with `BENCH_EXPLORER=settings\|part\|lsp\|thread\|problems\|terminal\|diff` for its settings, an MCP server, a language server, the thread beside, its Problems or its terminal sent to the thread, the post's diff, and `BENCH_DEMO_NEW=1` with `BENCH_EXPLORER=thread` presses that panel's "+" two seconds in (a new thread in the dock, the document kept in the middle); `BENCH_CLARIFY=1` [+`_MULTI=1`] puts the agent's question card over the thread; `BENCH_DEMO_BESIDE=<thread id>` (e.g. `d-tool`) opens that thread beside the open one; `BENCH_DEMO_DROP=chat|between|right` carries a file into the window and drops it there (an attachment in the thread under it); `BENCH_DEMO_JOURNAL=<file>` draws a real thread (`thread.open`'s answer saved from the agent) in the landing's place, `BENCH_DEMO_WORK=<n>[:<i>]` opens its n-th piece of work (`BENCH_DEMO_WORK_CALLS=<c>`: of those with c calls) at the window's top, its i-th step's card open in its milestone (`BENCH_DEMO_CARD=0`: the milestone only); `BENCH_DEMO_PROCS=1` unfolds the landing thread's background processes' card with its output; `BENCH_DEMO_QUEUE=1` puts two messages in the queue after the last row and the agent's plan above them (`BENCH_DEMO_SCROLL=end` keeps the thread at its end); `BENCH_DEMO_DROPLINE=<group>:above|below` draws the sidebar's drop line over a project's group, as it looks while another project is held in the air there; `BENCH_DEMO_TOOL=html|preview|long`
-  opens the tool insert with the pane that scrolls inside the thread (its own wheel, not the
-  thread's), with lines enough to scroll; `long` pastes a page so tall that the card's half-the-
-  window cap shows and the pane scrolls what doesn't fit; the other hooks in
-  `.agents/skills/bench-kit/references/build-verification.md`): `mod.rs` loads it, `journal.rs`, `threads.rs`, `env.rs`, `inserts.rs`, `drop.rs` |
-| `agent/src/server.ts`, `agent/src/modules/` | The agent's server: starts, collects the modules (each declares its RPC and REST routes) |
-| `agent/src/runtime/` | `runtime.ts` `Runtime`: the threads' core (make, open, send, stop, fork); its parts, each a file reached as `rt.<part>`: `models.ts` (the model, its fallback `fallback.ts`), `stream.ts` (a run's events → what Bench hears), `journal.ts` (`Journal`: a thread read whole, each commit's news, the search index; the journal as the items Bench shows), `hold.ts`, `queue.ts`, `asks.ts` (questions, approvals: `bench.approvals`), `inserts.ts` (the insert entry and document), `title.ts`, `usage.ts`; `tools-host.ts` the tools' host and where they work (`envFor`); `run.ts` a prompt run to its answer |
-| `agent/src/prompt.ts`, `agent/src/extensions/assistant.ts` | The prompt sections and the default extension (tools, sections, hooks) |
-| `agent/src/builtin/` | The agent's own tools and stores: `ssh`, `process`, `cron`, `memory`, `skills`, `ask`, `projects`, `servers` (the servers' agents), `presets`, `search` (grep, glob, ls), `navigate` (`lsp`: definitions, references, outline, symbols, hover from the project's language servers), `hashline` (read and edit by line anchors) |
-| `agent/src/machine/`, `agent/src/lsp/` | Where tools work: a project's machine over SSH as Pi's `ExecutionEnv` (`machine/ssh.ts`), a project kept in its folder (`machine/confined.ts`); its language servers (`lsp/lsp.ts`, diagnostics after every edit; `lsp/presets.ts`) |
-| `agent/src/mcp/` (`mcp.ts`, `oauth.ts`), `agent/src/telegram.ts` | MCP servers (pi-mcp, OAuth), Telegram bots (grammY, a proxy where needed) |
+| `crates/ui` (`bench_ui`), `crates/storybook` | Every element and size, the only place with pixel values; all of them on one page |
+| `crates/protocol`, `crates/thread`, `crates/devtools` | The wire, one type per method; the thread as rows from Pi's journal; the /tools utilities |
+| `src/main.rs`, `src/app.rs`, `src/app/` | Start; `BenchApp`, one field per area; what belongs to the whole app (`places.rs` answers "where") |
+| `src/workspace/`, `src/titlebar/`, `src/sidebar/`, `src/thread/`, `src/settings/` | The window by place, as Zed's workspace |
+| `src/inserts/`, `src/env/`, `src/explorer/` | By feature: a registry and one folder or file per kind |
+| `src/client/`, `src/media/`, `src/system/`, `src/demo/` | Services that draw nothing; the demo, a fake agent behind `src/client/fake.rs` |
+| `agent/src/` | `server.ts` and `modules/`; `runtime/`, `extensions/`, `builtin/`, `turn/`, `judge/`, `machine/`, `mcp/`, `lsp/` |
 
 ## How the agent uses Pi Durable
 
@@ -134,9 +107,9 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Piece | In Pi's terms |
 |---|---|
 | Thread | a Pi conversation in `~/.bench/pi.sqlite`; every step durable, a turn survives a restart. Bench shows its journal: `thread.open` (items after a head, the queue, the inserts' state) and the `thread.*` events from Pi's commits (`agent/src/runtime/journal.ts`) |
-| Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `session.insert`, `session.insert.patch` |
+| Insert | an entry `bench.insert {id, key}` written where it was put (a write: the model doesn't see it, never queued) + its state in the conversation document `bench.inserts` `{items:{id:{key,state,folded,removed,after?}}}`, changed in commits. `after` moves one whose entry's place is not where it belongs: an insert put while a message waits in the composer goes after that message. RPC `thread.insert`, `thread.insert.patch`, told as `ThreadEvent::Inserts` (`src/inserts/SPEC.md`) |
 | What the agent knows of inserts | the `inserts` prompt section, read with `input.read.snapshot(Inserts, conversationId)`, one line per kind (`prompt.ts` `inserted()`), plus `<block-state>` with each message |
-| Prompt | Pi sections (soul, environment, inserts, project, skills, notes); all but inserts held as first read until the next compaction (`builtin/frozen.ts`): a changed section rewrites the prompt's head and the model server's cache with it |
+| Prompt | Pi sections (soul, environment, inserts, project, skills, notes); all but inserts held as first read until the next compaction (`turn/frozen.ts`): a changed section rewrites the prompt's head and the model server's cache with it |
 | Queue | Pi's inbox: a message sent while a run is live is a follow-up; "send now" aborts it and steers. Bench's id for each message is Pi's `requestId`: the row shown on Enter is matched by it, never by its words |
 | Plan, questions | the agent's own `todo` and `clarify` calls in the journal, the answer the call's result (`docs/thread-objects.md`) |
 | Pause | the conversation document `bench.hold` (`hold.ts`) and a gate in `beforeTool`: a held run stays held across a restart |
@@ -148,17 +121,50 @@ Pi is used unmodified, as its authors describe it. Our code stays in Pi's terms:
 | Model | one for every thread of every project, set in the gear: the general agent's `defaultProvider`/`defaultModel`; a project has no model of its own. The fallback (`fallback_providers[0]`) is a pi-ai provider of ours (`fallback.ts`): the main model's error or silence sends the same request to it (Pi retries only with the same model), and the thread's `info {fallback}` shows a red chip by its repo |
 | Where tools work | Pi's `ExecutionEnv`, one per conversation (`runtime/tools-host.ts` `envFor`): `NodeExecutionEnv` on the agent's machine, `SshExecutionEnv` (`machine/ssh.ts`) on a project's machine over SSH, wrapped by `machine/confined.ts` for a project kept in its folder. Pi's read/write/edit/bash and our grep/glob/ls work through it unchanged |
 | Compaction | Pi's compaction policy; a project's share of the window becomes a per-model override under its own provider (`project_<id>.<provider>`), through a getter Pi reads at every use (`compactionOverrides`); 20% of the context stays word for word, and after the summary the evaluator puts the person's words in force, the files in work and exact results (`judge/summary.ts`) |
-| After an edit | a `ToolTask` `afterTool` hook adds the file's diagnostics from the project's language servers (`lsp.ts`) to edit and write results |
+| After an edit | a `ToolTask` `afterTool` hook (`builtin/diagnostics.ts`) adds the file's diagnostics from the project's language servers (`lsp/lsp.ts`) to edit and write results |
 | Read and edit | Pi's `read` wrapped to show every line as `LINE:HASH|text`, and an `edit` of the same name that changes lines by those anchors (`builtin/hashline.ts`): no old text to reproduce, a stale anchor refused with the lines as they are now, the changed lines returned with new anchors. An edit with `oldText`/`newText` is Pi's own edit |
 | Code navigation | tool `lsp` (`builtin/navigate.ts`) asks the same language servers: a place is a file, a line and the word on it, never a column. The servers start at a thread's first tool call (`envFor` → `warmUp`); one still loading the project (rust-analyzer's `experimental/serverStatus`) is waited for 20 s, then said to be loading |
-| Evaluator, step limit | Pi's classifier model `bench/evaluator` (`judge/models.ts`): the gear's System One servers (Jev's API), a main one and its fallback, which our hooks ask and code mode scripts too (`agent/src/judge/`, its `Point`s in `POINTS`, one request per moment): `beforeRequest` names a turn's skill and MCP servers (their tools offered from its next step) and, when the window would overflow, says what to cut first, `beforeTool` refuses a repeat of a failed or known call and judges a command's risk with approvals on, `afterTool` orders a long search and a JSON list, judges a failure, marks the plan's items (a `bench.plan` entry, a later snapshot of the plan) and checks the course every 10 steps, a long result keeps the parts the request needs (`builtin/window.ts`), `onYield` sends back once an answer whose facts no result supports or an unfinished turn with an `<evaluator>` message the thread does not show; a project uses it when its Settings say so (Model → Evaluator, on in a new project; off where a shared GPU needs its room) and the gear has a server; otherwise the classic way. A project's step limit refuses calls in `beforeTool` and tells the model to answer in `beforeRequest` (`builtin/steps.ts`) |
+| Evaluator | Pi's classifier model `bench/evaluator` (`judge/models.ts`): the gear's System One servers, a main one and its fallback, which our hooks ask at fixed points of a turn and code mode scripts too. A project uses it when its Settings say so (on in a new project). What it does at each point, and the classic way without it: `agent/src/judge/SPEC.md` |
+| Step limit | a project's most steps in one turn: refuses calls in `beforeTool` and tells the model to answer in `beforeRequest` (`turn/steps.ts`) |
 | Schedule | a durable `defineTask` per job that sleeps until its next run (`builtin/cron.ts`) |
 | Background processes | `process` (`builtin/process.ts`): a background task of the conversation (`bench.process`, `background`, `abandonOnRestart`) that runs the command in its `ExecutionEnv`, its output's tail in the checkpoint, its exit the outcome; Bench reads the task records from Pi's commits (`thread.process`). A restart of the agent ends it for good ("stopped by restart") |
-| MCP | `@earendil-works/pi-mcp`, a project's `mcp.json`, with Pi's `exposure`: `codemode` by default (the tools are scripts', found with `searchTools()`, a CallToolResult whole), `direct` (offered to the model too), `deferred` (`tool_search`), `hidden`; `toolExposure` per tool. OAuth via `mcp/oauth.ts` (callback on `localhost:47823`) |
+| MCP | `@earendil-works/pi-mcp`, a project's `mcp.json`, with Pi's `exposure`: `codemode` by default (`agent/src/mcp/SPEC.md`). OAuth via `mcp/oauth.ts` (callback on `localhost:47823`) |
 | Telegram | grammY, one bot per project, the same Pi conversations; `TELEGRAM_PROXY` or `HTTPS_PROXY` in the agent's env |
 
 Extend with Pi's packages and popular ones before writing your own. When something in Pi is
 missing or buggy, work around it in our code and say so in a comment. Never patch Pi.
+
+## How the owner wants Bench built
+
+These hold over any habit of your own.
+
+- **The base frameworks first.** The agent is built on Pi Durable as its authors intend: before
+  writing a mechanism, check whether Pi Durable, pi-ai, pi-mcp or code mode already has it (docs
+  vendored in `.agents/skills/pi-durable-dev-rules/references/`; sources in
+  `agent/node_modules/@earendil-works/`; live docs at pi.dev/docs/latest). Use theirs. The same for
+  the UI: GPUI, gpui-kit and Zed's patterns before anything custom (Zed is the reference for
+  organisation and names: workspace, docks, panels, items, `FakeFs`).
+- **Hooks are Pi's sanctioned extension point.** Our evaluator points in the agent loop
+  (`agent/src/judge/`) stay: they are real gains. Pi's own guide shows `onYield` sending the agent
+  back, exactly our use.
+- **Modules are self-contained**, in folders and files whose names tell a reader, a person or an
+  agent, where the logic is from the file tree alone.
+- **See the patterns and share them.** One thing written twice becomes one implementation. A family
+  of similar features gets one scaffold: a widget has a frame, a head and a body, so there is one
+  container and each widget brings its content; changing the container changes them all (an
+  answer's code block and the code inside an action card are one widget, `bench_ui::code_frame`).
+- **Anticipate where the app grows.** When adding a feature, ask what else of its kind will come and
+  lay the common ground (a registry, a container, a trait) from the first lines.
+- **Symmetric, logical code.** Siblings are built alike (inserts, env sections, gear tabs).
+- **Causes, not symptoms.** No flags threaded through layers to undo an effect, no special cases for
+  one observed bug, no negative margins to cancel a padding, no `if self.demo` in product code (the
+  demo is a fake agent, as Zed's `FakeFs`), no app-wide "click claimed" flag where GPUI has
+  `stop_propagation`, no pixel values or bare spacing outside `crates/ui`, no side effects in
+  `Render`, no polling where something can say it changed.
+- **The look is final** (below). Refactors keep pixels identical; do not redesign. If a mechanical
+  cleanup shifts something slightly, the owner accepts fixing it later, but check with pictures.
+- **Documents match the code.** Specs, docs and skills: each fact lives in one place, others link
+  to it. A change that moves a decision updates its spec in the same commit.
 
 ## How to work here
 
@@ -166,27 +172,10 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
   to you through it. It is only a client: threads, the queue and the agent live in the agent
   process and in `~/.bench`, so rebuilding and reopening it costs a few seconds and loses
   nothing — an unfinished run goes on in the agent and the window comes back to it.
-- **The change loop** (the same for every change, `.agents/skills/bench-kit/SKILL.md`):
-  1. **Change and look, on your own copy.** `cargo build`, then
-     `.agents/skills/bench-kit/scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=…`:
-     a separate copy of the debug binary on made-up data (no app, no permissions), shot and
-     quit. Read the picture; again until it is right. This is the main check of a change.
-     Never rebuild the app to see a change.
-     (It needs Bench allowed in Privacy & Security → Screen & System Audio Recording; without a
-     picture, ask the person to allow it.)
-  2. **Check and commit.** Tests (below), one change one commit.
-  3. **Build the app** — at once, no need to ask: `scripts/bundle-macos.sh` rebuilds
-     `/Applications/Bench.app` in place and quits nothing; the running Bench goes on from its
-     old copy. Uncommitted changes stop it.
-  4. **Ask the person to restart Bench** ("собрано — перезапусти Bench"): they quit it and open
-     it again, and the new build starts. Never quit, restart or open Bench yourself: you run
-     inside it, and your own run would be cut off.
-
-  From outside Bench (a terminal, another app), `.agents/skills/bench-kit/scripts/ship.sh` does
-  3 and 4 itself: quits Bench the honest way (`osascript … quit`), rebuilds it, opens it. The way
-  back from a bad change is an earlier commit, rebuilt — there is no second app and no second
-  build: Bench is one app, signed with the Apple Development certificate, so macOS asks for
-  each permission once.
+- **The change loop**, the same for every change: change and look at your own copy
+  (`.agents/skills/bench-kit/scripts/shot.sh`, on the demo's made-up data), checks and one commit,
+  `scripts/bundle-macos.sh` at once, ask the person to restart ("собрано — перезапусти Bench"). Never
+  rebuild the app to see a change. The steps are `.agents/skills/bench-kit/SKILL.md`'s.
 - **Never kill Bench or quit it** (`pkill`, deleting its `.app`, an ad-hoc quit; only `ship.sh`
   from outside): it is the window the person works in.
 - **Don't push without asking.** The repository is public: no private names, tokens or the
@@ -195,8 +184,9 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 - **Screenshots only of your own copy** (`.agents/skills/bench-kit/scripts/shot.sh`, with
   `BENCH_DEMO=…` or `BENCH_HOME=<a copy>`), never the person's window.
 - **Disk space is tight.** Clean `target/` (`cargo clean --profile dev`) before it fills.
-- **Checks.** The main check of anything the person will see is the picture of your own copy
-  (step 1 of the loop, `shot.sh` on demo data): a change is not done until you have looked at it.
+- **Checks.** The main check of anything the person will see is the picture of your own copy: a
+  change is not done until you have looked at it. Many screens touched: every demo state against a
+  reference (`.agents/skills/bench-kit/scripts/pixels/`).
   Then `cargo build` with zero warnings, `cargo test --workspace`, and
   `cd agent && node --test test/*.test.ts` for agent changes.
 
@@ -205,8 +195,8 @@ missing or buggy, work around it in our code and say so in a comment. Never patc
 The look is a Mac app's — Xcode, Finder, Mail, Messages, System Settings — settled as final on
 2026-10-28: extend it in the same voice, with Apple's concrete values, never a look of one's own.
 Assemble from `bench_ui` (`crates/ui`, shown by the storybook). A size or a gap is a `bench_ui`
-constant or `Gap` step, never a `px(…)` written in a screen; a missing piece is added to
-`crates/ui` first. The rules: `.agents/skills/bench-kit/references/design-look-rules.md`.
+constant or `Gap` step (`.gap(Gap::M)`, `.px(Gap::L)`), never a `px(…)` or a bare Tailwind spacing
+(`gap_2`, `px_3`) written in a screen; a missing piece is added to `crates/ui` first. The rules: `.agents/skills/bench-kit/references/design-look-rules.md`.
 
 - **Colours.** One look, two halves: `BENCH_LIGHT` and `BENCH_DARK` in
   `crates/ui/src/theme/palettes.rs` plus their syntax JSON (`assets/themes/bench-*.json`, checked

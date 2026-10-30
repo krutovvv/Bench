@@ -21,9 +21,9 @@ places that every view fills in its own way:
 │              │                               │                │
 │ Threads      │ Chat — the open thread        │ the thread     │
 │ Explorer     │ Doc — the open document, tabs │ beside a       │
-│              │ Providers — the gear          │ document       │
-│              │ Project — a project's Settings│ (RightPanel::  │
-│              │ NewProject                    │  Thread)       │
+│              │ Settings — the gear           │ document       │
+│              │ NewProject                    │ (Panel::       │
+│              │                               │  Thread)       │
 └──────────────┴───────────────────────────────┴────────────────┘
 ```
 
@@ -39,7 +39,7 @@ places that every view fills in its own way:
   demand. The same button, still in that corner and pressed, closes it and brings the thread back;
   the strip over the sidebar keeps its "+" and the fold under either panel.
   A new
-  way to look at things (search across threads, git, tasks) is a new `Panel` in the left dock's
+  way to look at things (search across threads, git) is a new `Panel` in the left dock's
   list, nothing else changes.
 - **The center** is `Center` (`src/workspace/mod.rs`): what the sidebar's click opened. A thread's click shows `Chat`; a
   file's click shows `Doc` with a tab per open document (the tabs are the center's own bar,
@@ -68,10 +68,10 @@ Its tree:
 | Agent | `SYSTEM.md` (its soul), prompts, skills by where they live; then its tools: MCP servers, language servers | the agent's own files (`~/.bench/projects/<id>/`), a folder's `.agents/skills`; the environment's parts whose `group()` is "Agent" |
 | Project | scheduled jobs, then its Settings | the agent's cron (`group()` "Project"); the settings document |
 
-Every tab holds an `Item` (`explorer/item.rs`, as Zed's): its tab, unsaved changes, what
+Every tab holds an `Item` (`explorer/pane/item.rs`, as Zed's): its tab, unsaved changes, what
 opening it reads, how it is drawn, saved and closed; `DocKey` is the tab's identity and
 `DocKey::item` the one place that tells the kinds apart. Everything that is a file is opened as
-one: an editor of its own (`explorer/file.rs`, `Doc`),
+one: an editor of its own (`explorer/pane/file.rs`, `Doc`),
 read and written through `/api/fs/read-text` and `write-text`; saving the agent's own text reads
 the environment again (the composer's @ list follows). What is not a file — an MCP server with
 its state and sign-in, a job with its schedule — is a **part**: an `ExplorerParts` section's `items()` in
@@ -79,13 +79,13 @@ the tree and its `card()` in the middle (`DocKey::Part`, `PartItem`). A new kind
 project is one of the two: files need nothing new; a part is a `Section` and `ExplorerParts` in
 `PARTS` (its `group()` the tree's group).
 
-The tree's work (`explorer/ops.rs`; ⌘P `file_finder.rs`, ⌘⇧F `project_search.rs`): folders are listed when they open (`/api/fs/list`), a name
+The tree's work (`explorer/tree/ops.rs`; ⌘P `search/file_finder.rs`, ⌘⇧F `search/project_search.rs`): folders are listed when they open (`/api/fs/list`), a name
 is typed in place for a new file, folder, prompt, skill or a rename, a delete is asked once.
 ⌘P opens a file by name (`/api/fs/files`: ripgrep's list of the folder), ⌘⇧F finds a text in it
 (`/api/fs/grep`), ⌘S saves, ⌘W closes the tab.
 
 What it was left with — the open tabs and the one shown, each project's open folders and groups —
-is kept on this Mac (`explorer.json` in the state folder, `explorer/persistence.rs`) and comes
+is kept on this Mac (`explorer.json` in the state folder, `explorer/pane/persistence.rs`) and comes
 back the first time the Explorer opens after a start; another project's tree comes back as it
 was left too.
 
@@ -131,36 +131,37 @@ Phases, each a thing of its own:
    right dock's panels; references from the code to the thread.
 2. **Language servers through the agent** (in the editor: done). The servers the threads use
    (`agent/src/lsp/lsp.ts`) answer the editor too: `POST /api/lsp/{diagnostics,hover,definition}`
-   (`agent/src/modules/lsp.ts`) with the file's text as typed; `explorer/lsp.rs` gives the
+   (`agent/src/modules/lsp.ts`) with the file's text as typed; `explorer/code/lsp.rs` gives the
    editor its providers — problems underlined (checked on open, save and a pause in typing),
    the hover, ⌘-click or F12 to the definition (another file opens as a tab). The project's
    **Problems** (⌘⇧M, the folder's menu) is a tab, as Zed's project diagnostics are
-   (`DocKey::Problems`, `explorer/problems.rs`): every error and warning the servers know, a
+   (`DocKey::Problems`, `explorer/code/problems.rs`): every error and warning the servers know, a
    click opens the file at its line; "Send to the thread" (and a file tab's "Send its problems
-   to the thread") puts them in the composer as a reference (`thread/attachments.rs`
+   to the thread") puts them in the composer as a reference (`thread/composer/attachments.rs`
    `Reference::Problems`), beside ⌘L's code.
 3. **A terminal in the bottom dock** (done): `Panel::Terminal` (`src/inserts/terminal/panel.rs`),
-   ⌃` or the title bar's button — the `/terminal` insert's shell (`servers.rs` `Tab`,
-   `session.rs`) on the project's machine, started in its folder, one per project (the
+   ⌃` or the Code status bar's button — the `/terminal` insert's shell (`inserts/terminal/session.rs`)
+   on the project's machine, started in its folder, one per project (the
    Explorer's while it is shown, else the thread's). "Send to the thread" puts its selection,
    or its last lines, in the composer (`Reference::Terminal`).
-4. **Git at a glance** (done, `explorer/git.rs`): a file's lines changed since HEAD marked in
+4. **Git at a glance** (done, `explorer/code/git.rs`): a file's lines changed since HEAD marked in
    its gutter as it is typed (added green, changed yellow, a red rule where lines were removed:
    `LineMark`, added to the vendored editor, `vendor/gpui-base`), HEAD's text from the agent
    (`/api/git/head`, on the file's machine); its diff against HEAD a read-only tab
-   (`DocKey::Diff`: the file head's button, its tab's and the tree's "Changes since HEAD").
+   (`DocKey::Diff`: the file head's button, its tab's and the tree's "Changes since HEAD"). A turn's
+   diff (`DocKey::TurnDiff`, `explorer/code/turn_diff.rs`) is the same pane with another title.
 
 ## Growing it
 
-- Another source of files in the tree (a second folder, a worktree): a group in `tree.rs` whose
+- Another source of files in the tree (a second folder, a worktree): a group in `tree/parts.rs` whose
   rows are `FileRef`s — opening, saving, renaming already work for any of them.
-- A diff view, an image viewer, a Markdown preview: another body in `view.rs` `file_pane` for
+- A diff view, an image viewer, a Markdown preview: another `Item` (`pane/item.rs`), a `DocKey` variant, for
   the kind of file (`Doc::binary` already says "not text").
 - A panel in a dock (a second thread, a Problems panel): a
   `Panel` variant, its dock's list in `BenchApp::new`, its drawing in `render_panel`. A split
   middle: documents are already shared by key.
 - A thread opening a file (a changed file in its answer) in the editor, itself beside it: done in
-  `thread/changed_files.rs` (`open_doc` + `right_dock.activate(Panel::Thread)`).
+  `thread/rows/changed_files.rs` (`open_doc` + `right_dock.activate(Panel::Thread)`).
 
 ## What the person sees, briefly
 
