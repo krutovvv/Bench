@@ -46,7 +46,7 @@ fn bundled_source() -> Option<PathBuf> {
 }
 
 /// What gets installed: the package files and the folders the server runs from.
-const PARTS: [&str; 4] = ["src", "scripts", "package.json", "package-lock.json"];
+const PARTS: [&str; 3] = ["src", "package.json", "package-lock.json"];
 
 fn node_ok(version: &str) -> bool {
     let mut parts = version

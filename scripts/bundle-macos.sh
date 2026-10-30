@@ -65,7 +65,7 @@ PY
 # bench-agent's sources (the Pi backend); Bench installs them into ~/.bench/app and runs
 # `npm ci` there, so node_modules stays out of every build.
 mkdir -p "$NEW/Contents/Resources/agent"
-cp -R agent/src agent/scripts agent/package.json agent/package-lock.json "$NEW/Contents/Resources/agent/"
+cp -R agent/src agent/package.json agent/package-lock.json "$NEW/Contents/Resources/agent/"
 
 # Icon: render the SVG mark, then build an .icns with every size macOS asks for.
 WORK=$(mktemp -d)
