@@ -56,7 +56,7 @@ impl ThreadView {
                     bench_ui::icon_button(
                         (id.clone(), 0),
                         Ico::Check,
-                        "Keep these words (⌘Enter)",
+                        "Keep these words (Enter)",
                         false,
                         cx,
                     )
@@ -170,16 +170,19 @@ impl ThreadView {
         let field = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .auto_grow(1, 100_000)
-                .submit_on_enter(false)
+                // As in the composer: Enter keeps the words, Shift+Enter (or ⌘Enter) is a new
+                // line.
+                .submit_on_enter(true)
         });
         field.update(cx, |s, cx| s.set_value(text, window, cx));
         cx.subscribe_in(&field, window, |this, _, ev: &InputEvent, window, cx| {
-            // Enter is a new line, as in the composer; ⌘Enter keeps the change.
+            // Enter keeps the change, as it sends in the composer; Shift+Enter and ⌘Enter are a
+            // new line.
             if matches!(
                 ev,
                 InputEvent::PressEnter {
-                    secondary: true,
-                    ..
+                    secondary: false,
+                    shift: false,
                 }
             ) {
                 this.queue_edit_save(window, cx);

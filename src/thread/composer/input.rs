@@ -1,6 +1,6 @@
 //! The input: the thread's next message — the person's avatar and the text,
-//! at the messages' size, growing with what is typed. No buttons (⌘Enter sends, ⌘⇧D dictates,
-//! files are dropped); stopping the agent is Send's Stop, ⌘..
+//! at the messages' size, growing with what is typed. No buttons (Enter sends as in Telegram,
+//! ⌘⇧D dictates, files are dropped); stopping the agent is Send's Stop, ⌘..
 
 use gpui_kit::component::input::Textarea;
 use gpui_kit::component::tooltip::Tooltip;
@@ -209,7 +209,7 @@ impl ThreadView {
 
     pub(crate) fn render_composer(&mut self, cx: &mut Context<Self>) -> AnyElement {
         let theme = cx.theme().clone();
-        // No buttons here: ⌘Enter sends, ⌘⇧D (or the composer's mic) dictates, files are
+        // No buttons here: Enter sends (Shift+Enter a new line), ⌘⇧D (or the composer's mic) dictates, files are
         // dropped or pasted. Stopping the agent is Send's Stop, ⌘..
         let slash = self.render_slash(cx);
         let mut chips: Vec<AnyElement> = vec![];
@@ -496,7 +496,7 @@ impl ThreadView {
             // The next turn of the thread: it is the thread's last row (it
             // scrolls with it). Avatar, the text and
             // the buttons sit on one line; the text starts where messages' text does and grows
-            // down. Enter is a new line, ⌘Enter sends; the buttons — an answer's own small ones —
+            // down. Enter sends, Shift+Enter (or ⌘Enter) is a new line; the buttons — an answer's own small ones —
             // show on hover (⌘⇧D dictates, files are dropped or pasted), a Stop that matters
             // always.
             .child(if in_list {

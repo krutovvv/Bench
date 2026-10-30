@@ -72,18 +72,21 @@ impl ThreadView {
         let composer = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .auto_grow(1, 100_000)
-                .submit_on_enter(false)
+                // As in Telegram: Enter sends, Shift+Enter (or ⌘Enter) is a new line.
+                .submit_on_enter(true)
                 // One quiet line on an empty row: what it is and its two keys.
-                .placeholder("Write to the agent · / for a tool")
+                .placeholder("Write to the agent · Enter sends · Shift+Enter a new line")
         });
         let clarify_input =
             cx.new(|cx| InputState::new(window, cx).placeholder("Your own answer — Enter to send"));
         let subscriptions = vec![
             cx.subscribe_in(&composer, window, |this, _, ev: &InputEvent, window, cx| {
                 match ev {
-                    // Enter is a new line; ⌘Enter sends.
+                    // Enter sends; Shift+Enter and ⌘Enter are a new line (the state grew the
+                    // text itself for those, so only the bare Enter lands here).
                     InputEvent::PressEnter {
-                        secondary: true, ..
+                        secondary: false,
+                        shift: false,
                     } => this.send(window, cx),
                     // New text: the command list starts over at its first row.
                     InputEvent::Change => {
