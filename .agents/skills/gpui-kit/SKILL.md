@@ -1,6 +1,6 @@
 ---
 name: gpui-kit
-description: 'How to build desktop applications with GPUI Kit, the Rust framework published as the gpui-kit crate (GPUI plus gpui_kit::component, gpui_kit::base, gpui_kit::assets). Use when setting up a gpui-kit app, choosing or using a component (Button, Input, Select, Dialog, Sheet, Tabs, Sidebar, List, DataTable, Tree, Chart, etc.), handling component state, theming, or window overlays, and for GPUI mechanics: actions and keybindings, async tasks, contexts, custom elements, entities, events, focus, global state, layout and styling, ElementId, and tests including UI integration testing. Holds the normative Coding Guides: read them before any architecture, state-ownership, public API, naming, or testing decision. Pairs with the gpui-kit-design-guides skill for the Design Guides.'
+description: "Use for how a gpui-kit component or a GPUI API works, once bench_ui (crates/ui) has no answer. Not for Bench's look."
 ---
 
 # GPUI Kit
@@ -23,15 +23,12 @@ similar file in the codebase, or from training data.
 
 | Guide                                                  | Read before                                                                                                                   |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| Design Guides, skill `gpui-kit-design-guides`          | Choosing components, layout, spacing, hierarchy, color, density, interaction states, overlays, motion, interface copy          |
+| [Design Guides](references/design-guides.md)           | Choosing components, layout, spacing, hierarchy, color, density, interaction states, overlays, motion, interface copy          |
 | [Coding Guides](references/coding-guides.md)           | Crate layering, `RenderOnce` vs `Entity<T>`, state ownership, `ElementId`, events, focus, async, public API, naming, testing |
 
-Read the Design Guides first when the change has a visible surface: code
-structure preserves product intent, it does not replace it. If the design
-skill is not installed, fetch `https://gpui-kit.com/docs/design-guides.md`.
-The coding guide is a verbatim copy of `https://gpui-kit.com/docs/coding-guides.md`,
-so its links to `./design-guides.md` and `./getting-started.md` mean the design
-skill and `https://gpui-kit.com/docs/getting-started.md`.
+In Bench the look is settled: `bench-kit`'s `references/design-look-rules.md` wins over the Design
+Guides, which are here for what those rules do not cover. The two guides are verbatim copies of
+`https://gpui-kit.com/docs/`.
 
 ### Coding Guides section map
 

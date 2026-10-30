@@ -115,7 +115,7 @@ cargo build 2>&1 | grep -E '^(warning|error)' -A7 | head -40
   timeout; later builds take 20–30 s.
 - An error you don't understand: read the whole message (the `-A7` lines). Then look up how
   the code already calls it (`grep -rn 'fn_name' src crates`) or the gpui-kit
-  pages (`gpui-kit-usage.md`). Don't guess method names: `ui-gotchas.md` lists those that
+  pages (the skill `gpui-kit`, `references/usage.md`). Don't guess method names: `ui-gotchas.md` lists those that
   already went wrong.
 
 ## 7. Measure AFTER, compare with the target

@@ -58,3 +58,24 @@ radii) rather than inventing them. Zed stays the reference for how the window is
     where macOS itself title-cases a menu).
 15. **Lightweight only.** No browser engines, WebViews or JS runtimes inside the app; slow work
     only on request.
+
+## In short, each with its values
+
+- **Colours.** One look, two halves: `BENCH_LIGHT` and `BENCH_DARK` in
+  `crates/ui/src/theme/palettes.rs` plus their syntax JSON (`assets/themes/bench-*.json`, checked
+  against the palette by `cargo test -p bench_ui`). Light or dark is the person's Mode, macOS's by
+  default; there is no theme or accent to choose (one accent, Bench's blue). A thread's or a
+  project's mark is a Finder tag dot (`bench_ui::mark`).
+- **Type.** The thread's words 14, its meta 13; sidebar rows 13, group heads 11 semibold in
+  their own case; bars 12, the title 13 semibold; controls 13; code Menlo 12 at Zed's leading.
+- **Controls.** Mac ones: segmented controls, switches, pull-downs, navigator glyphs, a
+  completion list for `/`, the menu bar with every shortcut (`src/app/menu.rs`).
+- **The thread.** A classic chat: the person's grey bubbles, no avatars, a centred column,
+  the composer pinned as one rounded field (plus, text, mic, Send). The document look stays in
+  code (`src/thread/look.rs`).
+- **Blocks.** Grouped boxes: the page's ground, a soft hairline, a card's corner
+  (`block_frame`); every block head is `block_head`. Fields are `FIELD_H` (28).
+- **Scrolling.** Only the thread scrolls, with a Mac's overlay scrollbar. No scroll inside a
+  scroll, except the terminal and editors. Lists are as long as they are. Empty states take one
+  line.
+- **One place for each change.** A change to how blocks look goes to all of them at once.

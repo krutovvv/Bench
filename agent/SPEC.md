@@ -21,7 +21,7 @@ the list of servers' agents.
 - **Pi Durable does the work, unmodified and in Pi's terms**: a thread is a Pi conversation in
   `~/.bench/pi.sqlite`, every step durable. How each Bench concept maps onto Pi — inserts,
   queue, plan, pause, code mode, fork, compaction, processes, MCP, Telegram — is the
-  table "How the agent uses Pi Durable" in `AGENTS.md`; it is not repeated in the specs. What Pi
+  table in `docs/pi-durable.md`; it is not repeated in the specs. What Pi
   lacks is worked around here and said so in a comment (the pause, the model's streams, the fallback model, background
   processes); Pi is never patched.
 - **The wire is `protocol`'s.** The agent imports its types from the generated

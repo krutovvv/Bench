@@ -29,7 +29,7 @@ words, one place for each change: `.agents/skills/bench-structure/SKILL.md`).
 ## The concepts
 
 The exact vocabulary — thread, insert, card, agent, project, host, Explorer, the gear — is
-defined once in `AGENTS.md` ("The concepts") and used unchanged in every spec. Three cores carry
+defined once in `docs/concepts.md` and used unchanged in every spec. Three cores carry
 the product, equal in weight:
 
 - **Threads** — a conversation with the agent as a document of messages, the agent's work and

@@ -1,6 +1,6 @@
 # Where is what
 
-One page to open before reading code. Find the row, open that file, not its neighbours.
+One page to open before reading code. Find the row, open that file, and look at its folder too.
 
 ## The common changes
 

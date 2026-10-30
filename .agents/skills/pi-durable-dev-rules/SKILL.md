@@ -1,7 +1,7 @@
 ---
 name: pi-durable-dev-rules
 version: 0.1.0
-description: "Developer reference for building applications, tools, and agents on the Pi Durable agent harness (@earendil-works/pi-durable) and the pi-ai model layer. Use when writing or debugging code that imports @earendil-works/pi-durable or pi-ai: assembling a Harness over memory/SQLite/JSONL/Durable Object storage, submitting input and waiting for answers, defining tools with TypeBox schemas and structured output, calling tools from tools, hooks and guards, durable tasks with checkpoints and ownership, subagents and child tasks, documents and migrations, code mode, tool search, per-conversation environments, compaction, recovery after a crash, storage and environment conformance tests, or choosing models and providers. Also use when a durable/agent-runtime behavior question comes up: what survives a restart, why an input stayed queued, why a task is blocked or orphaned, how abort cascades, or what the Pico5 specification requires."
+description: "Use when changing agent code that touches Pi Durable or pi-ai: hooks, tools, tasks, sections, models, compaction."
 license: MIT
 metadata: {"source":"https://github.com/earendil-works/pi/tree/main/packages/durable","docVersion":"1.2.0","fetched":"2026-10-13","piRevision":"b9ab2a623","piDurableVersion":"1.2.0","version":"0.1.0"}
 ---
@@ -15,12 +15,10 @@ mid-turn is picked up where it stopped. It ships in the pi monorepo next to `@ea
 
 Two things about it decide most design choices:
 
-- **The API is experimental.** This snapshot describes version 1.2.0 (fetched 2026-10-13); Bench has
-  1.4.0 installed. Breaking changes land in every release: what changed since is
-  `agent/node_modules/@earendil-works/pi-durable/CHANGELOG.md`, the sources beside it and the live docs
-  at pi.dev/docs/latest. Quote and write against the version installed, and treat a signature
-  difference as a version difference rather than a mistake. `scripts/refresh.sh` rebuilds the bundles
-  from a local Pi checkout.
+- **The API changes in every release.** These pages describe version 1.2.0; Bench has 1.4.0
+  installed. When a page and the code differ, the code wins: the sources and `CHANGELOG.md` in
+  `agent/node_modules/@earendil-works/pi-durable/`. `scripts/refresh.sh` rebuilds the pages from a
+  local Pi checkout.
 - **It is a library for building agentic applications, not a coding-agent CLI.** Pi's MCP package, as
   Bench uses it: `references/pi-mcp.md`.
 

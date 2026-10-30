@@ -1,6 +1,6 @@
 ---
 name: bench-kit
-description: "Bench Kit: how to change Bench, a native workbench for working with an AI agent (Rust + GPUI, gpui-kit 0.8) on its own agent in agent/ (Pi Durable). The two cores — the thread (Pi's journal as rows on a list that only the person moves) and projects/agents/machines (where each project lives) — where each thing is (docs/map.md), the elements every screen is built from (crates/ui, the storybook), how to change the UI (sections, inserts, the sidebar, the gear), the agent's modules and tools, the change loop with screenshots, shipping. Use for any change to Bench (~/Projects/bench)."
+description: "Use for any UI or insert change in Bench: the sidebar, thread, settings, Explorer, bench_ui; how to look at a change."
 version: 6.0.0
 author: The user and their agents (from building Bench, ~/Projects/bench)
 license: MIT
@@ -12,26 +12,22 @@ metadata:
 
 # Bench Kit
 
-Bench is a thread-centric app: a thread is a document of messages and the person's **inserts**
-(live tools put in with `/`); a **project** belongs to an **agent** (this Mac's or a server's)
-and says where its work is; its **environment** is edited on its Settings page. The repository's
-`AGENTS.md` has the concepts and the rules; this kit has the how.
+How to change what Bench shows. The words are in `docs/concepts.md`, how to work in `AGENTS.md`.
 
-## Find before you read
+## Where to look, in this order
 
-1. **Where is X?** `docs/map.md` answers it in one table. Open that file, not its neighbours.
-2. **What does an element look like?** `cargo run -p storybook` or `crates/storybook/reference/`;
-   the call for each: `references/ui-catalog.md`.
-3. **Why is it built this way?** `docs/architecture.md`, `docs/thread-rewrite.md`,
-   `docs/remote-projects.md`; the module's `SPEC.md`.
+1. Where the code is: `docs/map.md`.
+2. What an element looks like: `crates/storybook/reference/`. The call for each:
+   `references/ui-catalog.md`.
+3. Whether it exists: `crates/ui`, and the pages below (`ui-overlays.md` for menus). Missing: add
+   it to `crates/ui`.
+4. How the framework does it: one grep for the name, no reading around. gpui-kit is a facade over
+   `gpui-component-0.8.0` (`~/.cargo/registry/src/index.crates.io-*/gpui-component-0.8.0/src`);
+   GPUI is `vendor/gpui-base` (patched), its `text_xs`… in `gpui-pre-0.3.9/src/styled.rs`.
+5. Why it is built this way: the module's `SPEC.md`, `docs/architecture.md`.
 
-Never search `~/.cargo/registry` for how gpui-kit draws something: the answer you need is a
-constant or an element in `crates/ui`, or a page here (`ui-overlays.md` for menus). If it is
-missing there, add it there. When the framework's own source must be read: gpui-kit is a facade
-over `gpui-component-0.8.0` (`~/.cargo/registry/src/index.crates.io-*/gpui-component-0.8.0/src`);
-gpui itself is `vendor/gpui-base` (patched), its `text_xs`… in `gpui-pre-0.3.9/src/styled.rs`.
-Go there directly, with one grep. A `Button` that ignores a font size or won't wrap: the answer
-is in `ui-gotchas.md` ("A `Button` is not a row of text").
+A `Button` that ignores a font size or won't wrap: `ui-gotchas.md` ("A `Button` is not a row of
+text").
 
 ## The two cores (read before touching them)
 
@@ -77,35 +73,16 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 
 ## Working on Bench from inside Bench
 
-**The loop, for every change:**
+The loop is in `AGENTS.md`. What it needs beyond that:
 
-1. **Change → `cargo build` → look at your own copy.**
-   `.agents/skills/bench-kit/scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=landing` starts a separate
-   copy of the debug binary (no app, a plain Dock icon, no permissions asked) on made-up data,
-   takes the picture and quits it. Read the picture; change, build, shoot again until it is
-   right. The demo is a fake agent; every hook (`BENCH_DEMO=env`, `BENCH_PANEL=providers`…) is in
-   one table in `references/build-verification.md`, the check of every demo state against a
-   reference in `scripts/pixels/`. Never rebuild the app to see a change.
-   The picture is taken by macOS's `screencapture`, which asks for the app you run under: as
-   Bench's agent, Bench needs Privacy & Security → Screen & System Audio Recording. No picture
-   while the copy started ("no window for pid", nothing in its log)? Ask the person to allow
-   Bench there, once.
-2. **Checks, then commit** — one change, one commit.
-3. **Build the app at once** (no need to ask): `scripts/bundle-macos.sh` rebuilds
-   `/Applications/Bench.app` in place and quits nothing — the running Bench is a binary already
-   loaded and goes on from its old copy.
-4. **Ask the person to restart Bench** ("собрано — перезапусти Bench"). Never quit, restart or
-   open it yourself: you run inside it, and your run would be cut off. (From outside Bench,
-   `.agents/skills/bench-kit/scripts/ship.sh` does 3 and 4: quits Bench the honest way, rebuilds,
-   opens it.)
-
-Never `pkill` Bench. A Bench opened while the bundle is being written starts on half of it:
-build again.
-- **Checks**: `cargo build` (zero warnings), `cargo test --workspace`,
-  `cd agent && node --test test/*.test.ts`.
-- **Back up before a migration or a deletion** of the person's data (`~/.bench/backups/`).
-- **Small steps**: one change, build, look, commit. Past 40 tool calls without a running result:
-  stop and say what is hard.
+- The demo is a fake agent. Every hook (`BENCH_DEMO=env`, `BENCH_PANEL=providers`,
+  `BENCH_DEMO_DRAG=…`) is in one table in `references/build-verification.md`. Every demo state
+  against a reference, for a change to many screens: `scripts/pixels/`.
+- The picture is taken by macOS's `screencapture`. No picture while the copy started ("no window
+  for pid", nothing in its log): ask the person to allow Bench in Privacy & Security → Screen &
+  System Audio Recording, once.
+- From outside Bench, `scripts/ship.sh` quits Bench the honest way, rebuilds it and opens it.
+- A Bench opened while the bundle is being written starts on half of it: build again.
 
 ## Pages
 
@@ -124,4 +101,4 @@ build again.
 | `references/build-hard-won-rules.md`, `build-workflow.md`, `build-custom-render.md` | Rules each paid for by a round of feedback; how a piece of work goes; a custom element |
 | `references/design-*.md` | The look's rules and the person's preferences |
 | `references/ui-areas.md`, `ui-content.md`, `ui-overlays.md`, `ui-gotchas.md` | Where things go in the window, editors and Markdown, menus and popovers, pitfalls |
-| `references/gpui-*.md` | The framework's own reference — only for what none of the above answers |
+| The skill `gpui-kit` | The framework's own reference: only for what none of the above answers |

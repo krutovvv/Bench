@@ -53,4 +53,4 @@ Bench (`journal.ts`), the pause (`hold.ts`), the queue (`queue.ts`), questions a
   fork starts free.
 - An insert's `<block-state>` is appended to the message text the model gets and stripped from
   what Bench shows (`BLOCK_OPEN`/`BLOCK_CLOSE`), so the model's transcript keeps each one
-  (unconfirmed whether that growth is intended; `AGENTS.md` says "kept out of the history").
+  (unconfirmed whether that growth is intended; `docs/concepts.md` says "kept out of the thread Bench shows").

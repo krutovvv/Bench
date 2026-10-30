@@ -183,11 +183,11 @@ Bench is built from inside itself: I talk to the agent in Bench, and it changes 
 checks the change on its own copy of the app with made-up data, commits it and rebuilds the app.
 Everything that loop needs is in the repository, so it works in your fork too:
 
-- [`AGENTS.md`](AGENTS.md): what an agent reads first, the concepts and where everything is;
+- [`AGENTS.md`](AGENTS.md): what an agent reads first: how to work here and where to look;
 - [`docs/map.md`](docs/map.md): the file for each common change;
 - `SPEC.md` beside every module: why it is built the way it is, linked into one tree;
 - [`.agents/skills/bench-kit`](.agents/skills/bench-kit/SKILL.md): the UI pieces with pictures,
-  the look's rules, how to check a change with a screenshot, the GPUI reference.
+  the look's rules, how to check a change with a screenshot.
 
 Fork, open it with your coding agent (or in Bench itself), describe the feature.
 

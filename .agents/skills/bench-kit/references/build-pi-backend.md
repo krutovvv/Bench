@@ -140,7 +140,7 @@ Each piece is Pi's own mechanism used as documented; only the glue is ours.
   (`config.ts` `compactionPolicy`, read by Pi at every use through `runtime/models.ts`
   `compactionOverrides`); `turn/compaction.ts` (`beforeCompact`) summarizes with the same model,
   reasoning off.
-- **Code mode, the evaluator**: AGENTS.md's table has code mode; `agent/src/judge/SPEC.md` the evaluator.
+- **Code mode, the evaluator**: `docs/pi-durable.md` has code mode; `agent/src/judge/SPEC.md` the evaluator.
 - **Presets and servers' agents**: `builtin/presets.ts` (setting `presets`: MCP and language
   servers, compaction shares, reasoning levels; `/api/presets`), `builtin/servers.ts` (setting
   `agents`: the servers' agents this Mac knows; `/api/agents`). Kept by this Mac's agent; a
