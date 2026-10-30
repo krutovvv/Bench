@@ -23,7 +23,7 @@ and says where its work is; its **environment** is edited on its Settings page. 
 2. **What does an element look like?** `cargo run -p storybook` or `crates/storybook/reference/`;
    the call for each: `references/ui-catalog.md`.
 3. **Why is it built this way?** `docs/architecture.md`, `docs/thread-rewrite.md`,
-   `docs/remote-projects.md`.
+   `docs/remote-projects.md`; the module's `SPEC.md`.
 
 Never search `~/.cargo/registry` for how gpui-kit draws something: the answer you need is a
 constant or an element in `crates/ui`, or a page here (`ui-overlays.md` for menus). If it is
@@ -45,7 +45,12 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 
 ## The shape of every change
 
-- **An element or a size** → `crates/ui` (and the storybook). Never `px(…)` in a screen.
+- **An element or a size** → `crates/ui` (and the storybook). A screen writes no `px(…)` and no
+  bare Tailwind spacing (`gap_2`, `px_3`): `.gap(Gap::M)`, `.px(Gap::L)`, `bench_ui::row`/`stack`,
+  a named constant in `metrics.rs`.
+- **Something clickable** → a `bench_ui` element, or wrapped in `bench_ui::own_press`: what handles
+  a click stops its propagation, or the thread takes the press and gives the composer the focus
+  (`ThreadView::press`).
 - **What the thread shows, its order** → `crates/thread` (rules as tests), drawn by `src/thread/`.
 - **Where a project lives, a new kind of place** → `src/app/places.rs` + the agent's project row.
 - **A new insert** → a folder in `src/inserts/` (`references/build-insert.md`).
@@ -56,13 +61,17 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
   (`src/env/mod.rs`); where it lives: `place.rs`; its data from `/api/projects/<id>/env`.
 - **The sidebar** → `src/sidebar/mod.rs` draws; what is done to a thread or project (menu, pin,
   color, rename, ⌫⌫, ↑↓) is `src/sidebar/items.rs`, marks in `src/sidebar/marks.rs`.
-- **The gear** → `src/settings/mod.rs`: tabs Agents (each agent's models and voice, add/remove a
-  server's agent: `src/settings/agent_form.rs`), Presets (`src/settings/presets.rs`; defaults in
-  `agent/src/builtin/presets.ts`), Appearance (`src/settings/appearance.rs`).
+- **The gear** → `src/settings/mod.rs`: tabs Agents (each agent's providers `providers.rs`, voice
+  `voice.rs`, evaluator servers `evaluator.rs`, their shared form `server_form.rs`; add/remove a
+  server's agent `agent_form.rs`), Presets (`presets.rs`; defaults in
+  `agent/src/builtin/presets.ts`), Appearance (`appearance.rs`). Its `SPEC.md` says why.
 - **A new area of the agent** → a module in `agent/src/modules/`, a line in `server.ts`.
 - **A tool of the agent** → `agent/src/builtin/<tool>.ts`, listed in `extensions/assistant.ts`;
   through `api.env` it works on the project's machine. Code tools: grep, glob, ls
-  (`builtin/search.ts`); diagnostics after each edit from language servers (`lsp.ts`).
+  (`builtin/search.ts`); diagnostics after each edit from language servers
+  (`builtin/diagnostics.ts`, `lsp/lsp.ts`).
+- **What a turn's hooks keep, the evaluator** → `agent/src/turn/`, `agent/src/judge/` (each has a
+  `SPEC.md`).
 - **A type Bench and the agent share** → `crates/protocol`; `cargo test -p protocol` writes
   `agent/src/protocol.gen.ts`.
 
@@ -71,11 +80,12 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
 **The loop, for every change:**
 
 1. **Change → `cargo build` → look at your own copy.**
-   `scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=landing` starts a separate
+   `.agents/skills/bench-kit/scripts/shot.sh target/debug/bench /tmp/after.png 10 BENCH_DEMO=landing` starts a separate
    copy of the debug binary (no app, a plain Dock icon, no permissions asked) on made-up data,
    takes the picture and quits it. Read the picture; change, build, shoot again until it is
-   right. The demo's threads and every hook (`BENCH_DEMO=env`, `BENCH_PANEL=providers`…):
-   `references/build-verification.md`. Never rebuild the app to see a change.
+   right. The demo is a fake agent; every hook (`BENCH_DEMO=env`, `BENCH_PANEL=providers`…) is in
+   one table in `references/build-verification.md`, the check of every demo state against a
+   reference in `scripts/pixels/`. Never rebuild the app to see a change.
    The picture is taken by macOS's `screencapture`, which asks for the app you run under: as
    Bench's agent, Bench needs Privacy & Security → Screen & System Audio Recording. No picture
    while the copy started ("no window for pid", nothing in its log)? Ask the person to allow
@@ -86,7 +96,8 @@ is in `ui-gotchas.md` ("A `Button` is not a row of text").
    loaded and goes on from its old copy.
 4. **Ask the person to restart Bench** ("собрано — перезапусти Bench"). Never quit, restart or
    open it yourself: you run inside it, and your run would be cut off. (From outside Bench,
-   `scripts/ship.sh` does 3 and 4: quits Bench the honest way, rebuilds, opens it.)
+   `.agents/skills/bench-kit/scripts/ship.sh` does 3 and 4: quits Bench the honest way, rebuilds,
+   opens it.)
 
 Never `pkill` Bench. A Bench opened while the bundle is being written starts on half of it:
 build again.
@@ -104,12 +115,13 @@ build again.
 | `references/build-thread.md` | The thread core: pipeline, what the view promises, how to see it |
 | `references/build-projects.md` | Projects, agents, machines: the model, the agent side, growing it |
 | `references/ui-catalog.md` | Every element: the call and its file |
-| `references/build-insert.md` | A new kind of insert, end to end, with the six kinds as examples |
+| `references/build-insert.md` | A new kind of insert, end to end, with the three kinds (terminal, browser, tools) as examples |
 | `references/build-architecture.md` | The crates, the app's folders, the agent's modules |
 | `references/build-pi-backend.md` | The agent on Pi Durable: tools, prompt sections, how each insert uses Pi |
-| `references/build-change-loop.md`, `build-verification.md` | One change with before/after pictures and measurements; the demo and its hooks |
+| `references/build-change-loop.md`, `build-verification.md` | One change with before/after pictures and measurements; the demo, the one table of its hooks, the pixel check |
 | `references/build-native-data.md` | Where a tool's data lives (`~/.bench`) |
 | `references/build-crates.md`, `build-media.md`, `build-packaging.md` | Libraries, media, the .app |
+| `references/build-hard-won-rules.md`, `build-workflow.md`, `build-custom-render.md` | Rules each paid for by a round of feedback; how a piece of work goes; a custom element |
 | `references/design-*.md` | The look's rules and the person's preferences |
 | `references/ui-areas.md`, `ui-content.md`, `ui-overlays.md`, `ui-gotchas.md` | Where things go in the window, editors and Markdown, menus and popovers, pitfalls |
 | `references/gpui-*.md` | The framework's own reference — only for what none of the above answers |

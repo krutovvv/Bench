@@ -15,7 +15,7 @@ build time: check with `grep -A1 '^name = "<crate>"' Cargo.lock` first.
 | Async channels | `async-channel = "2"` | thread → UI events |
 | Errors | `anyhow = "1"` | `Result<T>` in I/O code |
 | Terminal | `portable-pty = "0.9"` + `alacritty_terminal = "0.26"` | a PTY and a VT parser (Bench `src/inserts/terminal/session.rs`) |
-| Text diff | `similar = "2"` | changed files' +/- (Bench `src/thread/diff.rs`) |
+| Text diff | `similar = "2"` | lines changed since HEAD, diffs (Bench `src/explorer/code/git.rs`) |
 | IDs | `uuid = { version = "1", features = ["v4"] }` | `Uuid::new_v4()` |
 | Base64 | `base64 = "0.22"` | `STANDARD.encode(bytes)` / `.decode(s)` |
 | Images | `imagesize = "0.13"` (size without decoding), `image = { version = "0.25", default-features = false }` | previews, sizes (Bench decodes nothing itself: gpui's `img()` does) |

@@ -3,13 +3,12 @@
 Every change to a Bench goes through these steps, in this order. Doing them every time is what
 makes the person's "1px off" complaints stop; skipping one is how a change ships unchecked.
 Paths: the project is `~/Projects/bench` (crate `bench`; anywhere else works the same);
-the kit's scripts are `~/Projects/bench/.agents/skills/bench-kit/scripts/` (`K=`
-below). Run every command from the project folder. Units: the scripts that end in `.py` take
+the kit's scripts are `.agents/skills/bench-kit/scripts/` (`K=` below). Run every command from the project folder. Units: the scripts that end in `.py` take
 **points** (as in the code), except `measure.py`, which takes **pixels** (pt × 2).
 
 ```bash
-K=~/Projects/bench/.agents/skills/bench-kit/scripts
 cd ~/Projects/bench
+K=.agents/skills/bench-kit/scripts
 ```
 
 ## 1. Turn the request into a target you can measure
@@ -21,13 +20,13 @@ Write one line for yourself before touching code, with numbers where the request
   text* (one 4pt step, `build-workflow.md`).
 - "Put the folder button next to +" → *Open folder then + in the top strip, on every sidebar;
   the strip's last icon still 16 from the divider*.
-- "The card closes by itself" → *the card is still open 10 s after New task*.
+- "The card closes by itself" → *the card is still open 10 s after it opened*.
 Which area and which procedure: `ui-areas.md` (put / move / fit).
 
 ## 2. Find the code
 
 - Grep a unique visible string: a label, a tooltip, a placeholder:
-  `grep -rn '"Search sessions' src/`, `grep -rn 'Hide sidebar  ⌘' src/`.
+  `grep -rn 'Hide sidebar  ⌘' src/`.
 - Or open the row for it in `docs/map.md`.
 - Read the whole function before editing. The value you need often has a comment saying why
   (`// 22 + the 2px selection stripe = the 24 of the headers`).
@@ -42,12 +41,12 @@ cargo build 2>&1 | grep -E '^(warning|error)|Finished'
 $K/shot.sh target/debug/bench /tmp/before.png 8          # prints the size in px and pt
 ```
 - Pick the state first: `BENCH_DEMO=…` (made-up threads: `1`, `landing`, `top`, `long`, `new`,
-  `tasks`, `server`, `tool`, `env`, `explorer`…) or `BENCH_HOME=<a copy of ~/.bench>` (real
-  data, never the person's own folder): `$K/shot.sh target/debug/bench /tmp/before.png 8
-  BENCH_DEMO=landing`. Every demo state and hook: `build-verification.md`. Only when neither
-  reaches the state, a temporary hook (step 5).
+  `server`, `tool`, `env`, `explorer`…) or `BENCH_HOME=<a copy of ~/.bench>` (real data, never the
+  person's own folder): `$K/shot.sh target/debug/bench /tmp/before.png 8 BENCH_DEMO=landing`. Every
+  demo state and hook: the table in `build-verification.md`. Neither reaches the state: add a hook
+  (step 5).
 - The data sits behind a macOS permission (the microphone, notifications)? A bare binary is
-  refused, and Bench is one app: commit, ask the person to ship, and check it with them in Bench.
+  refused, and Bench is one app: commit, ask the person to restart, and check it with them in Bench.
 - Wait longer when the app connects over SSH: 25–40 s.
 
 Look at it: read the shot itself (the read tool shrinks a 2480×1600 shot to fit and says by
@@ -94,28 +93,17 @@ state, each with its own hook.
 - Change every place that shares the value (`ui-areas.md`, "When a change makes something else
   not fit"), and stale comments and docs that state the old value.
 
-## 5. A temporary hook to reach the state (when needed)
+## 5. A hook to reach the state (when needed)
 
-First try `BENCH_DEMO=…` / `BENCH_HOME=<copy>` (step 3); a state they lack is better added to
-`src/demo/mod.rs` for good. Otherwise one line, marked, at the end of the app's `new()` (or where the
-data arrives):
-```rust
-if std::env::var("DEBUG_UPCOMING").is_ok() { app.open_task_list(List::Upcoming, window, cx); } // DEBUG-TMP
-```
-Call the same methods the buttons call: never post clicks.
+First try `BENCH_DEMO=…` / `BENCH_HOME=<copy>` (step 3). A state they lack is added for good:
+a field with its doc comment in `src/demo/hooks.rs`, what it does in `src/demo/script.rs` (which
+calls the same methods the buttons call, once the fake agent's answers are in), a line in the table
+in `build-verification.md`. Never a branch in product code.
 
-**Where the hook goes matters.** At the end of `new()` it runs before anything has loaded; data
-that arrives later (the sessions list, a chat's history, the tasks) **overwrites** what the hook
-did. Then put it where that data arrives (right after `self.sessions = rows;`). Fake content in
-the thread is a demo thread, not a hook: a `Journal` in `src/demo/mod.rs` (`j.turn(user, thought,
-calls, answer, at, secs)` with `tool("bash", "ls -la")` or `edit(path, diff)` calls), shown with
-`thread(app, id, title, subject, j)` under its own `BENCH_DEMO=<name>`.
-
-Hooks that worked:
-- open a thread with an insert in it (`open_subject_key` with the insert's key, e.g. `ssh:local`) or a list;
-- start a new session;
-- open a session by title (in the handler that receives the sessions list);
-- press New task and shoot twice, 10 s apart (for bugs that need time).
+Fake content in the thread is a demo thread: a `Journal` in `src/demo/journal.rs` (`j.turn(user,
+thought, calls, answer, at, secs)` with `tool("bash", "ls -la")` or `edit(path, diff)` calls), listed
+in `src/demo/threads.rs`. A project's made-up environment is `src/demo/env.rs`; what the fake agent
+answers an RPC or a REST call is `src/demo/agent.rs`.
 
 ## 6. Build
 
@@ -146,33 +134,15 @@ list, the dark theme if colors changed.
 ## 8. Clean up
 
 ```bash
-grep -rl 'DEBUG-TMP' src | xargs sed -i '' '/DEBUG-TMP/d'   # remove every hook line
-grep -rn 'DEBUG-TMP\|DEBUG_' src                              # must print nothing
-cargo fmt && cargo build 2>&1 | grep -E '^(warning|error)'; cargo test 2>&1 | grep 'test result'
+cargo fmt && cargo build 2>&1 | grep -E '^(warning|error)'; cargo test --workspace 2>&1 | grep 'test result'
 ```
 `cargo fmt` changes only your files: the tree is kept formatted. If it ever touches a file you
 didn't change, that file was committed unformatted: leave it in its own commit, not yours.
-Hooks: none left. Warnings: none. Tests: all pass. Delete the test files you made outside
-`/tmp` and the scratch folders.
+Warnings: none. Tests: all pass. Delete the test files you made outside `/tmp` and the scratch folders.
 
-## 9. Ship it to the person — only when they ask
+## 9. Commit, build the app, ask for a restart
 
-Commit the change, then build the app at once — no need to ask — and ask the person to restart
-Bench. As Bench's own agent never quit it yourself: your run would be cut off.
-
-```bash
-git add -A && git commit -m "<what changed, in the person's words>"   # a build is one commit
-scripts/bundle-macos.sh   # rebuilds /Applications/Bench.app in place, quits nothing
-# then: "собрано — перезапусти Bench"   (from outside Bench: $K/ship.sh quits, rebuilds, opens)
-```
-**One app** (Bench is developed from inside Bench): the person works in
-**Bench** (`/Applications/Bench.app`, `local.bench.app`), rebuilt in place;
-there is no other build. Bench is
-a client: threads, the queue and the agent live in the agent process and `~/.bench`, so quitting
-and reopening it costs the person a few seconds and an unfinished run comes back with the window.
-Never kill it or quit it (only `ship.sh`, from outside). Rolling back means rebuilding an earlier commit —
-nothing is parked beside `/Applications/Bench.app`. Signed with the Apple Development
-certificate, so macOS grants are given once. Uncommitted changes stop the build.
+The steps are `SKILL.md`'s ("Working on Bench from inside Bench"). `git add` only the paths you changed.
 
 **A grant that is on but doesn't work** (local network above all: the toggle is on in Privacy &
 Security, macOS never asks, and every request to a local service fails).
@@ -184,7 +154,7 @@ app a new bundle id** (`ID=` in `scripts/bundle-macos.sh`, then fix the id in th
 `src/main.rs`): macOS sees a new app and asks for every grant again (network, microphone,
 notifications). The person confirms them once, and it works. That is how the release
 went from `local.bench` to `local.bench.app` (2026-10-25). `bundle-macos.sh` also gives each app
-its own Mach-O UUID, so Dev and release built from one commit are never twins. Keep that.
+its own Mach-O UUID. Keep that.
 The person tests the bundle, not `target/`. "I see no changes" happened when only `target/`
 was rebuilt. Build the app, then ask them to restart Bench and try it.
 
@@ -195,7 +165,6 @@ was rebuilt. Build the app, then ask them to restart Bench and try it.
 - The numbers: before → after ("1454 vs 1456 px → both 1472").
 - What you couldn't check yourself (anything that needs a click, sound, another machine) as
   "not checked".
-- Commit only when the person is happy, or asks for it.
 
 ## The loop, as a checklist
 
@@ -203,9 +172,9 @@ was rebuilt. Build the app, then ask them to restart Bench and try it.
 2. find the code (`docs/map.md`)
 3. shot + numbers before
 4. one exact edit
-5. hook if needed
+5. a demo hook if needed
 6. build, zero warnings
 7. shot + numbers after = target; other threads
-8. hooks out, fmt, build, test
-9. `scripts/bundle-macos.sh`, then ask the person to restart Bench
+8. fmt, build, test
+9. commit, `scripts/bundle-macos.sh`, then ask the person to restart Bench
 10. report with numbers

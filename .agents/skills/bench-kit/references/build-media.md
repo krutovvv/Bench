@@ -24,7 +24,7 @@
 | ``` code block over 10 lines | folded to ~140 pt + "Show all · N lines" (like the md card) | Show all / Show less |
 | `$…$`, `$$…$$` | Unicode text (unicodeit), italic | — |
 
-Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()`, `media/view.rs`.
+Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()` (`src/media/fetch.rs`), `src/media/view.rs`; a code block's frame is `bench_ui::code_frame`, drawn by `render_code` in `src/media/text.rs`.
 
 ## Getting the bytes
 
@@ -46,7 +46,7 @@ Code: `media::kind()`, `media::segments()`, `media::fetch()/fetch_now()`, `media
 ```rust
 // gpui's img() with only max_w/max_h keeps the intrinsic height → distorted. Give both sizes:
 let (w, h) = fit(imagesize::size(&path)?, 560., 420.);   // scale ≤ 1
-div().w(w).h(h).border_1().border_color(theme.border).child(img(path).size_full())
+div().w(w).h(h).border_1().border_color(theme.border).child(img(path).size_full())   // w, h: bench_ui::MEDIA_MAX_W, MEDIA_MAX_H
 ```
 
 `img(PathBuf)` decodes off-thread and caches by path; SVG files work too (gpui's SVG renderer
@@ -66,8 +66,9 @@ PNG when it exists (that makes it synchronous next time).
 `rodio` with `default-features = false, features = ["symphonia-mp3", "symphonia-wav",
 "symphonia-flac", "symphonia-vorbis", "symphonia-isomp4", "symphonia-aac"]`. Probe first
 (`rodio::Decoder::new(Cursor::new(bytes)).is_ok()`), Opus etc. fail → `cx.open_with_system(path)`.
-Play on a thread; poll `is_done()` from the app's 500 ms ticker; one thing plays at a time (stop
-speech/video when audio starts and vice versa). Show elapsed time while playing.
+Play on a thread. The player says when a clip has ended (`Playback::ended`, a channel that closes;
+`play_clip` in `src/media/playback.rs` empties its place then): no timer asks. One thing plays at a
+time (stop speech/video when audio starts and vice versa). Show elapsed time while playing.
 
 ## Video in place (ffmpeg)
 
@@ -135,22 +136,23 @@ has a quiet ↗ "Open" icon; for kinds shown only as a row the whole row opens t
 
 ## Attachments: the plus, drag and drop, ⌘V
 
-Reference: `src/thread/attachments.rs`, `src/media/attach.rs`, chips in `src/media/view.rs`
+Reference: `src/thread/composer/attachments.rs`, `src/media/attach.rs`, chips in `src/media/chip.rs`
 (`attachment_chip`), composer in `src/thread/composer/input.rs`.
 
 - **The plus**: the composer's first button (`round_icon_button`, "Attach files") →
   `cx.prompt_for_paths(PathPromptOptions { files: true, directories: false, multiple: true, prompt: Some("Attach".into()) })`,
   await the receiver in `cx.spawn`, then add the paths.
-- **Drop**: on the whole thread column (messages + composer, `src/workspace/layout.rs`):
-  `.drag_over::<ExternalPaths>(|s, _, _, cx| s.bg(cx.theme().list_active)).on_drop(cx.listener(|this, p: &ExternalPaths, _, cx| this.add(p.paths().to_vec(), cx)))`.
-  Screenshot thumbnails dragged from the macOS corner preview arrive as files in
+- **Drop**: one layer over the whole window (`file_layer`, `src/workspace/layout.rs`), there at rest
+  and invisible: it answers only to files, washes the window while one is over it, and its drop is
+  the window's only one. The files go to the thread the person works in, the one whose composer has
+  the focus, else the open one (`BenchApp::drop_paths`). Screenshot thumbnails dragged from the macOS corner preview arrive as files in
   `/var/folders/…` that vanish — copy those before using them.
-- **⌘V**: in the composer (`composer.rs`), on `v` + `modifiers.platform`, read
-  `cx.read_from_clipboard()` (`attachments.rs`); `ClipboardEntry::Image(img)` (⌃⇧⌘4 screenshot: `img.format`,
+- **⌘V**: in the composer (`src/thread/composer/input.rs`), on `v` + `modifiers.platform`, read
+  `cx.read_from_clipboard()` (`src/thread/composer/attachments.rs`); `ClipboardEntry::Image(img)` (⌃⇧⌘4 screenshot: `img.format`,
   `img.bytes`) → save to `state_dir()/pasted/…png`; `ClipboardEntry::ExternalPaths` (files copied
   in Finder) → attach; then `cx.stop_propagation()`. Only text → let the field paste it.
-- **Chips** over the text field (one wrapping row at the text's inset, `pt_2`): 24px picture
-  (`img(path).size(px(24.)).object_fit(ObjectFit::Cover)`) or the kind's icon, the name
+- **Chips** over the text field (one wrapping row at the text's inset): a `bench_ui::ATTACHMENT_ICON`
+  picture (`object_fit(ObjectFit::Cover)`) or the kind's icon, the name
   truncated, × to remove. After sending, the same chips (without ×, click opens) sit under the
   user's message. Send is enabled with files and no text.
 - Don't restrict types: the agent can handle anything (ffmpeg for video, etc.).

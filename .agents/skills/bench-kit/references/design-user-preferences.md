@@ -104,7 +104,7 @@ is separate).
   debug binary with `shot.sh` and demo data, never by rebuilding the app; commit; build the app
   at once with `scripts/bundle-macos.sh` (it quits nothing); then ask them to restart Bench —
   they quit and reopen it themselves. Never quit their Bench from inside it.
-- One app: `/Applications/Bench.app`, rebuilt in place by `ship.sh`, signed with the Apple
+- One app: `/Applications/Bench.app`, rebuilt in place by `scripts/bundle-macos.sh`, signed with the Apple
   Development certificate so permissions are asked once. (An app per commit filled System
   Settings → Privacy with dead entries; a parked second app and the Dev build were dropped too: one app, and a bad change is fixed
   by the next one.)

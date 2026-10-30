@@ -31,7 +31,7 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
 - **Its label's font comes from its size, not from the parent.** `.small()` sets the label's
   size inside the button (`button_text_size`), so a `.text_xs()` on the bar or on the button
   itself changes nothing. A label of another size is a child: `Button::new(id).ghost().small()
-  .child(div().text_xs().child(label))` (the status bar, `src/statusbar/mod.rs`).
+  .child(div().text_xs().child(label))` (`bench_ui::status_button`, `crates/ui/src/bars.rs`).
 - **Its label is one line** (`whitespace_nowrap` + `text_ellipsis`) and the button is as wide
   as it: a long label pushes it past its card. Text that must wrap (a choice of the agent's
   question) is a row, not a button: `choice_row(id, cx).child(text)` (`crates/ui/src/list.rs`).
@@ -58,7 +58,7 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
 - **A scrolling `v_flex` squeezes its children** once they're taller than it: rows and headers
   shrink, text overlaps its rules, the steps between sections turn uneven. Every child of a
   long list (row, section header, spacer) needs `.flex_none()`. Short lists hide the bug; it
-  shows only when the data grows (Tasks → Upcoming).
+  shows only when the data grows.
 
 - A scroll column elsewhere (the sidebar, a popover's list):
   `v_flex().id("x").overflow_y_scroll().track_scroll(&handle)`; `ScrollHandle`: `offset()`,
@@ -74,8 +74,16 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
   — `inserts::scroll_pane` is that helper, `slash_body` the popup's copy of it.
   Never hand-write the wheel (`on_scroll_wheel` + `set_offset`): that is a second scroller.
 - **A scroll container ignores the last child's margin** → append a real spacer
-  (`div().h_3().flex_none()`).
+  (`div().h(Gap::L).flex_none()`).
 - The thread's scrollbar is a Mac's overlay one (`gpui_kit::component::scroll::Scrollbar`); don't add others.
+
+## Clicks
+
+- **What handles a click stops its propagation.** A click inside the thread that nothing handles gives
+  the composer the focus (`ThreadView::press`, `src/thread/mod.rs`: a press kept at mouse down,
+  acted on at an unmoved mouse up when the focus did not change). `bench_ui`'s clickable elements stop
+  it themselves (`own_press`); an element of your own wraps itself in `bench_ui::own_press`. There is
+  no app-wide flag.
 
 ## Keyboard
 
@@ -83,7 +91,8 @@ Both cost an agent 5–10 steps of reading `gpui-component-0.8.0` in the cargo r
   ancestor; check `ev.keystroke.key` ("up", "down", "tab", "escape") and
   `!ev.keystroke.modifiers.modified()`, then `cx.stop_propagation()`.
 - Enter in a textarea arrives as `InputEvent::PressEnter`; decide there whether it picks a popup
-  row or sends.
+  row or sends (`src/thread/view.rs`: Enter sends, Shift+Enter a new line). The composer grows to
+  `COMPOSER_MAX_LINES`, then scrolls inside.
 
 ## Theme and appearance
 
@@ -110,8 +119,8 @@ already recognizes `$…$` (`Node::InlineMath`) and `$$…$$` (`Node::Math`). md
 
 - Folder picker: `cx.prompt_for_paths(PathPromptOptions { files: false, directories: true, multiple: false, prompt: Some(..) })` → `oneshot` receiver.
 - Clipboard: `cx.write_to_clipboard(ClipboardItem::new_string(text))`.
-- Open URLs/apps: `std::process::Command::new("open")` (macOS); for Zed use the `zed` CLI
-  (`ssh://host/path` for remote files) and pass the project folder first so Zed opens the repo.
+- Open URLs/apps: `std::process::Command::new("open")` (macOS). No external editor is referenced:
+  a file opens in the Explorer.
 
 ## Mistakes we made (don't repeat)
 
@@ -124,13 +133,13 @@ already recognizes `$…$` (`Node::InlineMath`) and `$$…$$` (`Node::Math`). md
   → read the crashed thread's frames; the first frame in your crate is the place.
 
 - **A periodic re-read replaced the whole list** and dropped a new, not-yet-saved item: its card
-  closed by itself a few seconds after "New task". Keep local-only items across re-reads
+  closed by itself a few seconds after it opened. Keep local-only items across re-reads
   (`build-insert.md`, "Patterns for a body").
 - **A bar sized by its contents**: round buttons made a bar taller than the header next to it —
   the person saw it "bulge". Size the contents to the bar.
 - **A 1px step between facing bars**: one drew its rule *on top of* `bar_h`, its neighbour was
   exactly `bar_h`. Count the rules in the heights (`bar_h + 1`).
-- **A wider padding broke a fixed width**: raising the task card's padding 16 → 24 pushed its
+- **A wider padding broke a fixed width**: raising a card's padding 16 → 24 pushed its
   segmented control into the edge. When an inset grows, widen fixed-width boxes by the same.
 
 - Copying a widget's look 1:1 from another app (a fixed-width command popup) — rebuild it in
@@ -141,8 +150,9 @@ already recognizes `$…$` (`Node::InlineMath`) and `$$…$$` (`Node::Math`). md
 - Loading content sizes in the background so the thread jumped after opening.
 - Rendering diagrams/formulas through headless Chrome (rejected: too heavy) — see `references/build-media.md`.
 - Telling the person it's done after building only `target/debug`: they run
-  `/Applications/Bench.app`, rebuilt by `ship.sh` when they ask.
-- Hard-coded `px()` heights next to rem-based controls (they drift apart at other font sizes).
+  `/Applications/Bench.app`, rebuilt by `scripts/bundle-macos.sh`.
+- Hard-coded `px()` heights next to rem-based controls (they drift apart at other font sizes):
+  `Gap` steps are rems, sizes are `bench_ui` constants.
 
 ## Inputs
 

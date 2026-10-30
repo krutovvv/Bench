@@ -55,15 +55,14 @@ renderer in `src/thread/`.
 
 ## Seeing it
 
-- `BENCH_DEMO=landing` (a thread at its end), `top` (at its top), `long` (60 exchanges), `new`.
+- The demo's hooks (`build-verification.md`, the one table): `BENCH_DEMO=landing`, `top`, `long`,
+  `new` for where it opens, `BENCH_DEMO_SCROLL`, `BENCH_DEMO_JUMP`.
 - `BENCH_DEMO_RUN=1` plays a run (message, thinking, a tool, the answer streamed, its entry, the
-  end) in the open demo thread.
-- `BENCH_DEMO_TYPE=1` writes into the composer two seconds in; `BENCH_DEMO_SEND=1` with it
-  presses Send on the running thread (the queue's echo row must show the same frame).
-- `BENCH_DEMO_SCROLL=end` or `<item>:<px>` opens it scrolled; `BENCH_DEMO_JUMP=1` presses "Jump
-  to latest"; `BENCH_DEMO_RENAME=<thread id>` opens a thread's rename.
+  end) in the open demo thread. `BENCH_DEMO_TYPE=1` with `BENCH_DEMO_SEND=1` presses Send on the
+  running thread: the queue's echo row must show the same frame.
 - `BENCH_TRACE_SCROLL=1` logs, every frame, the scroll top, the composer's bottom and every row's
   height: a jerk is a number that changes when nothing should.
 - A real run on your own copy: a copy of `~/.bench` without bots, schedule and projects as
   `BENCH_HOME`, its agent from the repository (`node agent/src/server.ts`), driven over its
-  WebSocket (`session.create`, `prompt.submit`) — see `build-verification.md`.
+  WebSocket (`thread.create`, `thread.send`: `crates/protocol`), or with `bench --probe`
+  (`src/client/probe.rs`).

@@ -69,7 +69,6 @@ hand-made bold cuts or filled glyphs.
 | open externally | external-link |
 | warning / error | circle-alert |
 | saved note | save |
-| open in Zed | `zed` (a Z in a square, drawn in Lucide's stroke) |
 | web source | globe |
 
 The app icon (dock) is a separate `assets/logo.svg` rendered to `.icns` at bundle time.

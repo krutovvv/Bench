@@ -1,7 +1,7 @@
 # macOS packaging, permissions, logs
 
 Working script: `scripts/bundle-macos.sh` — builds `/Applications/Bench.app` (id
-`local.bench.app`), what `ship.sh` runs. There is no other build.
+`local.bench.app`), what `.agents/skills/bench-kit/scripts/ship.sh` runs. There is no other build.
 
 ## What the bundle needs
 
@@ -50,8 +50,7 @@ ship it, have the person open it, read the log.
   `.DS_Store`, `._*`, editor junk — Finder files once blocked a merge).
   Never ignore `Icon?`: git on macOS matches case-insensitively, so it hides every new file in
   `assets/icons/`; the folder-icon file is `Icon\r` — write the pattern with literal CRs.
-- After each change: `cargo fmt`, build, look (`shot.sh`), commit, then `scripts/bundle-macos.sh`
-  (rebuilds `/Applications/Bench.app` in place, quits nothing) and ask the person to restart Bench. Grants follow the signature: with the Apple Development
+- The loop after each change is `SKILL.md`'s. Grants follow the signature: with the Apple Development
   certificate they belong to team + bundle id and survive rebuilds; ad-hoc signing ties them to
   one build's hash, and every build becomes a new entry in Privacy & Security.
 - A running copy keeps running if its bundle is replaced — replacing the bundle alone changes

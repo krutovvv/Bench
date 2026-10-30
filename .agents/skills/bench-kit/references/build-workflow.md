@@ -29,5 +29,5 @@ the same on every side and in every place that shares it.
 5. **Commit, build the app, ask for a restart.** After the change looks right on your own copy:
    commit, then `scripts/bundle-macos.sh` at once (it rebuilds `/Applications/Bench.app` in
    place and quits nothing), then ask the person to restart Bench. They test that bundle, not
-   `target/`. Never quit Bench yourself (from outside Bench, `ship.sh` does build and restart).
+   `target/`. Never quit Bench yourself (from outside Bench, `.agents/skills/bench-kit/scripts/ship.sh` does build and restart).
 6. **Report honestly** what was verified and what was only built (anything that needs a click).

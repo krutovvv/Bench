@@ -1,6 +1,6 @@
 # Hard-won rules (each cost a round of user feedback)
 
-- Spacing complaints are about 1–3 pt. Measure both sides (`measure.py`), then fix the exact
+- Spacing complaints are about 1–3 pt. Measure both sides (`scripts/measure.py`), then fix the exact
   difference. Text glyphs have side bearing: an input's text inset that "looks" 1pt off usually is.
 - gpui-kit `Input` ignores `.h(...)`; its height comes from its size (Medium = `h_8` = 2rem =
   28px at 14px rem). Make neighbours match the input (2 rems), not the other way round.
@@ -9,8 +9,7 @@
 - The OS blocks a Finder-launched app from the LAN unless the bundle has
   `NSLocalNetworkUsageDescription` **and a stable code-signing identifier**; otherwise SSH to
   192.168.x.x fails with exit 255 while the same binary works from Terminal.
-- A Finder-launched app has no stderr: log errors to a file in
-  `~/Library/Application Support/<app>/`.
+- A Finder-launched app has no stderr: log errors to a file.
 - When patching files with scripts, never write back a stale buffer read before another edit of
   the same file (that silently reverted a whole feature once). Re-read, or use exact edits.
 - gpui-kit pins a pre-release GPUI fork (`gpui-pre`, `gpui-base`): Zed-head and tutorial snippets

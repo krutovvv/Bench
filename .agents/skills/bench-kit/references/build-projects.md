@@ -15,7 +15,7 @@ In Bench:
 
 - `ProjectKey` (`src/app/model.rs`): a project's agent and its id there. `ProjectKey::HOST` is an
   agent's own environment (its Host project). As a string: the id for this Mac's projects,
-  `<agent>:<id>` for a server's (sessions, marks and folds are keyed by it).
+  `<agent>:<id>` for a server's (threads, marks and folds are keyed by it).
 - `Location` (`src/app/model.rs`): agent, machine (None: the agent's own), folder;
   `machine_here()` — the machine as this Mac reaches it; `files_machine()` — what the agent is
   asked with (`/api/fs?machine=`) when it works on another machine.
@@ -26,7 +26,7 @@ In Bench:
 
 ## The agent side
 
-- A conversation's environment: `Runtime.envFor` — the project's machine (`SshExecutionEnv` or
+- A conversation's environment: `envFor` (`agent/src/runtime/tools-host.ts`) — the project's machine (`SshExecutionEnv` or
   `NodeExecutionEnv`), wrapped by `machine/confined.ts` when the project is kept in its folder. Pi's
   tools and ours (grep, glob, ls) work through it and never know where they are.
 - `/api/fs/*` take `machine`: the same environment, so Bench's file views and a thread's media reach

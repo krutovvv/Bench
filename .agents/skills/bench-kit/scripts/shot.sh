@@ -5,12 +5,12 @@
 #   shot.sh <binary | App.app> <out.png> [seconds] [KEY=VALUE ...]
 #
 #   binary      ./target/debug/<crate> (or target/release/...) — fast, but no macOS permissions
-#               (Reminders, Calendar, microphone are refused for a bare binary)
+#               (the microphone is refused for a bare binary)
 #   App.app     dist/<Title>.app — launched as a separate instance with `open -n`, so it has the
 #               permissions the person granted to the app
 #   seconds     how long to wait before the shot (default 10; ~12 for a chat on This Mac,
 #               25–40 when the app connects over SSH)
-#   KEY=VALUE   environment for this copy only, e.g. DEBUG_UPCOMING=1 (a temporary hook,
+#   KEY=VALUE   environment for this copy only, e.g. BENCH_DEMO=landing (the table of hooks:
 #               references/build-verification.md)
 #
 # Prints the PNG's size in px and in pt (Retina: 2 px = 1 pt). Exit 0 = a fresh picture exists;

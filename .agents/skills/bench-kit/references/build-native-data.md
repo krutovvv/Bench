@@ -41,12 +41,6 @@ Back up first; check the import by counts (open / done / with time / flagged) on
 a few spot checks by title, and in Bench itself. Check each changed job by running its prompt
 once in a thread, with nothing delivered anywhere.
 
-Mapping that worked for tasks (Things → Reminders → bench.sqlite): title → title (a trailing
-"- 2 часа" moved to spent); notes → notes; tags → tags; a start date / Today → the day; This
-Evening → evening; Someday → someday; a deadline → the flag (that person used deadlines only for
-it); completed → completed with its original date. Projects, areas and checklists were not used —
-ask before dropping them for someone who uses them.
-
 ## Projects without a folder
 
 The sidebar holds only projects. A project's folder (a codebase) is optional: without one its

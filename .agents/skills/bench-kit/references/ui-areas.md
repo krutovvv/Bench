@@ -28,7 +28,7 @@ y ┌─────────────────────────
 
 | Area | Height | Inside | Inset | Code |
 |---|---|---|---|---|
-| Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), the thread's meters and repo chip, Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header` in `src/titlebar/mod.rs`; Chat \| Code `src/titlebar/tail.rs` |
+| Title bar | `TITLE_BAR_H` 40 incl. its rule | the window's buttons, the fold ⌘\, a short rule, the title (a second thread's after "/"), Chat \| Code | left `WINDOW_BUTTONS_W` | `render_window_lead`, `render_header` in `src/titlebar/mod.rs`; Chat \| Code `src/titlebar/tail.rs` |
 | Actions | three rows | New thread, New project, Search (⌘K opens a list over the window) | `nav_row`, text at `SIDEBAR_TEXT_X` | `render_actions` in `src/sidebar/mod.rs`; the list `src/sidebar/search.rs` |
 | Sidebar list | rest | Host's threads first, then each project (pinned first) with its threads | rows at `SIDEBAR_ROW_INSET`, text at `SIDEBAR_TEXT_X` | `src/sidebar/mod.rs`; order and acts `src/sidebar/items.rs` |
 | Left dock's foot | `SIDEBAR_FOOT_H` 40 incl. its rule | the open thread's agent (where, a dot, "N working") and its popover; the gear (⌘,) | `SIDEBAR_ROW_INSET` | `render_foot`, `src/sidebar/agent.rs`, under any left panel (`workspace/layout.rs`) |
@@ -45,9 +45,9 @@ Every rule that crosses the window is one pixel row. Settings pages are a centre
 
 | The thing | Area | Never |
 |---|---|---|
-| A new tool (tasks, a server, files, a utility) | an insert put in with `/` (`build-insert.md`) | a sidebar group, a mode, a side panel |
+| A new tool (a server, a utility) | an insert put in with `/` (`build-insert.md`) | a sidebar group, a mode, a side panel |
 | A form a tool needs (a new server, a new host) | an agent-message card under the insert that asked for it | a dialog, a settings page |
-| A project's settings (name, where, model, Telegram) | its Settings page (`Center::Project`, `src/env/page.rs`) | a thread, a dialog |
+| A project's settings (name, where, model, Telegram) | its Settings page (a tab, `DocKey::Settings`, `src/env/page.rs`) | a thread, a dialog |
 | What a project contains (files, soul, prompts, skills, MCP, schedule) | the Explorer (`src/explorer/`, `docs/explorer.md`) | a thread, a settings tab |
 | The sidebar's fold | the title bar, right after the traffic lights; New project: a row over the sidebar's list | a bar under the window |
 | New window, Settings, and every other command | the menu bar (`app/menu.rs`), with its key | a button in a bar |
@@ -68,24 +68,22 @@ then make sure the area's other rules still hold (insets, Chat | Code last in th
 
 ## Moving a control from one area to another
 
-The real case: "New window from the status bar to the header's right end." The steps are the
-same for any icon.
+A control moving from a bar to the header's right end. The steps are the same for any icon.
 
-1. **Find where it is now.** `grep -rn '"New window  ⌘' src/`: the tooltip is the most unique
-   string. Note the handler it calls (`open_new_window`).
+1. **Find where it is now.** `grep -rn 'Hide sidebar  ⌘' src/`: the tooltip is the most unique
+   string. Note the handler it calls.
 2. **Find the target area's builder.** It's in the map above (`render_header_tail`). Check that
    every place that draws the area uses it (`grep -rn render_header_tail src`).
 3. **Rebuild the control as the target area's piece, not as a copy of the old one.** A status
-   bar button (`button` inside `render_statusbar`) becomes a header icon:
+   bar button (`bench_ui::status_button`) becomes a header icon:
    `bench_ui::icon_button(id, Ico::X, "Tip  ⌘…", on, cx)` (`crates/ui/src/button.rs`), its
    tooltip naming the shortcut. A button that opens rather than switches (New project, +) passes
    `on` false, so it never lights up.
-4. **Order and spacing in the target**: as asked ("Tools, then Tasks"), the area's own gap
-   (`gap_1`), and its inset (the last icon's edge 16pt from the sidebar's right edge).
+4. **Order and spacing in the target**: as asked, the area's own gap (`Gap::Xs`), and its inset (the last icon's edge 16pt from the sidebar's right edge).
 5. **Delete the old one completely.** Remove the element, any now-unused imports and
    variables, and fix every comment and doc line that names the old place — stale comments
    mislead the next agent.
-6. **Check what moved with it**: the shortcut (⌘⇧N) still works, the tooltip is right.
+6. **Check what moved with it**: the shortcut still works, the tooltip is right.
 7. **Measure** (`build-change-loop.md`): a shot of your own copy before and after;
    `spans.py` over the header lists its icons with their positions and the gap to the edge
    (the icons that were there must not move);
@@ -105,9 +103,9 @@ The real case: "The code block's header must be as tall as the Changed files lin
 1. **Name the reference piece and find its code.** Changed files' head (`src/thread/rows/changed_files.rs`). That is the target. "Similar" is not enough: take its exact
    padding and text size — better, one `bench_ui` constant for both.
 2. **Copy those values to the piece you fit**, or make both use the same piece (`block_head`).
-   The code header is `render_code` in `src/media/view.rs`; both are `THREAD_META` muted.
-3. **Check every child that can make it taller.** The Copy button had `py_0p5`: 2pt more than
-   the reference line. Its vertical padding went. A row is as tall as its tallest child plus
+   The code header is `bench_ui::code_frame`; both are `THREAD_META` muted.
+3. **Check every child that can make it taller.** A Copy button with its own vertical padding was
+   2pt more than the reference line. Its vertical padding went. A row is as tall as its tallest child plus
    the row's padding.
 4. **Measure both on one screenshot.** `rules.py` down a column that crosses each piece. The
    rule-to-rule distances must be equal (here both 25pt, from 851→901 and 1371→1421 px).
@@ -120,9 +118,10 @@ The real case: "The code block's header must be as tall as the Changed files lin
 ## Placing an icon exactly
 
 - An icon's visible edge = the container's padding + the icon box's own padding. To put a
-  toggle's edge at the sidebar's 16pt inset: `pr(12)` on the strip + `p_1` (4pt) on the toggle.
-- Inputs pad themselves (about 10pt) and glyphs have side bearings. The search magnifier sits
-  over the group icons with `pl(3.5)`: a measured number, not a guess. Measure with `textx.py`
+  toggle's edge at the sidebar's 16pt inset: the strip's `SIDEBAR_STRIP_PR` + the toggle's own
+  `ICON_BUTTON_PAD`.
+- Inputs pad themselves (about 10pt; `flush_field` pulls a bare one back) and glyphs have side
+  bearings. A number that lines them up is measured, not a guess, and named in `metrics.rs`. Measure with `textx.py`
   on the search field and on a group head; the x values must match.
 - Icon sizes are fixed per place (`design-icons.md`): `xsmall` in rows, `small` for head and
   status-bar icons. A size between two of these is not allowed: pick the place's size.
@@ -130,9 +129,8 @@ The real case: "The code block's header must be as tall as the Changed files lin
 
 ## When a change makes something else not fit
 
-- **A wider inset**: every fixed-width box in that area must grow by the same amount (the task
-  card went 380 → 404 when its padding went 16 → 24; its segmented control had run into the
-  edge).
+- **A wider inset**: every fixed-width box in that area must grow by the same amount (a card went
+  380 → 404 when its padding went 16 → 24; its segmented control had run into the edge).
 - **A smaller bar**: shrink what sits inside it (the mic's level bar fits the status bar). Never
   let the contents set the bar's height.
 - **A field sized to its placeholder**: measure; a clipped or a too-wide field both show.

@@ -10,7 +10,7 @@ An insert's body (`build-insert.md`) or a card under it shows the thing being wo
 | A web page / pasted rich text as it looked | `TextView::html(id, html)` | "Text views" |
 | Plain text that can be selected and copied (a message, a log) | Markdown of the escaped text | "Text views" |
 | An image | `img(path)` | "Images" |
-| Changes to a file | open it in Zed; counts from `src/thread/diff.rs` | "Diff" |
+| Changes to a file | the one diff pane, `src/explorer/code/git.rs` | "Diff" |
 | A terminal | Bench `src/inserts/terminal/session.rs` + `view.rs`, whole | "Terminal" |
 | Nothing selected yet | `bench_ui::empty_state` | "Empty state" |
 | Images, video, audio, Mermaid, LaTeX, attachments, drag and drop | `build-media.md` | — |
@@ -58,41 +58,23 @@ insert (`src/inserts/tools/{mod,state,view}.rs`, the utilities in `crates/devtoo
 ## Text views
 
 - **Markdown**: `TextView::markdown(id, text)`, selectable out of the box (the Root draws the
-  selection and binds ⌘C). Code blocks the size of the text: Bench `src/media/view.rs`
+  selection and binds ⌘C). Code blocks the size of the text: Bench `src/media/text.rs`
   `markdown()` (a `TextViewStyle` with a `code_block` refinement). Long texts are kept and
-  parsed once (`ui::media::Texts`, `kept_markdown`) — never a new `TextView` per frame.
-- **Code blocks with a header** (an agent's answer): the language on the left, **Copy** on the
-  right, the code under it, one 1px frame, no fill. gpui-kit's own block only puts the language
-  in its corner and lets `code_block_actions` float over the first line — no header. So split
-  closed fences out of the answer before rendering (Bench `src/media/mod.rs` `segments()`,
-  `src/media/view.rs` `answer_segments` → `Segment::Code { lang, code }`; an unclosed fence, still
-  streaming, stays text) and draw each:
-  ```rust
-  v_flex().w_full().border_1().rounded_md().border_color(theme.border)
-      .child(h_flex().py_1().pl_4().pr_2().items_center().justify_between()   // = Changed files' line
-          .border_b_1().border_color(theme.border).text_xs().text_color(muted)
-          .child(if lang.is_empty() { "code".into() } else { lang.clone() })
-          .child(h_flex().id(("code-copy", k)).gap_1().px_1p5().items_center().cursor_pointer()
-              .hover(|s| s.bg(theme.list_hover).text_color(theme.foreground))
-              .child(Ico::Copy.icon().xsmall()).child("Copy")
-              .on_click(move |_, window, cx| {
-                  cx.write_to_clipboard(ClipboardItem::new_string(code.trim_end().into()));
-                  window.push_notification((NotificationType::Success, SharedString::from("Copied")), cx);
-              })))
-      .child(TextView::markdown(id, format!("```{lang}\n{code}```"))
-          .code_block_actions(|_, _, _| div())          // any action hides the corner label
-          .style(TextViewStyle::default().code_block(StyleRefinement::default()
-              .text_size(rems(0.8125)).line_height(relative(1.5))
-              .border_0().bg(transparent_black()))))    // no fill: the frame alone
-  ```
-  `window.push_notification` needs `use gpui_kit::component::WindowExt as _;`. Full code:
-  Bench `src/media/view.rs` `render_code`.
+  parsed once (`Texts`, `src/media/text.rs`) — never a new `TextView` per frame.
+- **Code blocks with a header** (an agent's answer, a step card): `bench_ui::code_frame(title, action,
+  body, folded, more, cx)` is the one frame: the language or name on the left, its action on the
+  right, the code under it, one hairline, no fill. gpui-kit's own block only puts the language in
+  its corner and lets `code_block_actions` float over the first line, so split closed fences out of
+  the answer before rendering (`src/media/mod.rs` `segments()`, `src/media/text.rs` `answer_segments`
+  → `Segment::Code { lang, code }`; an unclosed fence, still streaming, stays text) and draw each with
+  `render_code` (`src/media/text.rs`). Copying: `window.push_notification` needs
+  `use gpui_kit::component::WindowExt as _;`.
 - **HTML as it looked**: `TextView::html(id, html)` — headings, lists, links, bordered tables,
   images; `<script>`/`<style>` skipped. Bench shows a pasted web page with it
   (`render_rich_input` in `src/inserts/tools/view.rs`), with a `Rendered | HTML` segmented switch.
 - **Plain text to select and copy** (a person's message, a log): not `SelectableText` (its
   copy needs keyboard focus, which stays in the composer) — a `TextView::markdown` of the
-  escaped text: Bench `src/media/view.rs` `plain_text`.
+  escaped text: Bench `src/media/text.rs` `plain_text`.
 - Import: `use gpui_kit::component::text::TextView;`.
 
 ## Images
@@ -104,11 +86,11 @@ folder each time (the image cache keys on the path), delete the previous one.
 
 ## Diff
 
-Bench draws no diffs: "Changed files" under an answer lists the files the agent edited with
-their +/− counts (`src/thread/diff.rs` `stats` over the tools' unified diffs; the card in
-`src/thread/extras.rs` `render_session_files`), a click opens the file in Zed. If a diff
-view is asked for: gpui-kit's `DiffFile::parse(patch)`, `DiffState::new(files, cx)`,
-`Diff::new(&state)` — not a hand-drawn one.
+"Changed files" under an answer lists the files a turn changed with their +/− counts
+(`src/thread/rows/diff_stats.rs` `stats`, the card `src/thread/rows/changed_files.rs`); a file's row
+opens its diff under it, "Open in Code" as a tab. A file's changes since HEAD and a turn's are one pane
+with another title (`diff_pane`, `src/explorer/code/git.rs`; a turn's `turn_diff.rs`): a read-only
+editor over the unified diff. A new kind of diff uses it.
 
 ## Terminal
 
@@ -116,15 +98,15 @@ Bench `src/inserts/terminal/session.rs` (a PTY with `portable-pty` + the VT pars
 `alacritty_terminal`) and `view.rs` (the grid painted cell-exactly by a custom element); the
 browser twin `session_web.rs`, `view_web.rs`. Extend them; don't write another.
 
-**Paths in a terminal open in Zed** (as Warp does, without Warp): ⌘-hover underlines a link
-(pointer cursor), ⌘-click opens it — a URL in the browser, a file or folder in Zed at its `:line`
-(compiler errors, grep; a server's over Zed's SSH). Recognized: absolute, `~/…`,
+**Paths in a terminal open in the Explorer** (as Warp does, without Warp): ⌘-hover underlines a link
+(pointer cursor), ⌘-click opens it — a URL in the browser, a file in the editor at its `:line`
+(compiler errors, grep; a server's on that machine). Recognized: absolute, `~/…`,
 relative (`src/main.rs`) and bare file names from `ls` (`wp-config.php`, `nginx.conf`; not
 `1.5`). Relative ones are resolved against the terminal's folder: a local shell's own (`lsof -a
 -p <pid> -d cwd -Fn`), a server's from the last prompt on screen (`user@host:/var/www$`,
 `[user@host /etc]#`), else home. A server answers "file or folder" over ssh. Code:
 `src/inserts/terminal/session.rs` `link_span`, `prompt_folder`, `cwd`, `hover_at`;
-`src/inserts/terminal/servers.rs` `open_terminal_link`; `src/app/projects.rs` `open_in_zed`. Notes on the
+`src/inserts/terminal/state.rs` `open_terminal_link`. Notes on the
 custom element: `build-custom-render.md`.
 
 ## Editor
@@ -135,7 +117,7 @@ keys, copy / cut / paste, undo ⌘Z / redo ⌘⇧Z, several cursors (⌘⌥↑ /
 `.searchable(true)`. "Select next occurrence" (⌘D) is not built in.
 
 Builder: `EditorState::new(window, cx).line_number(true).soft_wrap(false)`; `.folding(true)`
-for fold arrows; `set_highlighter(lang, cx)` with `crate::lang::language_for(path)` /
+for fold arrows; `set_highlighter(lang, cx)` with `crate::explorer::code::lang::language_for(path)` /
 `language_for_text` (`src/explorer/code/lang.rs`; only grammars enabled in `Cargo.toml`); `set_value`,
 `value()`. In a thread an editor never scrolls inside: give it the height of its text,
 `bench_ui::editor_height(lines, cx)` (`crates/ui/src/metrics.rs`), and let the thread scroll.
@@ -148,10 +130,10 @@ key back to an editor, return `false` for it while the editor has focus. Never b
 
 Limits to tell the person honestly (do not try to "fix" them by writing your own editor): the
 editor is smooth up to a few MB of text. Open the first 2 MB of a bigger file and say the rest
-is not shown. Anything heavier opens in Zed (the project's ⋯ menu, Open in Zed).
+is not shown.
 
-The finished editors in Bench are a project's environment texts: `section::code`
-(`src/env/section.rs`) and Instructions' editor (`src/env/ide.rs`). Copy from them.
+The finished editors in Bench: a file in the Explorer (`src/explorer/pane/file.rs`) and an editor as
+tall as its text on a part's card (`section::code`, `src/env/section.rs`). Copy from them.
 
 ### "Open…" with the macOS dialog
 

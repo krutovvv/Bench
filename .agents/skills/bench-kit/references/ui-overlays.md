@@ -21,8 +21,7 @@ Button::new(("row-menu", i)).ghost().xsmall().icon(Ico::Ellipsis.icon())
   still adds the label's padding and gap). A right-click menu (`.context_menu`) goes on any element.
 - Item closures are `'static`: clone the view entity (`let view = cx.entity();`) into each and
   call `view.update(cx, |this, cx| …)`.
-- Separate unrelated groups of items with `.separator()` (Settings, Open in Zed | Pin, Rename |
-  colours | Delete).
+- Separate unrelated groups of items with `.separator()` (Settings | Pin, Rename | colours | Delete).
 - A custom row (color swatches): `PopupMenuItem::element(move |_window, cx| …)`; it is
   re-rendered, so read live state inside (`view.read(cx).…`) — a captured value leaves the check
   mark stale until the menu reopens.
@@ -43,10 +42,11 @@ item -- a door that only opens on a right click is a door nobody finds.
 ```rust
 Popover::new("stats").anchor(gpui_kit::Anchor::BottomRight)
     .trigger(Button::new("stats-btn").ghost().xsmall().label(label))
-    .content(move |_, _, cx| v_flex().p_3().gap_1().child(…))
+    .content(move |_, _, cx| v_flex().child(bench_ui::popover_section(false, cx).child(…)))
 ```
 
 `trigger` must be selectable (a `Button` is). Anchor `BottomLeft` for things at the window's bottom (they open upward).
+Its parts are `bench_ui::popover_section(ruled, cx)` and `popover_title`: no padding of its own, the rules edge to edge.
 Bench: the agent's readout in `src/sidebar/agent.rs`; the thread's meters in `src/thread/meters.rs`.
 
 ## Tooltip
@@ -64,13 +64,13 @@ in `src/app.rs`.
 
 ## A list attached to a field (the `/` commands)
 
-`render_slash` in `src/thread/composer.rs`: an absolute panel (`bg(theme.popover)`, `border_1`,
+`render_slash` in `src/thread/composer/input.rs`: an absolute panel (`bg(theme.popover)`, `border_1`,
 `rounded_md`) at the text's column, under the line being typed — the composer is the thread's
 last row and the thread scrolls on past it, so there is room. When the window has none below
 (`viewport_h` against `composer_y` and the list's own height), it opens above the line. The
 parent is `.relative()`; the list scrolls inside itself (`max_h`, `track_scroll`) — a popover,
 not the thread. Keys (↑ ↓ Tab Esc) are caught with `.capture_key_down` on the
-composer before the text field gets them (`ui-gotchas.md`, "Keyboard"). Bench `src/thread/composer.rs`.
+composer before the text field gets them (`ui-gotchas.md`, "Keyboard").
 
 ## Loading
 
@@ -83,7 +83,7 @@ composer before the text field gets them (`ui-gotchas.md`, "Keyboard"). Bench `s
 
 A small bordered block under a chat answer for things the answer produced: changed files,
 sources, background processes (status, output, Stop). Same indent as the answer, actions on
-the right of each line. Bench `render_processes` in `src/thread/extras.rs`.
+the right of each line. Bench `processes_frame` in `src/thread/rows/processes.rs`.
 
 ## No dialogs for simple choices
 

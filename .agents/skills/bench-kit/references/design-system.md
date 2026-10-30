@@ -78,7 +78,7 @@ Leading: the thread's prose `LEAD` (1.5rem), shared with the composer.
 | `STEP_VERB_W` | 88 | a step's verb column |
 | `SETTINGS_W`, `PAGE_W` | 760, 680 | a settings page's column, the new project's page |
 | `TURN_Y` | 14 | a thread row's top and bottom |
-| `Gap::Xs…Xl` | 2 / 4 / 8 / 12 / 16 | gaps |
+| `Gap::Zero, Hair, Xxs, Xs, S, M, Ml, L, Xl, Xxl, Huge` | 0, a hairline, then 0.125 / 0.25 / 0.375 / 0.5 / 0.625 / 0.75 / 1 / 1.5 / 2 rem | every gap and inset: `.gap(Gap::M)`, `.px(Gap::L)` |
 | `editor_height(lines)` | fn | an editor as tall as its text |
 
 `CHAT_TEXT`, `AVATAR`, `CHAT_RIGHT`, `COMPOSER_TOOLS_*` belong to the document look
