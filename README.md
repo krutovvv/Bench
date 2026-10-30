@@ -174,6 +174,11 @@ because every step is kept on disk.
 
 ## Make it yours
 
+If Claude Code, by its creator's account, [largely writes itself](https://newsletter.pragmaticengineer.com/p/how-claude-code-is-built),
+it can write the interface you need for your own models too. Bench is what that looked like for me.
+Take it as a starting point: shape it with a strong coding agent, then do the actual work on a local
+model you control.
+
 Bench is built from inside itself: I talk to the agent in Bench, and it changes Bench's code,
 checks the change on its own copy of the app with made-up data, commits it and rebuilds the app.
 Everything that loop needs is in the repository, so it works in your fork too:
